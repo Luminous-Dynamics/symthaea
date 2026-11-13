@@ -228,6 +228,28 @@ Use the published benchmark case's exact topology, units, controls, demand patte
 
 No single score may compensate for an essential-service floor breach or a rights violation.
 
+### Water digital-twin maturity and operating-value qualification
+
+Do not call a static model, GIS layer or dashboard a digital twin. Use an explicit maturity ladder:
+
+1. **Digital model:** versioned representation; updates are manual or scenario-driven.
+2. **Digital shadow:** qualified physical observations update the digital representation, but there is no demonstrated bidirectional state/command loop.
+3. **Synchronised digital twin:** the physical and digital states are time-bound and traceably synchronised; bidirectional exchange and feedback are demonstrated under an approved operational authority, with safe fallback and audit.
+
+A June 2026 systematic review of 48 water digital-twin studies found that urban water infrastructure dominates the studied applications; distribution networks have the strongest share of operational real-world deployments, while natural-system applications are more often conceptual or simulation-based. The review identifies data availability, integration, institutional fragmentation, cybersecurity, cost-benefit evidence and social equity as persistent gaps. This is a maturity map, not a head-to-head performance benchmark.
+
+For each maturity claim, record:
+- telemetry source and exact valid/observed/received times;
+- synchronization latency distribution and stale-data behavior;
+- missingness, quality, calibration and out-of-range handling;
+- physical-to-digital state reconciliation and residuals;
+- whether any digital-to-physical action path exists, who authorizes it and the independent safety interlock;
+- cyber boundary, identity, least privilege, audit, recovery and offline behavior;
+- interoperability round-trip loss and owner-of-record for each field;
+- lifecycle cost and value per verified unit of service delivered.
+
+A simulation-only or data-poor pilot can be valuable; it must be labelled as a model or shadow, not as an operational twin. The first Johannesburg demonstrator should begin read-only and shadow-mode. No actuation, abstraction, valve, pump, rationing or relocation authority is introduced by this programme.
+
 ## 9. Proposed qualification gates and targets
 
 These are **proposed research targets**, not existing results or universal standards:
@@ -330,6 +352,7 @@ Newer evidence strengthens the Johannesburg pilot rationale while reinforcing th
 - SAnews reported on 3 November 2026 that DWS warned of El Niño-related 2026/27 summer pressure, heat-driven demand, and high Gauteng consumption and loss context. This is a risk/stress context, not a quantified local inflow forecast for a particular sub-catchment.
 - A September 2026 systematic review of 244 climate-(im)mobility articles finds persistent disciplinary separation, quantitative emphasis on large-scale movement, underrepresentation of internal/intra-regional mobility and local context, and weaker treatment of immobility and lived agency in predominantly quantitative studies.
 - The OECD's March 2026 migration forecasters' toolkit says gravity models can explain some historical flows but typically struggle with trend breaks and forced displacement; it cautions against treating a model family as a universal temporal forecaster.
+- A June 2026 systematic review of 48 water digital-twin studies finds the strongest operational maturity in distribution networks, with many natural-water-system applications still conceptual/simulation-led; data integration, cybersecurity, cost-benefit evidence and social equity remain significant gaps. This motivates an explicit model → shadow → synchronised digital-twin maturity ladder rather than premature twin claims.
 
 Pilot implication: treat Johannesburg's near-term problem first as a measurable delivered-service and infrastructure-reliability problem. Mobility research should consume those qualified service trajectories as one input, while separately incorporating agency, livelihoods, housing, rights and receiving-place capacity. Do not conflate the 2026 pressure episode with a climate-attributed migration event.
 
