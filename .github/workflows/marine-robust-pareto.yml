@@ -58,4 +58,23 @@ jobs:
           code=$?
           set -e
           test "$code" -eq 3
-          python3 -c "import json; r=json.load(open('/tmp/marine-robust-pareto-report.json')); assert r['disposition'] == 'INCOMPLETE'; assert len(r['candidate_reports']) == 2; assert len(r['robust_frontier']) == 0"
+          python3 - <<'PY'
+          import json
+          report = json.load(open('/tmp/marine-robust-pareto-report.json'))
+          assert report["disposition"] == "INCOMPLETE"
+          assert len(report["candidate_reports"]) == 2
+          assert len(report["robust_frontier"]) == 0
+          required = {
+              "biosecurity-release",
+              "cleaning-waste-authorization",
+              "acoustic-scale-transfer-evidence",
+              "acoustic-source-identifiability",
+              "cavitation-intermittency-characterization",
+              "vibration-coherence-characterization",
+              "rotation-synchronous-modulation",
+          }
+          for candidate in report["candidate_reports"]:
+              gates = {gate["gate_id"]: gate["status"] for gate in candidate["gate_results"]}
+              assert required <= gates.keys()
+              assert all(gates[gate_id] == "unresolved" for gate_id in required)
+          PY
