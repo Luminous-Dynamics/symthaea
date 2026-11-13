@@ -1,0 +1,2 @@
+# CI-only schema validator; not a production dependency.
+jsonschema==4.26.0
