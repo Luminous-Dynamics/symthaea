@@ -737,7 +737,7 @@ fn validate_policies(
             minimum_familiar_groups,
             minimum_hidden_groups,
             ..
-        } = policy.applicability
+        } = &policy.applicability
         {
             for partition in [
                 SourcePartition::Training,
@@ -1219,6 +1219,7 @@ pub fn audit_transfer_gap(input: &TransferGapInput) -> Result<TransferGapReport,
     Ok(TransferGapReport {
         benchmark_id: input.scope.benchmark_id.clone(),
         split_separation_receipt_digest: input.scope.split_separation_receipt_digest.clone(),
+        split_separation_disposition: input.scope.split_separation_disposition,
         baseline_arm_id: input.baseline_manifest.arm_id.clone(),
         candidate_arm_id: input.candidate_manifest.arm_id.clone(),
         disposition: if overall_inconclusive {
