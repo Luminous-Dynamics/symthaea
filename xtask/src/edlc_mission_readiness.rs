@@ -11,6 +11,7 @@ use std::path::Path;
 
 const FIXTURE_PATH: &str =
     "fixtures/energy/electrochemical-capacitor/mission_readiness_known_answer_v0_1.json";
+const SCHEMA_PATH: &str = "schemas/energy/edlc_mission_readiness_v0_1.schema.json";
 const EXPECTED_FIXTURE_ID: &str = "EDLC-MISSION-READINESS-KNOWN-ANSWER-001";
 const EXPECTED_EVIDENCE_CLASS: &str = "synthetic_mission_readiness_arithmetic";
 const EXPECTED_CLAIM_CEILING: &str =
@@ -427,6 +428,47 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
     })
 }
 
+fn audit_schema(root: &Path) -> Result<()> {
+    let path = root.join(SCHEMA_PATH);
+    let bytes = std::fs::read(&path)
+        .with_context(|| format!("could not read mission-readiness schema at {}", path.display()))?;
+    let schema: serde_json::Value = serde_json::from_slice(&bytes)
+        .with_context(|| format!("mission-readiness schema at {} is not valid JSON", path.display()))?;
+    if schema["$schema"].as_str() != Some("https://json-schema.org/draft/2020-12/schema") {
+        bail!("mission-readiness schema must declare JSON Schema draft 2020-12");
+    }
+    if schema["properties"]["strata"]["items"]["$ref"].as_str()
+        != Some("#/$defs/stratum")
+    {
+        bail!("mission-readiness schema strata must reference the canonical stratum definition");
+    }
+    let required = schema["required"]
+        .as_array()
+        .context("mission-readiness schema has no top-level required-field contract")?;
+    for field in [
+        "schema_version",
+        "fixture_id",
+        "evidence_class",
+        "claim_ceiling",
+        "assumptions",
+        "protocol",
+        "strata",
+        "expected",
+        "negative_controls",
+    ] {
+        if !required.iter().any(|entry| entry.as_str() == Some(field)) {
+            bail!("mission-readiness schema must require top-level field {field}");
+        }
+    }
+    if schema["$defs"]["stratum"]["required"]
+        .as_array()
+        .is_none_or(|fields| !fields.iter().any(|entry| entry.as_str() == Some("load_profile_id")))
+    {
+        bail!("mission-readiness schema must require a load_profile_id for every stratum");
+    }
+    Ok(())
+}
+
 fn audit_value(value: serde_json::Value) -> Result<AuditReport> {
     let fixture: Fixture = serde_json::from_value(value)
         .context("mission-readiness fixture does not match its strict data contract")?;
@@ -434,6 +476,7 @@ fn audit_value(value: serde_json::Value) -> Result<AuditReport> {
 }
 
 pub fn audit(root: &Path) -> Result<()> {
+    audit_schema(root)?;
     let path = root.join(FIXTURE_PATH);
     let bytes = std::fs::read(&path).with_context(|| {
         format!(
@@ -493,6 +536,11 @@ mod tests {
             .expect("checked-in mission-readiness fixture must be readable");
         serde_json::from_slice(&bytes)
             .expect("checked-in mission-readiness fixture must be valid JSON")
+    }
+
+    #[test]
+    fn checked_in_schema_matches_mission_readiness_contract() {
+        audit_schema(&root()).expect("mission-readiness schema should pass its structural audit");
     }
 
     #[test]
