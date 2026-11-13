@@ -143,11 +143,12 @@ pub fn simulate_three_qubit_bit_flip_universal_recovery(
                     } else {
                         0.0
                     };
-                    let expected: f64 = if error_row == error_column && logical_row == logical_column {
-                        1.0
-                    } else {
-                        0.0
-                    };
+                    let expected: f64 =
+                        if error_row == error_column && logical_row == logical_column {
+                            1.0
+                        } else {
+                            0.0
+                        };
                     qec_matrix_knill_laflamme_residual =
                         qec_matrix_knill_laflamme_residual.max((actual - expected).abs());
                 }
