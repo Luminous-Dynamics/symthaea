@@ -20,6 +20,7 @@ pub mod mining;
 pub mod properties;
 pub mod strategic;
 pub mod textile_sensing;
+pub mod textile_recovery;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
 pub use database::{MaterialDatabase, MaterialSearchResult};
