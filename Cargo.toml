@@ -25,11 +25,6 @@ exclude = [
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
-    # Source/examples-only directory; no Cargo package manifest.
-    # Keep out of the broad crates/core/* member glob until crate ownership is resolved.
-    "crates/core/symthaea",
-    # Source-only observation-attestation prototype; no Cargo package manifest yet.
-    "crates/core/symthaea-observation-attestation",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
     # stack, but zero consumers — its only reference is foveation's non-default
     # `perception` feature nothing enables, and it duplicates src/perception/'s
