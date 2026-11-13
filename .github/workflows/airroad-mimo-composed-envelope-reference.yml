@@ -1,0 +1,41 @@
+name: AIRROAD MIMO Composed Envelope Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_COMPOSED_ENVELOPE_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-composed-envelope-v0.1.json"
+      - "tools/airroad-mimo-composed-envelope-qualifier/verify_composed_envelope.py"
+      - ".github/workflows/airroad-mimo-composed-envelope-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-composed-envelope-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_COMPOSED_ENVELOPE_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-composed-envelope-v0.1.json"
+      - "tools/airroad-mimo-composed-envelope-qualifier/verify_composed_envelope.py"
+      - ".github/workflows/airroad-mimo-composed-envelope-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-composed-envelope-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute composed-envelope oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-composed-envelope-qualifier/verify_composed_envelope.py
+          python3 tools/airroad-mimo-composed-envelope-qualifier/verify_composed_envelope.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-composed-envelope-v0.1.json > /dev/null
