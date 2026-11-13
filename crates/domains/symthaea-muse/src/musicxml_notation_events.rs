@@ -163,6 +163,37 @@ pub struct MusicXmlPartNotationEventsV1 {
     pub cursor_moves: Vec<MusicXmlCursorMoveV1>,
 }
 
+/// Default used only when deserializing pre-MIR-018 notation graphs. It is
+/// omitted again during serialization so older graph commitments remain
+/// byte-for-byte stable under the prior canonical JSON representation.
+pub fn legacy_missing_notation_events() -> MusicXmlPartNotationEventsV1 {
+    MusicXmlPartNotationEventsV1 {
+        schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
+        canonicalization_version: MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into(),
+        part_id: String::new(),
+        status: MusicXmlNotationEventsStatusV1::Unknown {
+            reason: "legacy graph predates the notation-event layer".into(),
+        },
+        note_events: Vec::new(),
+        attribute_events: Vec::new(),
+        cursor_moves: Vec::new(),
+    }
+}
+
+pub fn is_legacy_missing_notation_events(
+    value: &MusicXmlPartNotationEventsV1,
+) -> bool {
+    value.part_id.is_empty()
+        && value.note_events.is_empty()
+        && value.attribute_events.is_empty()
+        && value.cursor_moves.is_empty()
+        && matches!(
+            &value.status,
+            MusicXmlNotationEventsStatusV1::Unknown { reason }
+                if reason == "legacy graph predates the notation-event layer"
+        )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ChordAnchor {
     source_order: usize,
