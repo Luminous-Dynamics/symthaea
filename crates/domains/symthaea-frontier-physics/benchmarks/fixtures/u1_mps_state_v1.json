@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Complex U1 MPS storage, fixed-charge dense factorization, validated local gates, exact charge-block split, truncation policy/ledger and deterministic even/odd TEBD layer executor are source-authored. Exact-head Rust 1.96 harness pending.",
+  "execution_status": "Mixed-canonical charge-block left/right sweeps and measured gauge-receipt API are source-authored. Exact-head Rust 1.96 validation pending. TEBD integration is the next stage.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -215,6 +215,42 @@
         "no adaptive dt",
         "no global fidelity/circuit error guarantee"
       ]
+    },
+    "canonical_gauge": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "ComplexU1Mps::inner_product(other)",
+        "ComplexU1Mps::canonicalize_for_bond(bond,tolerance)",
+        "U1CanonicalGaugeReceipt::qualifies(tolerance)",
+        "U1CanonicalGaugeReceipt::exterior_operator_norm_product_upper_bound()"
+      ],
+      "method": "Charge-block SVD left sweep on sites [0,bond), right sweep on sites (bond+1,N). Retain all positive singular values; omit exact zeros only. Rebuild a candidate MPS transactionally before replacing the original.",
+      "receipts": [
+        "left_isometry_residuals",
+        "right_isometry_residuals",
+        "maximum_left_isometry_residual",
+        "maximum_right_isometry_residual",
+        "left_exterior_operator_norm_upper_bound",
+        "right_exterior_operator_norm_upper_bound",
+        "factorization_max_residual",
+        "factorization_l2_residual",
+        "state_reconstruction_l2_residual",
+        "exact_zero_singular_values_omitted",
+        "selection_rule_residual",
+        "input_norm_squared",
+        "output_norm_squared",
+        "relative_norm_drift",
+        "qualified"
+      ],
+      "state_equivalence": "The L2 state-reconstruction residual is computed using the cross-MPS overlap contraction, not by dense expansion, and supports different virtual bond dimensions.",
+      "error_bound": "For a passing receipt, each site's Gram residual r bounds its physical-to-virtual map norm by sqrt(1+r). The product of site bounds gives conservative exterior map operator-norm upper bounds. Multiply local discarded Schmidt norm by the left/right exterior product and add the measured canonicalization state-reconstruction L2 residual.",
+      "authored_tests": [
+        "canonicalization_preserves_dense_state_and_qualifies_all_two_site_centers",
+        "canonicalization_receipt_is_bound_to_measured_external_isometries",
+        "mps_overlap_matches_norm_and_survives_gauge_rebasing",
+        "canonicalization_rejects_invalid_center_without_mutating_state"
+      ],
+      "claim_ceiling": "Gauge sweeps and receipt only. Global TEBD error certification remains disabled until every gate truncation is integrated with and checks a receipt."
     }
   },
   "known_answers": [
@@ -352,6 +388,20 @@
         "bond/cutoff/depth/filling sweeps",
         "peak memory/runtime/allocation receipts"
       ]
+    },
+    {
+      "id": "MPS-4A",
+      "name": "Charge-block mixed-canonicalization and exterior isometry receipt",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "left/right charge-block SVD sweeps produce mixed-canonical form for every two-site center",
+        "measured left/right Gram residuals per exterior site",
+        "non-dense cross-MPS overlap validates gauge-rebased state equivalence",
+        "dense state comparison at N<=12",
+        "norm and total charge preserved",
+        "invalid request leaves original MPS unchanged",
+        "global exterior operator-norm upper bounds derived from residuals"
+      ]
     }
   ],
   "negative_controls": [
@@ -388,7 +438,12 @@
     "TEBD layer applies a gate out of range",
     "TEBD layer changes total U1 charge",
     "claim global L2 state error without canonical exterior isometry receipt",
-    "implicitly renormalize TEBD state after local truncation"
+    "implicitly renormalize TEBD state after local truncation",
+    "canonicalization changes the represented dense state beyond tolerance",
+    "left canonical sweep produces a site with A dagger A not identity within tolerance",
+    "right canonical sweep produces a site with A A dagger not identity within tolerance",
+    "gauge operation fails after partially mutating the original MPS",
+    "claim exterior norm upper bound without measured Gram residual"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -435,7 +490,16 @@
     "tebd_layer_output_norm_squared",
     "tebd_layer_input_total_charge",
     "tebd_layer_output_total_charge",
-    "tebd_layer_global_l2_bound_qualified"
+    "tebd_layer_global_l2_bound_qualified",
+    "canonical_gauge_bond",
+    "canonical_gauge_left_isometry_residuals",
+    "canonical_gauge_right_isometry_residuals",
+    "canonical_gauge_left_exterior_norm_bound",
+    "canonical_gauge_right_exterior_norm_bound",
+    "canonical_gauge_factorization_max_residual",
+    "canonical_gauge_state_reconstruction_l2_residual",
+    "canonical_gauge_norm_drift",
+    "canonical_gauge_qualified"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
