@@ -1621,7 +1621,6 @@ mod tests {
         assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
     }
 
-
     #[test]
     fn dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight() {
         let tiny: f64 = 1.0e-18;
