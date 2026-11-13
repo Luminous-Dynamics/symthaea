@@ -1346,7 +1346,97 @@ mod tests {
         assert_eq!(report.clusters[0].baseline_accepted_items, 7);
         assert_eq!(report.clusters[0].candidate_accepted_items, 8);
         assert_eq!(report.clusters[0].work_rate_delta_milli_per_hour, 1_000);
+        assert_eq!(
+            report.clusters[0].baseline_terminal_option_count,
+            Some(2)
+        );
+        assert_eq!(
+            report.clusters[0].candidate_recovery_route_class_count,
+            Some(3)
+        );
+        assert_eq!(
+            report.clusters[0].candidate_failure_domain_independent_route_count,
+            Some(2)
+        );
+        assert_eq!(
+            report.clusters[0].candidate_minimum_cut_set_cardinality,
+            Some(1)
+        );
         assert!(!report.actuation_authorized);
+    }
+
+    #[test]
+    fn unknown_topology_evidence_makes_comparison_inconclusive() {
+        let mut audit = input();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .disposition = EvidenceDisposition::Unknown;
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .recovery_route_class_count = None;
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .failure_domain_independent_route_count = None;
+        let report = compare_work_and_terminal_capability(&audit).unwrap();
+        assert_eq!(
+            report.disposition,
+            CapabilityRetentionDisposition::Inconclusive
+        );
+        assert!(!report.clusters[0].evidence_complete);
+    }
+
+    #[test]
+    fn failure_domain_independent_routes_cannot_exceed_route_classes() {
+        let mut audit = input();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .failure_domain_independent_route_count = Some(4);
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::InconsistentRecoveryTopology(
+                "candidate".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_topology_receipt_requires_digest_and_route_counts() {
+        let mut audit = input();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .report_digest = None;
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+                "candidate".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn rejected_topology_evidence_is_rejected() {
+        let mut audit = input();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .disposition = EvidenceDisposition::Rejected;
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::RejectedRecoveryTopologyEvidence(
+                "candidate".into()
+            ))
+        );
     }
 
     #[test]
