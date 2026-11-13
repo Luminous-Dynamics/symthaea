@@ -32,9 +32,7 @@ impl<const K: usize> AbelianCharge<K> {
     }
 
     pub const fn zero() -> Self {
-        Self {
-            components: [0; K],
-        }
+        Self { components: [0; K] }
     }
 
     pub const fn components(&self) -> &[i32; K] {
@@ -49,10 +47,7 @@ impl<const K: usize> AbelianCharge<K> {
         self.components.iter().all(|component| *component == 0)
     }
 
-    pub fn checked_add(
-        self,
-        rhs: Self,
-    ) -> Result<Self, AbelianChargeError<K>> {
+    pub fn checked_add(self, rhs: Self) -> Result<Self, AbelianChargeError<K>> {
         if K == 0 {
             return Err(AbelianChargeError::ZeroChargeRank);
         }
@@ -65,10 +60,7 @@ impl<const K: usize> AbelianCharge<K> {
         Ok(Self { components: result })
     }
 
-    pub fn checked_sub(
-        self,
-        rhs: Self,
-    ) -> Result<Self, AbelianChargeError<K>> {
+    pub fn checked_sub(self, rhs: Self) -> Result<Self, AbelianChargeError<K>> {
         if K == 0 {
             return Err(AbelianChargeError::ZeroChargeRank);
         }
@@ -167,10 +159,7 @@ impl<const K: usize> AbelianChargeTensor<K> {
             return Err(AbelianChargeError::InvalidTolerance(tolerance));
         }
         if left_charges.is_empty() {
-            return Err(AbelianChargeError::EmptyBond {
-                site,
-                side: "left",
-            });
+            return Err(AbelianChargeError::EmptyBond { site, side: "left" });
         }
         if physical_charges.is_empty() {
             return Err(AbelianChargeError::EmptyPhysicalBasis { site });
@@ -202,17 +191,14 @@ impl<const K: usize> AbelianChargeTensor<K> {
         let right_dimension = right_charges.len();
         let physical_dimension = physical_charges.len();
         for (left_index, left_charge) in left_charges.iter().copied().enumerate() {
-            for (physical_index, physical_charge) in
-                physical_charges.iter().copied().enumerate()
-            {
+            for (physical_index, physical_charge) in physical_charges.iter().copied().enumerate() {
                 let expected_right = left_charge.checked_add(physical_charge)?;
                 for (right_index, right_charge) in right_charges.iter().copied().enumerate() {
                     if right_charge != expected_right {
                         let index = (left_index * physical_dimension + physical_index)
                             * right_dimension
                             + right_index;
-                        selection_rule_residual =
-                            selection_rule_residual.max(data[index].norm());
+                        selection_rule_residual = selection_rule_residual.max(data[index].norm());
                     }
                 }
             }
@@ -419,7 +405,10 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
         for (physical, physical_charge) in second.physical_charges().iter().enumerate() {
             for (right, right_charge) in second.right_charges().iter().enumerate() {
                 let charge = right_charge.checked_sub(*physical_charge)?;
-                column_groups.entry(charge).or_default().push((physical, right));
+                column_groups
+                    .entry(charge)
+                    .or_default()
+                    .push((physical, right));
             }
         }
 
@@ -519,15 +508,9 @@ mod tests {
         second_data[6] = Complex64::new(1.0, 0.0);
         second_data[9] = Complex64::new(1.0, 0.0);
         second_data[12] = Complex64::new(1.0, 0.0);
-        let second = AbelianChargeTensor::new(
-            1,
-            left_bond,
-            physical,
-            vec![double],
-            second_data,
-            1.0e-12,
-        )
-        .unwrap();
+        let second =
+            AbelianChargeTensor::new(1, left_bond, physical, vec![double], second_data, 1.0e-12)
+                .unwrap();
 
         let state = AbelianMps::new(vec![first, second], double, 1.0e-12).unwrap();
         assert_eq!(state.site_count(), 2);
@@ -553,15 +536,9 @@ mod tests {
             1.0e-12,
         )
         .unwrap();
-        let second = AbelianChargeTensor::new(
-            1,
-            bond,
-            physical,
-            vec![double],
-            vec![zero(); 16],
-            1.0e-12,
-        )
-        .unwrap();
+        let second =
+            AbelianChargeTensor::new(1, bond, physical, vec![double], vec![zero(); 16], 1.0e-12)
+                .unwrap();
 
         let plan = AbelianChargeBlockPlan::from_adjacent_tensors(&first, &second).unwrap();
         assert_eq!(plan.blocks.len(), 4);
