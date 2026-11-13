@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-evalqual-run-manifest-v1.json",
+  "title": "MACE Evaluator Qualification Run Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "benchmark_name", "benchmark_version", "benchmark_revision", "benchmark_split", "task_set_sha256",
+    "model_provider", "model_version", "agent_scaffold_sha256", "prompt_policy_sha256", "memory_state_sha256", "tool_schema_sha256",
+    "retry_policy_sha256", "network_policy_sha256", "environment_image_sha256", "grader_sha256", "oracle_sha256", "reporter_sha256",
+    "host_platform", "runtime_version", "seed", "budgets"
+  ],
+  "properties": {
+    "schema_version": {"const": "mace-evalqual/v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "benchmark_name": {"type": "string", "minLength": 1},
+    "benchmark_version": {"type": "string", "minLength": 1},
+    "benchmark_revision": {"type": "string", "minLength": 1},
+    "benchmark_split": {"type": "string", "minLength": 1},
+    "task_set_sha256": {"$ref": "#/$defs/sha256"},
+    "model_provider": {"type": "string", "minLength": 1},
+    "model_version": {"type": "string", "minLength": 1},
+    "agent_scaffold_sha256": {"$ref": "#/$defs/sha256"},
+    "prompt_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "memory_state_sha256": {"$ref": "#/$defs/sha256"},
+    "tool_schema_sha256": {"$ref": "#/$defs/sha256"},
+    "retry_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "network_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "environment_image_sha256": {"$ref": "#/$defs/sha256"},
+    "grader_sha256": {"$ref": "#/$defs/sha256"},
+    "oracle_sha256": {"$ref": "#/$defs/sha256"},
+    "reporter_sha256": {"$ref": "#/$defs/sha256"},
+    "host_platform": {"type": "string", "minLength": 1},
+    "runtime_version": {"type": "string", "minLength": 1},
+    "seed": {"type": "integer"},
+    "budgets": {
+      "type": "object", "additionalProperties": false,
+      "required": ["max_wall_time_ms", "max_tokens", "max_tool_calls", "max_retries", "max_concurrency"],
+      "properties": {
+        "max_wall_time_ms": {"type": "integer", "minimum": 1},
+        "max_tokens": {"type": "integer", "minimum": 1},
+        "max_tool_calls": {"type": "integer", "minimum": 1},
+        "max_retries": {"type": "integer", "minimum": 0},
+        "max_concurrency": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}
