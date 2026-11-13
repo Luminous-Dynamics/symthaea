@@ -209,3 +209,12 @@ Synthetic replay cannot become physical evidence. Solver convergence cannot beco
 - 2026 CFRP/Zn metallization: https://doi.org/10.1016/j.compositesa.2026.109797
 - 2026 in-situ plasma diagnostic ML review: https://doi.org/10.1021/acsami.6c04768
 - 2026 plasma scale-up roadmap: https://doi.org/10.1049/hve2.70241
+
+
+### P0 enabler — downstream-outcome virtual metrology
+
+A new child, [PLASMA-VM-001 #11847](https://github.com/Luminous-Dynamics/symthaea/issues/11847), with draft [PR #11850](https://github.com/Luminous-Dynamics/symthaea/pull/11850), separates commercially common process monitoring from the harder question of predicting actual downstream product quality.
+
+The S0 contract binds run/device/configuration, substrate and adhesive lot, calibrated OES/power/flow/temperature signals, exact grid-to-accepted-bond energy boundary, specimen identity and downstream adhesion/failure-mode label. Its synthetic evaluator tests stale/uncalibrated/misaligned telemetry, OOD material, incomplete energy, missing labels and high-confidence false accepts. It is explicitly advisory/shadow-only; no automatic quality release or physical actuation is introduced.
+
+This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENERALIZATION owns grouped source/lab/device/material split and literature model transfer; VM owns the joined production run-to-specimen telemetry/outcome contract and quality-value benchmark. The ten synthetic scenario expectations replayed 10/10 in an independent source-side check; 13 Rust tests are authored but uncompiled/unexecuted.
