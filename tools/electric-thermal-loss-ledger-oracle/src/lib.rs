@@ -12,7 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-thermal-loss-ledger-oracle-v0.1.0";
+pub const MODEL_VERSION: &str = "electric-thermal-loss-ledger-oracle-v0.2.0";
 
 /// Electrical load categories at declared non-overlapping meter boundaries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
