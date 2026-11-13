@@ -218,7 +218,7 @@ fn validate_graph(
             reason: "empty or inconsistent part/score-clock identity".into(),
         });
     }
-    if !matches!(graph.map.status, MeasureMapStatus::Supported) {
+    if !matches!(&graph.map.status, MeasureMapStatus::Supported) {
         return Err(if side == "reference" {
             MusicXmlNotationEvaluationErrorV1::ReferenceMeasureMapUnavailable
         } else {
@@ -226,7 +226,7 @@ fn validate_graph(
         });
     }
     if !matches!(
-        graph.notation_events.status,
+        &graph.notation_events.status,
         MusicXmlNotationEventsStatusV1::Supported
     ) {
         return Err(if side == "reference" {
@@ -477,8 +477,6 @@ fn note_pair_dimensions(
         MusicXmlNotationAccuracyV1,
         MusicXmlNotationAccuracyV1,
         MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
     ),
     MusicXmlNotationEvaluationErrorV1,
 > {
@@ -549,7 +547,7 @@ fn note_pair_dimensions(
         }
 
         duration_presence_samples += 1;
-        if gold.performed_duration == predicted.performed_duration {
+        if gold.performed_duration.is_some() == predicted.performed_duration.is_some() {
             duration_presence_correct += 1;
         }
         if let (Some(gold_duration), Some(predicted_duration)) =
@@ -618,7 +616,6 @@ fn note_pair_dimensions(
         accuracy(visual_tie_samples, visual_tie_correct),
         accuracy(time_mod_samples, time_mod_correct),
         accuracy(tuplet_samples, tuplet_correct),
-        accuracy(source_samples, source_correct),
         accuracy(source_samples, source_correct),
     ))
 }
@@ -766,16 +763,14 @@ pub fn evaluate_musicxml_notation_graphs(
         &gold.note_events,
         &predicted.note_events,
         |left, right| {
+            Ok(
             event_family(&left.kind) == event_family(&right.kind)
                 && exact_within(
                     left.score_offset,
                     right.score_offset,
                     config.position_tolerance,
-                )?
-                .then_some(true)
-                .unwrap_or(false)
-                .into()
-                .pipe(Ok)
+                )?,
+        )
         },
         &config,
     )?;
@@ -794,7 +789,6 @@ pub fn evaluate_musicxml_notation_graphs(
         time_modification,
         tuplet_notation,
         full_note_source_subtree,
-        _,
     ) = note_pair_dimensions(gold, predicted, &note_pairs, &config)?;
 
     let auxiliary_pairs = maximum_cardinality_matching(
@@ -1022,8 +1016,15 @@ mod tests {
     fn extra_note_is_false_positive_without_erasing_matched_note_accuracy() {
         let reference = graph(fixture_xml());
         let prediction_xml = fixture_xml().replace(
-            "</measure>",
-            r#"<note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note></measure>"#,
+            r#"</pitch><duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type><tie type="start"/> "#,
+            r#"</pitch><duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type><tie type="start"/> "#,
+        );
+        let prediction_xml = prediction_xml.replace(
+            r#"</notations></note>
+            <note><pitch><step>D</step>"#,
+            r#"</notations></note>
+            <note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice><staff>1</staff><type>eighth</type></note>
+            <note><pitch><step>D</step>"#,
         );
         let prediction = graph(&prediction_xml);
         let report = evaluate_musicxml_notation_graphs(
@@ -1067,6 +1068,7 @@ mod tests {
         );
         prediction = reference.clone();
         prediction.part_id = "P2".into();
+        prediction.notation_events.part_id = "P2".into();
         assert_eq!(
             evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
             Err(MusicXmlNotationEvaluationErrorV1::PartIdentityMismatch)
@@ -1089,10 +1091,17 @@ mod tests {
     #[test]
     fn duration_error_uses_exact_rational_tolerance() {
         let reference = graph(fixture_xml());
-        let prediction_xml = fixture_xml().replace(
-            "<duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type>",
-            "<duration>17</duration><voice>1</voice><staff>1</staff><type>quarter</type>",
-        );
+        let prediction_xml = fixture_xml()
+            .replacen(
+                "<pitch><step>C</step><alter>0</alter><octave>4</octave></pitch><duration>16</duration>",
+                "<pitch><step>C</step><alter>0</alter><octave>4</octave></pitch><duration>17</duration>",
+                1,
+            )
+            .replacen(
+                "<pitch><step>D</step><octave>4</octave></pitch><duration>16</duration>",
+                "<pitch><step>D</step><octave>4</octave></pitch><duration>15</duration>",
+                1,
+            );
         let prediction = graph(&prediction_xml);
         let mut config = default_config();
         config.duration_tolerance = RationalBeat::new(1, 32).unwrap();
