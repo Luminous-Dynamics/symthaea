@@ -114,8 +114,8 @@
     "selected_candidate_id": "omega-3-full-mimo",
     "no_guaranteed_discriminator_without_omega_3": true,
     "off_grid_model_separation_squared": {
-      "numerator": "",
-      "denominator": ""
+      "numerator": "612500000",
+      "denominator": "410338673"
     },
     "diagonal_only_score_at_omega_3": {
       "numerator": "0",
