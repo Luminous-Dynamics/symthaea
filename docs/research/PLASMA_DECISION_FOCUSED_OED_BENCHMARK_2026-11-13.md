@@ -209,8 +209,7 @@ Independent source-side JavaScript replay of the exact fetched JSON matched **12
 Twenty-one Rust unit tests are authored.
 
 The PA6 substrate-condition adapter now requires exact MAT-013 sample-lineage and MAT-INTERFACE subject references in addition to the condition protocol, moisture measurement receipt/calibration, environment, timestamp and digest. Synthetic refs in the fixture are placeholders only; physical promotion must resolve the canonical sample and interface subjects. A missing canonical reference is BLOCKED / ABSTAIN.
- The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
-
+The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
 
 The final evaluator hardening also:
 - binds every measurement's quantity and unit to its selected action definition;
@@ -219,6 +218,6 @@ The final evaluator hardening also:
 - requires an explicit model-adequacy receipt, an ADEQUATE status and registration of an OTHER hypothesis before any ACCEPT/REJECT product decision;
 - checks common sample-preparation and independence groups against the selected-set covariance receipt.
 
-The evaluator has 15 authored Rust tests, including mutations for unit relabelling and inconsistent retention. These tests remain uncompiled and unexecuted in this environment.
+The evaluator has 21 authored Rust tests, including mutations for unit relabelling, inconsistent retention, stale moisture, calibration mismatch and missing canonical material references. These tests remain uncompiled and unexecuted in this environment.
 
 The fixture is synthetic-only; it does not establish a useful measurement schedule, a real EVSI ranking, physical bond performance, lab savings, a process window or experiment authority. The next integration should consume a real UAP-OED selection result and its exact source/covariance/model-adequacy receipts without copying the generic selector.
