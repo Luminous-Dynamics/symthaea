@@ -1119,7 +1119,7 @@ mod tests {
             cargo_work_value: 1_000_000.0,
             cargo_work_expanded_uncertainty: 100.0,
             cargo_work_unit: "tonne_nautical_mile".to_string(),
-            operating_point_receipt_sha256,
+            operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
             metrics,
             gate_receipts: vec![
                 GateReceipt {
