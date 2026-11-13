@@ -699,7 +699,7 @@ fn validate_policies(
             TransferGapError::AssignmentForUnknownDimension(assignment.dimension),
         )?;
         if matches!(
-            policy.applicability,
+            &policy.applicability,
             DimensionApplicability::NotApplicable { .. }
         ) {
             return Err(TransferGapError::AssignmentForNotApplicableDimension(
