@@ -1799,7 +1799,7 @@
           "covariance_model_id": null,
           "quantity": "moisture_content",
           "unit": "wt_pct",
-          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-MOISTURE_CONTENT",
+          "calibration_record_id": "synthetic-moisture-calibration-pa6-saturated-state-low-wca-reject",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
           "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-moisture_content",
