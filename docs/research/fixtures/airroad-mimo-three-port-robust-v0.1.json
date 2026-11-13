@@ -1,0 +1,417 @@
+{
+  "schema": "luminous.airroad.mimo_three_port_robust_reference.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_reference",
+  "tracking_issue": 11801,
+  "model": {
+    "variable": "s",
+    "parameter": "gamma",
+    "parameter_domain": {
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "lower_exclusive": true
+    },
+    "transfer_matrix": {
+      "numerator_matrix": [
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "expression": "-2*gamma"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "common_denominator": "s + 1",
+      "row_convention": "observed_output_port",
+      "column_convention": "driven_input_port",
+      "feedback_convention": "negative_unity_feedback",
+      "port_ids": [
+        "bus-a",
+        "bus-b",
+        "bus-c"
+      ]
+    },
+    "state_space": {
+      "A": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ]
+      ],
+      "B": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "C": [
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          {
+            "expression": "-2*gamma"
+          },
+          0,
+          0
+        ]
+      ],
+      "D": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "closed_loop_matrix": "A - B*C"
+    },
+    "diagonal_loop_entries": [
+      "0",
+      "0",
+      "0"
+    ],
+    "open_loop_poles": [
+      {
+        "real": "-1",
+        "imag": "0",
+        "multiplicity": 3
+      }
+    ],
+    "return_ratio_determinant": "((s + 1)^3 - 8*gamma) / (s + 1)^3",
+    "closed_loop_characteristic_coefficients_descending": [
+      "1",
+      "3",
+      "3",
+      "1 - 8*gamma"
+    ],
+    "closed_loop_poles": [
+      "c - 1",
+      "-1 - c/2 + j*sqrt(3)*c/2",
+      "-1 - c/2 - j*sqrt(3)*c/2"
+    ],
+    "c_definition": "positive_real_cuberoot(8*gamma)",
+    "exact_stability_boundary": {
+      "numerator": "1",
+      "denominator": "8"
+    }
+  },
+  "uncertainty_sets": [
+    {
+      "id": "stable",
+      "gamma_lower": {
+        "numerator": "1",
+        "denominator": "32"
+      },
+      "gamma_upper": {
+        "numerator": "1",
+        "denominator": "16"
+      },
+      "expected": "ROBUSTLY_STABLE"
+    },
+    {
+      "id": "boundary",
+      "gamma_lower": {
+        "numerator": "1",
+        "denominator": "16"
+      },
+      "gamma_upper": {
+        "numerator": "1",
+        "denominator": "8"
+      },
+      "expected": "NOT_ESTABLISHED"
+    },
+    {
+      "id": "mixed",
+      "gamma_lower": {
+        "numerator": "1",
+        "denominator": "16"
+      },
+      "gamma_upper": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "expected": "NOT_ESTABLISHED"
+    },
+    {
+      "id": "unstable",
+      "gamma_lower": {
+        "numerator": "3",
+        "denominator": "16"
+      },
+      "gamma_upper": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "expected": "ROBUSTLY_UNSTABLE"
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "diagonal-siso-only",
+      "expected": "must_not_claim_network_stability"
+    },
+    {
+      "id": "uncertainty-set-touches-boundary",
+      "expected": "NOT_ESTABLISHED"
+    },
+    {
+      "id": "uncertainty-set-crosses-boundary",
+      "expected": "NOT_ESTABLISHED"
+    },
+    {
+      "id": "stable-set-labelled-unstable",
+      "expected": "reject"
+    },
+    {
+      "id": "invalid-non-positive-lower-bound",
+      "expected": "reject"
+    },
+    {
+      "id": "reversed-interval",
+      "expected": "reject"
+    }
+  ],
+  "claim_ceiling": [
+    "Exact synthetic analytic reference only.",
+    "No generalized-Nyquist or validated contour result is claimed.",
+    "No measured impedance, converter, aircraft, PHIL/HIL or airworthiness claim is made."
+  ],
+  "destabilization_witnesses": [
+    {
+      "id": "mixed-set-explicit-witness",
+      "uncertainty_set_id": "mixed",
+      "gamma": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "expected": "DESTABILIZATION_WITNESS"
+    },
+    {
+      "id": "robust-unstable-set-explicit-witness",
+      "uncertainty_set_id": "unstable",
+      "gamma": {
+        "numerator": "3",
+        "denominator": "16"
+      },
+      "expected": "DESTABILIZATION_WITNESS"
+    },
+    {
+      "id": "boundary-is-marginal-not-strict-witness",
+      "uncertainty_set_id": "boundary",
+      "gamma": {
+        "numerator": "1",
+        "denominator": "8"
+      },
+      "expected": "MARGINAL_NOT_STRICTLY_UNSTABLE"
+    },
+    {
+      "id": "stable-set-no-witness",
+      "uncertainty_set_id": "stable",
+      "gamma": {
+        "numerator": "1",
+        "denominator": "16"
+      },
+      "expected": "NO_DESTABILIZATION_WITNESS"
+    }
+  ],
+  "normalized_margin_reference": {
+    "parameter": "gamma",
+    "nominal_gamma": {
+      "numerator": "1",
+      "denominator": "16"
+    },
+    "one_sided_uncertainty_radius": {
+      "numerator": "1",
+      "denominator": "16"
+    },
+    "normalized_delta_domain": {
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    },
+    "critical_boundary_gamma": {
+      "numerator": "1",
+      "denominator": "8"
+    },
+    "exact_normalized_robust_stability_margin": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "cases": [
+      {
+        "id": "half-margin",
+        "scale": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "gamma_lower": {
+          "numerator": "1",
+          "denominator": "16"
+        },
+        "gamma_upper": {
+          "numerator": "3",
+          "denominator": "32"
+        },
+        "expected": "ROBUSTLY_STABLE"
+      },
+      {
+        "id": "at-margin",
+        "scale": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "gamma_lower": {
+          "numerator": "1",
+          "denominator": "16"
+        },
+        "gamma_upper": {
+          "numerator": "1",
+          "denominator": "8"
+        },
+        "expected": "NOT_ESTABLISHED_MARGINAL_BOUNDARY"
+      },
+      {
+        "id": "beyond-margin",
+        "scale": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "gamma_lower": {
+          "numerator": "1",
+          "denominator": "16"
+        },
+        "gamma_upper": {
+          "numerator": "3",
+          "denominator": "16"
+        },
+        "expected": "NOT_ESTABLISHED_WITH_DESTABILIZATION_WITNESS"
+      }
+    ],
+    "boundary_witness": {
+      "normalized_delta": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "gamma": {
+        "numerator": "1",
+        "denominator": "8"
+      },
+      "closed_loop_pole": {
+        "real": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "classification": "MARGINAL"
+    },
+    "unstable_witness_beyond_margin": {
+      "scale": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "normalized_delta": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "gamma": {
+        "numerator": "3",
+        "denominator": "16"
+      },
+      "characteristic_constant": {
+        "numerator": "-1",
+        "denominator": "2"
+      },
+      "routh_first_column_signs": [
+        "positive",
+        "positive",
+        "positive",
+        "negative"
+      ],
+      "classification": "ONE_RIGHT_HALF_PLANE_POLE"
+    }
+  }
+}
