@@ -35,6 +35,9 @@ class Episode:
     assigned_policy: str
     assignment_design: str
     followup_end: int
+    assignment_precedes_time_zero: bool = False
+    randomization_receipt_valid: bool = False
+    assignment_block_id: str | None = None
     event_time: int | None = None
     event_kind: str | None = None
     intervention_time: int | None = None
@@ -75,6 +78,7 @@ class Episode:
         bool_fields = (
             "intervention_delivery_known", "time_zero_valid", "clock_valid",
             "instrumentation_valid", "policy_followup_complete",
+            "assignment_precedes_time_zero", "randomization_receipt_valid",
             "censor_model_qualified", "censoring_positivity_supported",
             "censoring_weights_supported",
         )
@@ -87,6 +91,10 @@ class Episode:
             raise ValueError("unknown policy_endpoint")
         if self.policy_followup_complete and self.policy_endpoint is None:
             raise ValueError("complete policy follow-up requires policy_endpoint")
+        if self.assignment_block_id is not None and (not isinstance(self.assignment_block_id, str) or not self.assignment_block_id):
+            raise ValueError("assignment_block_id must be null or non-empty text")
+        if self.assignment_design == "randomized_blocked" and not self.assignment_block_id:
+            raise ValueError("randomized_blocked episodes require assignment_block_id")
 
 
 def classify_untreated_event_time(ep: Episode) -> T0Disposition:
@@ -160,6 +168,10 @@ def intention_to_treat_summary(
         return {"estimable": False, "reason": "no_selected_episodes"}
     if any(e.assignment_design not in {"randomized_blocked", "randomized_unblocked"} for e in selected):
         return {"estimable": False, "reason": "assignment_not_randomized"}
+    if any(not e.assignment_precedes_time_zero for e in selected):
+        return {"estimable": False, "reason": "assignment_not_pre_episode"}
+    if any(not e.randomization_receipt_valid for e in selected):
+        return {"estimable": False, "reason": "randomization_receipt_invalid_or_missing"}
     if any(not e.policy_followup_complete for e in selected):
         return {"estimable": False, "reason": "incomplete_fixed_horizon_followup_requires_separate_censor_method"}
     if any(e.policy_endpoint is None for e in selected):
@@ -170,6 +182,11 @@ def intention_to_treat_summary(
     }
     if not groups[control_policy] or not groups[candidate_policy]:
         return {"estimable": False, "reason": "one_policy_arm_empty"}
+    if any(e.assignment_design == "randomized_blocked" for e in selected):
+        control_blocks = {e.assignment_block_id for e in groups[control_policy]}
+        candidate_blocks = {e.assignment_block_id for e in groups[candidate_policy]}
+        if control_blocks != candidate_blocks:
+            return {"estimable": False, "reason": "blocked_randomization_missing_arm_within_block"}
 
     def summarize(group: list[Episode]) -> dict[str, Any]:
         n = len(group)
