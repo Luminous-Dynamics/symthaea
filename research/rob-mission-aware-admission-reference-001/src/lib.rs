@@ -7,6 +7,44 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Qualification state of the selected decision's remaining sufficiency horizon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionSufficiencyDisposition {
+    /// The selected action remains sufficient over a finite, calibrated prefix.
+    Qualified,
+    /// The selected action is already insufficient at the current tick.
+    Insufficient,
+    /// Evidence is missing, expired, incomplete or uncalibrated.
+    Unknown,
+    /// The supplied decision/horizon evidence is contradictory or rejected.
+    Rejected,
+}
+
+/// Receipt-bound summary exported from the decision-sufficiency evaluator (#11650).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecisionSufficiencyReceipt {
+    /// Qualification disposition.
+    pub disposition: DecisionSufficiencyDisposition,
+    /// Exact receipt digest from the decision-sufficiency evaluator.
+    pub receipt_digest: Option<String>,
+    /// Decision identity.
+    pub decision_id: String,
+    /// Action whose sufficiency horizon was evaluated.
+    pub selected_action_id: String,
+    /// Robot clock/decision epoch identity.
+    pub decision_epoch_digest: String,
+    /// Exact control tick at which the receipt is being consumed.
+    pub current_control_tick: u64,
+    /// Task-loss unit scale used by the calibrated regret bound.
+    pub loss_scale_id: String,
+    /// Expected-loss model digest covered by the calibration.
+    pub loss_model_digest: String,
+    /// Candidate action-domain digest covered by the calibration.
+    pub action_domain_digest: String,
+    /// Conservative number of ticks before the selected action ceases to be sufficient.
+    pub remaining_sufficient_ticks: Option<u64>,
+}
+
 /// Request-specific evidence required before optional remote inference is considered.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InferenceRequest {
@@ -14,6 +52,20 @@ pub struct InferenceRequest {
     pub request_id: String,
     /// Robot whose optional remote request is being considered.
     pub robot_id: String,
+    /// Exact decision identity this request is intended to support.
+    pub decision_id: Option<String>,
+    /// Currently selected action identity.
+    pub selected_action_id: Option<String>,
+    /// Monotonic robot clock/decision epoch identity.
+    pub decision_epoch_digest: Option<String>,
+    /// Current control tick in that decision epoch.
+    pub current_control_tick: Option<u64>,
+    /// Expected-loss model digest used to qualify the selected decision.
+    pub decision_loss_model_digest: Option<String>,
+    /// Candidate action-domain digest used to qualify the selected decision.
+    pub decision_action_domain_digest: Option<String>,
+    /// Calibrated decision-sufficiency receipt from #11650 / #11659.
+    pub decision_sufficiency: Option<DecisionSufficiencyReceipt>,
     /// Versioned loss scale for this request's EVSI.
     pub loss_scale_id: Option<String>,
     /// Expected value of sample information in task-loss units.
@@ -185,6 +237,16 @@ pub enum RejectReason {
     LocalSafetyWouldBeDisplaced,
     /// EVSI or loss-scale identity is missing.
     UnknownDecisionValue,
+    /// Decision-sufficiency receipt or one of its required identities is missing.
+    UnknownDecisionSufficiency,
+    /// The selected action is already beyond its qualified sufficiency horizon.
+    DecisionAlreadyInsufficient,
+    /// Decision-sufficiency evidence was explicitly rejected.
+    RejectedDecisionSufficiencyEvidence,
+    /// Decision, action, epoch, loss model or action-domain identity does not match.
+    DecisionSufficiencyBindingMismatch,
+    /// Remote result would return after the selected decision ceases to be sufficient.
+    DecisionResultReturnsTooLate,
     /// Optional remote request has exactly zero task-loss value.
     ZeroEvsi,
     /// The declared maximum starvation interval is invalid or zero.
@@ -252,6 +314,85 @@ pub struct AdmissionReport {
     pub actuation_authorized: bool,
 }
 
+fn decision_sufficiency_slack(
+    request: &InferenceRequest,
+) -> Result<u64, RejectReason> {
+    let decision_id = request
+        .decision_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let selected_action_id = request
+        .selected_action_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let decision_epoch_digest = request
+        .decision_epoch_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let current_control_tick = request
+        .current_control_tick
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let loss_model_digest = request
+        .decision_loss_model_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let action_domain_digest = request
+        .decision_action_domain_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let loss_scale_id = request
+        .loss_scale_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let receipt = request
+        .decision_sufficiency
+        .as_ref()
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+
+    match receipt.disposition {
+        DecisionSufficiencyDisposition::Qualified => {}
+        DecisionSufficiencyDisposition::Insufficient => {
+            return Err(RejectReason::DecisionAlreadyInsufficient);
+        }
+        DecisionSufficiencyDisposition::Unknown => {
+            return Err(RejectReason::UnknownDecisionSufficiency);
+        }
+        DecisionSufficiencyDisposition::Rejected => {
+            return Err(RejectReason::RejectedDecisionSufficiencyEvidence);
+        }
+    }
+
+    let receipt_digest = receipt
+        .receipt_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty());
+    if receipt_digest.is_none()
+        || receipt.decision_id != decision_id
+        || receipt.selected_action_id != selected_action_id
+        || receipt.decision_epoch_digest != decision_epoch_digest
+        || receipt.current_control_tick != current_control_tick
+        || receipt.loss_scale_id != loss_scale_id
+        || receipt.loss_model_digest != loss_model_digest
+        || receipt.action_domain_digest != action_domain_digest
+    {
+        return Err(RejectReason::DecisionSufficiencyBindingMismatch);
+    }
+
+    let remaining = receipt
+        .remaining_sufficient_ticks
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    if remaining == 0 {
+        return Err(RejectReason::DecisionAlreadyInsufficient);
+    }
+    Ok(remaining)
+}
+
 fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
     if !request.identity_valid {
         return Err(RejectReason::InvalidIdentity);
@@ -279,11 +420,15 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
     let deadline_slack = request
         .deadline_slack_ticks
         .ok_or(RejectReason::UnknownTimingBound)?;
-    let available_slack = buffer_slack.min(deadline_slack);
+    let decision_slack = decision_sufficiency_slack(request)?;
+    let available_slack = buffer_slack.min(deadline_slack).min(decision_slack);
     let result_and_guard = p99
         .checked_add(request.local_projection_dispatch_guard_ticks)
         .ok_or(RejectReason::ResultReturnsTooLate)?;
-    if result_and_guard > available_slack {
+    if result_and_guard > decision_slack {
+        return Err(RejectReason::DecisionResultReturnsTooLate);
+    }
+    if result_and_guard > buffer_slack.min(deadline_slack) {
         return Err(RejectReason::ResultReturnsTooLate);
     }
 
@@ -671,6 +816,24 @@ mod tests {
         InferenceRequest {
             request_id: id.to_owned(),
             robot_id: robot.to_owned(),
+            decision_id: Some(format!("decision-{id}")),
+            selected_action_id: Some(format!("action-{id}")),
+            decision_epoch_digest: Some("robot-epoch-1".into()),
+            current_control_tick: Some(100),
+            decision_loss_model_digest: Some("loss-model-v1".into()),
+            decision_action_domain_digest: Some("action-domain-v1".into()),
+            decision_sufficiency: Some(DecisionSufficiencyReceipt {
+                disposition: DecisionSufficiencyDisposition::Qualified,
+                receipt_digest: Some(format!("sufficiency-receipt-{id}")),
+                decision_id: format!("decision-{id}"),
+                selected_action_id: format!("action-{id}"),
+                decision_epoch_digest: "robot-epoch-1".into(),
+                current_control_tick: 100,
+                loss_scale_id: "task-loss-v1".into(),
+                loss_model_digest: "loss-model-v1".into(),
+                action_domain_digest: "action-domain-v1".into(),
+                remaining_sufficient_ticks: Some(8),
+            }),
             loss_scale_id: Some("task-loss-v1".to_owned()),
             evsi_units: Some(10),
             p99_return_ticks: Some(2),
