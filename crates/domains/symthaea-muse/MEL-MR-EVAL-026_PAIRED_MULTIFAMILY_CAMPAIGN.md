@@ -56,6 +56,18 @@ These splits are determined by the versioned family map, not chosen after lookin
 
 The campaign defaults to 70 composition fixtures (10 families × 7 compositions), three policy seeds and seven pair budgets. The module's tests use a smaller four-family matrix while retaining seven independent compositions per included family.
 
+## Workspace preflight
+
+A recursive Git tree audit of the current branch found three immediate directories matched by the root Cargo globs that contain no Cargo manifest:
+
+- `crates/core/symthaea` (source/examples-only orphan);
+- `crates/core/symthaea-observation-attestation` (source prototype without a package manifest);
+- `crates/domains/symthaea-rea-evidence-verifier` (README-only verifier placeholder).
+
+The branch adds exactly these three paths to `[workspace].exclude`. It does not alter the `crates/core/*`, `crates/domains/*`, or `crates/bridges/*` globs; does not fabricate empty packages; and does not suppress any validation command. The same recursive audit found no other immediate manifestless directories under those three globs.
+
+The first exact-head workflow attempt reached workspace metadata but failed earlier on the README-only verifier path. That path is now excluded. The next attempt passed workspace metadata and failed the package-wide `cargo fmt --check` because an existing unrelated `symbolic_audio_binding.rs` file is not rustfmt-clean. The focused workflow now runs rustfmt only on the new campaign module, while the later package compile/test and Clippy steps remain intact. No test result has yet been obtained.
+
 ## Important measurement semantics
 
 - A policy comparison is called matched-cost only when candidate and baseline have equal **actual** render counts for the same fixture, seed and requested budget.
