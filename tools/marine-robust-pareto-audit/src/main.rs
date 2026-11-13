@@ -947,13 +947,57 @@ mod tests {
             cargo_work_unit: "tonne_nautical_mile".to_string(),
             operating_point_receipt_sha256,
             metrics,
-            gate_receipts: vec![GateReceipt {
-                gate_id: "biosecurity-release".to_string(),
-                status: GateStatus::Satisfied,
-                audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
-                audit_receipt_sha256: digest(if id == "A" { '8' } else { '9' }),
-                requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
-            }],
+            gate_receipts: vec![
+                GateReceipt {
+                    gate_id: "biosecurity-release".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { '8' } else { '9' }),
+                    requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
+                },
+                GateReceipt {
+                    gate_id: "cleaning-waste-authorization".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { 'a' } else { 'b' }),
+                    requirement_reference: "permit:in-water-cleaning-authorized-and-waste-captured".to_string(),
+                },
+                GateReceipt {
+                    gate_id: "acoustic-scale-transfer-evidence".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-acoustic-scale-transfer-audit-v0.1.0".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { 'c' } else { 'd' }),
+                    requirement_reference: "measurement:scale-transfer-reviewed-on-held-out-full-scale-data".to_string(),
+                },
+                GateReceipt {
+                    gate_id: "acoustic-source-identifiability".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-acoustic-source-contrast-audit-v0.1.0".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { 'e' } else { 'f' }),
+                    requirement_reference: "measurement:source-state-contrast-reviewed".to_string(),
+                },
+                GateReceipt {
+                    gate_id: "cavitation-intermittency-characterization".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-cavitation-intermittency-audit-v0.1.0".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { '1' } else { '2' }),
+                    requirement_reference: "measurement:cavitation-intermittency-distribution-reviewed".to_string(),
+                },
+                GateReceipt {
+                    gate_id: "vibration-coherence-characterization".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-vibration-coherence-audit-v0.1.0".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { '3' } else { '4' }),
+                    requirement_reference: "measurement:vibration-coherent-pressure-component-reviewed".to_string(),
+                },
+                GateReceipt {
+                    gate_id: "rotation-synchronous-modulation".to_string(),
+                    status: GateStatus::Satisfied,
+                    audit_contract_id: "marine-rotation-synchronous-modulation-audit-v0.1.0".to_string(),
+                    audit_receipt_sha256: digest(if id == "A" { '5' } else { '6' }),
+                    requirement_reference: "measurement:rotation-synchronous-envelope-reviewed".to_string(),
+                },
+            ],
         }
     }
 
@@ -1020,8 +1064,111 @@ mod tests {
                     requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
                     non_compensable: true,
                 },
+                HardGateDefinition {
+                    gate_id: "cleaning-waste-authorization".to_string(),
+                    gate_class: "biosecurity".to_string(),
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-biofouling-evidence-audit-v0.1".to_string()),
+                    requirement_reference: "permit:in-water-cleaning-authorized-and-waste-captured".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "acoustic-scale-transfer-evidence".to_string(),
+                    gate_class: "underwater_noise_evidence".to_string(),
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-acoustic-scale-transfer-audit-v0.1.0".to_string()),
+                    requirement_reference: "measurement:scale-transfer-reviewed-on-held-out-full-scale-data".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "acoustic-source-identifiability".to_string(),
+                    gate_class: "underwater_noise_evidence".to_string(),
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-acoustic-source-contrast-audit-v0.1.0".to_string()),
+                    requirement_reference: "measurement:source-state-contrast-reviewed".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "cavitation-intermittency-characterization".to_string(),
+                    gate_class: "underwater_noise_evidence".to_string(),
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-cavitation-intermittency-audit-v0.1.0".to_string()),
+                    requirement_reference: "measurement:cavitation-intermittency-distribution-reviewed".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "vibration-coherence-characterization".to_string(),
+                    gate_class: "underwater_noise_evidence".to_string(),
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-vibration-coherence-audit-v0.1.0".to_string()),
+                    requirement_reference: "measurement:vibration-coherent-pressure-component-reviewed".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "rotation-synchronous-modulation".to_string(),
+                    gate_class: "underwater_noise_evidence".to_string(),
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-rotation-synchronous-modulation-audit-v0.1.0".to_string()),
+                    requirement_reference: "measurement:rotation-synchronous-envelope-reviewed".to_string(),
+                    non_compensable: true,
+                },
             ],
             candidates: vec![a, b],
+        }
+    }
+
+    #[test]
+    fn unresolved_acoustic_analysis_receipt_holds_candidate_despite_good_energy() {
+        let mut input = case();
+        input.candidates[0].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "energy_per_cargo_work")
+            .unwrap().value = 20.0;
+        input.candidates[0].gate_receipts.iter_mut()
+            .find(|receipt| receipt.gate_id == "cavitation-intermittency-characterization")
+            .unwrap().status = GateStatus::Unresolved;
+        let report = audit(&input);
+        assert_eq!(report.candidate_reports[0].disposition, "HOLD_UNRESOLVED");
+        assert!(report.robust_frontier.iter().all(|entry| entry.candidate_id != "A"));
+        let gate = report.candidate_reports[0].gate_results.iter()
+            .find(|gate| gate.gate_id == "cavitation-intermittency-characterization").unwrap();
+        assert_eq!(gate.status, "unresolved");
+        assert_eq!(gate.audit_contract_id.as_deref(), Some("marine-cavitation-intermittency-audit-v0.1.0"));
+    }
+
+    #[test]
+    fn every_registered_environmental_audit_gate_has_a_matching_receipt() {
+        let report = audit(&case());
+        let receipts = &report.candidate_reports[0].gate_results;
+        for id in [
+            "biosecurity-release",
+            "cleaning-waste-authorization",
+            "acoustic-scale-transfer-evidence",
+            "acoustic-source-identifiability",
+            "cavitation-intermittency-characterization",
+            "vibration-coherence-characterization",
+            "rotation-synchronous-modulation",
+        ] {
+            let gate = receipts.iter().find(|gate| gate.gate_id == id).unwrap();
+            assert_eq!(gate.status, "pass");
+            assert!(gate.audit_receipt_sha256.is_some());
         }
     }
 
