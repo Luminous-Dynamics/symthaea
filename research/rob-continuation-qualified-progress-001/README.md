@@ -18,6 +18,10 @@ The continuation receipt must bind to the exact physical result state, name the 
 
 A Qualified receipt must cover the entire mandatory successor set. An Insufficient receipt may cover only a subset and never earns continuation-qualified progress. Unknown/missing stays inconclusive. Rejected is rejected. Optional successors do not block a mission's mandatory continuation.
 
+The mission order must be topological with respect to the prerequisite DAG. At each subgoal boundary, the evaluator computes mandatory descendants that are still outstanding **at that boundary**. Later success cannot be used retroactively to make an earlier decision appear continuation-safe. A mandatory successor is removed from the outstanding set only after its own safe accepted completion has occurred in mission order.
+
+Each accepted subgoal also binds a stable accepted-output digest. The same physical output cannot be counted twice under different subgoal labels. Rework attempts are separately counted and require their own receipt; they do not create additional accepted outputs or independent samples. Rework energy, time and compute remain with the upstream work/capability accounting.
+
 ## Outputs
 
 Per subgoal: outcome, independent acceptance, safe acceptance, physical/option state join, continuation-qualified result, continuation Unknown, required mandatory successors and feasible successor count.
@@ -36,4 +40,4 @@ The reference does not compute viability, option sets, route connectivity, physi
     cargo test --locked --manifest-path research/rob-continuation-qualified-progress-001/reference/Cargo.toml
     cargo clippy --locked --manifest-path research/rob-continuation-qualified-progress-001/reference/Cargo.toml --all-targets -- -D warnings
 
-17 synthetic known-answer/adversarial tests are authored; qualification requires the exact-head Rust 1.96 workflow.
+20 synthetic known-answer/adversarial tests are authored; qualification requires the exact-head Rust 1.96 workflow.
