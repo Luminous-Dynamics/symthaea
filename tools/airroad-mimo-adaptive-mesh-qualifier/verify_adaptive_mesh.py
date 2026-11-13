@@ -119,6 +119,26 @@ def select_interval(
     )
 
 
+
+def snapshot_matches(
+    snapshot: dict,
+    intervals: list[tuple[Fraction, Fraction]],
+    coefficients: list[list[Fraction]],
+    bounds: list[Fraction],
+) -> bool:
+    rows = snapshot["partition"]
+    if len(rows) != len(intervals):
+        return False
+    for row, (a, b), beta, radius in zip(rows, intervals, coefficients, bounds):
+        if (q(row["lower"]), q(row["upper"])) != (a, b):
+            return False
+        if [Fraction(value) for value in row["bernstein"]] != beta:
+            return False
+        if q(row["bound"]) != radius:
+            return False
+    return q(snapshot["global_radius"]) == max(bounds)
+
+
 def fmt(value: Fraction) -> str:
     return f"{value.numerator}/{value.denominator}"
 
@@ -165,6 +185,7 @@ def main() -> None:
             radii.append(radius)
         return coeffs, radii
 
+    initial_partition_snapshot = list(partition)
     initial_coeffs, initial_bounds = bounds_for(partition)
     assert initial_coeffs == [
         [Fraction(0), Fraction(1, 2), Fraction(1, 6), Fraction(0), Fraction(0)],
@@ -172,6 +193,10 @@ def main() -> None:
     ]
     assert initial_bounds == [Fraction(1, 2), Fraction(1, 2)]
     assert max(initial_bounds) == q(data["expected"]["global_radius_after_zero_splits"])
+    trajectory = data["expected_trajectory"]
+    assert len(trajectory) == 3
+    assert trajectory[0]["step"] == 0 and trajectory[0]["selected_interval"] is None
+    assert snapshot_matches(trajectory[0], partition, initial_coeffs, initial_bounds)
 
     # First greedy split: tie is resolved by smallest lower endpoint.
     first_index = select_interval(partition, initial_bounds)
@@ -196,6 +221,10 @@ def main() -> None:
     ]
     assert bounds_1 == [Fraction(13, 64), Fraction(5, 96), Fraction(1, 2)]
     assert max(bounds_1) == q(data["expected"]["global_radius_after_one_split"]) == Fraction(1, 2)
+    assert trajectory[1]["step"] == 1 and trajectory[1]["selected_interval"] == "I0"
+    assert q(trajectory[1]["inserted_knot"]["omega"]) == Fraction(1, 4)
+    assert q(trajectory[1]["inserted_knot"]["value"]) == Fraction(3, 16)
+    assert snapshot_matches(trajectory[1], partition, coeffs_1, bounds_1)
 
     # Second greedy split: the still-largest right interval must be selected.
     second_index = select_interval(partition, bounds_1)
@@ -229,6 +258,11 @@ def main() -> None:
     assert global_radius == q(data["expected"]["global_radius_after_two_splits"])
     assert global_radius == Fraction(13, 64)
     assert global_radius == q(data["policy"]["target_global_radius"])
+    assert trajectory[2]["step"] == 2 and trajectory[2]["selected_interval"] == "I1"
+    assert q(trajectory[2]["inserted_knot"]["omega"]) == Fraction(3, 4)
+    assert q(trajectory[2]["inserted_knot"]["value"]) == Fraction(3, 16)
+    assert snapshot_matches(trajectory[2], partition, coeffs_2, bounds_2)
+    assert data["expected"]["target_met_after_two_splits"] is True
 
     # Bernstein convex-hull property: basis weights are nonnegative and sum
     # to one, so each exact coefficient maximum is a universal interval bound.
@@ -256,32 +290,39 @@ def main() -> None:
     # policy identity and must not be presented as the same replay.
     reverse_tie_choice = max(
         (i for i in range(len(initial_bounds))),
-        key=lambda i: (initial_bounds[i], partition[i][0])
+        key=lambda i: (initial_bounds[i], initial_partition_snapshot[i][0])
     )
-    assert reverse_tie_choice != 0
+    assert reverse_tie_choice == 1
+    assert reverse_tie_choice != first_index
 
-    # Missing interval coverage and duplicate knot identities are rejected.
+    # Missing interval coverage, gaps, duplicate IDs, and stale/unapproved
+    # evidence are evaluated from explicit counterfactual records.
     assert not partition_valid([(Fraction(0), Fraction(1, 2))], lo, hi)
     assert not partition_valid([
-        (Fraction(0), Fraction(1, 4)),
-        (Fraction(1, 2), Fraction(1)),
+        (q(item["lower"]), q(item["upper"]))
+        for item in data["counterfactuals"]["overstated_gap_partition"]
     ], lo, hi)
     assert len(set(knot_ids + ["omega-half"])) != len(knot_ids + ["omega-half"])
 
+    counter = data["counterfactuals"]
+    assert counter["unapproved_midpoint"]["approved"] is False
+    assert q(counter["unapproved_midpoint"]["omega"]) == Fraction(1, 4)
+    assert counter["stale_model_identity"] != data["model_identity"]
+    assert counter["stale_calibration_identity"] != data["calibration_identity"]
+    assert counter["wrong_frequency_unit"] != data["frequency_unit"]
+    assert counter["statistical_uncertainty_semantics"] != "deterministic_exact_midpoint_observation"
+
     # A radius smaller than the certified global bound cannot be a PASS.
-    too_small_target = Fraction(1, 5)
+    too_small_target = q(counter["too_small_target"])
+    assert too_small_target == Fraction(1, 5)
     assert too_small_target < global_radius
     exhausted_is_pass = len(partition) >= len(knots) + data["policy"]["split_budget"] and global_radius <= too_small_target
     assert not exhausted_is_pass
 
     # Missing/stale evidence, unapproved proposal and statistical noise do not
     # enter the deterministic synthetic hard profile.
-    assert "sha256:stale-model" != data["model_identity"]
-    assert "Hz" != data["frequency_unit"]
-    assert data["candidate_measurement_profile"]["shared_calibration_identity"] != "sha256:stale-calibration"
-    assert data["candidate_measurement_profile"]["approved_under_synthetic_protocol"] is True
-    statistical_semantics = "uncalibrated_statistical_confidence_interval"
-    assert statistical_semantics != "deterministic_exact_midpoint_observation"
+    assert data["counterfactuals"]["stale_model_identity"] != data["model_identity"]
+    assert data["counterfactuals"]["wrong_frequency_unit"] != data["frequency_unit"]
 
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
     assert controls["sampled-knot-maximum-used-as-universal-upper"] == "reject"
