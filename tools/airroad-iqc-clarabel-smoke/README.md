@@ -49,6 +49,18 @@ checks the returned ray `z` against the standard-form certificate conditions:
 A solver status without these witness checks is not accepted by this smoke
 test.
 
+## Independent SCS cross-check
+
+The workflow also runs a pinned SCS 3.3.1 research-only reference. SCS uses
+the **lower** triangle stacked column-wise, whereas Clarabel's Rust adapter
+uses the **upper** triangle stacked column-wise. Both use sqrt(2)-scaled
+off-diagonal entries. The Python cross-check therefore builds and decodes
+SCS vectors independently instead of reusing Clarabel's packed vector.
+
+The SCS job solves both analytic problems again and independently checks its
+primal solution and infeasibility certificate. NumPy, SciPy and SCS are
+validation-only dependencies; the production AIRROAD crate remains Rust-only.
+
 ## Scope
 
 These are analytic conic-backend tests. They do not implement the published
