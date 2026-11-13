@@ -9,6 +9,10 @@
 //! preserve polymetric per-part maps and the complete typed barline graph.
 
 use crate::evidence_digest::canonical_json_sha256;
+use crate::musicxml_notation_events::{
+    legacy_missing_notation_events, parse_musicxml_part_notation_events,
+    MusicXmlPartNotationEventsV1,
+};
 use serde::{Deserialize, Serialize};
 use crate::barline_eval::{
     MeasureKind, MeasureMap, MeasureMapStatus, MeasureSpan, RationalBeat,
@@ -440,6 +444,14 @@ pub struct MusicXmlPartNotationGraphV1 {
     pub non_controlling_measure_indices: Vec<usize>,
     pub barline_events: Vec<MusicXmlPartBarlineEventV1>,
     pub playback_controls: Vec<MusicXmlPlaybackControlV1>,
+    /// Exact source-ordered note/rest/tuplet/tie/staff semantics. Older
+    /// serialized graphs omit this field; the legacy sentinel is skipped
+    /// again so their canonical commitments remain stable.
+    #[serde(
+        default = "legacy_missing_notation_events",
+        skip_serializing_if = "crate::musicxml_notation_events::is_legacy_missing_notation_events"
+    )]
+    pub notation_events: MusicXmlPartNotationEventsV1,
 }
 
 /// Parse score-partwise into exact per-part measure maps plus typed barline
@@ -512,6 +524,8 @@ pub fn parse_musicxml_part_notation_graph(
                 )?;
                 let playback_controls =
                     parse_playback_controls_for_part(part, part_id);
+                let notation_events =
+                    parse_musicxml_part_notation_events(part, part_id, &spans);
                 let map = MeasureMap {
                     source_id: format!("{source_id}#part={part_id}"),
                     score_clock_id: score_clock_id.to_string(),
@@ -531,6 +545,7 @@ pub fn parse_musicxml_part_notation_graph(
                     non_controlling_measure_indices,
                     barline_events,
                     playback_controls,
+                    notation_events,
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
@@ -548,6 +563,7 @@ pub fn parse_musicxml_part_notation_graph(
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
+                notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
                 part_id: part_id.to_string(),
