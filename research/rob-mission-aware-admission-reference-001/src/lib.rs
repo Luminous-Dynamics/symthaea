@@ -1058,11 +1058,8 @@ mod tests {
     fn replan_without_local_fallback_is_rejected() {
         let mut audit = request("q1", "r1");
         audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
-        audit
-            .decision_sufficiency
-            .as_mut()
-            .unwrap()
-            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Insufficient;
         audit.local_fallback_ready = false;
         let report =
             admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
