@@ -110,6 +110,57 @@ The verifier at tools/airroad-mimo-robust-qualifier/verify_three_port_reference.
 
 The machine-readable corpus is docs/research/fixtures/airroad-mimo-three-port-robust-v0.1.json.
 
+
+## 5B. Current industry benchmark contracts (R2026b / current documentation)
+
+The primary commercial robust-stability baseline is MATLAB Robust Control Toolbox `robstab` for uncertain state-space models (`uss` / `genss`):
+
+- `LowerBound` is a guaranteed lower bound on the normalized robust-stability margin. For uncertainty up to that level, the model is guaranteed stable.
+- `UpperBound` is a guaranteed upper bound on that margin and is associated with an existential destabilizing perturbation returned as `wcu`. Substituting `wcu` and checking poles is the documented confirmation step.
+- The `uss` / `genss` state-space algorithm searches across frequency and does not rely on frequency gridding.
+- Passing an explicit frequency vector, or using `ufrd` / `genfrd`, evaluates a frequency grid and gives no guarantee between the supplied points.
+
+Primary reference: https://www.mathworks.com/help/robust/ref/dynamicsystem.robstab.html
+
+This requires a sharper AIRROAD output contract:
+
+| Result | Meaning | Must not be confused with |
+|---|---|---|
+| `ROBUSTLY_STABLE` | Every admissible realization in the declared set is internally stable | Nominal stability |
+| `ROBUST_STABILITY_MARGIN_LOWER_BOUND` | Guaranteed stable uncertainty scaling up to a normalized margin | A witness |
+| `DESTABILIZATION_WITNESS` | One admissible realization with a verified unstable/marginal closed-loop mode | Universal instability of the entire set |
+| `ROBUST_STABILITY_MARGIN_UPPER_BOUND` | A destabilizing perturbation exists at or below the bound | Proof all points in the set are unstable |
+| `ROBUSTLY_UNSTABLE` | Every admitted realization is proven unstable | An upper robust-stability-margin bound |
+| `NOT_ESTABLISHED` | Neither universal proposition has been proven | PASS |
+| `NOT_EVALUABLE` | Inputs, evidence or model applicability are insufficient | Stable-by-default |
+
+MathWorks documents that a robust-stability margin above 1 means stable for all values of the modeled uncertainty, while below 1 means there exist values that destabilize. That is not the same proposition as "every member is unstable." AIRROAD must compare these results separately and preserve the witness identity and exact pole evidence.
+
+### Additional baselines
+
+- **IQC Toolbox / IQClab** provides worst-case stability/performance analysis for uncertainty and nonlinearities using integral quadratic constraints. It is an important complementary baseline for dynamic/nonlinear uncertainty, not simply another frequency-sweep solver: https://iqctoolbox.github.io/iqcToolbox/ and https://www.ll.mit.edu/partner-us/available-technologies/integral-quadratic-constraints-iqc-toolbox
+- **RobustAndOptimalControl.jl** is a useful reproducible open-source control baseline. Current docs describe structured singular-value support for diagonal complex perturbations only; its documented `robstab` method uses a frequency vector by default: https://juliacontrol.github.io/RobustAndOptimalControl.jl/stable/ and https://juliacontrol.github.io/RobustAndOptimalControl.jl/stable/uncertainty/
+- **PLECS 5.0** has AC analysis, frequency sweeps and frequency response at discrete perturbation frequencies. Its loop-gain analysis block is scalar-signal-only; AC analysis can linearize state-space/MNA equations at an operating point. It is a circuit-analysis/frequency-response baseline, not directly equivalent to structured robust-stability analysis: https://docs.plexim.com/plecs/5.0/analysis/frequency-response/ and https://docs.plexim.com/plecs/latest/components-by-category/loopgainanalysis/
+
+### Matched benchmark protocol
+
+For every candidate, pin:
+- identical nominal model, state-space realization, source/load partition and feedback signs;
+- identical uncertainty parameterization, shared-vs-independent dependencies and admissible set;
+- identical nominal stability and internal-mode/cancellation semantics;
+- identical time units, frequency domain, and uncertainty scaling convention;
+- solver/tool version and all options.
+
+Report:
+- exact stability margin when analytically known;
+- MATLAB lower and upper margin bounds, critical frequency, `wcu`, and substituted closed-loop poles;
+- IQC certificate status, multiplier class/order, solver and conservatism where applicable;
+- Julia `mu` lower/upper capabilities and perturbation structure;
+- AIRROAD enclosure width, subdivision/work budget, proof coverage, witness validation and abstention;
+- false robust-pass, false witness, false abstention, runtime and memory.
+
+AIRROAD's defensible differentiation remains the evidence and physical applicability bridge: calibrated per-port provenance, joint parameter semantics across frequency, internal-mode preservation, replayable margins/witnesses, configuration identity and composition with fault/supply/mission evidence. It is not a claim that MATLAB lacks continuous-frequency state-space robust analysis.
+
 ## 6. What this benchmark establishes
 
 It establishes an independently replayable analytic example where diagonal SISO inspection loses all relevant coupling information, and it creates exact stable / boundary / mixed / unstable parameter families for future robust-analysis implementations.
