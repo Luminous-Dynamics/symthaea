@@ -64,7 +64,17 @@
           }
         ]
       ],
-      "shared_coordinate_id": "theta-common-gain"
+      "shared_coordinate_id": "theta-common-gain",
+      "model_identity": "sha256:two-frequency-shared-calibration-generator-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "acquisition_root_identity": "sha256:common-acquisition-root-v0.1",
+      "calibration_certificate_identity": "sha256:common-calibration-certificate-v0.1",
+      "frequency_unit": "rad_per_second",
+      "port_order": [
+        "bus-a",
+        "bus-b"
+      ]
     },
     {
       "frequency_id": "omega-2",
@@ -116,7 +126,17 @@
           }
         ]
       ],
-      "shared_coordinate_id": "theta-common-gain"
+      "shared_coordinate_id": "theta-common-gain",
+      "model_identity": "sha256:two-frequency-shared-calibration-generator-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "acquisition_root_identity": "sha256:common-acquisition-root-v0.1",
+      "calibration_certificate_identity": "sha256:common-calibration-certificate-v0.1",
+      "frequency_unit": "rad_per_second",
+      "port_order": [
+        "bus-a",
+        "bus-b"
+      ]
     }
   ],
   "generator_coordinates": [
@@ -302,7 +322,13 @@
       }
     ],
     "stale_calibration_identity": "sha256:stale-calibration-certificate",
-    "stale_topology_identity": "sha256:stale-topology"
+    "stale_topology_identity": "sha256:stale-topology",
+    "incomplete_matrix_element_scope": [
+      "G11",
+      "G12",
+      "G21"
+    ],
+    "unknown_dependency_status": "UNKNOWN"
   },
   "negative_controls": [
     {
@@ -354,5 +380,11 @@
     "Synthetic two-frequency shared hard-generator set and exact inter-frequency remainder.",
     "No IQC synthesis or robust-stability theorem is run by this adapter.",
     "No physical FRF calibration, aircraft robust stability, flight safety or certification is established."
-  ]
+  ],
+  "adapter_output": {
+    "artifact_type": "evidence_qualified_joint_frequency_generator_set",
+    "controller_synthesis_performed": false,
+    "iqc_feasibility_claim": false,
+    "robust_stability_claim": false
+  }
 }
