@@ -82,6 +82,70 @@ fn one_of(value: &Value, key: &str, context: &str, allowed: &[&str]) -> Result<S
     Ok(actual.to_string())
 }
 
+fn boundary_rank(boundary: &str) -> Option<u8> {
+    match boundary {
+        "active_material" => Some(0),
+        "electrode" => Some(1),
+        "complete_device" => Some(2),
+        "module" => Some(3),
+        "installed_system" => Some(4),
+        _ => None,
+    }
+}
+
+fn required_complete_device_components() -> [&'static str; 9] {
+    [
+        "positive_electrode",
+        "negative_electrode",
+        "electrolyte",
+        "separator",
+        "current_collectors",
+        "binder_additives",
+        "tabs",
+        "seals",
+        "case",
+    ]
+}
+
+fn normalized_metric_name(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .replace(' ', "_")
+        .replace('-', "_")
+}
+
+fn has_measured_density_metric(
+    metrics: &[Value],
+    top_level_boundary: &str,
+    names: &[&str],
+    units: &[&str],
+) -> bool {
+    let Some(minimum_boundary) = boundary_rank(top_level_boundary) else {
+        return false;
+    };
+    metrics.iter().any(|metric| {
+        let name = metric["name"]
+            .as_str()
+            .map(normalized_metric_name)
+            .unwrap_or_default();
+        let unit = metric["unit"]
+            .as_str()
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .replace(' ', "");
+        let metric_boundary = metric["boundary"]
+            .as_str()
+            .and_then(boundary_rank);
+        metric["status"].as_str() == Some("measured")
+            && metric["value"].as_f64().is_some_and(|value| value.is_finite() && value >= 0.0)
+            && metric_boundary.is_some_and(|boundary| boundary >= minimum_boundary)
+            && names.contains(&name.as_str())
+            && units.contains(&unit.as_str())
+    })
+}
+
 fn valid_sha256(value: &Value) -> bool {
     let Some(digest) = value.as_str() else {
         return false;
@@ -134,6 +198,81 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
     one_of(record, "device_class", &context, DEVICE_CLASSES)?;
     let boundary = one_of(record, "boundary", &context, BOUNDARIES)?;
     let disposition = one_of(record, "disposition", &context, DISPOSITIONS)?;
+
+    let denominator = required(record, "denominator", &context)?;
+    let mass_kg = required(denominator, "mass_kg", &context)?;
+    if !mass_kg.is_null()
+        && mass_kg
+            .as_f64()
+            .is_none_or(|value| !value.is_finite() || value <= 0.0)
+    {
+        bail!("{context}.denominator.mass_kg must be null or finite and positive");
+    }
+    let volume_l = required(denominator, "volume_l", &context)?;
+    if !volume_l.is_null()
+        && volume_l
+            .as_f64()
+            .is_none_or(|value| !value.is_finite() || value <= 0.0)
+    {
+        bail!("{context}.denominator.volume_l must be null or finite and positive");
+    }
+    one_of(
+        denominator,
+        "basis",
+        &context,
+        &[
+            "active_material_only",
+            "electrode_basis",
+            "complete_device_weighed",
+            "module_vendor_reported",
+            "installed_system_measured",
+            "unknown",
+        ],
+    )?;
+    let denominator_status = one_of(
+        denominator,
+        "status",
+        &context,
+        &["complete", "partial", "unknown"],
+    )?;
+    let included_components = required(denominator, "included_components", &context)?
+        .as_array()
+        .context("denominator.included_components must be an array")?;
+    let excluded_components = required(denominator, "excluded_components", &context)?
+        .as_array()
+        .context("denominator.excluded_components must be an array")?;
+    let mut included = BTreeSet::new();
+    for component in included_components {
+        let component = component
+            .as_str()
+            .context("included denominator component names must be strings")?;
+        if component.trim().is_empty() || !included.insert(component) {
+            bail!("{context}: included denominator components must be non-empty and unique");
+        }
+    }
+    let mut excluded = BTreeSet::new();
+    for component in excluded_components {
+        let component = component
+            .as_str()
+            .context("excluded denominator component names must be strings")?;
+        if component.trim().is_empty() || !excluded.insert(component) {
+            bail!("{context}: excluded denominator components must be non-empty and unique");
+        }
+        if included.contains(component) {
+            bail!("{context}: a denominator component cannot be both included and excluded");
+        }
+    }
+    if denominator_status == "complete" {
+        if mass_kg.is_null() || volume_l.is_null() {
+            bail!("{context}: complete denominator requires measured mass_kg and volume_l");
+        }
+        if !required_complete_device_components()
+            .iter()
+            .all(|component| included.contains(component))
+        {
+            bail!("{context}: complete device denominator must enumerate all nine physical component groups");
+        }
+    }
 
     let design = required(record, "design", &context)?;
     for key in [
@@ -284,6 +423,15 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
     }
 
     if disposition == "evaluation_eligible" {
+        if denominator_status != "complete" {
+            bail!("{context}: evaluation_eligible requires a complete mass-and-volume denominator");
+        }
+        if !required_complete_device_components()
+            .iter()
+            .all(|component| included.contains(component))
+        {
+            bail!("{context}: evaluation_eligible requires complete-device component accounting");
+        }
         if admission != "evaluation_admitted"
             || (evidence_class != "physical_measurement"
                 && evidence_class != "independent_laboratory")
@@ -295,6 +443,19 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
         }
         if !valid_sha256(required(conditions, "raw_data_digest", &context)?) {
             bail!("{context}: evaluation_eligible requires a raw-data SHA-256 digest");
+        }
+        if !valid_sha256(required(evidence, "sha256", &context)?) {
+            bail!("{context}: evaluation_eligible requires an evidence-package SHA-256 digest");
+        }
+        let energy_names = ["specific_energy_density", "energy_density", "usable_energy_density"];
+        let energy_units = ["wh/kg", "wh/l"];
+        if !has_measured_density_metric(metrics, &boundary, &energy_names, &energy_units) {
+            bail!("{context}: evaluation_eligible requires a measured device-bound energy-density metric");
+        }
+        let power_names = ["specific_power_density", "power_density"];
+        let power_units = ["w/kg", "w/l", "kw/kg", "kw/l"];
+        if !has_measured_density_metric(metrics, &boundary, &power_names, &power_units) {
+            bail!("{context}: evaluation_eligible requires a measured device-bound power-density metric");
         }
         if placeholder {
             bail!("{context}: evaluation_eligible requires a unique physical device serial");
@@ -444,6 +605,93 @@ mod tests {
         let mut value = fixture();
         value["records"][0]["test_conditions"]["voltage_max_v"] = json!(0.0);
         assert!(audit_fixture_value(&value).is_err());
+    }
+
+    // This is an in-memory contract test record, not a physical measurement or checked-in fixture.
+    fn test_only_promotable_record() -> Value {
+        let mut record = fixture()["records"][1].clone();
+        record["boundary"] = json!("complete_device");
+        record["disposition"] = json!("evaluation_eligible");
+        record["design"]["physical_device_serial"] = json!("TEST-ONLY-DEVICE-0001");
+        record["design"]["material_lot_ids"] = json!(["TEST-ONLY-LOT"]);
+        record["test_conditions"]["raw_data_digest"] = json!(
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        record["evidence"]["evidence_id"] = json!("TEST-ONLY-EVIDENCE");
+        record["evidence"]["class"] = json!("physical_measurement");
+        record["evidence"]["admission"] = json!("evaluation_admitted");
+        record["evidence"]["sha256"] = json!(
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        );
+        record["evidence"]["source_uri"] = json!("https://example.invalid/test-only");
+        record["denominator"] = json!({
+            "mass_kg": 0.01,
+            "volume_l": 0.001,
+            "basis": "complete_device_weighed",
+            "included_components": [
+                "positive_electrode",
+                "negative_electrode",
+                "electrolyte",
+                "separator",
+                "current_collectors",
+                "binder_additives",
+                "tabs",
+                "seals",
+                "case"
+            ],
+            "excluded_components": [],
+            "status": "complete"
+        });
+        record["manufacturing"]["batch_id"] = json!("TEST-ONLY-BATCH");
+        record["manufacturing"]["process_revision"] = json!("TEST-ONLY-PROCESS");
+        record["metrics"] = json!([
+            {
+                "name": "specific_energy_density",
+                "value": 5.0,
+                "unit": "Wh/kg",
+                "boundary": "complete_device",
+                "measurement_method": "test-only contract fixture",
+                "uncertainty": 0.1,
+                "status": "measured"
+            },
+            {
+                "name": "specific_power_density",
+                "value": 1000.0,
+                "unit": "W/kg",
+                "boundary": "complete_device",
+                "measurement_method": "test-only contract fixture",
+                "uncertainty": 10.0,
+                "status": "measured"
+            }
+        ]);
+        record
+    }
+
+    #[test]
+    fn evaluation_eligibility_accepts_only_complete_device_bound_measurements() {
+        let record = test_only_promotable_record();
+        let mut seen_ids = BTreeSet::new();
+        let mut seen_serials = BTreeSet::new();
+        audit_record(&record, &mut seen_ids, &mut seen_serials)
+            .expect("test-only complete-device control should satisfy the contract");
+    }
+
+    #[test]
+    fn evaluation_eligibility_rejects_missing_device_power_density() {
+        let mut record = test_only_promotable_record();
+        record["metrics"].as_array_mut().unwrap().pop();
+        let mut seen_ids = BTreeSet::new();
+        let mut seen_serials = BTreeSet::new();
+        assert!(audit_record(&record, &mut seen_ids, &mut seen_serials).is_err());
+    }
+
+    #[test]
+    fn complete_denominator_rejects_missing_volume_or_component_groups() {
+        let mut record = test_only_promotable_record();
+        record["denominator"]["volume_l"] = Value::Null;
+        let mut seen_ids = BTreeSet::new();
+        let mut seen_serials = BTreeSet::new();
+        assert!(audit_record(&record, &mut seen_ids, &mut seen_serials).is_err());
     }
 
     #[test]
