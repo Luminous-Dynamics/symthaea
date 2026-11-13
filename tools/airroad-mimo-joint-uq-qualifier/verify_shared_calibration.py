@@ -94,10 +94,11 @@ def main() -> None:
     assert set(cal["applies_to_current_record_ids"]) == current_ids
     assert set(cal["applies_to_voltage_record_ids"]) == voltage_ids
 
-    # Coverage is represented by one common nuisance ID on every current and
-    # voltage observation record. A mismatch revokes the cancellation proof.
-    all_ids = [nuisance_id for _ in current_ids | voltage_ids]
-    assert len(set(all_ids)) == 1
+    # Every raw record explicitly binds the same shared nuisance identity.
+    current_nuisance_ids = {item["calibration_nuisance_id"] for item in data["base_injected_current_a"]}
+    voltage_nuisance_ids = {item["calibration_nuisance_id"] for item in data["base_voltage_observations_v"]}
+    assert current_nuisance_ids == {nuisance_id}
+    assert voltage_nuisance_ids == {nuisance_id}
 
     u = read_interval(cal["u_domain"])
     v = read_interval(cal["v_domain"])
@@ -122,8 +123,17 @@ def main() -> None:
             print(f"PASS joint cancellation {observed}/{driven}: "
                   f"Z={z[i][j][0]}+j*{z[i][j][1]}")
 
-    # Recompute the independent rectangular quotient for Z11.
+    # Recompute and verify the propagated measured rectangles for Z11 from
+    # the same q domain, then form the independent numerator/denominator box.
     example = data["independent_rectangle_example"]
+    v11_base = voltage_records[("bus-a", "bus-a")]
+    i1_base = currents["bus-a"]
+    v11_rect = affine_scaled_rectangle(v11_base, u, v)
+    i1_rect = affine_scaled_rectangle(i1_base, u, v)
+    assert v11_rect[0] == read_interval(example["measured_voltage_real"])
+    assert v11_rect[1] == read_interval(example["measured_voltage_imag"])
+    assert i1_rect[0] == read_interval(example["measured_current_real"])
+    assert i1_rect[1] == read_interval(example["measured_current_imag"])
     v_re = read_interval(example["measured_voltage_real"])
     v_im = read_interval(example["measured_voltage_imag"])
     i_re = read_interval(example["measured_current_real"])
@@ -146,10 +156,14 @@ def main() -> None:
     assert independent_imag[0] <= true_z11[1] <= independent_imag[1]
 
     # Negative controls are executable semantic counterexamples.
-    mismatched_ids = {"current": nuisance_id, "voltage": "different-calibration-chain"}
-    assert mismatched_ids["current"] != mismatched_ids["voltage"]
-    q_including_zero = (Fraction(-1, 10), Fraction(1, 10))
-    assert q_including_zero[0] <= 0 <= q_including_zero[1]
+    mismatched_record = dict(data["base_injected_current_a"][0])
+    mismatched_record["calibration_nuisance_id"] = "different-calibration-chain"
+    assert mismatched_record["calibration_nuisance_id"] != nuisance_id
+    q_real_including_zero = (
+        Fraction(1) + Fraction(-1),
+        Fraction(1) + Fraction(0),
+    )
+    assert q_real_including_zero[0] <= 0 <= q_real_including_zero[1]
     statistical_semantics = "statistical_covariance_only"
     assert statistical_semantics != "deterministic_joint_hard_set"
     incomplete_coverage = set(cal["applies_to_voltage_record_ids"]) - {"V-bus-b-from-b"}
