@@ -6040,8 +6040,8 @@ mod compose_bars_contract_tests {
 #[cfg(test)]
 mod notation_summary_tests {
     use super::{
-        summarize_imported_notation_structure, verify_imported_audition_bytes,
-        ImportedNotationArtifact,
+        summarize_imported_notation_structure, validate_imported_musicxml_graph_artifact,
+        verify_imported_audition_bytes, ImportedNotationArtifact,
     };
     use symthaea_muse::symbolic_import::ImportedNotationStructureV1;
     use symthaea_muse_protocol::ImportedNotationStructureSummary;
