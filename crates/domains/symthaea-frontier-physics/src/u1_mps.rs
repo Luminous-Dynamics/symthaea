@@ -4505,7 +4505,6 @@ mod tests {
         output
     }
 
-
     #[test]
     fn tebd_global_error_bound_dominates_independent_dense_sequential_circuit_residual() {
         let input = ComplexU1Mps::product_state(&[true, false, false, true]).unwrap();
@@ -4597,7 +4596,6 @@ mod tests {
         }
         output
     }
-
 
     #[test]
     fn tebd_global_error_bound_dominates_independent_dense_sequential_circuit_residual() {
@@ -4873,8 +4871,7 @@ mod tests {
         let sine = (frequency * time).sin();
         let mut exact = vec![complex_zero(); 8];
         exact[4] = Complex64::new(
-            1.0 + (cosine - 1.0) * coupling_left * coupling_left
-                / (frequency * frequency),
+            1.0 + (cosine - 1.0) * coupling_left * coupling_left / (frequency * frequency),
             0.0,
         );
         exact[2] = Complex64::new(0.0, -sine * coupling_left / frequency);
