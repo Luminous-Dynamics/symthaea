@@ -198,6 +198,26 @@ The new research question is whether an **impedance-programmed electrode** can o
 
 A focused experiment contract is [ZIHC-IMPEDANCE-FIELD-001 #11875](https://github.com/Luminous-Dynamics/symthaea/issues/11875). It complements, rather than replaces, [ZIHSC-TRANSPORT-ABLATION-001 #11853](https://github.com/Luminous-Dynamics/symthaea/issues/11853): the latter isolates electron-network and long-range pore-channel effects in carbon cathodes; the new issue evaluates spatially varying, multi-scale gradient architecture and field-conditioned inverse design. Exact numerical reproduction of the October paper is blocked until its supplementary protocol and relevant data/rights are obtained.
 
+### 2.5 Load-bearing electrochemical storage: coupled mechanical/electrochemical durability
+
+Fu et al., *Advanced Functional Materials*, first published 19 June 2026, report “All 3D Printed Load-bearing Zn-ion Hybrid Supercapacitors” (DOI: 10.1002/adfm.76654; https://doi.org/10.1002/adfm.76654). The publisher abstract describes core–shell continuous-carbon-fibre prepreg filaments used to print a structural framework containing electrodes and electrolyte matrix, followed by supercritical foaming and gelation. It reports supercritical-fluid-assisted laser graphitization forming hierarchical porous graphene cathodes, 2.4× areal capacitance relative to conventional laser-induced-graphitization electrodes, and a biphasic PP/PVA semi-solid electrolyte whose reported ionic conductivity rises from 0.5 to 4.2 mS cm⁻¹.
+
+This is a structural energy-storage research comparator, not yet a complete structural/electrochemical qualification dataset. The abstract does not establish full-device Wh kg⁻¹ / Wh L⁻¹, complete component mass, design allowables, stiffness/strength/fatigue, post-fatigue electrochemical retention or independent-lab replication. The publisher lists supporting information and says data are available from the corresponding author on reasonable request. Those materials must be reviewed before exact reproduction.
+
+The paradigm is **co-qualified structural power**: compare a load-bearing storage article against a conventional structure plus separately mounted storage at the same installed assembly boundary. Do not subtract structural mass from a device denominator unless the integrated device demonstrably replaces a specified structural function and meets the same mechanical service, durability, inspection and repair requirements. Mechanical fatigue can alter electronic contact, current collection, electrolyte confinement and ion pathways; these coupled failure modes need to be measured on the same article, not inferred from separate mechanical-only and electrochemical-only tests.
+
+A new focused contract is [STRUCTURAL-ZIHC-COQUAL-001 #11878](https://github.com/Luminous-Dynamics/symthaea/issues/11878). It starts with low-voltage, non-flight structural coupons under a qualified laboratory's review and requires mechanical/electrochemical sequencing, coupled durability, a matched assembly baseline and independent replication. It does not authorize safety-critical structural applications.
+
+### 2.6 Zero-excess sodium-metal: finite inventory becomes the governing design constraint
+
+Zhao et al., *Nature Reviews Clean Technology*, published 11 November 2026, review “Zero-excess sodium-metal batteries for post-lithium energy storage” (DOI: 10.1038/s44359-026-00234-6; https://doi.org/10.1038/s44359-026-00234-6). The review reports demonstrations above 200 Wh kg⁻¹ at cell level, but identifies irreversible loss of finite cyclable sodium through nonuniform plating, unstable SEI and electrolyte consumption as a central cycle-life limitation. It describes practical challenge conditions of cathode loading ≥3 mAh cm⁻² and lean electrolyte ≤2 g Ah⁻¹; retaining 80% capacity over 1,000 cycles requires average Coulombic efficiency of approximately ≥99.98% under its inventory assumptions.
+
+This is not proof that a general zero-excess sodium-metal cell has achieved 1,000 cycles under those combined conditions. The 99.98% value is an inventory constraint, not a complete lifetime model. In a simplified constant-efficiency model, retained inventory scales as ηⁿ; at η = 0.9998 and n = 1,000, the result is about 81.9%. Real full-cell degradation is time-, state- and mechanism-dependent and must be measured.
+
+The paradigm is to co-design **finite sodium inventory, current distribution, sodiophilic interface, electrolyte/SEI, stack pressure, manufacturability and end-of-life recovery**. A high initial Wh kg⁻¹ claim is not sufficient if sodium loss makes the cell short-lived or if lean-electrolyte manufacturing proves unrepeatable.
+
+The existing sodium chemistry parent remains [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694); the new focused child is [ZERO-EXCESS-SODIUM-INVENTORY-001 #11879](https://github.com/Luminous-Dynamics/symthaea/issues/11879). It owns practical Coulombic-efficiency and inventory accounting, not a duplicate sodium materials engine.
+
 ## Sources
 
 - IEA, *Global EV Outlook 2026*, battery deployment and chemistry context: https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
