@@ -1,0 +1,46 @@
+name: Vocal no-op tolerance calibration
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-noop-calibration/**"
+      - "docs/research/VOCAL_NOOP_TOLERANCE_CALIBRATION_V1.md"
+      - ".github/workflows/vocal-noop-calibration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  calibration-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_NOOP_CALIBRATION_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check standalone calibrator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-noop-calibration/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-noop-calibration/Cargo.toml
+
+      - name: Run calibration contract tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-noop-calibration/Cargo.toml
