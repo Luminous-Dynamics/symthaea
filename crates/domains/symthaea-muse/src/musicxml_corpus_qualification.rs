@@ -203,6 +203,7 @@ pub enum CorpusQualificationIssueV1 {
     EmptyCorpusId,
     EmptyReleaseId,
     MissingSourceRevision { corpus_id: String },
+    InvalidSourceRevision { corpus_id: String },
     InvalidSourceUri,
     InvalidRightsEvidenceUri,
     MissingRightsNotes,
@@ -286,8 +287,20 @@ struct QualificationReportCommitmentV1<'a> {
     next_stage_requirements: &'a [String],
 }
 
+fn is_lower_hex(value: &str) -> bool {
+    value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64 && is_lower_hex(value)
+}
+
+fn is_pinned_source_revision(value: &str) -> bool {
+    (value.len() == 40 && is_lower_hex(value))
+        || is_sha256(value)
+        || value
+            .strip_prefix("archive-sha256:")
+            .is_some_and(is_sha256)
 }
 
 fn is_https_uri(value: &str) -> bool {
@@ -318,14 +331,16 @@ pub fn validate_corpus_registration(
     if registration.release_id.trim().is_empty() {
         issues.push(CorpusQualificationIssueV1::EmptyReleaseId);
     }
-    if registration
-        .source_revision_id
-        .as_deref()
-        .is_none_or(|revision| revision.trim().is_empty())
-    {
-        issues.push(CorpusQualificationIssueV1::MissingSourceRevision {
+    match registration.source_revision_id.as_deref() {
+        None => issues.push(CorpusQualificationIssueV1::MissingSourceRevision {
             corpus_id: registration.corpus_id.clone(),
-        });
+        }),
+        Some(revision) if !is_pinned_source_revision(revision) => {
+            issues.push(CorpusQualificationIssueV1::InvalidSourceRevision {
+                corpus_id: registration.corpus_id.clone(),
+            });
+        }
+        Some(_) => {}
     }
     if !is_https_uri(&registration.source_uri) {
         issues.push(CorpusQualificationIssueV1::InvalidSourceUri);
@@ -552,9 +567,11 @@ pub fn validate_corpus_protocol(
 
 /// Determine the strongest stage supported by declared metadata and receipts.
 ///
-/// V1 deliberately stops at ProtocolFrozen. It does not read source files,
-/// verify their bytes, authenticate annotations, or provide legal review. A
-/// SHA-256 string supplied by a manifest is only a digest declaration.
+/// The metadata-only qualification path ends at ProtocolFrozen. The separate
+/// byte-aware path can hash supplied artifact slices and produce
+/// ProtocolAndBytesVerified. Neither path authenticates who supplied the bytes,
+/// adjudicates annotations, or provides legal review. A digest declaration
+/// alone is never described as byte verification.
 pub fn qualify_corpus_track(
     registration: &CorpusRegistrationV1,
     manifest: Option<&CorpusSampleManifestV1>,
@@ -688,8 +705,48 @@ where
     I: IntoIterator<Item = CorpusArtifactBytesV1<'a>>,
 {
     let mut issues = Vec::new();
+    if manifest.schema != MUSICXML_CORPUS_SAMPLE_MANIFEST_SCHEMA_V1 {
+        issues.push(CorpusQualificationIssueV1::WrongSampleManifestSchema);
+    }
+    if manifest.samples.is_empty() {
+        issues.push(CorpusQualificationIssueV1::EmptySampleManifest);
+    }
     if !is_sha256(verifier_build_sha256) {
         issues.push(CorpusQualificationIssueV1::InvalidByteVerifierDigest);
+    }
+    let mut manifest_sample_ids = BTreeSet::new();
+    for sample in &manifest.samples {
+        if sample.sample_id.trim().is_empty() {
+            issues.push(CorpusQualificationIssueV1::EmptySampleId);
+        }
+        if !manifest_sample_ids.insert(sample.sample_id.clone()) {
+            issues.push(CorpusQualificationIssueV1::DuplicateSampleId {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+        if !is_safe_relative_path(&sample.input_relative_path) {
+            issues.push(CorpusQualificationIssueV1::InvalidInputPath {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+        if !is_safe_relative_path(&sample.reference_relative_path) {
+            issues.push(CorpusQualificationIssueV1::InvalidReferencePath {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+        if !is_sha256(&sample.input_sha256) {
+            issues.push(CorpusQualificationIssueV1::InvalidInputDigest {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+        if !is_sha256(&sample.reference_sha256) {
+            issues.push(CorpusQualificationIssueV1::InvalidReferenceDigest {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+    }
+    if !issues.is_empty() {
+        return Err(issues);
     }
     let expected: BTreeMap<_, _> = manifest
         .samples
@@ -874,10 +931,10 @@ where
 }
 
 
-/// Metadata-only candidate registry. No sample bytes, SHA-256 manifests or
-/// frozen conversion/evaluation protocols are embedded here, so these entries
-/// cannot be promoted beyond MetadataRecorded until independent manifests
-/// and fingerprints are supplied.
+/// Metadata-only candidate registry. No sample bytes, sample manifests or
+/// frozen conversion/evaluation protocols are embedded here. Entries can
+/// advance only when callers supply independent manifests, split assignments
+/// and protocol fingerprints.
 pub fn candidate_musicxml_corpus_registry_v1() -> Vec<CorpusRegistrationV1> {
     let split = |work_disjoint, composer_disjoint| CorpusSplitPolicyV1 {
         work_disjoint,
@@ -1404,6 +1461,49 @@ mod tests {
         assert!(issues.contains(
             &CorpusQualificationIssueV1::InvalidInputPath {
                 sample_id: "page-001".into()
+            }
+        ));
+    }
+
+ 
+    #[test]
+    fn immutable_source_revision_requires_a_commit_or_archive_digest() {
+        let mut registration = registration("ossq-omr");
+        registration.source_revision_id = Some("latest".into());
+        assert!(validate_corpus_registration(&registration).contains(
+            &CorpusQualificationIssueV1::InvalidSourceRevision {
+                corpus_id: "ossq-omr".into()
+            }
+        ));
+        registration.source_revision_id = Some("a".repeat(40));
+        assert!(!validate_corpus_registration(&registration).iter().any(|issue| {
+            matches!(issue, CorpusQualificationIssueV1::InvalidSourceRevision { .. })
+        }));
+        registration.source_revision_id =
+            Some(format!("archive-sha256:{}", "b".repeat(64)));
+        assert!(!validate_corpus_registration(&registration).iter().any(|issue| {
+            matches!(issue, CorpusQualificationIssueV1::InvalidSourceRevision { .. })
+        }));
+    }
+
+    #[test]
+    fn direct_byte_verifier_rejects_duplicate_ids_and_malformed_manifests() {
+        let registration = registration("ossq-omr");
+        let first = sample("same", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b');
+        let second = sample("same", "fold-0", CorpusSplitRoleV1::Test, "composer-b", "work-b", 'c', 'd');
+        let manifest = sample_manifest(
+            &registration,
+            "omr-synthetic-score-image",
+            vec![first, second],
+        );
+        let result = verify_corpus_artifact_bytes(
+            &manifest,
+            Vec::<CorpusArtifactBytesV1<'_>>::new(),
+            &"f".repeat(64),
+        );
+        assert!(result.unwrap_err().contains(
+            &CorpusQualificationIssueV1::DuplicateSampleId {
+                sample_id: "same".into()
             }
         ));
     }
