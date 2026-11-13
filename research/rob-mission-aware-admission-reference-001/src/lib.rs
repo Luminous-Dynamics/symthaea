@@ -1020,18 +1020,14 @@ mod tests {
     fn explicit_replan_can_use_local_fallback_after_current_decision_becomes_insufficient() {
         let mut audit = request("q1", "r1");
         audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
-        audit
-            .decision_sufficiency
-            .as_mut()
-            .unwrap()
-            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Insufficient;
         audit
             .decision_sufficiency
             .as_mut()
             .unwrap()
             .remaining_sufficient_ticks = None;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q1"]);
         assert!(!report.actuation_authorized);
     }
@@ -1040,11 +1036,8 @@ mod tests {
     fn replan_does_not_bypass_unknown_decision_sufficiency() {
         let mut audit = request("q1", "r1");
         audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
-        audit
-            .decision_sufficiency
-            .as_mut()
-            .unwrap()
-            .disposition = DecisionSufficiencyDisposition::Unknown;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Unknown;
         let report =
             admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
