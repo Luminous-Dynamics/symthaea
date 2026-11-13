@@ -166,7 +166,33 @@
     "No real geographic boundaries, coordinates, climate forcing, population observations, migration events, utility data or community preferences are represented.",
     "Only drinking-water delivery and habitable-household capacity are included; all other service domains remain unassessed.",
     "The expected outcomes test arithmetic and contract behavior only. They do not establish potable-water safety, housing habitability or receiving-place suitability.",
-    "The fixture does not assign probabilities to pathways and does not infer climate attribution."
+    "The fixture does not assign probabilities to pathways and does not infer climate attribution.",
+    "The service-floor example is synthetic-only: its arbitrary threshold is not a real minimum service standard, and its partial coverage cannot support a full-scope floor verdict."
   ],
-  "claim_ceiling": "Synthetic arithmetic and schema behavior only; not a real city assessment, migration forecast, engineering validation or relocation recommendation."
+  "claim_ceiling": "Synthetic arithmetic and schema behavior only; not a real city assessment, migration forecast, engineering validation or relocation recommendation.",
+  "service_floor_assessments": [
+    {
+      "assessment_id": "partial-water-floor-observed-breach",
+      "service_scope_id": "synthetic-community-cell-a",
+      "metric": "declared_minimum_service_metric",
+      "unit": "synthetic_units",
+      "floor_profile_revision": "SYNTHETIC-FLOOR-PROFILE-0.1",
+      "floor_authority_ref": "SYNTHETIC-001",
+      "observation_ref": "SYNTHETIC-001",
+      "minimum_required": 25,
+      "observed_lower_bound": 12,
+      "observed_upper_bound": 20,
+      "coverage_numerator": 10,
+      "coverage_denominator": 100,
+      "expected_outcome": "observed_breach",
+      "evidence_class": "synthetic",
+      "qualification": "contract_only",
+      "result_scope": "synthetic_contract_only",
+      "limitations": [
+        "The threshold and measurement units are arbitrary synthetic contract constants, not a legal or community-approved service standard.",
+        "Only 10 of 100 synthetic coverage units are represented; the observed breach must not be generalized to the full service scope.",
+        "No actual water-delivery, health, affordability, or household measurement is represented."
+      ]
+    }
+  ]
 }
