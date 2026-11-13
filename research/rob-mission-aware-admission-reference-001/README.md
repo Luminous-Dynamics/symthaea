@@ -24,6 +24,13 @@ The conservative p99 return latency plus local projection/dispatch guard must fi
 
 The effective bound is their minimum. Exact-boundary equality is inclusive. EVSI remains a separate positive-value requirement: a long decision horizon does not make a zero-EVSI request useful, and positive EVSI cannot authorize a result that arrives after the selected decision expires.
 
+### Two distinct request modes
+
+- `PreserveCurrentDecision`: the remote result is intended to improve/continue the currently selected action. The result must return within the calibrated remaining decision-sufficiency horizon, in addition to buffer and task-deadline bounds. An already-insufficient decision blocks this mode.
+- `ReplanWithLocalFallback`: the selected decision has been explicitly marked Insufficient, and the request creates a replacement plan from the current observation/decision epoch. The old action is not extended. The request still requires an identity-bound Insufficient receipt, current clock/AoI evidence, positive EVSI, action-buffer and deadline slack, and a qualified local fallback. Unknown or Rejected sufficiency evidence is never accepted. If the decision is still Qualified, this mode remains subject to its remaining sufficient horizon.
+
+This distinction avoids a subtle failure mode: a strict decision-horizon gate must not extend an expired action, but it should not prevent a new plan from being computed when an independently qualified local fallback is carrying the robot. Every returned proposal is still revalidated against current observation identity and the local projection/assurance path before use.
+
 This is not an action-authority extension. Local control, RTA, physical interlocks, fallback and safe-stop remain independent.
 
 ## Hard eligibility precedes policy ranking
