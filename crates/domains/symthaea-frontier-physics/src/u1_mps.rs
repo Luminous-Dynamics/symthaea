@@ -3746,4 +3746,99 @@ mod tests {
         }
     }
 
+
+    fn canonical_w_state() -> ComplexU1Mps {
+        let amplitude = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(amplitude, 0.0);
+        dense[2] = Complex64::new(amplitude, 0.0);
+        dense[4] = Complex64::new(amplitude, 0.0);
+        ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap()
+    }
+
+    #[test]
+    fn mixed_canonicalization_qualifies_both_two_site_centers_and_preserves_dense_state() {
+        let original = canonical_w_state();
+        let expected_dense = original.to_dense(4).unwrap();
+        let expected_norm = original.norm_squared(1.0e-12).unwrap();
+
+        for bond in [0, 1] {
+            let mut candidate = original.clone();
+            let receipt: U1CanonicalGaugeReceipt =
+                candidate.canonicalize_for_bond(bond, 1.0e-10).unwrap();
+
+            assert_eq!(receipt.bond, bond);
+            assert_eq!(receipt.site_count, 3);
+            assert_eq!(receipt.total_charge, 1);
+            assert!(receipt.qualifies(1.0e-10), "receipt={receipt:?}");
+            assert_eq!(
+                receipt.left_isometry_residuals.iter().map(|(site, _)| *site).collect::<Vec<_>>(),
+                (0..bond).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                receipt.right_isometry_residuals.iter().map(|(site, _)| *site).collect::<Vec<_>>(),
+                ((bond + 2)..3).collect::<Vec<_>>()
+            );
+            assert!(receipt.left_exterior_operator_norm_upper_bound >= 1.0);
+            assert!(receipt.right_exterior_operator_norm_upper_bound >= 1.0);
+            assert!(receipt.state_reconstruction_l2_residual <= 1.0e-10);
+            assert!((receipt.output_norm_squared - expected_norm).abs() <= 1.0e-10);
+
+            let actual_dense = candidate.to_dense(4).unwrap();
+            for (actual, expected) in actual_dense.iter().zip(expected_dense.iter()) {
+                assert!((*actual - *expected).norm() <= 1.0e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn canonical_gauge_receipt_fails_closed_for_invalid_tolerance_or_bond() {
+        let mut state = canonical_w_state();
+        let original_tensors = state.tensors().to_vec();
+        assert!(matches!(
+            state.canonicalize_for_bond(0, 0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        ));
+        assert!(matches!(
+            state.canonicalize_for_bond(2, 1.0e-12),
+            Err(U1MpsError::TwoSiteShapeMismatch)
+        ));
+        assert_eq!(state.tensors(), original_tensors.as_slice());
+        let receipt = U1CanonicalGaugeReceipt {
+            bond: 0,
+            site_count: 3,
+            total_charge: 1,
+            left_isometry_residuals: Vec::new(),
+            right_isometry_residuals: Vec::new(),
+            maximum_left_isometry_residual: 0.0,
+            maximum_right_isometry_residual: 0.0,
+            left_exterior_operator_norm_upper_bound: f64::NAN,
+            right_exterior_operator_norm_upper_bound: 1.0,
+            factorization_max_residual: 0.0,
+            factorization_l2_residual: 0.0,
+            state_reconstruction_l2_residual: 0.0,
+            exact_zero_singular_values_omitted: 0,
+            selection_rule_residual: 0.0,
+            input_norm_squared: 1.0,
+            output_norm_squared: 1.0,
+            relative_norm_drift: 0.0,
+            qualified: true,
+        };
+        assert!(!receipt.qualifies(1.0e-12));
+    }
+
+    #[test]
+    fn canonicalization_is_idempotent_at_a_fixed_two_site_center() {
+        let mut state = canonical_w_state();
+        let first = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+        let dense_after_first = state.to_dense(4).unwrap();
+        let second = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+        let dense_after_second = state.to_dense(4).unwrap();
+        assert!(first.qualifies(1.0e-10));
+        assert!(second.qualifies(1.0e-10));
+        for (first_value, second_value) in dense_after_first.iter().zip(dense_after_second.iter()) {
+            assert!((*first_value - *second_value).norm() <= 1.0e-10);
+        }
+    }
+
 }
