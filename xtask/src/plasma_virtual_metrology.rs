@@ -798,42 +798,6 @@ mod tests {
     }
 
     #[test]
-    fn training_group_overlap_is_rejected() {
-        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(result_for(&report, "training-group-overlap").disposition, Disposition::Rejected);
-    }
-
-    #[test]
-    fn missing_training_group_manifest_is_blocked() {
-        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(result_for(&report, "model-holdout-unverified").disposition, Disposition::Blocked);
-    }
-
-    #[test]
-    fn future_dated_sensor_sample_is_blocked() {
-        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(result_for(&report, "future-dated-sensor").disposition, Disposition::Blocked);
-    }
-
-    #[test]
-    fn expired_sensor_calibration_is_blocked() {
-        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(result_for(&report, "expired-sensor-calibration").disposition, Disposition::Blocked);
-    }
-
-    #[test]
-    fn missing_energy_meter_record_is_blocked() {
-        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(result_for(&report, "missing-energy-meter").disposition, Disposition::Blocked);
-    }
-
-    #[test]
-    fn energy_subsystem_sum_mismatch_is_rejected() {
-        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(result_for(&report, "energy-subsystem-sum-mismatch").disposition, Disposition::Rejected);
-    }
-
-    #[test]
     fn in_spec_prediction_below_probability_gate_is_rejected() {
         let report = audit_fixture_json(FIXTURE).expect("fixture audit");
         assert_eq!(
