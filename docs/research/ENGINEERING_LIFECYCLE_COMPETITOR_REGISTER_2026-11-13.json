@@ -59,7 +59,10 @@
         "The agent can write affected-item relationships in one operation after user approval; it does not itself promote the change request through lifecycle approval.",
         "Customer-specific deployment and configuration are described as a separately contracted professional-services engagement.",
         "Five specialist agents and a recommendation validator are not five independent human reviewers or five independent failure domains.",
-        "Public documentation does not report independent gold-set accuracy, critical impact recall, evidence-applicability confusion matrix, human time or cost per accepted result."
+        "Public documentation does not report independent gold-set accuracy, critical impact recall, evidence-applicability confusion matrix, human time or cost per accepted result.",
+        "The configured account needs read/update access to Change Requests and read access to Affected Items (Parts, CADs and Documents); record the effective principal and permissions at analysis and apply time.",
+        "The optional Analysis Instructions field is free text intended to focus/constrain one session; it is task context, not an authority, approval or declassification grant.",
+        "Benchmark only the selected relationships the user explicitly applies; verify the Change Request remains Draft and record the observed effects rather than assuming undocumented transactional or permission semantics."
       ],
       "evidence_class": "vendor_release_notes_and_user_documentation",
       "sources": [
