@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Complex U1 MPS state representation, fixed-charge dense-to-MPS factorization and exact pre-SVD two-site gate contraction are source-authored. Exact-head Rust 1.96 isolated harness validation pending.",
+  "execution_status": "Complex U1 MPS state representation, charge-block dense factorization, U1 two-site gates and exact charge-block two-site split are source-authored. Exact-head isolated Rust 1.96 validation pending.",
   "claim_ceiling": "No two-site TEBD circuit evolution, truncation guarantee, large-N scaling or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -103,6 +103,26 @@
         "adjacent_tensor_contraction_rejects_mismatched_virtual_charge_bonds"
       ],
       "claim_ceiling": "Exact two-site contraction and gate application only; no charge-block SVD split or TEBD yet."
+    },
+    "two_site_split": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TwoSiteState::split_exact(tolerance)",
+      "method": "For each intermediate prefix charge q, factor the submatrix whose rows satisfy q_left+s1=q and columns satisfy q_right=q+s2. Independent complex SVD per q block.",
+      "truncation": "No positive cutoff or bond cap. Omit exactly-zero singular directions only; retain every positive singular value.",
+      "receipts": [
+        "rank_by_charge",
+        "retained_singular_values",
+        "exact_zero_singular_values_omitted",
+        "reconstruction_max_residual",
+        "reconstruction_l2_residual"
+      ],
+      "authored_tests": [
+        "exact_charge_block_split_rebuilds_phase_gated_entangled_w_state",
+        "exact_two_site_split_retains_tiny_positive_schmidt_amplitude",
+        "exact_two_site_split_omits_only_exact_zero_singular_directions",
+        "exact_two_site_split_rejects_zero_tensor_and_invalid_tolerance"
+      ],
+      "claim_ceiling": "Exact charge-block two-site SVD split only. No approximate truncation policy or TEBD yet."
     }
   },
   "known_answers": [
@@ -172,6 +192,19 @@
         "complex U(2) single-excitation block known answer",
         "MPS virtual-charge selection rule after gate",
         "no SVD, truncation or renormalization during gate application"
+      ]
+    },
+    {
+      "id": "MPS-1C",
+      "name": "Exact U1 charge-block two-site SVD split",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "independent SVD per admissible intermediate charge",
+        "charge-sector ranks reported for every split",
+        "only exact-zero singular directions may be omitted",
+        "tiny positive Schmidt component retained",
+        "dense reconstruction max and L2 residual",
+        "phase-gated W-state circuit matches dense oracle"
       ]
     },
     {
@@ -245,7 +278,11 @@
     "unitary gate that couples different total excitation sectors",
     "non-unitary two-site gate",
     "gate application that changes declared virtual-charge selection rules",
-    "implicit SVD or truncation during local gate application"
+    "implicit SVD or truncation during local gate application",
+    "SVD mixes distinct intermediate charge sectors",
+    "positive Schmidt value removed by numerical cutoff in exact split",
+    "charge-block split fails to reconstruct pre-split two-site tensor",
+    "zero tensor fabricated into a rank-bearing MPS"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -270,6 +307,11 @@
     "gate_charge_conservation_residual",
     "two_site_selection_rule_residual",
     "two_site_dense_oracle_amplitudes",
-    "two_site_gate_identity"
+    "two_site_gate_identity",
+    "two_site_split_rank_by_charge",
+    "two_site_split_retained_singular_values",
+    "two_site_split_exact_zero_directions_omitted",
+    "two_site_split_reconstruction_max_residual",
+    "two_site_split_reconstruction_l2_residual"
   ]
 }

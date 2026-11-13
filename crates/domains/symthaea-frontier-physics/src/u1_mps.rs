@@ -41,18 +41,32 @@ pub struct U1MpsTensor {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum U1MpsError {
     EmptyChain,
-    EmptyBond { site: usize, side: &'static str },
+    EmptyBond {
+        site: usize,
+        side: &'static str,
+    },
     DimensionOverflow,
-    EntryCount { expected: usize, actual: usize },
-    NonFiniteTensorEntry { site: usize, index: usize },
+    EntryCount {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteTensorEntry {
+        site: usize,
+        index: usize,
+    },
     InvalidTolerance(f64),
-    LeftBoundary { dimension: usize, charge: Option<i32> },
+    LeftBoundary {
+        dimension: usize,
+        charge: Option<i32>,
+    },
     RightBoundary {
         dimension: usize,
         actual_charge: Option<i32>,
         expected_charge: i32,
     },
-    BondChargeMismatch { bond: usize },
+    BondChargeMismatch {
+        bond: usize,
+    },
     ChargeSelectionRule {
         site: usize,
         left_charge: i32,
@@ -61,11 +75,20 @@ pub enum U1MpsError {
         amplitude: f64,
         tolerance: f64,
     },
-    DenseExpansionTooLarge { sites: usize, maximum_sites: usize },
+    DenseExpansionTooLarge {
+        sites: usize,
+        maximum_sites: usize,
+    },
     NonFiniteContraction(&'static str),
-    ComplexNormResidual { imaginary_part: f64, tolerance: f64 },
+    ComplexNormResidual {
+        imaginary_part: f64,
+        tolerance: f64,
+    },
     NegativeNormSquared(f64),
-    InvalidTotalCharge { total_charge: i32, site_count: usize },
+    InvalidTotalCharge {
+        total_charge: i32,
+        site_count: usize,
+    },
     ZeroDenseState,
     GateChargeLeakage {
         output_charge: u32,
@@ -73,12 +96,26 @@ pub enum U1MpsError {
         amplitude: f64,
         tolerance: f64,
     },
-    GateUnitarityResidual { residual: f64, tolerance: f64 },
+    GateUnitarityResidual {
+        residual: f64,
+        tolerance: f64,
+    },
     TwoSiteBondMismatch,
     TwoSiteShapeMismatch,
     TwoSiteDenseExpansionRequiresOpenBoundaries,
-    DenseChargeLeakage { basis_index: usize, amplitude: f64, tolerance: f64 },
-    SvdFailed { rows: usize, columns: usize },
+    TwoSiteSvdFailed {
+        rows: usize,
+        columns: usize,
+    },
+    DenseChargeLeakage {
+        basis_index: usize,
+        amplitude: f64,
+        tolerance: f64,
+    },
+    SvdFailed {
+        rows: usize,
+        columns: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -111,7 +148,10 @@ impl core::fmt::Display for U1MpsError {
                 "right boundary must be one state with charge {expected_charge}, got dimension {dimension}, charge {actual_charge:?}"
             ),
             Self::BondChargeMismatch { bond } => {
-                write!(f, "right/left charge labels disagree on virtual bond {bond}")
+                write!(
+                    f,
+                    "right/left charge labels disagree on virtual bond {bond}"
+                )
             }
             Self::ChargeSelectionRule {
                 site,
@@ -144,11 +184,17 @@ impl core::fmt::Display for U1MpsError {
             Self::NegativeNormSquared(value) => {
                 write!(f, "MPS norm squared is negative: {value}")
             }
-            Self::InvalidTotalCharge { total_charge, site_count } => write!(
+            Self::InvalidTotalCharge {
+                total_charge,
+                site_count,
+            } => write!(
                 f,
                 "total charge {total_charge} is invalid for a {site_count}-site qubit MPS"
             ),
-            Self::ZeroDenseState => write!(f, "the dense input has no nonzero amplitude in the declared charge sector"),
+            Self::ZeroDenseState => write!(
+                f,
+                "the dense input has no nonzero amplitude in the declared charge sector"
+            ),
             Self::GateChargeLeakage {
                 output_charge,
                 input_charge,
@@ -158,21 +204,43 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "two-site gate couples charge {input_charge} to {output_charge} with amplitude {amplitude}, tolerance {tolerance}"
             ),
-            Self::GateUnitarityResidual { residual, tolerance } => write!(
+            Self::GateUnitarityResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "two-site gate unitarity residual {residual} exceeds tolerance {tolerance}"
             ),
-            Self::TwoSiteBondMismatch => write!(f, "adjacent MPS tensors have different virtual charge labels"),
-            Self::TwoSiteShapeMismatch => write!(f, "two-site state tensor dimensions are inconsistent"),
-            Self::TwoSiteDenseExpansionRequiresOpenBoundaries => {
-                write!(f, "two-site dense expansion requires one-dimensional external boundary bonds")
+            Self::TwoSiteBondMismatch => write!(
+                f,
+                "adjacent MPS tensors have different virtual charge labels"
+            ),
+            Self::TwoSiteShapeMismatch => {
+                write!(f, "two-site state tensor dimensions are inconsistent")
             }
-            Self::DenseChargeLeakage { basis_index, amplitude, tolerance } => write!(
+            Self::TwoSiteDenseExpansionRequiresOpenBoundaries => {
+                write!(
+                    f,
+                    "two-site dense expansion requires one-dimensional external boundary bonds"
+                )
+            }
+            Self::TwoSiteSvdFailed { rows, columns } => write!(
+                f,
+                "charge-block two-site SVD failed to converge for {rows}x{columns} block"
+            ),
+            Self::DenseChargeLeakage {
+                basis_index,
+                amplitude,
+                tolerance,
+            } => write!(
                 f,
                 "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
             ),
             Self::SvdFailed { rows, columns } => {
-                write!(f, "charge-block SVD failed to converge for {rows}x{columns} block")
+                write!(
+                    f,
+                    "charge-block SVD failed to converge for {rows}x{columns} block"
+                )
             }
         }
     }
@@ -454,7 +522,6 @@ impl ComplexU1Mps {
         Ok(dense)
     }
 
-
     /// Factor an exact dense fixed-charge state into a complex U(1)-symmetric MPS.
     ///
     /// The decomposition performs a full SVD independently in each intermediate
@@ -589,12 +656,12 @@ impl ComplexU1Mps {
                 }
 
                 let (block_rows, block_columns) = (block.nrows(), block.ncols());
-                let decomposition = block
-                    .try_svd(true, true, tolerance, max_iterations)
-                    .ok_or(U1MpsError::SvdFailed {
+                let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
+                    U1MpsError::SvdFailed {
                         rows: block_rows,
                         columns: block_columns,
-                    })?;
+                    },
+                )?;
                 let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
                     rows: block_rows,
                     columns: block_columns,
@@ -614,9 +681,10 @@ impl ComplexU1Mps {
                 if kept_indices.is_empty() {
                     continue;
                 }
-                let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |r, col| {
-                    u[(r, kept_indices[col])]
-                });
+                let kept_u =
+                    DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |r, col| {
+                        u[(r, kept_indices[col])]
+                    });
                 let kept_v_t =
                     DMatrix::<Complex64>::from_fn(kept_indices.len(), columns.len(), |r, col| {
                         v_t[(kept_indices[r], col)]
@@ -670,8 +738,7 @@ impl ComplexU1Mps {
                 for singular_index in 0..block_rank {
                     let new_bond = offset + singular_index;
                     for (row_index, &(left, physical)) in block.rows.iter().enumerate() {
-                        let index =
-                            (left * 2 + physical) * next_bond_dimension + new_bond;
+                        let index = (left * 2 + physical) * next_bond_dimension + new_bond;
                         tensor_data[index] = block.u[(row_index, singular_index)];
                     }
                     let singular_value = block.singular_values[singular_index];
@@ -764,7 +831,10 @@ impl ComplexU1Mps {
                     }
                 }
             }
-            if next.iter().any(|value| !value.re.is_finite() || !value.im.is_finite()) {
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
                 return Err(U1MpsError::NonFiniteContraction("transfer environment"));
             }
             environment = next;
@@ -787,8 +857,6 @@ impl ComplexU1Mps {
         Ok(norm.re.max(0.0))
     }
 }
-
-
 
 /// A validated two-qubit gate that preserves total U(1) excitation number.
 ///
@@ -817,10 +885,7 @@ pub struct U1TwoSiteState {
 
 impl U1TwoSiteGate {
     /// Construct and validate a charge-conserving 4x4 unitary.
-    pub fn new(
-        matrix: [[Complex64; 4]; 4],
-        tolerance: f64,
-    ) -> Result<Self, U1MpsError> {
+    pub fn new(matrix: [[Complex64; 4]; 4], tolerance: f64) -> Result<Self, U1MpsError> {
         if !tolerance.is_finite() || tolerance <= 0.0 {
             return Err(U1MpsError::InvalidTolerance(tolerance));
         }
@@ -837,8 +902,8 @@ impl U1TwoSiteGate {
         }
 
         let mut charge_conservation_residual: f64 = 0.0;
-        for output in 0..4 {
-            for input in 0..4 {
+        for output in 0_usize..4 {
+            for input in 0_usize..4 {
                 if output.count_ones() != input.count_ones() {
                     charge_conservation_residual =
                         charge_conservation_residual.max(matrix[output][input].norm());
@@ -846,10 +911,10 @@ impl U1TwoSiteGate {
             }
         }
         if charge_conservation_residual > tolerance {
-            let witness = (0..4)
-                .flat_map(|output| (0..4).map(move |input| (output, input)))
+            let witness = (0_usize..4)
+                .flat_map(|output| (0_usize..4).map(move |input| (output, input)))
                 .find(|(output, input)| {
-                    output.count_ones() != input.count_ones()
+                    (*output).count_ones() != (*input).count_ones()
                         && matrix[*output][*input].norm() > tolerance
                 })
                 .unwrap_or((0, 0));
@@ -873,8 +938,7 @@ impl U1TwoSiteGate {
                 } else {
                     Complex64::new(0.0, 0.0)
                 };
-                unitarity_residual =
-                    unitarity_residual.max((overlap - expected).norm());
+                unitarity_residual = unitarity_residual.max((overlap - expected).norm());
             }
         }
         if unitarity_residual > tolerance {
@@ -929,6 +993,22 @@ impl U1TwoSiteGate {
             unitarity_residual: 0.0,
         }
     }
+}
+
+/// Receipts from an exact charge-block split of a two-site state.
+///
+/// Exactly-zero singular directions are omitted as nullspace. Every positive
+/// singular value is retained; this operation has no bond cap or cutoff.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteSplitDiagnostics {
+    pub left_tensor: U1MpsTensor,
+    pub right_tensor: U1MpsTensor,
+    /// (intermediate charge, retained positive singular-value count).
+    pub rank_by_charge: Vec<(i32, usize)>,
+    pub retained_singular_values: usize,
+    pub exact_zero_singular_values_omitted: usize,
+    pub reconstruction_max_residual: f64,
+    pub reconstruction_l2_residual: f64,
 }
 
 impl U1TwoSiteState {
@@ -1061,8 +1141,7 @@ impl U1TwoSiteState {
                             value += left.get(left_index, first_physical, bond)
                                 * right.get(bond, second_physical, right_index);
                         }
-                        let index = (left_index * 4 + physical_pair)
-                            * right.right_dimension()
+                        let index = (left_index * 4 + physical_pair) * right.right_dimension()
                             + right_index;
                         data[index] = value;
                     }
@@ -1078,11 +1157,7 @@ impl U1TwoSiteState {
     }
 
     /// Apply a validated two-site gate without splitting or truncating the bond.
-    pub fn apply_gate(
-        &self,
-        gate: &U1TwoSiteGate,
-        tolerance: f64,
-    ) -> Result<Self, U1MpsError> {
+    pub fn apply_gate(&self, gate: &U1TwoSiteGate, tolerance: f64) -> Result<Self, U1MpsError> {
         let right_dimension = self.right_dimension();
         let entries = self
             .left_dimension()
@@ -1111,6 +1186,214 @@ impl U1TwoSiteState {
         )
     }
 
+    /// Split this two-site tensor into two U(1)-symmetric site tensors.
+    ///
+    /// The matrix is block-diagonalized by the intermediate prefix charge q:
+    /// rows satisfy q_left + s_first = q and columns satisfy
+    /// q_right = q + s_second. Each charge block is factorized independently.
+    ///
+    /// No bond cap, positive singular-value cutoff, normalization or
+    /// renormalization is applied. Exactly-zero singular directions are omitted;
+    /// every positive singular value is retained, however small.
+    pub fn split_exact(&self, tolerance: f64) -> Result<U1TwoSiteSplitDiagnostics, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        struct ChargeBlock {
+            charge: i32,
+            rows: Vec<(usize, usize)>,
+            columns: Vec<(usize, usize)>,
+            left_vectors: DMatrix<Complex64>,
+            right_vectors_t: DMatrix<Complex64>,
+            singular_values: Vec<f64>,
+        }
+
+        let mut row_groups: Vec<(i32, Vec<(usize, usize)>)> = Vec::new();
+        for left in 0..self.left_dimension() {
+            for first_physical in 0..2 {
+                let charge = self.left_charges[left] + first_physical as i32;
+                if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+                    rows.push((left, first_physical));
+                } else {
+                    row_groups.push((charge, vec![(left, first_physical)]));
+                }
+            }
+        }
+
+        let max_block_dimension = self
+            .left_dimension()
+            .saturating_mul(2)
+            .max(self.right_dimension().saturating_mul(2));
+        let max_iterations = 10_000usize
+            .max(64usize.saturating_mul(max_block_dimension.saturating_mul(max_block_dimension)));
+        let mut blocks = Vec::new();
+        let mut exact_zero_singular_values_omitted = 0_usize;
+
+        for (charge, rows) in row_groups {
+            let mut columns = Vec::new();
+            for second_physical in 0..2 {
+                for right in 0..self.right_dimension() {
+                    if self.right_charges[right] == charge + second_physical as i32 {
+                        columns.push((second_physical, right));
+                    }
+                }
+            }
+            if rows.is_empty() || columns.is_empty() {
+                continue;
+            }
+
+            let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+            for (row_index, &(left, first_physical)) in rows.iter().enumerate() {
+                for (column_index, &(second_physical, right)) in columns.iter().enumerate() {
+                    let physical_pair = first_physical * 2 + second_physical;
+                    block[(row_index, column_index)] = self.get(left, physical_pair, right);
+                }
+            }
+
+            let block_rows = block.nrows();
+            let block_columns = block.ncols();
+            let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
+                U1MpsError::TwoSiteSvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                },
+            )?;
+            let left_vectors = decomposition.u.ok_or(U1MpsError::TwoSiteSvdFailed {
+                rows: block_rows,
+                columns: block_columns,
+            })?;
+            let right_vectors_t = decomposition.v_t.ok_or(U1MpsError::TwoSiteSvdFailed {
+                rows: block_rows,
+                columns: block_columns,
+            })?;
+
+            let mut kept_indices = Vec::new();
+            for (index, singular_value) in decomposition.singular_values.iter().enumerate() {
+                if !singular_value.is_finite() {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "two-site charge-block singular value",
+                    ));
+                }
+                if *singular_value > 0.0 {
+                    kept_indices.push(index);
+                } else {
+                    exact_zero_singular_values_omitted += 1;
+                }
+            }
+            if kept_indices.is_empty() {
+                continue;
+            }
+
+            let kept_left =
+                DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |row, column| {
+                    left_vectors[(row, kept_indices[column])]
+                });
+            let kept_right_t =
+                DMatrix::<Complex64>::from_fn(kept_indices.len(), columns.len(), |row, column| {
+                    right_vectors_t[(kept_indices[row], column)]
+                });
+            let singular_values = kept_indices
+                .iter()
+                .map(|&index| decomposition.singular_values[index])
+                .collect();
+
+            blocks.push(ChargeBlock {
+                charge,
+                rows,
+                columns,
+                left_vectors: kept_left,
+                right_vectors_t: kept_right_t,
+                singular_values,
+            });
+        }
+
+        let total_rank = blocks.iter().try_fold(0_usize, |sum, block| {
+            sum.checked_add(block.singular_values.len())
+                .ok_or(U1MpsError::DimensionOverflow)
+        })?;
+        if total_rank == 0 {
+            return Err(U1MpsError::ZeroDenseState);
+        }
+
+        let left_entries = self
+            .left_dimension()
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(total_rank))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let right_entries = total_rank
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(self.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut left_data = vec![Complex64::new(0.0, 0.0); left_entries];
+        let mut right_data = vec![Complex64::new(0.0, 0.0); right_entries];
+        let mut middle_charges = Vec::with_capacity(total_rank);
+        let mut rank_by_charge = Vec::with_capacity(blocks.len());
+        let mut offset = 0_usize;
+
+        for block in &blocks {
+            let rank = block.singular_values.len();
+            rank_by_charge.push((block.charge, rank));
+            middle_charges.extend(core::iter::repeat_n(block.charge, rank));
+
+            for singular_index in 0..rank {
+                let middle = offset + singular_index;
+                for (row_index, &(left, first_physical)) in block.rows.iter().enumerate() {
+                    let index = (left * 2 + first_physical) * total_rank + middle;
+                    left_data[index] = block.left_vectors[(row_index, singular_index)];
+                }
+
+                for (column_index, &(second_physical, right)) in block.columns.iter().enumerate() {
+                    let index = (middle * 2 + second_physical) * self.right_dimension() + right;
+                    right_data[index] = block.singular_values[singular_index]
+                        * block.right_vectors_t[(singular_index, column_index)];
+                }
+            }
+            offset += rank;
+        }
+
+        let left_tensor =
+            U1MpsTensor::new(self.left_charges.clone(), middle_charges.clone(), left_data)?;
+        let right_tensor =
+            U1MpsTensor::new(middle_charges, self.right_charges.clone(), right_data)?;
+
+        let mut reconstruction_max_residual: f64 = 0.0;
+        let mut reconstruction_squared = 0.0;
+        for left in 0..self.left_dimension() {
+            for first_physical in 0..2 {
+                for second_physical in 0..2 {
+                    let physical_pair = first_physical * 2 + second_physical;
+                    for right in 0..self.right_dimension() {
+                        let mut reconstructed = Complex64::new(0.0, 0.0);
+                        for middle in 0..total_rank {
+                            reconstructed += left_tensor.get(left, first_physical, middle)
+                                * right_tensor.get(middle, second_physical, right);
+                        }
+                        let residual =
+                            (reconstructed - self.get(left, physical_pair, right)).norm();
+                        reconstruction_max_residual = reconstruction_max_residual.max(residual);
+                        reconstruction_squared += residual * residual;
+                    }
+                }
+            }
+        }
+        if !reconstruction_max_residual.is_finite() || !reconstruction_squared.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site split reconstruction",
+            ));
+        }
+
+        Ok(U1TwoSiteSplitDiagnostics {
+            left_tensor,
+            right_tensor,
+            rank_by_charge,
+            retained_singular_values: total_rank,
+            exact_zero_singular_values_omitted,
+            reconstruction_max_residual,
+            reconstruction_l2_residual: reconstruction_squared.sqrt(),
+        })
+    }
+
     /// Return the four computational-basis amplitudes for open-boundary tensors.
     pub fn to_dense_two_qubit(&self) -> Result<[Complex64; 4], U1MpsError> {
         if self.left_dimension() != 1 || self.right_dimension() != 1 {
@@ -1120,12 +1403,9 @@ impl U1TwoSiteState {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        ComplexU1Mps, U1MpsError, U1MpsTensor, U1TwoSiteGate, U1TwoSiteState,
-    };
+    use super::{ComplexU1Mps, U1MpsError, U1MpsTensor, U1TwoSiteGate, U1TwoSiteState};
     use num_complex::Complex64;
 
     #[test]
@@ -1248,10 +1528,7 @@ mod tests {
         let nonfinite = U1MpsTensor::new(
             vec![0],
             vec![0],
-            vec![
-                Complex64::new(f64::NAN, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
+            vec![Complex64::new(f64::NAN, 0.0), Complex64::new(0.0, 0.0)],
         )
         .unwrap();
         assert!(matches!(
@@ -1302,6 +1579,7 @@ mod tests {
         assert_eq!(state.total_charge(), 2);
         assert!(state.maximum_bond_dimension() <= 2);
         assert_eq!(state.dense_svd_rank_by_charge_and_cut().unwrap().len(), 3);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-12);
         assert!((state.norm_squared(1.0e-12).unwrap() - 0.625).abs() <= 1.0e-12);
         let reconstructed = state.to_dense(8).unwrap();
         for (actual, expected) in reconstructed.iter().zip(dense.iter()) {
@@ -1331,7 +1609,6 @@ mod tests {
         ));
     }
 
-
     #[test]
     fn dense_factorization_reports_tolerated_out_of_sector_input_leakage() {
         let amplitude = 1.0 / 3.0_f64.sqrt();
@@ -1347,10 +1624,9 @@ mod tests {
         assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
     }
 
-
     #[test]
     fn dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight() {
-        let tiny = 1.0e-18;
+        let tiny: f64 = 1.0e-18;
         let large = (1.0 - tiny * tiny).sqrt();
         let mut dense = vec![Complex64::new(0.0, 0.0); 4];
         dense[1] = Complex64::new(large, 0.0);
@@ -1382,7 +1658,6 @@ mod tests {
             Err(U1MpsError::ZeroDenseState)
         );
     }
-
 
     fn single_excitation_state() -> ComplexU1Mps {
         let amplitude = 1.0 / 2.0_f64.sqrt();
@@ -1418,7 +1693,9 @@ mod tests {
         )
         .unwrap();
         let dense = pair.to_dense_two_qubit().unwrap();
-        assert_eq!(dense, state.to_dense(2).unwrap().try_into().unwrap());
+        let dense_vec = state.to_dense(2).unwrap();
+        let dense_from_state: [Complex64; 4] = dense_vec.try_into().unwrap();
+        assert_eq!(dense, dense_from_state);
         assert!(pair.selection_rule_residual() <= 1.0e-12);
     }
 
@@ -1553,7 +1830,6 @@ mod tests {
         ));
     }
 
-
     fn complex_zero() -> Complex64 {
         Complex64::new(0.0, 0.0)
     }
@@ -1561,26 +1837,42 @@ mod tests {
     #[test]
     fn two_site_identity_and_swap_gates_preserve_charge_and_dense_amplitudes() {
         let product = ComplexU1Mps::product_state(&[false, true]).unwrap();
-        let two_site =
-            U1TwoSiteState::from_adjacent_tensors(&product.tensors()[0], &product.tensors()[1], 1.0e-12)
-                .unwrap();
-        assert_eq!(two_site.to_dense_two_qubit().unwrap(), [
-            complex_zero(),
-            Complex64::new(1.0, 0.0),
-            complex_zero(),
-            complex_zero(),
-        ]);
+        let two_site = U1TwoSiteState::from_adjacent_tensors(
+            &product.tensors()[0],
+            &product.tensors()[1],
+            1.0e-12,
+        )
+        .unwrap();
+        assert_eq!(
+            two_site.to_dense_two_qubit().unwrap(),
+            [
+                complex_zero(),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+                complex_zero(),
+            ]
+        );
 
-        let identity = two_site.apply_gate(&U1TwoSiteGate::identity(), 1.0e-12).unwrap();
-        assert_eq!(identity.to_dense_two_qubit().unwrap(), two_site.to_dense_two_qubit().unwrap());
+        let identity = two_site
+            .apply_gate(&U1TwoSiteGate::identity(), 1.0e-12)
+            .unwrap();
+        assert_eq!(
+            identity.to_dense_two_qubit().unwrap(),
+            two_site.to_dense_two_qubit().unwrap()
+        );
 
-        let swapped = two_site.apply_gate(&U1TwoSiteGate::swap(), 1.0e-12).unwrap();
-        assert_eq!(swapped.to_dense_two_qubit().unwrap(), [
-            complex_zero(),
-            complex_zero(),
-            Complex64::new(1.0, 0.0),
-            complex_zero(),
-        ]);
+        let swapped = two_site
+            .apply_gate(&U1TwoSiteGate::swap(), 1.0e-12)
+            .unwrap();
+        assert_eq!(
+            swapped.to_dense_two_qubit().unwrap(),
+            [
+                complex_zero(),
+                complex_zero(),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+            ]
+        );
         assert_eq!(swapped.left_charges(), &[0]);
         assert_eq!(swapped.right_charges(), &[1]);
         assert_eq!(swapped.selection_rule_residual(), 0.0);
@@ -1615,8 +1907,8 @@ mod tests {
         let evolved = plus.apply_gate(&gate, 1.0e-12).unwrap();
         let dense = evolved.to_dense_two_qubit().unwrap();
         assert!(dense[0].norm() <= 1.0e-12);
-        assert!((dense[1] - Complex64::new(inverse_root_two, inverse_root_two)).norm() <= 1.0e-12);
-        assert!((dense[2] - Complex64::new(inverse_root_two, inverse_root_two)).norm() <= 1.0e-12);
+        assert!((dense[1] - Complex64::new(0.5, 0.5)).norm() <= 1.0e-12);
+        assert!((dense[2] - Complex64::new(0.5, 0.5)).norm() <= 1.0e-12);
         assert!(dense[3].norm() <= 1.0e-12);
     }
 
@@ -1703,4 +1995,121 @@ mod tests {
         );
     }
 
+    #[test]
+    fn exact_charge_block_split_rebuilds_phase_gated_entangled_w_state() {
+        let root_two_thirds = (2.0_f64 / 3.0).sqrt();
+        let root_one_third = (1.0_f64 / 3.0).sqrt();
+        let inverse_root_two = 1.0 / 2.0_f64.sqrt();
+
+        let mut first_data = vec![complex_zero(); 4];
+        first_data[0] = Complex64::new(root_two_thirds, 0.0);
+        first_data[3] = Complex64::new(root_one_third, 0.0);
+        let first = U1MpsTensor::new(vec![0], vec![0, 1], first_data).unwrap();
+
+        let mut second_data = vec![complex_zero(); 8];
+        second_data[0] = Complex64::new(inverse_root_two, 0.0);
+        second_data[3] = Complex64::new(inverse_root_two, 0.0);
+        second_data[5] = Complex64::new(1.0, 0.0);
+        let second = U1MpsTensor::new(vec![0, 1], vec![0, 1], second_data).unwrap();
+
+        let mut third_data = vec![complex_zero(); 4];
+        third_data[1] = Complex64::new(1.0, 0.0);
+        third_data[2] = Complex64::new(1.0, 0.0);
+        let third = U1MpsTensor::new(vec![0, 1], vec![1], third_data).unwrap();
+
+        let initial = ComplexU1Mps::new(
+            vec![first.clone(), second.clone(), third.clone()],
+            1,
+            1.0e-12,
+        )
+        .unwrap();
+        let two_site = U1TwoSiteState::from_adjacent_tensors(&first, &second, 1.0e-12).unwrap();
+
+        let mut phase_gate = [[complex_zero(); 4]; 4];
+        phase_gate[0][0] = Complex64::new(1.0, 0.0);
+        phase_gate[1][1] = Complex64::new(1.0, 0.0);
+        phase_gate[2][2] = Complex64::new(-1.0, 0.0);
+        phase_gate[3][3] = Complex64::new(1.0, 0.0);
+        let gate = U1TwoSiteGate::new(phase_gate, 1.0e-12).unwrap();
+
+        let evolved_two_site = two_site.apply_gate(&gate, 1.0e-12).unwrap();
+        let split = evolved_two_site.split_exact(1.0e-12).unwrap();
+        assert_eq!(split.rank_by_charge, vec![(0, 1), (1, 1)]);
+        assert_eq!(split.retained_singular_values, 2);
+        assert!(split.reconstruction_max_residual <= 1.0e-12);
+        assert!(split.reconstruction_l2_residual <= 1.0e-12);
+
+        let rebuilt = ComplexU1Mps::new(
+            vec![split.left_tensor, split.right_tensor, third],
+            1,
+            1.0e-12,
+        )
+        .unwrap();
+        assert!((rebuilt.norm_squared(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-12);
+
+        let mut expected = initial.to_dense(4).unwrap();
+        expected[4] = -expected[4];
+        let actual = rebuilt.to_dense(4).unwrap();
+        for index in 0..expected.len() {
+            assert!(
+                (actual[index] - expected[index]).norm() <= 1.0e-10,
+                "basis={index}, actual={:?}, expected={:?}",
+                actual[index],
+                expected[index]
+            );
+        }
+    }
+
+    #[test]
+    fn exact_two_site_split_retains_tiny_positive_schmidt_amplitude() {
+        let tiny: f64 = 1.0e-18;
+        let large = (1.0 - tiny * tiny).sqrt();
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                complex_zero(),
+                Complex64::new(large, 0.0),
+                Complex64::new(tiny, 0.0),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+
+        let split = state.split_exact(1.0e-12).unwrap();
+        assert_eq!(split.retained_singular_values, 2);
+        assert!(split.rank_by_charge.contains(&(0, 1)));
+        assert!(split.rank_by_charge.contains(&(1, 1)));
+        assert!(split.reconstruction_max_residual <= 1.0e-15);
+        let small_amplitude = split.left_tensor.get(0, 1, 1) * split.right_tensor.get(1, 0, 0);
+        assert!((small_amplitude.re - tiny).abs() <= 1.0e-30);
+    }
+
+    #[test]
+    fn exact_two_site_split_omits_only_exact_zero_singular_directions() {
+        // The q=0 block is [[1, 1], [1, 1]], with one exact zero
+        // singular value and one positive singular value.
+        let mut entries = vec![complex_zero(); 2 * 4 * 2];
+        entries[0] = Complex64::new(1.0, 0.0);
+        entries[1] = Complex64::new(1.0, 0.0);
+        entries[8] = Complex64::new(1.0, 0.0);
+        entries[9] = Complex64::new(1.0, 0.0);
+        let state = U1TwoSiteState::new(vec![0, 0], vec![0, 0], entries, 1.0e-12).unwrap();
+        let split = state.split_exact(1.0e-12).unwrap();
+        assert_eq!(split.rank_by_charge, vec![(0, 1)]);
+        assert_eq!(split.retained_singular_values, 1);
+        assert_eq!(split.exact_zero_singular_values_omitted, 1);
+        assert!(split.reconstruction_max_residual <= 1.0e-12);
+    }
+
+    #[test]
+    fn exact_two_site_split_rejects_zero_tensor_and_invalid_tolerance() {
+        let zero = U1TwoSiteState::new(vec![0], vec![0], vec![complex_zero(); 4], 1.0e-12).unwrap();
+        assert_eq!(zero.split_exact(1.0e-12), Err(U1MpsError::ZeroDenseState));
+        assert_eq!(
+            zero.split_exact(0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        );
+    }
 }
