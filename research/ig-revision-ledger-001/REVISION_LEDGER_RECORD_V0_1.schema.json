@@ -1,0 +1,852 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-revision-ledger-001/REVISION_LEDGER_RECORD_V0_1.schema.json",
+  "title": "IG-REVISION-LEDGER-001 revision event v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "revision_event_id",
+    "run_id",
+    "scenario_id",
+    "agent_instance_id",
+    "principal_ref",
+    "stage",
+    "transition",
+    "previous_state",
+    "next_state",
+    "claim_delta",
+    "evidence_delta",
+    "claim_evidence_links",
+    "delivered_messages",
+    "agent_report",
+    "oracle",
+    "descriptive_exposure",
+    "causal_attribution",
+    "event_status",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "revision_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent_instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "principal_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stage": {
+      "enum": [
+        "PrivateBaseline",
+        "PublicInteraction",
+        "PrivateExposureMemory",
+        "PrivateContextReset",
+        "DelayedPrivate"
+      ]
+    },
+    "transition": {
+      "enum": [
+        "Changed",
+        "NoChange",
+        "Abstained",
+        "Missing",
+        "Invalid"
+      ]
+    },
+    "previous_state": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "state_sha256",
+        "stance",
+        "uncertainty_state",
+        "claim_ids",
+        "evidence_ids"
+      ],
+      "properties": {
+        "state_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "stance": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_state": {
+          "enum": [
+            "Certain",
+            "Uncertain",
+            "Conflicted",
+            "Abstained",
+            "Unknown"
+          ]
+        },
+        "claim_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "scale",
+            "calibration_profile_sha256",
+            "calibration_receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NotProvided",
+                "SelfReported",
+                "Calibrated"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "scale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "calibration_profile_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "calibration_receipt_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "next_state": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "state_sha256",
+        "stance",
+        "uncertainty_state",
+        "claim_ids",
+        "evidence_ids"
+      ],
+      "properties": {
+        "state_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "stance": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_state": {
+          "enum": [
+            "Certain",
+            "Uncertain",
+            "Conflicted",
+            "Abstained",
+            "Unknown"
+          ]
+        },
+        "claim_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value",
+            "scale",
+            "calibration_profile_sha256",
+            "calibration_receipt_sha256"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "NotProvided",
+                "SelfReported",
+                "Calibrated"
+              ]
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "scale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "calibration_profile_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "calibration_receipt_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "claim_delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "added",
+        "removed",
+        "retained",
+        "contradicted",
+        "retracted"
+      ],
+      "properties": {
+        "added": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "retained": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "contradicted": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "retracted": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence_delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "available_before",
+        "newly_available",
+        "newly_unavailable",
+        "invalidated"
+      ],
+      "properties": {
+        "available_before": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "newly_available": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "newly_unavailable": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalidated": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "claim_evidence_links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "evidence_id",
+          "relationship"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string"
+          },
+          "evidence_id": {
+            "type": "string"
+          },
+          "relationship": {
+            "enum": [
+              "supports",
+              "contradicts",
+              "qualifies",
+              "contextualizes"
+            ]
+          }
+        }
+      }
+    },
+    "delivered_messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "message_id",
+          "channel_event_id",
+          "channel_event_sha256",
+          "communication_graph_sha256",
+          "sender_agent_instance_id",
+          "recipient_agent_instance_id",
+          "delivery_sequence",
+          "payload_sha256"
+        ],
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel_event_id": {
+            "type": "string"
+          },
+          "channel_event_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "communication_graph_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sender_agent_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recipient_agent_instance_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "delivery_sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "payload_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "agent_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provided",
+        "kind",
+        "reason_code",
+        "explanation_sha256"
+      ],
+      "properties": {
+        "provided": {
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "self_report"
+        },
+        "reason_code": {
+          "enum": [
+            "Evidence",
+            "Correction",
+            "Constraint",
+            "Repetition",
+            "StatusCue",
+            "ConsensusCue",
+            "Uncertainty",
+            "Other",
+            "NotProvided"
+          ]
+        },
+        "explanation_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_profile",
+        "outcome",
+        "answer_space_sha256",
+        "oracle_receipt_sha256"
+      ],
+      "properties": {
+        "task_profile": {
+          "enum": [
+            "MeasurementOnly",
+            "SyntheticKnownAnswer",
+            "OpenWorld",
+            "NormativePluralism",
+            "SocialClaimIntegrity"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "Supported",
+            "Unsupported",
+            "Contradicted",
+            "Indeterminate",
+            "NotApplicable"
+          ]
+        },
+        "answer_space_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "oracle_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "descriptive_exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "social_message_exposure",
+        "status_cue_exposure",
+        "repetition_cue_exposure",
+        "valid_evidence_delta"
+      ],
+      "properties": {
+        "social_message_exposure": {
+          "type": "boolean"
+        },
+        "status_cue_exposure": {
+          "type": "boolean"
+        },
+        "repetition_cue_exposure": {
+          "type": "boolean"
+        },
+        "valid_evidence_delta": {
+          "type": "boolean"
+        }
+      }
+    },
+    "causal_attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "matched_pair_id",
+        "treatment_run_id",
+        "control_run_id",
+        "analysis_plan_sha256",
+        "effect_estimate_sha256",
+        "matched_inputs",
+        "varied_factor",
+        "pair_validator_id",
+        "pair_validation_receipt_sha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NotEstimated",
+            "InsufficientEvidence",
+            "MatchedPairEstimate"
+          ]
+        },
+        "matched_pair_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "treatment_run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "control_run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "analysis_plan_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "effect_estimate_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "matched_inputs": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "task_instance",
+            "model_profile",
+            "system_prompt",
+            "elicitation_prompt",
+            "evidence_packet",
+            "communication_graph",
+            "budget_profile",
+            "decoding_profile",
+            "rng_stream",
+            "evaluator_profile"
+          ],
+          "properties": {
+            "task_instance": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "model_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "system_prompt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "elicitation_prompt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "evidence_packet": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "communication_graph": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "budget_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "decoding_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "rng_stream": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "evaluator_profile": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "treatment_sha256",
+                "control_sha256"
+              ],
+              "properties": {
+                "treatment_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "control_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "varied_factor": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "treatment_sha256",
+            "control_sha256"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "enum": [
+                "persuasion_exposure",
+                "communication_placement",
+                "confidence_policy",
+                "debate_method",
+                "evidence_availability",
+                "message_order",
+                "agent_diversity",
+                "abstention_policy",
+                "loss_profile",
+                "retrieval_policy"
+              ]
+            },
+            "treatment_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "control_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "pair_validator_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pair_validation_receipt_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "event_status": {
+      "enum": [
+        "Pass",
+        "Fail",
+        "Indeterminate",
+        "Invalid",
+        "Unsupported",
+        "Timeout",
+        "NotRun"
+      ]
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 40
+    }
+  }
+}
