@@ -1,0 +1,21 @@
+[package]
+name = "za-click-gesture-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Synthetic-only multi-source click articulatory gesture compiler benchmark"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "za-click-gesture-bench"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+
+[workspace]

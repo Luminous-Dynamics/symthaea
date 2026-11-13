@@ -1,0 +1,61 @@
+name: ZA-CLICK-001 synthetic click gesture compiler
+
+on:
+  pull_request:
+    paths:
+      - "tools/za-click-gesture-bench/**"
+      - "docs/research/ZA_CLICK_GESTURE_COMPILER_V1.md"
+      - ".github/workflows/za-click-gesture-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-click-gesture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "ZA_CLICK_SOURCE_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate standalone dependency lock
+        run: cargo generate-lockfile --manifest-path tools/za-click-gesture-bench/Cargo.toml
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/za-click-gesture-bench/Cargo.toml --all -- --check
+
+      - name: Run symbolic gesture tests
+        run: cargo test --manifest-path tools/za-click-gesture-bench/Cargo.toml --locked --all-targets
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/za-click-gesture-bench/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Generate known-answer gesture bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/za-click-gesture"
+          cargo run --manifest-path tools/za-click-gesture-bench/Cargo.toml --locked -- "$output"
+          test -s "$output/gesture-manifest.json"
+          test -s "$output/gesture-manifest.sha256"
+          test -s "$output/gesture-timelines.txt"
+          grep -q '"content_class": "synthetic_symbolic_gesture_only"' "$output/gesture-manifest.json"
+          grep -q '"human_recordings_ingested": false' "$output/gesture-manifest.json"
