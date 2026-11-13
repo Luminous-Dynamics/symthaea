@@ -1232,6 +1232,39 @@ mod tests {
     }
 
     #[test]
+    fn unqualified_low_reserve_reading_cannot_trigger_a_hard_floor_veto() {
+        let mut audit = input();
+        audit.clusters[0].candidate.reserves[0].disposition = EvidenceDisposition::Unknown;
+        audit.clusters[0].candidate.reserves[0].terminal_lower_bound = Some(1);
+        audit.clusters[0].candidate.reserves[0].source_receipt_digest = None;
+        let report = compare_work_and_terminal_capability(&audit).unwrap();
+        assert_eq!(
+            report.disposition,
+            CapabilityRetentionDisposition::Inconclusive
+        );
+        let energy = report.clusters[0]
+            .reserve_deltas
+            .iter()
+            .find(|delta| delta.kind == ReserveKind::EnergyReserveMilliWh)
+            .unwrap();
+        assert!(!energy.candidate_below_floor);
+        assert_eq!(energy.disposition, EvidenceDisposition::Unknown);
+    }
+
+    #[test]
+    fn calibration_required_reserve_without_calibration_receipt_is_rejected() {
+        let mut audit = input();
+        audit.clusters[0].candidate.reserves[1].calibration_receipt_digest = None;
+        assert!(matches!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::IncompleteQualifiedReserve {
+                arm_id,
+                kind: ReserveKind::ThermalHeadroomMilliC
+            }) if arm_id == "candidate"
+        ));
+    }
+
+    #[test]
     fn missing_option_ledger_receipt_is_rejected() {
         let mut audit = input();
         audit.clusters[0].candidate.option_set.ledger_receipt_digest.clear();
