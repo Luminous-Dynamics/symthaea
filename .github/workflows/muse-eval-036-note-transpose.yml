@@ -9,6 +9,8 @@ on:
       - "Cargo.lock"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/MEL-MR-EVAL-017_COUNTERFACTUAL_INFLUENCE.md"
+      - "crates/domains/symthaea-muse/MEL-MR-EVAL-036_PHASE1_SEMITONE_TRANSPOSE.md"
       - ".github/workflows/muse-eval-036-note-transpose.yml"
   pull_request:
     paths:
