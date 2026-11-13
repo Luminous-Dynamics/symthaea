@@ -1,0 +1,35 @@
+name: Robotics Capability Retention
+
+on:
+  push:
+    branches:
+      - research/rob-capability-retention-001
+    paths:
+      - "research/rob-capability-retention-001/**"
+      - ".github/workflows/rob-capability-retention.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "research/rob-capability-retention-001/**"
+      - ".github/workflows/rob-capability-retention.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  capability-retention:
+    name: Rust 1.96 format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/rob-capability-retention-001/reference/Cargo.toml -- --check
+      - name: Run deterministic tests
+        run: cargo test --locked --manifest-path research/rob-capability-retention-001/reference/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/rob-capability-retention-001/reference/Cargo.toml --all-targets -- -D warnings
