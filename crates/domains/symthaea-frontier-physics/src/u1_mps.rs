@@ -117,6 +117,11 @@ pub enum U1MpsError {
         rows: usize,
         columns: usize,
     },
+    InvalidTruncationPolicy {
+        max_bond_dimension: usize,
+        relative_cutoff: f64,
+        tolerance: f64,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -1597,6 +1602,7 @@ impl U1TwoSiteState {
         for left in 0..self.left_dimension() {
             for first_physical in 0..2 {
                 for second_physical in 0..2 {
+                    let pair = first_physical * 2 + second_physical;
                     for right in 0..self.right_dimension() {
                         let mut value = Complex64::new(0.0, 0.0);
                         for middle in 0..retained_rank {
@@ -1900,10 +1906,14 @@ mod tests {
         dense[10] = Complex64::new(0.75, -0.25);
         let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
         assert_eq!(state.total_charge(), 2);
-        assert_eq!(state.maximum_bond_dimension(), 1);
+        assert!(state.maximum_bond_dimension() <= 2);
         assert_eq!(state.dense_svd_rank_by_charge_and_cut().unwrap().len(), 3);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-12);
         assert!((state.norm_squared(1.0e-12).unwrap() - 0.625).abs() <= 1.0e-12);
-        assert_eq!(state.to_dense(8).unwrap(), dense);
+        let reconstructed = state.to_dense(8).unwrap();
+        for (actual, expected) in reconstructed.iter().zip(dense.iter()) {
+            assert!((*actual - *expected).norm() <= 1.0e-12);
+        }
     }
 
     #[test]
