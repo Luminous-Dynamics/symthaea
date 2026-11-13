@@ -1760,7 +1760,7 @@
           "production_day": "2026-11-13",
           "sample_preparation_group": "prep-pa6-saturated-state-low-wca-reject",
           "independence_group": "wet-pa6-saturated-state-low-wca-reject",
-          "covariance_model_id": null,
+          "covariance_model_id": "cov-pa6-prep-v1",
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-WCA_SCREEN",
@@ -1778,7 +1778,7 @@
           "production_day": "2026-11-13",
           "sample_preparation_group": "prep-pa6-saturated-state-low-wca-reject",
           "independence_group": "chem-pa6-saturated-state-low-wca-reject",
-          "covariance_model_id": null,
+          "covariance_model_id": "cov-pa6-prep-v1",
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-FTIR_CHEMISTRY",
@@ -1842,7 +1842,17 @@
           "measured_value": 3.4
         }
       ],
-      "covariance_models": [],
+      "covariance_models": [
+        {
+          "model_id": "cov-pa6-prep-v1",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-pa6-preparation-covariance-v1",
+          "measurement_ids": [
+            "pa6-saturated-state-low-wca-reject-wca_screen",
+            "pa6-saturated-state-low-wca-reject-ftir_chemistry"
+          ]
+        }
+      ],
       "outcomes": {
         "wca_deg": 15,
         "bond_strength_mpa": 4.2,
