@@ -59,15 +59,22 @@ Each child of MusicXML `<attributes>` becomes an ordered attribute event at its 
 
 `<backup>` and `<forward>` become explicit cursor-movement events. A forward event retains voice/staff and its source subtree, not just the final cursor position.
 
+### Positioned auxiliary events
+
+Other measure-level elements are not silently discarded. Directions (including dynamics, words, metronome and sound controls), harmony, figured bass, barlines, print/layout and future measure-level elements are retained as positioned source subtrees.
+
+A signed `<offset>` is converted from divisions into exact rational quarter-note beats relative to the current measure cursor. The resulting position must remain inside the explicit measure span; malformed, overflowing or out-of-measure offsets withhold the complete event layer as Unknown. These are source-preservation events, not a claim that every direction or harmony element is executable during playback.
+
 Opaque source subtrees preserve ordered element children, attributes and ordered mixed text/element content. This is a structural source representation, not a byte-for-byte lexical XML archive: namespace prefixes, comments and insignificant lexical formatting are not promised as preserved. The original uploaded XML remains the authoritative byte artifact.
 
 ### Fail-closed and compatibility behavior
 
 - The event layer emits all events or `Unknown`; it never leaks a partial event list.
-- Invalid divisions/durations, cursor underflow/overflow, unresolved chord anchors and event/source-tree budget exhaustion produce Unknown.
+- Invalid divisions/durations, cursor underflow/overflow, unresolved chord anchors, offsets outside the explicit measure span and event/source-tree budget exhaustion produce Unknown.
 - A measure map can remain Supported while its notation-event layer is Unknown; consumers must read both status values independently.
 - Existing Score importer signatures and note-only MIDI metrics are unchanged.
-- New graph commitments include notation events.
+- New graph commitments include note/rest events, attribute events, auxiliary events and cursor moves.
+- Import summaries report note-event, auxiliary-event, attribute-event and cursor-move counts, plus unpitched/cue/chord/time-modification counts. The overall summary becomes partially unknown if either the measure graph or notation-event layer is unresolved.
 - Old graph JSON without the field deserializes to a legacy Unknown sentinel; serialization skips the sentinel, keeping old graph commitment shape stable.
 - Replay validation projects newly parsed graphs back to the legacy shape when validating an old receipt. New receipts compare the full event layer, so tampering is rejected.
 
@@ -78,7 +85,7 @@ Resource budgets:
 
 ## Tests authored
 
-### Notation-event parser (12 tests)
+### Notation-event parser (14 tests)
 
 - rest and measure-rest, grace, cue, unpitched, microtonal pitch spelling, voice/staff and instrument ID;
 - chord member onset anchoring and no cursor advance;
@@ -91,7 +98,9 @@ Resource budgets:
 - ambiguous chord / invalid duration fail-closed behavior;
 - grace-chord grouping;
 - ordered mixed text/element content;
-- forward movement voice/staff identity.
+- forward movement voice/staff identity;
+- positioned direction/harmony/sound events with signed offsets;
+- out-of-measure auxiliary offsets fail closed.
 
 ### Integrated graph (32 adapter tests total)
 
