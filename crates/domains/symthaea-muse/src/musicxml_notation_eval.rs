@@ -305,12 +305,13 @@ fn validate_graph(
             || event.performed_duration.is_some_and(|duration| {
                 !rational_is_canonical(duration)
                     || duration.numerator() == 0
-                    || event.score_offset
-                        .checked_add(duration)
-                        .is_err_or(|end| {
+                    || match event.score_offset.checked_add(duration) {
+                        Ok(end) => {
                             end.compare_exact(graph.map.measures[event.source_measure_index].end)
                                 == Ordering::Greater
-                        })
+                        }
+                        Err(_) => true,
+                    }
             })
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
@@ -359,11 +360,11 @@ fn validate_graph(
                 event.score_offset_after,
             );
         let duration_matches_direction = match event.direction.as_str() {
-            "backup" => event.score_offset_after
-                .checked_sub(event.score_offset_before)
-                .is_ok_and(|distance| distance == event.duration),
-            "forward" => event.score_offset_before
+            "backup" => event.score_offset_before
                 .checked_sub(event.score_offset_after)
+                .is_ok_and(|distance| distance == event.duration),
+            "forward" => event.score_offset_after
+                .checked_sub(event.score_offset_before)
                 .is_ok_and(|distance| distance == event.duration),
             _ => false,
         };
