@@ -1009,6 +1009,106 @@ impl ComplexU1Mps {
         Self::new(tensors, prefix_charge, 0.0_f64.max(1.0e-14))
     }
 
+
+    /// Move the MPS into mixed-canonical form around a two-site center.
+    ///
+    /// Sites before the bond are left-isometric; sites after the bond plus one
+    /// are right-isometric. All factorizations are charge-blocked and retain
+    /// every positive singular value. The center pair remains available for a
+    /// local two-site operation.
+    pub fn canonicalize_for_bond(
+        &mut self,
+        bond: usize,
+        tolerance: f64,
+    ) -> Result<U1CanonicalGaugeReceipt, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if self.site_count() < 2 || bond >= self.site_count() - 1 {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+
+        let input_norm_squared = self.norm_squared(tolerance)?;
+        let mut factorization_stats = CanonicalizationStats::default();
+
+        for site in 0..bond {
+            let stats = left_canonicalize_site(&mut self.tensors, site, tolerance)?;
+            factorization_stats.max_residual =
+                factorization_stats.max_residual.max(stats.max_residual);
+            factorization_stats.residual_squared += stats.residual_squared;
+            factorization_stats.exact_zero_singular_values_omitted +=
+                stats.exact_zero_singular_values_omitted;
+        }
+
+        for site in ((bond + 2)..self.site_count()).rev() {
+            let stats = right_canonicalize_site(&mut self.tensors, site, tolerance)?;
+            factorization_stats.max_residual =
+                factorization_stats.max_residual.max(stats.max_residual);
+            factorization_stats.residual_squared += stats.residual_squared;
+            factorization_stats.exact_zero_singular_values_omitted +=
+                stats.exact_zero_singular_values_omitted;
+        }
+
+        let validated = Self::new(self.tensors.clone(), self.total_charge, tolerance)?;
+        self.tensors = validated.tensors;
+        self.selection_rule_residual = validated.selection_rule_residual;
+        let output_norm_squared = self.norm_squared(tolerance)?;
+        let relative_norm_drift =
+            (output_norm_squared - input_norm_squared).abs() / input_norm_squared.abs().max(1.0);
+
+        let mut left_isometry_residuals = Vec::with_capacity(bond);
+        let mut right_isometry_residuals =
+            Vec::with_capacity(self.site_count().saturating_sub(bond + 2));
+        let mut maximum_left_isometry_residual: f64 = 0.0;
+        let mut maximum_right_isometry_residual: f64 = 0.0;
+        let mut left_exterior_operator_norm_upper_bound = 1.0;
+        let mut right_exterior_operator_norm_upper_bound = 1.0;
+
+        for site in 0..bond {
+            let residual = left_isometry_residual(&self.tensors[site])?;
+            maximum_left_isometry_residual = maximum_left_isometry_residual.max(residual);
+            left_exterior_operator_norm_upper_bound *= (1.0 + residual).sqrt();
+            left_isometry_residuals.push((site, residual));
+        }
+        for site in ((bond + 2)..self.site_count()).rev() {
+            let residual = right_isometry_residual(&self.tensors[site])?;
+            maximum_right_isometry_residual = maximum_right_isometry_residual.max(residual);
+            right_exterior_operator_norm_upper_bound *= (1.0 + residual).sqrt();
+            right_isometry_residuals.push((site, residual));
+        }
+        right_isometry_residuals.sort_by_key(|(site, _)| *site);
+
+        let factorization_l2_residual = factorization_stats.residual_squared.sqrt();
+        let qualified = maximum_left_isometry_residual <= tolerance
+            && maximum_right_isometry_residual <= tolerance
+            && factorization_stats.max_residual <= tolerance
+            && relative_norm_drift <= tolerance
+            && self.selection_rule_residual <= tolerance
+            && left_exterior_operator_norm_upper_bound.is_finite()
+            && right_exterior_operator_norm_upper_bound.is_finite();
+
+        Ok(U1CanonicalGaugeReceipt {
+            bond,
+            site_count: self.site_count(),
+            total_charge: self.total_charge,
+            left_isometry_residuals,
+            right_isometry_residuals,
+            maximum_left_isometry_residual,
+            maximum_right_isometry_residual,
+            left_exterior_operator_norm_upper_bound,
+            right_exterior_operator_norm_upper_bound,
+            factorization_max_residual: factorization_stats.max_residual,
+            factorization_l2_residual,
+            exact_zero_singular_values_omitted: factorization_stats
+                .exact_zero_singular_values_omitted,
+            selection_rule_residual: self.selection_rule_residual,
+            input_norm_squared,
+            output_norm_squared,
+            relative_norm_drift,
+            qualified,
+        })
+    }
+
     pub fn site_count(&self) -> usize {
         self.tensors.len()
     }
