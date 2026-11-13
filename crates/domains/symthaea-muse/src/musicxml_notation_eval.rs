@@ -334,7 +334,7 @@ fn validate_graph(
     for (index, span) in graph.map.measures.iter().enumerate() {
         if !rational_is_canonical(span.start)
             || !rational_is_canonical(span.end)
-            || (index == 0 && span.start != RationalBeat::new(0, 1).expect("zero is rational"))
+            || (index == 0 && span.start.numerator() != 0)
             || span.start.compare_exact(span.end) != Ordering::Less
             || previous_end.is_some_and(|end| end != span.start)
         {
@@ -1071,6 +1071,12 @@ pub fn evaluate_musicxml_notation_graphs(
         canonical_json_sha256(prediction).map_err(|_| {
             MusicXmlNotationEvaluationErrorV1::SerializationFailed
         })?;
+    let note_onset_error = note_onset_error(
+        gold,
+        predicted,
+        &note_pairs,
+        config.position_tolerance,
+    )?;
 
     let mut report = MusicXmlNotationEvaluationReportV1 {
         schema: MUSICXML_NOTATION_EVALUATION_SCHEMA_V1.into(),
@@ -1088,12 +1094,7 @@ pub fn evaluate_musicxml_notation_graphs(
             predicted.note_events.len(),
             note_pairs.len(),
         ),
-        note_onset_error: note_onset_error(
-            gold,
-            predicted,
-            &note_pairs,
-            config.position_tolerance,
-        )?,
+        note_onset_error,
         written_pitch_spelling,
         rest_semantics,
         unpitched_display,
