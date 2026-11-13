@@ -1,0 +1,263 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-shallow-water-site-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-site-campaign",
+    "citation": "Synthetic known-answer fixture only; not measured data",
+    "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "rights_status": "public_or_permitted",
+    "independently_reviewed": false
+  },
+  "minimum_runs": 4,
+  "maximum_depth_range_fraction": 0.1,
+  "maximum_seabed_sound_speed_range_fraction": 0.1,
+  "maximum_ctd_sound_speed_range_fraction": 0.1,
+  "maximum_stw_relative_deviation": 0.03,
+  "maximum_cross_site_seabed_sound_speed_difference_fraction": 0.08,
+  "campaigns": [
+    {
+      "campaign_id": "synthetic-site-campaign-001",
+      "site": {
+        "site_id": "synthetic-sandy-site",
+        "site_revision": "v1",
+        "bathymetry_source_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "bathymetry_method_id": "multibeam",
+        "water_depth_samples": [
+          {
+            "sample_id": "depth-1",
+            "along_track_position_m": 0,
+            "cross_track_position_m": 0,
+            "depth_m": 30,
+            "expanded_uncertainty_m": 0.2
+          },
+          {
+            "sample_id": "depth-2",
+            "along_track_position_m": 100,
+            "cross_track_position_m": 10,
+            "depth_m": 31,
+            "expanded_uncertainty_m": 0.2
+          }
+        ],
+        "seabed_profile_source_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "seabed_method_id": "geophysical-and-core",
+        "seabed_samples": [
+          {
+            "sample_id": "bottom-1",
+            "along_track_position_m": 0,
+            "cross_track_position_m": 0,
+            "substrate": "sand",
+            "sound_speed_m_s": 1650,
+            "expanded_uncertainty_m_s": 10,
+            "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "sample_id": "bottom-2",
+            "along_track_position_m": 100,
+            "cross_track_position_m": 10,
+            "substrate": "sand",
+            "sound_speed_m_s": 1655,
+            "expanded_uncertainty_m_s": 10,
+            "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          }
+        ],
+        "ctd_profile": {
+          "instrument_id": "synthetic-ctd-1",
+          "method_id": "sound-velocity-profile",
+          "calibration_certificate_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "samples": [
+            {
+              "depth_m": 0,
+              "sound_speed_m_s": 1500,
+              "expanded_uncertainty_m_s": 0.5,
+              "temperature_c": 18,
+              "salinity_psu": 35
+            },
+            {
+              "depth_m": 20,
+              "sound_speed_m_s": 1502,
+              "expanded_uncertainty_m_s": 0.5,
+              "temperature_c": 17,
+              "salinity_psu": 35.1
+            }
+          ]
+        },
+        "current": {
+          "instrument_id": "synthetic-adcp-1",
+          "method_id": "adcp",
+          "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "speed_m_s": 0.5,
+          "direction_deg_true": 180,
+          "observed_at_utc": "2026-10-01T09:00:00Z"
+        },
+        "ambient_background": {
+          "measurement_id": "synthetic-background-1",
+          "method_id": "pre-run-hydrophone",
+          "raw_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "measured_at_utc": "2026-10-01T09:00:00Z"
+        }
+      },
+      "vessel": {
+        "vessel_id": "synthetic-vessel-1",
+        "overall_ship_length_m": 80,
+        "acoustic_ship_length_m": 25,
+        "acoustic_reference_point_id": "acoustic-centre",
+        "gps_to_acoustic_centre_offset_m": 3,
+        "propulsion_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "loading_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "draft_m": 4,
+        "hull_condition": "clean",
+        "propeller_condition": "polished",
+        "last_dry_dock_date": "2026-06-01"
+      },
+      "hydrophones": [
+        {
+          "instrument_id": "synthetic-hydrophone-1",
+          "x_m": 0,
+          "y_m": 0,
+          "depth_m": 18,
+          "orientation_azimuth_deg": 180,
+          "orientation_elevation_deg": 0,
+          "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "calibrated_min_frequency_hz": 10,
+          "calibrated_max_frequency_hz": 20000
+        },
+        {
+          "instrument_id": "synthetic-hydrophone-2",
+          "x_m": 5,
+          "y_m": 0,
+          "depth_m": 18,
+          "orientation_azimuth_deg": 180,
+          "orientation_elevation_deg": 0,
+          "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "calibrated_min_frequency_hz": 10,
+          "calibrated_max_frequency_hz": 20000
+        },
+        {
+          "instrument_id": "synthetic-hydrophone-3",
+          "x_m": 10,
+          "y_m": 0,
+          "depth_m": 18,
+          "orientation_azimuth_deg": 180,
+          "orientation_elevation_deg": 0,
+          "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "calibrated_min_frequency_hz": 10,
+          "calibrated_max_frequency_hz": 20000
+        }
+      ],
+      "in_situ_pre_deployment_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "in_situ_post_recovery_calibration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "runs": [
+        {
+          "run_id": "run-1",
+          "aspect": "port",
+          "timebase_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "operating_point_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "background_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "propulsion_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "loading_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "draft_m": 4,
+          "hull_condition": "clean",
+          "propeller_condition": "polished",
+          "speed_through_water_knots": 10,
+          "speed_over_ground_knots": 10.1,
+          "shaft_rotation_rate_rpm": 120,
+          "propulsion_power_kw": 800,
+          "heading_deg_true": 90,
+          "cpa_distance_m": 120,
+          "data_window_duration_s": 20,
+          "run_start_utc": "2026-10-01T10:00:00Z"
+        },
+        {
+          "run_id": "run-2",
+          "aspect": "starboard",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "background_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "propulsion_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "loading_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "draft_m": 4,
+          "hull_condition": "clean",
+          "propeller_condition": "polished",
+          "speed_through_water_knots": 10.05,
+          "speed_over_ground_knots": 10.15,
+          "shaft_rotation_rate_rpm": 120,
+          "propulsion_power_kw": 800,
+          "heading_deg_true": 270,
+          "cpa_distance_m": 120,
+          "data_window_duration_s": 20,
+          "run_start_utc": "2026-10-01T10:01:00Z"
+        },
+        {
+          "run_id": "run-3",
+          "aspect": "port",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "background_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "propulsion_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "loading_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "draft_m": 4,
+          "hull_condition": "clean",
+          "propeller_condition": "polished",
+          "speed_through_water_knots": 10.1,
+          "speed_over_ground_knots": 10.2,
+          "shaft_rotation_rate_rpm": 120,
+          "propulsion_power_kw": 800,
+          "heading_deg_true": 90,
+          "cpa_distance_m": 120,
+          "data_window_duration_s": 20,
+          "run_start_utc": "2026-10-01T10:02:00Z"
+        },
+        {
+          "run_id": "run-4",
+          "aspect": "starboard",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "background_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "propulsion_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "loading_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "draft_m": 4,
+          "hull_condition": "clean",
+          "propeller_condition": "polished",
+          "speed_through_water_knots": 10.15,
+          "speed_over_ground_knots": 10.25,
+          "shaft_rotation_rate_rpm": 120,
+          "propulsion_power_kw": 800,
+          "heading_deg_true": 270,
+          "cpa_distance_m": 120,
+          "data_window_duration_s": 20,
+          "run_start_utc": "2026-10-01T10:03:00Z"
+        }
+      ],
+      "bands": [
+        {
+          "band_id": "rnl-100hz",
+          "quantity": "radiated_noise_level",
+          "center_frequency_hz": 100,
+          "site_cutoff_frequency_hz": 20,
+          "propagation_method_id": "iso-17208-3",
+          "propagation_method_revision": "2025",
+          "expanded_uncertainty_db": 2.2,
+          "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        },
+        {
+          "band_id": "sl-1000hz",
+          "quantity": "source_level",
+          "center_frequency_hz": 1000,
+          "site_cutoff_frequency_hz": 20,
+          "propagation_method_id": "iso-17208-3",
+          "propagation_method_revision": "2025",
+          "expanded_uncertainty_db": 2.2,
+          "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        }
+      ]
+    }
+  ],
+  "propagation_transfer_receipts": []
+}
