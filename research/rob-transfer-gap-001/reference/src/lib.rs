@@ -465,10 +465,7 @@ pub enum TransferGapError {
         observed: usize,
     },
     /// Candidate and baseline arm scope does not match.
-    ArmScopeMismatch {
-        arm_id: String,
-        field: &'static str,
-    },
+    ArmScopeMismatch { arm_id: String, field: &'static str },
     /// Candidate and baseline arm IDs are identical.
     DuplicateArmId(String),
     /// No paired cluster evaluations supplied.
@@ -512,18 +509,12 @@ pub enum TransferGapError {
     /// Candidate and baseline did not receive the same scheduled episode count.
     PairingMismatch(String),
     /// Outcome categories do not exactly cover the scheduled denominator.
-    InvalidOutcomeTally {
-        arm_id: String,
-        cluster_id: String,
-    },
+    InvalidOutcomeTally { arm_id: String, cluster_id: String },
     /// Arithmetic overflow in an integer rate or aggregate.
     ArithmeticOverflow,
 }
 
-fn require_nonempty(
-    name: &'static str,
-    value: &str,
-) -> Result<(), TransferGapError> {
+fn require_nonempty(name: &'static str, value: &str) -> Result<(), TransferGapError> {
     if value.trim().is_empty() {
         return Err(TransferGapError::EmptyIdentity(name));
     }
@@ -534,7 +525,10 @@ fn validate_scope(scope: &TransferScope) -> Result<(), TransferGapError> {
     for (name, value) in [
         ("benchmark_id", scope.benchmark_id.as_str()),
         ("benchmark_version", scope.benchmark_version.as_str()),
-        ("training_manifest_digest", scope.training_manifest_digest.as_str()),
+        (
+            "training_manifest_digest",
+            scope.training_manifest_digest.as_str(),
+        ),
         (
             "calibration_manifest_digest",
             scope.calibration_manifest_digest.as_str(),
@@ -547,7 +541,10 @@ fn validate_scope(scope: &TransferScope) -> Result<(), TransferGapError> {
             "hidden_confirmatory_manifest_digest",
             scope.hidden_confirmatory_manifest_digest.as_str(),
         ),
-        ("grouping_policy_digest", scope.grouping_policy_digest.as_str()),
+        (
+            "grouping_policy_digest",
+            scope.grouping_policy_digest.as_str(),
+        ),
         ("split_policy_digest", scope.split_policy_digest.as_str()),
         (
             "split_separation_receipt_digest",
@@ -581,10 +578,7 @@ fn validate_scope(scope: &TransferScope) -> Result<(), TransferGapError> {
     Ok(())
 }
 
-fn validate_arm(
-    scope: &TransferScope,
-    arm: &ArmManifest,
-) -> Result<(), TransferGapError> {
+fn validate_arm(scope: &TransferScope, arm: &ArmManifest) -> Result<(), TransferGapError> {
     for (name, value) in [
         ("arm_id", arm.arm_id.as_str()),
         ("model_artifact_digest", arm.model_artifact_digest.as_str()),
@@ -654,9 +648,7 @@ fn validate_policies(
             )
             .is_some()
         {
-            return Err(TransferGapError::DuplicateDimensionPolicy(
-                policy.dimension,
-            ));
+            return Err(TransferGapError::DuplicateDimensionPolicy(policy.dimension));
         }
         match &policy.applicability {
             DimensionApplicability::Required {
@@ -685,11 +677,9 @@ fn validate_policies(
     }
 
     for assignment in assignments {
-        let policy = validated
-            .get_mut(&assignment.dimension)
-            .ok_or(TransferGapError::AssignmentForUnknownDimension(
-                assignment.dimension,
-            ))?;
+        let policy = validated.get_mut(&assignment.dimension).ok_or(
+            TransferGapError::AssignmentForUnknownDimension(assignment.dimension),
+        )?;
         if matches!(
             policy.applicability,
             DimensionApplicability::NotApplicable { .. }
@@ -744,8 +734,7 @@ fn validate_policies(
                     == 0
                 {
                     return Err(TransferGapError::EmptyRequiredGroupPartition(
-                        *dimension,
-                        partition,
+                        *dimension, partition,
                     ));
                 }
             }
@@ -754,11 +743,11 @@ fn validate_policies(
                 .get(&SourcePartition::Training)
                 .copied()
                 .unwrap_or(0);
-            if training < usize::from(minimum_familiar_groups) {
+            if training < usize::from(*minimum_familiar_groups) {
                 return Err(TransferGapError::InsufficientAssignedGroups {
                     dimension: *dimension,
                     partition: SourcePartition::Training,
-                    minimum: minimum_familiar_groups,
+                    minimum: *minimum_familiar_groups,
                     observed: training,
                 });
             }
@@ -767,11 +756,11 @@ fn validate_policies(
                 .get(&SourcePartition::HiddenConfirmatory)
                 .copied()
                 .unwrap_or(0);
-            if hidden < usize::from(minimum_hidden_groups) {
+            if hidden < usize::from(*minimum_hidden_groups) {
                 return Err(TransferGapError::InsufficientAssignedGroups {
                     dimension: *dimension,
                     partition: SourcePartition::HiddenConfirmatory,
-                    minimum: minimum_hidden_groups,
+                    minimum: *minimum_hidden_groups,
                     observed: hidden,
                 });
             }
@@ -807,11 +796,9 @@ fn validate_evaluations(
         BTreeMap::new();
 
     for evaluation in evaluations {
-        let policy = policies
-            .get(&evaluation.dimension)
-            .ok_or(TransferGapError::EvaluationForUnknownDimension(
-                evaluation.dimension,
-            ))?;
+        let policy = policies.get(&evaluation.dimension).ok_or(
+            TransferGapError::EvaluationForUnknownDimension(evaluation.dimension),
+        )?;
         if matches!(
             policy.applicability,
             DimensionApplicability::NotApplicable { .. }
@@ -821,21 +808,17 @@ fn validate_evaluations(
             ));
         }
 
-        require_nonempty("source_group_digest", &evaluation.source_group_digest)
-            .map_err(|_| TransferGapError::MissingEvaluationIdentity(
-                evaluation.cluster_id.clone(),
-            ))?;
-        require_nonempty("cluster_id", &evaluation.cluster_id)
-            .map_err(|_| TransferGapError::MissingEvaluationIdentity(
-                evaluation.cluster_id.clone(),
-            ))?;
+        require_nonempty("source_group_digest", &evaluation.source_group_digest).map_err(|_| {
+            TransferGapError::MissingEvaluationIdentity(evaluation.cluster_id.clone())
+        })?;
+        require_nonempty("cluster_id", &evaluation.cluster_id).map_err(|_| {
+            TransferGapError::MissingEvaluationIdentity(evaluation.cluster_id.clone())
+        })?;
         require_nonempty(
             "evaluation_manifest_digest",
             &evaluation.evaluation_manifest_digest,
         )
-        .map_err(|_| TransferGapError::MissingEvaluationIdentity(
-            evaluation.cluster_id.clone(),
-        ))?;
+        .map_err(|_| TransferGapError::MissingEvaluationIdentity(evaluation.cluster_id.clone()))?;
         require_nonempty(
             "paired_case_manifest_digest",
             &evaluation.paired_case_manifest_digest,
@@ -852,12 +835,8 @@ fn validate_evaluations(
         ))?;
 
         let expected_manifest = match evaluation.regime {
-            EvaluationRegime::FamiliarSourceReference => {
-                &scope.familiar_reference_manifest_digest
-            }
-            EvaluationRegime::HiddenSourceTransfer => {
-                &scope.hidden_confirmatory_manifest_digest
-            }
+            EvaluationRegime::FamiliarSourceReference => &scope.familiar_reference_manifest_digest,
+            EvaluationRegime::HiddenSourceTransfer => &scope.hidden_confirmatory_manifest_digest,
         };
         if &evaluation.evaluation_manifest_digest != expected_manifest {
             return Err(TransferGapError::EvaluationManifestMismatch(
@@ -869,9 +848,7 @@ fn validate_evaluations(
             EvaluationRegime::FamiliarSourceReference => SourcePartition::Training,
             EvaluationRegime::HiddenSourceTransfer => SourcePartition::HiddenConfirmatory,
         };
-        if policy.assignments.get(&evaluation.source_group_digest)
-            != Some(&expected_partition)
-        {
+        if policy.assignments.get(&evaluation.source_group_digest) != Some(&expected_partition) {
             return Err(TransferGapError::EvaluationGroupPartitionMismatch {
                 dimension: evaluation.dimension,
                 regime: evaluation.regime,
@@ -929,9 +906,7 @@ fn validate_evaluations(
                     ClusterGroup {
                         regime: evaluation.regime,
                         group_digest: evaluation.source_group_digest.clone(),
-                        independence_receipt_digest: evaluation
-                            .independence_receipt_digest
-                            .clone(),
+                        independence_receipt_digest: evaluation.independence_receipt_digest.clone(),
                         independence_disposition: evaluation.independence_disposition,
                     },
                 );
@@ -976,18 +951,10 @@ fn validate_evaluations(
             scheduled_episodes: evaluation.baseline.scheduled_episodes,
             baseline_unknown: evaluation.baseline.unknown,
             candidate_unknown: evaluation.candidate.unknown,
-            baseline_task_success_ppm: evaluation
-                .baseline
-                .rate_ppm(OutcomeAxis::TaskSuccess)?,
-            candidate_task_success_ppm: evaluation
-                .candidate
-                .rate_ppm(OutcomeAxis::TaskSuccess)?,
-            baseline_safe_success_ppm: evaluation
-                .baseline
-                .rate_ppm(OutcomeAxis::SafeSuccess)?,
-            candidate_safe_success_ppm: evaluation
-                .candidate
-                .rate_ppm(OutcomeAxis::SafeSuccess)?,
+            baseline_task_success_ppm: evaluation.baseline.rate_ppm(OutcomeAxis::TaskSuccess)?,
+            candidate_task_success_ppm: evaluation.candidate.rate_ppm(OutcomeAxis::TaskSuccess)?,
+            baseline_safe_success_ppm: evaluation.baseline.rate_ppm(OutcomeAxis::SafeSuccess)?,
+            candidate_safe_success_ppm: evaluation.candidate.rate_ppm(OutcomeAxis::SafeSuccess)?,
             baseline_successful_but_unsafe_ppm: evaluation
                 .baseline
                 .rate_ppm(OutcomeAxis::SuccessfulButUnsafe)?,
@@ -1015,12 +982,8 @@ fn axis_rate(report: &ClusterTransferReport, axis: OutcomeAxis, candidate: bool)
         (OutcomeAxis::TaskSuccess, true) => report.candidate_task_success_ppm,
         (OutcomeAxis::SafeSuccess, false) => report.baseline_safe_success_ppm,
         (OutcomeAxis::SafeSuccess, true) => report.candidate_safe_success_ppm,
-        (OutcomeAxis::SuccessfulButUnsafe, false) => {
-            report.baseline_successful_but_unsafe_ppm
-        }
-        (OutcomeAxis::SuccessfulButUnsafe, true) => {
-            report.candidate_successful_but_unsafe_ppm
-        }
+        (OutcomeAxis::SuccessfulButUnsafe, false) => report.baseline_successful_but_unsafe_ppm,
+        (OutcomeAxis::SuccessfulButUnsafe, true) => report.candidate_successful_but_unsafe_ppm,
     }
 }
 
@@ -1045,12 +1008,12 @@ fn summarize_regime(
     let mean = if rates.is_empty() {
         None
     } else {
-        let sum = rates.iter().try_fold(0_u128, |acc, rate| {
-            acc.checked_add(u128::from(*rate))
-        });
+        let sum = rates
+            .iter()
+            .try_fold(0_u128, |acc, rate| acc.checked_add(u128::from(*rate)));
         let total = sum.ok_or(TransferGapError::ArithmeticOverflow)?;
         Some(
-            u32::try_from(total / rates.len() as u128)
+            u32::try_from(total / u128::try_from(rates.len()).map_err(|_| TransferGapError::ArithmeticOverflow)?)
                 .map_err(|_| TransferGapError::ArithmeticOverflow)?,
         )
     };
@@ -1077,9 +1040,7 @@ fn subtract_rates(hidden: Option<u32>, familiar: Option<u32>) -> Option<i64> {
 ///
 /// The mean gives each independent cluster equal weight. It does not use
 /// episode count as the statistical sample size and emits no inferential result.
-pub fn audit_transfer_gap(
-    input: &TransferGapInput,
-) -> Result<TransferGapReport, TransferGapError> {
+pub fn audit_transfer_gap(input: &TransferGapInput) -> Result<TransferGapReport, TransferGapError> {
     validate_scope(&input.scope)?;
     validate_arm(&input.scope, &input.baseline_manifest)?;
     validate_arm(&input.scope, &input.candidate_manifest)?;
@@ -1315,11 +1276,7 @@ mod tests {
         }
     }
 
-    fn tally(
-        safe_successes: u32,
-        unsafe_successes: u32,
-        unknown: u32,
-    ) -> OutcomeTally {
+    fn tally(safe_successes: u32, unsafe_successes: u32, unknown: u32) -> OutcomeTally {
         let safe_failures = 10_u32
             .checked_sub(safe_successes + unsafe_successes + unknown)
             .unwrap();
@@ -1347,9 +1304,7 @@ mod tests {
             source_group_digest: group.into(),
             cluster_id: cluster.into(),
             evaluation_manifest_digest: match regime {
-                EvaluationRegime::FamiliarSourceReference => {
-                    "familiar-reference-sha256".into()
-                }
+                EvaluationRegime::FamiliarSourceReference => "familiar-reference-sha256".into(),
                 EvaluationRegime::HiddenSourceTransfer => "hidden-confirmatory-sha256".into(),
             },
             paired_case_manifest_digest: format!("paired-cases-{cluster}"),
@@ -1441,8 +1396,10 @@ mod tests {
             .iter()
             .find(|axis| axis.axis == OutcomeAxis::SuccessfulButUnsafe)
             .unwrap();
-        assert!(task.baseline_hidden.mean_cluster_rate_ppm.unwrap()
-            > safe.baseline_hidden.mean_cluster_rate_ppm.unwrap());
+        assert!(
+            task.baseline_hidden.mean_cluster_rate_ppm.unwrap()
+                > safe.baseline_hidden.mean_cluster_rate_ppm.unwrap()
+        );
         assert_eq!(
             unsafe_success.baseline_hidden.mean_cluster_rate_ppm,
             Some(50_000)
@@ -1452,9 +1409,9 @@ mod tests {
     #[test]
     fn empty_required_regime_is_inconclusive_not_zero_transfer_gap() {
         let mut audit = input();
-        audit.evaluations.retain(|item| {
-            item.regime == EvaluationRegime::FamiliarSourceReference
-        });
+        audit
+            .evaluations
+            .retain(|item| item.regime == EvaluationRegime::FamiliarSourceReference);
         let report = audit_transfer_gap(&audit).unwrap();
         assert_eq!(report.disposition, TransferGapDisposition::Inconclusive);
         let safe = &report.dimensions[0].axes[1];
@@ -1658,10 +1615,8 @@ mod tests {
         // Equal +10 percentage point uplift is constructed for all clusters.
         for evaluation in &mut audit.evaluations {
             let add = 1;
-            evaluation.candidate.safe_successes = evaluation
-                .baseline
-                .safe_successes
-                .saturating_add(add);
+            evaluation.candidate.safe_successes =
+                evaluation.baseline.safe_successes.saturating_add(add);
             evaluation.candidate.safe_failures = evaluation
                 .candidate
                 .scheduled_episodes
@@ -1728,9 +1683,7 @@ mod tests {
         for cluster in &report.clusters {
             assert!(cluster.baseline_safe_success_ppm <= PPM_SCALE);
             assert!(cluster.candidate_safe_success_ppm <= PPM_SCALE);
-            assert!(
-                cluster.baseline_successful_but_unsafe_ppm <= PPM_SCALE
-            );
+            assert!(cluster.baseline_successful_but_unsafe_ppm <= PPM_SCALE);
         }
     }
 }
