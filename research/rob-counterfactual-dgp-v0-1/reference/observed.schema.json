@@ -1,0 +1,148 @@
+{
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/rob-counterfactual-dgp-v0-1/reference/observed.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "followup_complete_by_horizon": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "followup_status": {
+            "const": "complete"
+          },
+          "policy_outcome": {
+            "enum": [
+              "boundary_event",
+              "competing_event",
+              "event_free"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "followup_complete_by_horizon": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "followup_status": {
+            "enum": [
+              "administrative_endpoint_not_obtained",
+              "telemetry_loss_before_horizon"
+            ]
+          },
+          "policy_outcome": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "assigned_policy": {
+      "enum": [
+        "reference_safe",
+        "anticipatory_safe"
+      ]
+    },
+    "assignment_design": {
+      "const": "randomized_blocked"
+    },
+    "assignment_precedes_time_zero": {
+      "const": true
+    },
+    "assignment_time": {
+      "exclusiveMaximum": 0,
+      "type": "number"
+    },
+    "block_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "episode_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "followup_complete_by_horizon": {
+      "type": "boolean"
+    },
+    "followup_status": {
+      "enum": [
+        "complete",
+        "administrative_endpoint_not_obtained",
+        "telemetry_loss_before_horizon"
+      ]
+    },
+    "horizon": {
+      "exclusiveMinimum": 0,
+      "type": "number"
+    },
+    "intervention_applied": {
+      "type": "boolean"
+    },
+    "intervention_time": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "policy_event_time_observed": {
+      "minimum": 0,
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "policy_outcome": {
+      "enum": [
+        "boundary_event",
+        "competing_event",
+        "event_free",
+        null
+      ]
+    },
+    "pre_assignment_stratum": {
+      "enum": [
+        "high",
+        "low"
+      ]
+    },
+    "randomization_receipt_valid": {
+      "const": true
+    },
+    "time_zero": {
+      "const": 0
+    }
+  },
+  "required": [
+    "episode_id",
+    "block_id",
+    "assignment_design",
+    "assignment_precedes_time_zero",
+    "randomization_receipt_valid",
+    "assignment_time",
+    "time_zero",
+    "assigned_policy",
+    "pre_assignment_stratum",
+    "intervention_applied",
+    "intervention_time",
+    "followup_complete_by_horizon",
+    "followup_status",
+    "policy_outcome",
+    "policy_event_time_observed",
+    "horizon"
+  ],
+  "title": "MCR2 v17 observed episode record",
+  "type": "object"
+}
