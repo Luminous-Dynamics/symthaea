@@ -132,7 +132,19 @@ Vendor trials must receive the same eligible source versions and decision fronti
 
 This overlay consumes these contracts. It creates no generic temporal ledger, evidence identity, event log, relation graph, rights service, receipt schema, validator or approval authority.
 
-## 8. Staging and claim ceiling
+## 8. Gold-record contract compatibility gate
+
+A compatibility audit of the current [#10581 gold-record schema](https://github.com/Luminous-Dynamics/symthaea/blob/research/eng-design-change-qual-gold-protocol-v0-1/benchmarks/engineering-change-impact/gold-record.schema.json) found that its root object uses `additionalProperties: false`. It has no structured temporal-admissibility property for T/K, source-version availability, repository receipt, acquisition/ingestion, derived materialization, actual run-context inclusion or rights-at-time. Its optional `notes` field is an array of strings and is not an adequate machine-readable substitute.
+
+**Consequently, temporal overlay gold labels are blocked pending a versioned contract change.** Before adjudicators create temporal labels, the #10581 owner must approve either:
+1. a versioned optional nested temporal-evidence object in the existing gold-record contract; or
+2. a separately content-addressed companion record, explicitly bound to the existing gold record and validated by an independently reviewed contract.
+
+Whichever route is chosen must bind the exact T and K coordinates, source/version identities, relevant availability/receipt/materialization/context evidence, rights profile, uncertainty/unknown states and assessor adjudication. The ten existing engineering dispositions must remain unchanged. Do not stuff these fields into `notes`, relax `additionalProperties`, or create a second unbound gold-record system.
+
+The current overlay remains public blueprint-only research. Existing #10543 pilot assessment may proceed under its current contract where applicable; no claim is made that the temporal sub-axis is ready for gold adjudication or candidate scoring.
+
+## 9. Staging and claim ceiling
 
 The current 24 engineering blueprints remain a feasibility/rubric pilot and are not automatically nine more statistically independent cases. First map the nine overlays onto existing blueprint claim–evidence pairs, identify which source owners can supply the required time evidence, and mark gaps as unknown. Then have independent assessors adjudicate the applicable pairs under #10581. Any new confirmatory sample must be split by design family and change lineage and powered using cluster-aware analysis.
 
