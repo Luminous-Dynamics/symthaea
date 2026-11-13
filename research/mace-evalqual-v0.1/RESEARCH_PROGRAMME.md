@@ -110,6 +110,39 @@ Do not compare a verifier's millisecond microbenchmark to a model's SWE-bench sc
 
 The latency and overhead figures are provisional engineering targets, not industry-standard thresholds. They should be revised after a reproducible isolated-host and broker/network baseline exists.
 
+## Industry frontier snapshot — 2026-11-13
+
+These numbers are context, not a single comparable ranking. Agent benchmarks differ in task set, model/harness, turn/cost limits, grading, and whether results are independently reproduced.
+
+| Benchmark | Current visible frontier | Provenance / interpretation | MACE implication |
+|---|---|---|---|
+| SWE-Bench Pro V2 full | Scale's board displays Claude Opus 5 at 99.40±0.40%, Gemini 4 Argon at 99.22±0.45%, Fable 5.1 at 99.10±0.50%, GPT-6 Astra at 96.90±1.10%. | 642 tasks / 11 repos. Scale's V2 release uses network restriction, pristine-image re-grade and reference-pass / empty-patch-fail gates. It also discloses residual trust in the model endpoint relay and execution of code in patches by the verifier. | Do not compare MACE's verifier microseconds with this task score. Add a separate state/effect assurance overlay and independent pristine replay. Reproduce the exact harness/task revision before claiming any model gap. |
+| OSWorld 2.1 | Third-party November 13 aggregation lists 81.8% for Claude Opus 5.5 as a partial provider-reported result; all 11 listed results are lab-reported. | The full task suite has 108 tasks. Epoch AI's audit inspected a stratified 50 and found defects in 36, with estimated potential impact up to 50.4% of the maximum score on that audited sample. The estimate is grading impact, not lost agent capability. | Use an audited task-pinned subset. Compare application/process/filesystem/network state against an independent effect-origin source; do not promote provider-reported scores to independent SOTA. |
+| τ³-bench | Third-party November 13 aggregation lists Mercury 2.5 at 96.0%, with Mistral Medium 3.5 128B at 91.4%. | 32 of 33 rows are provider-reported in the cited aggregator; none is an independent run by that aggregator. | Prioritize stateful API actions, principal/scope enforcement, idempotency and remote-success/lost-ack reconciliation. Report source provenance beside scores. |
+| AgentProp-Bench | The paper reports judge reliability and tool-use hallucination findings on its trace corpus. | Its arXiv version describes 14,750 traces across 13 agents and four domains; substring judging had Cohen's κ=0.049, the best tested single judge κ=0.567, and dual-human agreement κ=0.835. These are study-specific, not universal judge constants. | Tool-call text must never serve as proof of execution. Reconcile model claims to actual dispatch, external effect and resulting state. |
+| ReA-Bench | Published November 12, 2026. | Diagnostic tiers include contradictions, long-context evidence retrieval, provenance, indirect steering and missing information, plus authorized benign lookalikes. | Measure false positives and information insufficiency alongside attack detection; preserve indeterminate outcomes. |
+
+Sources:
+- Scale AI, [SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), updated 22 September 2026.
+- Epoch AI, [OSWorld 2.1 review](https://epoch.ai/benchmarks/osworld-2-1/review), 28 September 2026.
+- BenchLM, [τ³-bench results snapshot](https://benchlm.ai/benchmarks/tau3-bench), accessed 13 November 2026; provider-reported provenance is explicitly disclosed.
+- Chen, [Oracle failures and configuration-dependent measurement](https://arxiv.org/abs/2610.16067), October 2026.
+- Gurram, [AgentProp-Bench](https://arxiv.org/abs/2604.16706), April 2026.
+- Ye et al., [ReA-Bench](https://arxiv.org/abs/2611.16493), 12 November 2026.
+
+### What “better than SOTA” should mean for MACE
+
+MACE is not a foundation model or task-solving agent. It should not claim to beat SWE-bench's top solver with a receipt verifier. Its competitive target is **higher trustworthy completion under matched utility**:
+
+1. Preserve official task score, and show baseline / telemetry-only / full-MACE on the exact same task, model, harness, budgets and environment.
+2. Reduce accepted unauthorized effects and undetected observer gaps to zero in the frozen deterministic qualification corpus; report the numerator and denominator, not a universal zero-risk claim.
+3. Require reference-positive, no-op-negative, defect-positive and condition-removed controls before a task contributes to a qualified leaderboard.
+4. Demonstrate non-interfering evaluation: unchanged protected state and zero mutation events in scope; repeated-query stability and A→B/B→A order invariance.
+5. Retain an explicit indeterminate / not-qualified path when oracle provenance, observer coverage or benchmark comparability is insufficient.
+6. Publish utility, effect assurance, benchmark integrity, false-positive/false-negative rates, observer coverage, latency, cost and human intervention separately.
+
+Provisional engineering targets remain: 100% expected results on registered mutation controls; 10,000+ fixed-seed crash/race/expiry/revocation/lost-ack schedules on the real durable broker; p95 local eight-effect verification below 10 ms and p99 below 25 ms; and below 5% median end-to-end overhead where network time does not dominate. These are proposed qualification gates, not industry standards or achieved results. A fixed 10,000-schedule replay does not imply a 10,000-sample independent population estimate.
+
 ## Immediate execution sequence
 
 1. **Completed locally and published for review:** benchmark-integrity protocol branch (#11921) and executable evaluator/observer laboratory branch (#11965). Both are draft PRs; no hosted CI result is claimed.
@@ -120,4 +153,4 @@ The latency and overhead figures are provisional engineering targets, not indust
 
 ## Current claim boundary
 
-The evaluator harness is an offline result-bundle checker. The observerlab truth ledger is simulator-authored. Neither currently executes external benchmark agents or graders, proves real OS/API/network observer completeness, authenticates evidence producers, establishes administrative independence, or qualifies the durable broker. The 10-fixture evaluator corpus and four-event observer trace are demonstrations of plumbing and failure discrimination, not benchmark scores or evidence of production safety.
+The evaluator harness is an offline result-bundle checker. The observerlab truth ledger is simulator-authored. The oraclelab state/event recorder is also an in-memory synthetic adapter. None currently executes external benchmark agents or graders, proves real OS/API/network observer completeness, authenticates evidence producers, establishes administrative independence, or qualifies the durable broker. The 10-fixture evaluator corpus, four-event observer trace and oracle non-interference tests are demonstrations of plumbing and failure discrimination, not benchmark scores or evidence of production safety.
