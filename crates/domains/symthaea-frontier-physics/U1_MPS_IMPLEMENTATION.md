@@ -1,6 +1,6 @@
 # Complex U(1)-symmetric MPS state representation
 
-**Status:** the complex charge-labelled MPS core and exact dense fixed-charge to charge-block MPS factorization are source-authored; exact-head Rust 1.96 validation is pending. Two-site gate application, TEBD gate sequencing, truncation and scaling remain unimplemented.
+**Status:** the complex charge-labelled MPS core, charge-block dense factorization, U(1)-conserving two-site gates, exact two-site charge-block split, and explicit global truncation/error ledger are source-authored. The latest truncation branch is awaiting its exact-head Rust 1.96 harness. Full TEBD sequencing and scaling remain unimplemented.
 
 ## Scope of this increment
 
@@ -74,17 +74,31 @@ For each intermediate charge \(q\):
 
 This is the exact, untruncated SVD split required to implement TEBD. It still does not impose a bond cap or approximate cutoff. The next stage is a *separate* truncating split that must return discarded squared Schmidt weight, normalization change, bond-cap saturation and a conservative error ledger; do not mix that approximation into \`split_exact\`.
 
+
+## Explicit truncation policy and cumulative error ledger
+
+The new approximate path is separate from \`split_exact\`:
+
+- \`U1TwoSiteTruncationPolicy\` carries a global maximum bond dimension, a relative singular-value cutoff \(r\in[0,1]\), and a numerical tolerance.
+- Cutoff semantics are explicit: retain \(\sigma_i\ge r\,\sigma_{\max}\).
+- The cutoff is applied first; the global bond cap is then applied to the remaining singular values ranked across *all* charge sectors.
+- Charge labels remain attached to every retained Schmidt direction, so the cap cannot mix charge sectors.
+- The returned tensors remain unnormalized. Diagnostics report pre/post norm squared and the factor that would restore the original norm, without applying it.
+- Cutoff-discarded weight and bond-cap-discarded weight are separate, as are their singular-value counts.
+- The ledger accumulates \(\sum_j\sqrt{w_j}\), a conservative L2 error upper bound by the triangle inequality for a sequence of unitary gates and orthogonal Schmidt projections. This bound is not claimed when non-unitary operations or nonlinear renormalization are interleaved.
+
+The benchmark suite must compare against Quimb CircuitMPS with matched gate sequence, qubit ordering, initial vector, precision, cutoff semantics, bond cap, and hardware. Quimb already exposes maximum bond dimension, cutoffs, swap-and-split gate contraction, and norm-based fidelity/error estimates. ITensor already provides Abelian QN block-sparse MPS and automatic symmetry enforcement. The proposed advantage is not the novelty of MPS or U(1) conservation; it is the auditable end-to-end receipt for each symmetry-sector operation and the separation of approximation sources.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- Approximate/truncating two-site SVD with per-gate discarded-weight receipts.
-- TEBD gate sequencing and nonlocal MPO evolution.
+- Full TEBD gate sequencing, nonlocal MPO evolution and circuit-level state-error qualification.
 - TEBD or nonlocal MPO evolution.
 - Per-truncation discarded-weight accounting.
 - Cumulative state-vector / reduced-state error bounds.
 - Any N=16–64 scaling or matched Quimb/ITensor performance claim.
 
-Those are the next stages. The implementation should add them in this order: global singular-value truncation policy, per-gate discarded-weight ledger, cumulative state-error bounds, canonical-form sweeps, then controlled scaling.
+Those are the next stages. The implementation should add them in this order: two-site TEBD gate scheduler, canonical-form sweeps, cumulative circuit-level error qualification, then controlled scaling against Quimb and ITensor.
 
 ## Competitive benchmark policy
 
