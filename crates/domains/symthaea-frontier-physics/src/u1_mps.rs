@@ -39,10 +39,19 @@ pub struct U1MpsTensor {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum U1MpsError {
     EmptyChain,
-    EmptyBond { site: usize, side: &'static str },
+    EmptyBond {
+        site: usize,
+        side: &'static str,
+    },
     DimensionOverflow,
-    EntryCount { expected: usize, actual: usize },
-    NonFiniteTensorEntry { site: usize, index: usize },
+    EntryCount {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteTensorEntry {
+        site: usize,
+        index: usize,
+    },
     InvalidTolerance(f64),
     LeftBoundary {
         dimension: usize,
