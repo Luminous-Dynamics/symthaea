@@ -11,6 +11,7 @@ on:
       - "crates/domains/symthaea-muse/src/fluid_render.rs"
       - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "crates/domains/symthaea-music-theory/src/edit_contract_validation.rs"
       - ".github/workflows/muse-renderer-invocation-evidence.yml"
   pull_request:
     paths:
