@@ -1949,4 +1949,138 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn exact_charge_block_split_rebuilds_phase_gated_entangled_w_state() {
+        let root_two_thirds = (2.0_f64 / 3.0).sqrt();
+        let root_one_third = (1.0_f64 / 3.0).sqrt();
+        let inverse_root_two = 1.0 / 2.0_f64.sqrt();
+
+        let mut first_data = vec![complex_zero(); 4];
+        first_data[0] = Complex64::new(root_two_thirds, 0.0);
+        first_data[3] = Complex64::new(root_one_third, 0.0);
+        let first = U1MpsTensor::new(vec![0], vec![0, 1], first_data).unwrap();
+
+        let mut second_data = vec![complex_zero(); 8];
+        second_data[0] = Complex64::new(inverse_root_two, 0.0);
+        second_data[3] = Complex64::new(inverse_root_two, 0.0);
+        second_data[5] = Complex64::new(1.0, 0.0);
+        let second = U1MpsTensor::new(vec![0, 1], vec![0, 1], second_data).unwrap();
+
+        let mut third_data = vec![complex_zero(); 4];
+        third_data[1] = Complex64::new(1.0, 0.0);
+        third_data[2] = Complex64::new(1.0, 0.0);
+        let third = U1MpsTensor::new(vec![0, 1], vec![1], third_data).unwrap();
+
+        let initial = ComplexU1Mps::new(
+            vec![first.clone(), second.clone(), third.clone()],
+            1,
+            1.0e-12,
+        )
+        .unwrap();
+        let two_site =
+            U1TwoSiteState::from_adjacent_tensors(&first, &second, 1.0e-12).unwrap();
+
+        let mut phase_gate = [[complex_zero(); 4]; 4];
+        phase_gate[0][0] = Complex64::new(1.0, 0.0);
+        phase_gate[1][1] = Complex64::new(1.0, 0.0);
+        phase_gate[2][2] = Complex64::new(-1.0, 0.0);
+        phase_gate[3][3] = Complex64::new(1.0, 0.0);
+        let gate = U1TwoSiteGate::new(phase_gate, 1.0e-12).unwrap();
+
+        let evolved_two_site = two_site.apply_gate(&gate, 1.0e-12).unwrap();
+        let split = evolved_two_site.split_exact(1.0e-12).unwrap();
+        assert_eq!(split.rank_by_charge, vec![(0, 1), (1, 1)]);
+        assert_eq!(split.retained_singular_values, 2);
+        assert!(split.reconstruction_max_residual <= 1.0e-12);
+        assert!(split.reconstruction_l2_residual <= 1.0e-12);
+
+        let rebuilt = ComplexU1Mps::new(
+            vec![
+                split.left_tensor,
+                split.right_tensor,
+                third,
+            ],
+            1,
+            1.0e-12,
+        )
+        .unwrap();
+        assert!((rebuilt.norm_squared(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-12);
+
+        let mut expected = initial.to_dense(4).unwrap();
+        expected[4] = -expected[4];
+        let actual = rebuilt.to_dense(4).unwrap();
+        for index in 0..expected.len() {
+            assert!(
+                (actual[index] - expected[index]).norm() <= 1.0e-10,
+                "basis={index}, actual={:?}, expected={:?}",
+                actual[index],
+                expected[index]
+            );
+        }
+    }
+
+    #[test]
+    fn exact_two_site_split_retains_tiny_positive_schmidt_amplitude() {
+        let tiny = 1.0e-18;
+        let large = (1.0 - tiny * tiny).sqrt();
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                complex_zero(),
+                Complex64::new(large, 0.0),
+                Complex64::new(tiny, 0.0),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+
+        let split = state.split_exact(1.0e-12).unwrap();
+        assert_eq!(split.retained_singular_values, 2);
+        assert!(split.rank_by_charge.contains(&(0, 1)));
+        assert!(split.rank_by_charge.contains(&(1, 1)));
+        assert!(split.reconstruction_max_residual <= 1.0e-15);
+        let small_amplitude = split
+            .left_tensor
+            .get(0, 1, 1)
+            * split.right_tensor.get(1, 0, 0);
+        assert!((small_amplitude.re - tiny).abs() <= 1.0e-30);
+    }
+
+    #[test]
+    fn exact_two_site_split_omits_only_exact_zero_singular_directions() {
+        // The q=0 block is [[1, 1], [1, 1]], with one exact zero
+        // singular value and one positive singular value.
+        let mut entries = vec![complex_zero(); 2 * 4 * 2];
+        entries[0] = Complex64::new(1.0, 0.0);
+        entries[1] = Complex64::new(1.0, 0.0);
+        entries[8] = Complex64::new(1.0, 0.0);
+        entries[9] = Complex64::new(1.0, 0.0);
+        let state =
+            U1TwoSiteState::new(vec![0, 0], vec![0, 0], entries, 1.0e-12).unwrap();
+        let split = state.split_exact(1.0e-12).unwrap();
+        assert_eq!(split.rank_by_charge, vec![(0, 1)]);
+        assert_eq!(split.retained_singular_values, 1);
+        assert_eq!(split.exact_zero_singular_values_omitted, 1);
+        assert!(split.reconstruction_max_residual <= 1.0e-12);
+    }
+
+    #[test]
+    fn exact_two_site_split_rejects_zero_tensor_and_invalid_tolerance() {
+        let zero = U1TwoSiteState::new(
+            vec![0],
+            vec![0],
+            vec![complex_zero(); 4],
+            1.0e-12,
+        )
+        .unwrap();
+        assert_eq!(zero.split_exact(1.0e-12), Err(U1MpsError::ZeroDenseState));
+        assert_eq!(
+            zero.split_exact(0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        );
+    }
+
 }
