@@ -156,6 +156,7 @@ pub enum ContractError {
     DuplicateAreaId(String),
     DuplicatePathwayId(String),
     DuplicateAssessmentId(String),
+    DuplicateFloorAssessmentId(String),
     UnknownOriginArea { pathway_id: String, area_id: String },
     UnknownDestinationArea { pathway_id: String, area_id: String },
     OriginRoleMismatch { pathway_id: String, area_id: String },
@@ -163,6 +164,10 @@ pub enum ContractError {
     UnknownAssessmentPathway { assessment_id: String, pathway_id: String },
     UnknownAssessmentArea { assessment_id: String, area_id: String },
     AssessmentAreaNotInPathway { assessment_id: String, pathway_id: String, area_id: String },
+    UnknownFloorAssessmentPathway { assessment_id: String, pathway_id: String },
+    UnknownFloorAssessmentArea { assessment_id: String, area_id: String },
+    FloorAssessmentAreaNotInPathway { assessment_id: String, pathway_id: String, area_id: String },
+    ServiceFloor(ServiceFloorError),
     RecommendationAuthorityForbidden { pathway_id: String },
     AttributionMethodRequired { pathway_id: String },
     Evaluation(EvaluationError),
@@ -179,6 +184,7 @@ pub struct MobilityScenarioSet {
     pub areas: Vec<ScenarioArea>,
     pub pathways: Vec<MobilityPathway>,
     pub assessments: Vec<CapacityAssessment>,
+    pub floor_assessments: Vec<ServiceFloorAssessment>,
 }
 
 /// Evaluate a single declared capacity envelope.
@@ -382,6 +388,48 @@ impl MobilityScenarioSet {
             // remains a valid, explicitly indeterminate assessment.
             let _ = evaluate_capacity(assessment)?;
         }
+
+        let mut floor_assessment_ids = BTreeSet::new();
+        for floor in &self.floor_assessments {
+            if floor.id.trim().is_empty()
+                || floor.pathway_id.trim().is_empty()
+                || floor.area_id.trim().is_empty()
+            {
+                return Err(ContractError::EmptyField(
+                    "floor assessment id, pathway id, or area id",
+                ));
+            }
+            if !floor_assessment_ids.insert(floor.id.as_str()) {
+                return Err(ContractError::DuplicateFloorAssessmentId(floor.id.clone()));
+            }
+            if !pathways.contains(floor.pathway_id.as_str()) {
+                return Err(ContractError::UnknownFloorAssessmentPathway {
+                    assessment_id: floor.id.clone(),
+                    pathway_id: floor.pathway_id.clone(),
+                });
+            }
+            if !areas.contains_key(floor.area_id.as_str()) {
+                return Err(ContractError::UnknownFloorAssessmentArea {
+                    assessment_id: floor.id.clone(),
+                    area_id: floor.area_id.clone(),
+                });
+            }
+            let pathway = self
+                .pathways
+                .iter()
+                .find(|pathway| pathway.id == floor.pathway_id)
+                .expect("floor pathway reference was checked above");
+            let area_is_in_pathway = floor.area_id == pathway.origin_area_id
+                || pathway.destination_area_id.as_deref() == Some(floor.area_id.as_str());
+            if !area_is_in_pathway {
+                return Err(ContractError::FloorAssessmentAreaNotInPathway {
+                    assessment_id: floor.id.clone(),
+                    pathway_id: floor.pathway_id.clone(),
+                    area_id: floor.area_id.clone(),
+                });
+            }
+            let _ = evaluate_service_floor(floor).map_err(ContractError::ServiceFloor)?;
+        }
         Ok(())
     }
 }
@@ -397,6 +445,8 @@ impl MobilityScenarioSet {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceFloorAssessment {
     pub id: String,
+    pub pathway_id: String,
+    pub area_id: String,
     pub service_scope_id: String,
     pub metric: String,
     pub unit: String,
@@ -427,6 +477,8 @@ pub enum ServiceFloorOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceFloorResult {
     pub assessment_id: String,
+    pub pathway_id: String,
+    pub area_id: String,
     pub service_scope_id: String,
     pub outcome: ServiceFloorOutcome,
     pub minimum_required: Option<u64>,
@@ -468,6 +520,8 @@ pub fn evaluate_service_floor(
 
     let indeterminate = || ServiceFloorResult {
         assessment_id: input.id.clone(),
+        pathway_id: input.pathway_id.clone(),
+        area_id: input.area_id.clone(),
         service_scope_id: input.service_scope_id.clone(),
         outcome: ServiceFloorOutcome::Indeterminate,
         minimum_required: input.minimum_required,
@@ -532,6 +586,8 @@ pub fn evaluate_service_floor(
 
     Ok(ServiceFloorResult {
         assessment_id: input.id.clone(),
+        pathway_id: input.pathway_id.clone(),
+        area_id: input.area_id.clone(),
         service_scope_id: input.service_scope_id.clone(),
         outcome,
         minimum_required: Some(minimum_required),
@@ -671,6 +727,7 @@ mod tests {
                 is_recommendation: false,
             }],
             assessments: Vec::new(),
+            floor_assessments: Vec::new(),
         };
         assert_eq!(
             set.validate(),
@@ -729,6 +786,7 @@ mod tests {
                 is_recommendation: false,
             }],
             assessments: vec![assessment("a", Some(1), Some(0), Some(2), Some(0))],
+            floor_assessments: Vec::new(),
         };
         assert_eq!(
             set.validate(),
@@ -783,6 +841,7 @@ mod tests {
                 evidence_class: EvidenceClass::Synthetic,
                 qualification: AssessmentQualification::ContractOnly,
             }],
+            floor_assessments: Vec::new(),
         };
         assert_eq!(
             set.validate(),
@@ -802,6 +861,8 @@ mod tests {
     ) -> ServiceFloorAssessment {
         ServiceFloorAssessment {
             id: "floor-water-area-a".to_owned(),
+            pathway_id: "pathway-a".to_owned(),
+            area_id: "area-a".to_owned(),
             service_scope_id: "community-cell-a".to_owned(),
             metric: "delivered_potable_water_per_person_day".to_owned(),
             unit: "L/person/day".to_owned(),
@@ -905,6 +966,83 @@ mod tests {
             evaluate_service_floor(&input),
             Err(ServiceFloorError::InvertedObservationInterval {
                 assessment_id: "floor-water-area-a".to_owned()
+            })
+        );
+    }
+ 
+    #[test]
+    fn scenario_validation_binds_floor_assessment_to_pathway_and_area() {
+        let set = MobilityScenarioSet {
+            areas: vec![ScenarioArea {
+                id: "area-a".to_owned(),
+                role: AreaRole::Origin,
+                boundary_revision: Some("boundary-v1".to_owned()),
+            }],
+            pathways: vec![MobilityPathway {
+                id: "pathway-a".to_owned(),
+                kind: PathwayKind::InPlaceAdaptation,
+                origin_area_id: "area-a".to_owned(),
+                destination_area_id: None,
+                moved_people: Some(0),
+                climate_attribution: ClimateAttribution::NotClaimed,
+                attribution_method_id: None,
+                decision_state: DecisionState::ScenarioOnly,
+                is_recommendation: false,
+            }],
+            assessments: Vec::new(),
+            floor_assessments: vec![service_floor(
+                Some(10),
+                Some(100),
+                Some(12),
+                Some(20),
+            )],
+        };
+        assert_eq!(set.validate(), Ok(()));
+    }
+
+    #[test]
+    fn floor_assessment_cannot_be_attached_to_an_unrelated_area() {
+        let mut floor = service_floor(Some(100), Some(100), Some(30), Some(35));
+        floor.pathway_id = "path-a".to_owned();
+        floor.area_id = "unrelated".to_owned();
+        let set = MobilityScenarioSet {
+            areas: vec![
+                ScenarioArea {
+                    id: "origin".to_owned(),
+                    role: AreaRole::Origin,
+                    boundary_revision: None,
+                },
+                ScenarioArea {
+                    id: "destination".to_owned(),
+                    role: AreaRole::Destination,
+                    boundary_revision: None,
+                },
+                ScenarioArea {
+                    id: "unrelated".to_owned(),
+                    role: AreaRole::Destination,
+                    boundary_revision: None,
+                },
+            ],
+            pathways: vec![MobilityPathway {
+                id: "path-a".to_owned(),
+                kind: PathwayKind::VoluntaryMigration,
+                origin_area_id: "origin".to_owned(),
+                destination_area_id: Some("destination".to_owned()),
+                moved_people: Some(5),
+                climate_attribution: ClimateAttribution::NotClaimed,
+                attribution_method_id: None,
+                decision_state: DecisionState::ScenarioOnly,
+                is_recommendation: false,
+            }],
+            assessments: Vec::new(),
+            floor_assessments: vec![floor],
+        };
+        assert_eq!(
+            set.validate(),
+            Err(ContractError::FloorAssessmentAreaNotInPathway {
+                assessment_id: "floor-water-area-a".to_owned(),
+                pathway_id: "path-a".to_owned(),
+                area_id: "unrelated".to_owned(),
             })
         );
     }
