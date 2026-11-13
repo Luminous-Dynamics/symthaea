@@ -682,19 +682,19 @@ fn validate_option_set(
     validate_recovery_topology(arm_id, &options.recovery_topology)?;
     if let Some(topology_state) = options.recovery_topology.physical_state_digest.as_deref() {
         if topology_state.trim().is_empty() {
-            return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-                arm_id.to_owned(),
-            ));
+            return Err(
+                CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(arm_id.to_owned()),
+            );
         }
         if topology_state != options.result_state_digest {
-            return Err(CapabilityRetentionError::RecoveryTopologyTerminalStateMismatch(
-                arm_id.to_owned(),
-            ));
+            return Err(
+                CapabilityRetentionError::RecoveryTopologyTerminalStateMismatch(arm_id.to_owned()),
+            );
         }
     } else if options.recovery_topology.disposition == EvidenceDisposition::Qualified {
-        return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-            arm_id.to_owned(),
-        ));
+        return Err(
+            CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(arm_id.to_owned()),
+        );
     }
     Ok(())
 }
@@ -1495,9 +1495,9 @@ mod tests {
             .physical_state_digest = Some("another-terminal-state".into());
         assert_eq!(
             compare_work_and_terminal_capability(&audit),
-            Err(CapabilityRetentionError::RecoveryTopologyTerminalStateMismatch(
-                "candidate".into()
-            ))
+            Err(
+                CapabilityRetentionError::RecoveryTopologyTerminalStateMismatch("candidate".into())
+            )
         );
     }
 
@@ -1511,9 +1511,7 @@ mod tests {
             .physical_state_digest = None;
         assert_eq!(
             compare_work_and_terminal_capability(&audit),
-            Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-                "candidate".into()
-            ))
+            Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology("candidate".into()))
         );
     }
 
@@ -1563,8 +1561,11 @@ mod tests {
     #[test]
     fn more_work_but_thermal_headroom_below_floor_vetoes_positive_disposition() {
         let mut audit = input();
-        let candidate_terminal_state =
-            audit.clusters[0].candidate.option_set.result_state_digest.clone();
+        let candidate_terminal_state = audit.clusters[0]
+            .candidate
+            .option_set
+            .result_state_digest
+            .clone();
         audit.clusters[0].candidate.reserves =
             reserves(18_000, 4_000, 2, &candidate_terminal_state);
         let report = compare_work_and_terminal_capability(&audit).unwrap();
