@@ -104,6 +104,9 @@ struct SelectionReceipt {
     objective: String,
     selected_action_ids: Vec<String>,
     training_group_manifest: TrainingGroupManifest,
+    model_adequacy_status: String,
+    model_adequacy_receipt_id: String,
+    other_model_registered: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -127,7 +130,11 @@ struct Measurement {
     sample_preparation_group: String,
     independence_group: String,
     covariance_model_id: Option<String>,
+    quantity: String,
+    unit: String,
+    calibration_record_id: String,
     calibration_status: String,
+    uncertainty: f64,
     raw_trace_digest: String,
 }
 
@@ -379,6 +386,17 @@ fn evaluate_scenario(
     {
         rejected.push("selection receipt identity/ownership/action set is invalid".to_owned());
     }
+    if !matches!(
+        receipt.model_adequacy_status.as_str(),
+        "ADEQUATE" | "INADEQUATE" | "UNRESOLVED"
+    ) {
+        rejected.push("selection receipt has an unsupported model-adequacy status".to_owned());
+    } else if receipt.model_adequacy_status != "ADEQUATE" {
+        blocked.push("model family is INADEQUATE/UNRESOLVED; retain OTHER and abstain".to_owned());
+    }
+    if receipt.model_adequacy_receipt_id.trim().is_empty() || !receipt.other_model_registered {
+        blocked.push("model-adequacy receipt or explicit OTHER hypothesis registration is missing".to_owned());
+    }
 
     let mut selected_ids = BTreeSet::new();
     let mut selected_cost = 0.0_f64;
@@ -414,7 +432,7 @@ fn evaluate_scenario(
 
     let mut measurement_ids = BTreeSet::new();
     let mut measurement_by_action = BTreeMap::<String, usize>::new();
-    let mut preparation_groups = BTreeMap::<String, Vec<&Measurement>>::new();
+    let mut dependency_groups = BTreeMap::<(String, String), Vec<&Measurement>>::new();
     let mut lot_ids = BTreeSet::<String>::new();
     let mut device_ids = BTreeSet::<String>::new();
     let mut production_days = BTreeSet::<String>::new();
@@ -434,16 +452,26 @@ fn evaluate_scenario(
             || measurement.production_day.trim().is_empty()
             || measurement.sample_preparation_group.trim().is_empty()
             || measurement.independence_group.trim().is_empty()
+            || measurement.quantity.trim().is_empty()
+            || measurement.unit.trim().is_empty()
+            || measurement.calibration_record_id.trim().is_empty()
             || measurement.raw_trace_digest.trim().is_empty()
         {
-            blocked.push(format!("measurement {} lacks specimen/group/raw-trace identity", measurement.measurement_id));
+            blocked.push(format!("measurement {} lacks specimen/group/quantity/unit/calibration/raw-trace identity", measurement.measurement_id));
         }
         if measurement.calibration_status != "QUALIFIED" {
             blocked.push(format!("measurement {} lacks qualified calibration", measurement.measurement_id));
         }
+        if !measurement.uncertainty.is_finite() || measurement.uncertainty < 0.0 {
+            rejected.push(format!("measurement {} has invalid uncertainty", measurement.measurement_id));
+        }
         *measurement_by_action.entry(measurement.action_id.clone()).or_default() += 1;
-        preparation_groups
-            .entry(measurement.sample_preparation_group.clone())
+        dependency_groups
+            .entry(("SAMPLE_PREPARATION".to_owned(), measurement.sample_preparation_group.clone()))
+            .or_default()
+            .push(measurement);
+        dependency_groups
+            .entry(("INDEPENDENCE".to_owned(), measurement.independence_group.clone()))
             .or_default()
             .push(measurement);
         lot_ids.insert(measurement.lot_id.clone());
@@ -503,7 +531,7 @@ fn evaluate_scenario(
         }
     }
 
-    for group in preparation_groups.values().filter(|items| items.len() > 1) {
+    for ((group_kind, _group_id), group) in dependency_groups.iter().filter(|(_, items)| items.len() > 1) {
         let group_ids: BTreeSet<_> = group.iter().map(|measurement| measurement.measurement_id.clone()).collect();
         let declared_model = group[0].covariance_model_id.as_deref();
         let same_model = declared_model.is_some()
@@ -512,10 +540,13 @@ fn evaluate_scenario(
             .and_then(|model_id| covariance_map.get(model_id))
             .is_some_and(|model| {
                 let recorded: BTreeSet<_> = model.measurement_ids.iter().cloned().collect();
-                recorded.len() == model.measurement_ids.len() && recorded == group_ids
+                recorded.len() == model.measurement_ids.len()
+                    && group_ids.is_subset(&recorded)
             });
         if !same_model || !covariance_valid {
-            blocked.push("shared sample-preparation group lacks a matched selected-set covariance receipt".to_owned());
+            blocked.push(format!(
+                "shared {group_kind} group lacks a matched selected-set covariance receipt"
+            ));
         }
     }
 
@@ -686,11 +717,11 @@ mod tests {
     #[test]
     fn frozen_fixture_matches_all_expected_audit_and_product_dispositions() {
         let report = report();
-        assert_eq!(report.scenario_count, 9);
+        assert_eq!(report.scenario_count, 10);
         assert_eq!(report.mismatched_expectations, 0);
-        assert_eq!(report.matched_expectations, 9);
+        assert_eq!(report.matched_expectations, 10);
         assert_eq!(report.pass_count, 4);
-        assert_eq!(report.blocked_count, 2);
+        assert_eq!(report.blocked_count, 3);
         assert_eq!(report.rejected_count, 3);
         assert!(!report.optimizer_executed);
         assert!(!report.automatic_experiment_execution);
@@ -754,6 +785,13 @@ mod tests {
     fn inadmissible_action_is_rejected() {
         let result = result_for(&report(), "inadmissible-action-abstain");
         assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
+    }
+
+    #[test]
+    fn inadequate_model_family_forces_other_and_abstention() {
+        let result = result_for(&report(), "model-family-inadequate-abstain");
+        assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
 
     #[test]
