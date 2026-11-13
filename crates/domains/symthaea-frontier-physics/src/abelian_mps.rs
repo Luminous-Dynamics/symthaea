@@ -636,4 +636,5 @@ mod tests {
             AbelianMps::new(vec![first, last], vacuum, 1.0e-12),
             Err(AbelianChargeError::RightBoundary { .. })
         ));
-    }}
+    }
+}
