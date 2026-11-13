@@ -10,8 +10,11 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::fmt::Write as _;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FiniteGroupV1 {
     pub group_id: String,
     pub identity: usize,
@@ -19,7 +22,7 @@ pub struct FiniteGroupV1 {
 }
 
 /// Left-action convention: p_g(p_h(x)) = p_(g*h)(x).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FiniteActionV1 {
     pub action_id: String,
     pub group: FiniteGroupV1,
@@ -27,7 +30,7 @@ pub struct FiniteActionV1 {
 }
 
 /// Exact task fields required to be invariant before pruning.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CandidateSemanticsV1 {
     pub in_search_domain: bool,
     pub admissible: bool,
@@ -38,14 +41,14 @@ pub struct CandidateSemanticsV1 {
     pub output_equivalence_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SearchProblemV1 {
     pub problem_id: String,
     pub candidate_ids: Vec<String>,
     pub semantics: Vec<CandidateSemanticsV1>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct QualificationBudgetV1 {
     pub maximum_group_order: usize,
     pub maximum_candidates: usize,
@@ -60,6 +63,147 @@ impl Default for QualificationBudgetV1 {
             maximum_work_units: 50_000_000,
         }
     }
+}
+
+/// Canonical content commitments for the exact problem/action/resource inputs.
+/// A digest binds identity; it does not replace independent certificate replay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InputCommitmentV1 {
+    pub schema_version: String,
+    pub canonicalization_id: String,
+    pub problem_sha256: String,
+    pub action_sha256: String,
+    pub budget_sha256: String,
+    pub commitment_sha256: String,
+}
+
+#[derive(Serialize)]
+struct InputCommitmentCoreV1<'a> {
+    schema_version: &'a str,
+    canonicalization_id: &'a str,
+    problem_sha256: &'a str,
+    action_sha256: &'a str,
+    budget_sha256: &'a str,
+}
+
+fn write_canonical_json(
+    value: &serde_json::Value,
+    output: &mut String,
+) -> Result<(), QuotientErrorV1> {
+    match value {
+        serde_json::Value::Null => output.push_str("null"),
+        serde_json::Value::Bool(value) => {
+            output.push_str(if *value { "true" } else { "false" });
+        }
+        serde_json::Value::Number(value) => output.push_str(&value.to_string()),
+        serde_json::Value::String(value) => {
+            output.push_str(
+                &serde_json::to_string(value)
+                    .map_err(|_| QuotientErrorV1::CanonicalSerializationFailed)?,
+            );
+        }
+        serde_json::Value::Array(values) => {
+            output.push('[');
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    output.push(',');
+                }
+                write_canonical_json(value, output)?;
+            }
+            output.push(']');
+        }
+        serde_json::Value::Object(values) => {
+            output.push('{');
+            let mut entries: Vec<_> = values.iter().collect();
+            entries.sort_by(|left, right| left.0.cmp(right.0));
+            for (index, (key, value)) in entries.into_iter().enumerate() {
+                if index > 0 {
+                    output.push(',');
+                }
+                output.push_str(
+                    &serde_json::to_string(key)
+                        .map_err(|_| QuotientErrorV1::CanonicalSerializationFailed)?,
+                );
+                output.push(':');
+                write_canonical_json(value, output)?;
+            }
+            output.push('}');
+        }
+    }
+    Ok(())
+}
+
+/// Versioned compact UTF-8 JSON with recursively sorted object keys.
+/// The current input structs contain only booleans, integers, arrays and strings;
+/// non-finite floating-point encodings are therefore outside this schema.
+fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, QuotientErrorV1> {
+    let value = serde_json::to_value(value)
+        .map_err(|_| QuotientErrorV1::CanonicalSerializationFailed)?;
+    let mut output = String::new();
+    write_canonical_json(&value, &mut output)?;
+    Ok(output.into_bytes())
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut result = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut result, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    result
+}
+
+fn canonical_json_sha256<T: Serialize>(
+    domain: &str,
+    value: &T,
+) -> Result<String, QuotientErrorV1> {
+    let canonical = canonical_json_bytes(value)?;
+    let mut hasher = Sha256::new();
+    hasher.update(domain.as_bytes());
+    hasher.update([0_u8]);
+    hasher.update((canonical.len() as u64).to_le_bytes());
+    hasher.update(&canonical);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Content-addresses the entire problem, action and declared resource profile.
+/// Each component has its own domain separator; an additional bundle digest
+/// commits their ordered association and schema/canonicalization versions.
+pub fn input_commitment_v1(
+    problem: &SearchProblemV1,
+    action: &FiniteActionV1,
+    budget: QualificationBudgetV1,
+) -> Result<InputCommitmentV1, QuotientErrorV1> {
+    const SCHEMA_VERSION: &str = "luminous.symmetry_quotient_inputs.v1";
+    const CANONICALIZATION_ID: &str = "luminous.canonical_json.sorted_keys_compact_utf8.v1";
+    let problem_sha256 =
+        canonical_json_sha256("luminous.symmetry_quotient.problem.v1", problem)?;
+    let action_sha256 =
+        canonical_json_sha256("luminous.symmetry_quotient.action.v1", action)?;
+    let budget_sha256 =
+        canonical_json_sha256("luminous.symmetry_quotient.budget.v1", &budget)?;
+    let core = InputCommitmentCoreV1 {
+        schema_version: SCHEMA_VERSION,
+        canonicalization_id: CANONICALIZATION_ID,
+        problem_sha256: &problem_sha256,
+        action_sha256: &action_sha256,
+        budget_sha256: &budget_sha256,
+    };
+    let commitment_sha256 =
+        canonical_json_sha256("luminous.symmetry_quotient.bundle.v1", &core)?;
+    Ok(InputCommitmentV1 {
+        schema_version: SCHEMA_VERSION.to_owned(),
+        canonicalization_id: CANONICALIZATION_ID.to_owned(),
+        problem_sha256,
+        action_sha256,
+        budget_sha256,
+        commitment_sha256,
+    })
+}
+
+#[cfg(test)]
+fn canonical_json_for_test(value: &serde_json::Value) -> Result<Vec<u8>, QuotientErrorV1> {
+    canonical_json_bytes(value)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,6 +244,7 @@ pub struct CertificateEvidenceV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QuotientCertificateV1 {
     pub schema_version: u32,
+    pub input_commitment: InputCommitmentV1,
     pub problem_id: String,
     pub action_id: String,
     pub group_id: String,
@@ -127,6 +272,7 @@ pub enum CompileOutcomeV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationReceiptV1 {
+    pub input_commitment: InputCommitmentV1,
     pub problem_id: String,
     pub action_id: String,
     pub group_id: String,
@@ -187,6 +333,8 @@ pub enum QuotientErrorV1 {
     NonCanonicalOrdering,
     RequestedCandidateIsNotRepresentative,
     EvidenceCountMismatch,
+    CanonicalSerializationFailed,
+    InputCommitmentMismatch,
 }
 
 impl fmt::Display for QuotientErrorV1 {
@@ -595,6 +743,7 @@ pub fn compile_quotient(
         Ok(checks) => checks,
         Err(violation) => return Ok(CompileOutcomeV1::Blocked(violation)),
     };
+    let input_commitment = input_commitment_v1(problem, action, budget)?;
     let orbits = build_orbits(problem, action, &validated.group.inverses);
     let (
         stabilizer_membership_checks,
@@ -604,6 +753,7 @@ pub fn compile_quotient(
     ) = stabilizer_evidence_counts(group_order, &orbits)?;
     Ok(CompileOutcomeV1::Authorized(QuotientCertificateV1 {
         schema_version: 1,
+        input_commitment,
         problem_id: problem.problem_id.clone(),
         action_id: action.action_id.clone(),
         group_id: action.group.group_id.clone(),
@@ -635,6 +785,10 @@ pub fn verify_certificate(
     let group_order = action.group.multiplication.len();
     let candidate_count = problem.candidate_ids.len();
     preflight(group_order, candidate_count, budget)?;
+    let expected_input_commitment = input_commitment_v1(problem, action, budget)?;
+    if certificate.input_commitment != expected_input_commitment {
+        return Err(QuotientErrorV1::InputCommitmentMismatch);
+    }
     validate_problem(problem, budget)?;
     let validated = validate_action(action, candidate_count, budget)?;
 
@@ -793,6 +947,7 @@ pub fn verify_certificate(
     }
 
     Ok(VerificationReceiptV1 {
+        input_commitment: expected_input_commitment,
         problem_id: problem.problem_id.clone(),
         action_id: action.action_id.clone(),
         group_id: action.group.group_id.clone(),
@@ -960,6 +1115,77 @@ mod tests {
             panic!("expected an exact task-preserving quotient");
         };
         (problem, action, certificate)
+    }
+
+    #[test]
+    fn sha256_matches_nist_known_vectors() {
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn canonical_json_sorts_nested_object_keys_and_preserves_array_order() {
+        let left: serde_json::Value = serde_json::from_str(
+            r#"{"z":[{"b":2,"a":1}],"a":true}"#
+        )
+        .unwrap();
+        let right: serde_json::Value = serde_json::from_str(
+            r#"{"a":true,"z":[{"a":1,"b":2}]}"#
+        )
+        .unwrap();
+        assert_eq!(
+            canonical_json_for_test(&left).unwrap(),
+            canonical_json_for_test(&right).unwrap()
+        );
+        assert_eq!(
+            String::from_utf8(canonical_json_for_test(&left).unwrap()).unwrap(),
+            r#"{"a":true,"z":[{"a":1,"b":2}]}"#
+        );
+    }
+
+    #[test]
+    fn input_commitments_are_deterministic_and_domain_separated() {
+        let problem = c2_problem();
+        let action = c2_action();
+        let budget = QualificationBudgetV1::default();
+        let first = input_commitment_v1(&problem, &action, budget).unwrap();
+        let second = input_commitment_v1(&problem, &action, budget).unwrap();
+        assert_eq!(first, second);
+        assert_ne!(first.problem_sha256, first.action_sha256);
+        assert_ne!(first.commitment_sha256, first.problem_sha256);
+
+        let mut changed_budget = budget;
+        changed_budget.maximum_work_units += 1;
+        let changed = input_commitment_v1(&problem, &action, changed_budget).unwrap();
+        assert_ne!(first.budget_sha256, changed.budget_sha256);
+        assert_eq!(first.problem_sha256, changed.problem_sha256);
+        assert_eq!(first.action_sha256, changed.action_sha256);
+    }
+
+    #[test]
+    fn changed_objective_changes_problem_commitment_even_when_invariance_remains_valid() {
+        let original = c2_problem();
+        let action = c2_action();
+        let budget = QualificationBudgetV1::default();
+        let original_commitment = input_commitment_v1(&original, &action, budget).unwrap();
+
+        let mut changed = original.clone();
+        changed.semantics[0].objective_cost += 1;
+        changed.semantics[1].objective_cost += 1;
+        let changed_commitment = input_commitment_v1(&changed, &action, budget).unwrap();
+
+        assert_ne!(
+            original_commitment.problem_sha256,
+            changed_commitment.problem_sha256
+        );
+        assert_eq!(original_commitment.action_sha256, changed_commitment.action_sha256);
+        assert_eq!(original_commitment.budget_sha256, changed_commitment.budget_sha256);
     }
 
     #[test]
@@ -1302,10 +1528,28 @@ mod tests {
     }
 
     #[test]
-    fn certificate_cannot_be_replayed_against_changed_task_semantics() {
-        let (_problem, action, certificate) = authorized_fixture();
-        let mut changed_problem = c2_problem();
+    fn mismatched_input_commitment_is_rejected_before_replay() {
+        let (problem, action, mut certificate) = authorized_fixture();
+        certificate.input_commitment.problem_sha256.replace_range(0..1, "f");
+        assert_eq!(
+            verify_certificate(
+                &problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default()
+            ),
+            Err(QuotientErrorV1::InputCommitmentMismatch)
+        );
+    }
+
+    #[test]
+    fn changed_task_with_recommitted_input_still_fails_task_invariance() {
+        let (problem, action, mut certificate) = authorized_fixture();
+        let mut changed_problem = problem.clone();
         changed_problem.semantics[2].objective_cost += 1;
+        certificate.input_commitment =
+            input_commitment_v1(&changed_problem, &action, QualificationBudgetV1::default())
+                .unwrap();
         assert_eq!(
             verify_certificate(
                 &changed_problem,
