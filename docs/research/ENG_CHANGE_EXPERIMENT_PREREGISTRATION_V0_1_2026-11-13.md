@@ -80,6 +80,11 @@ Determine sample size through a preregistered power analysis using the pilot's p
 
 - **V1 — Siemens Teamcenter 2606 / Teamcenter X:** include AI BOM agent, Copilot MBSE and native change workflow only where the exact edition, deployment, model and enabled features can be pinned.
 - **V2 — Aras Innovator UCM + Impact Analysis AI Agent v1.0.1:** highest-priority direct commercial comparator where a licensed representative environment can be provisioned.
+  - Eligibility requires a real pinned Aras Innovator/UCM/InnovatorEdge AI environment and the actual supported agent release; public documentation alone is not a score.
+  - Prepare a Draft-state Change Request with substantive title, Reason of Change and Description, complete product-structure links, and stable unique `item_number` values for custom item types.
+  - Record the authenticated principal and its configured access: read/update Change Requests and read Affected Items (Parts, CADs, Documents). Record effective permissions at analysis and apply time.
+  - The optional session-level Analysis Instructions field is part of the candidate-visible instruction channel. Give all arms equivalent task scope; test both legitimate narrowing and hostile expansion attempts. Free text is not approval or a permission grant.
+  - The human must select the relationships to Apply. Capture the exact selected set, observed writes and resulting lifecycle state; the guide says the CR remains Draft. Do not assume permission enforcement or atomicity beyond what is actually observed.
 - **V3 — PTC Windchill 13.1.2:** include change-impact collection and configured upstream/downstream external links; state whether requirements integration is active.
 - **V4 — IBM DOORS Next 7.2:** requirements-traceability adjunct only, paired with a declared PLM system. Do not rank it as a complete PLM workflow.
 
