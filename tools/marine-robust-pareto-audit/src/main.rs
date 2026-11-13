@@ -1371,7 +1371,12 @@ mod tests {
                 metric.expanded_uncertainty = 10.0;
             }
         }
-        input.hard_gates[0].threshold = Some(200.0);
+        input.hard_gates.iter_mut()
+            .filter(|gate| gate.evaluation == GateEvaluation::MetricUpperBound)
+            .for_each(|gate| gate.threshold = Some(200.0));
+        input.hard_gates.iter_mut()
+            .find(|gate| gate.gate_id == "availability-minimum")
+            .unwrap().threshold = Some(-100.0);
         let report = audit(&input);
         assert_eq!(report.pairwise_relations[0].relation_from_a, "unresolved_interval_order");
         assert!(report.robust_frontier.iter().all(|entry| entry.certainty == "provisional_unresolved_pairs"));
@@ -1472,16 +1477,12 @@ mod tests {
     #[test]
     fn maximizing_objective_uses_lower_interval_against_upper_interval() {
         let mut input = case();
-        input.objectives.push(ObjectiveDefinition {
-            metric_id: "availability".to_string(),
-            direction: Direction::Maximize,
-            unit: "fraction".to_string(),
-        });
         for candidate in &mut input.candidates {
-            let mut observation = metric("availability", if candidate.candidate_id == "A" {0.99} else {0.95}, "fraction");
+            let observation = candidate.metrics.iter_mut()
+                .find(|metric| metric.metric_id == "availability")
+                .unwrap();
+            observation.value = if candidate.candidate_id == "A" { 0.99 } else { 0.95 };
             observation.expanded_uncertainty = 0.001;
-            observation.operating_point_receipt_sha256 = candidate.operating_point_receipt_sha256.clone();
-            candidate.metrics.push(observation);
         }
         let report = audit(&input);
         let relation = &report.pairwise_relations[0];
@@ -1504,6 +1505,6 @@ mod tests {
         assert_eq!(fixture["candidates"][0]["evidence_kind"], "synthetic");
         assert_eq!(fixture["candidates"][1]["evidence_kind"], "synthetic");
         assert!(fixture["candidates"][0]["metrics"][0]["operating_point_receipt_sha256"].is_string());
-        assert_eq!(fixture["hard_gates"].as_array().unwrap().iter().filter(|gate| gate["non_compensable"] == true).count(), 8);
+        assert_eq!(fixture["hard_gates"].as_array().unwrap().iter().filter(|gate| gate["non_compensable"] == true).count(), 10);
     }
 }
