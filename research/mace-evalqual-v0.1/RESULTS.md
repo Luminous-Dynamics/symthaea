@@ -95,9 +95,9 @@ A real local Linux filesystem observer adapter was added alongside the in-memory
 - `ObserveDirectory` installs recursive inotify watches on a pinned existing directory tree, captures pre/post content digests, and keeps the mutation event stream as a separate observation.
 - Root device/inode is checked before and after evaluation. Nested paths are compared with the most-specific mount ID from `/proc/self/mountinfo`.
 - The parser uses the 16-byte Linux inotify wire header explicitly. An initial implementation incorrectly used Go's 20-byte `syscall.InotifyEvent` memory size; it corrupted event boundaries and failed transient-write tests. That was corrected before publication.
-- 12 focused filesystem observer tests plus three root/mount hardening tests pass.
+- 12 focused filesystem observer tests, three root/mount hardening tests, and two cross-process mutation tests pass.
 - Cases include read-only, persistent writes, transient write/restore with unchanged final content, transient create/delete, nested file changes, symlinks, dynamic subdirectories, callback panic, root replacement, mountpoint selection and live mount-table parsing.
-- The combined local `oraclelab` package has 34 test functions (19 in-memory non-interference, 12 filesystem observer, 3 root/mount hardening). Go 1.23.2 / Linux amd64:
+- The combined local `oraclelab` package has 36 test functions (19 in-memory non-interference, 12 filesystem observer, 3 root/mount hardening, 2 child-process mutation tests). Go 1.23.2 / Linux amd64:
   - `go test -count=1 ./...`: pass.
   - `go test -count=1 -race ./...`: pass.
   - `go vet ./...`: pass.
