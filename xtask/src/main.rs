@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod electrochemical_capacitor;
 mod manifest;
 mod rhn_sweep;
 
@@ -62,6 +63,8 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Audit the electrochemical-capacitor benchmark schema, fixture and source register.
+    ElectrochemicalCapacitorAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +108,13 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::ElectrochemicalCapacitorAudit => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            electrochemical_capacitor::audit(&root)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
