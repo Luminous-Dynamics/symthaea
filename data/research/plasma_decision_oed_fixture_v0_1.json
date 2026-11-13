@@ -18,7 +18,9 @@
       "provides": [
         "wettability_screen"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "water_contact_angle",
+      "unit": "degree"
     },
     {
       "action_id": "FTIR_CHEMISTRY",
@@ -29,7 +31,9 @@
       "provides": [
         "surface_chemistry"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "infrared_signature",
+      "unit": "a.u."
     },
     {
       "action_id": "XPS_CHEMISTRY",
@@ -40,7 +44,9 @@
       "provides": [
         "surface_chemistry"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "surface_atomic_fraction",
+      "unit": "at.%"
     },
     {
       "action_id": "LAP_SHEAR",
@@ -52,7 +58,9 @@
         "bond_strength",
         "failure_mode"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "lap_shear_strength",
+      "unit": "MPa"
     },
     {
       "action_id": "AGED_LAP_SHEAR",
@@ -64,7 +72,9 @@
         "aged_bond_strength",
         "bond_retention"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "aged_lap_shear_strength",
+      "unit": "MPa"
     },
     {
       "action_id": "WVTR",
@@ -75,7 +85,9 @@
       "provides": [
         "water_vapour_barrier"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "water_vapour_transmission_ratio",
+      "unit": "ratio"
     },
     {
       "action_id": "OTR",
@@ -86,7 +98,9 @@
       "provides": [
         "oxygen_barrier"
       ],
-      "admissible": true
+      "admissible": true,
+      "quantity": "oxygen_transmission_ratio",
+      "unit": "ratio"
     },
     {
       "action_id": "UNAPPROVED_CHEMICAL_ACTIVATION",
@@ -97,7 +111,9 @@
       "provides": [
         "surface_chemistry"
       ],
-      "admissible": false
+      "admissible": false,
+      "quantity": "unapproved_chemistry_signal",
+      "unit": "a.u."
     }
   ],
   "scenarios": [
@@ -317,7 +333,7 @@
         "wca_deg": 12,
         "bond_strength_mpa": 4.2,
         "aged_bond_strength_mpa": 3.9,
-        "bond_retention": 0.78,
+        "bond_retention": 0.9285714285714285,
         "failure_mode": "interfacial",
         "wvtr_ratio": null,
         "otr_ratio": null,
@@ -434,7 +450,7 @@
         "wca_deg": 15,
         "bond_strength_mpa": 6.2,
         "aged_bond_strength_mpa": 4,
-        "bond_retention": 0.65,
+        "bond_retention": 0.6451612903225806,
         "failure_mode": "interfacial",
         "wvtr_ratio": null,
         "otr_ratio": null,
@@ -624,7 +640,7 @@
         "wca_deg": 13,
         "bond_strength_mpa": 6.3,
         "aged_bond_strength_mpa": 5.4,
-        "bond_retention": 0.86,
+        "bond_retention": 0.8571428571428572,
         "failure_mode": "cohesive",
         "wvtr_ratio": 1.6,
         "otr_ratio": 1.45,
@@ -771,7 +787,7 @@
         "wca_deg": 18,
         "bond_strength_mpa": 6.2,
         "aged_bond_strength_mpa": 5.5,
-        "bond_retention": 0.887,
+        "bond_retention": 0.8870967741935484,
         "failure_mode": "cohesive",
         "wvtr_ratio": null,
         "otr_ratio": null,
@@ -1051,7 +1067,7 @@
         "wca_deg": 18,
         "bond_strength_mpa": 6,
         "aged_bond_strength_mpa": 5.3,
-        "bond_retention": 0.88,
+        "bond_retention": 0.8833333333333333,
         "failure_mode": "cohesive",
         "wvtr_ratio": null,
         "otr_ratio": null,
@@ -1281,7 +1297,7 @@
         "wca_deg": 18,
         "bond_strength_mpa": 6.2,
         "aged_bond_strength_mpa": 5.5,
-        "bond_retention": 0.887,
+        "bond_retention": 0.8870967741935484,
         "failure_mode": "cohesive",
         "wvtr_ratio": null,
         "otr_ratio": null,
@@ -1428,7 +1444,7 @@
         "wca_deg": 18,
         "bond_strength_mpa": 6.2,
         "aged_bond_strength_mpa": 5.5,
-        "bond_retention": 0.887,
+        "bond_retention": 0.8870967741935484,
         "failure_mode": "cohesive",
         "wvtr_ratio": null,
         "otr_ratio": null,
