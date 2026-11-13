@@ -920,11 +920,19 @@ mod tests {
         let operating_point_receipt_sha256 = digest(if id == "A" { '3' } else { '4' });
         let mut metrics = vec![
             metric("energy_per_cargo_work", energy, "kWh_per_1000_tonne_nm"),
+            metric("well_to_wake_ghg_per_cargo_work", if id == "A" { 70.0 } else { 75.0 }, "kgCO2e_per_1000_tonne_nm"),
             metric("acoustic_1khz", acoustic, "dB_re_1uPa_at_declared_reference"),
+            metric("acoustic_2_5khz", if id == "A" { 102.0 } else { 103.0 }, "dB_re_1uPa_at_declared_reference"),
+            metric("acoustic_30_80khz", if id == "A" { 115.0 } else { 116.0 }, "dB_re_1uPa_at_declared_reference"),
             metric("lifecycle_cost", if id == "A" { 20.0 } else { 21.0 }, "USD_per_1000_tonne_nm"),
+            metric("maintenance_hours_per_cargo_work", if id == "A" { 6.0 } else { 7.0 }, "hours_per_1000_tonne_nm"),
+            metric("availability", if id == "A" { 0.98 } else { 0.97 }, "fraction"),
         ];
         for observation in &mut metrics {
             observation.operating_point_receipt_sha256 = operating_point_receipt_sha256.clone();
+            if observation.metric_id == "availability" {
+                observation.expanded_uncertainty = 0.005;
+            }
         }
         Candidate {
             candidate_id: id.to_string(),
@@ -1031,7 +1039,22 @@ mod tests {
                     unit: "kWh_per_1000_tonne_nm".to_string(),
                 },
                 ObjectiveDefinition {
+                    metric_id: "well_to_wake_ghg_per_cargo_work".to_string(),
+                    direction: Direction::Minimize,
+                    unit: "kgCO2e_per_1000_tonne_nm".to_string(),
+                },
+                ObjectiveDefinition {
                     metric_id: "acoustic_1khz".to_string(),
+                    direction: Direction::Minimize,
+                    unit: "dB_re_1uPa_at_declared_reference".to_string(),
+                },
+                ObjectiveDefinition {
+                    metric_id: "acoustic_2_5khz".to_string(),
+                    direction: Direction::Minimize,
+                    unit: "dB_re_1uPa_at_declared_reference".to_string(),
+                },
+                ObjectiveDefinition {
+                    metric_id: "acoustic_30_80khz".to_string(),
                     direction: Direction::Minimize,
                     unit: "dB_re_1uPa_at_declared_reference".to_string(),
                 },
@@ -1039,6 +1062,16 @@ mod tests {
                     metric_id: "lifecycle_cost".to_string(),
                     direction: Direction::Minimize,
                     unit: "USD_per_1000_tonne_nm".to_string(),
+                },
+                ObjectiveDefinition {
+                    metric_id: "maintenance_hours_per_cargo_work".to_string(),
+                    direction: Direction::Minimize,
+                    unit: "hours_per_1000_tonne_nm".to_string(),
+                },
+                ObjectiveDefinition {
+                    metric_id: "availability".to_string(),
+                    direction: Direction::Maximize,
+                    unit: "fraction".to_string(),
                 },
             ],
             hard_gates: vec![
@@ -1051,6 +1084,28 @@ mod tests {
                     unit: Some("dB_re_1uPa_at_declared_reference".to_string()),
                     required_audit_contract_id: None,
                     requirement_reference: "operator-limit:acoustic-1khz".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "acoustic-30-80khz-maximum".to_string(),
+                    gate_class: "underwater_noise".to_string(),
+                    evaluation: GateEvaluation::MetricUpperBound,
+                    metric_id: Some("acoustic_30_80khz".to_string()),
+                    threshold: Some(125.0),
+                    unit: Some("dB_re_1uPa_at_declared_reference".to_string()),
+                    required_audit_contract_id: None,
+                    requirement_reference: "operator-limit:acoustic-30-80khz".to_string(),
+                    non_compensable: true,
+                },
+                HardGateDefinition {
+                    gate_id: "availability-minimum".to_string(),
+                    gate_class: "reliability".to_string(),
+                    evaluation: GateEvaluation::MetricLowerBound,
+                    metric_id: Some("availability".to_string()),
+                    threshold: Some(0.95),
+                    unit: Some("fraction".to_string()),
+                    required_audit_contract_id: None,
+                    requirement_reference: "service-contract:minimum-availability".to_string(),
                     non_compensable: true,
                 },
                 HardGateDefinition {
@@ -1218,25 +1273,27 @@ mod tests {
 
     #[test]
     fn lower_gate_passes_only_when_entire_interval_above_threshold() {
+        let input = case();
+        let report = audit(&input);
+        let gate = report.candidate_reports[0].gate_results.iter()
+            .find(|gate| gate.gate_id == "availability-minimum").unwrap();
+        assert_eq!(gate.status, "pass");
+        assert_eq!(report.candidate_reports[0].disposition, "ELIGIBLE_FOR_ROBUST_PARETO");
+    }
+
+    #[test]
+    fn upper_acoustic_gate_is_frequency_specific_and_non_compensable() {
         let mut input = case();
-        input.hard_gates.push(HardGateDefinition {
-            gate_id: "availability-minimum".to_string(),
-            gate_class: "reliability".to_string(),
-            evaluation: GateEvaluation::MetricLowerBound,
-            metric_id: Some("availability".to_string()),
-            threshold: Some(0.95),
-            unit: Some("fraction".to_string()),
-            required_audit_contract_id: None,
-            requirement_reference: "contract:min-availability".to_string(),
-            non_compensable: true,
-        });
-        for candidate in &mut input.candidates {
-            let mut obs = metric("availability", 0.98, "fraction");
-            obs.expanded_uncertainty = 0.01;
-            obs.operating_point_receipt_sha256 = candidate.operating_point_receipt_sha256.clone();
-            candidate.metrics.push(obs);
-        }
-        assert_eq!(audit(&input).candidate_reports[0].disposition, "ELIGIBLE_FOR_ROBUST_PARETO");
+        input.candidates[0].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "acoustic_30_80khz")
+            .unwrap().value = 126.0;
+        input.candidates[0].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "energy_per_cargo_work")
+            .unwrap().value = 10.0;
+        let report = audit(&input);
+        assert_eq!(report.candidate_reports[0].disposition, "EXCLUDED_HARD_GATE");
+        assert!(report.candidate_reports[0].gate_results.iter()
+            .any(|gate| gate.gate_id == "acoustic-30-80khz-maximum" && gate.status == "fail"));
     }
 
     #[test]
