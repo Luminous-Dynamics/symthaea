@@ -52,6 +52,16 @@ def coverage_valid(knots: list[Fraction], band_lo: Fraction, band_hi: Fraction) 
     )
 
 
+
+def evidence_identity_valid(data: dict, derivative: dict) -> bool:
+    return (
+        derivative.get("bound_model_identity") == data.get("model_set_identity")
+        and derivative.get("bound_operating_point_identity") == data.get("operating_point_identity")
+        and derivative.get("bound_frequency_unit") == data.get("frequency_unit")
+        and bool(derivative.get("evidence_reference"))
+    )
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_lipschitz_residual_envelope.v0_1"
@@ -72,6 +82,11 @@ def main() -> None:
     assert dr == [
         Fraction(1, 2), Fraction(-3), Fraction(3)
     ]
+    derivative_of_derivative = derivative(dr)
+    second_derivative_of_derivative = derivative(derivative_of_derivative)
+    assert derivative_of_derivative == [Fraction(-3), Fraction(6)]
+    assert second_derivative_of_derivative == [Fraction(6)]
+    assert second_derivative_of_derivative[0] > 0
     assert [str(c) for c in r] == data["residual_polynomial_coefficients_ascending"]
     assert [str(c) for c in dr] == data["derivative_polynomial_coefficients_ascending"]
 
@@ -82,8 +97,10 @@ def main() -> None:
     assert derivative_at_lo == Fraction(1, 2)
     assert derivative_at_vertex == Fraction(-1, 4)
     assert derivative_at_hi == Fraction(1, 2)
-    assert data["derivative_evidence"]["convex_derivative"] is True
-    assert q(data["derivative_evidence"]["derivative_vertex"]) == vertex
+    derivative_evidence = data["derivative_evidence"]
+    assert derivative_evidence["convex_derivative"] is True
+    assert q(derivative_evidence["derivative_vertex"]) == vertex
+    assert evidence_identity_valid(data, derivative_evidence)
 
     # The derivative polynomial is convex; its maximum is at an endpoint
     # and its minimum at its vertex. The exact global absolute bound is 1/2.
@@ -102,6 +119,7 @@ def main() -> None:
     for item in samples:
         assert q(item["observed_residual_center"]) == 0
         assert q(item["hard_error_radius"]) == Fraction(1, 100)
+        assert item["uncertainty_semantics"] == "deterministic_hard_interval"
         assert abs(residual(q(item["omega"])) - q(item["observed_residual_center"])) <= q(item["hard_error_radius"])
 
     gaps = [right - left for left, right in zip(knots, knots[1:])]
@@ -146,12 +164,22 @@ def main() -> None:
     assert data["model_set_identity"] == "sha256:synthetic-cubic-residual-family-v0.1"
     assert data["operating_point_identity"] == "sha256:synthetic-operating-point-v0.1"
 
-    stale_model = "sha256:stale-model"
-    stale_operating_point = "sha256:stale-operating-point"
-    wrong_frequency_unit = "Hz"
-    assert stale_model != data["model_set_identity"]
-    assert stale_operating_point != data["operating_point_identity"]
-    assert wrong_frequency_unit != data["frequency_unit"]
+    stale_derivative = dict(derivative_evidence)
+    stale_derivative["bound_model_identity"] = "sha256:stale-model"
+    assert not evidence_identity_valid(data, stale_derivative)
+    stale_derivative = dict(derivative_evidence)
+    stale_derivative["bound_operating_point_identity"] = "sha256:stale-operating-point"
+    assert not evidence_identity_valid(data, stale_derivative)
+    stale_derivative = dict(derivative_evidence)
+    stale_derivative["bound_frequency_unit"] = "Hz"
+    assert not evidence_identity_valid(data, stale_derivative)
+
+    statistical_samples = [dict(item) for item in samples]
+    statistical_samples[0]["uncertainty_semantics"] = "uncalibrated_statistical_confidence_interval"
+    assert not all(
+        item.get("uncertainty_semantics") == "deterministic_hard_interval"
+        for item in statistical_samples
+    )
 
     # Coverage controls: missing endpoint, duplicate and unsorted knots.
     assert not coverage_valid(knots[:-1], lo, hi)
