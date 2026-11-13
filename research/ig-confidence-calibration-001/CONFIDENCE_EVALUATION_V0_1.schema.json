@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-confidence-calibration-001/CONFIDENCE_EVALUATION_V0_1.schema.json",
+  "title": "IG confidence calibration evaluation bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "evaluation_identity",
+    "evaluation_dataset_sha256",
+    "minimum_observations",
+    "calibration_profile",
+    "observations",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-confidence-evaluation-v0.1"
+    },
+    "benchmark_id": {
+      "const": "IG-CONFIDENCE-CALIBRATION-001"
+    },
+    "status": {
+      "enum": [
+        "synthetic_known_answer_unexecuted",
+        "evaluation_complete_synthetic_only"
+      ]
+    },
+    "evaluation_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "revision",
+        "prompt_family_sha256",
+        "task_scope",
+        "task_truth_profile"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_family_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_scope": {
+          "const": "factual_qa_binary_correctness"
+        },
+        "task_truth_profile": {
+          "const": "SyntheticKnownAnswer"
+        }
+      }
+    },
+    "evaluation_dataset_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "minimum_observations": {
+      "type": "integer",
+      "minimum": 20
+    },
+    "calibration_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "calibration_profile_sha256",
+        "calibration_report_sha256",
+        "method",
+        "model_identity",
+        "prompt_family_sha256",
+        "task_scope",
+        "scale_id",
+        "calibration_data",
+        "validator"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "Calibrated",
+            "SelfReported",
+            "NotCalibrated"
+          ]
+        },
+        "calibration_profile_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "calibration_report_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "method": {
+          "enum": [
+            "PlattScaling",
+            "IsotonicRegression",
+            "BetaCalibration",
+            "TemperatureScaling"
+          ]
+        },
+        "model_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "model",
+            "revision"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            }
+          }
+        },
+        "prompt_family_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_scope": {
+          "type": "string"
+        },
+        "scale_id": {
+          "const": "probability_of_correctness_v1"
+        },
+        "calibration_data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fit_dataset_sha256",
+            "validation_dataset_sha256",
+            "sample_count",
+            "fit_group_ids",
+            "validation_group_ids",
+            "evaluation_group_ids"
+          ],
+          "properties": {
+            "fit_dataset_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "validation_dataset_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "sample_count": {
+              "type": "integer",
+              "minimum": 20
+            },
+            "fit_group_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "validation_group_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "evaluation_group_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "validator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "version"
+          ],
+          "properties": {
+            "identity": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sample_id",
+          "task_group_id",
+          "probability_correct",
+          "outcome_correct"
+        ],
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "probability_correct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "outcome_correct": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 80
+    }
+  }
+}
