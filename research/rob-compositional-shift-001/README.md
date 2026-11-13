@@ -12,6 +12,17 @@ Parent issue: [#11897](https://github.com/Luminous-Dynamics/symthaea/issues/1189
 
 These claims are not interchangeable. A composition pass is not an unseen-site or unseen-embodiment result.
 
+## Existing compositional benchmarks: explicit reuse, not novelty claims
+
+Two 2026 benchmarks already establish strong adjacent controls and must be included in any comparative study:
+
+- **MESA / BiMESA (CoRL 2026)** separate in-distribution, spatial, unseen object-instance, unseen object-category and unseen subtask-composition evaluation. The released sets use Franka and bimanual YAM embodiments; MESA-70 contains 7,000 demos over 70 tasks and BiMESA-57 6,833 over 57 tasks. The strongest reported baseline in the published table is 52.0% on MESA and 48.7% on BiMESA. MESA also studies cross-arm transfer and its strongest policy shows a large gap between familiar and held-out axes. We should reuse MESA/ BiMESA task and reset variants when license and data access permit, rather than inventing a second object/task-composition suite.
+  - https://www.pair.toronto.edu/MESA/
+- **ATOM-Bench (June 15, 2026)** evaluates 30 atomic tasks and 24 held-out compositional tasks across paired single-arm and dual-arm tracks, with 3,000 demonstrations and 2,700 physical rollouts across five policies. Its Atomic Score and Compositional Failure Share diagnose weak motor atoms versus poor compositional reuse.
+  - https://arxiv.org/abs/2606.16826
+
+The present contract is a separate and complementary axis: **provenance/embodiment/operating-factor composition** (e.g. familiar site levels × familiar morphology levels, paired in a joint cell never used in training or calibration). It does not claim to invent compositional manipulation generalization or to outperform MESA/ATOM. The strongest next benchmark is to cross their held-out task/skill-composition protocols with our held-out source-factor cells, then add per-episode safety, terminal reserve, route redundancy and independent replay. This asks whether task composition survives a new combination of physical deployment conditions, not only whether known skills recombine in one familiar setup.
+
 ## Factorial interaction contract
 
 Every frozen interaction spec declares exactly two or three source dimensions, for example:
