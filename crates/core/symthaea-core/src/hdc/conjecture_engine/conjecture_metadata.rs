@@ -265,7 +265,7 @@ pub(crate) fn identify_constant(val: f64) -> Option<String> {
         ("1/√π", 1.0 / std::f64::consts::PI.sqrt()),
         ("√3", 3.0_f64.sqrt()),
         ("1/√3", 1.0 / 3.0_f64.sqrt()),
-        ("γ (Euler-Mascheroni)", 0.5772156649015329),
+        ("γ (Euler-Mascheroni)", std::f64::consts::EULER_GAMMA),
         ("Catalan", 0.915_965_594_177_219),
         ("Apéry ζ(3)", 1.2020569031595942),
     ];
