@@ -2449,12 +2449,13 @@ pub struct U1MpsTruncationLedger {
     pub accumulated_discarded_weight: f64,
     pub cumulative_local_l2_error_bound: f64,
     pub maximum_single_gate_relative_discarded_weight: f64,
+    pub canonical_gauge_receipt_count: usize,
     pub global_state_error_bound_qualified: bool,
+    pub global_state_error_bound_upper: Option<f64>,
 }
 
 impl U1MpsTruncationLedger {
-    /// Record one local truncation. Fails closed on non-finite or overflowed data.
-    pub fn record(
+    fn record_local(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
     ) -> Result<(), U1MpsError> {
@@ -2470,7 +2471,8 @@ impl U1MpsTruncationLedger {
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound = self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
+        let next_bound =
+            self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
@@ -2482,6 +2484,76 @@ impl U1MpsTruncationLedger {
         self.maximum_single_gate_relative_discarded_weight = self
             .maximum_single_gate_relative_discarded_weight
             .max(diagnostics.relative_discarded_weight);
+        Ok(())
+    }
+
+    /// Record local tensor truncation diagnostics without claiming a global
+    /// state-vector bound. A caller must supply a qualified gauge receipt for
+    /// every gate to enable the global ledger.
+    pub fn record(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+    ) -> Result<(), U1MpsError> {
+        self.record_local(diagnostics)?;
+        self.global_state_error_bound_qualified = false;
+        self.global_state_error_bound_upper = None;
+        Ok(())
+    }
+
+    /// Record a truncation with a measured mixed-canonical gauge receipt.
+    ///
+    /// The global contribution is bounded by the canonicalization state-change
+    /// residual plus sqrt(discarded_weight) times the product of the exterior
+    /// block-map operator-norm upper bounds. Every gate in a sequence must use
+    /// this method with a qualified receipt; otherwise the global guarantee is
+    /// disabled.
+    pub fn record_with_canonical_gauge(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+        receipt: &U1CanonicalGaugeReceipt,
+        tolerance: f64,
+    ) -> Result<(), U1MpsError> {
+        let prior_count = self.gate_count;
+        let prior_qualified = self.global_state_error_bound_qualified;
+        let prior_bound = self.global_state_error_bound_upper;
+        self.record_local(diagnostics)?;
+        self.canonical_gauge_receipt_count = self
+            .canonical_gauge_receipt_count
+            .checked_add(1)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+
+        if !receipt.qualifies(tolerance) {
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+            return Ok(());
+        }
+
+        let projection_error = diagnostics.discarded_weight.sqrt()
+            * receipt.exterior_operator_norm_product_upper_bound();
+        let contribution = receipt.state_reconstruction_l2_residual + projection_error;
+        if !contribution.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "canonical-gauge global truncation contribution",
+            ));
+        }
+
+        let next_bound = if prior_count == 0 {
+            Some(contribution)
+        } else if prior_qualified {
+            prior_bound
+                .map(|bound| bound + contribution)
+                .filter(|bound| bound.is_finite())
+        } else {
+            None
+        };
+
+        if let Some(bound) = next_bound {
+            self.global_state_error_bound_qualified = true;
+            self.global_state_error_bound_upper = Some(bound);
+        } else {
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+        }
         Ok(())
     }
 }
@@ -2522,6 +2594,7 @@ pub struct U1TeBDLayerResult {
     pub parity: u8,
     pub bond_indices: Vec<usize>,
     pub gate_truncations: Vec<U1TwoSiteTruncationDiagnostics>,
+    pub canonical_gauge_receipts: Vec<U1CanonicalGaugeReceipt>,
     pub truncation_ledger: U1MpsTruncationLedger,
     pub input_norm_squared: f64,
     pub output_norm_squared: f64,
@@ -2610,27 +2683,39 @@ impl U1TeBDLayer {
         }
         let input_norm_squared = input.norm_squared(policy.tolerance)?;
         let input_total_charge = input.total_charge;
-        let mut tensors = input.tensors.clone();
+        let mut state = input.clone();
         let mut truncation_ledger = U1MpsTruncationLedger::default();
         let mut gate_truncations = Vec::with_capacity(self.gates.len());
+        let mut canonical_gauge_receipts = Vec::with_capacity(self.gates.len());
 
         for entry in &self.gates {
             let bond = entry.bond_index;
+            let gauge_receipt = state.canonicalize_for_bond(bond, policy.tolerance)?;
             let pair = U1TwoSiteState::from_adjacent_tensors(
-                &tensors[bond],
-                &tensors[bond + 1],
+                &state.tensors[bond],
+                &state.tensors[bond + 1],
                 policy.tolerance,
             )?;
             let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
             let truncation = evolved_pair.split_truncated(policy)?;
-            truncation_ledger.record(&truncation)?;
-            tensors[bond] = truncation.left_tensor.clone();
-            tensors[bond + 1] = truncation.right_tensor.clone();
+            truncation_ledger.record_with_canonical_gauge(
+                &truncation,
+                &gauge_receipt,
+                policy.tolerance,
+            )?;
+            state.tensors[bond] = truncation.left_tensor.clone();
+            state.tensors[bond + 1] = truncation.right_tensor.clone();
+            state = ComplexU1Mps::new(
+                state.tensors.clone(),
+                input_total_charge,
+                policy.tolerance,
+            )?;
+            canonical_gauge_receipts.push(gauge_receipt);
             gate_truncations.push(truncation);
         }
 
-        let state = ComplexU1Mps::new(tensors, input_total_charge, policy.tolerance)?;
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        let global_l2_bound_qualified = truncation_ledger.global_state_error_bound_qualified;
         Ok(U1TeBDLayerResult {
             output_selection_rule_residual: state.selection_rule_residual(),
             output_total_charge: state.total_charge(),
@@ -2638,14 +2723,14 @@ impl U1TeBDLayer {
             parity: self.parity,
             bond_indices: self.bond_indices(),
             gate_truncations,
+            canonical_gauge_receipts,
             truncation_ledger,
             input_norm_squared,
             output_norm_squared,
             input_total_charge,
-            global_l2_bound_qualified: false,
+            global_l2_bound_qualified,
         })
-    }
-}
+    }}
 
 #[cfg(test)]
 mod tests {
