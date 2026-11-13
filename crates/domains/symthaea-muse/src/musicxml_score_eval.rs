@@ -1186,12 +1186,15 @@ fn accumulate_event_agreements(
     }
 }
 
-fn matched_annotation_count<T: PartialEq>(
+fn matched_annotation_count<T: PartialEq, F>(
     gold_events: &[MusicXmlNotationEventV1],
     prediction_events: &[MusicXmlNotationEventV1],
     pairs: &[(usize, usize)],
-    select: impl Fn(&MusicXmlNotationEventV1) -> &[T],
-) -> usize {
+    select: F,
+) -> usize
+where
+    F: for<'a> Fn(&'a MusicXmlNotationEventV1) -> &'a [T],
+{
     let mut matched = 0usize;
     for (gold_index, prediction_index) in pairs {
         let gold = select(&gold_events[*gold_index]);
