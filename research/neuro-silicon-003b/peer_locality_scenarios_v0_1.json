@@ -1,0 +1,343 @@
+{
+  "schema_version": "0.1",
+  "title": "NEURO-SILICON-003B synthetic peer-locality scenario corpus",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11251",
+  "status": "synthetic_only_not_physical_measurements",
+  "semantics": {
+    "vector_dimension_bits": 16384,
+    "vector_bytes": 2048,
+    "metric": "exact_hamming",
+    "top_k": 1,
+    "tie_break": "lowest_store_index",
+    "store_sizes": [
+      64,
+      256,
+      1024,
+      4096
+    ],
+    "query_batch_sizes": [
+      1,
+      4,
+      16,
+      64
+    ],
+    "data_policy_default": "synthetic_public_fixture",
+    "note": "All timings, bytes, energy values, devices, network parameters and evidence states are synthetic scenario inputs or expected dispositions. They are not physical measurements or proof of current implementation."
+  },
+  "scenarios": [
+    {
+      "id": "NS003B-01",
+      "name": "tiny store local CPU wins dispatch overhead",
+      "arm": "local_vs_query_to_data",
+      "store_size": 64,
+      "query_batch": 1,
+      "network_class": "same_lan",
+      "synthetic_costs": {
+        "local_latency_ms": 0.4,
+        "remote_latency_ms": 8,
+        "local_joules": 0.2,
+        "remote_total_joules": 1.1
+      },
+      "expected": {
+        "placement": "LOCAL",
+        "correctness": "EXACT",
+        "reason": "REMOTE_FIXED_OVERHEAD_DOMINATES"
+      }
+    },
+    {
+      "id": "NS003B-02",
+      "name": "large resident store small query",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "network_class": "same_lan",
+      "synthetic_costs": {
+        "query_bytes": 2048,
+        "result_bytes": 32,
+        "store_bytes": 8388608
+      },
+      "expected": {
+        "placement": "QUERY_TO_DATA_CANDIDATE",
+        "correctness": "EXACT",
+        "reason": "QUERY_RESULT_TRANSFER_SMALLER_THAN_STORE"
+      }
+    },
+    {
+      "id": "NS003B-03",
+      "name": "large query batch may dominate transfer",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 64,
+      "network_class": "rate_limited_lan",
+      "synthetic_costs": {
+        "query_bytes": 131072,
+        "result_bytes": 2048,
+        "store_bytes": 8388608
+      },
+      "expected": {
+        "placement": "NOT_PREDETERMINED",
+        "correctness": "EXACT",
+        "reason": "MEASURE_COMPLETE_BATCH_TRANSFER_AND_LOCAL_COST"
+      }
+    },
+    {
+      "id": "NS003B-04",
+      "name": "replicate once amortizes repeated queries",
+      "arm": "replicate_once_query_many",
+      "store_size": 4096,
+      "query_batch": 1,
+      "query_count": 10000,
+      "network_class": "same_lan",
+      "synthetic_costs": {
+        "one_time_store_bytes": 8388608,
+        "per_query_bytes": 2080,
+        "refresh_cost_required": true
+      },
+      "expected": {
+        "placement": "REPLICATE_IF_QUERY_COUNT_EXCEEDS_MEASURED_BREAK_EVEN",
+        "correctness": "EXACT",
+        "reason": "BREAK_EVEN_MUST_INCLUDE_REFRESH"
+      }
+    },
+    {
+      "id": "NS003B-05",
+      "name": "remote index-build cost omitted",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "peer_store_state": "build_required",
+      "expected": {
+        "placement": "INELIGIBLE_FOR_COMPARISON",
+        "correctness": "UNKNOWN",
+        "reason": "INDEX_BUILD_AND_VERIFICATION_BOUNDARY_MISSING"
+      }
+    },
+    {
+      "id": "NS003B-06",
+      "name": "one-bit-mutated remote store manifest",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "peer_store_state": "resident_digest_mismatch",
+      "expected": {
+        "placement": "REJECT_PEER_RESULT",
+        "correctness": "REJECTED",
+        "reason": "STORE_MANIFEST_DIGEST_MISMATCH"
+      }
+    },
+    {
+      "id": "NS003B-07",
+      "name": "local-only classification blocks query egress",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "data_policy": "local_only",
+      "expected": {
+        "placement": "LOCAL_ONLY",
+        "correctness": "NOT_DISPATCHED",
+        "reason": "REMOTE_EGRESS_FORBIDDEN"
+      }
+    },
+    {
+      "id": "NS003B-08",
+      "name": "validly signed but incorrect top-k result",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "execution": {
+        "signature_valid": true,
+        "oracle_match": false
+      },
+      "expected": {
+        "placement": "REJECT_PEER_RESULT",
+        "correctness": "REJECTED",
+        "reason": "SIGNATURE_DOES_NOT_PROVE_RETRIEVAL_CORRECTNESS"
+      }
+    },
+    {
+      "id": "NS003B-09",
+      "name": "network partition after dispatch",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "network_class": "partition_after_dispatch",
+      "execution": {
+        "dispatch": "confirmed",
+        "response": "missing"
+      },
+      "expected": {
+        "placement": "INDETERMINATE",
+        "correctness": "UNKNOWN",
+        "reason": "COMPLETION_NOT_PROVEN"
+      }
+    },
+    {
+      "id": "NS003B-10",
+      "name": "peer energy meter unsupported",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "energy": {
+        "origin": "supported",
+        "peer": "unsupported"
+      },
+      "expected": {
+        "placement": "NOT_COMPARABLE_FOR_TOTAL_ENERGY",
+        "correctness": "UNRELATED",
+        "reason": "MISSING_PEER_ENERGY_SCOPE"
+      }
+    },
+    {
+      "id": "NS003B-11",
+      "name": "approximate index misses exact nearest neighbor",
+      "arm": "approximate_index",
+      "store_size": 4096,
+      "query_batch": 1,
+      "backend": "faiss_ivf_or_hnsw",
+      "execution": {
+        "exact_oracle_top1": "id-17",
+        "approx_result_top1": "id-22",
+        "recall_at_1": 0
+      },
+      "expected": {
+        "placement": "APPROXIMATE_TRACK_ONLY",
+        "correctness": "QUALITY_REGRESSION",
+        "reason": "DO_NOT_PROMOTE_AS_EXACT"
+      }
+    },
+    {
+      "id": "NS003B-12",
+      "name": "runtime reports NPU but observed CPU fallback",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "execution": {
+        "reported_backend": "npu",
+        "observed_backend": "cpu"
+      },
+      "expected": {
+        "placement": "REJECT_REQUIRED_BACKEND_CLAIM",
+        "correctness": "PENDING",
+        "reason": "BACKEND_NOT_OBSERVED"
+      }
+    },
+    {
+      "id": "NS003B-13",
+      "name": "stale peer store after update",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "peer_store_state": "stale_generation",
+      "expected": {
+        "placement": "REJECT_PEER_RESULT",
+        "correctness": "REJECTED",
+        "reason": "STORE_GENERATION_STALE"
+      }
+    },
+    {
+      "id": "NS003B-14",
+      "name": "peer session lacks compute execution scope",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "session": {
+        "authenticated": true,
+        "scopes": [
+          "view:telemetry"
+        ]
+      },
+      "expected": {
+        "placement": "LOCAL_OR_DEFER",
+        "correctness": "NOT_DISPATCHED",
+        "reason": "SESSION_SCOPE_MISSING"
+      }
+    },
+    {
+      "id": "NS003B-15",
+      "name": "WAN-like emulation is synthetic only",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "network": {
+        "class": "wan_emulated",
+        "synthetic": true,
+        "rtt_ms": 80
+      },
+      "expected": {
+        "placement": "SEPARATE_SYNTHETIC_STRATUM",
+        "correctness": "EXACT",
+        "reason": "DO_NOT_POOL_WITH_PHYSICAL_PEER_MEASUREMENTS"
+      }
+    },
+    {
+      "id": "NS003B-16",
+      "name": "peer restart without store-integrity verification",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 1,
+      "peer_store_state": "loaded_unverified",
+      "expected": {
+        "placement": "REJECT_PEER",
+        "correctness": "UNKNOWN",
+        "reason": "STORE_INTEGRITY_NOT_VERIFIED"
+      }
+    },
+    {
+      "id": "NS003B-17",
+      "name": "store update invalidates old replica",
+      "arm": "replicate_once_query_many",
+      "store_size": 4096,
+      "query_batch": 16,
+      "origin_replica_generation": "g10",
+      "authoritative_generation": "g11",
+      "expected": {
+        "placement": "REVERIFY_OR_REFRESH_REPLICA",
+        "correctness": "NOT_EXECUTED",
+        "reason": "REPLICA_GENERATION_MISMATCH"
+      }
+    },
+    {
+      "id": "NS003B-18",
+      "name": "peer overload violates latency and thermal envelope",
+      "arm": "query_to_data",
+      "store_size": 4096,
+      "query_batch": 16,
+      "peer_state": {
+        "queue_depth": 64,
+        "thermal_headroom_c": 2
+      },
+      "expected": {
+        "placement": "LOCAL_OR_DEFER",
+        "correctness": "NOT_DISPATCHED",
+        "reason": "PEER_RESOURCE_HARD_LIMIT"
+      }
+    },
+    {
+      "id": "NS003B-19",
+      "name": "overlapping energy sensors cannot be summed",
+      "arm": "compare_energy",
+      "energy": {
+        "origin_scope": "whole_system",
+        "peer_scope": "gpu_package_overlapping_with_host"
+      },
+      "expected": {
+        "placement": "NOT_COMPARABLE_FOR_TOTAL_ENERGY",
+        "correctness": "UNRELATED",
+        "reason": "OVERLAPPING_SENSOR_BOUNDARIES"
+      }
+    },
+    {
+      "id": "NS003B-20",
+      "name": "no peer available local/deferred behavior remains valid",
+      "arm": "fallback",
+      "store_size": 1024,
+      "query_batch": 4,
+      "peer_state": "unavailable",
+      "expected": {
+        "placement": "LOCAL_OR_DEFER",
+        "correctness": "LOCAL_RESULT_OR_EXPLICIT_UNAVAILABLE",
+        "reason": "NO_REMOTE_AUTHORITY_OR_CAPABILITY_ASSUMPTION"
+      }
+    }
+  ]
+}
