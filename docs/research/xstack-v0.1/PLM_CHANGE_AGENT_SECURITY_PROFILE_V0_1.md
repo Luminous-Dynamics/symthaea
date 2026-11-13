@@ -96,3 +96,21 @@ This profile may not mint a second authority model, review quorum, evidence kern
 The six overlays are authored only as public development specifications. No candidate, vendor workflow or attack payload was executed. No gold labels were created and no hidden holdout exists. #10064 and #10369 remain prerequisites for claims that require untrusted candidate-code isolation or strong independent-runner attestation.
 
 This profile is not a security certification, proof of universal prompt-injection resistance, proof of independent review, or evidence of production readiness.
+
+
+## Additional Aras InnovatorEdge AI 2.4 — MCP profile and cached-tool boundary (2026-11-13)
+
+Aras release notes dated 2026-11-10 describe multiple MCP Server profiles per tenant. Each profile has its own endpoint URL, Access Point, published-tool selection and enabled/disabled state. The administrator guide further documents that Claude caches a connector's discovered tool list and does not reread it on every call, so the client-visible list can be stale until manually refreshed.
+
+The administrator guide also states:
+- the Edge AI MCP Server uses End User authentication, so calls run under the signed-in user's Innovator permissions;
+- the beta Invoke Innovator Method Tool must be exposed through Edge API, is not selected by default on the Aras-managed profile and requires user confirmation on every call;
+- an administrator can configure profile availability and tool scope, while each profile remains a distinct endpoint.
+
+This is a new source-documented configuration surface, not evidence of an Aras vulnerability. The XSTACK PLM overlay adds PLM-X07 under the existing XSR-002 confidentiality/effect boundary and PLM-M08 as a metamorphic control. The protected mock effect gateway must re-check exact tenant/profile/endpoint, current Access Point, current enabled state, published tool set, authenticated user permissions and required per-call confirmation. A stale client tool list is advisory, never authority.
+
+The key positive controls are an authorized read on an enabled profile and an explicitly confirmed, permitted beta method call. Negative controls exercise cached tools after disable/removal, cross-profile tool substitution, changed Access Points, permission changes and absent method confirmation. We must observe the real licensed tenant before claiming that Aras itself enforces these conditions; no tenant or endpoint was accessed in this research pass.
+
+Sources:
+- [Aras Edge AI Release Notes](https://docs.aras.com/aras-innovatoredge-ai-book/edge-ai-release-notes) — InnovatorEdge AI 2.4, 2026-11-10
+- [Aras Administrator Guide](https://docs.aras.com/aras-innovatoredge-ai-book/innovatoredge-ai-administrator-guide) — MCP Server profiles, access, tool caching and method invocation
