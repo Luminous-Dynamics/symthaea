@@ -1447,6 +1447,6 @@ mod tests {
         assert_eq!(fixture["candidates"][0]["evidence_kind"], "synthetic");
         assert_eq!(fixture["candidates"][1]["evidence_kind"], "synthetic");
         assert!(fixture["candidates"][0]["metrics"][0]["operating_point_receipt_sha256"].is_string());
-        assert_eq!(fixture["hard_gates"].as_array().unwrap().iter().filter(|gate| gate["non_compensable"] == true).count(), 2);
+        assert_eq!(fixture["hard_gates"].as_array().unwrap().iter().filter(|gate| gate["non_compensable"] == true).count(), 8);
     }
 }
