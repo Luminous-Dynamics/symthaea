@@ -422,6 +422,7 @@ fn active_interval(
 }
 
 fn make_signal(
+    family: InteractionFamily,
     event_index: usize,
     frame_count: usize,
     start: usize,
@@ -430,7 +431,13 @@ fn make_signal(
     composition_index: usize,
 ) -> SyntheticEventSignal {
     let mut samples = vec![0.0; frame_count];
-    let polarity = if (event_index + composition_index) % 3 == 0 { -1.0 } else { 1.0 };
+    let polarity = if matches!(family, InteractionFamily::Saturation | InteractionFamily::PureThirdOrder) {
+        1.0
+    } else if (event_index + composition_index) % 3 == 0 {
+        -1.0
+    } else {
+        1.0
+    };
     for (frame, sample) in samples.iter_mut().enumerate().take(end).skip(start) {
         // A deterministic multi-level envelope avoids a constant-only fixture
         // while remaining exactly reproducible across runs.
@@ -504,7 +511,7 @@ fn generate_fixture(
         } else {
             0.18 + ((composition_index + event_index * 3) % 7) as f64 * 0.012 + jitter
         };
-        events.push(make_signal(event_index, frame_count, start, end, amplitude, composition_index));
+        events.push(make_signal(family, event_index, frame_count, start, end, amplitude, composition_index));
 
         let mut support_start = start as u64;
         let mut support_end = end as u64;
@@ -760,6 +767,7 @@ pub fn build_probe_policy_campaign(
                 &generated.effect_digest,
             );
             let fixture_id = canonical_digest(&composition_identity)?;
+            let rendered_frame_count = oracle.output_frame_count as u64;
             let comparison = compare_probe_policies(
                 &oracle,
                 &generated.events,
@@ -767,7 +775,7 @@ pub fn build_probe_policy_campaign(
                 &config.factorial_config,
                 &generated.source_digest,
                 &generated.effect_digest,
-                generated.total_frames,
+                rendered_frame_count,
                 &generated.supports,
                 &config.planner_config,
                 &config.pair_budgets,
@@ -790,7 +798,7 @@ pub fn build_probe_policy_campaign(
                 family,
                 composition_index,
                 generated.events.len(),
-                generated.total_frames,
+                rendered_frame_count,
                 &generated.source_digest,
                 &generated.effect_digest,
                 &oracle.receipt_sha256,
@@ -804,7 +812,7 @@ pub fn build_probe_policy_campaign(
                 family: *family,
                 split: family.split(),
                 event_count: generated.events.len(),
-                frame_count: generated.total_frames as usize,
+                frame_count: rendered_frame_count as usize,
                 source_composition_sha256: generated.source_digest,
                 effect_profile_sha256: generated.effect_digest,
                 oracle_receipt_sha256: oracle.receipt_sha256,
