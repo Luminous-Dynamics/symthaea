@@ -670,9 +670,11 @@ mod tests {
         dossier.joints[0].recovery_relevant = false;
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result.reasons.contains(
-            &DesignAuditReason::DisassemblyIntentWithoutTargetJoints
-        ));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::DisassemblyIntentWithoutTargetJoints)
+        );
     }
 
     #[test]
