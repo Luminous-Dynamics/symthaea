@@ -39,6 +39,8 @@ pub enum ReserveApplicability {
     Required {
         /// Minimum conservative lower bound in the units implied by ReserveKind.
         minimum_floor: u64,
+        /// Whether a valid calibration receipt is mandatory for this reserve measurement.
+        calibration_required: bool,
     },
     /// This component does not apply to the declared embodiment/workcell.
     NotApplicable {
@@ -52,8 +54,10 @@ pub enum ReserveApplicability {
 pub enum EvidenceDisposition {
     /// Evidence owner has qualified the receipt for this scope.
     Qualified,
-    /// Evidence is missing, unresolved or outside the declared applicability.
+    /// Evidence is missing or unresolved.
     Unknown,
+    /// This dimension is explicitly outside the frozen applicability profile.
+    NotApplicable,
     /// Evidence is contradictory or explicitly rejected.
     Rejected,
 }
@@ -630,13 +634,23 @@ fn validate_reserves(
                     .source_receipt_digest
                     .as_deref()
                     .filter(|value| !value.trim().is_empty());
-                if lower == u64::MAX && receipt.is_none() {
+                if receipt.is_none() {
                     return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
                         arm_id: arm_id.to_owned(),
                         kind: *kind,
                     });
                 }
-                if receipt.is_none() {
+                if matches!(
+                    applicability,
+                    ReserveApplicability::Required {
+                        calibration_required: true,
+                        ..
+                    }
+                ) && !observation
+                    .calibration_receipt_digest
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty())
+                {
                     return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
                         arm_id: arm_id.to_owned(),
                         kind: *kind,
@@ -644,7 +658,7 @@ fn validate_reserves(
                 }
             }
             (ReserveApplicability::Required { .. }, EvidenceDisposition::Unknown) => {}
-            (ReserveApplicability::NotApplicable { reason }, EvidenceDisposition::Unknown)
+            (ReserveApplicability::NotApplicable { reason }, EvidenceDisposition::NotApplicable)
                 if !reason.trim().is_empty()
                     && observation
                         .not_applicable_reason
@@ -653,6 +667,7 @@ fn validate_reserves(
             {
                 if observation.terminal_lower_bound.is_some()
                     || observation.source_receipt_digest.is_some()
+                    || observation.calibration_receipt_digest.is_some()
                 {
                     return Err(CapabilityRetentionError::InvalidNotApplicableReserve {
                         arm_id: arm_id.to_owned(),
@@ -706,7 +721,7 @@ fn reserve_deltas(
                     candidate_minus_baseline: None,
                     minimum_floor: None,
                     candidate_below_floor: false,
-                    disposition: EvidenceDisposition::Unknown,
+                    disposition: EvidenceDisposition::NotApplicable,
                 });
             }
             ReserveApplicability::Required { minimum_floor } => {
@@ -977,17 +992,22 @@ mod tests {
                     ReserveKind::EnergyReserveMilliWh,
                     ReserveApplicability::Required {
                         minimum_floor: 10_000,
+                        calibration_required: true,
                     },
                 ),
                 (
                     ReserveKind::ThermalHeadroomMilliC,
                     ReserveApplicability::Required {
                         minimum_floor: 5_000,
+                        calibration_required: true,
                     },
                 ),
                 (
                     ReserveKind::RecoveryOptionCount,
-                    ReserveApplicability::Required { minimum_floor: 1 },
+                    ReserveApplicability::Required {
+                        minimum_floor: 1,
+                        calibration_required: false,
+                    },
                 ),
                 (
                     ReserveKind::SensorEligibilityPpm,
@@ -1067,7 +1087,7 @@ mod tests {
             },
             ReserveObservation {
                 kind: ReserveKind::SensorEligibilityPpm,
-                disposition: EvidenceDisposition::Unknown,
+                disposition: EvidenceDisposition::NotApplicable,
                 terminal_lower_bound: None,
                 source_receipt_digest: None,
                 calibration_receipt_digest: None,
