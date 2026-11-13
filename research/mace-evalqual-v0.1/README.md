@@ -28,7 +28,7 @@ These dimensions are not collapsed into a weighted score. A payment can satisfy 
 - qualify_grader_mutation_test.go: grader-integrity negative-control and condition-removal tests.
 - schemas/: Draft 2020-12 structural schemas; cross-record invariants are enforced by the Go validator.
 - verify.sh: format, tests, race detector, vet, build and demo CLI checks.
-- oraclelab/: snapshot/event based non-interference, repeatability and evaluation-order checks for graders.
+- oraclelab/: snapshot/event based non-interference, repeatability, evaluation-order and Linux filesystem observer checks for graders.
 
 ## Run
 
