@@ -6,8 +6,8 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Complex U1 MPS state representation, charge-block dense factorization, U1 two-site gates and exact charge-block two-site split are source-authored. Exact-head isolated Rust 1.96 validation pending.",
-  "claim_ceiling": "No two-site TEBD circuit evolution, truncation guarantee, large-N scaling or quantum advantage claim.",
+  "execution_status": "Complex U1 MPS state representation, charge-block dense factorization, U1 two-site gates, exact two-site split, and explicit truncation/error-ledger source are authored. Exact-head Rust 1.96 validation pending.",
+  "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
     "physical_charges": [
@@ -123,6 +123,60 @@
         "exact_two_site_split_rejects_zero_tensor_and_invalid_tolerance"
       ],
       "claim_ceiling": "Exact charge-block two-site SVD split only. No approximate truncation policy or TEBD yet."
+    },
+    "truncation": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TwoSiteState::split_truncated(policy)",
+      "policy": {
+        "max_bond_dimension": "Global across all admissible charge sectors.",
+        "relative_singular_value_cutoff": "Keep sigma_i >= relative_cutoff * sigma_max, where cutoff lies in [0,1].",
+        "order": "Apply relative cutoff first, then global bond cap to remaining singular values ranked descending across all sectors.",
+        "normalization": "No implicit renormalization."
+      },
+      "diagnostics": [
+        "retained_rank_by_charge",
+        "total_singular_value_count",
+        "retained_singular_value_count",
+        "cutoff_discarded_singular_value_count",
+        "bond_cap_discarded_singular_value_count",
+        "total_schmidt_weight",
+        "retained_schmidt_weight",
+        "cutoff_discarded_weight",
+        "bond_cap_discarded_weight",
+        "discarded_weight",
+        "relative_discarded_weight",
+        "pre_truncation_norm_squared",
+        "post_truncation_norm_squared",
+        "renormalization_factor_to_restore_original_norm",
+        "bond_cap_binding",
+        "reconstruction_max_residual",
+        "reconstruction_l2_residual"
+      ],
+      "authored_tests": [
+        "truncated_split_applies_global_bond_cap_and_reports_discarded_weight",
+        "truncated_split_relative_cutoff_is_separate_from_bond_cap",
+        "truncated_split_keeps_u1_charge_and_does_not_renormalize",
+        "truncation_ledger_sums_per_gate_l2_residuals_conservatively",
+        "truncation_ledger_rejects_nonfinite_receipts",
+        "truncated_split_rejects_invalid_policy_fields"
+      ],
+      "claim_ceiling": "Local two-site approximate compression only; full TEBD scheduler and end-to-end circuit fidelity/error guarantee remain pending."
+    },
+    "truncation_ledger": {
+      "type": "U1MpsTruncationLedger",
+      "method": "record(two_site_truncation_diagnostics)",
+      "bound": "sum_j sqrt(discarded_weight_j)",
+      "assumptions": [
+        "interleaved gates are unitary",
+        "each truncation is an orthogonal Schmidt projection",
+        "no nonlinear normalization between truncations"
+      ],
+      "fields": [
+        "gate_count",
+        "accumulated_discarded_weight",
+        "cumulative_l2_error_upper_bound",
+        "maximum_single_gate_relative_discarded_weight"
+      ]
     }
   },
   "known_answers": [
@@ -208,6 +262,19 @@
       ]
     },
     {
+      "id": "MPS-2",
+      "name": "Global charge-aware truncation and conservative ledger",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "relative cutoff semantics frozen as sigma_i >= r*sigma_max",
+        "global max bond across charge sectors",
+        "separate cutoff and bond-cap discarded weights",
+        "pre/post norm and no implicit renormalization",
+        "per-charge retained rank",
+        "cumulative L2 bound sum sqrt(discarded weight) under unitary/orthogonal-projection assumptions"
+      ]
+    },
+    {
       "id": "MPS-1",
       "name": "Untruncated two-site gate application",
       "status": "planned",
@@ -215,16 +282,6 @@
         "U(1)-conserving gate family 1 direct_sum U(2) direct_sum 1",
         "exact dense overlap at N=4..12",
         "charge preserved before SVD"
-      ]
-    },
-    {
-      "id": "MPS-2",
-      "name": "Charge-block Schmidt decomposition",
-      "status": "planned",
-      "acceptance": [
-        "SVD separated by virtual charge",
-        "global singular-value ordering",
-        "no charge-sector merging"
       ]
     },
     {
@@ -282,7 +339,12 @@
     "SVD mixes distinct intermediate charge sectors",
     "positive Schmidt value removed by numerical cutoff in exact split",
     "charge-block split fails to reconstruct pre-split two-site tensor",
-    "zero tensor fabricated into a rank-bearing MPS"
+    "zero tensor fabricated into a rank-bearing MPS",
+    "per-charge bond cap mistakenly applied instead of global cap",
+    "cutoff weight conflated with bond-cap discarded weight",
+    "implicit renormalization changes amplitudes without receipt",
+    "cumulative L2 ledger reports root-sum-square instead of triangle-inequality sum",
+    "apply unitary-gate ledger bound across an unreported non-unitary operation"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -312,6 +374,39 @@
     "two_site_split_retained_singular_values",
     "two_site_split_exact_zero_directions_omitted",
     "two_site_split_reconstruction_max_residual",
-    "two_site_split_reconstruction_l2_residual"
-  ]
+    "two_site_split_reconstruction_l2_residual",
+    "global_max_bond",
+    "relative_singular_value_cutoff",
+    "cutoff_discarded_weight",
+    "bond_cap_discarded_weight",
+    "pre_truncation_norm_squared",
+    "post_truncation_norm_squared",
+    "renormalization_factor_not_applied",
+    "bond_cap_binding",
+    "cumulative_l2_error_upper_bound"
+  ],
+  "competitive_baseline_matrix": {
+    "quimb": {
+      "reference": "https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html",
+      "capabilities": [
+        "CircuitMPS max_bond",
+        "cutoff",
+        "gate_opts",
+        "auto-mps swap+split for two-qubit gates",
+        "norm-based fidelity_estimate",
+        "error_estimate"
+      ],
+      "fairness": "Same initial vector, gate sequence, qubit order, dtype, cutoff policy, bond cap, hardware and measurement checkpoints."
+    },
+    "itensor": {
+      "reference": "https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html",
+      "capabilities": [
+        "Abelian quantum-number conserving MPS",
+        "block-sparse tensor storage",
+        "symmetry constraints propagated by QN-aware indices"
+      ],
+      "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error."
+    },
+    "differentiator": "Per-operation charge-sector receipts, separation of truncation sources and cumulative error accounting with explicit assumptions."
+  }
 }
