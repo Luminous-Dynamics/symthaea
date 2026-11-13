@@ -299,6 +299,10 @@ fn parse_part_events(
 
     for (measure_index, measure) in measure_nodes.iter().enumerate() {
         let measure_start = measure_spans[measure_index].start;
+        let measure_duration = measure_spans[measure_index]
+            .end
+            .checked_sub(measure_start)
+            .map_err(|_| ParseEventError::Unknown("invalid measure span".into()))?;
         let measure_number = measure.attribute("number").map(str::to_string);
         let mut cursor = zero;
         let mut chord_anchor: Option<ChordAnchor> = None;
@@ -395,6 +399,16 @@ fn parse_part_events(
                     (cursor, None)
                 };
 
+                if let Some(duration) = performed_duration {
+                    let event_end = note_onset
+                        .checked_add(duration)
+                        .map_err(|_| ParseEventError::Unknown("note end overflow".into()))?;
+                    if event_end.compare_exact(measure_duration) == std::cmp::Ordering::Greater {
+                        return Err(ParseEventError::Unknown(
+                            "note event extends beyond its explicit measure span".into(),
+                        ));
+                    }
+                }
                 let score_offset = measure_start
                     .checked_add(note_onset)
                     .map_err(|_| ParseEventError::Unknown("note score offset overflow".into()))?;
@@ -547,6 +561,11 @@ fn parse_part_events(
                         .checked_add(duration)
                         .map_err(|_| ParseEventError::Unknown("MusicXML forward overflow".into()))?
                 };
+                if cursor.compare_exact(measure_duration) == std::cmp::Ordering::Greater {
+                    return Err(ParseEventError::Unknown(
+                        "backup/forward cursor extends beyond its explicit measure span".into(),
+                    ));
+                }
                 cursor_moves.push(MusicXmlCursorMoveV1 {
                     source_order,
                     measure_index,
@@ -740,15 +759,22 @@ mod tests {
         }
     }
 
-    fn parse(xml: &str) -> MusicXmlPartNotationEventsV1 {
+    fn parse_with_span(
+        xml: &str,
+        end: (i64, i64),
+    ) -> MusicXmlPartNotationEventsV1 {
         let document = roxmltree::Document::parse(xml).unwrap();
         let part = document
             .root_element()
             .children()
             .find(|node| node.has_tag_name("part"))
             .unwrap();
-        let spans = [span((0, 1), (4, 1))];
+        let spans = [span((0, 1), end)];
         parse_musicxml_part_notation_events(part, "P1", &spans)
+    }
+
+    fn parse(xml: &str) -> MusicXmlPartNotationEventsV1 {
+        parse_with_span(xml, (4, 1))
     }
 
     fn supported(events: &MusicXmlPartNotationEventsV1) {
@@ -765,7 +791,7 @@ mod tests {
             <note><rest measure="yes"/><duration>16</duration><voice>1</voice><staff>1</staff></note>
             <note><grace slash="yes" steal-time-previous="20"/><pitch><step>D</step><alter>0.5</alter><octave>5</octave></pitch><voice>1</voice><staff>1</staff></note>
             <note><cue/><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><instrument id="P1-I2"/><voice>2</voice><staff>2</staff></note>
-            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>12</duration><voice>2</voice><staff>2</staff></note>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>8</duration><voice>2</voice><staff>2</staff></note>
         </measure></part></score-partwise>"#;
         let events = parse(xml);
         supported(&events);
@@ -800,14 +826,14 @@ mod tests {
         ));
         assert_eq!(
             events.note_events[3].performed_duration,
-            Some(RationalBeat::new(3, 1).unwrap())
+            Some(RationalBeat::new(2, 1).unwrap())
         );
     }
 
     #[test]
     fn chord_members_share_base_onset_and_do_not_advance_measure_cursor() {
         let xml = r#"<score-partwise><part id="P1"><measure number="1">
-            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <attributes><divisions>8</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note>
             <note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice></note>
             <note><pitch><step>G</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice></note>
@@ -819,7 +845,7 @@ mod tests {
         assert_eq!(events.note_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
         assert!(events.note_events[1].is_chord_member);
         assert_eq!(events.note_events[1].chord_anchor_source_order, Some(2));
-        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(4, 1).unwrap());
+        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(2, 1).unwrap());
     }
 
     #[test]
@@ -898,14 +924,14 @@ mod tests {
     #[test]
     fn backup_and_forward_cursor_moves_preserve_secondary_voice_positions() {
         let xml = r#"<score-partwise><part id="P1"><measure number="1">
-            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <attributes><divisions>4</divisions><time><beats>6</beats><beat-type>4</beat-type></time></attributes>
             <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><staff>1</staff></note>
             <backup><duration>16</duration></backup>
             <note><pitch><step>C</step><octave>3</octave></pitch><duration>8</duration><voice>2</voice><staff>2</staff></note>
             <forward><duration>8</duration></forward>
             <note><rest/><duration>8</duration><voice>2</voice><staff>2</staff></note>
         </measure></part></score-partwise>"#;
-        let events = parse(xml);
+        let events = parse_with_span(xml, (6, 1));
         supported(&events);
         assert_eq!(events.note_events.len(), 3);
         assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
