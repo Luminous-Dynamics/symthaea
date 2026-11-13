@@ -9,6 +9,7 @@ on:
       - "crates/core/symthaea-core/**"
       - "crates/core/symthaea-fep/**"
       - ".github/workflows/rust-toolchain-compatibility.yml"
+      - "scripts/audit-cargo-unused-dependencies.sh"
   workflow_dispatch:
 
 permissions:
