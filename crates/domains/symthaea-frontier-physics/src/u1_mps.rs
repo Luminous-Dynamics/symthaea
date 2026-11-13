@@ -4218,7 +4218,6 @@ mod tests {
         output
     }
 
-
     #[test]
     fn tebd_global_error_bound_dominates_independent_dense_sequential_circuit_residual() {
         let input = ComplexU1Mps::product_state(&[true, false, false, true]).unwrap();
@@ -4310,7 +4309,6 @@ mod tests {
         }
         output
     }
-
 
     #[test]
     fn tebd_global_error_bound_dominates_independent_dense_sequential_circuit_residual() {
