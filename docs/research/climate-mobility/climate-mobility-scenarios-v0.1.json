@@ -184,14 +184,15 @@
       "observed_upper_bound": 20,
       "coverage_numerator": 10,
       "coverage_denominator": 100,
-      "expected_outcome": "observed_breach",
+      "expected_outcome": "indeterminate",
       "evidence_class": "synthetic",
       "qualification": "contract_only",
       "result_scope": "synthetic_contract_only",
       "limitations": [
         "The threshold and measurement units are arbitrary synthetic contract constants, not a legal or community-approved service standard.",
         "Only 10 of 100 synthetic coverage units are represented; the observed breach must not be generalized to the full service scope.",
-        "No actual water-delivery, health, affordability, or household measurement is represented."
+        "No actual water-delivery, health, affordability, or household measurement is represented.",
+        "Synthetic/contract-only floor evidence must remain Indeterminate in the executable evaluator; the partial-breach arithmetic is exercised by unit tests using explicit reference-matched test inputs, not promoted from this fixture."
       ],
       "pathway_id": "voluntary-move-a-b",
       "area_id": "destination-b"
