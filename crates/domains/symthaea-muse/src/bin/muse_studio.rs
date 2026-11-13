@@ -2347,10 +2347,21 @@ fn symbolic_import_format(filename: &str) -> Option<symthaea_muse_protocol::Symb
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum SourceMidiAuditionError {
-    MalformedMidi(String),
+    MalformedMidi,
     SequentialFormatUnsupported,
-    TemporaryFile(String),
+    TemporaryFile,
     SourceBytesChanged,
+}
+
+impl SourceMidiAuditionError {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::MalformedMidi => "malformed_source_midi",
+            Self::SequentialFormatUnsupported => "unsupported_sequential_smf",
+            Self::TemporaryFile => "source_midi_materialization_failed",
+            Self::SourceBytesChanged => "source_midi_bytes_changed",
+        }
+    }
 }
 
 /// Only simultaneous-sequence SMF Format 0/1 can be used as a source
@@ -2359,7 +2370,7 @@ enum SourceMidiAuditionError {
 /// policy. Parsing the MIDI here does not rewrite it.
 fn validate_source_midi_audition(bytes: &[u8]) -> Result<(), SourceMidiAuditionError> {
     let smf = midly::Smf::parse(bytes)
-        .map_err(|error| SourceMidiAuditionError::MalformedMidi(error.to_string()))?;
+        .map_err(|_| SourceMidiAuditionError::MalformedMidi)?;
     match smf.header.format {
         midly::Format::SingleTrack | midly::Format::Parallel => Ok(()),
         midly::Format::Sequential => Err(SourceMidiAuditionError::SequentialFormatUnsupported),
@@ -2378,12 +2389,12 @@ fn materialize_source_midi_audition(
         unique_temp_suffix()
     ));
     std::fs::write(&path, bytes)
-        .map_err(|error| SourceMidiAuditionError::TemporaryFile(error.to_string()))?;
+        .map_err(|_| SourceMidiAuditionError::TemporaryFile)?;
     let read_back = match std::fs::read(&path) {
         Ok(value) => value,
         Err(error) => {
             let _ = std::fs::remove_file(&path);
-            return Err(SourceMidiAuditionError::TemporaryFile(error.to_string()));
+            return Err(SourceMidiAuditionError::TemporaryFile);
         }
     };
     if read_back != bytes {
@@ -2661,7 +2672,7 @@ async fn import_music(
         // source is a supported simultaneous-sequence SMF and FluidSynth is
         // available. MusicXML/MuseScore and unsupported/failed MIDI fall
         // back to an explicitly reconstructed Score rendition.
-        let (wav, audio_renderer, audition_kind, instrumentation_note) =
+        let (wav, audio_renderer, audition_kind, instrumentation_note, audition_fallback_reason) =
             if matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
                 match render_source_midi_audition(&source) {
                     Ok(Some(wav)) => (
@@ -2669,14 +2680,27 @@ async fn import_music(
                         "fluidsynth",
                         ImportedAuditionKind::SourceMidiPerformance,
                         source_midi_instrumentation_note(),
+                        None,
                     ),
-                    Ok(None) | Err(_) => {
+                    Ok(None) => {
                         let (wav, renderer) = render_import_audition(&score)?;
                         (
                             wav,
                             renderer,
                             ImportedAuditionKind::ReconstructedScore,
                             default_instrumentation_note(),
+                            Some("fluidsynth_unavailable".to_owned()),
+                        )
+                    }
+                    Err(error) => {
+                        let reason = error.code().to_owned();
+                        let (wav, renderer) = render_import_audition(&score)?;
+                        (
+                            wav,
+                            renderer,
+                            ImportedAuditionKind::ReconstructedScore,
+                            default_instrumentation_note(),
+                            Some(reason),
                         )
                     }
                 }
@@ -2687,6 +2711,7 @@ async fn import_music(
                     renderer,
                     ImportedAuditionKind::ReconstructedScore,
                     default_instrumentation_note(),
+                    None,
                 )
             };
         let audition_wav_sha256 = sha256_hex(&wav);
@@ -2697,6 +2722,7 @@ async fn import_music(
             audio_renderer: audio_renderer.to_string(),
             audition_kind,
             audition_wav_sha256: Some(audition_wav_sha256),
+            audition_fallback_reason,
             instrumentation_note,
             notation_structure: Some(notation_structure),
         };
@@ -6097,7 +6123,7 @@ mod imported_audio_provenance_tests {
     fn source_midi_audition_rejects_malformed_bytes() {
         assert!(matches!(
             validate_source_midi_audition(b"not a standard MIDI file"),
-            Err(SourceMidiAuditionError::MalformedMidi(_))
+            Err(SourceMidiAuditionError::MalformedMidi)
         ));
     }
 
