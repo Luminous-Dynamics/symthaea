@@ -205,6 +205,19 @@ pub fn AddMusicPage() -> impl IntoView {
                                         structure.voice_assignment_count,
                                         structure.staff_assignment_count
                                     )}</span>
+                                    <span>{format!(
+                                        "{} positioned directions/harmony/etc. · {} attribute changes · {} backup/forward moves",
+                                        structure.notation_auxiliary_event_count,
+                                        structure.notation_attribute_event_count,
+                                        structure.notation_cursor_move_count
+                                    )}</span>
+                                    <span>{format!(
+                                        "{} unpitched · {} cue · {} chord members · {} time-modified notes",
+                                        structure.unpitched_event_count,
+                                        structure.cue_note_count,
+                                        structure.chord_member_count,
+                                        structure.time_modification_count
+                                    )}</span>
                                     {structure.explanation.map(|reason| view! {
                                         <p class="muted small">{reason}</p>
                                     })}
