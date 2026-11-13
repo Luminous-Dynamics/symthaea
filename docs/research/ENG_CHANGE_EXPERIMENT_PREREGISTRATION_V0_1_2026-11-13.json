@@ -1,0 +1,153 @@
+{
+  "schema_version": "luminous.eng-change-experiment-preregistration.v0.1",
+  "snapshot_date": "2026-11-13",
+  "status": "design_only_no_gold_no_candidate_runs",
+  "benchmark_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
+  "corpus": {
+    "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10547",
+    "branch": "research/eng-design-change-qual-manifest-v0-1",
+    "commit": "3f658a9f74b750667cfe9642a2e881afa993fca1",
+    "file_git_blob_sha": "db0f6195283190ae319df3bf03dec58927bc9327",
+    "cases": 24,
+    "status": "blueprint_only_unadjudicated_unscored"
+  },
+  "gold_protocol": {
+    "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
+    "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10581",
+    "branch": "research/eng-design-change-qual-gold-protocol-v0-1",
+    "commit": "afa2af1c3ebeb35bc6d776de97f1f9766d941490",
+    "schema_git_blob_sha": "4b7f6c46bc7895d57cbc6ee8b5b110dfc710eed7"
+  },
+  "evaluation_unit": "claim_evidence_applicability_pair",
+  "trial_stages": [
+    "pin_corpus_contracts_and_evaluator_partition",
+    "independent_dual_assessor_gold_adjudication",
+    "24_case_public_development_pilot_for_variance_and_cost_estimation_only",
+    "design_family_and_change_lineage_held_out_set",
+    "powered_confirmatory_matched_comparison"
+  ],
+  "arms": [
+    {
+      "id": "B0",
+      "name": "full_requalification",
+      "kind": "reference_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B1",
+      "name": "byte_field_diff",
+      "kind": "weak_automation_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B2",
+      "name": "static_dependency_closure",
+      "kind": "conventional_graph_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B3",
+      "name": "qualified_semantic_delta_projection",
+      "kind": "ablation",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B4",
+      "name": "full_luminous_composition",
+      "kind": "candidate",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B5",
+      "name": "qualified_human_workflow",
+      "kind": "human_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "V1",
+      "name": "siemens_teamcenter_2606_teamcenter_x",
+      "kind": "vendor_native",
+      "eligibility": "conditional_access_and_version_pin_required"
+    },
+    {
+      "id": "V2",
+      "name": "aras_innovator_ucm_impact_analysis_ai_1_0_1",
+      "kind": "vendor_native",
+      "eligibility": "conditional_access_and_version_pin_required"
+    },
+    {
+      "id": "V3",
+      "name": "ptc_windchill_13_1_2",
+      "kind": "vendor_native",
+      "eligibility": "conditional_access_and_version_pin_required"
+    },
+    {
+      "id": "V4",
+      "name": "ibm_doors_next_7_2_paired_plm",
+      "kind": "requirements_adjunct",
+      "eligibility": "conditional_named_plm_pair_required"
+    }
+  ],
+  "hard_gates": [
+    "critical_impact_miss_count_zero_in_frozen_critical_suite",
+    "stale_evidence_false_current_count_zero",
+    "no_invalid_scope_or_generation_preservation_witness_accepted",
+    "no_evidence_state_or_authority_amplification",
+    "no_etk_authority_currentness_approval_release_or_actuation_mutation",
+    "complete_task_and_claim_evidence_pair_accounting"
+  ],
+  "metrics": {
+    "accuracy": [
+      "per_disposition_confusion_matrix",
+      "impact_precision_recall_by_family_and_criticality",
+      "critical_under_impact_count",
+      "over_requalification_count",
+      "valid_preservation_witness_rate",
+      "unknown_unsupported_detection",
+      "unsupported_relation_invention_rate",
+      "provenance_completeness"
+    ],
+    "operations": [
+      "human_minutes_by_role",
+      "time_to_independently_accepted_assessment",
+      "correctly_avoided_reverification_obligations",
+      "integration_and_configuration_effort",
+      "p50_p95_latency_when_sample_size_supports"
+    ],
+    "economics": [
+      "fully_burdened_cost_per_independently_accepted_assessment",
+      "cash_outlay",
+      "human_time",
+      "verification_and_rework_cost",
+      "material_unknown_cost_categories"
+    ]
+  },
+  "analysis": {
+    "pilot_claim_ceiling": "exploratory_variance_and_workflow_cost_estimation_only",
+    "primary_endpoint": "select_after_pilot_variance_and_assessor_disagreement; freeze before holdout unblinding",
+    "paired_outcomes": true,
+    "cluster_keys": [
+      "design_family",
+      "change_lineage"
+    ],
+    "repeated_seeds_are_independent_tasks": false,
+    "confirmatory_power_analysis_required": true,
+    "statistical_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10619",
+    "claim_validator": "https://github.com/Luminous-Dynamics/symthaea/issues/10624"
+  },
+  "owners": {
+    "gold": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
+    "judge_qualification": "https://github.com/Luminous-Dynamics/symthaea/issues/11772",
+    "cost_accounting": "https://github.com/Luminous-Dynamics/symthaea/pull/11859",
+    "run_receipt": "https://github.com/Luminous-Dynamics/symthaea/issues/10314",
+    "evidence_composition": "https://github.com/Luminous-Dynamics/symthaea/issues/10370",
+    "isolation": "https://github.com/Luminous-Dynamics/symthaea/issues/10064",
+    "runner_trust": "https://github.com/Luminous-Dynamics/symthaea/issues/10369"
+  },
+  "nonclaims": [
+    "No independent gold labels or human adjudications were created by this preregistration.",
+    "No vendor product was accessed, licensed, configured, executed or scored.",
+    "No superiority, non-inferiority, ROI, safety, manufacturability, compliance, qualification or release claim is made.",
+    "This preregistration is not a run receipt, gold label, score service, authority or release record."
+  ]
+}
