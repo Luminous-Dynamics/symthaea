@@ -402,8 +402,12 @@ fn active_interval(
                 0 => (edge, edge + slot * 3),
                 1 => (edge + slot * 2, edge + slot * 4),
                 _ => {
-                    let start = edge + slot * 4 + (event_index - 2) * slot;
-                    (start, start + (slot / 3).max(2))
+                    let tail_start = edge + slot * 4;
+                    let tail_frames = frame_count.saturating_sub(edge + tail_start);
+                    let remaining_events = (event_count - 2).max(1);
+                    let tail_slot = (tail_frames / remaining_events).max(1);
+                    let start = tail_start + (event_index - 2) * tail_slot;
+                    (start, start + (tail_slot / 2).max(1))
                 }
             };
             clamp_interval(start, end)
