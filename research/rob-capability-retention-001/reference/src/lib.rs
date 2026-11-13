@@ -1486,6 +1486,65 @@ mod tests {
     }
 
     #[test]
+    fn recovery_topology_must_bind_to_the_same_terminal_physical_state() {
+        let mut audit = input();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .physical_state_digest = Some("another-terminal-state".into());
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::RecoveryTopologyTerminalStateMismatch(
+                "candidate".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_recovery_topology_requires_terminal_state_identity() {
+        let mut audit = input();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .recovery_topology
+            .physical_state_digest = None;
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+                "candidate".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn reserve_observation_must_bind_to_the_option_ledger_terminal_state() {
+        let mut audit = input();
+        audit.clusters[0].candidate.reserves[0].physical_state_digest =
+            Some("pre-task-state".into());
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::ReserveTerminalStateMismatch {
+                arm_id: "candidate".into(),
+                kind: ReserveKind::EnergyReserveMilliWh,
+            })
+        );
+    }
+
+    #[test]
+    fn qualified_reserve_without_terminal_state_binding_is_incomplete() {
+        let mut audit = input();
+        audit.clusters[0].candidate.reserves[0].physical_state_digest = None;
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::IncompleteQualifiedReserve {
+                arm_id: "candidate".into(),
+                kind: ReserveKind::EnergyReserveMilliWh,
+            })
+        );
+    }
+
+    #[test]
     fn rejected_topology_evidence_is_rejected() {
         let mut audit = input();
         audit.clusters[0]
@@ -1504,7 +1563,10 @@ mod tests {
     #[test]
     fn more_work_but_thermal_headroom_below_floor_vetoes_positive_disposition() {
         let mut audit = input();
-        audit.clusters[0].candidate.reserves = reserves(18_000, 4_000, 2);
+        let candidate_terminal_state =
+            audit.clusters[0].candidate.option_set.result_state_digest.clone();
+        audit.clusters[0].candidate.reserves =
+            reserves(18_000, 4_000, 2, &candidate_terminal_state);
         let report = compare_work_and_terminal_capability(&audit).unwrap();
         assert_eq!(
             report.disposition,
