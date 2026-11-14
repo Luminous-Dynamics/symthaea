@@ -127,6 +127,10 @@ def period_rows(data: dict[str, Any]) -> list[list[Fraction]]:
             raise ValueError("stale campaign identity")
         if period["acquisition_id"] != data["acquisition_id"]:
             raise ValueError("stale acquisition identity")
+        if period["model_identity"] != data["model_identity"]:
+            raise ValueError("stale model identity")
+        if period["topology_identity"] != data["topology_identity"]:
+            raise ValueError("stale topology identity")
         rows.append([q(item["value"]) for item in period["frequency_values"]])
     return rows
 
@@ -168,7 +172,19 @@ def assert_metadata(data: dict[str, Any]) -> None:
     assert data["campaign_id"] == "campaign-hfrf-001"
     assert data["acquisition_id"] == "acquisition-multisine-001"
     assert data["frequency_unit"] == "normalized_frequency"
+    assert data["model_identity"] == "sha256:hierarchical-frf-model-v0.1"
     assert data["topology_identity"] == "sha256:two-port-topology-v0.1"
+
+
+def validate_calibration_bindings(data: dict[str, Any]) -> None:
+    expected_frequency_ids = [item["frequency_id"] for item in data["frequencies"]]
+    bindings = data["calibration"].get("frequency_bindings", [])
+    actual_frequency_ids = [item["frequency_id"] for item in bindings]
+    if actual_frequency_ids != expected_frequency_ids:
+        raise ValueError("calibration frequency coverage/order mismatch")
+    nuisance_ids = {item["nuisance_id"] for item in bindings}
+    if nuisance_ids != {data["calibration"]["nuisance_id"]}:
+        raise ValueError("shared calibration nuisance identity mismatch")
 
 
 def assert_claim_controls(data: dict[str, Any]) -> None:
@@ -193,6 +209,7 @@ def main() -> None:
     assert_claim_controls(data)
 
     rows = period_rows(data)
+    validate_calibration_bindings(data)
     assert len(rows) >= 2
     average, deviations = centered(rows)
     expected = data["expected"]
@@ -291,6 +308,26 @@ def main() -> None:
         pass
     else:
         raise AssertionError("single-period sample covariance was accepted")
+
+    stale_periods = json.loads(json.dumps(data))
+    stale_periods["periods"][1]["acquisition_id"] = "stale-acquisition"
+    try:
+        period_rows(stale_periods)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("stale acquisition identity was accepted")
+
+    split_calibration = json.loads(json.dumps(data))
+    split_calibration["calibration"]["frequency_bindings"][1]["nuisance_id"] = (
+        "different-calibration-root"
+    )
+    try:
+        validate_calibration_bindings(split_calibration)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("frequency-wise calibration ID change was accepted")
 
     print("AIRROAD hierarchical FRF UQ exact-rational reference: PASS")
     print(f"period covariance: {period_cov}")
