@@ -40,6 +40,8 @@ struct StudyDesign {
     grouping_scheme: String,
     independent_unit: String,
     minimum_independent_clusters: usize,
+    maximum_specimen_attrition_rate: f64,
+    maximum_cluster_attrition_rate: f64,
     confidence_level: f64,
     minimum_confidence_level: f64,
     frozen_at: i64,
@@ -58,6 +60,7 @@ struct SpecimenUnit {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Exclusion {
+    arm: String,
     specimen_id: String,
     independent_cluster_id: String,
     reason_ref: String,
@@ -266,6 +269,13 @@ fn validate_design(design: &StudyDesign, required_profile: &str) -> std::result:
     if design.minimum_independent_clusters == 0 {
         return Err(Decision::rejected("minimum independent-cluster count must be positive"));
     }
+    if !design.maximum_specimen_attrition_rate.is_finite()
+        || !(0.0..1.0).contains(&design.maximum_specimen_attrition_rate)
+        || !design.maximum_cluster_attrition_rate.is_finite()
+        || !(0.0..1.0).contains(&design.maximum_cluster_attrition_rate)
+    {
+        return Err(Decision::rejected("specimen and cluster attrition allowances must be finite and in [0, 1)"));
+    }
     if !design.confidence_level.is_finite()
         || !design.minimum_confidence_level.is_finite()
         || !(0.0..=1.0).contains(&design.minimum_confidence_level)
@@ -341,12 +351,17 @@ fn validate_sample_cohorts(
     }
 
     let mut exclusion_ids = HashSet::new();
+    let mut excluded_baseline_specimens = HashSet::new();
+    let mut excluded_conditioned_specimens = HashSet::new();
+    let mut excluded_baseline_clusters = HashSet::new();
+    let mut excluded_conditioned_clusters = HashSet::new();
     for exclusion in exclusions {
-        if !nonempty(&exclusion.specimen_id)
+        if !matches!(exclusion.arm.as_str(), "baseline" | "conditioned")
+            || !nonempty(&exclusion.specimen_id)
             || !nonempty(&exclusion.independent_cluster_id)
             || !nonempty(&exclusion.reason_ref)
         {
-            return Err(Decision::blocked("excluded specimen lacks a cluster identity or exclusion reason"));
+            return Err(Decision::blocked("excluded specimen lacks a valid cohort, cluster identity or exclusion reason"));
         }
         if !exclusion_ids.insert(exclusion.specimen_id.as_str())
             || baseline_ids.contains(&exclusion.specimen_id)
@@ -354,6 +369,44 @@ fn validate_sample_cohorts(
         {
             return Err(Decision::rejected("excluded specimen identity is duplicated or also appears in an analysis cohort"));
         }
+        if exclusion.arm == "baseline" {
+            excluded_baseline_specimens.insert(exclusion.specimen_id.as_str());
+            excluded_baseline_clusters.insert(exclusion.independent_cluster_id.as_str());
+        } else {
+            excluded_conditioned_specimens.insert(exclusion.specimen_id.as_str());
+            excluded_conditioned_clusters.insert(exclusion.independent_cluster_id.as_str());
+        }
+    }
+    if design.grouping_scheme == "paired_by_cluster"
+        && excluded_baseline_clusters != excluded_conditioned_clusters
+    {
+        return Err(Decision::rejected("paired cohort attrition does not remove the same independent clusters from baseline and conditioned arms"));
+    }
+    let baseline_specimen_attrition = excluded_baseline_specimens.len() as f64
+        / (baseline.len() + excluded_baseline_specimens.len()).max(1) as f64;
+    let conditioned_specimen_attrition = excluded_conditioned_specimens.len() as f64
+        / (treated.len() + excluded_conditioned_specimens.len()).max(1) as f64;
+    if baseline_specimen_attrition > design.maximum_specimen_attrition_rate
+        || conditioned_specimen_attrition > design.maximum_specimen_attrition_rate
+    {
+        return Err(Decision::blocked("specimen attrition exceeds the preregistered aged-retention allowance"));
+    }
+    let baseline_all_clusters: HashSet<&str> = baseline_clusters
+        .union(&excluded_baseline_clusters)
+        .copied()
+        .collect();
+    let conditioned_all_clusters: HashSet<&str> = treated_clusters
+        .union(&excluded_conditioned_clusters)
+        .copied()
+        .collect();
+    let baseline_cluster_attrition = (baseline_all_clusters.len() - baseline_clusters.len()) as f64
+        / baseline_all_clusters.len().max(1) as f64;
+    let conditioned_cluster_attrition = (conditioned_all_clusters.len() - treated_clusters.len()) as f64
+        / conditioned_all_clusters.len().max(1) as f64;
+    if baseline_cluster_attrition > design.maximum_cluster_attrition_rate
+        || conditioned_cluster_attrition > design.maximum_cluster_attrition_rate
+    {
+        return Err(Decision::blocked("independent-cluster attrition exceeds the preregistered aged-retention allowance"));
     }
 
     let independent_count = match design.grouping_scheme.as_str() {
@@ -401,6 +454,8 @@ fn validate_conditioning(
         || !conditioning.relative_humidity_pct.is_finite()
         || !(0.0..=100.0).contains(&conditioning.relative_humidity_pct)
         || conditioning.end_time <= conditioning.start_time
+        || (receipt.method_id == "ASTM_D1183" && conditioning.cycle_count == 0)
+        || (receipt.method_id == "ASTM_D1151" && conditioning.cycle_count > 0 && conditioning.cycle_protocol_id.is_none())
     {
         return Err(Decision::blocked("conditioning exposure profile, raw trace, duration, environment or time interval is incomplete"));
     }
@@ -532,6 +587,12 @@ fn audit_aged_retention(evidence: &AgedRetentionEvidence) -> Decision {
     Decision::blocked("aged-strength-retention interval crosses the minimum acceptable ratio")
 }
 
+fn clusters_from_map<'a>(
+    assignments: &'a HashMap<&'a str, &'a str>,
+) -> HashSet<&'a str> {
+    assignments.values().copied().collect()
+}
+
 fn audit_failure_mode_distribution(evidence: &FailureModeDistributionEvidence) -> Decision {
     if evidence.endpoint_id != "frp_failure_mode_distribution" {
         return Decision::rejected("failure-mode result uses an unsupported endpoint identity");
@@ -646,6 +707,38 @@ fn audit_failure_mode_distribution(evidence: &FailureModeDistributionEvidence) -
     }
     if assignments.len() != denominator.len() {
         return Decision::blocked("classification denominator contains specimens without a final classified, mixed, unclear or invalid assignment");
+    }
+    let mut exclusion_ids = HashSet::new();
+    let mut exclusion_clusters = HashSet::new();
+    for exclusion in &evidence.exclusions {
+        if exclusion.arm != "cohort"
+            || !nonempty(&exclusion.specimen_id)
+            || !nonempty(&exclusion.independent_cluster_id)
+            || !nonempty(&exclusion.reason_ref)
+        {
+            return Decision::blocked("failure-mode exclusion lacks cohort identity, cluster or reason");
+        }
+        if !exclusion_ids.insert(exclusion.specimen_id.as_str())
+            || denominator.contains(&exclusion.specimen_id)
+        {
+            return Decision::rejected("failure-mode exclusion identity is duplicated or also included in the denominator");
+        }
+        exclusion_clusters.insert(exclusion.independent_cluster_id.as_str());
+    }
+    let specimen_attrition = exclusion_ids.len() as f64
+        / (denominator.len() + exclusion_ids.len()).max(1) as f64;
+    if specimen_attrition > evidence.design.maximum_specimen_attrition_rate {
+        return Decision::blocked("failure-mode specimen attrition exceeds the preregistered allowance");
+    }
+    let all_clusters: HashSet<&str> = clusters_from_map(&assignment_clusters)
+        .union(&exclusion_clusters)
+        .copied()
+        .collect();
+    let included_cluster_count = clusters_for_assignments(&assignment_clusters).len();
+    let cluster_attrition = (all_clusters.len() - included_cluster_count) as f64
+        / all_clusters.len().max(1) as f64;
+    if cluster_attrition > evidence.design.maximum_cluster_attrition_rate {
+        return Decision::blocked("failure-mode cluster attrition exceeds the preregistered allowance");
     }
 
     let mut declared_counts = HashMap::<&str, usize>::new();
