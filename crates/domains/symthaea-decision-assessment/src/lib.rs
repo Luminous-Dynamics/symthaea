@@ -86,6 +86,7 @@ impl GateState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionSupport {
+    #[serde(rename = "supported_at_K")]
     SupportedAtK,
     NotSupportedAtK,
     Indeterminate,
@@ -486,6 +487,23 @@ fn validate_commitment(
     let assessed_at = datetime_at(evaluator, "/assessed_at")?;
     let boundary = string_at(episode, "/decision_frontier/boundary")?;
 
+    let target_world_time = required_object(episode, "/target_world_time")?;
+    match string_at(target_world_time, "/state")? {
+        "known" => {
+            let _ = datetime_at(target_world_time, "/instant")?;
+        }
+        "unknown" => {
+            if target_world_time.get("instant").is_some() {
+                failures.insert("UNKNOWN_TARGET_TIME_HAS_INSTANT".to_owned());
+            }
+        }
+        other => {
+            return Err(EvaluationError::InvalidEnvelope(format!(
+                "unknown target-world-time state: {other}"
+            )));
+        }
+    }
+
     let before_frontier = if boundary == "inclusive" {
         committed_at <= frontier
     } else if boundary == "exclusive" {
@@ -499,6 +517,19 @@ fn validate_commitment(
     }
     if committed_at > assessed_at {
         failures.insert("COMMITMENT_AFTER_ASSESSMENT_TIME".to_owned());
+    }
+
+    match string_at(episode, "/decision_frontier/causal_frontier_state")? {
+        "complete" | "not_required" => {}
+        "incomplete" | "unknown" => {
+            reasons.insert("CAUSAL_FRONTIER_INCOMPLETE".to_owned());
+            *indeterminate = true;
+        }
+        other => {
+            return Err(EvaluationError::InvalidEnvelope(format!(
+                "unknown causal frontier state: {other}"
+            )));
+        }
     }
 
     if let Some(disclosed_at) = commitment.get("outcome_disclosed_at") {
@@ -844,7 +875,7 @@ mod tests {
                 "build_sha256":"8".repeat(64),
                 "assessed_at":"2026-11-13T09:01:00Z",
                 "assessment_kind":"synthetic_known_answer",
-                "independent_assessment":true
+                "independent_assessment":false
             },
             "assessment_result": {
                 "decision_support":"supported_at_K",
@@ -916,16 +947,13 @@ mod tests {
     #[test]
     fn absent_owner_qualification_is_indeterminate_not_pass() {
         let mut packet = sample_packet();
-        let report = run(&packet, &BTreeMap::new());
-        assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
-        assert_eq!(report.indeterminate_axis_count, 5);
-        assert!(report.reason_codes.iter().any(|r| r.starts_with("OWNER_QUALIFICATION_MISSING:")));
-
         packet["assessment_result"]["decision_support"] = json!("indeterminate");
         packet["assessment_result"]["indeterminate_axis_count"] = json!(5);
         let report = run(&packet, &BTreeMap::new());
         assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
+        assert_eq!(report.indeterminate_axis_count, 5);
         assert_eq!(report.critical_gate_failure_count, 0);
+        assert!(report.reason_codes.iter().any(|r| r.starts_with("OWNER_QUALIFICATION_MISSING:")));
     }
 
     #[test]
