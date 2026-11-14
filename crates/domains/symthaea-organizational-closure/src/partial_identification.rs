@@ -508,7 +508,7 @@ fn relevant_latent_district_hull(
     graph.bidirected_edges.iter().enumerate()
         .filter_map(|(index, edge)| {
             component_of.get(&edge.left)
-                .filter(|component_id| relevant_components.contains(component_id))
+                .filter(|component_id| relevant_components.contains(*component_id))
                 .map(|_| index)
         })
         .collect()
