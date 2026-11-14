@@ -169,10 +169,33 @@ def validate_contract(data: dict[str, Any]) -> None:
         len(training_ids) == len(training_error_ids) == len(training["frequencies"]),
         "training frequencies, observations and IDs do not align",
     )
+    for index, observation in enumerate(training["crossport_observations"]):
+        require(
+            observation["observation_id"] == training_ids[index],
+            "training observation identity mismatch",
+        )
+        require(
+            Fraction(observation["frequency"]) == Fraction(training["frequencies"][index]),
+            "training observation frequency mismatch",
+        )
+        require(
+            observation["measurement_error_id"] == training_error_ids[index],
+            "training measurement-error identity mismatch",
+        )
+    expected_training_matrix = [
+        [(Fraction(2), Fraction(0)), (Fraction(0), Fraction(0))],
+        [(Fraction(0), Fraction(0)), (Fraction(3), Fraction(0))],
+    ]
     require(
-        training["crossport_observations"][0]["observation_id"] in training_ids,
-        "training observation identity mismatch",
+        len(training["nominal_matrices"]) == len(training["frequencies"]),
+        "training matrix/frequency count mismatch",
     )
+    for encoded_matrix in training["nominal_matrices"]:
+        decoded = [
+            [(q(cell["numerator"]), q(cell["denominator"])) for cell in row]
+            for row in encoded_matrix
+        ]
+        require(decoded == expected_training_matrix, "training matrix does not match frozen observations")
     require(
         holdout["observation_id"] not in set(training_ids),
         "holdout reuses a training observation ID",
