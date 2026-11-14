@@ -2346,6 +2346,9 @@ pub struct U1TwoSiteBudgetedSplitDiagnostics {
     pub minimum_required_bond_dimension: usize,
     pub selected_bond_dimension: usize,
     pub cap_headroom: usize,
+    /// Exact charge-block SVD factorizations performed while satisfying the target.
+    /// The current implementation exposes retries rather than hiding their cost.
+    pub svd_factorization_passes: usize,
     pub budget_satisfied: bool,
 }
 
@@ -3107,12 +3110,16 @@ impl U1TwoSiteState {
         }
 
         let mut best_residual = f64::INFINITY;
+        let mut svd_factorization_passes = 1_usize;
         for retained_rank in ideal_minimum_rank..=max_rank {
             let truncation = self.split_truncated(U1TwoSiteTruncationPolicy {
                 max_bond_dimension: retained_rank,
                 relative_singular_value_cutoff: 0.0,
                 tolerance: policy.tolerance,
             })?;
+            svd_factorization_passes = svd_factorization_passes
+                .checked_add(1)
+                .ok_or(U1MpsError::DimensionOverflow)?;
             let achieved = truncation.reconstruction_l2_residual;
             if !achieved.is_finite() {
                 return Err(U1MpsError::NonFiniteContraction(
@@ -3127,6 +3134,7 @@ impl U1TwoSiteState {
                     cap_headroom: policy
                         .max_bond_dimension
                         .saturating_sub(truncation.retained_singular_value_count),
+                    svd_factorization_passes,
                     requested_local_l2_error: policy.maximum_local_l2_error,
                     achieved_local_l2_error: achieved,
                     budget_satisfied: true,
