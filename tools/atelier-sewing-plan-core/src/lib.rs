@@ -253,24 +253,32 @@ pub fn validate_plan(
         }
     }
 
+    let mut dependency_graph_is_well_formed = operation_map.len() == plan.operations.len();
     for (index, operation) in plan.operations.iter().enumerate() {
         let path = format!("operations[{index}]");
         let mut seen_predecessors = BTreeSet::new();
         for (pred_index, predecessor_id) in operation.predecessor_ids.iter().enumerate() {
             if predecessor_id == &operation.operation_id {
+                dependency_graph_is_well_formed = false;
                 issue(&mut issues, "self_predecessor", format!("{path}.predecessor_ids[{pred_index}]"), "operation cannot precede itself");
             }
             if !seen_predecessors.insert(predecessor_id) {
+                dependency_graph_is_well_formed = false;
                 issue(&mut issues, "duplicate_predecessor", format!("{path}.predecessor_ids[{pred_index}]"), "predecessor is duplicated");
             }
             if !operation_map.contains_key(predecessor_id.as_str()) {
+                dependency_graph_is_well_formed = false;
                 issue(&mut issues, "unknown_predecessor", format!("{path}.predecessor_ids[{pred_index}]"), "operation references an unknown predecessor");
             }
         }
     }
 
-    let topological_order = topological_sort(&plan.operations);
-    if topological_order.is_none() {
+    let topological_order = if dependency_graph_is_well_formed {
+        topological_sort(&plan.operations)
+    } else {
+        None
+    };
+    if dependency_graph_is_well_formed && topological_order.is_none() {
         issue(&mut issues, "operation_cycle", "operations", "precedence graph contains a cycle");
     }
 
@@ -415,6 +423,16 @@ mod tests {
         plan.operations[0].predecessor_ids.push("not-an-operation".to_owned());
         let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
         assert!(report.issues.iter().any(|v| v.code == "unknown_predecessor"));
+    }
+
+    #[test]
+    fn unknown_predecessor_is_not_misreported_as_cycle() {
+        let mut plan = base_plan();
+        plan.operations[1].predecessor_ids = vec!["missing".to_owned()];
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "unknown_predecessor"));
+        assert!(!report.issues.iter().any(|v| v.code == "operation_cycle"));
+        assert!(report.topological_order.is_none());
     }
 
     #[test]
