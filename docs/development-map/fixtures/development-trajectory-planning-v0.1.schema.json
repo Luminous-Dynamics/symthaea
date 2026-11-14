@@ -18,7 +18,8 @@
     "evidence_state",
     "actions",
     "candidate_plans",
-    "claim_ceiling"
+    "claim_ceiling",
+    "document_type"
   ],
   "properties": {
     "schema_version": {
@@ -87,6 +88,9 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "document_type": {
+      "const": "development_trajectory_planning_case"
     }
   },
   "$defs": {
