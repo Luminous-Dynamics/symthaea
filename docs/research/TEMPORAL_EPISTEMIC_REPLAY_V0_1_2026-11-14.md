@@ -60,6 +60,7 @@ The v0.1 replay projection reports *temporal eligibility*, not proof of decision
 The crate exposes:
 
 - `validate_ledger(&EventLedger)`;
+- `append_event(ledger, event_id, body)` for atomic, validated in-memory appends with rollback on failure;
 - `start_replay_cursor(prefix, query)`;
 - `resume_replay_cursor(cursor, suffix)`;
 - `serialize_replay_cursor(cursor)` and `deserialize_replay_cursor(bytes)`;
@@ -97,6 +98,7 @@ The fixture intentionally includes: a decision-relevant assertion, a retroactive
 ## 7. Adversarial properties to qualify
 
 The authored unit tests cover:
+- atomic event append, deterministic sequence/hash assignment and rollback of invalid candidates;
 
 - event hash tampering and event reordering;
 - event sequence gaps and duplicate IDs;
