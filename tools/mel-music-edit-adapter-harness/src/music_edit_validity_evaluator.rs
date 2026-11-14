@@ -695,9 +695,7 @@ mod tests {
     use crate::music_edit_benchmark_adapter::{
         MusicEditOperationV1, MusicEditSplitV1, MusicEditTargetScopeV1,
     };
-    use crate::music_edit_validity_envelope::{
-        MusicEditReferencePolicyV1, MusicEditValidityConstraintV1,
-    };
+    use crate::music_edit_validity_envelope::MusicEditReferencePolicyV1;
 
     const CANDIDATE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const LINEAGE: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
