@@ -206,18 +206,6 @@ fn audit_case(case: &CompositionCase) -> Decision {
             return rejected("baseline and candidate observations do not use the same method/edition/evidence/endpoint/claim contract");
         }
 
-        if baseline.protocol_id != candidate.protocol_id
-            || baseline.protocol_sha256 != candidate.protocol_sha256
-        {
-            return rejected("baseline and candidate measurement protocols differ; this comparison cannot isolate the declared transfer change");
-        }
-
-        if baseline.id == candidate.id
-            || baseline.raw_data_sha256 == candidate.raw_data_sha256
-        {
-            return rejected("baseline and candidate observation identities or raw-data artifacts are reused");
-        }
-
         for receipt in [baseline, candidate] {
             match decide(receipt).disposition {
                 ClaimDisposition::Supported => {}
@@ -226,6 +214,30 @@ fn audit_case(case: &CompositionCase) -> Decision {
                     return rejected("the shared method-to-claim evaluator rejected a required endpoint receipt")
                 }
             }
+        }
+
+        match (baseline.protocol_id.as_deref(), candidate.protocol_id.as_deref()) {
+            (Some(left), Some(right)) if left != right => {
+                return rejected("baseline and candidate measurement protocol identities differ");
+            }
+            (None, _) | (_, None) => saw_blocked = true,
+            _ => {}
+        }
+        match (
+            baseline.protocol_sha256.as_deref(),
+            candidate.protocol_sha256.as_deref(),
+        ) {
+            (Some(left), Some(right)) if left != right => {
+                return rejected("baseline and candidate measurement protocol digests differ");
+            }
+            (None, _) | (_, None) => saw_blocked = true,
+            _ => {}
+        }
+
+        if baseline.id == candidate.id
+            || baseline.raw_data_sha256 == candidate.raw_data_sha256
+        {
+            return rejected("baseline and candidate observation identities or raw-data artifacts are reused");
         }
     }
 
