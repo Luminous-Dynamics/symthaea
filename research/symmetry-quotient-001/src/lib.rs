@@ -1310,10 +1310,8 @@ mod tests {
         // The exact finite fixture needs 3 representative objective calls
         // instead of 16 exhaustive calls: 16/3 = 5.33x fewer evaluations.
         // This is candidate-work reduction, not measured wall-clock speedup.
-        assert_eq!(
-            problem.candidate_ids.len(),
-            certificate.orbits.len() * 5 + 1
-        );
+        assert_eq!(problem.candidate_ids.len(), 16);
+        assert_eq!(certificate.orbits.len(), 3);
     }
 
     #[test]
