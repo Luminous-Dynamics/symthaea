@@ -20,3 +20,5 @@ malformed-geometry-digest|REJECT|bad_geometry_digest
 dangling-gate-evidence|REJECT|dangling_evidence
 changed-material-invalidates-design|REVIEW|dependency_invalidation
 dependency-cycle|REVIEW|dependency_cycle
+solver-stale-candidate-revision|REJECT|solver_revision_mismatch
+solver-stale-geometry|REJECT|solver_geometry_mismatch
