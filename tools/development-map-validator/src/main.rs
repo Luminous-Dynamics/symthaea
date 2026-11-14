@@ -4,7 +4,7 @@ use development_map_validator::validate_document_json;
 
 fn usage() {
     eprintln!("Usage: development-map-validator <snapshot.json>");
-    eprintln!("Validates EGDDM v0.1 map snapshots or federation manifests.");
+    eprintln!("Validates EGDDM v0.1 map snapshots, federation manifests, or DYNPLAN case/oracle fixtures.");
     eprintln!("This is a read-only structural validator, not a full JSON Schema validator or signature verifier.");
 }
 
