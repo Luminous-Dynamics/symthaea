@@ -156,6 +156,60 @@
       "id": "TEMP-GOLD-SEM-015",
       "mutation": "A causal edge has no evidence reference, a cycle exists, or a projection is not causally after its independently validated receipt.",
       "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-016",
+      "mutation": "Treat an EPCIS recordTime (repository bookkeeping/record-retrieval time) as the time the real-world event occurred, or use eventTime alone as proof that the event was available to the decision process by K.",
+      "expected": "semantic_reject_or_indeterminate",
+      "note": "Keep event occurrence assertion, repository receipt, publisher availability and decision-process acquisition as distinct temporal facts."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-017",
+      "mutation": "A query requires evidence from pre-change, change-window and post-change periods, but the retrieved set contains only one period; the candidate nevertheless declares temporal coverage complete.",
+      "expected": "coverage_fail",
+      "note": "Report Temporal Coverage@k and Temporal Precision@k; relevance in one period does not compensate for missing required periods."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-018",
+      "mutation": "The declared source inventory or source-set digest omits a required source/conductor, while the candidate claims complete evidence coverage or a complete decision frontier.",
+      "expected": "semantic_reject",
+      "note": "A frontier is complete only relative to a frozen and independently qualified source inventory; a cutoff is not corpus completeness."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-019",
+      "mutation": "Two event-time uncertainty intervals overlap or have incompatible clock bounds, but the candidate invents a strict BEFORE/AFTER or cross-source happens-before edge.",
+      "expected": "semantic_reject_or_indeterminate",
+      "note": "Preserve concurrency/incomparability unless a verified causal edge or disjoint qualified intervals justify order."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-020",
+      "mutation": "The candidate labels a dependency as causally influential solely from temporal succession, correlation or a co-occurrence pattern, without a justified causal mechanism, intervention or independently admissible causal edge.",
+      "expected": "semantic_reject_or_unproven",
+      "note": "Observed order, causal partial order and causal effect are different claims; score them separately."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-021",
+      "mutation": "A bitemporal replay at K imports a later correction, supersession, retraction or source-version remapping that was not published, received and materialized by K.",
+      "expected": "semantic_reject",
+      "note": "Later knowledge may correct the present view but must not silently rewrite the historical decision-time projection."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-022",
+      "mutation": "The candidate reports full Temporal Coverage@k using only retrieved/easy bins as the denominator, omitting required bins or hard negatives from the frozen query specification.",
+      "expected": "coverage_accounting_fail",
+      "note": "The denominator is the evaluator-frozen required temporal-bin universe, not the candidate's retrieved set."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-023",
+      "mutation": "An action was authorized when planned, but the principal's role, permission, profile or target scope was revoked/changed before execution; the system executes without a fresh authorization check.",
+      "expected": "effect_gate_reject",
+      "note": "Decision-time evidence admissibility does not grant action-time authority. Recheck scope and authorization at the effect boundary."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-024",
+      "mutation": "A client carries a cached MCP tool inventory from profile A and invokes it against profile B or a substituted endpoint without binding the exact tenant/profile/endpoint/tool-set identity and rechecking permissions.",
+      "expected": "effect_gate_reject_or_quarantine",
+      "note": "Aras InnovatorEdge 2.4 documents multiple profiles with independent endpoints, Access Points, tool sets and enablement; this is a conformance/security test scenario, not a claim of vendor vulnerability."
     }
   ],
   "invariants": [
@@ -172,6 +226,63 @@
     "local_monotonic_indices_are_compared_only_within_their_own_conductor",
     "missing_cross_conductor_causal_join_is_incomplete_or_unknown_not_pass",
     "causal_frontier_binding_reuses_Mycelix_EPI_008_and_PULSE_MULTICONDUCTOR_OWNERS",
-    "multi_source_system_availability_requires_a_complete_verified_causal_cut_when_declared_required"
-  ]
+    "multi_source_system_availability_requires_a_complete_verified_causal_cut_when_declared_required",
+    "event_occurrence_time_is_not_repository_record_time_or_decision_process_availability",
+    "temporal_coverage_denominator_is_the_frozen_required_time_bin_universe",
+    "source_set_completeness_is_relative_to_a_frozen_source_inventory_not_a_cutoff",
+    "overlapping_clock_uncertainty_preserves_incomparability_unless_a_verified_edge_exists",
+    "temporal_succession_or_correlation_alone_does_not_establish_causal_influence",
+    "later_corrections_do_not_rewrite_a_historical_decision_frontier_projection",
+    "decision_time_admissibility_never_substitutes_for_action_time_authorization",
+    "cached_tool_inventories_are_bound_to_exact_profile_endpoint_tool_set_and_scope"
+  ],
+  "evaluation_extensions": {
+    "schema_version": "luminous.eng-change-decision-replay-evaluation.v0.1",
+    "status": "preregistered_metrics_not_results",
+    "metrics": [
+      {
+        "id": "temporal_coverage_at_k",
+        "definition": "Required evaluator-frozen temporal bins with at least one admissible, claim-relevant evidence item divided by all bins frozen by the evaluator."
+      },
+      {
+        "id": "temporal_precision_at_k",
+        "definition": "Retrieved items admissible for the requested decision frontier and target-time semantics divided by all retrieved items."
+      },
+      {
+        "id": "future_knowledge_leakage_rate",
+        "definition": "Decision claims supported by evidence whose required availability, ingestion or materialization exceeds K divided by all evidence-supported decision claims; critical target is zero."
+      },
+      {
+        "id": "causal_order_false_edge_rate",
+        "definition": "Asserted cross-source causal-order edges lacking a valid independent causal-frontier receipt divided by all asserted cross-source causal-order edges."
+      },
+      {
+        "id": "source_inventory_coverage",
+        "definition": "Required source roles covered by the frozen evidence frontier divided by all evaluator-declared required source roles."
+      },
+      {
+        "id": "historical_replay_fidelity",
+        "definition": "Exact agreement between the frozen K projection and independently reconstructed evidence, disposition and obligation outputs."
+      },
+      {
+        "id": "false_current_critical_count",
+        "definition": "Count of critical claim-evidence pairs incorrectly represented as current/applicable; non-compensatory."
+      },
+      {
+        "id": "accepted_decision_cost",
+        "definition": "Fully burdened human, model, tool, review and rework cost per independently accepted decision; report absolute and matched-baseline ratios."
+      }
+    ],
+    "scoring_rule": "Hard safety, provenance and authority gates are reported before quality and economics. No weighted aggregate may compensate for a critical false-current, future-leakage, false-causal-edge or unauthorized-effect failure.",
+    "baseline_arms": [
+      "human_only_process",
+      "native_plm_workflow",
+      "keyword_or_bm25_retrieval",
+      "temporal_rag_without_causal_frontier",
+      "model_only",
+      "model_plus_pinned_evidence",
+      "symthaea_plus_existing_mycelix_frontier_owners"
+    ],
+    "status_note": "Targets and baselines are preregistration only. No vendor tenant, candidate run, human gold labels or physical evidence is claimed."
+  }
 }
