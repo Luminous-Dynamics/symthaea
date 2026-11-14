@@ -75,8 +75,10 @@ pub struct CameraDrivingPolicyManifest {
     /// Exact proprioceptive encoder seed identity used for training.
     pub vehicle_encoder_seed_sha256: String,
     /// Exact camera calibration identity used for training.
+    pub camera_id: String,
     pub camera_calibration_sha256: String,
-    /// Renderer identity; a renderer change requires an explicit new manifest.
+    /// Simulator and renderer identities; changes require an explicit new manifest.
+    pub simulator_revision: String,
     pub renderer_revision: String,
     /// Visual fusion weight in parts per million.
     pub visual_weight_ppm: u32,
@@ -135,7 +137,11 @@ impl CameraDrivingPolicyManifest {
         if self.schema_version != CAMERA_POLICY_MANIFEST_SCHEMA_VERSION {
             return Err(CameraPolicyCompatibilityError::UnsupportedManifestVersion);
         }
-        if self.policy_revision.trim().is_empty() || self.renderer_revision.trim().is_empty() {
+        if self.policy_revision.trim().is_empty()
+            || self.camera_id.trim().is_empty()
+            || self.simulator_revision.trim().is_empty()
+            || self.renderer_revision.trim().is_empty()
+        {
             return Err(CameraPolicyCompatibilityError::MissingPolicyRevision);
         }
 
@@ -199,6 +205,17 @@ impl CameraDrivingPolicyManifest {
         }
         if self.vehicle_encoder_seed_sha256 != receipt.vehicle_encoder_seed_sha256 {
             return Err(CameraPolicyCompatibilityError::EncoderSeedMismatch);
+        }
+        if self.camera_id != receipt.identity.camera_id {
+            return Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch);
+        }
+        if self.simulator_revision != receipt.identity.simulator_revision {
+            return Err(CameraPolicyCompatibilityError::RendererMismatch);
+        }
+        if receipt.capture_timestamp_us != receipt.upstream_capture_timestamp_us
+            || receipt.identity.agent_id != receipt.upstream_agent_id
+        {
+            return Err(CameraPolicyCompatibilityError::ReceiptCommitmentMismatch);
         }
         if self.camera_calibration_sha256 != receipt.upstream_camera_calibration_sha256 {
             return Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch);
@@ -355,7 +372,9 @@ mod tests {
             action_output_schema_sha256: vehicle_action_schema_sha256(),
             vision_config_sha256: "b".repeat(64),
             vehicle_encoder_seed_sha256: "c".repeat(64),
+            camera_id: "front-camera".into(),
             camera_calibration_sha256: "f".repeat(64),
+            simulator_revision: "sim-r1".into(),
             renderer_revision: "renderer-r1".into(),
             visual_weight_ppm: 600_000,
             hdc_dimension: HDC_DIMENSION,
@@ -406,6 +425,22 @@ mod tests {
         manifest.camera_calibration_sha256 = "0".repeat(64);
         let error = manifest.validate_for(&bytes, &input, &scope);
         assert_eq!(error, Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch));
+    }
+
+    #[test]
+    fn camera_identity_change_requires_a_new_manifest() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.camera_id = "rear-camera".into();
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch));
+    }
+
+    #[test]
+    fn simulator_revision_change_requires_a_new_manifest() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.simulator_revision = "sim-r2".into();
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::RendererMismatch));
     }
 
     #[test]
