@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-change-impact/gold-record-v1.1.schema.json",
   "title": "Engineering Change Impact Gold Record V1.1",
-  "description": "Versioned successor to V1. Adds an optional, typed decision-time evidence-admissibility assessment. The engineering disposition, assessor independence and authority boundary remain unchanged. V1 remains supported for non-temporal records; V1.1 is required when the temporal_admissibility extension is present.",
+  "description": "Versioned successor to V1. Adds an optional, typed decision-time evidence-admissibility assessment. The engineering disposition, assessor independence and authority boundary remain unchanged. V1 remains supported for non-temporal records; V1.1 is required when the temporal_admissibility extension is present. V1.1 also binds an existing source-specific evidence frontier and, where required, an independently verified multi-conductor causal cut; it does not define a new clock or causal-history service.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -1094,7 +1094,9 @@
           "required": [
             "instant",
             "boundary",
-            "frontier_ref"
+            "frontier_ref",
+            "ordering_model",
+            "causal_frontier"
           ],
           "properties": {
             "instant": {
@@ -1109,8 +1111,87 @@
             "frontier_ref": {
               "type": "string",
               "minLength": 1
+            },
+            "ordering_model": {
+              "enum": [
+                "single_source_authoritative_clock_or_monotonic_sequence",
+                "multi_source_causal_partial_order",
+                "hybrid_clock_plus_causal_partial_order"
+              ]
+            },
+            "causal_frontier": {
+              "$ref": "#/$defs/causalFrontierBinding"
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "ordering_model": {
+                    "const": "single_source_authoritative_clock_or_monotonic_sequence"
+                  }
+                },
+                "required": [
+                  "ordering_model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "causal_frontier": {
+                    "properties": {
+                      "required": {
+                        "const": false
+                      },
+                      "state": {
+                        "const": "not_required"
+                      }
+                    },
+                    "required": [
+                      "required",
+                      "state"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "ordering_model": {
+                    "enum": [
+                      "multi_source_causal_partial_order",
+                      "hybrid_clock_plus_causal_partial_order"
+                    ]
+                  }
+                },
+                "required": [
+                  "ordering_model"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "causal_frontier": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "state": {
+                        "enum": [
+                          "complete",
+                          "incomplete",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "required",
+                      "state"
+                    ]
+                  }
+                }
+              }
+            }
+          ]
         },
         "declared_principal_ref": {
           "type": "string",
@@ -1774,6 +1855,386 @@
                 }
               }
             }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "source_version": {
+                "properties": {
+                  "identity_state": {
+                    "const": "unknown"
+                  }
+                },
+                "required": [
+                  "identity_state"
+                ]
+              }
+            },
+            "required": [
+              "source_version"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "source_availability": {
+                    "not": {
+                      "const": "admissible"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "evidence_validity_at_target_time": {
+                    "enum": [
+                      "valid",
+                      "invalid"
+                    ]
+                  }
+                },
+                "required": [
+                  "evidence_validity_at_target_time"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_validity": {
+                "required": [
+                  "interval_evidence_ref"
+                ],
+                "properties": {
+                  "lower": {
+                    "properties": {
+                      "state": {
+                        "not": {
+                          "const": "unknown"
+                        }
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  },
+                  "upper": {
+                    "properties": {
+                      "state": {
+                        "not": {
+                          "const": "unknown"
+                        }
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_frontier": {
+                "properties": {
+                  "causal_frontier": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "state": {
+                        "const": "complete"
+                      }
+                    },
+                    "required": [
+                      "required",
+                      "state"
+                    ]
+                  }
+                },
+                "required": [
+                  "causal_frontier"
+                ]
+              }
+            },
+            "required": [
+              "decision_frontier"
+            ]
+          },
+          "then": {}
+        },
+        {
+          "if": {
+            "properties": {
+              "decision_frontier": {
+                "properties": {
+                  "causal_frontier": {
+                    "properties": {
+                      "required": {
+                        "const": true
+                      },
+                      "state": {
+                        "enum": [
+                          "incomplete",
+                          "unknown"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "required",
+                      "state"
+                    ]
+                  }
+                },
+                "required": [
+                  "causal_frontier"
+                ]
+              }
+            },
+            "required": [
+              "decision_frontier"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "system_availability": {
+                    "enum": [
+                      "unavailable",
+                      "indeterminate",
+                      "not_applicable"
+                    ]
+                  },
+                  "run_context_presence": {
+                    "enum": [
+                      "not_included",
+                      "indeterminate",
+                      "not_applicable"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "system_availability": {
+                    "const": "available"
+                  }
+                },
+                "required": [
+                  "system_availability"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "decision_frontier": {
+                "properties": {
+                  "causal_frontier": {
+                    "properties": {
+                      "state": {
+                        "enum": [
+                          "not_required",
+                          "complete"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "causalFrontierBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "state"
+      ],
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "state": {
+          "enum": [
+            "not_required",
+            "complete",
+            "incomplete",
+            "unknown"
+          ]
+        },
+        "evidence_frontier_contract_ref": {
+          "const": "https://github.com/Luminous-Dynamics/mycelix/issues/2631"
+        },
+        "evidence_frontier_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_frontier_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "causal_history_contract_ref": {
+          "const": "https://github.com/Luminous-Dynamics/mycelix/issues/5843"
+        },
+        "causal_history_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "causal_history_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "source_set_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "verifier_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifier_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "verification_receipt_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "required": {
+                "const": false
+              }
+            },
+            "required": [
+              "required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "not_required"
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "evidence_frontier_ref"
+                  ]
+                },
+                {
+                  "required": [
+                    "causal_history_ref"
+                  ]
+                },
+                {
+                  "required": [
+                    "verification_receipt_ref"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "required": {
+                "const": true
+              }
+            },
+            "required": [
+              "required"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "complete",
+                  "incomplete",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "complete"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "evidence_frontier_contract_ref",
+              "evidence_frontier_ref",
+              "evidence_frontier_digest",
+              "causal_history_contract_ref",
+              "causal_history_ref",
+              "causal_history_digest",
+              "source_set_digest",
+              "verifier_ref",
+              "verifier_digest",
+              "verification_receipt_ref"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "incomplete",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
           }
         }
       ]
