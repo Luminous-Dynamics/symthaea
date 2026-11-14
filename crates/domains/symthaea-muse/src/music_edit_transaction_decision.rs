@@ -17,8 +17,10 @@ pub const MUSIC_EDIT_TRANSACTION_SCHEMA_V1: &str = "mel-music-edit-transaction-v
 pub const MUSIC_EDIT_DECISION_RECEIPT_SCHEMA_V1: &str =
     "mel-music-edit-transaction-decision-receipt-v1";
 
+const POLICY_DOMAIN: &[u8] = b"luminous.mel.music-edit-transaction-policy.v1";
 const TRANSACTION_DOMAIN: &[u8] = b"luminous.mel.music-edit-transaction.v1";
 const DECISION_DOMAIN: &[u8] = b"luminous.mel.music-edit-transaction-decision.v1";
+const MUSIC_EDIT_TRANSACTION_POLICY_SCHEMA_V1: &str = "mel-music-edit-transaction-policy-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -92,6 +94,7 @@ pub enum MusicEditDecisionReasonV1 {
     IntegrityViolation,
     NoCandidateAttempt,
     OutcomeUnknown,
+    PolicyMismatch,
     RequiredEvidenceUnresolved,
 }
 
@@ -102,6 +105,15 @@ pub struct MusicEditTransactionBudgetV1 {
     pub maximum_repair_iterations: u64,
     pub maximum_elapsed_ms: u64,
     pub maximum_materialized_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditTransactionPolicyV1 {
+    pub schema_version: String,
+    pub policy_id: String,
+    /// Canonical ascending enum order. Four core gates are always mandatory.
+    pub required_evidence: Vec<MusicEditEvidenceKindV1>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -168,8 +180,8 @@ pub struct MusicEditTransactionV1 {
     pub source_lineage_sha256: String,
     pub validity_envelope_sha256: String,
     pub policy_sha256: String,
-    /// Canonical ascending enum order; each evidence kind appears once.
-    pub required_evidence: Vec<MusicEditEvidenceKindV1>,
+    /// Full policy is digest-bound and must match the caller's trusted policy digest.
+    pub policy: MusicEditTransactionPolicyV1,
     pub budget: MusicEditTransactionBudgetV1,
     /// Append-only, one-based attempt ledger. Candidate IDs are never reused.
     pub attempts: Vec<MusicEditCandidateAttemptV1>,
@@ -178,7 +190,10 @@ pub struct MusicEditTransactionV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MusicEditTransactionIssueV1 {
     WrongSchema,
+    WrongPolicySchema,
     EmptyField(&'static str),
+    MissingMandatoryEvidence(MusicEditEvidenceKindV1),
+    PolicyDigestMismatch,
     InvalidDigest(&'static str),
     NonCanonicalRequiredEvidence,
     DuplicateRequiredEvidence(MusicEditEvidenceKindV1),
@@ -321,6 +336,55 @@ fn checked_usage(
     Ok(usage)
 }
 
+fn validate_policy(
+    policy: &MusicEditTransactionPolicyV1,
+) -> Vec<MusicEditTransactionIssueV1> {
+    let mut issues = Vec::new();
+    if policy.schema_version != MUSIC_EDIT_TRANSACTION_POLICY_SCHEMA_V1 {
+        issues.push(MusicEditTransactionIssueV1::WrongPolicySchema);
+    }
+    if policy.policy_id.trim().is_empty() {
+        issues.push(MusicEditTransactionIssueV1::EmptyField("policy_id"));
+    }
+    if !policy
+        .required_evidence
+        .windows(2)
+        .all(|pair| pair[0] < pair[1])
+    {
+        issues.push(MusicEditTransactionIssueV1::NonCanonicalRequiredEvidence);
+    }
+    let mut seen = BTreeSet::new();
+    for kind in &policy.required_evidence {
+        if !seen.insert(*kind) {
+            issues.push(MusicEditTransactionIssueV1::DuplicateRequiredEvidence(*kind));
+        }
+    }
+    for mandatory in [
+        MusicEditEvidenceKindV1::SymbolicObligation,
+        MusicEditEvidenceKindV1::RendererExecution,
+        MusicEditEvidenceKindV1::TargetAcoustic,
+        MusicEditEvidenceKindV1::ProtectedPreservation,
+    ] {
+        if !seen.contains(&mandatory) {
+            issues.push(MusicEditTransactionIssueV1::MissingMandatoryEvidence(
+                mandatory,
+            ));
+        }
+    }
+    issues
+}
+
+/// Computes the digest of a structurally valid, versioned decision policy.
+pub fn music_edit_transaction_policy_digest_v1(
+    policy: &MusicEditTransactionPolicyV1,
+) -> Result<String, Vec<MusicEditTransactionIssueV1>> {
+    let issues = validate_policy(policy);
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    digest(POLICY_DOMAIN, policy).map_err(|issue| vec![issue])
+}
+
 /// Validates the append-only ledger's structure and canonical ordering.
 /// Evidence-to-candidate binding is evaluated as a terminal integrity decision.
 pub fn validate_music_edit_transaction_v1(
@@ -351,18 +415,13 @@ pub fn validate_music_edit_transaction_v1(
         }
     }
 
-    if !transaction
-        .required_evidence
-        .windows(2)
-        .all(|pair| pair[0] < pair[1])
-    {
-        issues.push(MusicEditTransactionIssueV1::NonCanonicalRequiredEvidence);
-    }
-    let mut required = BTreeSet::new();
-    for kind in &transaction.required_evidence {
-        if !required.insert(*kind) {
-            issues.push(MusicEditTransactionIssueV1::DuplicateRequiredEvidence(*kind));
+    issues.extend(validate_policy(&transaction.policy));
+    match digest(POLICY_DOMAIN, &transaction.policy) {
+        Ok(expected) if expected != transaction.policy_sha256 => {
+            issues.push(MusicEditTransactionIssueV1::PolicyDigestMismatch);
         }
+        Err(issue) => issues.push(issue),
+        _ => {}
     }
 
     let mut attempt_ids = BTreeSet::new();
@@ -515,6 +574,7 @@ fn make_receipt(
 /// semantic integrity, hard-gate and budget outcomes become explicit decisions.
 pub fn evaluate_music_edit_transaction_v1(
     transaction: &MusicEditTransactionV1,
+    trusted_policy_sha256: &str,
 ) -> Result<MusicEditTransactionDecisionReceiptV1, Vec<MusicEditTransactionIssueV1>> {
     let issues = validate_music_edit_transaction_v1(transaction);
     if !issues.is_empty() {
@@ -522,6 +582,22 @@ pub fn evaluate_music_edit_transaction_v1(
     }
     let usage = checked_usage(transaction)
         .map_err(|issue| vec![issue])?;
+
+    if !is_sha256(trusted_policy_sha256) {
+        return Err(vec![MusicEditTransactionIssueV1::InvalidDigest(
+            "trusted_policy_sha256",
+        )]);
+    }
+    if transaction.policy_sha256 != trusted_policy_sha256 {
+        return make_receipt(
+            transaction,
+            MusicEditDecisionActionV1::Reject,
+            transaction.attempts.last().map(|attempt| attempt.attempt_id.clone()),
+            vec![MusicEditDecisionReasonV1::PolicyMismatch],
+            usage,
+        )
+        .map_err(|issue| vec![issue]);
+    }
 
     let last_attempt = transaction.attempts.last();
     let selected_attempt_id = last_attempt.map(|attempt| attempt.attempt_id.clone());
@@ -569,7 +645,7 @@ pub fn evaluate_music_edit_transaction_v1(
         if attempt.outcome != MusicEditAttemptOutcomeV1::CandidateReady {
             continue;
         }
-        let all_verified = transaction.required_evidence.iter().all(|kind| {
+        let all_verified = transaction.policy.required_evidence.iter().all(|kind| {
             required_record(attempt, *kind)
                 .is_some_and(|record| record.state == MusicEditEvidenceStateV1::Verified)
         });
@@ -603,7 +679,7 @@ pub fn evaluate_music_edit_transaction_v1(
     if hard_rejection {
         reasons.push(MusicEditDecisionReasonV1::CandidateHardInvalid);
     }
-    for kind in &transaction.required_evidence {
+    for kind in &transaction.policy.required_evidence {
         match required_record(last, *kind) {
             None | Some(MusicEditEvidenceRecordV1 {
                 state: MusicEditEvidenceStateV1::NotRun,
@@ -699,9 +775,10 @@ pub fn evaluate_music_edit_transaction_v1(
 /// A receipt from another source, candidate, policy, ordering or budget cannot pass.
 pub fn verify_music_edit_transaction_decision_v1(
     transaction: &MusicEditTransactionV1,
+    trusted_policy_sha256: &str,
     receipt: &MusicEditTransactionDecisionReceiptV1,
 ) -> Result<(), MusicEditTransactionIssueV1> {
-    let expected = evaluate_music_edit_transaction_v1(transaction)
+    let expected = evaluate_music_edit_transaction_v1(transaction, trusted_policy_sha256)
         .map_err(|_| MusicEditTransactionIssueV1::InvalidTransaction)?;
     if expected != *receipt {
         return Err(MusicEditTransactionIssueV1::DecisionReceiptMismatch);
@@ -770,13 +847,19 @@ mod tests {
     }
 
     fn transaction() -> MusicEditTransactionV1 {
+        let policy = MusicEditTransactionPolicyV1 {
+            schema_version: MUSIC_EDIT_TRANSACTION_POLICY_SCHEMA_V1.to_owned(),
+            policy_id: "strict-edit-policy-v1".to_owned(),
+            required_evidence: required(),
+        };
+        let policy_sha256 = music_edit_transaction_policy_digest_v1(&policy).unwrap();
         MusicEditTransactionV1 {
             schema_version: MUSIC_EDIT_TRANSACTION_SCHEMA_V1.to_owned(),
             transaction_id: "tx-001".to_owned(),
             source_lineage_sha256: d(1),
             validity_envelope_sha256: d(2),
-            policy_sha256: d(8),
-            required_evidence: required(),
+            policy_sha256,
+            policy,
             budget: MusicEditTransactionBudgetV1 {
                 maximum_render_calls: 4,
                 maximum_repair_iterations: 2,
@@ -804,13 +887,13 @@ mod tests {
     #[test]
     fn accepts_only_when_every_required_gate_is_verified_for_exact_candidate() {
         let tx = transaction();
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Accept);
         assert_eq!(
             receipt.payload.selected_attempt_id.as_deref(),
             Some("attempt-001")
         );
-        assert!(verify_music_edit_transaction_decision_v1(&tx, &receipt).is_ok());
+        assert!(verify_music_edit_transaction_decision_v1(&tx, &tx.policy_sha256, &receipt).is_ok());
     }
 
     #[test]
@@ -822,7 +905,7 @@ mod tests {
             .find(|record| record.kind == MusicEditEvidenceKindV1::RendererExecution)
             .unwrap();
         *record = pending(MusicEditEvidenceKindV1::RendererExecution);
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
         assert!(receipt
             .payload
@@ -834,7 +917,7 @@ mod tests {
     fn candidate_evidence_from_another_output_rejects() {
         let mut tx = transaction();
         tx.attempts[0].evidence[0].candidate_artifact_sha256 = Some(d(0x99));
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Reject);
         assert!(receipt
             .payload
@@ -853,7 +936,7 @@ mod tests {
         record.state = MusicEditEvidenceStateV1::Rejected;
         record.failure_class = Some(MusicEditEvidenceFailureClassV1::HardGate);
         record.reason_code = Some("protected-event-changed".to_owned());
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Reject);
     }
 
@@ -865,7 +948,7 @@ mod tests {
         tx.attempts[0].candidate_artifact_sha256 = None;
         tx.attempts[0].candidate_symbolic_sha256 = None;
         tx.attempts[0].evidence.clear();
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Repair);
     }
 
@@ -878,7 +961,7 @@ mod tests {
         tx.attempts[0].candidate_artifact_sha256 = None;
         tx.attempts[0].candidate_symbolic_sha256 = None;
         tx.attempts[0].evidence.clear();
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
         assert!(receipt
             .payload
@@ -894,7 +977,7 @@ mod tests {
         tx.attempts[0].candidate_artifact_sha256 = None;
         tx.attempts[0].candidate_symbolic_sha256 = None;
         tx.attempts[0].evidence.clear();
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
 
         let mut later = ready_attempt();
@@ -916,7 +999,7 @@ mod tests {
         tx.attempts[0].candidate_artifact_sha256 = None;
         tx.attempts[0].candidate_symbolic_sha256 = None;
         tx.attempts[0].evidence.clear();
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
         assert_eq!(receipt.payload.usage.render_calls, 1);
     }
@@ -925,7 +1008,7 @@ mod tests {
     fn over_budget_ledger_is_rejected_instead_of_hidden() {
         let mut tx = transaction();
         tx.budget.maximum_render_calls = 0;
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Reject);
         assert!(receipt
             .payload
@@ -946,9 +1029,34 @@ mod tests {
     }
 
     #[test]
+    fn transaction_cannot_weaken_mandatory_core_gates() {
+        let mut tx = transaction();
+        tx.policy
+            .required_evidence
+            .retain(|kind| *kind != MusicEditEvidenceKindV1::ProtectedPreservation);
+        tx.policy_sha256 = digest(POLICY_DOMAIN, &tx.policy).unwrap();
+        assert!(validate_music_edit_transaction_v1(&tx).contains(
+            &MusicEditTransactionIssueV1::MissingMandatoryEvidence(
+                MusicEditEvidenceKindV1::ProtectedPreservation
+            )
+        ));
+    }
+
+    #[test]
+    fn trusted_policy_digest_is_required_for_a_decision() {
+        let tx = transaction();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &d(0x99)).unwrap();
+        assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Reject);
+        assert!(receipt
+            .payload
+            .reasons
+            .contains(&MusicEditDecisionReasonV1::PolicyMismatch));
+    }
+
+    #[test]
     fn malformed_or_reordered_required_evidence_is_rejected() {
         let mut tx = transaction();
-        tx.required_evidence.reverse();
+        tx.policy.required_evidence.reverse();
         assert!(validate_music_edit_transaction_v1(&tx)
             .contains(&MusicEditTransactionIssueV1::NonCanonicalRequiredEvidence));
     }
@@ -970,10 +1078,10 @@ mod tests {
     #[test]
     fn tampered_decision_receipt_fails_replay() {
         let tx = transaction();
-        let mut receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let mut receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         receipt.payload.action = MusicEditDecisionActionV1::Repair;
         assert_eq!(
-            verify_music_edit_transaction_decision_v1(&tx, &receipt),
+            verify_music_edit_transaction_decision_v1(&tx, &tx.policy_sha256, &receipt),
             Err(MusicEditTransactionIssueV1::DecisionReceiptMismatch)
         );
     }
@@ -984,7 +1092,7 @@ mod tests {
         tx.attempts[0]
             .evidence
             .retain(|record| record.kind != MusicEditEvidenceKindV1::RightsAdmission);
-        let receipt = evaluate_music_edit_transaction_v1(&tx).unwrap();
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
         assert!(receipt
             .payload
