@@ -119,3 +119,8 @@ The demonstration fixtures are synthetic plumbing examples. They are not measure
 ## Observer independence profile
 
 The proposed E0–E4 observer taxonomy and trust-domain vector are documented in [OBSERVER_INDEPENDENCE.md](OBSERVER_INDEPENDENCE.md). The current separate-process SQLite audit companion is E2: useful for database-snapshot reconciliation, but not an external-service or independent-host witness. The public branch contains the profile and scope contract; the executable SQLite observer remains a separate local companion pending promotion and review.
+
+
+## Formal protocol model
+
+A bounded TLA+ model and pinned TLC runner are available in [formal/](formal/README.md). The specification covers delayed dispatch, destination serialization, staged effect/fence transactions, rollback and reconciliation. The Go state explorer has passed its declared finite test; the new TLA+ module has **not yet been run through TLC** in this environment. The runner records the stable tool pin and refuses an unverified JAR.
