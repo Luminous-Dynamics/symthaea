@@ -401,3 +401,19 @@ The versioned claim registry has been extended with two exact-edition entries:
 The plasma method ontology now contains `classification_practice` as an explicit evidence kind. Non-aluminum D5656 use and non-SMC D5573 generalization are BLOCKED pending separate applicability evidence. The v0.3 fixture has 52 cases and independently replays 52/52.
 
 See `docs/research/PLASMA_METHOD_EVIDENCE_PLANES_2026-11-14.md` for standard scope, the three evidence planes, 2026 plasma literature and benchmark targets.
+
+
+## 2026-11-14 — ISO 10365:2022 adds a general bonded-assembly ontology
+
+The shared claim-scope registry now includes ISO 10365:2022 as a separate classification-practice method:
+- evidence kind: `classification_practice`;
+- material class: `bonded_assembly`;
+- geometry: `failure_surface_classification`;
+- endpoint: `bonded_assembly_failure_pattern_designation`;
+- claim: `failure_mode_classification_reference`.
+
+ISO 10365:2022 applies to mechanical tests on bonded assemblies regardless of adherend or adhesive, and its failure-pattern table includes SF, CSF, DF, CF, SCF, SWCF, AF, ACFP and COR. For mixed patterns, it calls for approximate percentages for each observed pattern. Official scope: https://www.iso.org/standard/80800.html.
+
+This ontology is not merged with D5573's SMC FRP-specific categories. The claim-scope fixture advances to v0.4 with 59 cases. The failure-composition auditor advances to v0.2 with separate ontology IDs, method-specific observation-mode requirements and a cross-ontology rejection control. Its fixture has 47 cases. Both latest branch fixtures independently replayed exactly (59/59 and 47/47).
+
+A future reviewed mapping receipt may translate between ontologies, but no implicit category-name equivalence is accepted today. See #12102 and draft PR #12103.
