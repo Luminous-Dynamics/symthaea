@@ -45,6 +45,8 @@ pub enum MusicXmlMeasureAdapterError {
     UnknownTimewisePart { id: String },
     IncompleteTimewiseMeasure { measure_number: String, part_id: String },
     DuplicateTimewisePart { measure_number: String, part_id: String },
+    UnexpectedTimewiseMeasureChild { measure_number: String, element: String },
+    DuplicateTimewisePartList,
 }
 
 /// Original source-node pair for one part's music data in one measure.
@@ -106,10 +108,13 @@ fn collect_part_inputs<'a, 'input>(
             root: root.tag_name().name().to_string(),
         });
     }
-    let part_list = root
-        .children()
-        .find(|node| node.has_tag_name("part-list"))
+    let mut part_lists = root.children().filter(|node| node.has_tag_name("part-list"));
+    let part_list = part_lists
+        .next()
         .ok_or(MusicXmlMeasureAdapterError::MissingPartList)?;
+    if part_lists.next().is_some() {
+        return Err(MusicXmlMeasureAdapterError::DuplicateTimewisePartList);
+    }
     let declarations: Vec<String> = part_list
         .children()
         .filter(|node| node.has_tag_name("score-part"))
@@ -150,7 +155,14 @@ fn collect_part_inputs<'a, 'input>(
     for measure in measures {
         let measure_number = measure.attribute("number").unwrap_or("").to_string();
         let mut blocks = std::collections::BTreeMap::new();
-        for part in measure.children().filter(|node| node.has_tag_name("part")) {
+        for child in measure.children().filter(|node| node.is_element()) {
+            if !child.has_tag_name("part") {
+                return Err(MusicXmlMeasureAdapterError::UnexpectedTimewiseMeasureChild {
+                    measure_number: measure_number.clone(),
+                    element: child.tag_name().name().to_string(),
+                });
+            }
+            let part = child;
             let part_id = part
                 .attribute("id")
                 .filter(|value| !value.trim().is_empty())
