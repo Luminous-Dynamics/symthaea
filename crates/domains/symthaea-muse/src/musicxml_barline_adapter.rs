@@ -645,41 +645,27 @@ pub fn parse_musicxml_part_notation_graph(
     let document = roxmltree::Document::parse(text)
         .map_err(|error| MusicXmlMeasureAdapterError::MalformedXml(error.to_string()))?;
     let root = document.root_element();
-    if !root.has_tag_name("score-partwise") {
-        return Err(MusicXmlMeasureAdapterError::UnsupportedRoot {
-            root: root.tag_name().name().to_string(),
-        });
-    }
     if let Some((element, namespace)) = foreign_namespace_core_element(root) {
         return Err(MusicXmlMeasureAdapterError::ForeignNamespaceCoreElement {
             element,
             namespace,
         });
     }
-    let parts: Vec<_> = root
-        .children()
-        .filter(|node| node.has_tag_name("part"))
-        .collect();
-    if parts.is_empty() {
-        return Err(MusicXmlMeasureAdapterError::NoParts);
+    if !root.has_tag_name("score-partwise") && !root.has_tag_name("score-timewise") {
+        return Err(MusicXmlMeasureAdapterError::UnsupportedRoot {
+            root: root.tag_name().name().to_string(),
+        });
     }
 
-    let mut seen_part_ids = std::collections::BTreeSet::new();
+    let parts = collect_part_inputs(root)?;
     let mut output = Vec::with_capacity(parts.len());
-    for part in parts {
-        let part_id = part
-            .attribute("id")
-            .filter(|value| !value.trim().is_empty())
-            .ok_or(MusicXmlMeasureAdapterError::MissingPartId)?;
-        if !seen_part_ids.insert(part_id.to_string()) {
-            return Err(MusicXmlMeasureAdapterError::DuplicatePartId {
-                id: part_id.to_string(),
-            });
-        }
-        let measure_locators = parse_measure_locators_for_part(part);
-        let part_metadata = parse_musicxml_part_metadata(root, part_id)
+    for part_input in parts {
+        let part_id = part_input.part_id;
+        let measure_inputs = part_input.measures;
+        let measure_locators = parse_measure_locators_for_inputs(&measure_inputs);
+        let part_metadata = parse_musicxml_part_metadata(root, &part_id)
             .map_err(MusicXmlMeasureAdapterError::PartMetadata)?;
-        let parsed = parse_part(part)?;
+        let parsed = parse_part_measure_inputs(&measure_inputs)?;
         match parsed {
             Some(measures) if !measures.is_empty() => {
                 let mut start = RationalBeat::new(0, 1)
@@ -696,16 +682,19 @@ pub fn parse_musicxml_part_notation_graph(
                     });
                     start = end;
                 }
-                let barline_events = parse_barline_events_for_part(
-                    part,
-                    part_id,
+                let barline_events = parse_barline_events_for_inputs(
+                    &measure_inputs,
+                    &part_id,
                     &measures,
                     &spans,
                 )?;
                 let playback_controls =
-                    parse_playback_controls_for_part(part, part_id);
-                let notation_events =
-                    parse_musicxml_part_notation_events(part, part_id, &spans);
+                    parse_playback_controls_for_inputs(&measure_inputs, &part_id);
+                let notation_events = parse_musicxml_measure_inputs(
+                    &measure_inputs,
+                    &part_id,
+                    &spans,
+                );
                 let map = MeasureMap {
                     source_id: format!("{source_id}#part={part_id}"),
                     score_clock_id: score_clock_id.to_string(),
@@ -719,7 +708,7 @@ pub fn parse_musicxml_part_notation_graph(
                     .filter_map(|(index, measure)| measure.non_controlling.then_some(index))
                     .collect();
                 output.push(MusicXmlPartNotationGraphV1 {
-                    part_id: part_id.to_string(),
+                    part_id,
                     map,
                     measure_locators,
                     non_controlling_measure_indices,
@@ -731,9 +720,9 @@ pub fn parse_musicxml_part_notation_graph(
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
-                part_id: part_id.to_string(),
+                part_id,
                 map: MeasureMap {
-                    source_id: format!("{source_id}#part={part_id}"),
+                    source_id: format!("{source_id}#part={}", part_id),
                     score_clock_id: score_clock_id.to_string(),
                     canonicalization_version: MUSICXML_BARLINE_CANONICALIZATION_V1.into(),
                     status: MeasureMapStatus::Unknown {
@@ -745,14 +734,14 @@ pub fn parse_musicxml_part_notation_graph(
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
-                notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
+                notation_events: parse_musicxml_measure_inputs(&measure_inputs, &part_id, &[]),
                 part_metadata,
                 part_metadata_layer_present: true,
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
-                part_id: part_id.to_string(),
+                part_id,
                 map: MeasureMap {
-                    source_id: format!("{source_id}#part={part_id}"),
+                    source_id: format!("{source_id}#part={}", part_id),
                     score_clock_id: score_clock_id.to_string(),
                     canonicalization_version: MUSICXML_BARLINE_CANONICALIZATION_V1.into(),
                     status: MeasureMapStatus::Unknown {
@@ -764,7 +753,7 @@ pub fn parse_musicxml_part_notation_graph(
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
-                notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
+                notation_events: parse_musicxml_measure_inputs(&measure_inputs, &part_id, &[]),
                 part_metadata,
                 part_metadata_layer_present: true,
             }),
@@ -772,7 +761,6 @@ pub fn parse_musicxml_part_notation_graph(
     }
     Ok(output)
 }
-
 
 /// Canonical SHA-256 commitment to one parsed per-part notation graph.
 ///
