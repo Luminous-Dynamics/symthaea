@@ -209,3 +209,12 @@ No duplicate statistics engine, calibration registry, material-lot authority, DO
 - The audit does not calculate WVTR, OTR, tensile retention, uncertainty intervals or bond strength.
 - Referenced artifact bytes, calibration, lab custody, clock trust, actual sample/roll identity and standard execution are not authenticated.
 - No physical substrate integrity, actual safe activation window, bond durability, product qualification, safety, standard compliance or production release is established.
+
+
+## 2026-11-14 — method applicability is now bound to the substrate profile
+
+The substrate profile now contains an explicit `supported_method_material_classes` list. An individually valid WVTR, gas-transmission or tensile receipt is BLOCKED when the profile does not declare that method-material class as applicable. The D882 path also checks the actual substrate thickness is below 1.0 mm.
+
+The expanded fixture now contains **18 cases** (3 PASS, 8 BLOCKED, 7 REJECTED), including a valid method receipt whose material class is omitted from the substrate profile. The exact updated fixture independently replays **18/18**. The claim-scope v0.4 registry independently replays **61/61** (16 SUPPORTED, 14 BLOCKED, 31 REJECTED).
+
+The method-material class list and profile digest are structurally cross-bound; the underlying material specification, supplier/lot records and test artifacts are not authenticated by this S0 auditor.
