@@ -32,4 +32,4 @@ cargo clippy --manifest-path tools/atelier-wardrobe-core/Cargo.toml --locked --a
 cargo fmt --manifest-path tools/atelier-wardrobe-core/Cargo.toml -- --check
 ```
 
-Twelve unit tests are authored. They have not been compiled or executed in the current authoring environment because the Rust toolchain is absent.
+Twelve unit tests are authored, including mixed-currency and malformed-currency-code rejection. They have not been compiled or executed in the current authoring environment because the Rust toolchain is absent.
