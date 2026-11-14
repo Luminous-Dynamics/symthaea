@@ -222,7 +222,13 @@ The wedge is not “better requirements software.” It is a verified bridge fro
 5. Add a benchmark runner that measures semantic-quality metrics using adjudicated human labels rather than calling the production validator as its own oracle.
 6. Define ReqIF and API adapter experiments only after the static requirement contract and privacy boundary stabilize.
 
-## 11. Claim ceiling
+## 11. Family-office / real-asset benchmark composition
+
+A complementary synthetic institutional benchmark has been opened in [Mycelix IPB-S6](https://github.com/Luminous-Dynamics/mycelix/issues/6127). It tests title/custody/possession/valuation/condition/insurance/authority separation, provenance disputes, stale evidence, cross-entity authority, succession and provider concentration.
+
+This is the downstream domain test for one of the commercial profiles discussed here. It consumes Mycelix's existing LIFE-CONTINUITY and typed evidence-state work, ERG asset lifecycle contracts, physical-artwork passports, Symtropy physical-domain evidence and Sol-Atlas heritage/source profiles. It is not another asset registry or wealth-management platform.
+
+## 12. Claim ceiling
 
 The v0.1 validator only checks structural consistency of the supplied manifest. It cannot establish that a requirement is complete, true, feasible, legally valid, safe, authorised, or an accurate interpretation of customer intent.
 
