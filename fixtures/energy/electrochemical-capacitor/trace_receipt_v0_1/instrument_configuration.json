@@ -1,0 +1,7 @@
+{
+  "instrument_id": "SYNTH-INSTRUMENT-001",
+  "model": "SYNTH-DIGITIZER",
+  "serial": "SYNTH-DIGITIZER-001",
+  "sample_rate_hz": 10,
+  "timebase_reference": "SYNTHETIC-CLOCK"
+}

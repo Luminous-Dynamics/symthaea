@@ -1,0 +1,7 @@
+{
+  "calibration_id": "SYNTH-CAL-001",
+  "instrument_serial": "SYNTH-DIGITIZER-001",
+  "valid_from_unix_ms": 1794000000000,
+  "valid_until_unix_ms": 1795000000000,
+  "certificate_status": "synthetic_fixture_only"
+}

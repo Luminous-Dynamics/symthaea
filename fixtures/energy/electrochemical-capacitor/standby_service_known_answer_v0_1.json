@@ -1,0 +1,74 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "EDLC-STANDBY-SERVICE-KNOWN-ANSWER-001",
+  "evidence_class": "synthetic_known_answer_arithmetic",
+  "claim_ceiling": "TRACE_INTEGRATION_AND_UNIT_ARITHMETIC_ONLY_NOT_A_PHYSICAL_EDLC_MEASUREMENT_OR_LIFETIME_MODEL",
+  "assumptions": [
+    "All samples are synthetic and are not copied from any physical device or standard test.",
+    "Linear interpolation between adjacent samples is used for trapezoidal integration.",
+    "Leakage-current sign is positive into the device for charge integration.",
+    "Discharge current is positive out of the device and the supplied voltage/current pairs are simultaneous terminal measurements.",
+    "No converter, wiring, balancing or downstream load losses are represented.",
+    "The trace does not model voltage-hold aging, ESR evolution, electrochemical kinetics or statistical lifetime."
+  ],
+  "leakage_trace": {
+    "quantity": "terminal_leakage_current",
+    "unit": "A",
+    "time_unit": "s",
+    "samples": [
+      {
+        "t": 0,
+        "current": 0.005
+      },
+      {
+        "t": 10,
+        "current": 0.003
+      },
+      {
+        "t": 20,
+        "current": 0.002
+      }
+    ],
+    "expected": {
+      "integrated_charge_C": 0.065,
+      "method": "trapezoidal_integral_current_over_time"
+    }
+  },
+  "post_standby_discharge_trace": {
+    "quantity": "terminal_voltage_and_discharge_current",
+    "voltage_unit": "V",
+    "current_unit": "A",
+    "time_unit": "s",
+    "samples": [
+      {
+        "t": 0,
+        "voltage": 2.7,
+        "current": 1
+      },
+      {
+        "t": 1,
+        "voltage": 2,
+        "current": 1
+      },
+      {
+        "t": 2,
+        "voltage": 1.2,
+        "current": 1
+      }
+    ],
+    "expected": {
+      "delivered_energy_J": 3.95,
+      "delivered_energy_Wh": 0.0010972222222222223,
+      "peak_sampled_power_W": 2.7,
+      "method": "trapezoidal_integral_of_simultaneous_terminal_voltage_times_current"
+    }
+  },
+  "negative_controls": [
+    "Do not infer delivered Wh from open-circuit voltage alone.",
+    "Do not treat leakage charge as delivered energy.",
+    "Reject traces with non-monotonic timestamps or incompatible units.",
+    "Reject missing simultaneous voltage/current samples for energy integration.",
+    "Do not extrapolate these two-segment traces to multi-day or multi-month lifetime.",
+    "Do not promote synthetic fixture arithmetic into physical evidence."
+  ]
+}

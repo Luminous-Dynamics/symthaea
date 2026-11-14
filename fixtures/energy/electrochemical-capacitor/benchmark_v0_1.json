@@ -1,0 +1,307 @@
+{
+  "schema_version": "0.1.0",
+  "records": [
+    {
+      "schema_version": "0.1.0",
+      "record_id": "vendor-eaton-xlr48-reference-2023",
+      "device_class": "edlc",
+      "design": {
+        "design_id": "eaton-xlr48",
+        "revision": "datasheet-effective-2023-07",
+        "positive_electrode_id": "vendor-not-disclosed",
+        "negative_electrode_id": "vendor-not-disclosed",
+        "electrolyte_id": "vendor-not-disclosed",
+        "separator_id": "vendor-not-disclosed",
+        "current_collector_id": "vendor-not-disclosed",
+        "package_id": "vendor-xlr48-module",
+        "process_id": "vendor-not-disclosed",
+        "physical_device_serial": "not-provided-in-public-datasheet",
+        "material_lot_ids": [
+          "not-disclosed"
+        ]
+      },
+      "boundary": "module",
+      "test_conditions": {
+        "protocol_id": "vendor-datasheet-conditions-not-fully-normalized",
+        "voltage_min_v": 0,
+        "voltage_max_v": 48.6,
+        "temperature_c": 20,
+        "current_profile_id": "vendor-cycle-life-profile-not-fully-normalized",
+        "fixture_id": "vendor-not-disclosed",
+        "instrument_id": "vendor-not-disclosed",
+        "calibration_id": "vendor-not-disclosed",
+        "raw_data_digest": null
+      },
+      "evidence": {
+        "evidence_id": "eaton-xlr48-public-vendor-datasheet",
+        "class": "vendor",
+        "admission": "candidate",
+        "source_uri": "https://www.eaton.com/content/dam/eaton/products/electronic-components/resources/data-sheet/eaton-xlr-48-supercapacitor-module-data-sheet.pdf",
+        "sha256": null,
+        "independent_lab": false
+      },
+      "metrics": [
+        {
+          "name": "capacitance",
+          "value": 166,
+          "unit": "F",
+          "boundary": "module",
+          "measurement_method": "vendor reported; IEC 62391-1 reference",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "stored_energy",
+          "value": 54,
+          "unit": "Wh",
+          "boundary": "module",
+          "measurement_method": "vendor reported",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "maximum_initial_esr",
+          "value": 5,
+          "unit": "mOhm",
+          "boundary": "module",
+          "measurement_method": "vendor reported",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "maximum_working_voltage",
+          "value": 48.6,
+          "unit": "V",
+          "boundary": "module",
+          "measurement_method": "vendor reported",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "cycle_life_specification",
+          "value": 1000000,
+          "unit": "cycles",
+          "boundary": "module",
+          "measurement_method": "vendor stated test conditions; do not treat as independently verified",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        }
+      ],
+      "manufacturing": {
+        "batch_id": "not-disclosed",
+        "process_revision": "not-disclosed",
+        "yield_status": "not_measured",
+        "accepted_device_cost": null
+      },
+      "disposition": "candidate",
+      "denominator": {
+        "mass_kg": 14.7,
+        "volume_l": null,
+        "basis": "module_vendor_reported",
+        "included_components": [],
+        "excluded_components": [],
+        "status": "partial"
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "record_id": "synthetic-active-mass-only-zihsc-claim",
+      "device_class": "zinc_ion_hybrid_supercapacitor",
+      "design": {
+        "design_id": "synthetic-zihsc-claim",
+        "revision": "fixture-only",
+        "positive_electrode_id": "synthetic-cathode",
+        "negative_electrode_id": "synthetic-zinc-anode",
+        "electrolyte_id": "synthetic-electrolyte",
+        "separator_id": "synthetic-separator",
+        "current_collector_id": "synthetic-current-collector",
+        "package_id": "missing-complete-package-details",
+        "process_id": "synthetic-process",
+        "physical_device_serial": "SYNTHETIC-NOT-PHYSICAL",
+        "material_lot_ids": [
+          "SYNTHETIC-LOT"
+        ]
+      },
+      "boundary": "active_material",
+      "test_conditions": {
+        "protocol_id": "synthetic-protocol",
+        "voltage_min_v": 0,
+        "voltage_max_v": 1.8,
+        "temperature_c": 25,
+        "current_profile_id": "synthetic-profile",
+        "fixture_id": "synthetic-fixture",
+        "instrument_id": "synthetic-instrument",
+        "calibration_id": "synthetic-calibration",
+        "raw_data_digest": null
+      },
+      "evidence": {
+        "evidence_id": "synthetic-only-not-admissible",
+        "class": "synthetic",
+        "admission": "blocked",
+        "source_uri": null,
+        "sha256": null,
+        "independent_lab": false
+      },
+      "metrics": [
+        {
+          "name": "claimed_energy_density",
+          "value": 120,
+          "unit": "Wh/kg",
+          "boundary": "active_material",
+          "measurement_method": "synthetic negative-control only",
+          "uncertainty": null,
+          "status": "synthetic"
+        },
+        {
+          "name": "complete_device_energy_density",
+          "value": null,
+          "unit": "Wh/kg",
+          "boundary": "complete_device",
+          "measurement_method": "missing complete-device mass and measurement",
+          "uncertainty": null,
+          "status": "unknown"
+        }
+      ],
+      "manufacturing": {
+        "batch_id": "synthetic",
+        "process_revision": "synthetic",
+        "yield_status": "unknown",
+        "accepted_device_cost": null
+      },
+      "disposition": "blocked_missing_complete_device_boundary",
+      "denominator": {
+        "mass_kg": null,
+        "volume_l": null,
+        "basis": "active_material_only",
+        "included_components": [
+          "active_material"
+        ],
+        "excluded_components": [
+          "positive_electrode_substrate",
+          "negative_electrode",
+          "electrolyte",
+          "separator",
+          "current_collectors",
+          "binder_additives",
+          "tabs",
+          "seals",
+          "case"
+        ],
+        "status": "partial"
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "record_id": "vendor-skeleton-skelmod-54v188f-reference-2026",
+      "device_class": "edlc",
+      "design": {
+        "design_id": "skeleton-skelmod-54v188f",
+        "revision": "datasheet-2026-06-05",
+        "positive_electrode_id": "vendor-not-disclosed",
+        "negative_electrode_id": "vendor-not-disclosed",
+        "electrolyte_id": "vendor-not-disclosed",
+        "separator_id": "vendor-not-disclosed",
+        "current_collector_id": "vendor-not-disclosed",
+        "package_id": "skelmod-54v188f-module",
+        "process_id": "vendor-not-disclosed",
+        "physical_device_serial": "not-provided-in-public-datasheet",
+        "material_lot_ids": [
+          "not-disclosed"
+        ]
+      },
+      "boundary": "module",
+      "denominator": {
+        "mass_kg": 16,
+        "volume_l": 13.5,
+        "basis": "module_vendor_reported",
+        "included_components": [
+          "module_enclosure"
+        ],
+        "excluded_components": [],
+        "status": "partial"
+      },
+      "test_conditions": {
+        "protocol_id": "vendor-datasheet-conditions; metric-specific conditions retained in measurement_method",
+        "voltage_min_v": 0,
+        "voltage_max_v": 54,
+        "temperature_c": 20,
+        "current_profile_id": "vendor-rating-conditions-not-one-common-profile",
+        "fixture_id": "vendor-not-disclosed",
+        "instrument_id": "vendor-not-disclosed",
+        "calibration_id": "vendor-not-disclosed",
+        "raw_data_digest": null
+      },
+      "evidence": {
+        "evidence_id": "skeleton-skelmod-54v188f-datasheet-2026-06-05",
+        "class": "vendor",
+        "admission": "candidate",
+        "source_uri": "https://www.skeletontech.com/hubfs/01-DS-211229-SKELMOD-51V177F-1D.pdf?hsLang=en",
+        "sha256": null,
+        "independent_lab": false
+      },
+      "metrics": [
+        {
+          "name": "rated_capacitance",
+          "value": 188,
+          "unit": "F",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet; measurement method and temperature per datasheet",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "maximum_stored_energy",
+          "value": 76.14,
+          "unit": "Wh",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet maximum stored energy at 54 V rating",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "rated_initial_esr_10ms",
+          "value": 3,
+          "unit": "mOhm",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet rated DC 10 ms ESR",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "rated_initial_esr_1s",
+          "value": 3.4,
+          "unit": "mOhm",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet rated DC 1 s ESR",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "esr_based_power_1s",
+          "value": 162.6,
+          "unit": "kW",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet power calculated from 1 s ESR",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "rated_voltage",
+          "value": 54,
+          "unit": "V",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        }
+      ],
+      "manufacturing": {
+        "batch_id": "not-disclosed",
+        "process_revision": "not-disclosed",
+        "yield_status": "not_measured",
+        "accepted_device_cost": null
+      },
+      "disposition": "candidate"
+    }
+  ]
+}

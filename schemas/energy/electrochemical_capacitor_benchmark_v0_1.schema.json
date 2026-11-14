@@ -1,0 +1,447 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/energy/electrochemical_capacitor_benchmark_v0_1.schema.json",
+  "title": "Electrochemical capacitor benchmark record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_id",
+        "device_class",
+        "design",
+        "boundary",
+        "test_conditions",
+        "evidence",
+        "metrics",
+        "manufacturing",
+        "disposition",
+        "denominator"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "0.1.0"
+        },
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device_class": {
+          "enum": [
+            "edlc",
+            "pseudocapacitor",
+            "asymmetric_hybrid_capacitor",
+            "zinc_ion_hybrid_supercapacitor",
+            "lithium_ion_capacitor",
+            "dielectric_capacitor"
+          ]
+        },
+        "design": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "design_id",
+            "revision",
+            "positive_electrode_id",
+            "negative_electrode_id",
+            "electrolyte_id",
+            "separator_id",
+            "current_collector_id",
+            "package_id",
+            "process_id",
+            "physical_device_serial",
+            "material_lot_ids"
+          ],
+          "properties": {
+            "design_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "positive_electrode_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "negative_electrode_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "electrolyte_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "separator_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "current_collector_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "package_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "process_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "physical_device_serial": {
+              "type": "string",
+              "minLength": 1
+            },
+            "material_lot_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
+        },
+        "boundary": {
+          "enum": [
+            "active_material",
+            "electrode",
+            "complete_device",
+            "module",
+            "installed_system"
+          ]
+        },
+        "test_conditions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "protocol_id",
+            "voltage_min_v",
+            "voltage_max_v",
+            "temperature_c",
+            "current_profile_id",
+            "fixture_id",
+            "instrument_id",
+            "calibration_id",
+            "raw_data_digest"
+          ],
+          "properties": {
+            "protocol_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "voltage_min_v": {
+              "type": "number",
+              "minimum": 0
+            },
+            "voltage_max_v": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "temperature_c": {
+              "type": "number"
+            },
+            "current_profile_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fixture_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "instrument_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "calibration_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "raw_data_digest": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(sha256:[a-f0-9]{64})$"
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evidence_id",
+            "class",
+            "admission",
+            "source_uri",
+            "sha256",
+            "independent_lab"
+          ],
+          "properties": {
+            "evidence_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "class": {
+              "enum": [
+                "synthetic",
+                "assumption",
+                "vendor",
+                "literature",
+                "surrogate",
+                "calculation",
+                "physical_measurement",
+                "independent_laboratory"
+              ]
+            },
+            "admission": {
+              "enum": [
+                "candidate",
+                "evaluation_admitted",
+                "blocked",
+                "unknown"
+              ]
+            },
+            "source_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^(sha256:[a-f0-9]{64})$"
+            },
+            "independent_lab": {
+              "type": "boolean"
+            }
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "value",
+              "unit",
+              "boundary",
+              "measurement_method",
+              "uncertainty",
+              "status"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boundary": {
+                "enum": [
+                  "active_material",
+                  "electrode",
+                  "complete_device",
+                  "module",
+                  "installed_system"
+                ]
+              },
+              "measurement_method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uncertainty": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "status": {
+                "enum": [
+                  "measured",
+                  "vendor_reported",
+                  "literature_reported",
+                  "synthetic",
+                  "unknown",
+                  "invalid",
+                  "censored"
+                ]
+              }
+            }
+          }
+        },
+        "manufacturing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "batch_id",
+            "process_revision",
+            "yield_status",
+            "accepted_device_cost"
+          ],
+          "properties": {
+            "batch_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "process_revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "yield_status": {
+              "enum": [
+                "not_measured",
+                "measured",
+                "failed",
+                "unknown"
+              ]
+            },
+            "accepted_device_cost": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        },
+        "disposition": {
+          "enum": [
+            "candidate",
+            "blocked_missing_complete_device_boundary",
+            "measurement_only",
+            "evaluation_eligible",
+            "invalid",
+            "failed",
+            "censored"
+          ]
+        },
+        "denominator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mass_kg",
+            "volume_l",
+            "basis",
+            "included_components",
+            "excluded_components",
+            "status"
+          ],
+          "properties": {
+            "mass_kg": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "volume_l": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "basis": {
+              "enum": [
+                "active_material_only",
+                "electrode_basis",
+                "complete_device_weighed",
+                "module_vendor_reported",
+                "module_measured",
+                "installed_system_measured",
+                "unknown"
+              ]
+            },
+            "included_components": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "excluded_components": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "status": {
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "complete"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "mass_kg": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "volume_l": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "included_components": {}
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

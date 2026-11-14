@@ -1,0 +1,406 @@
+{
+  "schema_version": "0.1.0",
+  "as_of": "2026-11-14",
+  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-14; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline. New dynamic-load and operando-characterization sources are classified as research comparators, not commercial SOTA or Luminous results. Added two versioned public raw-data dataset records on 2026-11-14; the DataverseNO dataset is CC0, while the Zenodo record's explicit licence was not established from the inspected metadata and is not eligible for redistribution until verified.",
+  "sources": [
+    {
+      "id": "IEA-GEVO-2026",
+      "title": "Global EV Outlook 2026 — Electric vehicle batteries",
+      "url": "https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries",
+      "publisher": "International Energy Agency",
+      "published": "2026",
+      "evidence_class": "industry_report",
+      "permitted_use": "Market scale, deployment and source-reported upper cell energy density context",
+      "prohibited_inference": "Not matched independent cell testing or Luminous performance"
+    },
+    {
+      "id": "JACS-AMORPHOUS-HALIDE-2026",
+      "title": "Amorphous Halide Cathodes Enable 75C All-Solid-State Lithium Batteries",
+      "url": "https://pubs.acs.org/doi/10.1021/jacs.6c16957",
+      "publisher": "Journal of the American Chemical Society",
+      "published": "2026-10-26",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Research comparator for grain-boundary/interface transport and rate behavior",
+      "prohibited_inference": "Not an automotive pack, commercial cell or Luminous result"
+    },
+    {
+      "id": "LOW-PRESSURE-SULFIDE-ASSB-2026",
+      "title": "Low-pressure sulfide composite ASSB report",
+      "url": "https://www.nature.com/articles/s41467-026-79393-w",
+      "publisher": "Nature Communications",
+      "published": "2026-11-07",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Reported low-pressure complete-cell translation comparator",
+      "prohibited_inference": "Do not combine with different chemistry, loading, rate or pressure results"
+    },
+    {
+      "id": "EATON-XLR48",
+      "title": "XLR-48 Supercapacitor Module Data Sheet",
+      "url": "https://www.eaton.com/content/dam/eaton/products/electronic-components/resources/data-sheet/eaton-xlr-48-supercapacitor-module-data-sheet.pdf",
+      "publisher": "Eaton",
+      "published": "2023-07",
+      "evidence_class": "vendor_datasheet",
+      "permitted_use": "Commercial EDLC module specification under vendor test conditions",
+      "prohibited_inference": "Not an independent test or cell-level comparator"
+    },
+    {
+      "id": "IEC-62391-1-2022",
+      "title": "Fixed electric double-layer capacitors — Part 1: Generic specification",
+      "url": "https://webstore.iec.ch/en/publication/66557",
+      "publisher": "IEC",
+      "published": "2022-10-20",
+      "evidence_class": "international_standard",
+      "permitted_use": "EDLC test / inspection / measurement / quality-assessment reference",
+      "prohibited_inference": "Not a product certification by itself"
+    },
+    {
+      "id": "IEC-62391-2-2025",
+      "title": "Fixed electric double-layer capacitors — Part 2: Power-application EDLCs",
+      "url": "https://webstore.iec.ch/en/publication/82213",
+      "publisher": "IEC",
+      "published": "2025-02-13",
+      "evidence_class": "international_standard",
+      "permitted_use": "EDLC power-application performance, leakage-current measurement and maintain-voltage quality-assessment reference. Publicly searchable excerpts specify leakage at 20 °C ± 2 °C with rated voltage through a protective resistor ≤1 000 Ω, ≥12 h pre-discharge and 24 h electrification unless otherwise agreed; the separate 5.11 maintain-voltage test references IEC 62391-1:2022 6.4 and specifies ≥12 h pre-discharge, rated-voltage charging for 8 h, then a 24 h retention-voltage measurement unless otherwise agreed. Use the controlled normative standard and applicable detail specification for physical testing.",
+      "prohibited_inference": "These are standardized leakage and retention-voltage procedures, not a multi-month application standby-life guarantee or post-standby delivered-energy qualification; requirements depend on the applicable detail specification and product/application boundary."
+    },
+    {
+      "id": "UL-810A-2026",
+      "title": "UL 810A Electrochemical Capacitors, Second Edition",
+      "url": "https://shopulstandards.com/ProductDetail.aspx?productId=UL810A_2_S_20260203",
+      "publisher": "UL Standards & Engagement",
+      "published": "2026-02-03",
+      "evidence_class": "product_safety_standard",
+      "permitted_use": "Applicability assessment for electrochemical capacitor products in stated scope",
+      "prohibited_inference": "Not a blanket certification or hazardous-location approval"
+    },
+    {
+      "id": "ZIHSC-WILEY-2026",
+      "title": "Strategies and Emerging Directions for Next-Generation Zinc-Ion Hybrid Supercapacitors",
+      "url": "https://onlinelibrary.wiley.com/doi/full/10.1002/ente.70641",
+      "publisher": "Energy Technology",
+      "published": "2026-09-08",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Mechanism and challenge map for zinc-ion hybrid supercapacitors",
+      "prohibited_inference": "Not proof of manufacturing scale or commercial performance"
+    },
+    {
+      "id": "MULTIFUNCTIONAL-ZIC-2026",
+      "title": "Multifunctional zinc-ion capacitors for energy storage",
+      "url": "https://www.nature.com/articles/s43246-026-01152-7",
+      "publisher": "Communications Materials",
+      "published": "2026",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Critical review of multifunctional zinc-ion capacitor device boundaries and practical gaps",
+      "prohibited_inference": "Do not equate active-material-normalized figures with full-device results"
+    },
+    {
+      "id": "AQUEOUS-ZINC-REVIEW-2026-11",
+      "title": "Research Progress in Key Technologies and Energy Storage Applications of New Aqueous Zinc-Ion Batteries",
+      "url": "https://cje.ustb.edu.cn/en/article/doi/10.13374/j.issn2095-9389.2026.08.21.006",
+      "publisher": "Chinese Journal of Engineering",
+      "published": "2026-11",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Full-cell boundary and scale-dependent aqueous zinc-battery comparator",
+      "prohibited_inference": "Not a direct zinc-ion hybrid supercapacitor benchmark"
+    },
+    {
+      "id": "DOE-AUTOBOT-2026-11-10",
+      "title": "Accelerating Experiment Design Through Super Intelligence-Driven Robotics",
+      "url": "https://www.energy.gov/science/bes/articles/accelerating-experiment-design-through-super-intelligence-driven-robotics",
+      "publisher": "US Department of Energy / Berkeley Lab",
+      "published": "2026-11-10",
+      "evidence_class": "research_infrastructure_report",
+      "permitted_use": "Method comparator for budgeted experiment selection and robotic synthesis",
+      "prohibited_inference": "Perovskite material demonstration, not battery result"
+    },
+    {
+      "id": "SDL-REVIEW-2026",
+      "title": "The past, present and future of self-driving laboratories",
+      "url": "https://www.nature.com/articles/s41570-026-00847-2",
+      "publisher": "Nature Reviews Chemistry",
+      "published": "2026-07-31",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Scalability, generalizability and provenance requirements for self-driving labs",
+      "prohibited_inference": "Not an electrochemical device performance result"
+    },
+    {
+      "id": "DISCOVERY-LEARNING-2026",
+      "title": "Discovery Learning predicts battery cycle life from minimal experiments",
+      "url": "https://www.nature.com/articles/s41586-025-09951-7",
+      "publisher": "Nature",
+      "published": "2026",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Battery design-lifetime prediction comparator on exact matched task",
+      "prohibited_inference": "Not Luminous prediction accuracy or universal transfer performance"
+    },
+    {
+      "id": "CSIR-ENERGY-TESTBED",
+      "title": "Energy storage testbed",
+      "url": "https://www.csir.co.za/what-we-do/natural-environment/energy/energy-storage-testbed",
+      "publisher": "CSIR",
+      "published": null,
+      "evidence_class": "institutional_capability_page",
+      "permitted_use": "Potential South African independent battery testing collaboration route",
+      "prohibited_inference": "Capacitor test capability and access not confirmed"
+    },
+    {
+      "id": "WITS-MERG",
+      "title": "Materials for Energy Research Group",
+      "url": "https://www.wits.ac.za/physics/research-areas/condensed-matter-experiment-and-material-science/materials-for-energy-research-groupmerg/",
+      "publisher": "University of the Witwatersrand",
+      "published": null,
+      "evidence_class": "institutional_capability_page",
+      "permitted_use": "Potential collaboration on materials, ion storage and supercapacitors",
+      "prohibited_inference": "No partnership or facility access agreed"
+    },
+    {
+      "id": "UP-CBNM",
+      "title": "Carbon Based Nano Materials Research Group",
+      "url": "https://www.up.ac.za/physics/carbon-based-nano-materials-research-group",
+      "publisher": "University of Pretoria",
+      "published": null,
+      "evidence_class": "institutional_capability_page",
+      "permitted_use": "Potential collaboration on porous carbon, graphene and supercapacitor research",
+      "prohibited_inference": "No partnership or facility access agreed"
+    },
+    {
+      "id": "ZIHSC-TRANSPORT-POUCH-2026",
+      "title": "Breaking the Kinetics–Loading Trade-Off in Zinc-Ion Hybrid Capacitors Through Synergistic Electron–Ion Transport Design",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/advs.76823",
+      "doi": "10.1002/advs.76823",
+      "publisher": "Advanced Science",
+      "authors": "Wu et al.",
+      "published": "2026-07-27",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Matched research comparator for 10 mg cm-2 carbon cathode loading, approximately 16.4 N/P ratio, 38.3 mAh g-1 at 10 A g-1 over 3000 cycles, and 2.82 Wh kg-1 reported device-level energy based on 0.746 g total device weight",
+      "prohibited_inference": "Not a universal ZIHSC benchmark or Luminous result; retain the paper's precise device denominator, cathode/coin/pouch distinction and test conditions"
+    },
+    {
+      "id": "SKELETON-SKELMOD-54V188F-2026",
+      "title": "SkelMod 51V / 54V188F Data Sheet",
+      "url": "https://www.skeletontech.com/hubfs/01-DS-2026-03-10-SKELMOD-54V188F-SM-1A.pdf?hsLang=en",
+      "publisher": "Skeleton Technologies",
+      "published": "2026-06-05",
+      "evidence_class": "vendor_datasheet",
+      "permitted_use": "Commercial EDLC module specification: 54 V, 188 F, 76.14 Wh maximum stored energy, 16 kg, 13.5 L, 3.0 mOhm 10 ms ESR and 3.4 mOhm 1 s ESR, 162.6 kW 1 s ESR-based power figure, integrated balancing/monitoring and CAN",
+      "prohibited_inference": "Vendor specifications, not independent usable-energy measurements; retain 54 V rated-energy basis and do not transfer cycle-life conditions stated for 51 V or 48 V variants to the 54 V variant"
+    },
+    {
+      "id": "ZIHSC-FOUR-PARAMETERS-2024",
+      "title": "Zinc Ion Hybrid Capacitors: Four Essential Parameters Determining Device Energy Density",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11672303/",
+      "doi": "10.1002/advs.202408997",
+      "publisher": "Advanced Science",
+      "authors": "Wu et al.",
+      "published": "2024-11-06",
+      "evidence_class": "peer_reviewed_perspective_and_device_model",
+      "permitted_use": "Model-informed parameter envelope: carbon loading 10–20 mg cm-2, carbon specific capacity >100 mAh g-1, N/P <20 and E/C <5 are jointly needed in the representative model to approach >30 Wh kg-1 cell energy density",
+      "prohibited_inference": "The representative model explicitly excludes stainless casing, springs and current-collecting plates; >30 Wh kg-1 is not a measured complete packaged-device result or direct SOTA claim"
+    },
+    {
+      "id": "ZIHSC-DUAL-GRADIENT-2026",
+      "title": "3D-Printed Dual-Gradient Gel Electrodes Synchronize Ion Transport and Active-Site Utilization for High-Energy Zinc-Ion Hybrid Supercapacitors",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/10.1002/adfm.78804",
+      "doi": "10.1002/adfm.78804",
+      "publisher": "Advanced Functional Materials",
+      "authors": "Meng et al.",
+      "published": "2026-10-05",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Research comparator for stepwise multi-ink 3D-printed dual-gradient MXene/polypyrrole@CNT gel electrodes: electrolyte-facing region with larger microlattice openings, lower micron-scale porosity and higher specific surface area; current-collector side with smaller openings, higher micron-scale porosity and coarser transport pores; micro-CT verification of geometry; COMSOL-predicted suppression of concentration polarization and homogenized reaction-current distribution; abstract-reported 42.7 mg cm-2 loading, 6.2 F cm-2 areal capacitance, 0.86 mWh cm-2 areal energy, 71.1% retention across a 40-fold current-density increase and 98.8% after 15,000 cycles",
+      "prohibited_inference": "COMSOL local reaction-current maps are simulated, not direct current measurements; micro-CT verifies geometry, not local reaction current. Abstract does not establish complete-device gravimetric/volumetric denominator, full inactive-mass or packaging boundary, process yield, independent-lab reproducibility or commercial performance. Data are stated by authors to be available from corresponding author on reasonable request; obtain supporting information and any needed data/rights before exact reproduction. Do not infer Wh/kg or Wh/L, and do not conflate with the distinct July 2026 carbon/Zn pouch-cell comparator."
+    },
+    {
+      "id": "STRUCTURAL-ZIHC-LOAD-BEARING-2026",
+      "title": "All 3D Printed Load-bearing Zn-ion Hybrid Supercapacitors",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/10.1002/adfm.76654",
+      "doi": "10.1002/adfm.76654",
+      "publisher": "Advanced Functional Materials",
+      "authors": "Fu et al.",
+      "published": "2026-06-19",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Research comparator for continuous-carbon-fibre prepreg 3D-printed load-bearing ZIHC framework; publisher abstract reports 2.4x areal capacitance over conventional LIG electrodes and PP/PVA semi-solid electrolyte ionic conductivity increasing from 0.5 to 4.2 mS cm-1 after supercritical foaming",
+      "prohibited_inference": "Abstract does not provide complete structural design allowables, stiffness/strength/fatigue, complete-device Wh/kg or Wh/L, full component mass, coupled mechanical-electrochemical ageing, independent-lab replication or commercial readiness. Review supporting information and request data under appropriate rights; do not infer structural credit or complete assembly mass savings from the abstract."
+    },
+    {
+      "id": "EATON-XLR51-2019",
+      "title": "XLR-51 51 V, 188 F Rugged Supercapacitor Module — Technical Data 10765",
+      "url": "https://www.eaton.com/content/dam/eaton/products/electronic-components/resources/data-sheet/eaton-xlr-51-supercapacitor-module-data-sheet.pdf",
+      "publisher": "Eaton",
+      "published": "2019-07",
+      "evidence_class": "vendor_datasheet",
+      "permitted_use": "Vendor comparator: 188 F, 51.3 V maximum working voltage, 8 mA nominal leakage at 20 °C after 72 h charge and hold, 1 500 h life test at +65 °C/51.3 Vdc and 1 000 000-cycle test under the stated conditions.",
+      "prohibited_inference": "Not independent measurement or a post-standby delivered-energy result. The 72 h charge-and-hold leakage endpoint is not equivalent to unpowered long-duration standby or application service; retain the datasheet's voltage, temperature, rest and cycling conditions."
+    },
+    {
+      "id": "SELF-DISCHARGE-MECHANISMS-REVIEW-2026",
+      "title": "How to Tackle the Killer of Supercapacitors: Self-Discharge",
+      "url": "https://onlinelibrary.wiley.com/doi/10.1002/tcr.70230",
+      "doi": "10.1002/tcr.70230",
+      "publisher": "The Chemical Record",
+      "authors": "Wu et al.",
+      "published": "2026-09-02",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Mechanism map for ohmic leakage, parasitic Faradaic reactions and charge redistribution; informs orthogonal diagnostics and mechanism-identifiability experiments.",
+      "prohibited_inference": "Review article with no generated dataset; does not establish a new device result, uniquely identify mechanisms from voltage decay alone, or demonstrate a Luminous mitigation."
+    },
+    {
+      "id": "SUPERCAPACITORS-NONEQUILIBRIUM-2026",
+      "title": "Supercapacitors Under Nonequilibrium Conditions: Mechanisms and Design Principles",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/10.1002/adma.75460",
+      "doi": "10.1002/adma.75460",
+      "publisher": "Advanced Materials",
+      "authors": "Xu and Yang",
+      "published": "2026-10-21",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Mechanism map for transition and dynamic operating conditions; identifies transport mismatch, interfacial instability and thermomechanical coupling under floating states, high-frequency cycling, rapid charge/discharge, wide temperature windows and high-voltage regimes.",
+      "prohibited_inference": "Review, not a new supercapacitor device dataset or proof that a specific Luminous architecture mitigates these mechanisms; exact quantitative design claims require primary sources and matched experiments."
+    },
+    {
+      "id": "EPRI-BESS-RELIABLE-ROADMAP",
+      "title": "Battery Energy Storage Roadmap — RELIABLE",
+      "url": "https://storagewiki.epri.com/index.php/Battery_Energy_Storage_Roadmap/RELIABLE",
+      "publisher": "Electric Power Research Institute",
+      "published": null,
+      "evidence_class": "industry_reliability_framework",
+      "permitted_use": "Operational reliability framing for storage fleets: common data collection, performance/reliability characterization, outage reporting, monitoring/control, lifecycle and asset-management data.",
+      "prohibited_inference": "Battery-system reliability roadmap, not an EDLC device benchmark, manufacturer result or direct capacitor comparator."
+    },
+    {
+      "id": "RELIABILITY-BY-DESIGN-SUPERCAP-2027",
+      "title": "Reliability-by-design for deployable next-generation supercapacitors: degradation, harsh-environment operation, sustainability, and AI-guided lifetime prediction",
+      "url": "https://www.sciencedirect.com/science/article/pii/S0079642526001908",
+      "doi": "10.1016/j.pmatsci.2026.101843",
+      "publisher": "Progress in Materials Science",
+      "authors": "Shah et al.",
+      "published": "2027-03",
+      "publication_status": "forthcoming_at_2026-11-13_not_eligible_for_current_sota",
+      "evidence_class": "peer_reviewed_review_forthcoming",
+      "permitted_use": "Forward literature watch only: publisher and institutional records specify March 2027 volume publication; abstract describes reliability-by-design and a five-gate 5R readiness framework.",
+      "prohibited_inference": "Not published as of the 2026-11-13 benchmark cutoff; do not cite as current SOTA or as an independently validated result. Review reports no generated dataset."
+    },
+    {
+      "id": "SUPERCAP-DYNAMICS-EXPERIMENT-2026",
+      "title": "Experimental investigation of supercapacitor dynamics: charge–discharge performance analysis under system uncertainties",
+      "url": "https://doi.org/10.1080/19397038.2026.2720202",
+      "doi": "10.1080/19397038.2026.2720202",
+      "publisher": "Taylor & Francis",
+      "published": "2026-08-24",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "permitted_use": "Dynamic-load and uncertainty comparator. The paper reports a 20-cell pack of series-connected 2.7 V, 100 F cells (54 V nominal), an approximately 54 V to 33 V open-circuit voltage decline over 24 h at 25 °C in its setup, effective capacitance falling from 99% of nominal at 1 A to 77% at 10 A constant current and 60% at 200 W constant power, plus a two-branch equivalent-circuit model reducing voltage-prediction RMSE by 49%–83% across the evaluated conditions.",
+      "prohibited_inference": "Single study and setup; do not use its 24 h decline or 60%–77% high-rate effective-capacitance values as a universal EDLC decay/derating law, product rating or SOTA value. The two-branch RMSE result is in the authors' evaluated cases and is not a cross-device generalization claim. Preserve exact load, device, temperature, uncertainty and measurement boundaries.",
+      "journal": "International Journal of Sustainable Engineering",
+      "authors": "Mohammed Shijas V.; Santanu Kumar Dash"
+    },
+    {
+      "id": "SUPERCAP-DYNAMICS-OPERANDO-REVIEW-2026",
+      "title": "Supercapacitor dynamics: Mechanisms, architectures, and advanced in-situ characterizations for next-generation energy storage",
+      "url": "https://doi.org/10.1016/j.ccr.2025.217268",
+      "doi": "10.1016/j.ccr.2025.217268",
+      "publisher": "Elsevier",
+      "published": "2026-02-15",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Operando and multimodal characterization roadmap spanning optical, electrochemical, magnetic, gravimetric and neutron methods; highlights unresolved standardization, spatiotemporal resolution, high-throughput analysis and industrial translation challenges.",
+      "prohibited_inference": "Review, not a primary EDLC device performance dataset or evidence that any particular Luminous diagnostic stack is validated.",
+      "journal": "Coordination Chemistry Reviews",
+      "authors": "Fang Yuan et al."
+    },
+    {
+      "id": "DATAVERSE-CARBON-ENERGY-RAW-2026",
+      "title": "Electrochemical and Structural Data of Carbon-Based Materials for Energy Storage",
+      "url": "https://doi.org/10.18710/F4NFMJ",
+      "doi": "10.18710/F4NFMJ",
+      "publisher": "DataverseNO / University of South-Eastern Norway",
+      "authors": "Guoli Zhang; Chenglu Wei",
+      "published": "2026-05-08",
+      "dataset_version": "1.0",
+      "evidence_class": "public_research_dataset",
+      "license": "CC0 1.0 Universal",
+      "permitted_use": "External raw-data reproduction after local file checksum and header verification. Version 1.0 lists 26 public files including CV, GCD, EIS, cycling, XRD, Raman, SEM and BET files. Selected file-level records: CyclicVoltammetry_PCNS_TemperatureComparison_50mVs.csv, MD5 42631fe50e35001dfcfd474f99db37dd; GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv, MD5 88bc3dc26bd37971d7ca4a80ed79f290; ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv, MD5 4ef9d5efe0519c599a03b6527511c54c.",
+      "prohibited_inference": "Materials / electrochemical characterization dataset, not a full EDLC module, installed system, standby-reliability or sequential-reserve benchmark. Do not infer module Wh/kg, Wh/L, power, service availability, physical calibration provenance or Luminous performance. Preserve dataset version and each file's own DOI/MD5; verify downloaded bytes and actual CSV columns before analysis. Repository MD5 values and file persistent IDs are metadata captured from the public version 1.0 page; no local file bytes or SHA-256 have yet been verified.",
+      "file_records": [
+        {
+          "file_name": "CyclicVoltammetry_PCNS_TemperatureComparison_50mVs.csv",
+          "persistent_id": "10.18710/F4NFMJ/RREE4O",
+          "repository_md5": "42631fe50e35001dfcfd474f99db37dd",
+          "local_sha256_verified": false,
+          "size_display": "220.4 KB"
+        },
+        {
+          "file_name": "GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv",
+          "persistent_id": "10.18710/F4NFMJ/8LHNEC",
+          "repository_md5": "88bc3dc26bd37971d7ca4a80ed79f290",
+          "local_sha256_verified": false,
+          "size_display": "3.9 MB"
+        },
+        {
+          "file_name": "ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv",
+          "persistent_id": "10.18710/F4NFMJ/QKZMNC",
+          "repository_md5": "4ef9d5efe0519c599a03b6527511c54c",
+          "local_sha256_verified": false,
+          "size_display": "2.9 KB"
+        }
+      ],
+      "local_download_status": "not_downloaded_in_this_work_increment"
+    },
+    {
+      "id": "ZENODO-TIO2-AC-FLEX-SUPERCAP-2026",
+      "title": "Dataset for publication: Charge-storage evolution of TiO2 ALD-coated AC flexible supercapacitors over long-term cycling",
+      "url": "https://doi.org/10.5281/zenodo.22106814",
+      "doi": "10.5281/zenodo.22106814",
+      "publisher": "Zenodo",
+      "authors": "Remuel Isaac Vitto; Hamed Pourkheirollah; Jari Keskinen; Paul Berger; Matti Mäntysalo",
+      "published": "2026-08-26",
+      "dataset_version": "v2",
+      "evidence_class": "public_research_dataset",
+      "license": "not verified from inspected public record; no redistribution until verified",
+      "permitted_use": "External reproducibility candidate. Deposit describes pristine activated-carbon and TiO2 ALD-coated symmetric flexible supercapacitors (60 and 100 ALD cycles), GCD long-term cycling to 10,000 cycles at low/high current density, CV at varying scan rates, Trasatti analysis and before/after MACCOR raw data. File inventory includes 0.1 A/g and 1.0 A/g long-term cycling, CV, MACCOR data before/after long-term cycling, and analysis/graph archives.",
+      "prohibited_inference": "Do not redistribute or mirror until the dataset's explicit licence/terms are confirmed. Flexible research devices are not commercial EDLC modules or installed systems; cycle retention and electrode/cell results do not establish standby-service or repeated-call reliability. Preserve the exact version and file checksums after licensed retrieval.",
+      "file_records": [
+        {
+          "file_name": "0.1Ag Long-term Cycling.zip",
+          "repository_md5": "a4b3f9b0408c53726f631917056504a4",
+          "size_display": "174.1 kB",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "1.0Ag Long-term Cycling.zip",
+          "repository_md5": "d15048417ce7f351fdf573c83edd8a36",
+          "size_display": "277.4 kB",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "All Data and Graphs.opju",
+          "repository_md5": "eacdc0b6251057ddaecbc65bd0ee6cc6",
+          "size_display": "1.3 MB",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "All Data and Graphs.zip",
+          "repository_md5": "7774ee54d6ea0cf4e31b1914c0698522",
+          "size_display": "1.6 MB",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "CV.zip",
+          "repository_md5": "edd70a94907c301b284e0965e80d5bf6",
+          "size_display": "402.2 kB",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "MACCOR Data After LTC.zip",
+          "repository_md5": "8e98f3445744d92cc3601d0d9ecbfcdf",
+          "size_display": "3.3 MB",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "MACCOR Data Before LTC.zip",
+          "repository_md5": "741e8d7c8d4099b1b5052606cc1e1a92",
+          "size_display": "6.0 MB",
+          "local_sha256_verified": false
+        }
+      ],
+      "rights_status": "Zenodo public record Rights section did not expose a licence value at inspection time; redistribution not authorized by this register.",
+      "local_download_status": "not_downloaded_in_this_work_increment"
+    }
+  ]
+}
