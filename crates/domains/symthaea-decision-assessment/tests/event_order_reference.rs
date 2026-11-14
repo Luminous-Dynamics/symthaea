@@ -162,6 +162,10 @@ fn baseline_qualification() -> EventTraceQualification {
         completeness: GateState::Pass,
         causal_ordering: GateState::Pass,
         stop_disposition: GateState::NotApplicable,
+        stop_disposition_receipt_ref: None,
+        stop_disposition_receipt_sha256: None,
+        stop_disposition_trigger_event_id: None,
+        stop_disposition_event_id: None,
     }
 }
 
@@ -329,6 +333,46 @@ fn invalid_partial_orders_fail_closed() {
         latest_unix_ms: 400,
     });
     expect_invalid(&[start, malformed_interval], &base);
+}
+
+#[test]
+fn stop_disposition_pass_is_bound_to_exact_receipt_trigger_and_discharge() {
+    let data = fixture();
+    let case = data["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "EO-POS-001")
+        .unwrap();
+    let events = parse_events(&case["events"]);
+    let mut qualification = parse_qualification(&case["qualification"]);
+
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::Safe);
+    assert!(!report.block_irreversible_actions);
+
+    qualification.stop_disposition_event_id = Some("different-discharge".to_owned());
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report
+        .reason_codes
+        .contains(&"STOP_DISPOSITION_RECEIPT_BINDING_INVALID".to_owned()));
+
+    qualification = parse_qualification(&case["qualification"]);
+    qualification.stop_disposition_trigger_event_id = Some("different-trigger".to_owned());
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report
+        .reason_codes
+        .contains(&"STOP_DISPOSITION_RECEIPT_BINDING_INVALID".to_owned()));
+
+    qualification = parse_qualification(&case["qualification"]);
+    qualification.stop_disposition_receipt_sha256 = Some("not-a-digest".to_owned());
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report
+        .reason_codes
+        .contains(&"STOP_DISPOSITION_RECEIPT_BINDING_INVALID".to_owned()));
 }
 
 #[test]
