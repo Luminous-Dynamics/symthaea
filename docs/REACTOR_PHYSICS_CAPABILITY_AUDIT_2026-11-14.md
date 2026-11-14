@@ -108,3 +108,23 @@ See Spark's docs/CROSS_REPOSITORY_REACTOR_WORKSTREAM_2026.md and Symtropy's reac
 - [Symtropy SHIPYARD-WELD-PHYSICS-VVUQ-001 #4614](https://github.com/Luminous-Dynamics/symtropy/issues/4614)
 
 **Claim boundary:** This audit is based on source inspection. It does not qualify a reactor model, a physical component, a neutron source, a plasma process, a manufacturing procedure or a safety case.
+
+
+## Follow-up cross-repository integrity findings (14 Nov 2026)
+
+### Stale vendored Spark snapshot
+
+A search across Symthaea found that the excluded `crates/domains/spark-engine` copy still contains the old Maxwellian prefactor (`3.727e-12`), old `DD_S_FACTOR = 55` and the withdrawn room-temperature/anomaly-gap headline. The vendored README says the crate is excluded from the workspace and has zero consumers.
+
+Do not sync or maintain a second independent nuclear-reaction implementation. The standalone Spark repository is the numerical owner. Its correction is in draft [Spark PR #7](https://github.com/Luminous-Dynamics/spark-engine/pull/7), which has not yet been merged or CI-verified. The Symthaea vendored README is being explicitly marked stale and non-authoritative. Follow-up: [SPARK-VENDORED-SNAPSHOT-DRIFT-001 #12088](https://github.com/Luminous-Dynamics/symthaea/issues/12088).
+
+### Trigger catalogue estimates are not qualification records
+
+The active-but-dead-code-gated `physics/trigger_systems.rs` catalogue embeds USD estimates, broad cost categories, trigger rates and TRLs (including high TRL values for enabling technologies). These values currently do not carry a complete source/date/scope/uncertainty chain for the proposed lattice-fusion use case. An X-ray tube, piezo transducer or electron gun can be a mature component without its proposed use in a lattice-mediated nuclear-reaction system being mature.
+
+Treat this catalogue as exploratory taxonomy, not an engineering-ready technology assessment. Numeric inputs must have source, date, configuration, geographic/currency scope and uncertainty; missing/unqualified values must remain unknown and cannot silently improve ranking scores. Follow-up: [REACTOR-TRIGGER-ESTIMATE-QUALIFICATION-001 #12089](https://github.com/Luminous-Dynamics/symthaea/issues/12089).
+
+The active reactor research ownership remains:
+- Spark standalone: nuclear reaction calculation and LCF benchmark data.
+- Symthaea: scientific hypotheses, model adequacy and evidence synthesis.
+- Symtropy: solver/run receipts and energy/material boundary assurance.
