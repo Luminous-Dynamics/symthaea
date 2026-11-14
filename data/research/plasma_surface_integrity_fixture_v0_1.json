@@ -3790,8 +3790,8 @@
         ]
       },
       "claimed_bond_outcome_passed": true,
-      "expected_disposition": "REJECTED",
-      "rationale": "A thin-film tensile method receipt cannot claim an unsupported FRP material class."
+      "expected_disposition": "BLOCKED",
+      "rationale": "A thin-film tensile method receipt outside its registered material class is blocked pending an applicability review."
     }
   ]
 }
