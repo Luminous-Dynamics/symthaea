@@ -13,7 +13,7 @@
       "dtea:evidence:E2"
     ],
     "later_correction_events": [
-      "event-005"
+      "event-006"
     ],
     "current_state_of_E1": "stale",
     "decision_time_state_of_E1": "admissible",
@@ -21,7 +21,14 @@
     "admissible_actor_authority_evidence": "dtea:evidence:authority-1",
     "actor_authority_disposition": "source_declares_authorized",
     "actor_authority_scope": "release:staging",
-    "actor_authority_policy_version": "release-policy-v3"
+    "actor_authority_policy_version": "release-policy-v3",
+    "authority_evidence_event": "event-002",
+    "authority_evidence_source_observed_at": "2026-11-14T08:55:00Z",
+    "authority_evidence_available_to_actor_at": "2026-11-14T09:00:00Z",
+    "authority_validity_window": [
+      "2026-11-01T00:00:00Z",
+      "2026-11-14T17:00:00Z"
+    ]
   },
   "negative_controls": [
     {
@@ -91,8 +98,18 @@
     },
     {
       "id": "DTEA-NC-14",
-      "mutation": "Change authority policy_version without changing the decision policy_version.",
-      "expected": "reject_authority_policy_mismatch"
+      "mutation": "Backdate authority source_observed_at after available_to_actor_at or after the authority-evidence-recorded event.",
+      "expected": "reject_authority_observed_after_availability"
+    },
+    {
+      "id": "DTEA-NC-15",
+      "mutation": "Remove the authority_evidence_recorded event while retaining the decision's actor_authority reference.",
+      "expected": "reject_unrecorded_authority_evidence"
+    },
+    {
+      "id": "DTEA-NC-16",
+      "mutation": "Change the authority evidence node actor/scope/policy or validity while leaving the decision projection unchanged.",
+      "expected": "reject_owner_record_projection_mismatch"
     }
   ],
   "metrics": [
@@ -106,5 +123,5 @@
     "decision-time authority-window admissibility",
     "late-arriving or expired authority evidence rejection"
   ],
-  "claim_ceiling": "Synthetic known-answer case only. No general decision correctness, institutional governance, compliance or real-world assurance claim. Authority is synthetic and source-declared; fixture does not authenticate actor rights or owner-native Mycelix authority."
+  "claim_ceiling": "Synthetic known-answer case only. The authority evidence is a synthetic, source-declared Mycelix-shaped reference, not a real owner-native grant or cryptographically authenticated record. No general decision correctness, institutional governance, compliance or real-world assurance claim."
 }
