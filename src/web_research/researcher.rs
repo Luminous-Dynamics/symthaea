@@ -30,7 +30,7 @@ pub struct WebResearcher {
     extractor: ContentExtractor,
     /// Epistemic verifier
     verifier: EpistemicVerifier,
-    /// Serialize arXiv requests and enforce the provider's recommended spacing.
+    /// Space arXiv request starts within this researcher instance.
     arxiv_rate_limiter: tokio::sync::Mutex<Instant>,
 }
 
