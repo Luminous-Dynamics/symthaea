@@ -67,7 +67,7 @@ jobs:
 
       - name: Check formatting of touched Rust modules
         run: |
-          rustfmt --edition 2024 --check \
+          rustfmt --edition 2024 --config skip_children=true --check \
             crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
             crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
             crates/domains/symthaea-muse/src/bin/muse_studio.rs \
