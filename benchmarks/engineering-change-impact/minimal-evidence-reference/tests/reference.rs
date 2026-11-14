@@ -83,6 +83,22 @@ fn irrelevant_injection_sha256(evidence: &[Value]) -> String {
     format!("{:x}", Sha256::digest(serde_json::to_vec(&projection).unwrap()))
 }
 
+fn candidate_visible_manifest_sha256(case: &Value, world: &Value) -> String {
+    let inventory_digest = world
+        .get("source_inventory_sha256")
+        .and_then(Value::as_str)
+        .or_else(|| case.get("source_inventory_sha256").and_then(Value::as_str))
+        .unwrap_or_else(|| panic!("missing source inventory digest for {}", string_at(case, "id")));
+    let mut evidence_ids = visible_ids(case, world);
+    evidence_ids.sort();
+    let projection = json!({
+        "domain": "symthaea.engineering-decision-min-evidence.candidate-visible-set.v0.1",
+        "source_inventory_sha256": inventory_digest,
+        "evidence_ids": evidence_ids
+    });
+    format!("{:x}", Sha256::digest(serde_json::to_vec(&projection).unwrap()))
+}
+
 fn combinations(values: &[String], choose: usize) -> Vec<Vec<String>> {
     fn recurse(
         values: &[String],
@@ -371,6 +387,13 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                         "{case_id} / {}: canonical source-inventory digest",
                         string_at(world, "world_id")
                     );
+                    assert!(digest_is_sha256(string_at(world, "candidate_visible_manifest_sha256")), "{case_id}: malformed candidate-visible digest");
+                    assert_eq!(
+                        string_at(world, "candidate_visible_manifest_sha256"),
+                        candidate_visible_manifest_sha256(case, world),
+                        "{case_id} / {}: candidate-visible evidence digest",
+                        string_at(world, "world_id")
+                    );
                     let visible = visible_ids(case, world);
                     let evidence = world_evidence(case, world);
                     let evidence_ids: BTreeSet<String> = evidence
@@ -403,6 +426,12 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                 other => panic!("{case_id}: unsupported paired relation {other}"),
             }
             if case.get("candidate_visible_evidence_ids").is_some() {
+                assert!(digest_is_sha256(string_at(case, "candidate_visible_manifest_sha256")), "{case_id}: malformed top-level candidate-visible digest");
+                assert_eq!(
+                    string_at(case, "candidate_visible_manifest_sha256"),
+                    candidate_visible_manifest_sha256(case, case),
+                    "{case_id}: top-level candidate-visible evidence digest"
+                );
                 if case.get("irrelevant_evidence_injection_count").and_then(Value::as_u64).unwrap_or(0) > 0 {
                     assert_eq!(
                         string_at(case, "irrelevant_evidence_injection_digest"),
@@ -454,6 +483,12 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                 );
             }
         } else if case.get("candidate_visible_evidence_ids").is_some() {
+            assert!(digest_is_sha256(string_at(case, "candidate_visible_manifest_sha256")), "{case_id}: malformed top-level candidate-visible digest");
+            assert_eq!(
+                string_at(case, "candidate_visible_manifest_sha256"),
+                candidate_visible_manifest_sha256(case, case),
+                "{case_id}: top-level candidate-visible evidence digest"
+            );
             let mut report = evaluate_world(case, case);
             if case_id == "ME-NEG-002" {
                 report.reason_codes.push("LAST_SUFFICIENT_ROOT_REMOVED".to_owned());
