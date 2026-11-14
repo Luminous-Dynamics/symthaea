@@ -55,7 +55,7 @@ A record represents one situated claim, not an entire worldview. It separates:
 
 ## 5. Proposed HMP-Bench
 
-HMP-Bench is a proposed suite, not an established benchmark or a claim of current superiority. It must be versioned, independently reviewed, leakage-tested and released only where dataset rights permit.
+HMP-Bench is a proposed suite, not an established benchmark or a claim of current superiority. It must be versioned, independently reviewed, leakage-tested and released only where dataset rights permit. A companion system-level suite, [Plurality Integrity under Interaction (PIB)](PLURALITY_INTEGRITY_BENCHMARK_V0_1.md), evaluates how multi-agent interaction changes evidence-supported human differences over time. Its 10-case fixture is synthetic-only and is not yet wired into the xtask auditors.
 
 | Track | What it measures | Core metrics |
 |---|---|---|
@@ -126,7 +126,7 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 
 1. Publish the four RFCs and shared schema/fixture; obtain independent review.
 2. Use the two Rust fixture audits (`cargo run -p xtask -- hmp-record-audit` and `cargo run -p xtask -- hmp-bench-audit`) and their negative-control tests; add a standards-compliant JSON Schema 2020-12 validator before claiming full schema validation.
-3. Extend the 14-case synthetic adversarial starter set across all nine HMP-Bench tracks; add blinded human-reviewed items only after permissions and review are in place.
+3. Extend the 14-case HMP-Bench starter set and 10-case PIB system-level fixture; wire explicit audits and add blinded human-reviewed items only after permissions and review are in place.
 4. Curate a small public-source pilot with explicit reuse rights and expert/community review; keep restricted content outside the public corpus.
 5. Run matched model baselines and publish per-track metrics.
 6. Only after review, integrate Mycelix permission enforcement, Sol-Atlas records, Symtropy experiment receipts and Symthaea retrieval/synthesis.
@@ -138,7 +138,7 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 | Shared programme contract | Proposed in this document |
 | JSON Schema | Included as a draft |
 | Synthetic example fixture | Included; not a real cultural record |
-| HMP-Bench synthetic adversarial starter set | Fourteen fictional edge-case fixtures across all nine registered tracks, including SOURCE, PSYCH and SOC; not a validated benchmark |
+| HMP-Bench synthetic adversarial starter set | Fourteen fictional edge-case fixtures across all nine registered tracks, including SOURCE, PSYCH and SOC; not a validated benchmark |\n| PIB system-level plurality fixture | Ten fictional multi-agent interaction and governance edge cases; not yet wired into the xtask auditors and not a validated benchmark |
 | Mycelix runtime permission enforcement | Not implemented by this RFC |
 | Sol-Atlas ingestion/catalog integration | Not implemented by this RFC |
 | Symtropy simulation runner | Not implemented by this RFC |
