@@ -699,6 +699,19 @@ mod tests {
             MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::MemberOfSet,
         );
         target.allowed_values = vec!["flute".to_owned(), "oboe".to_owned()];
+        let source_identity = MusicEditValidityConstraintV1 {
+            constraint_id: "change.from-original".to_owned(),
+            property: MusicEditValidityPropertyV1::InstrumentIdentity,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::DifferentFrom,
+            expected_value: Some("clarinet".to_owned()),
+            allowed_values: Vec::new(),
+            minimum: None,
+            maximum: None,
+            unit: None,
+            evidence: MusicEditValidityEvidenceV1::Symbolic,
+            rationale: "the new instrument differs from the source instrument".to_owned(),
+        };
         let variation = MusicEditValidityConstraintV1 {
             constraint_id: "variation.dynamic-range".to_owned(),
             property: MusicEditValidityPropertyV1::DynamicContour,
@@ -728,10 +741,11 @@ mod tests {
             operation: MusicEditOperationV1::ReplaceInstrument,
             target_scope: MusicEditTargetScopeV1::Instrument,
             target_selector_sha256: digest(4),
-            requested_change: vec![target],
+            requested_change: vec![source_identity, target],
             protected_invariants: vec![
                 constraint("protect.harmony", MusicEditValidityPropertyV1::Harmony, MusicEditValidityScopeV1::Composition, MusicEditValidityRelationV1::NoChange),
                 constraint("protect.melody", MusicEditValidityPropertyV1::MelodyPitch, MusicEditValidityScopeV1::UnaffectedParts, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-lineage", MusicEditValidityPropertyV1::EventLineage, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
             ],
             permitted_variations: vec![variation],
             forbidden_changes: vec![
@@ -751,35 +765,30 @@ mod tests {
 
 
     #[test]
-    fn operation_contract_requires_target_specific_instrument_change_and_event_lineage() {
+    fn operation_contract_requires_target_identity_and_event_lineage() {
         let mut envelope = valid_envelope();
-        assert!(validate_music_edit_validity_envelope_v1(&envelope)
-            .contains(&MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+
+        envelope.protected_invariants.retain(|constraint| {
+            constraint.property != MusicEditValidityPropertyV1::EventLineage
+        });
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
                 operation: MusicEditOperationV1::ReplaceInstrument,
                 property: MusicEditValidityPropertyV1::EventLineage,
-            }));
-        envelope.protected_invariants.push(constraint(
-            "protect.part-lineage",
-            MusicEditValidityPropertyV1::EventLineage,
-            MusicEditValidityScopeV1::TargetPart,
-            MusicEditValidityRelationV1::NoChange,
+            }
         ));
-        envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
-        envelope.requested_change.push(MusicEditValidityConstraintV1 {
-            constraint_id: "change.from-original".to_owned(),
-            property: MusicEditValidityPropertyV1::InstrumentIdentity,
-            scope: MusicEditValidityScopeV1::TargetPart,
-            relation: MusicEditValidityRelationV1::DifferentFrom,
-            expected_value: Some("clarinet".to_owned()),
-            allowed_values: Vec::new(),
-            minimum: None,
-            maximum: None,
-            unit: None,
-            evidence: MusicEditValidityEvidenceV1::Symbolic,
-            rationale: "replace the prior instrument identity".to_owned(),
+
+        envelope = valid_envelope();
+        envelope.requested_change.retain(|constraint| {
+            constraint.relation != MusicEditValidityRelationV1::DifferentFrom
         });
-        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
-        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::ReplaceInstrument,
+                property: MusicEditValidityPropertyV1::InstrumentIdentity,
+            }
+        ));
     }
 
     #[test]
