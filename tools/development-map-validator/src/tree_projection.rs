@@ -5,18 +5,18 @@
 //! follows symlinks/submodules, invokes Git/Cargo/rustc, or executes code.
 
 use std::collections::{BTreeMap, BTreeSet};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use crate::cargo_manifest::CargoManifestProjection;
 use crate::rust_syntax::RustFileProjection;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RepositoryTreeAnchor {
     pub repository_full_name: String,
     pub revision: String,
     pub tree_oid: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RepositoryTreeEntry {
     pub path: String,
     pub mode: String,
@@ -24,7 +24,8 @@ pub struct RepositoryTreeEntry {
     pub oid: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum InventoryCompleteness {
     Complete,
     Partial,
@@ -39,7 +40,7 @@ impl InventoryCompleteness {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TreeProjectionCoverage {
     pub cargo_manifests_in_inventory: usize,
     pub cargo_manifests_projected: usize,
@@ -47,7 +48,7 @@ pub struct TreeProjectionCoverage {
     pub rust_sources_projected: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RepositoryTreeComposition {
     pub schema_version: String,
     pub authority: String,
@@ -60,6 +61,30 @@ pub struct RepositoryTreeComposition {
     pub unprojected_rust_sources: Vec<String>,
     pub coverage: TreeProjectionCoverage,
     pub limitations: Vec<String>,
+}
+
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RepositoryTreeCompositionInput {
+    pub source: RepositoryTreeAnchor,
+    pub tree_entries: Vec<RepositoryTreeEntry>,
+    pub cargo_manifests: Vec<CargoManifestProjection>,
+    pub rust_files: Vec<RustFileProjection>,
+    pub inventory_completeness: InventoryCompleteness,
+}
+
+/// Parse and compose a JSON request. This only deserializes data and performs
+/// structural identity checks; it never fetches paths or executes repository code.
+pub fn compose_repository_tree_json(raw_json: &str) -> Result<RepositoryTreeComposition, String> {
+    let request: RepositoryTreeCompositionInput = serde_json::from_str(raw_json)
+        .map_err(|error| format!("tree composition input JSON parse error: {error}"))?;
+    compose_repository_tree(
+        request.source,
+        request.tree_entries,
+        request.cargo_manifests,
+        request.rust_files,
+        request.inventory_completeness,
+    )
 }
 
 fn valid_git_oid(value: &str) -> bool {
@@ -348,6 +373,22 @@ mod tests {
             entry("src", "040000", "tree", 'e'),
             entry("README.md", "100644", "blob", 'f'),
         ]
+    }
+
+
+    #[test]
+    fn accepts_a_serialized_json_composition_request() {
+        let request = RepositoryTreeCompositionInput {
+            source: source_anchor(),
+            tree_entries: base_entries(),
+            cargo_manifests: vec![manifest("Cargo.toml", 'c')],
+            rust_files: vec![rust_file("src/lib.rs", 'd')],
+            inventory_completeness: InventoryCompleteness::Complete,
+        };
+        let json = serde_json::to_string(&request).expect("serialize request");
+        let result = compose_repository_tree_json(&json).expect("compose JSON request");
+        assert_eq!(result.coverage.cargo_manifests_projected, 1);
+        assert_eq!(result.coverage.rust_sources_projected, 1);
     }
 
     #[test]

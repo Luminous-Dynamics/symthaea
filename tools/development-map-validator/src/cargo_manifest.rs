@@ -4,10 +4,10 @@
 //! workspace globs, executes build scripts, expands procedural macros, or
 //! promotes manifest declarations to compiler-resolved relationships.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use toml::Value;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ManifestAnchor {
     pub repository_full_name: String,
     pub revision: String,
@@ -16,7 +16,7 @@ pub struct ManifestAnchor {
     pub blob_oid: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PackageDeclaration {
     pub name: String,
     pub version: Option<String>,
@@ -25,7 +25,7 @@ pub struct PackageDeclaration {
     pub workspace_inherited_fields: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct WorkspaceDeclaration {
     /// Literal member patterns from Cargo.toml; these are not glob-expanded.
     pub members: Vec<String>,
@@ -36,7 +36,7 @@ pub struct WorkspaceDeclaration {
     pub shared_package_field_names: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct DependencyDeclaration {
     pub alias: String,
     pub package: Option<String>,
@@ -55,14 +55,14 @@ pub struct DependencyDeclaration {
     pub features: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FeatureDeclaration {
     pub name: String,
     /// Cargo feature expressions are preserved, not expanded or interpreted.
     pub members: Vec<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TargetDeclaration {
     pub kind: String,
     pub name: Option<String>,
@@ -74,14 +74,14 @@ pub struct TargetDeclaration {
     pub bench: Option<bool>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct BuildScriptDeclaration {
     /// One of: disabled, explicit_path, default_convention_unobserved, not_applicable.
     pub state: String,
     pub declared_path: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct CargoManifestProjection {
     pub schema_version: String,
     pub authority: String,

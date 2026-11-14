@@ -6,14 +6,14 @@
 
 use proc_macro2::Span;
 use quote::ToTokens;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use syn::{
     spanned::Spanned,
     visit::{self, Visit},
     Attribute, File, Visibility,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RustFileAnchor {
     pub repository_full_name: String,
     pub revision: String,
@@ -22,7 +22,7 @@ pub struct RustFileAnchor {
     pub blob_oid: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RustSourceSpan {
     /// One-based line number.
     pub start_line: usize,
@@ -45,7 +45,7 @@ fn source_span(span: Span) -> RustSourceSpan {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RustSyntaxFact {
     pub source_order: usize,
     pub source_span: RustSourceSpan,
@@ -59,7 +59,7 @@ pub struct RustSyntaxFact {
     pub declaration: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RustFileProjection {
     pub schema_version: String,
     pub authority: String,

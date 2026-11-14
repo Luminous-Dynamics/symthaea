@@ -3,6 +3,7 @@ use std::{env, fs, process};
 use development_map_validator::{
     cargo_manifest::{project_cargo_manifest, ManifestAnchor},
     rust_syntax::{project_rust_file, RustFileAnchor},
+    tree_projection::compose_repository_tree_json,
     validate_document_json,
 };
 
@@ -11,10 +12,11 @@ fn usage() {
     eprintln!("  development-map-validator <snapshot.json>");
     eprintln!("  development-map-validator cargo-manifest <Cargo.toml> <repository> <revision> <tree-oid> <manifest-path> <blob-oid>");
     eprintln!("  development-map-validator rust-file <source.rs> <repository> <revision> <tree-oid> <source-path> <blob-oid>");
+    eprintln!("  development-map-validator tree-compose <request.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
-    eprintln!("projects a Cargo manifest or Rust source file as read-only evidence.");
-    eprintln!("Neither projection mode invokes Cargo or executes repository code.");
+    eprintln!("projects a Cargo manifest or Rust source file, or composes exact source projections into a Git tree snapshot.");
+    eprintln!("No mode invokes Cargo, rustc, build scripts, tests or repository code.");
     eprintln!("Git identities are recorded and syntax-checked, not authenticated.");
 }
 
@@ -131,6 +133,35 @@ fn project_rust_source_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn compose_repository_tree_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let request_file = &args[1];
+    let input = match read_input(request_file, "EGDDM-TREE-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match compose_repository_tree_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR EGDDM-TREE-001 {request_file}: {error}");
+            1
+        }
+        Ok(composition) => match serde_json::to_string_pretty(&composition) {
+            Ok(output) => {
+                println!("{output}");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR EGDDM-TREE-JSON-001 {request_file}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -144,6 +175,7 @@ fn main() {
     let code = match args[0].as_str() {
         "cargo-manifest" => project_cargo_manifest_file(&args),
         "rust-file" => project_rust_source_file(&args),
+        "tree-compose" => compose_repository_tree_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();
