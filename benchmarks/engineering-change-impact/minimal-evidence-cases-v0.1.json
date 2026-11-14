@@ -851,7 +851,8 @@
                 ]
               ]
             }
-          }
+          },
+          "source_inventory_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
         },
         {
           "world_id": "SUBSTITUTED",
@@ -895,7 +896,8 @@
                 ]
               ]
             }
-          }
+          },
+          "source_inventory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
       ],
       "expected": {
