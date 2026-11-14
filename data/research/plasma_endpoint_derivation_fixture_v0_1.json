@@ -121,7 +121,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-VALID-BASE-AGED",
@@ -179,7 +181,9 @@
                 "RET-VALID-BASE-A-2",
                 "RET-VALID-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -222,7 +226,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-VALID-CAND-AGED",
@@ -280,7 +286,9 @@
                 "RET-VALID-CAND-A-2",
                 "RET-VALID-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -289,7 +297,7 @@
           "design_id": "RET-VALID-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005dd4",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005dd3",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dd6",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -297,8 +305,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "PASS",
       "expected_outcome": "EQUIVALENCE_ESTABLISHED",
@@ -358,7 +371,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-SAME-SPECIMEN-BASE-AGED",
@@ -416,7 +431,9 @@
                 "RET-SAME-SPECIMEN-BASE-A-2",
                 "RET-SAME-SPECIMEN-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -459,7 +476,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-SAME-SPECIMEN-CAND-AGED",
@@ -517,7 +536,9 @@
                 "RET-SAME-SPECIMEN-CAND-I-2",
                 "RET-SAME-SPECIMEN-CAND-I-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -526,7 +547,7 @@
           "design_id": "RET-SAME-SPECIMEN-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005de8",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005de7",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dea",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -534,8 +555,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -595,7 +621,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-WRONG-FORMULA-BASE-AGED",
@@ -653,7 +681,9 @@
                 "RET-WRONG-FORMULA-BASE-A-2",
                 "RET-WRONG-FORMULA-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -696,7 +726,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-WRONG-FORMULA-CAND-AGED",
@@ -754,7 +786,9 @@
                 "RET-WRONG-FORMULA-CAND-A-2",
                 "RET-WRONG-FORMULA-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -763,7 +797,7 @@
           "design_id": "RET-WRONG-FORMULA-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005dfc",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005dfb",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dfe",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -771,8 +805,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -832,7 +871,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-MISSING-CONDITION-BASE-AGED",
@@ -872,7 +913,9 @@
               }
             ],
             "mean_strength_mpa": 8,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -915,7 +958,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-MISSING-CONDITION-CAND-AGED",
@@ -973,7 +1018,9 @@
                 "RET-MISSING-CONDITION-CAND-A-2",
                 "RET-MISSING-CONDITION-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -982,7 +1029,7 @@
           "design_id": "RET-MISSING-CONDITION-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e10",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e0f",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e12",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -990,8 +1037,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
@@ -1051,7 +1103,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-INSUFFICIENT-CLUSTERS-BASE-AGED",
@@ -1109,7 +1163,9 @@
                 "RET-INSUFFICIENT-CLUSTERS-BASE-A-2",
                 "RET-INSUFFICIENT-CLUSTERS-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -1152,7 +1208,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-INSUFFICIENT-CLUSTERS-CAND-AGED",
@@ -1210,7 +1268,9 @@
                 "RET-INSUFFICIENT-CLUSTERS-CAND-A-2",
                 "RET-INSUFFICIENT-CLUSTERS-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -1219,7 +1279,7 @@
           "design_id": "RET-INSUFFICIENT-CLUSTERS-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e24",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e23",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e26",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -1227,8 +1287,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
@@ -1288,7 +1353,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-PROFILE-MISMATCH-BASE-AGED",
@@ -1346,7 +1413,9 @@
                 "RET-PROFILE-MISMATCH-BASE-A-2",
                 "RET-PROFILE-MISMATCH-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -1389,7 +1458,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-PROFILE-MISMATCH-CAND-AGED",
@@ -1447,7 +1518,9 @@
                 "RET-PROFILE-MISMATCH-CAND-A-2",
                 "RET-PROFILE-MISMATCH-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -1456,7 +1529,7 @@
           "design_id": "RET-PROFILE-MISMATCH-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e38",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e37",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e3a",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -1464,8 +1537,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -1525,7 +1603,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-RESULT-MISMATCH-BASE-AGED",
@@ -1583,7 +1663,9 @@
                 "RET-RESULT-MISMATCH-BASE-A-2",
                 "RET-RESULT-MISMATCH-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -1626,7 +1708,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-RESULT-MISMATCH-CAND-AGED",
@@ -1684,7 +1768,9 @@
                 "RET-RESULT-MISMATCH-CAND-A-2",
                 "RET-RESULT-MISMATCH-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -1693,7 +1779,7 @@
           "design_id": "RET-RESULT-MISMATCH-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e4c",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e4b",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e4e",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.95,
           "candidate_minus_baseline": -0.02,
@@ -1701,8 +1787,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -1762,7 +1853,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-MISSING-PLAN-BASE-AGED",
@@ -1820,7 +1913,9 @@
                 "RET-MISSING-PLAN-BASE-A-2",
                 "RET-MISSING-PLAN-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -1863,7 +1958,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-MISSING-PLAN-CAND-AGED",
@@ -1921,7 +2018,9 @@
                 "RET-MISSING-PLAN-CAND-A-2",
                 "RET-MISSING-PLAN-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -1930,7 +2029,7 @@
           "design_id": "RET-MISSING-PLAN-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e60",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e5f",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e62",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -1938,8 +2037,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
@@ -1999,7 +2103,9 @@
               }
             ],
             "mean_strength_mpa": 0,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-AGED",
@@ -2057,7 +2163,9 @@
                 "RET-NONPOSITIVE-DENOMINATOR-BASE-A-2",
                 "RET-NONPOSITIVE-DENOMINATOR-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -2100,7 +2208,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-AGED",
@@ -2158,7 +2268,9 @@
                 "RET-NONPOSITIVE-DENOMINATOR-CAND-A-2",
                 "RET-NONPOSITIVE-DENOMINATOR-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -2167,7 +2279,7 @@
           "design_id": "RET-NONPOSITIVE-DENOMINATOR-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e74",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e73",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e76",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -2175,8 +2287,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -2236,7 +2353,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-AGED",
@@ -2294,7 +2413,9 @@
                 "RET-CLUSTER-PAIR-MISMATCH-BASE-A-2",
                 "RET-CLUSTER-PAIR-MISMATCH-BASE-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "candidate": {
@@ -2337,7 +2458,9 @@
               }
             ],
             "mean_strength_mpa": 10,
-            "conditioning_receipt": null
+            "conditioning_receipt": null,
+            "conditioning_profile_id": null,
+            "conditioning_profile_sha256": null
           },
           "aged": {
             "receipt_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-AGED",
@@ -2395,7 +2518,9 @@
                 "RET-CLUSTER-PAIR-MISMATCH-CAND-A-2",
                 "RET-CLUSTER-PAIR-MISMATCH-CAND-A-3"
               ]
-            }
+            },
+            "conditioning_profile_id": "COND-PROFILE-2026-A1",
+            "conditioning_profile_sha256": "e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
           }
         },
         "result": {
@@ -2404,7 +2529,7 @@
           "design_id": "RET-CLUSTER-PAIR-MISMATCH-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e88",
           "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e87",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e8a",
+          "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
           "baseline_retention": 0.8,
           "candidate_retention": 0.78,
           "candidate_minus_baseline": -0.02,
@@ -2412,8 +2537,13 @@
           "ci_upper": 0,
           "margin_lower": -0.05,
           "margin_upper": 0.05,
-          "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
+          "analysis_profile": "cluster_bootstrap_diff_of_retention_v1"
+        },
+        "input_manifest_sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_retention_v1",
+        "uncertainty_receipt_sha256": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -2538,7 +2668,7 @@
           "design_id": "FAIL-VALID-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e8e",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e8d",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e90",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -2551,8 +2681,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "PASS",
       "expected_outcome": "EQUIVALENCE_ESTABLISHED",
@@ -2677,7 +2812,7 @@
           "design_id": "FAIL-UNKNOWN-OMITTED-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e94",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e93",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e96",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 2,
           "candidate_numerator": 1,
@@ -2690,8 +2825,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -2816,7 +2956,7 @@
           "design_id": "FAIL-PP-SCOPE-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e9a",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e99",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e9c",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -2829,8 +2969,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
@@ -2955,7 +3100,7 @@
           "design_id": "FAIL-ACCEPTABILITY-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ea0",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e9f",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ea2",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -2968,8 +3113,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "failure_mode_acceptability"
-        }
+          "claim_ceiling": "failure_mode_acceptability",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3094,7 +3244,7 @@
           "design_id": "FAIL-DUPLICATE-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ea6",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ea5",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ea8",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -3107,8 +3257,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3233,7 +3388,7 @@
           "design_id": "FAIL-RATER-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eac",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eab",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005eae",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -3246,8 +3401,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3372,7 +3532,7 @@
           "design_id": "FAIL-NUMERATOR-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eb2",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eb1",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005eb4",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 3,
@@ -3385,8 +3545,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3511,7 +3676,7 @@
           "design_id": "FAIL-TAXONOMY-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eb8",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ebb",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005eba",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -3524,8 +3689,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3650,7 +3820,7 @@
           "design_id": "FAIL-MISSING-DIGEST-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ebf",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ebe",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ec1",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -3663,8 +3833,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3790,7 +3965,7 @@
           "design_id": "FAIL-UNKNOWN-MIXED-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ec5",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ec4",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ec7",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -3803,8 +3978,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
@@ -3929,7 +4109,7 @@
           "design_id": "FAIL-TOO-FEW-LOTS-DESIGN",
           "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ecb",
           "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eca",
-          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ecd",
+          "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
           "baseline_numerator": 1,
           "baseline_denominator": 3,
           "candidate_numerator": 1,
@@ -3942,8 +4122,13 @@
           "margin_lower": -0.2,
           "margin_upper": 0.2,
           "outcome": "EQUIVALENCE_ESTABLISHED",
-          "claim_ceiling": "descriptive_fraction_only"
-        }
+          "claim_ceiling": "descriptive_fraction_only",
+          "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "analysis_profile": "cluster_bootstrap_diff_of_fractions_v1"
+        },
+        "input_manifest_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "uncertainty_method_id": "cluster_bootstrap_diff_of_fractions_v1",
+        "uncertainty_receipt_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
