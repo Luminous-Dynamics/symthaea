@@ -41,6 +41,8 @@ pub enum EvidenceKind {
     ConditionInspection,
     /// Calibrated measurement supporting fibre composition.
     CompositionMeasurement,
+    /// Physical sorting/routing trial that creates identified material streams.
+    SortingTrial,
     /// Instrument calibration record in force at acquisition.
     CalibrationRecord,
     /// Physical repair operation and post-repair testing.
