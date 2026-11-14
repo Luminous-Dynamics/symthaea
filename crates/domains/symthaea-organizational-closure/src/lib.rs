@@ -23,8 +23,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
 
 pub use assay::{
-    AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation,
-    CandidateModel, ModelId, ModelPairAssessment, evaluate_assay_adequacy,
+    AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
+    ModelId, ModelPairAssessment, evaluate_assay_adequacy,
 };
 
 macro_rules! string_id {
