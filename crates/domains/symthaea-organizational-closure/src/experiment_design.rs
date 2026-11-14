@@ -449,10 +449,6 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
         cumulative_oracle_regret += (best_efficiency - chosen_efficiency).max(0.0);
         if chosen_gain > f64::EPSILON {
             informative_trials += 1;
-        } else if target_classes(&active, &hypotheses).len() > 1 {
-            push_finding(&mut findings, ExperimentFindingCode::UninformativeProbe,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "selected probe does not distinguish the remaining target classes");
         }
 
         let mut evidence_qualified = true;
@@ -509,6 +505,12 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
                 Some(trial_index), Some(trial.probe_id.clone()),
                 "qualified observation differs from the evaluator-only deterministic response");
             continue;
+        }
+
+        if chosen_gain <= f64::EPSILON && target_classes(&active, &hypotheses).len() > 1 {
+            push_finding(&mut findings, ExperimentFindingCode::UninformativeProbe,
+                Some(trial_index), Some(trial.probe_id.clone()),
+                "selected probe does not distinguish the remaining target classes under the frozen model");
         }
 
         active.retain(|id| probe.outcomes.get(id)
