@@ -170,8 +170,7 @@ pub struct ContinuityReport {
 
 impl ContinuityReport {
     pub fn preserves_operational_continuity(&self) -> bool {
-        self.qualification == ContinuityQualification::Preserved
-            && self.findings.is_empty()
+        self.qualification == ContinuityQualification::Preserved && self.findings.is_empty()
     }
 }
 
@@ -190,11 +189,7 @@ fn push_finding(
     });
 }
 
-fn validate_model(
-    model: &TransitionSystem,
-    baseline: bool,
-    findings: &mut Vec<ContinuityFinding>,
-) {
+fn validate_model(model: &TransitionSystem, baseline: bool, findings: &mut Vec<ContinuityFinding>) {
     if model.states.is_empty() {
         push_finding(
             findings,
@@ -232,8 +227,16 @@ fn validate_model(
                 } else {
                     ContinuityFindingCode::UnknownCandidateInitialState
                 },
-                if baseline { Some(initial.clone()) } else { None },
-                if baseline { None } else { Some(initial.clone()) },
+                if baseline {
+                    Some(initial.clone())
+                } else {
+                    None
+                },
+                if baseline {
+                    None
+                } else {
+                    Some(initial.clone())
+                },
                 "initial state is absent from the state map",
             );
         }
@@ -245,8 +248,16 @@ fn validate_model(
                 push_finding(
                     findings,
                     ContinuityFindingCode::EmptyObservationLabel,
-                    if baseline { Some(state_id.clone()) } else { None },
-                    if baseline { None } else { Some(state_id.clone()) },
+                    if baseline {
+                        Some(state_id.clone())
+                    } else {
+                        None
+                    },
+                    if baseline {
+                        None
+                    } else {
+                        Some(state_id.clone())
+                    },
                     "state contains an empty observation label",
                 );
             }
@@ -256,8 +267,16 @@ fn validate_model(
                 push_finding(
                     findings,
                     ContinuityFindingCode::EmptyCapabilityLabel,
-                    if baseline { Some(state_id.clone()) } else { None },
-                    if baseline { None } else { Some(state_id.clone()) },
+                    if baseline {
+                        Some(state_id.clone())
+                    } else {
+                        None
+                    },
+                    if baseline {
+                        None
+                    } else {
+                        Some(state_id.clone())
+                    },
                     "state contains an empty capability label",
                 );
             }
@@ -267,8 +286,16 @@ fn validate_model(
                 push_finding(
                     findings,
                     ContinuityFindingCode::EmptyInvariantLabel,
-                    if baseline { Some(state_id.clone()) } else { None },
-                    if baseline { None } else { Some(state_id.clone()) },
+                    if baseline {
+                        Some(state_id.clone())
+                    } else {
+                        None
+                    },
+                    if baseline {
+                        None
+                    } else {
+                        Some(state_id.clone())
+                    },
                     "state contains an empty invariant label",
                 );
             }
@@ -280,8 +307,16 @@ fn validate_model(
             push_finding(
                 findings,
                 ContinuityFindingCode::EmptyTransitionAction,
-                if baseline { Some(transition.from.clone()) } else { None },
-                if baseline { None } else { Some(transition.from.clone()) },
+                if baseline {
+                    Some(transition.from.clone())
+                } else {
+                    None
+                },
+                if baseline {
+                    None
+                } else {
+                    Some(transition.from.clone())
+                },
                 "transition action label is empty",
             );
         }
@@ -289,8 +324,16 @@ fn validate_model(
             push_finding(
                 findings,
                 ContinuityFindingCode::EmptyTransitionObservation,
-                if baseline { Some(transition.from.clone()) } else { None },
-                if baseline { None } else { Some(transition.from.clone()) },
+                if baseline {
+                    Some(transition.from.clone())
+                } else {
+                    None
+                },
+                if baseline {
+                    None
+                } else {
+                    Some(transition.from.clone())
+                },
                 "transition observation label is empty",
             );
         }
@@ -302,8 +345,16 @@ fn validate_model(
                 } else {
                     ContinuityFindingCode::UnknownCandidateTransitionSource
                 },
-                if baseline { Some(transition.from.clone()) } else { None },
-                if baseline { None } else { Some(transition.from.clone()) },
+                if baseline {
+                    Some(transition.from.clone())
+                } else {
+                    None
+                },
+                if baseline {
+                    None
+                } else {
+                    Some(transition.from.clone())
+                },
                 "transition source is not declared in the state map",
             );
         }
@@ -315,8 +366,16 @@ fn validate_model(
                 } else {
                     ContinuityFindingCode::UnknownCandidateTransitionTarget
                 },
-                if baseline { Some(transition.to.clone()) } else { None },
-                if baseline { None } else { Some(transition.to.clone()) },
+                if baseline {
+                    Some(transition.to.clone())
+                } else {
+                    None
+                },
+                if baseline {
+                    None
+                } else {
+                    Some(transition.to.clone())
+                },
                 "transition target is not declared in the state map",
             );
         }
@@ -343,9 +402,7 @@ fn profiles_compatible(
     }
 
     match policy.mode {
-        RelationMode::Simulation => baseline
-            .capabilities
-            .is_subset(&candidate.capabilities),
+        RelationMode::Simulation => baseline.capabilities.is_subset(&candidate.capabilities),
         RelationMode::Bisimulation => baseline.capabilities == candidate.capabilities,
     }
 }
@@ -549,11 +606,12 @@ pub fn evaluate_operational_continuity(
 
     if policy.mode == RelationMode::Bisimulation {
         for candidate_initial in &candidate.initial_states {
-            if !baseline
-                .initial_states
-                .iter()
-                .any(|baseline_initial| relation.contains(&(baseline_initial.as_str().to_owned(), candidate_initial.as_str().to_owned())))
-            {
+            if !baseline.initial_states.iter().any(|baseline_initial| {
+                relation.contains(&(
+                    baseline_initial.as_str().to_owned(),
+                    candidate_initial.as_str().to_owned(),
+                ))
+            }) {
                 push_finding(
                     &mut findings,
                     ContinuityFindingCode::UnmatchedCandidateInitialState,
@@ -586,14 +644,16 @@ pub fn evaluate_operational_continuity(
 mod tests {
     use super::*;
 
-    fn profile(
-        observations: &[&str],
-        capabilities: &[&str],
-        invariants: &[&str],
-    ) -> StateProfile {
+    fn profile(observations: &[&str], capabilities: &[&str], invariants: &[&str]) -> StateProfile {
         StateProfile {
-            observations: observations.iter().map(|value| (*value).to_owned()).collect(),
-            capabilities: capabilities.iter().map(|value| (*value).to_owned()).collect(),
+            observations: observations
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect(),
+            capabilities: capabilities
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect(),
             held_invariants: invariants.iter().map(|value| (*value).to_owned()).collect(),
         }
     }
@@ -602,8 +662,16 @@ mod tests {
         let mut system = TransitionSystem::default();
         let start = format!("{prefix}-start");
         let done = format!("{prefix}-done");
-        assert!(system.insert_state(start.clone(), profile(&["idle"], &["predict"], &["policy"]), true));
-        assert!(system.insert_state(done.clone(), profile(&["ready"], &["predict"], &["policy"]), false));
+        assert!(system.insert_state(
+            start.clone(),
+            profile(&["idle"], &["predict"], &["policy"]),
+            true
+        ));
+        assert!(system.insert_state(
+            done.clone(),
+            profile(&["ready"], &["predict"], &["policy"]),
+            false
+        ));
         assert!(system.insert_transition(Transition::new(start, "refresh", "model-updated", done)));
         system
     }
@@ -611,41 +679,76 @@ mod tests {
     #[test]
     fn unchanged_system_passes_simulation_and_bisimulation() {
         let system = two_state_system("same");
-        let simulation = evaluate_operational_continuity(&system, &system, &ContinuityPolicy::default());
-        assert!(simulation.preserves_operational_continuity(), "{:?}", simulation.findings);
+        let simulation =
+            evaluate_operational_continuity(&system, &system, &ContinuityPolicy::default());
+        assert!(
+            simulation.preserves_operational_continuity(),
+            "{:?}",
+            simulation.findings
+        );
 
         let policy = ContinuityPolicy {
             mode: RelationMode::Bisimulation,
             ..ContinuityPolicy::default()
         };
         let bisimulation = evaluate_operational_continuity(&system, &system, &policy);
-        assert!(bisimulation.preserves_operational_continuity(), "{:?}", bisimulation.findings);
+        assert!(
+            bisimulation.preserves_operational_continuity(),
+            "{:?}",
+            bisimulation.findings
+        );
     }
 
     #[test]
     fn renamed_state_ids_preserve_behavioral_continuity() {
         let baseline = two_state_system("old");
         let candidate = two_state_system("new");
-        let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
-        assert!(report.preserves_operational_continuity(), "{:?}", report.findings);
-        assert!(report.related_state_pairs.iter().any(|(left, right)| left != right));
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        assert!(
+            report.preserves_operational_continuity(),
+            "{:?}",
+            report.findings
+        );
+        assert!(
+            report
+                .related_state_pairs
+                .iter()
+                .any(|(left, right)| left != right)
+        );
     }
 
     #[test]
     fn candidate_may_add_a_capability_under_one_way_simulation() {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
-        candidate.states.get_mut("new-start").unwrap().capabilities.insert("summarize".into());
-        candidate.states.get_mut("new-done").unwrap().capabilities.insert("summarize".into());
+        candidate
+            .states
+            .get_mut("new-start")
+            .unwrap()
+            .capabilities
+            .insert("summarize".into());
+        candidate
+            .states
+            .get_mut("new-done")
+            .unwrap()
+            .capabilities
+            .insert("summarize".into());
 
-        let simulation = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
-        assert!(simulation.preserves_operational_continuity(), "{:?}", simulation.findings);
+        let simulation =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        assert!(
+            simulation.preserves_operational_continuity(),
+            "{:?}",
+            simulation.findings
+        );
 
         let bisimulation_policy = ContinuityPolicy {
             mode: RelationMode::Bisimulation,
             ..ContinuityPolicy::default()
         };
-        let bisimulation = evaluate_operational_continuity(&baseline, &candidate, &bisimulation_policy);
+        let bisimulation =
+            evaluate_operational_continuity(&baseline, &candidate, &bisimulation_policy);
         assert!(!bisimulation.preserves_operational_continuity());
     }
 
@@ -653,17 +756,33 @@ mod tests {
     fn capability_loss_breaks_simulation() {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
-        candidate.states.get_mut("new-done").unwrap().capabilities.clear();
-        let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        candidate
+            .states
+            .get_mut("new-done")
+            .unwrap()
+            .capabilities
+            .clear();
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert!(!report.preserves_operational_continuity());
-        assert!(report.findings.iter().any(|item| item.code == ContinuityFindingCode::UnmatchedBaselineInitialState));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|item| item.code == ContinuityFindingCode::UnmatchedBaselineInitialState)
+        );
     }
 
     #[test]
     fn missing_required_invariant_breaks_continuity() {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
-        candidate.states.get_mut("new-start").unwrap().held_invariants.clear();
+        candidate
+            .states
+            .get_mut("new-start")
+            .unwrap()
+            .held_invariants
+            .clear();
         let policy = ContinuityPolicy {
             required_invariants: ["policy".to_owned()].into(),
             ..ContinuityPolicy::default()
@@ -677,7 +796,8 @@ mod tests {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
         candidate.transitions.clear();
-        let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert!(!report.preserves_operational_continuity());
     }
 
@@ -720,27 +840,41 @@ mod tests {
 
         let baseline = chain("old", "commit");
         let candidate = chain("new", "discard");
-        let report = evaluate_operational_continuity(
-            &baseline,
-            &candidate,
-            &ContinuityPolicy::default(),
-        );
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert!(!report.preserves_operational_continuity());
         assert!(report.refinement_iterations >= 2);
-        assert!(report.findings.iter().any(|item| {
-            item.code == ContinuityFindingCode::UnmatchedBaselineInitialState
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|item| { item.code == ContinuityFindingCode::UnmatchedBaselineInitialState })
+        );
     }
 
     #[test]
     fn extra_candidate_transition_is_permitted_by_simulation_but_not_bisimulation() {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
-        assert!(candidate.insert_state("new-extra", profile(&["extra"], &["predict"], &["policy"]), false));
-        assert!(candidate.insert_transition(Transition::new("new-start", "diagnose", "diagnostic-event", "new-extra")));
+        assert!(candidate.insert_state(
+            "new-extra",
+            profile(&["extra"], &["predict"], &["policy"]),
+            false
+        ));
+        assert!(candidate.insert_transition(Transition::new(
+            "new-start",
+            "diagnose",
+            "diagnostic-event",
+            "new-extra"
+        )));
 
-        let simulation = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
-        assert!(simulation.preserves_operational_continuity(), "{:?}", simulation.findings);
+        let simulation =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        assert!(
+            simulation.preserves_operational_continuity(),
+            "{:?}",
+            simulation.findings
+        );
 
         let policy = ContinuityPolicy {
             mode: RelationMode::Bisimulation,
@@ -754,8 +888,10 @@ mod tests {
     fn state_observation_mismatch_breaks_relation() {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
-        candidate.states.get_mut("new-done").unwrap().observations = ["different".to_owned()].into();
-        let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        candidate.states.get_mut("new-done").unwrap().observations =
+            ["different".to_owned()].into();
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert!(!report.preserves_operational_continuity());
     }
 
@@ -764,23 +900,35 @@ mod tests {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
         candidate.transitions.clear();
-        assert!(candidate.insert_transition(Transition::new("new-start", "refresh", "model-updated", "ghost")));
-        let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        assert!(candidate.insert_transition(Transition::new(
+            "new-start",
+            "refresh",
+            "model-updated",
+            "ghost"
+        )));
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert_eq!(report.qualification, ContinuityQualification::NotPreserved);
-        assert!(report.findings.iter().any(|item| {
-            item.code == ContinuityFindingCode::UnknownCandidateTransitionTarget
-        }));
+        assert!(
+            report.findings.iter().any(|item| {
+                item.code == ContinuityFindingCode::UnknownCandidateTransitionTarget
+            })
+        );
     }
 
     #[test]
     fn empty_state_universe_is_not_a_pass() {
         let baseline = TransitionSystem::default();
         let candidate = two_state_system("new");
-        let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
+        let report =
+            evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert_eq!(report.qualification, ContinuityQualification::NotPreserved);
-        assert!(report.findings.iter().any(|item| {
-            item.code == ContinuityFindingCode::EmptyBaselineStateSet
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|item| { item.code == ContinuityFindingCode::EmptyBaselineStateSet })
+        );
     }
 
     #[test]
@@ -793,9 +941,12 @@ mod tests {
         };
         let report = evaluate_operational_continuity(&baseline, &candidate, &policy);
         assert_eq!(report.qualification, ContinuityQualification::Inconclusive);
-        assert!(report.findings.iter().any(|item| {
-            item.code == ContinuityFindingCode::StatePairBudgetExceeded
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|item| { item.code == ContinuityFindingCode::StatePairBudgetExceeded })
+        );
     }
 
     #[test]
@@ -814,15 +965,22 @@ mod tests {
     fn bisimulation_requires_candidate_initial_states_to_be_matched() {
         let baseline = two_state_system("old");
         let mut candidate = two_state_system("new");
-        assert!(candidate.insert_state("new-other-initial", profile(&["other"], &["predict"], &["policy"]), true));
+        assert!(candidate.insert_state(
+            "new-other-initial",
+            profile(&["other"], &["predict"], &["policy"]),
+            true
+        ));
         let policy = ContinuityPolicy {
             mode: RelationMode::Bisimulation,
             ..ContinuityPolicy::default()
         };
         let report = evaluate_operational_continuity(&baseline, &candidate, &policy);
         assert!(!report.preserves_operational_continuity());
-        assert!(report.findings.iter().any(|item| {
-            item.code == ContinuityFindingCode::UnmatchedCandidateInitialState
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|item| { item.code == ContinuityFindingCode::UnmatchedCandidateInitialState })
+        );
     }
 }
