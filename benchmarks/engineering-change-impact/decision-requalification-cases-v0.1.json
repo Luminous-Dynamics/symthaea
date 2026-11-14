@@ -655,6 +655,66 @@
         "EV-VALVE-REVOKE-001"
       ],
       "candidate_visible_event_manifest_k0_sha256": "d603d3d2327198db26a1deb8388be40e7988407eccb222cb5b6544bc67830047"
+    },
+    {
+      "id": "RQ-UNK-002",
+      "family": "relevant_event_not_materialized",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-UNK-002",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-UNK-002",
+      "decisions": [
+        {
+          "decision_id": "D-BOND-03",
+          "original_decision_at": "2026-11-14T10:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T10:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:30:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-BOND-LOT"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "indeterminate",
+            "current_action": "hold_pending_evidence",
+            "reason_codes": [
+              "RELEVANT_EVENT_NOT_MATERIALIZED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-BOND-LOT",
+          "kind": "attestation",
+          "root_id": "ROOT-BOND-LOT",
+          "configuration": "BOND-3"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-BOND-REVOKE-002",
+          "event_type": "trust_revoked",
+          "effective_at": "2026-11-14T09:30:00Z",
+          "observed_at": "2026-11-14T11:45:00Z",
+          "source_sequence": 89,
+          "affected_dependency_ids": [
+            "DEP-BOND-LOT"
+          ],
+          "qualification_state": "qualified",
+          "severity": "critical"
+        }
+      ],
+      "candidate_visible_event_ids": [],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "candidate_visible_event_ids_at_k0": [],
+      "dependency_manifest_sha256": "2ca15fdfe61acfc2050cf28530a3c9e5d0ee9578fac5f18faea4373656c70662",
+      "event_inventory_sha256": "c1df20fea1b3d9005ce3048ddcf7111672b4f071c3e28bbec86dcc065d5d48d1",
+      "candidate_visible_event_manifest_k0_sha256": "e71b85d49eb942bde9fb50cb3c00c000374ef649d1ddd4a6eff2429fa8322e80",
+      "candidate_visible_event_manifest_sha256": "041a554399ad36c7996366ffb8a03664946e440904f996d20293cfae0f05ce11"
     }
   ],
   "intervention_pairs": [
@@ -749,6 +809,18 @@
       "expected_current_state": "withdrawn",
       "before_decision_id": "D-PUMP-01",
       "after_decision_id": "D-VALVE-10"
+    },
+    {
+      "id": "RQ-PAIR-009",
+      "before_case_id": "RQ-NEG-002",
+      "after_case_id": "RQ-UNK-002",
+      "expected_relation": "materialization_gate",
+      "before_decision_id": "D-BOND-03",
+      "after_decision_id": "D-BOND-03",
+      "expected_as_of_state": "supported",
+      "expected_before_current_state": "withdrawn",
+      "expected_after_current_state": "indeterminate",
+      "expected_after_action": "hold_pending_evidence"
     }
   ]
 }
