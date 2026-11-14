@@ -149,7 +149,24 @@ The current evaluator reports:
 
 **Important limitation:** the graph certificate is currently an auditable candidate/pruning diagnostic. It is not yet removed from the exhaustive subset oracle, because this first finite-world representation provides arbitrary response tables rather than a complete SCM certificate proving every graphical assumption. The ID-algorithm identifiability test from the paper is also not implemented yet. Those are separate follow-on increments; do not claim the reported candidate count is a search-space reduction.
 
-## 9. Implementation path
+## 9. Deterministic implementation controls
+
+The current Rust module includes eleven deterministic tests:
+- exact recomputation of post-experiment bounds and max potency;
+- lower-potency experiment selection and regret against the exhaustive optimum;
+- rejection of false effect-bound narrowing;
+- safe-but-conservative defer scoring;
+- unavailable intervention evidence does not tighten bounds;
+- actual-world observation mismatch remains inconclusive;
+- false decisive action rejected when the interval crosses the threshold;
+- budget violation is not masked by unavailable evidence;
+- exact subset-oracle budget exhaustion remains inconclusive;
+- AllPathsBlocked certificate matches an exact zero-potency finite-world fixture;
+- graph certificate disagreement with the finite oracle is surfaced rather than applied.
+
+These tests are deterministic controls, not a statistical benchmark, graph-pruning speedup, or mutation campaign. The current implementation does not yet run a Rust compiler/test/Clippy qualification in this environment.
+
+## 10. Implementation path
 
 1. Define a finite exact identified-set representation and interval arithmetic.
 2. Add a deterministic oracle over a small family of admissible worlds and intervention outcomes.
@@ -160,11 +177,11 @@ The current evaluator reports:
 7. Extend to probabilistic/stochastic models only with coverage, calibration, multiplicity and stopping guarantees.
 8. Connect to AOBENCH-006 intervention integrity, AOBENCH-011 sequential experiment selection, AOBENCH-012 model-class refinement and #12048 stochastic assay adequacy.
 
-## 10. Claim boundary
+## 11. Claim boundary
 
 This finite evaluator will not be a general solution to partial identification in arbitrary physical systems. The estimand, target population, admissible model class, causal assumptions and bound semantics must be frozen and independently reviewed. A stochastic interval requires a separate coverage guarantee. A correct point action in a synthetic task does not establish general causal truth.
 
-## 11. References
+## 12. References
 
 - [Maringgele & Etesami (2026), *Optimal Experiments for Partial Causal Effect Identification*, NeurIPS 2026](https://arxiv.org/abs/2605.06993)
 - [Causal-Discovery-Bench](https://arxiv.org/abs/2611.09934)
