@@ -216,3 +216,12 @@ The public `checkpoints` package now exposes `AcceptObserved` in addition to `Ac
 ## 14 November 2026 — reject sequence-only checkpoint advancement
 
 Tightened `AcceptNext`: a new checkpoint must advance both `JournalSequence` and `JournalHeadSHA256`. A signed checkpoint that increments the sequence while repeating the prior head is now rejected as `ErrNoProgress`. Added a regression test for this condition. The checkpoint package now has 22 tests (including optional OpenSSL interoperability); local companion inventory will be refreshed in the next source-package snapshot.
+
+
+## 14 November 2026 — peer checkpoint consistency primitive
+
+Added `VerifyPeerConsistency` to the public checkpoint verifier. It validates that a newer trusted cursor is a descendant of an older one under the same pinned witness key/database, checking every intervening signed checkpoint through `AcceptNext` and requiring the final bridge digest/sequence/head/time to exactly match the peer cursor. Six tests cover a complete bridge, same-sequence fork, missing checkpoint, broken predecessor, key/database identity mismatch and peer state not reached by the bridge.
+
+The local companion's full verifier passed after this addition: Go 1.23.2/Linux amd64, 25.80 seconds; default and SQLite-tagged test/race/vet/build/smoke legs passed; no-CGO tests passed separately. Current assembled local source counts at that point: 80 named test functions in the default build, 103 with `mace_sqlite`, including 28 in `checkpoints`. These are companion results, not an exact public-PR checkout replay or hosted CI. The public checkpoint package now contains the same peer-consistency primitive and six tests.
+
+Claim boundary: peer consistency detects a split view only after consumers exchange signed checkpoint bridges or report to a common monitor. It does not prevent equivocation, implement gossip/transparency, or keep isolated clients from receiving hidden different histories.
