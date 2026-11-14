@@ -1,10 +1,10 @@
 use std::{env, fs, process};
 
-use development_map_validator::validate_json;
+use development_map_validator::validate_document_json;
 
 fn usage() {
     eprintln!("Usage: development-map-validator <snapshot.json>");
-    eprintln!("Validates EGDDM v0.1 structure, references, evidence lifecycle and event consistency.");
+    eprintln!("Validates EGDDM v0.1 map snapshots or federation manifests.");
     eprintln!("This is a read-only structural validator, not a full JSON Schema validator or signature verifier.");
 }
 
@@ -31,7 +31,7 @@ fn main() {
         }
     };
 
-    match validate_json(&input) {
+    match validate_document_json(&input) {
         Err(error) => {
             eprintln!("ERROR EGDDM-JSON-001 {path}: {error}");
             process::exit(2);
