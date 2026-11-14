@@ -187,6 +187,8 @@ ASTM D1440 is used in the cited 2026 cotton study; confirm the current applicabl
 
 ### 5.5 Yarn, fabric and receiver acceptance
 
+Sampling and uncertainty gates are receiver-specific and must be frozen in the versioned receiving specification before a route trial. The contract now requires a minimum accepted-output sample mass, minimum independent replicate count and minimum expanded-uncertainty coverage probability. Fibre-length histograms must partition the full interval from zero to the open-ended upper tail without gaps; the final exclusive upper bound uses `u32::MAX` as the sentinel. A receiver's nominal minimum length is increased by the declared relative expanded uncertainty before classifying bins, so a nominal pass cannot hide an uncertainty interval that overlaps the receiving floor. These values must be derived from the intended yarn process/lab protocol; the synthetic unit-test policy values are not universal textile standards.
+
 For each output yarn route, measure:
 - recycled mass fraction and recipe;
 - yarn tenacity/elongation, neps, thick places, thin places, hairiness and mass irregularity;
