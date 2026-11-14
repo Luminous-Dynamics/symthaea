@@ -116,6 +116,17 @@ fn audit_case_composed(
             };
             bridge_profile.insert(key.clone(), to.clone());
         }
+        let Some(candidate_grade) = bridge_profile.get("substrate_grade").and_then(Value::as_str) else {
+            return Ok(Disposition::Blocked);
+        };
+        let Some(candidate_scope) = scope_registry.get(candidate_grade).and_then(Value::as_object) else {
+            return Ok(Disposition::Blocked);
+        };
+        if candidate_scope.get("material_pair_class").and_then(Value::as_str) != Some(material_pair_class)
+            || candidate_scope.get("geometry").and_then(Value::as_str) != Some(geometry)
+        {
+            return Ok(Disposition::Rejected);
+        }
         let candidate_profile_sha256 = profile_digest(&bridge_profile)?;
         let decision = crate::plasma_evidence_composition::validate_transfer_case(
             composition_fixture_path,
@@ -322,7 +333,18 @@ mod tests {
     use serde_json::Value;
 
     fn fixture() -> Value {
-        serde_json::from_str(include_str!("../../data/research/plasma_transfer_fixture_v0_1.json")).expect("fixture parses")
+        serde_json::from_str(include_str!("../../data/research/plasma_transfer_fixture_v0_2.json")).expect("fixture parses")
+    }
+
+    fn composition_fixture_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent().expect("xtask parent exists")
+            .join("data/research/plasma_transfer_composition_fixture_v0_1.json")
+    }
+
+    fn composed(data: &Value, id: &str) -> Disposition {
+        audit_case_composed(case(data, id), data, &composition_fixture_path())
+            .expect("composed transfer fixture audits")
     }
     fn case<'a>(data: &'a Value, id: &str) -> &'a Value {
         data["cases"].as_array().expect("cases").iter().find(|row| row["id"].as_str() == Some(id)).expect("case exists")
@@ -331,12 +353,12 @@ mod tests {
     #[test] fn all_fixture_dispositions_match() {
         let data = fixture();
         for row in data["cases"].as_array().expect("cases") {
-            assert_eq!(audit_case(row, &data).as_str(), row["expected_disposition"].as_str().expect("expected"));
+            assert_eq!(audit_case_composed(row, &data, &composition_fixture_path()).expect("composed fixture audit").as_str(), row["expected_disposition"].as_str().expect("expected"));
         }
     }
     #[test] fn unchanged_profile_passes() {
         let data = fixture();
-        assert_eq!(audit_case(case(&data, "unchanged-profile"), &data), Disposition::Pass);
+        assert_eq!(composed(&data, "unchanged-profile"), Disposition::Pass);
     }
     #[test] fn absent_single_factor_bridge_blocks() {
         let data = fixture();
@@ -377,5 +399,30 @@ mod tests {
     #[test] fn missing_baseline_qualification_blocks() {
         let data = fixture();
         assert_eq!(audit_case(case(&data, "missing-baseline-qualification-receipt"), &data), Disposition::Blocked);
+    }
+
+    #[test] fn interval_only_bridge_cannot_pass_without_composition() {
+        let data = fixture();
+        assert_eq!(composed(&data, "pass-interval-without-composition"), Disposition::Blocked);
+    }
+
+    #[test] fn composition_from_another_transfer_is_rejected() {
+        let data = fixture();
+        assert_eq!(composed(&data, "composition-case-from-another-transfer"), Disposition::Rejected);
+    }
+
+    #[test] fn composition_receipt_cannot_be_reused_across_bridges() {
+        let data = fixture();
+        assert_eq!(composed(&data, "same-composition-reused-across-bridges"), Disposition::Rejected);
+    }
+
+    #[test] fn joint_design_cannot_substitute_for_single_factor_bridge() {
+        let data = fixture();
+        assert_eq!(composed(&data, "joint-design-substituted-for-single-factor"), Disposition::Rejected);
+    }
+
+    #[test] fn unchanged_profile_requires_current_baseline_composition() {
+        let data = fixture();
+        assert_eq!(composed(&data, "unchanged-profile-without-baseline-composition"), Disposition::Blocked);
     }
 }
