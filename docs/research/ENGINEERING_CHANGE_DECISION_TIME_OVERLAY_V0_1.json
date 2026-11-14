@@ -157,6 +157,28 @@
         "decision_frontier"
       ],
       "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-010",
+      "family": "distributed_evidence_frontier",
+      "name": "multi-source decision cut with partial-order causality",
+      "mutation": "The assessed evidence depends on multiple conductors or asynchronous source services. Local sequence indices and wall-clock timestamps disagree or are concurrent; one causal join or source is missing.",
+      "evaluator_control": "Bind the exact EvidenceFrontierV1 source-set commitment and the independently verified multi-conductor causal-history receipt. Never compare local sequence/authority indices across conductors or use timestamps to mint cross-source happens-before edges. A missing join or incomplete source set remains INCOMPLETE/UNKNOWN.",
+      "required_lineage": [
+        "evidence_frontier_reference_and_digest",
+        "exact_source_set_digest",
+        "per_conductor_local_sequence_evidence",
+        "explicit_cross_conductor_causal_edges_and_supporting_receipts",
+        "causal_history_digest",
+        "independent_verifier_identity_and_receipt",
+        "decision_frontier_K"
+      ],
+      "owner_composition": [
+        "Mycelix #2631",
+        "Mycelix #5843",
+        "Mycelix #5923"
+      ],
+      "status": "blueprint_only"
     }
   ],
   "hard_gates": [
@@ -165,7 +187,9 @@
     "zero_clock_semantic_substitution",
     "unknown_temporal_evidence_never_forced_to_pass",
     "deterministic_as_of_replay_for_frozen_inputs",
-    "no_authority_or_release_mutation"
+    "no_authority_or_release_mutation",
+    "zero_cross_conductor_total_order_inference_from_wall_clock_or_foreign_local_indices",
+    "no_system_available_or_run_context_included_result_when_a_required_causal_frontier_is_incomplete"
   ],
   "metrics": [
     "future_knowledge_leakage_count",
@@ -176,7 +200,10 @@
     "indeterminate_detection_and_forced_resolution_rate",
     "historical_replay_equality_under_late_arrival_and_correction_permutations",
     "clock_order_error_rate",
-    "review_and_retrieval_burden"
+    "review_and_retrieval_burden",
+    "required_causal_frontier_completeness_and_source_set_coverage",
+    "false_cross_conductor_total_order_rate",
+    "incomplete_causal_join_indeterminate_detection_rate"
   ],
   "owner_composition": {
     "engineering_benchmark": "Symthaea #10543 / #10581",
@@ -187,7 +214,8 @@
     "temporal_relation_materialization": "Mycelix #4778",
     "source_specific_chronology": "Mycelix #5687",
     "desci_receipt_time_projection_only": "Mycelix #5860",
-    "semantic_translation_and_gs1_intake": "Mycelix #1112 / #5395 / #6105"
+    "semantic_translation_and_gs1_intake": "Mycelix #1112 / #5395 / #6105",
+    "distributed_causal_frontier": "Mycelix #5843; EvidenceFrontierV1 #2631; time-qualified dependency completeness #5923"
   },
   "non_claims": [
     "No benchmark task has been adjudicated or scored.",
