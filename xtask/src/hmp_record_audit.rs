@@ -198,6 +198,158 @@ pub fn run(root: &Path, file: &Path, schema_path: &Path) -> Result<()> {
     Ok(())
 }
 
+
+const REQUIRED_BENCH_TRACKS: &[&str] = &[
+    "HMP-ATTR",
+    "HMP-PLURAL",
+    "HMP-UNCERTAINTY",
+    "HMP-PHILO",
+    "HMP-RIGHTS",
+    "HMP-CORRECT",
+];
+
+fn non_empty_string_array<'a>(value: &'a Value, key: &str, at: &str) -> Result<Vec<&'a str>> {
+    let values = value
+        .get(key)
+        .and_then(Value::as_array)
+        .with_context(|| format!("{at}.{key} must be an array"))?;
+    if values.is_empty() {
+        bail!("{at}.{key} must not be empty");
+    }
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            let text = item
+                .as_str()
+                .with_context(|| format!("{at}.{key}[{index}] must be a string"))?;
+            if text.trim().is_empty() {
+                bail!("{at}.{key}[{index}] must not be empty");
+            }
+            Ok(text)
+        })
+        .collect()
+}
+
+/// Validate benchmark fixture integrity and its rights-related negative control.
+/// This does not evaluate model answers or establish benchmark validity.
+pub fn audit_benchmark(fixture: &Value) -> Result<usize> {
+    let benchmark_id = required_string(fixture, "benchmark_id", "benchmark")?;
+    if !benchmark_id.starts_with("HMP-BENCH-") {
+        bail!("benchmark.benchmark_id must start with HMP-BENCH-");
+    }
+    if required_string(fixture, "version", "benchmark")? != "0.1.0" {
+        bail!("benchmark.version must be 0.1.0");
+    }
+    if required_string(fixture, "status", "benchmark")? != "synthetic_fixture_only" {
+        bail!("benchmark.status must be synthetic_fixture_only");
+    }
+    required_string(fixture, "purpose", "benchmark")?;
+    required_string(fixture, "scoring_warning", "benchmark")?;
+
+    let cases = fixture
+        .get("cases")
+        .and_then(Value::as_array)
+        .context("benchmark.cases must be a non-empty array")?;
+    if cases.is_empty() {
+        bail!("benchmark.cases must not be empty");
+    }
+
+    let mut case_ids = BTreeSet::new();
+    let mut present_tracks = BTreeSet::new();
+
+    for (index, case) in cases.iter().enumerate() {
+        let at = format!("benchmark.cases[{index}]");
+        let case_id = required_string(case, "case_id", &at)?;
+        if !case_ids.insert(case_id.to_owned()) {
+            bail!("duplicate benchmark case_id: {case_id}");
+        }
+
+        let track = required_string(case, "track", &at)?;
+        if !REQUIRED_BENCH_TRACKS.contains(&track) {
+            bail!("{at}.track is not a registered HMP-Bench v0.1 track: {track}");
+        }
+        present_tracks.insert(track.to_owned());
+
+        required_string(case, "scenario", &at)?;
+        required_string(case, "prompt", &at)?;
+        required_string(case, "evaluator", &at)?;
+        non_empty_string_array(case, "expected_behaviors", &at)?;
+        non_empty_string_array(case, "forbidden_behaviors", &at)?;
+        non_empty_string_array(case, "hard_fail_conditions", &at)?;
+
+        let evidence = case
+            .get("evidence")
+            .and_then(Value::as_array)
+            .with_context(|| format!("{at}.evidence must be a non-empty array"))?;
+        if evidence.is_empty() {
+            bail!("{at}.evidence must not be empty");
+        }
+        let mut evidence_ids = BTreeSet::new();
+        for (evidence_index, item) in evidence.iter().enumerate() {
+            let evidence_at = format!("{at}.evidence[{evidence_index}]");
+            let source_id = required_string(item, "id", &evidence_at)?;
+            if !evidence_ids.insert(source_id.to_owned()) {
+                bail!("{evidence_at}.id is duplicated within case {case_id}");
+            }
+            required_string(item, "voice_type", &evidence_at)?;
+            required_string(item, "scope", &evidence_at)?;
+            required_string(item, "text", &evidence_at)?;
+        }
+
+        if track == "HMP-RIGHTS" {
+            let rights = case
+                .get("permission")
+                .context("HMP-RIGHTS case must include permission")?;
+            let access_class = required_string(rights, "access_class", "permission")?;
+            if !matches!(access_class, "restricted" | "community_controlled") {
+                bail!("HMP-RIGHTS case must exercise restricted or community-controlled access");
+            }
+            let status = required_string(rights, "permission_status", "permission")?;
+            if !matches!(status, "denied" | "withdrawn" | "pending") {
+                bail!("HMP-RIGHTS negative control must not have granted permission");
+            }
+            let allowed = rights
+                .get("permitted_uses")
+                .and_then(Value::as_array)
+                .context("HMP-RIGHTS permission.permitted_uses must be an array")?;
+            if !allowed.is_empty() {
+                bail!("HMP-RIGHTS denied/pending/withdrawn fixture must have zero permitted_uses");
+            }
+            non_empty_string_array(rights, "prohibited_uses", "permission")?;
+        }
+    }
+
+    for required_track in REQUIRED_BENCH_TRACKS {
+        if !present_tracks.contains(*required_track) {
+            bail!("benchmark fixture is missing required track {required_track}");
+        }
+    }
+
+    Ok(cases.len())
+}
+
+pub fn run_benchmark(root: &Path, file: &Path) -> Result<()> {
+    let file_path = resolve(root, file);
+    let fixture: Value = serde_json::from_slice(
+        &std::fs::read(&file_path)
+            .with_context(|| format!("reading benchmark {}", file_path.display()))?,
+    )
+    .with_context(|| format!("parsing benchmark {}", file_path.display()))?;
+
+    let case_count = audit_benchmark(&fixture)?;
+    println!(
+        "HMP-Bench fixture audit: PASS ({}; {} cases)",
+        required_string(&fixture, "benchmark_id", "benchmark")?,
+        case_count
+    );
+    println!("Required track coverage: PASS");
+    println!("Synthetic-only declaration: PASS");
+    println!("Rights negative control: PASS");
+    println!("Note: this audits fixture integrity only; it does not score model outputs or validate cultural competence.");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
