@@ -1,0 +1,209 @@
+{
+  "schema_version": "luminous.benchmark-run-receipt.v1",
+  "run_id": "SYNTHETIC-NOT-AN-EXTERNAL-BENCHMARK-RESULT-001",
+  "generated_at": "2026-11-03T00:01:01Z",
+  "evaluation_started_at": "2026-11-03T00:00:00Z",
+  "evaluation_completed_at": "2026-11-03T00:01:00Z",
+  "benchmark": {
+    "id": "synthetic-re-bench",
+    "version": "0.1",
+    "revision": "fixture-1",
+    "dataset_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "access_class": "synthetic",
+    "scoring_formula_id": "binary-pass-rate-v1",
+    "grader_version": "fixture-grader-1",
+    "grader_output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "system": {
+    "arm": "REA_plus_Symthaea",
+    "name": "synthetic-system",
+    "version": "0.1",
+    "source_revision": "0123456789abcdef",
+    "executable_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "model_id": "synthetic-model",
+    "config_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "prompt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "target_scope": {
+    "platform": "android",
+    "os": "synthetic",
+    "architecture": "x86_64",
+    "cohort": "emulator"
+  },
+  "runner": {
+    "image_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "host_os": "linux",
+    "host_architecture": "x86_64",
+    "network_policy": "disabled"
+  },
+  "comparison": null,
+  "task_universe": [
+    {"task_id": "task-001", "eligibility": "eligible", "exclusion": null},
+    {"task_id": "task-002", "eligibility": "eligible", "exclusion": null},
+    {"task_id": "task-003", "eligibility": "eligible", "exclusion": null},
+    {"task_id": "task-004", "eligibility": "eligible", "exclusion": null},
+    {"task_id": "task-005", "eligibility": "eligible", "exclusion": null}
+  ],
+  "eligible_task_set_sha256": "023cf71d94b1d9fd018da6bfe24fbaa409ddbcfedd77d40750c30990f4495b78",
+  "task_universe_sha256": "b9d97a3078d6b275978096efd160530388c0c6d490ff608ce6b65041dce0daff",
+  "task_results": [
+    {
+      "task_id": "task-001",
+      "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "attempt_state": "terminal",
+      "attempts": 1,
+      "terminal_disposition": "passed",
+      "grade": {
+        "kind": "binary",
+        "value": true,
+        "grader_version": "fixture-grader-1",
+        "grader_output_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "tool_calls": 2,
+      "model_calls": 1,
+      "wall_time_ms": 1000,
+      "output_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    },
+    {
+      "task_id": "task-002",
+      "input_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "attempt_state": "terminal",
+      "attempts": 1,
+      "terminal_disposition": "passed",
+      "grade": {
+        "kind": "binary",
+        "value": true,
+        "grader_version": "fixture-grader-1",
+        "grader_output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "tool_calls": 2,
+      "model_calls": 1,
+      "wall_time_ms": 1000,
+      "output_sha256": ["dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"]
+    },
+    {
+      "task_id": "task-003",
+      "input_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "attempt_state": "terminal",
+      "attempts": 1,
+      "terminal_disposition": "refused",
+      "grade": null,
+      "tool_calls": 1,
+      "model_calls": 1,
+      "wall_time_ms": 300,
+      "output_sha256": []
+    },
+    {
+      "task_id": "task-004",
+      "input_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "attempt_state": "terminal",
+      "attempts": 1,
+      "terminal_disposition": "unsupported",
+      "grade": null,
+      "tool_calls": 1,
+      "model_calls": 1,
+      "wall_time_ms": 300,
+      "output_sha256": []
+    },
+    {
+      "task_id": "task-005",
+      "input_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "attempt_state": "not_attempted",
+      "attempts": 0,
+      "terminal_disposition": null,
+      "grade": null,
+      "tool_calls": 0,
+      "model_calls": 0,
+      "wall_time_ms": 0,
+      "output_sha256": []
+    }
+  ],
+  "grading_mode": "binary",
+  "accounting": {
+    "universe_count": 5,
+    "eligible_count": 5,
+    "excluded_count": 0,
+    "attempted_count": 4,
+    "not_attempted_count": 1,
+    "in_progress_count": 0,
+    "completed_count": 4,
+    "graded_count": 2,
+    "passed_count": 2,
+    "failed_count": 0,
+    "refused_count": 1,
+    "abstained_count": 0,
+    "unsupported_count": 1,
+    "timed_out_count": 0,
+    "tool_failed_count": 0,
+    "ungraded_count": 0
+  },
+  "budget_caps": {
+    "wall_time_ms": 10000,
+    "cpu_time_ms": 10000,
+    "peak_memory_bytes": 100000000,
+    "model_calls": 20,
+    "input_tokens": 20000,
+    "output_tokens": 20000,
+    "tool_calls": 25
+  },
+  "actual_usage": {
+    "wall_time_ms": 2600,
+    "cpu_time_ms": 1400,
+    "peak_memory_bytes": 10000000,
+    "model_calls": 4,
+    "input_tokens": 1000,
+    "output_tokens": 500,
+    "tool_calls": 6
+  },
+  "unavailable_usage": {},
+  "official_score": {
+    "metric_id": "benchmark-owner-official-score",
+    "formula_version": "not-applicable-synthetic",
+    "value": null,
+    "unit": "fraction",
+    "numerator": null,
+    "denominator": null,
+    "is_official": false,
+    "source_output_sha256": null,
+    "unavailable_reason": "Synthetic fixture has no benchmark-owner official score."
+  },
+  "derived_metrics": [
+    {
+      "metric_id": "eligible-coverage",
+      "value": 0.8,
+      "unit": "fraction",
+      "formula": "attempted / eligible",
+      "is_official": false,
+      "unavailable_reason": null
+    },
+    {
+      "metric_id": "graded-coverage",
+      "value": 0.4,
+      "unit": "fraction",
+      "formula": "graded / eligible",
+      "is_official": false,
+      "unavailable_reason": null
+    },
+    {
+      "metric_id": "coverage-adjusted-task-yield",
+      "value": 0.4,
+      "unit": "fraction",
+      "formula": "passed / eligible",
+      "is_official": false,
+      "unavailable_reason": null
+    },
+    {
+      "metric_id": "conditional-success",
+      "value": 1.0,
+      "unit": "fraction",
+      "formula": "passed / graded",
+      "is_official": false,
+      "unavailable_reason": null
+    }
+  ],
+  "provenance": {
+    "input_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "output_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "transcript_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  }
+}
