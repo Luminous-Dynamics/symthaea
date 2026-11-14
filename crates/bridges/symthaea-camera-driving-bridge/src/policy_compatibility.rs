@@ -107,7 +107,9 @@ pub enum CameraPolicyCompatibilityError {
     ActionSchemaMismatch,
     VisionConfigMismatch,
     EncoderSeedMismatch,
+    CameraIdentityMismatch,
     CameraCalibrationMismatch,
+    SimulatorRevisionMismatch,
     RendererMismatch,
     VisualWeightMismatch,
     HdcDimensionMismatch,
@@ -207,10 +209,10 @@ impl CameraDrivingPolicyManifest {
             return Err(CameraPolicyCompatibilityError::EncoderSeedMismatch);
         }
         if self.camera_id != receipt.identity.camera_id {
-            return Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch);
+            return Err(CameraPolicyCompatibilityError::CameraIdentityMismatch);
         }
         if self.simulator_revision != receipt.identity.simulator_revision {
-            return Err(CameraPolicyCompatibilityError::RendererMismatch);
+            return Err(CameraPolicyCompatibilityError::SimulatorRevisionMismatch);
         }
         if receipt.capture_timestamp_us != receipt.upstream_capture_timestamp_us
             || receipt.identity.agent_id != receipt.upstream_agent_id
@@ -432,7 +434,7 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.camera_id = "rear-camera".into();
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch));
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::CameraIdentityMismatch));
     }
 
     #[test]
@@ -440,7 +442,7 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.simulator_revision = "sim-r2".into();
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::RendererMismatch));
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::SimulatorRevisionMismatch));
     }
 
     #[test]
