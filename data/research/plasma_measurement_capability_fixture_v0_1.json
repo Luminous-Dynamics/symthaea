@@ -3,7 +3,8 @@
   "benchmark_status": "synthetic_known_answer_contract_only",
   "policy": {
     "max_expanded_uncertainty_to_decision_margin_ratio": 0.25,
-    "policy_note": "Illustrative S0 target only; not an ISO requirement or universal pass criterion."
+    "policy_note": "Illustrative S0 target only; not an ISO requirement or universal pass criterion.",
+    "qualified_software_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "required_fields": [
     "measurand",
