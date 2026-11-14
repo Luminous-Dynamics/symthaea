@@ -1017,6 +1017,35 @@ mod tests {
     }
 
     #[test]
+    fn committed_schema_and_fixture_match_runtime_contract() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-cavitation-conditioned-coherence-v0.1.0.schema.json"
+        )).expect("committed schema is valid JSON");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        for field in [
+            "intermittency_report_sha256",
+            "coherence_estimator_fingerprint_sha256",
+            "cross_spectrum_convention",
+            "minimum_independent_runs",
+            "windows",
+        ] {
+            assert!(schema["required"].as_array().unwrap().iter().any(|value| value == field));
+        }
+        assert_eq!(
+            schema["$defs"]["coherenceBand"]["properties"]["coherence_lower_bound"]["type"],
+            serde_json::json!(["number", "null"])
+        );
+
+        let fixture: Case = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-cavitation-conditioned-coherence-v0.1.0.json"
+        )).expect("committed synthetic fixture matches runtime input contract");
+        let report = audit(&fixture);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports.len(), 2);
+        assert!((report.aggregate_band_reports[0].present_minus_absent_equal_run_weighted_mean_coherence.unwrap() - 0.5).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn synthetic_fixture_never_qualifies_physical_conditioned_coherence() {
         let report = audit(&case());
         assert_eq!(report.disposition, "INCOMPLETE");
