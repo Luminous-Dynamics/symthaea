@@ -16,16 +16,16 @@ use std::collections::BTreeSet;
 pub const MUSIC_EDIT_TRANSACTION_SCHEMA_V1: &str = "mel-music-edit-transaction-v1";
 pub const MUSIC_EDIT_DECISION_RECEIPT_SCHEMA_V1: &str =
     "mel-music-edit-transaction-decision-receipt-v1";
+pub const MUSIC_EDIT_TRANSACTION_POLICY_SCHEMA_V1: &str = "mel-music-edit-transaction-policy-v1";
 
 const POLICY_DOMAIN: &[u8] = b"luminous.mel.music-edit-transaction-policy.v1";
 const TRANSACTION_DOMAIN: &[u8] = b"luminous.mel.music-edit-transaction.v1";
 const DECISION_DOMAIN: &[u8] = b"luminous.mel.music-edit-transaction-decision.v1";
-const MUSIC_EDIT_TRANSACTION_POLICY_SCHEMA_V1: &str = "mel-music-edit-transaction-policy-v1";
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MusicEditEvidenceKindV1 {
     SymbolicObligation,
+    ActualByteMaterialization,
     RendererExecution,
     TargetAcoustic,
     ProtectedPreservation,
@@ -361,6 +361,7 @@ fn validate_policy(
     }
     for mandatory in [
         MusicEditEvidenceKindV1::SymbolicObligation,
+        MusicEditEvidenceKindV1::ActualByteMaterialization,
         MusicEditEvidenceKindV1::RendererExecution,
         MusicEditEvidenceKindV1::TargetAcoustic,
         MusicEditEvidenceKindV1::ProtectedPreservation,
@@ -801,6 +802,7 @@ mod tests {
     fn required() -> Vec<MusicEditEvidenceKindV1> {
         vec![
             MusicEditEvidenceKindV1::SymbolicObligation,
+            MusicEditEvidenceKindV1::ActualByteMaterialization,
             MusicEditEvidenceKindV1::RendererExecution,
             MusicEditEvidenceKindV1::TargetAcoustic,
             MusicEditEvidenceKindV1::ProtectedPreservation,
