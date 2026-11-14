@@ -1389,54 +1389,35 @@ impl MathService {
         response
     }
 
-    /// Attempt to construct a proof for a mathematical statement.
+    /// Construct a proof for a mathematical statement.
     ///
-    /// Uses the TacticProver from symthaea-core to search for a proof via
-    /// automated tactic application (intro, assumption, ring, omega, norm_num,
-    /// simp, contradiction, induction). Returns a proof script if found.
+    /// Proof construction is deliberately unavailable until this service has
+    /// a real proposition parser and a kernel-checking backend. The previous
+    /// path wrapped arbitrary input text in Expr::Var, then treated a tactic
+    /// script as a verified proof. That did not establish the requested claim.
+    ///
+    /// Keep this fail-closed response until the typed proof pipeline tracked
+    /// in MATH-PROOF-API-001 can distinguish candidates from kernel acceptance.
     pub fn construct_proof(&mut self, conjecture: &str) -> MathResponse {
-        use symthaea_core::hdc::tactics::{Expr, Goal, TacticProver};
-
-        // Parse the conjecture into a Goal and attempt automated proof search.
-        let goal = Goal::new(Expr::Var(conjecture.to_string()));
-        let prover = TacticProver::new(50); // max 50 steps depth
-        let result = prover.prove(&goal);
-
-        let (answer, phi) = if let Some(script) = &result {
-            (
-                format!(
-                    "Proof found ({} steps):\n{}",
-                    script.len(),
-                    script.join("\n")
-                ),
-                0.8 + 0.01 * script.len().min(20) as f64,
-            )
-        } else {
-            ("No proof found within search depth".to_string(), 0.2)
-        };
-        let found = result.is_some();
-
-        self.record_solve(MathProblemType::Proof, phi);
-
+        let query_prefix: String = conjecture.chars().take(32).collect();
         let encoding = BinaryHV::random(seed_from_name(&format!(
-            "PROOF_{}",
-            &conjecture[..conjecture.len().min(32)]
+            "UNSUPPORTED_PROOF_QUERY_{query_prefix}"
         )));
 
-        let response = MathResponse {
-            answer,
+        MathResponse {
+            answer: "Proof construction is unsupported: the input proposition is not parsed and no proof-kernel verification is available.".to_string(),
             numerical_result: None,
             vector_result: None,
             encoding,
-            phi,
-            confidence: if found { 0.95 } else { 0.1 },
-            multipath_verified: found,
+            phi: 0.0,
+            confidence: 0.0,
+            multipath_verified: false,
             problem_type: MathProblemType::Proof,
-            epistemic_caveat: Some("Tactic-based proof search; depth-limited".into()),
+            epistemic_caveat: Some(
+                "No proposition parser or independent proof-kernel check ran; no theorem or proof candidate is claimed.".into(),
+            ),
             error_bound: None,
-        };
-        self.store_episode(&response, "proof");
-        response
+        }
     }
 
     /// Get service telemetry
@@ -1814,6 +1795,20 @@ fn extract_formula(text: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn proof_request_fails_closed_without_parser_or_kernel() {
+        let mut service = MathService::new();
+        let response = service.construct_proof("∀ n : ℕ, n + 0 = n");
+
+        assert_eq!(response.problem_type, MathProblemType::Proof);
+        assert_eq!(response.phi, 0.0);
+        assert_eq!(response.confidence, 0.0);
+        assert!(!response.multipath_verified);
+        assert!(response.answer.contains("unsupported"));
+        assert!(response.epistemic_caveat.is_some());
+        assert_eq!(service.telemetry().problems_solved, 0);
+    }
 
     #[test]
     fn test_classify_problem() {
