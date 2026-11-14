@@ -42,6 +42,17 @@ impl ChoiceOrigin {
     fn newly_manufactured(self) -> bool {
         matches!(self, Self::MadeToOrder)
     }
+
+    fn allowed_by(self, policy: &WardrobePolicy) -> bool {
+        match self {
+            Self::Owned | Self::Repair | Self::Alteration => true,
+            Self::Borrowed => policy.allow_borrowing,
+            Self::Rented => policy.allow_renting,
+            Self::SecondHand => policy.allow_second_hand,
+            Self::Purchase => policy.allow_purchase,
+            Self::MadeToOrder => policy.allow_made_to_order,
+        }
+    }
 }
 
 /// A garment or action that can cover one or more explicitly declared needs.
@@ -61,13 +72,15 @@ pub struct WardrobeChoice {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WardrobePolicy {
-    /// False forbids any new-to-wardrobe acquisition, including borrowing,
-    /// renting and second-hand acquisition. Owned items, repairs and
-    /// alterations remain eligible.
-    pub allow_additions: bool,
-    /// Separately controls made-to-order production. A retail purchase is an
-    /// acquisition, but is not automatically counted as newly manufactured
-    /// because its production timing is not established by this model.
+    /// These acquisition routes are independent. A no-purchase policy can
+    /// still permit borrowing, renting or second-hand access when the user
+    /// explicitly allows those options.
+    pub allow_borrowing: bool,
+    pub allow_renting: bool,
+    pub allow_second_hand: bool,
+    pub allow_purchase: bool,
+    /// Made-to-order is separately controlled because it represents new
+    /// manufacturing, not merely acquisition of an existing garment.
     pub allow_made_to_order: bool,
     /// ISO 4217-style uppercase currency code for every choice cost.
     /// The caller is responsible for confirming the code is currently valid.
@@ -177,20 +190,19 @@ pub fn search_exact(
         }
 
         if choice.must_keep {
-            if !policy.allow_additions && choice.origin.adds_to_wardrobe() {
-                return Err(WardrobeError::ProtectedAdditionForbidden {
+            if choice.origin == ChoiceOrigin::MadeToOrder && !policy.allow_made_to_order {
+                return Err(WardrobeError::ProtectedProductionForbidden {
                     choice_id: choice.id.clone(),
                 });
             }
-            if !policy.allow_made_to_order && choice.origin.newly_manufactured() {
-                return Err(WardrobeError::ProtectedProductionForbidden {
+            if !choice.origin.allowed_by(&policy) {
+                return Err(WardrobeError::ProtectedAdditionForbidden {
                     choice_id: choice.id.clone(),
                 });
             }
             forced.push(choice);
         } else if choice.usable
-            && (policy.allow_additions || !choice.origin.adds_to_wardrobe())
-            && (policy.allow_made_to_order || !choice.origin.newly_manufactured())
+            && choice.origin.allowed_by(&policy)
             && !choice.covers_need_ids.is_empty()
         {
             optional.push(choice);
@@ -419,7 +431,10 @@ mod tests {
             &needs,
             &choices,
             WardrobePolicy {
-                allow_additions: false,
+                allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                 allow_made_to_order: false,
                 currency_code: "ZAR".to_owned(),
             },
@@ -438,7 +453,10 @@ mod tests {
             &needs,
             &choices,
             WardrobePolicy {
-                allow_additions: false,
+                allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                 allow_made_to_order: false,
                 currency_code: "ZAR".to_owned(),
             },
@@ -484,7 +502,10 @@ mod tests {
             &needs,
             &[protected, formal],
             WardrobePolicy {
-                allow_additions: false,
+                allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                 allow_made_to_order: false,
                 currency_code: "ZAR".to_owned(),
             },
@@ -501,7 +522,10 @@ mod tests {
             &[need("office")],
             &[choice("shirt", &["wedding"], ChoiceOrigin::Owned, 0, 0)],
             WardrobePolicy {
-                allow_additions: false,
+                allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                 allow_made_to_order: false,
                 currency_code: "ZAR".to_owned(),
             },
@@ -534,7 +558,10 @@ mod tests {
                 &needs,
                 &choices,
                 WardrobePolicy {
-                    allow_additions: false,
+                    allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 }
@@ -553,7 +580,10 @@ mod tests {
                 &needs,
                 &[protected],
                 WardrobePolicy {
-                    allow_additions: false,
+                    allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 }
@@ -595,7 +625,10 @@ mod tests {
                 &needs,
                 &choices,
                 WardrobePolicy {
-                    allow_additions: false,
+                    allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 }
@@ -616,7 +649,10 @@ mod tests {
                 &needs,
                 &[mixed],
                 WardrobePolicy {
-                    allow_additions: false,
+                    allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 },
@@ -631,7 +667,10 @@ mod tests {
             &[need("work")],
             &[],
             WardrobePolicy {
-                allow_additions: false,
+                allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                 allow_made_to_order: false,
                 currency_code: "zar".to_owned(),
             },
@@ -655,7 +694,10 @@ mod tests {
             &[],
             &[protected],
             WardrobePolicy {
-                allow_additions: false,
+                allow_borrowing: false,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
                 allow_made_to_order: false,
                 currency_code: "ZAR".to_owned(),
             },
