@@ -114,3 +114,8 @@ For a declared IID random sample only, the harness can emit the exact one-sided 
 This is an offline result-bundle checker. It does not execute or sandbox benchmark agents/graders, inspect OS/process/filesystem/network activity, prove observer completeness, authenticate artifact producers, or establish administrative independence. SHA-256 identifies bytes; it does not prove their truth.
 
 The demonstration fixtures are synthetic plumbing examples. They are not measured external-agent results, a real tool integration, a production broker test, independent review, benchmark certification or SOTA result. The next gate is one deterministic effect-origin simulator whose independently maintained ground-truth event log can be compared against runtime observer and gateway receipts, including intentional observer gaps.
+
+
+## Observer independence profile
+
+The proposed E0–E4 observer taxonomy and trust-domain vector are documented in [OBSERVER_INDEPENDENCE.md](OBSERVER_INDEPENDENCE.md). The current separate-process SQLite audit companion is E2: useful for database-snapshot reconciliation, but not an external-service or independent-host witness. The public branch contains the profile and scope contract; the executable SQLite observer remains a separate local companion pending promotion and review.
