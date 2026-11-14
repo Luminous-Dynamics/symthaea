@@ -6,6 +6,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -472,6 +473,274 @@ fn validate_edge(
     }
 }
 
+
+fn parse_rfc3339(value: &Value, path: &str, report: &mut ValidationReport) -> Option<DateTime<FixedOffset>> {
+    let raw = string(value, path, report)?;
+    match DateTime::parse_from_rfc3339(raw) {
+        Ok(parsed) => Some(parsed),
+        Err(_) => {
+            report.error("EGDDM-TIME-001", path, "timestamp must be valid RFC 3339");
+            None
+        }
+    }
+}
+
+fn validate_decision_evidence_list(
+    value: &Value,
+    path: &str,
+    expect_admissible: bool,
+    cutoff: &DateTime<FixedOffset>,
+    decision_at: &DateTime<FixedOffset>,
+    nodes: &HashMap<String, NodeMeta>,
+    seen: &mut HashSet<String>,
+    report: &mut ValidationReport,
+) {
+    let Some(entries) = array(value, path, report) else {
+        return;
+    };
+    for (index, entry) in entries.iter().enumerate() {
+        let entry_path = format!("{path}[{index}]");
+        let Some(entry_object) = object(entry, &entry_path, report) else {
+            continue;
+        };
+        check_allowed_keys(
+            entry_object,
+            &[
+                "evidence_id", "available_to_actor_at", "source_observed_at",
+                "valid_from", "valid_through", "admissibility", "reason",
+            ],
+            &entry_path,
+            report,
+        );
+
+        let evidence_id = field(entry, "evidence_id", &entry_path, report)
+            .and_then(|v| string(v, &format!("{entry_path}.evidence_id"), report))
+            .map(str::to_owned);
+        if let Some(evidence_id) = evidence_id.as_deref() {
+            if !seen.insert(evidence_id.to_owned()) {
+                report.error(
+                    "DTEA-EVIDENCE-001",
+                    format!("{entry_path}.evidence_id"),
+                    format!("evidence {evidence_id:?} is duplicated across decision evidence sets"),
+                );
+            }
+            match nodes.get(evidence_id) {
+                Some(node) if node.node_type == "evidence" => {}
+                Some(node) => report.error(
+                    "DTEA-EVIDENCE-002",
+                    format!("{entry_path}.evidence_id"),
+                    format!("decision evidence reference must target an evidence node, not {}", node.node_type),
+                ),
+                None => report.error(
+                    "DTEA-EVIDENCE-003",
+                    format!("{entry_path}.evidence_id"),
+                    format!("unknown evidence node {evidence_id:?}"),
+                ),
+            }
+        }
+
+        let available = field(entry, "available_to_actor_at", &entry_path, report)
+            .and_then(|v| parse_rfc3339(v, &format!("{entry_path}.available_to_actor_at"), report));
+        if let Some(available) = available.as_ref() {
+            if available > cutoff {
+                report.error(
+                    "DTEA-EVIDENCE-004",
+                    format!("{entry_path}.available_to_actor_at"),
+                    "evidence was not available to the actor by the decision knowledge cutoff",
+                );
+            }
+            if available > decision_at {
+                report.error(
+                    "DTEA-EVIDENCE-005",
+                    format!("{entry_path}.available_to_actor_at"),
+                    "evidence became available after the decision",
+                );
+            }
+        }
+
+        if let Some(source_observed) = entry.get("source_observed_at") {
+            if let Some(source_observed) = optional_string(source_observed, &format!("{entry_path}.source_observed_at"), report) {
+                let parsed = DateTime::parse_from_rfc3339(&source_observed);
+                match parsed {
+                    Ok(source_observed) => {
+                        if let Some(available) = available.as_ref() {
+                            if source_observed > *available {
+                                report.error(
+                                    "DTEA-EVIDENCE-006",
+                                    format!("{entry_path}.source_observed_at"),
+                                    "source observation cannot occur after evidence became available to the actor",
+                                );
+                            }
+                        }
+                    }
+                    Err(_) => report.error(
+                        "EGDDM-TIME-001",
+                        format!("{entry_path}.source_observed_at"),
+                        "timestamp must be valid RFC 3339",
+                    ),
+                }
+            }
+        }
+
+        for key in ["valid_from", "valid_through"] {
+            if let Some(value) = entry.get(key) {
+                if let Some(value) = optional_string(value, &format!("{entry_path}.{key}"), report) {
+                    if DateTime::parse_from_rfc3339(&value).is_err() {
+                        report.error("EGDDM-TIME-001", format!("{entry_path}.{key}"), "timestamp must be valid RFC 3339");
+                    }
+                }
+            }
+        }
+
+        let admissibility = field(entry, "admissibility", &entry_path, report)
+            .and_then(|v| enum_value(v, &format!("{entry_path}.admissibility"), &["admissible", "inadmissible", "indeterminate"], report));
+        if let Some(admissibility) = admissibility.as_deref() {
+            if expect_admissible && admissibility != "admissible" {
+                report.error(
+                    "DTEA-EVIDENCE-007",
+                    format!("{entry_path}.admissibility"),
+                    "consulted evidence must be marked admissible at decision time",
+                );
+            }
+            if !expect_admissible && admissibility == "admissible" {
+                report.error(
+                    "DTEA-EVIDENCE-008",
+                    format!("{entry_path}.admissibility"),
+                    "excluded evidence cannot be marked admissible",
+                );
+            }
+        }
+
+        if let Some(reason) = field(entry, "reason", &entry_path, report) {
+            string(reason, &format!("{entry_path}.reason"), report);
+        }
+    }
+}
+
+fn validate_decision_payload(
+    payload: &Value,
+    path: &str,
+    occurred_at: Option<&str>,
+    state_effect: &str,
+    targets: &[String],
+    nodes: &HashMap<String, NodeMeta>,
+    report: &mut ValidationReport,
+) {
+    let Some(payload_object) = object(payload, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        payload_object,
+        &[
+            "decision_at", "knowledge_cutoff_at", "actor_id", "authority_scope",
+            "policy_version", "outcome", "rationale_summary", "consulted_evidence",
+            "excluded_evidence", "later_corrections", "abstention_reason",
+        ],
+        path,
+        report,
+    );
+
+    let decision_at = field(payload, "decision_at", path, report)
+        .and_then(|v| parse_rfc3339(v, &format!("{path}.decision_at"), report));
+    let cutoff = field(payload, "knowledge_cutoff_at", path, report)
+        .and_then(|v| parse_rfc3339(v, &format!("{path}.knowledge_cutoff_at"), report));
+
+    for key in ["actor_id", "authority_scope", "policy_version", "outcome"] {
+        if let Some(value) = field(payload, key, path, report) {
+            string(value, &format!("{path}.{key}"), report);
+        }
+    }
+
+    if let (Some(decision_at), Some(cutoff)) = (decision_at.as_ref(), cutoff.as_ref()) {
+        if cutoff > decision_at {
+            report.error(
+                "DTEA-TIME-001",
+                format!("{path}.knowledge_cutoff_at"),
+                "knowledge cutoff cannot be later than the decision time",
+            );
+        }
+        match occurred_at.and_then(|value| DateTime::parse_from_rfc3339(value).ok()) {
+            Some(event_time) if event_time == *decision_at => {}
+            Some(_) => report.error(
+                "DTEA-TIME-002",
+                format!("{path}.decision_at"),
+                "decision_at must match the decision_recorded event's occurred_at",
+            ),
+            None => report.error(
+                "DTEA-TIME-003",
+                format!("{path}.decision_at"),
+                "decision_recorded requires a valid occurred_at timestamp",
+            ),
+        }
+
+        if let Some(consulted) = field(payload, "consulted_evidence", path, report) {
+            let mut seen = HashSet::new();
+            validate_decision_evidence_list(
+                consulted,
+                &format!("{path}.consulted_evidence"),
+                true,
+                cutoff,
+                decision_at,
+                nodes,
+                &mut seen,
+                report,
+            );
+            if let Some(excluded) = field(payload, "excluded_evidence", path, report) {
+                validate_decision_evidence_list(
+                    excluded,
+                    &format!("{path}.excluded_evidence"),
+                    false,
+                    cutoff,
+                    decision_at,
+                    nodes,
+                    &mut seen,
+                    report,
+                );
+            }
+        } else if let Some(excluded) = field(payload, "excluded_evidence", path, report) {
+            let mut seen = HashSet::new();
+            validate_decision_evidence_list(
+                excluded,
+                &format!("{path}.excluded_evidence"),
+                false,
+                cutoff,
+                decision_at,
+                nodes,
+                &mut seen,
+                report,
+            );
+        }
+    }
+
+    if let Some(later) = payload.get("later_corrections") {
+        if let Some(later) = array(later, &format!("{path}.later_corrections"), report) {
+            let mut unique = HashSet::new();
+            for (index, correction) in later.iter().enumerate() {
+                if let Some(correction) = string(correction, &format!("{path}.later_corrections[{index}]"), report) {
+                    if !unique.insert(correction.to_owned()) {
+                        report.error("DTEA-EVENT-001", format!("{path}.later_corrections[{index}]"), "duplicate correction event reference");
+                    }
+                }
+            }
+        }
+    }
+
+    if state_effect != "introduces" && state_effect != "observes" {
+        report.error(
+            "DTEA-EVENT-002",
+            format!("{path}"),
+            "decision_recorded must use state_effect=introduces or observes",
+        );
+    }
+    if !targets.iter().any(|target| nodes.get(target).is_some_and(|node| node.node_type == "decision")) {
+        report.error(
+            "DTEA-EVENT-003",
+            format!("{path}"),
+            "decision_recorded must target at least one decision node",
+        );
+    }
+}
+
 fn validate_event(
     value: &Value,
     index: usize,
@@ -500,9 +769,9 @@ fn validate_event(
     let effect = field(value, "state_effect", &path, report)
         .and_then(|v| enum_value(v, &format!("{path}.state_effect"), EVENT_EFFECTS, report));
 
-    if let Some(occurred_at) = event.get("occurred_at") {
-        optional_string(occurred_at, &format!("{path}.occurred_at"), report);
-    }
+    let occurred_at = event
+        .get("occurred_at")
+        .and_then(|value| optional_string(value, &format!("{path}.occurred_at"), report));
     if let Some(observed_at) = field(value, "observed_at", &path, report) {
         string(observed_at, &format!("{path}.observed_at"), report);
     }
@@ -587,6 +856,20 @@ fn validate_event(
             let expected_effect = if kind == "evidence_invalidated" { "invalidates" } else { "supersedes" };
             if effect != expected_effect {
                 report.error("EGDDM-EVENT-007", format!("{path}.state_effect"), format!("{kind} must use state_effect={expected_effect}"));
+            }
+        }
+        if kind == "decision_recorded" {
+            let decision_payload = event.get("payload");
+            if let Some(decision_payload) = decision_payload {
+                validate_decision_payload(
+                    decision_payload,
+                    &format!("{path}.payload"),
+                    occurred_at.as_deref(),
+                    &effect,
+                    &targets_for_event,
+                    nodes,
+                    report,
+                );
             }
         }
         if kind == "development_action_proposed" {
@@ -891,6 +1174,63 @@ mod tests {
         assert_eq!(oracle["negative_controls"].as_array().map(Vec::len), Some(7));
         assert_eq!(oracle["expected_snapshots"].as_array().map(Vec::len), Some(3));
     }
+
+
+
+    const DTEA_FIXTURE: &str = include_str!(
+        "../../../docs/development-map/fixtures/decision-time-admissibility-v0.1.map.json"
+    );
+    const DTEA_EXPECTED: &str = include_str!(
+        "../../../docs/development-map/fixtures/decision-time-admissibility-v0.1.expected.json"
+    );
+
+    #[test]
+    fn decision_time_fixture_preserves_late_arrival_and_later_correction() {
+        let report = validate_json(DTEA_FIXTURE).expect("DTEA fixture JSON must parse");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn backdated_but_late_evidence_cannot_be_consulted() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        let late = value["events"][2]["payload"]["excluded_evidence"][0].clone();
+        value["events"][2]["payload"]["consulted_evidence"] = Value::Array(vec![late]);
+        value["events"][2]["payload"]["excluded_evidence"] = Value::Array(vec![]);
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-004"));
+    }
+
+    #[test]
+    fn source_cannot_be_observed_after_actor_availability() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][2]["payload"]["consulted_evidence"][0]["source_observed_at"] =
+            Value::String("2026-11-14T09:10:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-006"));
+    }
+
+    #[test]
+    fn knowledge_cutoff_cannot_be_after_decision() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][2]["payload"]["knowledge_cutoff_at"] =
+            Value::String("2026-11-14T10:01:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-TIME-001"));
+    }
+
+    #[test]
+    fn decision_time_manifest_survives_current_evidence_invalidation() {
+        let value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        assert_eq!(value["nodes"][2]["lifecycle"]["state"], "stale");
+        assert_eq!(
+            value["events"][2]["payload"]["consulted_evidence"][0]["evidence_id"],
+            "dtea:evidence:E1"
+        );
+        let oracle: Value = serde_json::from_str(DTEA_EXPECTED).expect("DTEA expected JSON");
+        assert_eq!(oracle["expected_decision"]["decision_time_state_of_E1"], "admissible");
+        assert_eq!(oracle["expected_decision"]["current_state_of_E1"], "stale");
+    }
+
 
     #[test]
     fn containment_cycles_are_rejected() {
