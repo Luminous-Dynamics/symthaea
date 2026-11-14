@@ -1191,8 +1191,11 @@ mod tests {
         );
 
         assert!(!report.qualifies_functional_self_maintenance());
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::EmptyRequiredRegenerativeSet
-        }));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::EmptyRequiredRegenerativeSet })
+        );
     }
 }
