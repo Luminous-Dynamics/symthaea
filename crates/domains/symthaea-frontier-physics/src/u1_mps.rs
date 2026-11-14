@@ -150,6 +150,18 @@ pub enum U1MpsError {
     DuplicateTeBDHamiltonianBond {
         bond_index: usize,
     },
+    ObservableSiteOutOfRange {
+        site_index: usize,
+        site_count: usize,
+    },
+    ObservableBondOutOfRange {
+        bond_index: usize,
+        site_count: usize,
+    },
+    InvalidObservableOperator {
+        index: usize,
+    },
+    InvalidObservableErrorInput,
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -318,6 +330,26 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "Hamiltonian contains more than one local term for bond {bond_index}"
             ),
+            Self::ObservableSiteOutOfRange {
+                site_index,
+                site_count,
+            } => write!(
+                f,
+                "observable site {site_index} is out of range for {site_count} sites"
+            ),
+            Self::ObservableBondOutOfRange {
+                bond_index,
+                site_count,
+            } => write!(
+                f,
+                "observable bond {bond_index} is out of range for {site_count} sites"
+            ),
+            Self::InvalidObservableOperator { index } => {
+                write!(f, "local observable matrix entry {index} is non-finite")
+            }
+            Self::InvalidObservableErrorInput => {
+                write!(f, "observable error-bound inputs must be finite and non-negative")
+            }
             Self::DenseChargeLeakage {
                 basis_index,
                 amplitude,
@@ -948,6 +980,82 @@ fn right_canonicalize_site(
     tensors[site] = new_current;
     Ok(stats)
 }
+
+
+
+/// Direct MPS contraction receipt for a one- or two-site observable.
+///
+/// The operator norm is conservatively upper-bounded by its Frobenius norm.
+/// The expectation is raw (not divided by norm squared), so normalization is
+/// never hidden inside this receipt.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1ObservableReceipt {
+    pub start_site: usize,
+    pub support_sites: usize,
+    pub expectation: Complex64,
+    pub norm_squared: f64,
+    pub identity_norm_residual: f64,
+    pub operator_frobenius_norm_upper_bound: f64,
+}
+
+impl U1ObservableReceipt {
+    /// Bound the change in this raw expectation from a state-vector L2 bound.
+    ///
+    /// For states psi and phi:
+    /// |<psi|O|psi>-<phi|O|phi>|
+    /// <= ||O|| * ||psi-phi|| * (||psi||+||phi||).
+    pub fn state_distance_error_upper_bound(
+        &self,
+        state_l2_error: f64,
+        other_state_norm_squared: f64,
+    ) -> Result<f64, U1MpsError> {
+        if !state_l2_error.is_finite()
+            || state_l2_error < 0.0
+            || !other_state_norm_squared.is_finite()
+            || other_state_norm_squared < 0.0
+            || !self.norm_squared.is_finite()
+            || self.norm_squared < 0.0
+            || !self.operator_frobenius_norm_upper_bound.is_finite()
+            || self.operator_frobenius_norm_upper_bound < 0.0
+        {
+            return Err(U1MpsError::InvalidObservableErrorInput);
+        }
+        let bound = self.operator_frobenius_norm_upper_bound
+            * state_l2_error
+            * (self.norm_squared.sqrt() + other_state_norm_squared.sqrt());
+        if !bound.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "observable state-distance error bound",
+            ));
+        }
+        Ok(bound)
+    }
+}
+
+fn matrix_frobenius_norm<const N: usize>(
+    matrix: &[[Complex64; N]; N],
+) -> Result<f64, U1MpsError> {
+    let mut squared = 0.0;
+    for row in 0..N {
+        for column in 0..N {
+            let value = matrix[row][column];
+            if !value.re.is_finite() || !value.im.is_finite() {
+                return Err(U1MpsError::InvalidObservableOperator {
+                    index: row * N + column,
+                });
+            }
+            squared += value.norm_sqr();
+        }
+    }
+    let norm = squared.sqrt();
+    if !norm.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "observable operator Frobenius norm",
+        ));
+    }
+    Ok(norm)
+}
+
 
 impl ComplexU1Mps {
     /// Validate a complete open-boundary MPS and its charge-selection rules.
