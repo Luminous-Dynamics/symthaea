@@ -244,7 +244,7 @@ fn canonical_decimal(value: &str) -> Option<(i128, i128)> {
     Some((numerator / divisor, scale / divisor))
 }
 
-fn written_pitch_equal(
+pub(crate) fn written_pitch_equal(
     left: &crate::musicxml_notation_events::MusicXmlWrittenPitchV1,
     right: &crate::musicxml_notation_events::MusicXmlWrittenPitchV1,
 ) -> bool {
