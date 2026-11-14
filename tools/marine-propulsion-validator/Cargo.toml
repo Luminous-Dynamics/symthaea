@@ -73,3 +73,7 @@ path = "src/bin/marine_hull_state_evidence_join_audit.rs"
 [[bin]]
 name = "marine-acoustic-timebase-binding-audit"
 path = "src/bin/marine_acoustic_timebase_binding_audit.rs"
+
+[[bin]]
+name = "marine-performance-drift-audit"
+path = "src/bin/marine_performance_drift_audit.rs"
