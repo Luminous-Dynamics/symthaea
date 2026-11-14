@@ -2406,6 +2406,8 @@ pub struct U1MpsObservableErrorReceipt {
     pub global_state_l2_error_bound: f64,
     pub compiled_state_l2_error_budget: Option<f64>,
     pub expectation_error_upper_bound: f64,
+    /// Always false in this API: Strang/Trotter time-discretization error is separate.
+    pub trotter_error_included: bool,
     pub budget_satisfied: bool,
 }
 
@@ -2484,6 +2486,7 @@ impl U1MpsObservableErrorTarget {
                 global_state_l2_error_bound: 0.0,
                 compiled_state_l2_error_budget: None,
                 expectation_error_upper_bound: 0.0,
+                trotter_error_included: false,
                 budget_satisfied: true,
             });
         }
@@ -2512,6 +2515,7 @@ impl U1MpsObservableErrorTarget {
             global_state_l2_error_bound,
             compiled_state_l2_error_budget,
             expectation_error_upper_bound,
+            trotter_error_included: false,
             budget_satisfied: expectation_error_upper_bound <= self.maximum_expectation_error,
         })
     }
@@ -6527,6 +6531,7 @@ mod tests {
             .unwrap();
         assert!(receipt.global_state_l2_error_bound >= 0.7);
         assert!(receipt.expectation_error_upper_bound <= 1.3);
+        assert!(!receipt.trotter_error_included);
         assert!(receipt.budget_satisfied);
         assert!((receipt.compiled_state_l2_error_budget.unwrap()
             - 1.3 / (1.0 + 0.5_f64.sqrt()))
@@ -6546,6 +6551,7 @@ mod tests {
             .certify(&result.truncation_ledger, result.output_norm_squared)
             .unwrap();
         assert!(receipt.expectation_error_upper_bound > 1.0);
+        assert!(!receipt.trotter_error_included);
         assert!(!receipt.budget_satisfied);
     }
 
