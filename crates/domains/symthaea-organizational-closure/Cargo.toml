@@ -7,5 +7,9 @@ description = "Evidence-verified functional self-maintenance and organizational 
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
 [dependencies]
-serde = { workspace = true }
-sha2 = { workspace = true }
+serde = { version = "=1.0.228", features = ["derive"] }
+sha2 = "=0.10.9"
+
+# Keep this research package independently buildable; the main Symthaea
+# workspace explicitly excludes this nested workspace.
+[workspace]
