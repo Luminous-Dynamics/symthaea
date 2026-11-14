@@ -18,6 +18,7 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 12. [AOBENCH-007 organizational reconfiguration](https://github.com/Luminous-Dynamics/symthaea/issues/12113) — structural evolution and capability preservation.
 13. [Operational continuity specification](AOBENCH_OPERATIONAL_CONTINUITY_2026-11-14.md) — simulation/bisimulation and separate capability, governance and evidence continuity.
 14. [AOBENCH-008 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/12121) — operational identity and behavioral continuity across reconfiguration.
+15. [Mutation adequacy and cross-plane adversarial qualification](AOBENCH_MUTATION_ADEQUACY_2026-11-14.md) — mutation-tested assurance, paired positive twins and sealed challenge protocol; tracked by [AOBENCH-009 #12140](https://github.com/Luminous-Dynamics/symthaea/issues/12140).
 
 ## Current implementation
 
