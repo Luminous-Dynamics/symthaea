@@ -385,6 +385,53 @@ fn validate_source_tree_budget(
     Ok(())
 }
 
+fn validate_part_metadata_graph_binding(
+    graph: &MusicXmlPartNotationGraphV1,
+    side: &str,
+) -> Result<(), MusicXmlNotationEvaluationErrorV1> {
+    let invalid = |reason: &str| MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
+        side: side.into(),
+        reason: reason.into(),
+    };
+    match (&graph.part_metadata_layer_present, &graph.part_metadata) {
+        (false, Some(_)) => Err(invalid(
+            "part metadata exists without a committed metadata-layer presence marker",
+        )),
+        (true, Some(metadata)) => {
+            let declared_part_id = metadata
+                .source_score_part
+                .attributes
+                .iter()
+                .find(|(name, _)| name == "id")
+                .map(|(_, value)| value.as_str());
+            let instrument_ids: Vec<String> = metadata
+                .source_score_part
+                .children
+                .iter()
+                .filter(|node| node.element == "score-instrument")
+                .filter_map(|node| {
+                    node.attributes
+                        .iter()
+                        .find(|(name, _)| name == "id")
+                        .map(|(_, value)| value.clone())
+                })
+                .collect();
+            if metadata.source_part_id != graph.part_id
+                || metadata.source_score_part.element != "score-part"
+                || declared_part_id != Some(graph.part_id.as_str())
+                || instrument_ids != metadata.score_instrument_ids
+            {
+                Err(invalid(
+                    "part metadata source locator, part ID or score-instrument declarations are inconsistent",
+                ))
+            } else {
+                Ok(())
+            }
+        }
+        _ => Ok(()),
+    }
+}
+
 fn validate_graph(
     graph: &MusicXmlPartNotationGraphV1,
     side: &str,
@@ -399,6 +446,7 @@ fn validate_graph(
             reason: "empty or inconsistent part/score-clock identity".into(),
         });
     }
+    validate_part_metadata_graph_binding(graph, side)?;
     if !matches!(&graph.map.status, MeasureMapStatus::Supported) {
         return Err(if side == "reference" {
             MusicXmlNotationEvaluationErrorV1::ReferenceMeasureMapUnavailable
@@ -2169,6 +2217,29 @@ mod tests {
                 default_config()
             ),
             Err(MusicXmlNotationEvaluationErrorV1::SourceTreeDepthExceeded { .. })
+        ));
+    }
+
+
+    #[test]
+    fn inconsistent_part_metadata_source_binding_refuses_scoring() {
+        let reference = graph(&part_metadata_fixture("Violin I", 1));
+        let mut prediction = reference.clone();
+        prediction.part_metadata.as_mut().unwrap().source_part_id = "P2".into();
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(
+                &reference, &prediction, default_config()
+            ),
+            Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
+        ));
+
+        prediction = reference.clone();
+        prediction.part_metadata.as_mut().unwrap().score_instrument_ids.clear();
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(
+                &reference, &prediction, default_config()
+            ),
+            Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
         ));
     }
 
