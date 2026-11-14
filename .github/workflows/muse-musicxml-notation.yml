@@ -9,6 +9,7 @@ on:
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
       - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
@@ -16,6 +17,7 @@ on:
   push:
     branches:
       - "research/melothaea-musicxml-notation-events-v1"
+      - "research/melothaea-score-event-evaluator-v2"
     paths:
       - ".github/workflows/muse-musicxml-notation.yml"
       - "Cargo.toml"
@@ -23,6 +25,7 @@ on:
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
       - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
@@ -69,11 +72,15 @@ jobs:
         run: |
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
+            crates/domains/symthaea-muse/src/musicxml_notation_eval.rs \
             crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
             crates/domains/symthaea-muse/src/bin/muse_studio.rs \
             crates/domains/symthaea-muse/src/lib.rs \
             crates/domains/symthaea-muse-protocol/src/lib.rs \
             crates/domains/symthaea-muse-ui/src/add_music_page.rs
+
+      - name: Test multidimensional MusicXML notation evaluator
+        run: "cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::"
 
       - name: Test MusicXML notation-event parser
         run: "cargo test --locked -p symthaea-muse --features theory musicxml_notation_events::tests::"
