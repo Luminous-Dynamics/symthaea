@@ -196,3 +196,8 @@ The standard-library Go Ed25519 checkpoint verifier is now committed under `chec
 Local verification of the assembled v0.8 companion source after aligning the public package contents: focused checkpoint tests, focused checkpoint race test and vet passed; full `bash verify.sh` passed, including default and SQLite-tagged suites/race/vet/build legs. The local companion has 68 named test functions in the default build and 90 with the optional SQLite tag. Those aggregate counts and SQLite-tagged results describe the local companion, not the exact public checkout; the public PR now includes the 16-test checkpoint package and the updated public verifier script.
 
 The public verifier is a building block, not a deployed witness. It does not provision or custody production keys, protect its own trusted cursor, operate a quorum/transparency log, provide split-view gossip, or prove downstream effect occurrence. TLC remains pending unless the pinned runner is executed and its state counts/results are archived.
+
+
+## 14 November 2026 — independent Ed25519 implementation cross-check
+
+Added `checkpoints/openssl_interop_test.go`. Where OpenSSL CLI is installed, the test reconstructs the public test vector's exact domain-separated signing bytes, packages the public Ed25519 key as RFC 8410 SubjectPublicKeyInfo DER and asks OpenSSL `pkeyutl` to verify the detached signature. Local test passed with OpenSSL 3.5.5. If OpenSSL is absent, the test skips with an explicit reason; the Go standard-library vector verification remains required. This checks the signing bytes/signature across two crypto providers, not the full monotonic checkpoint state machine in an independent implementation.
