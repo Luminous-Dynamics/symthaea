@@ -12,28 +12,9 @@
 //!
 //! ## Output Format
 //!
-//! ```text
-//! ┌─────────────────────────────────────────────────────────┐
-//! │         SPARK ENGINE PROTOTYPE SPECIFICATION            │
-//! ├─────────────────────────────────────────────────────────┤
-//! │  Model: SE-5K-DD-25                                     │
-//! │  Power: 5 kW thermal                                    │
-//! │  Fuel: Deuterium-Deuterium                              │
-//! │  Lifetime: 25 years                                     │
-//! ├─────────────────────────────────────────────────────────┤
-//! │  DIMENSIONS                                             │
-//! │  Core diameter: 60 mm                                   │
-//! │  Shell thickness: 10 mm                                 │
-//! │  Shielding: 200 mm                                      │
-//! │  Total diameter: 540 mm                                 │
-//! ├─────────────────────────────────────────────────────────┤
-//! │  BILL OF MATERIALS                                      │
-//! │  1. TiVZrNbPd HEA shell - 2.4 kg                        │
-//! │  2. Zr/Nb nano-laminate - 0.8 kg                        │
-//! │  3. Galinstan core - 1.2 kg                             │
-//! │  4. LiH shielding - 45 kg                               │
-//! └─────────────────────────────────────────────────────────┘
-//! ```
+//! The formatter emits a conceptual screening report only. It does not produce
+//! a fabrication package, construction procedure, safety case, regulatory
+//! determination, or evidence of physical validation.
 
 use super::coupled_physics::{CoupledSimulationResult, OperatingConditions};
 use super::radiation_damage::FusionReaction;
@@ -659,11 +640,11 @@ impl PrototypeSpecification {
             self.operating_temp_range_k.0, self.operating_temp_range_k.1
         ));
         output.push_str(&format!(
-            "  Design Lifetime:   {:.0} years\n",
+            "  Target Lifetime:   {:.0} years (unqualified)\n",
             self.design_lifetime_years
         ));
         output.push_str(&format!(
-            "  Predicted Life:    {:.1} years\n",
+            "  Modelled Life:     {:.1} years (unqualified)\n",
             self.predicted_lifetime_years
         ));
         output.push('\n');
@@ -724,7 +705,7 @@ impl PrototypeSpecification {
         output.push_str(&"─".repeat(70));
         output.push('\n');
         output.push_str(
-            "No independent hazard analysis, radiation-safety assessment, pressure-boundary review, or safety authorization is established by this model.\\n",
+            "No independent hazard analysis, radiation-safety assessment, pressure-boundary review, or safety authorization is established by this model.\n",
         );
         output.push('\n');
 
@@ -733,7 +714,7 @@ impl PrototypeSpecification {
         output.push_str(&"─".repeat(70));
         output.push('\n');
         output.push_str(
-            "No fabrication or construction procedure is supplied. Manufacturing readiness requires separate qualified engineering, materials/process evidence, inspection planning, and independent review.\\n",
+            "No fabrication or construction procedure is supplied. Manufacturing readiness requires separate qualified engineering, materials/process evidence, inspection planning, and independent review.\n",
         );
         output.push('\n');
 
@@ -742,11 +723,11 @@ impl PrototypeSpecification {
         output.push_str(&"─".repeat(70));
         output.push('\n');
         output.push_str(
-            "Applicable jurisdiction, licensing, safeguards, radiation protection, environmental review, and export-control requirements require determination by qualified authorities.\\n",
+            "Applicable jurisdiction, licensing, safeguards, radiation protection, environmental review, and export-control requirements require determination by qualified authorities.\n",
         );
         output.push('\n');
         output.push_str(&"═".repeat(70));
-        output.push_str("\n  END OF SPECIFICATION\n");
+        output.push_str("\n  END OF CONCEPT SCREEN ONLY\n");
         output.push_str(&"═".repeat(70));
         output.push('\n');
 
