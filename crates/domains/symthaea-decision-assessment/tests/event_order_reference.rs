@@ -332,6 +332,127 @@ fn invalid_partial_orders_fail_closed() {
 }
 
 #[test]
+fn retry_is_allowed_only_after_not_applied_reconciliation_and_stop_discharge() {
+    let data = fixture();
+    let case = data["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "EO-POS-002")
+        .unwrap();
+    let mut events = parse_events(&case["events"]);
+    let mut retry = events
+        .iter()
+        .find(|event| event.event_id == "outcome-not-applied")
+        .unwrap()
+        .clone();
+    retry.event_id = "retry-after-discharge".to_owned();
+    retry.kind = DecisionEventKind::RetryAttempted;
+    retry.reconciled_outcome = None;
+    let clock = retry.clock.as_mut().expect("fixture operation clock");
+    clock.sequence_number = Some(8);
+    clock.interval = Some(EventTimeInterval {
+        earliest_unix_ms: 170,
+        latest_unix_ms: 170,
+    });
+    retry.causal_predecessors = vec!["stop-revalidated".to_owned()];
+    events.push(retry);
+
+    let report = evaluate_event_order(&events, &parse_qualification(&case["qualification"]))
+        .expect("retry after exact reconciliation and stop discharge");
+    assert_eq!(report.disposition, EventTraceDisposition::Safe);
+    assert!(!report.block_irreversible_actions);
+    assert_eq!(report.retry_before_reconciliation_count, 0);
+}
+
+#[test]
+fn retry_after_reconciliation_but_before_stop_discharge_is_critical() {
+    let data = fixture();
+    let case = data["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "EO-POS-002")
+        .unwrap();
+    let mut events = parse_events(&case["events"]);
+    let discharge = events
+        .iter_mut()
+        .find(|event| event.event_id == "stop-revalidated")
+        .unwrap();
+    let clock = discharge.clock.as_mut().unwrap();
+    clock.sequence_number = Some(9);
+    clock.interval = Some(EventTimeInterval {
+        earliest_unix_ms: 180,
+        latest_unix_ms: 180,
+    });
+
+    let mut retry = events
+        .iter()
+        .find(|event| event.event_id == "outcome-not-applied")
+        .unwrap()
+        .clone();
+    retry.event_id = "retry-before-discharge".to_owned();
+    retry.kind = DecisionEventKind::RetryAttempted;
+    retry.reconciled_outcome = None;
+    let clock = retry.clock.as_mut().unwrap();
+    clock.sequence_number = Some(8);
+    clock.interval = Some(EventTimeInterval {
+        earliest_unix_ms: 170,
+        latest_unix_ms: 170,
+    });
+    retry.causal_predecessors = vec!["outcome-not-applied".to_owned(), "stop".to_owned()];
+    events.push(retry);
+
+    let report = evaluate_event_order(&events, &parse_qualification(&case["qualification"]))
+        .expect("retry before stop discharge is a valid but unsafe trace");
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report.block_irreversible_actions);
+    assert!(report
+        .reason_codes
+        .contains(&"RETRY_BEFORE_STOP_DISCHARGE:OP-6".to_owned()));
+}
+
+#[test]
+fn stop_discharge_cannot_cover_a_preexisting_unreconciled_operation() {
+    let data = fixture();
+    let case = data["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "EO-UNK-003")
+        .unwrap();
+    let mut events = parse_events(&case["events"]);
+    let mut discharge = events
+        .iter()
+        .find(|event| event.event_id == "stop")
+        .unwrap()
+        .clone();
+    discharge.event_id = "stop-discharge".to_owned();
+    discharge.kind = DecisionEventKind::StopObligationDischarged;
+    discharge.operation_id = None;
+    discharge.reconciled_outcome = None;
+    let clock = discharge.clock.as_mut().unwrap();
+    clock.sequence_number = Some(6);
+    clock.interval = Some(EventTimeInterval {
+        earliest_unix_ms: 150,
+        latest_unix_ms: 150,
+    });
+    discharge.causal_predecessors = vec!["stop".to_owned()];
+    events.push(discharge);
+
+    let mut qualification = parse_qualification(&case["qualification"]);
+    qualification.causal_ordering = GateState::Pass;
+    qualification.stop_disposition = GateState::Pass;
+
+    let report = evaluate_event_order(&events, &qualification)
+        .expect("unsafe discharge remains a classifiable trace");
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report
+        .reason_codes
+        .contains(&"STOP_DISCHARGE_WITH_UNRECONCILED_OPERATION:OP-5".to_owned()));
+}
+
+#[test]
 fn qualified_clock_and_causal_order_disagreement_is_not_silently_resolved() {
     let mut qualification = baseline_qualification();
     qualification.causal_ordering = GateState::Pass;
