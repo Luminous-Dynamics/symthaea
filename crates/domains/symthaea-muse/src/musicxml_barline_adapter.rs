@@ -602,6 +602,7 @@ pub fn parse_musicxml_part_notation_graph(
                 playback_controls: Vec::new(),
                 notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
                 part_metadata,
+                part_metadata_layer_present: true,
             }),
         }
     }
