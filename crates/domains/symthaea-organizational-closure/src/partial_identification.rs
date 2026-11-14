@@ -896,7 +896,32 @@ pub fn evaluate_partial_identification(
     }
 
     if unresolved {
-        return PartialIdentificationReport {    let selected_vec = selected_ids.iter().cloned().collect::<Vec<_>>();
+        return PartialIdentificationReport {
+            qualification: PartialIdentificationQualification::Inconclusive,
+            decision_quality: None,
+            exact_identified_bounds: None,
+            declared_bounds: trace.declared_bounds,
+            selected_experiment_count: selected_ids.len(),
+            total_cost_units: total_cost,
+            total_risk_units: total_risk,
+            possible_worlds_before: oracle.admissible_worlds.len(),
+            possible_worlds_after: 0,
+            guaranteed_potency: None,
+            optimal_guaranteed_potency: None,
+            guaranteed_potency_regret: None,
+            normalized_potency_regret: None,
+            selected_experiment_ids: selected_ids.into_iter().collect(),
+            oracle_optimal_experiment_ids: Vec::new(),
+            zero_potency_experiment_count: 0,
+            selected_zero_potency_count: 0,
+            path_interception_candidate_count: 0,
+            path_interception_confirmed_count: 0,
+            path_interception_disagreement_count: 0,
+            findings,
+        };
+    }
+
+    let selected_vec = selected_ids.iter().cloned().collect::<Vec<_>>();
     let selection_potency = guaranteed_potency(
         &oracle.admissible_worlds,
         scenario.initial_bounds,
