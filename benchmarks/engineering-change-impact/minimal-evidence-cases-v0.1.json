@@ -63,11 +63,6 @@
           ]
         }
       ],
-      "candidate_selected_evidence": [
-        "E-A1",
-        "E-A1-COPY",
-        "E-B"
-      ],
       "expected": {
         "state": "supported",
         "action": "revalidate",
@@ -93,12 +88,19 @@
             ]
           ]
         },
-        "reason_codes": []
+        "reason_codes": [
+          "DERIVATIVE_NOT_COUNTED_AS_INDEPENDENT:E-A1-COPY"
+        ]
       },
       "target_configuration": "CFG-7",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-001",
-      "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "candidate_visible_evidence_ids": [
+        "E-A1",
+        "E-A1-COPY",
+        "E-B"
+      ]
     },
     {
       "id": "ME-NEG-001",
@@ -131,10 +133,6 @@
           ]
         }
       ],
-      "candidate_selected_evidence": [
-        "E-PRIMARY",
-        "E-EXPORT"
-      ],
       "expected": {
         "state": "unsupported",
         "action": "request_evidence",
@@ -154,7 +152,11 @@
       "target_configuration": "BOND-4",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-001",
-      "source_inventory_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      "source_inventory_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "candidate_visible_evidence_ids": [
+        "E-PRIMARY",
+        "E-EXPORT"
+      ]
     },
     {
       "id": "ME-NEG-002",
@@ -185,9 +187,6 @@
           ]
         }
       ],
-      "candidate_selected_evidence": [
-        "E-THERM-A"
-      ],
       "expected": {
         "state": "unsupported",
         "action": "hold",
@@ -207,7 +206,38 @@
       "target_configuration": "PACK-3",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-002",
-      "source_inventory_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      "source_inventory_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "candidate_visible_evidence_ids": [
+        "E-THERM-A"
+      ],
+      "candidate_worlds": [
+        {
+          "world_id": "BASELINE",
+          "candidate_visible_evidence_ids": [
+            "E-THERM-A",
+            "E-THERM-B"
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "revalidate"
+          }
+        },
+        {
+          "world_id": "LAST_SUPPORT_REMOVED",
+          "candidate_visible_evidence_ids": [
+            "E-THERM-A"
+          ],
+          "expected": {
+            "state": "unsupported",
+            "action": "hold"
+          }
+        }
+      ],
+      "expected_intervention_relation": "flip",
+      "expected_intervention_actions": [
+        "revalidate",
+        "hold"
+      ]
     },
     {
       "id": "ME-NEG-003",
@@ -239,10 +269,6 @@
           ]
         }
       ],
-      "candidate_selected_evidence": [
-        "E-BOLT-A",
-        "E-BOLT-B"
-      ],
       "expected": {
         "state": "unsupported",
         "action": "revalidate",
@@ -262,7 +288,11 @@
       "target_configuration": "JOINT-NEW",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-003",
-      "source_inventory_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      "source_inventory_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "candidate_visible_evidence_ids": [
+        "E-BOLT-A",
+        "E-BOLT-B"
+      ]
     },
     {
       "id": "ME-POS-002",
@@ -295,10 +325,6 @@
       ],
       "irrelevant_evidence_injection_count": 40,
       "irrelevant_evidence_injection_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "candidate_selected_evidence": [
-        "E-PRESS-A",
-        "E-PRESS-B"
-      ],
       "expected": {
         "state": "supported",
         "action": "revalidate",
@@ -321,7 +347,11 @@
       "target_configuration": "VESSEL-2",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-002",
-      "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "candidate_visible_evidence_ids": [
+        "E-PRESS-A",
+        "E-PRESS-B"
+      ]
     },
     {
       "id": "ME-POS-003",
@@ -364,11 +394,6 @@
           ]
         }
       ],
-      "candidate_selected_evidence": [
-        "E-CORR-A",
-        "E-CORR-A-SUMMARY",
-        "E-CORR-B"
-      ],
       "expected": {
         "state": "supported",
         "action": "revalidate",
@@ -395,7 +420,12 @@
       "target_configuration": "PIPE-6",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-003",
-      "source_inventory_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      "source_inventory_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "candidate_visible_evidence_ids": [
+        "E-CORR-A",
+        "E-CORR-A-SUMMARY",
+        "E-CORR-B"
+      ]
     },
     {
       "id": "ME-POS-004",
@@ -521,10 +551,6 @@
           ]
         }
       ],
-      "candidate_selected_evidence": [
-        "E-SEISMIC-A",
-        "E-SEISMIC-UNK"
-      ],
       "expected": {
         "state": "indeterminate",
         "action": "request_evidence",
@@ -546,7 +572,11 @@
       "target_configuration": "ANCHOR-5",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-UNK-001",
-      "source_inventory_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+      "source_inventory_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "candidate_visible_evidence_ids": [
+        "E-SEISMIC-A",
+        "E-SEISMIC-UNK"
+      ]
     }
   ],
   "intervention_pairs": [
