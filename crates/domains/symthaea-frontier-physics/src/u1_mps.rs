@@ -900,7 +900,6 @@ fn right_canonicalize_site(
     }
 
     let previous_left_dimension = previous.left_dimension();
-    let previous_right_dimension = previous.right_dimension();
     let current_right_dimension = current.right_dimension();
     let previous_entries = previous_left_dimension
         .checked_mul(2)
@@ -2595,8 +2594,7 @@ impl U1MpsTruncationLedger {
             ));
         }
         if !gate_unitarity_residual.is_finite()
-            || gate_unitarity_residual < 0.0
-            || gate_unitarity_residual >= 1.0
+            || !(0.0..1.0).contains(&gate_unitarity_residual)
             || !gate_charge_residual.is_finite()
             || gate_charge_residual < 0.0
         {
@@ -3673,7 +3671,6 @@ mod tests {
         let mut norm_squared = 0.0;
         for first_physical in 0..2 {
             for second_physical in 0..2 {
-                let pair = first_physical * 2 + second_physical;
                 let mut amplitude = Complex64::new(0.0, 0.0);
                 for middle in 0..result.left_tensor.right_dimension() {
                     amplitude += result.left_tensor.get(0, first_physical, middle)
