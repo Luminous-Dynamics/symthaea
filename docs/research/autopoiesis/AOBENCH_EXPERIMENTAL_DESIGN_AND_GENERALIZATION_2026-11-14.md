@@ -192,7 +192,7 @@ AOBench must not tune thresholds on its confirmatory suite. Pilot data select an
 
 No cross-benchmark headline number is an apples-to-apples leaderboard comparison. Every report must include model/version, task generator and commit, harness version, number of runs, task counts, compute/time/action budgets, oracle, scoring weights and uncertainty.
 
-## 8. Claim boundary
+## 10. Claim boundary
 
 A synthetic causal-discovery result does not establish scientific discovery competence in uncontrolled physical environments. Intervention conclusions require independently qualified target, delivery, isolation, observer and oracle evidence. A non-significant difference is not an equivalence proof. A system that cannot identify the mechanism under the available experiments must abstain.
 
