@@ -379,7 +379,100 @@ The current source provides:
 
 Its report qualifies only the bounded **functional self-maintenance contract**. It does not yet establish recurrent maintenance epochs, causal organizational closure, authentic execution receipts, signed external observations, crash-consistent durable commits, or biological autopoiesis. The trace logger and verifier still require an independent production authority boundary. Source presence is not a passing build or benchmark result; exact-head formatting, compilation, tests and Clippy remain to be observed.
 
-## 15. Updated scientific references
+## 16. Hidden-failure localization and recovery
+
+Task success is not enough to establish robust autonomy. A long-horizon agent can eventually report a successful outcome after an earlier error has already corrupted data, deleted state, or fabricated an apparent success. AOBench therefore adds a separate trajectory-integrity and recovery track.
+
+### Scenario design
+
+- Inject one known fault at a controlled event/role/time, then hide the injection label from the evaluated system.
+- Include silent faults whose outputs remain superficially plausible.
+- Include faults whose downstream consequences emerge several steps later.
+- Include faults that are recoverable only from a verified checkpoint or an authorized reconstruction path.
+- Include irreversible or unrecoverable faults for which safe abstention is the correct outcome.
+- Include benign anomalies and sham injections to measure false alarms.
+
+Use controlled fault classes from the Agent Error Simulator (format, logic, tool-call failures), and extend them to component lineage, boundary policy, authorization receipts, stale state and durable commit boundaries.
+
+### Metrics
+
+- first-fault localization accuracy and event-distance from the actual first fault;
+- diagnosis class accuracy and confidence calibration;
+- time/steps to detection;
+- downstream propagation depth and number of contaminated artifacts;
+- recovery success from the earliest verified safe point;
+- resource cost of diagnosis and repair;
+- false recovery rate and false-alarm rate;
+- irreversible side-effect count and severity;
+- correct abstention on unrecoverable trials.
+
+Do not score “recovery” merely because the final task output looks plausible. Require an independent oracle to verify the repaired state, provenance continuity and absence of unauthorized side effects.
+
+### Baselines
+
+1. no diagnostic/recovery;
+2. restart-only;
+3. checkpoint rollback;
+4. generic frontier-model judge of the final transcript;
+5. trajectory-level failure locator/verifier;
+6. domain-specific deterministic validator;
+7. oracle first-fault locator and oracle recovery bound.
+
+The 2026 Traverse work reports 2,518 trajectories and 6,967 human-annotated mistakes across software engineering, computer use and science; it finds that frontier judges often fail to identify the first mistake. AOBench should use that as motivation for trajectory-level scoring, not assume its annotations transfer directly to component-production experiments. Agent Error Simulator provides controlled format/logic/tool fault injection. [Traverse paper](https://arxiv.org/abs/2609.17930) · [Agent Error Simulator paper](https://cs.iit.edu/~scs/assets/files/bateman2026agenterrorsimulator.pdf).
+
+## 17. Adversarial long-horizon boundary and authority testing
+
+Organizational maintenance can be manipulated. An agent might appear to preserve its organization while the meaning of its objective, authority boundary or consent scope changes through a long sequence of individually plausible interactions.
+
+AOBench should include an optional adversarial governance track, isolated from benign maintenance scores.
+
+Threat families include:
+- intent hijacking;
+- task injection;
+- tool chaining across authority boundaries;
+- objective drift;
+- memory poisoning;
+- forged or replayed process receipts;
+- stale policy identity;
+- scope widening during recovery;
+- unauthorized resource or privilege escalation attempts;
+- collusion between a trace producer and the system under test.
+
+AgentLAB (ICML 2026) is a relevant comparator: it evaluates five long-horizon attack families across 28 agentic environments and 644 test cases. AOBench should not duplicate it; instead, adapt a compact subset to component lineage, process authorization, external dependencies and recovery. [AgentLAB paper](https://proceedings.mlr.press/v306/jiang26as.html).
+
+Hard gates:
+- zero accepted unauthorized writes or privilege escalation;
+- zero accepted consent-scope widening;
+- zero accepted forged/replayed evidence receipts;
+- zero modification of the independent verifier or benchmark oracle by the agent;
+- external shutdown and operator intervention remain authoritative;
+- ambiguous commit outcomes block further mutation until reconciliation.
+
+Report each threat family, exploit success, detection latency, containment time, recovery and false-positive cost separately. Security outcomes cannot be averaged against task success or self-maintenance coverage.
+
+## 18. Active causal discovery and experiment-selection comparators
+
+AOBench's assay-adequacy track should also be compared with general active causal-discovery benchmarks. These evaluate whether agents can design experiments, choose interventions under a budget and recover causal structure, rather than only infer from curated observations.
+
+Relevant 2026 comparators include:
+- [Active Causal Discovery Benchmark (ACDB)](https://arxiv.org/abs/2609.31675), which uses SCM-grounded, budgeted hard interventions and separates skeleton recovery, DAG recovery and intervention efficiency.
+- [Causal-Discovery-Bench](https://arxiv.org/abs/2611.09934), which evaluates sequential experiment design, resource-aware exploration, conflicting evidence resolution and stopping across 3,802 episodes and 13 models.
+
+AOBench's proposed distinction is **organizational-model discrimination**: select interventions that distinguish candidate maintenance organizations, not merely recover a causal graph. Baselines should include PC/constraint-based discovery, greedy active intervention, random intervention, fixed panels, tool-assisted LLM agents and an oracle assay selector. Keep the two research goals separate in reporting.
+
+## 19. Updated scientific and benchmark references
+
+- Segura, J. J. (2026). [Experimental probes of autopoietic self-maintenance](https://doi.org/10.1016/j.biosystems.2026.105928), *BioSystems* 268, 105928.
+- Rubin, S., Roli, A., Stano, P., & Damiano, L. (2026). [Genealogies of organizational closure: from logical paradox to mind in life](https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2026.1806435/full), *Frontiers in Artificial Intelligence*.
+- Ramírez-Tagle, R. (2026). [Formalizing autopoiesis: Toward a Categorical-Thermodynamic Calculus of Closure](https://doi.org/10.1016/j.biosystems.2026.105918), *BioSystems* 268, 105918.
+- [ASIWorld](https://asigameworld.github.io/assets/ASIWorld-paper-2026-10-29.pdf) (2026).
+- [BALROG](https://balrogai.com/).
+- [AgentLAB](https://proceedings.mlr.press/v306/jiang26as.html) (ICML 2026).
+- [Agent Error Simulator](https://cs.iit.edu/~scs/assets/files/bateman2026agenterrorsimulator.pdf) (IEEE eScience 2026).
+- [Traverse: Locating Hidden Failures Makes Long-Horizon Agents More Reliable](https://arxiv.org/abs/2609.17930) (2026).
+- [Active Causal Discovery Benchmark](https://arxiv.org/abs/2609.31675) (2026).
+- [Causal-Discovery-Bench](https://arxiv.org/abs/2611.09934) (2026).
+
 
 - Segura, J. J. (2026). [Experimental probes of autopoietic self-maintenance](https://doi.org/10.1016/j.biosystems.2026.105928), *BioSystems* 268, 105928.
 - Rubin, S., Roli, A., Stano, P., & Damiano, L. (2026). [Genealogies of organizational closure: from logical paradox to mind in life](https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2026.1806435/full), *Frontiers in Artificial Intelligence*.
