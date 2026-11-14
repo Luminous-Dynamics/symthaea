@@ -3492,7 +3492,8 @@ mod tests {
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
         U1TeBDAdaptivePolicy, U1TeBDGate, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
         U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
+        U1TwoSiteTruncationPolicy, left_isometry_residual, mps_state_distance,
+        right_isometry_residual,
     };
     use num_complex::Complex64;
 
