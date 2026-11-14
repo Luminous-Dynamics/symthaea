@@ -51,7 +51,7 @@ fn audit_case(case: &Value, fixture: &Value) -> Disposition {
     for key in all_keys {
         if !required_set.contains(key.as_str()) && baseline.get(key) != candidate.get(key) { return Disposition::Blocked; }
     }
-    let baseline_check = validate_baseline_qualification(case, baseline, &required_endpoints);
+    let baseline_check = validate_baseline_qualification(case, baseline, &required_endpoints, fixture);
     if baseline_check != Disposition::Pass { return baseline_check; }
     let Some(scope) = fixture.get("qualification_scope").and_then(Value::as_object) else { return Disposition::Blocked; };
     for factor in &required_factors {
@@ -147,7 +147,7 @@ fn audit_case(case: &Value, fixture: &Value) -> Disposition {
     Disposition::Pass
 }
 
-fn validate_baseline_qualification(case: &Value, baseline: &serde_json::Map<String, Value>, required_endpoints: &[String]) -> Disposition {
+fn validate_baseline_qualification(case: &Value, baseline: &serde_json::Map<String, Value>, required_endpoints: &[String], fixture: &Value) -> Disposition {
     let Some(receipt) = case.get("baseline_qualification").and_then(Value::as_object) else { return Disposition::Blocked; };
     for key in ["qualification_id", "protocol_id", "independence_group"] {
         let Some(value) = receipt.get(key).and_then(Value::as_str) else { return Disposition::Blocked; };
@@ -239,7 +239,7 @@ mod tests {
     use serde_json::Value;
 
     fn fixture() -> Value {
-        serde_json::from_str(include_str!("../../data/research/plasma_transfer_fixture_v0_1.json")).expect("fixture parses")
+        serde_json::from_str(include_str!("../../data/research/plasma_transfer_fixture_v0_2.json")).expect("fixture parses")
     }
     fn case<'a>(data: &'a Value, id: &str) -> &'a Value {
         data["cases"].as_array().expect("cases").iter().find(|row| row["id"].as_str() == Some(id)).expect("case exists")
