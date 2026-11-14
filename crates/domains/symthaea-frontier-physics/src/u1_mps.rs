@@ -4997,17 +4997,41 @@ mod tests {
 
     #[test]
     fn stable_mps_difference_supports_distinct_virtual_bond_dimensions() {
-        let amplitude = 1.0 / 3.0_f64.sqrt();
-        let mut dense = vec![complex_zero(); 8];
-        dense[1] = Complex64::new(amplitude, 0.0);
-        dense[2] = Complex64::new(amplitude, 0.0);
-        dense[4] = Complex64::new(amplitude, 0.0);
-        let raw = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
-        let mut canonical = raw.clone();
-        canonical.canonicalize_for_bond(0, 1.0e-10).unwrap();
-        let distance = mps_state_distance(&raw, &canonical, 1.0e-10).unwrap();
-        assert!(distance <= 1.0e-10);
-        assert_eq!(raw.total_charge(), canonical.total_charge());
+        let minimal = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let redundant = ComplexU1Mps::new(
+            vec![
+                U1MpsTensor::new(
+                    vec![0],
+                    vec![1, 1],
+                    vec![complex_zero(), complex_zero(), Complex64::new(1.0, 0.0), complex_zero()],
+                )
+                .unwrap(),
+                U1MpsTensor::new(
+                    vec![1, 1],
+                    vec![1],
+                    vec![
+                        Complex64::new(1.0, 0.0),
+                        complex_zero(),
+                        Complex64::new(1.0, 0.0),
+                        complex_zero(),
+                    ],
+                )
+                .unwrap(),
+                U1MpsTensor::new(
+                    vec![1],
+                    vec![1],
+                    vec![Complex64::new(1.0, 0.0), complex_zero()],
+                )
+                .unwrap(),
+            ],
+            1,
+            1.0e-12,
+        )
+        .unwrap();
+        assert_eq!(minimal.tensors[0].right_dimension(), 1);
+        assert_eq!(redundant.tensors[0].right_dimension(), 2);
+        let distance = mps_state_distance(&minimal, &redundant, 1.0e-12).unwrap();
+        assert!(distance <= 1.0e-12);
     }
 
     #[test]
