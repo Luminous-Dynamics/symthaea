@@ -90,7 +90,7 @@ pub enum FlowProcess {
 impl FlowProcess {
     fn expected_evidence_kind(self) -> EvidenceKind {
         match self {
-            Self::Sorting => EvidenceKind::CompositionMeasurement,
+            Self::Sorting => EvidenceKind::SortingTrial,
             Self::Repair => EvidenceKind::RepairTrial,
             Self::ComponentDisassembly => EvidenceKind::ComponentRecoveryTrial,
             Self::MechanicalOpening => EvidenceKind::MechanicalRecyclingTrial,
@@ -255,6 +255,21 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
         );
     }
 
+    let mut events = BTreeMap::<&str, &MaterialFlowEvent>::new();
+    for event in &ledger.events {
+        match events.entry(event.event_id.as_str()) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(event);
+            }
+            std::collections::btree_map::Entry::Occupied(_) => add(
+                &mut findings,
+                "DUPLICATE_EVENT_ID",
+                &event.event_id,
+                "event IDs must be unique",
+            ),
+        }
+    }
+
     let mut lots = BTreeMap::<&str, &MaterialLot>::new();
     for lot in &ledger.lots {
         if lot.lot_id.trim().is_empty() || lot.mass_mg == 0 || lot.material_class.trim().is_empty() {
@@ -275,15 +290,10 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
         }
     }
 
-    let mut events = BTreeMap::<&str, &MaterialFlowEvent>::new();
-    let mut evidence_ids = BTreeSet::<&str>::new();
-    let mut evidence_digests = BTreeSet::<&str>::new();
+
     let mut incoming_lot_count = 0_usize;
     let mut terminal_lot_count = 0_usize;
-    let mut producer_by_lot = BTreeMap::<&str, &str>::new();
     let mut consumer_by_lot = BTreeMap::<&str, &str>::new();
-    let mut event_input_mass = BTreeMap::<&str, u128>::new();
-    let mut event_output_mass = BTreeMap::<&str, u128>::new();
 
     for lot in &ledger.lots {
         match &lot.origin {
@@ -308,14 +318,6 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "evidence IDs must be unique across inventory, events and receiver decisions",
                     );
                 }
-                if !evidence_digests.insert(inventory_evidence.sha256.as_str()) {
-                    add(
-                        &mut findings,
-                        "DUPLICATE_EVIDENCE_DIGEST",
-                        &lot.lot_id,
-                        "distinct physical evidence records must not reuse the same byte digest",
-                    );
-                }
                 if !add_total(&mut totals.incoming_mass_mg, lot.mass_mg) {
                     add(
                         &mut findings,
@@ -333,13 +335,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         &lot.lot_id,
                         "event-produced lot must identify its producer event",
                     );
-                } else if producer_by_lot.insert(lot.lot_id.as_str(), event_id.as_str()).is_some() {
-                    add(
-                        &mut findings,
-                        "LOT_PRODUCER_DUPLICATE",
-                        &lot.lot_id,
-                        "each output lot has exactly one producer",
-                    );
+                }
                 }
             }
         }
@@ -387,11 +383,22 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "lot disposition does not match the receiver's exact acceptance outcome",
                     );
                 }
-                let basis_id = match &lot.origin {
-                    LotOrigin::Incoming { inventory_evidence } => inventory_evidence.evidence_id.as_str(),
-                    LotOrigin::EventOutput { event_id } => {
-                        events.get(event_id.as_str()).map(|event| event.evidence.evidence_id.as_str()).unwrap_or("")
-                    }
+                let (basis_id, basis_issuer, basis_digest, basis_time) = match &lot.origin {
+                    LotOrigin::Incoming { inventory_evidence } => (
+                        inventory_evidence.evidence_id.as_str(),
+                        inventory_evidence.issuer_id.as_str(),
+                        inventory_evidence.sha256.as_str(),
+                        inventory_evidence.observed_at_ns,
+                    ),
+                    LotOrigin::EventOutput { event_id } => events
+                        .get(event_id.as_str())
+                        .map(|event| (
+                            event.evidence.evidence_id.as_str(),
+                            event.evidence.issuer_id.as_str(),
+                            event.evidence.sha256.as_str(),
+                            event.evidence.observed_at_ns,
+                        ))
+                        .unwrap_or(("", "", "", u64::MAX)),
                 };
                 if acceptance.basis_evidence_id != basis_id {
                     add(
@@ -401,20 +408,36 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "receiver decision must bind to the exact inventory or process-trial evidence that produced this lot",
                     );
                 }
+                if acceptance.evidence.issuer_id == basis_issuer {
+                    add(
+                        &mut findings,
+                        "RECEIVER_NOT_INDEPENDENT_OF_PROCESS",
+                        &lot.lot_id,
+                        "receiver organization must be independent of the incoming inventory or process-trial issuer",
+                    );
+                }
+                if acceptance.evidence.sha256 == basis_digest {
+                    add(
+                        &mut findings,
+                        "RECEIVER_EVIDENCE_REUSES_BASIS_BYTES",
+                        &lot.lot_id,
+                        "receiver acceptance must be a distinct evidence artifact from the process/inventory evidence",
+                    );
+                }
+                if acceptance.evidence.observed_at_ns < basis_time {
+                    add(
+                        &mut findings,
+                        "RECEIVER_DECISION_PRECEDES_OUTPUT",
+                        &lot.lot_id,
+                        "receiver decision cannot precede the exact inventory or process evidence that produced the lot",
+                    );
+                }
                 if !evidence_ids.insert(acceptance.evidence.evidence_id.as_str()) {
                     add(
                         &mut findings,
                         "DUPLICATE_EVIDENCE_ID",
                         &lot.lot_id,
                         "receiver acceptance must have its own unique evidence ID",
-                    );
-                }
-                if !evidence_digests.insert(acceptance.evidence.sha256.as_str()) {
-                    add(
-                        &mut findings,
-                        "DUPLICATE_EVIDENCE_DIGEST",
-                        &lot.lot_id,
-                        "receiver acceptance must bind to distinct evidence bytes",
                     );
                 }
                 if expected_outcome == AcceptanceOutcome::Accepted
@@ -496,14 +519,6 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                 "event ID must be non-empty",
             );
         }
-        if events.insert(event.event_id.as_str(), event).is_some() {
-            add(
-                &mut findings,
-                "DUPLICATE_EVENT_ID",
-                &event.event_id,
-                "event IDs must be unique",
-            );
-        }
         if event.input_lot_ids.is_empty() || event.output_lot_ids.is_empty() {
             add(
                 &mut findings,
@@ -529,14 +544,6 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                 "DUPLICATE_EVIDENCE_ID",
                 &event.event_id,
                 "event evidence ID is duplicated within the ledger",
-            );
-        }
-        if !evidence_digests.insert(event.evidence.sha256.as_str()) {
-            add(
-                &mut findings,
-                "DUPLICATE_EVIDENCE_DIGEST",
-                &event.event_id,
-                "event evidence must reference distinct exact bytes",
             );
         }
         if event.max_unaccounted_ppm > MATERIAL_FLOW_FRACTION_SCALE_PPM as u32
@@ -618,8 +625,6 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                 }
             }
         }
-        event_input_mass.insert(event.event_id.as_str(), input_total);
-
         let mut output_total = 0_u128;
         let mut seen_outputs = BTreeSet::new();
         for output_id in &event.output_lot_ids {
@@ -667,10 +672,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     "event output mass total overflows u128",
                 ),
             }
-            producer_by_lot.insert(output_id.as_str(), event.event_id.as_str());
         }
-        event_output_mass.insert(event.event_id.as_str(), output_total);
-
         let accounted = output_total
             .checked_add(u128::from(event.unaccounted_mass_mg))
             .unwrap_or(u128::MAX);
@@ -829,7 +831,6 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
             &right.message,
         ))
     });
-    let _ = (event_input_mass, event_output_mass);
 
     MaterialFlowReport {
         valid: findings.is_empty(),
@@ -947,7 +948,7 @@ mod tests {
             ledger_id: "ledger-001".to_owned(),
             lots: vec![
                 incoming_lot("incoming-001", 10_000, "inventory-001", 'a'),
-                output_lot("cotton-stream", 6_000, "sort-001", LotDisposition::Accepted),
+                output_lot("cotton-stream", 6_000, "sort-001", LotDisposition::AwaitingReceiver),
                 output_lot("poly-stream", 3_800, "sort-001", LotDisposition::AwaitingReceiver),
             ],
             events: vec![event(
@@ -1110,9 +1111,34 @@ mod tests {
     #[test]
     fn event_lineage_cycle_is_rejected() {
         let mut ledger = sorting_split_ledger();
-        ledger.lots[0].origin = LotOrigin::EventOutput {
-            event_id: "sort-001".to_owned(),
-        };
+        ledger.lots = vec![
+            output_lot("lot-a", 10_000, "event-b", LotDisposition::InProcess),
+            output_lot("lot-b", 10_000, "event-a", LotDisposition::InProcess),
+        ];
+        ledger.events = vec![
+            event(
+                "event-a",
+                FlowProcess::MechanicalOpening,
+                &["lot-a"],
+                &["lot-b"],
+                0,
+                0,
+                "event-a-evidence",
+                'c',
+                20,
+            ),
+            event(
+                "event-b",
+                FlowProcess::MechanicalOpening,
+                &["lot-b"],
+                &["lot-a"],
+                0,
+                0,
+                "event-b-evidence",
+                'd',
+                30,
+            ),
+        ];
         let report = validate_material_flow(&ledger);
         assert!(!report.valid);
         assert!(report.findings.iter().any(|item| item.code == "EVENT_GRAPH_CYCLE"));
