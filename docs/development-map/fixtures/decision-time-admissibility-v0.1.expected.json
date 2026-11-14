@@ -1,0 +1,73 @@
+{
+  "fixture_id": "synthetic:dtea-decision-time-admissibility-v0.1",
+  "status": "design_only_public_known_answer",
+  "expected_decision": {
+    "decision_id": "dtea:decision:approve",
+    "decision_at": "2026-11-14T10:00:00Z",
+    "knowledge_cutoff_at": "2026-11-14T10:00:00Z",
+    "outcome": "approved",
+    "admissible_consulted_evidence": [
+      "dtea:evidence:E1"
+    ],
+    "rejected_as_late_evidence": [
+      "dtea:evidence:E2"
+    ],
+    "later_correction_events": [
+      "event-005"
+    ],
+    "current_state_of_E1": "stale",
+    "decision_time_state_of_E1": "admissible",
+    "invariant": "A later invalidation does not erase or rewrite the decision-time evidence manifest."
+  },
+  "negative_controls": [
+    {
+      "id": "DTEA-NC-01",
+      "mutation": "Move E2 into consulted_evidence without changing its availability time.",
+      "expected": "reject_future_evidence_as_decision_basis"
+    },
+    {
+      "id": "DTEA-NC-02",
+      "mutation": "Backdate E2 available_to_actor_at while source_observed_at remains after the decision.",
+      "expected": "reject_availability_before_observation"
+    },
+    {
+      "id": "DTEA-NC-03",
+      "mutation": "Move knowledge_cutoff_at after decision_at.",
+      "expected": "reject_future_knowledge_cutoff"
+    },
+    {
+      "id": "DTEA-NC-04",
+      "mutation": "Change E1's current lifecycle to current but retain event-005 invalidation.",
+      "expected": "reject_current_state_inconsistent_with_invalidation"
+    },
+    {
+      "id": "DTEA-NC-05",
+      "mutation": "Delete event-005 after E1 was marked stale.",
+      "expected": "reject_unexplained_stale_evidence"
+    },
+    {
+      "id": "DTEA-NC-06",
+      "mutation": "Cite a missing evidence ID.",
+      "expected": "reject_unknown_evidence_reference"
+    },
+    {
+      "id": "DTEA-NC-07",
+      "mutation": "Mark E2 admissible despite late availability.",
+      "expected": "reject_admissibility_time_mismatch"
+    },
+    {
+      "id": "DTEA-NC-08",
+      "mutation": "Change actor scope without a corresponding authorization evidence record.",
+      "expected": "indeterminate_or_reject_scope"
+    }
+  ],
+  "metrics": [
+    "decision-time admissibility precision and recall",
+    "future-evidence leakage rate",
+    "availability-time reconstruction accuracy",
+    "valid-time vs observation-time confusion",
+    "historical decision-record integrity after correction",
+    "correct abstention/defer rate"
+  ],
+  "claim_ceiling": "Synthetic known-answer case only. No general decision correctness, institutional governance, compliance or real-world assurance claim."
+}
