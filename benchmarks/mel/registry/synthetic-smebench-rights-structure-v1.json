@@ -11,7 +11,8 @@
         "license_version": "4.0",
         "source_uri": "https://arxiv.org/abs/2610.36715",
         "license_text_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "inherited_from": "SME-Bench licensing appendix"
+        "inherited_from": "SME-Bench licensing appendix",
+        "source_revision": "SMEBench-paper-arxiv-2610.36715-2026-10-27"
       },
       "permissions": {
         "internal_research": "unknown",
@@ -37,7 +38,8 @@
         "license_version": "4.0",
         "source_uri": "https://arxiv.org/abs/2610.36715",
         "license_text_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "inherited_from": "MoisesDB, as identified by SMEBench licensing appendix"
+        "inherited_from": "MoisesDB, as identified by SMEBench licensing appendix",
+        "source_revision": "SMEBench-paper-arxiv-2610.36715-2026-10-27"
       },
       "permissions": {
         "internal_research": "unknown",
