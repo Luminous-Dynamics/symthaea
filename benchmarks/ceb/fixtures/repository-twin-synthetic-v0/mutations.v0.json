@@ -1,0 +1,162 @@
+{
+  "schema_version": 0,
+  "fixture_id": "CEB-REPO-001-SYNTHETIC-V0",
+  "status": "design_only_scenarios",
+  "mutations": [
+    {
+      "id": "REPO-MUT-001",
+      "title": "Rename public UserId and update selected call sites",
+      "edit_intent": "Rename UserId to AccountId in the domain crate and update the service and test call sites. Leave one intentionally hidden stale reference in a separate candidate variant.",
+      "expected_impact": [
+        "sym.UserId",
+        "sym.User",
+        "sym.UserService.get_user",
+        "sym.get_profile",
+        "test.profile_query_returns_the_matching_user",
+        "test.profile_query_returns_none_for_unknown_user"
+      ],
+      "expected_invalidations": [
+        "crates/domain/src/lib.rs",
+        "crates/service/src/lib.rs",
+        "crates/api/src/profile_api.rs",
+        "crates/api/tests/profile.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "parameter_type",
+        "calls_generic_method"
+      ],
+      "stale_fact_negative_control": "After rename, no graph fact may point to the removed symbol ID."
+    },
+    {
+      "id": "REPO-MUT-002",
+      "title": "Move Profile to a new module and retain a public re-export",
+      "edit_intent": "Move Profile from profile_api.rs into profile.rs and re-export it through the API crate root.",
+      "expected_impact": [
+        "sym.Profile",
+        "sym.get_profile",
+        "pkg.api"
+      ],
+      "expected_invalidations": [
+        "crates/api/src/profile_api.rs",
+        "crates/api/src/lib.rs",
+        "crates/api/src/profile.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "defines",
+        "reexports",
+        "constructs"
+      ],
+      "stale_fact_negative_control": "The old definition span must be removed and the re-export edge must bind to the new definition."
+    },
+    {
+      "id": "REPO-MUT-003",
+      "title": "Change the Store trait implementation surface",
+      "edit_intent": "Add a required metadata method to Store and update MemoryStore. A second variant intentionally omits the implementation.",
+      "expected_impact": [
+        "sym.Store",
+        "sym.MemoryStore",
+        "sym.MemoryStore.get_user",
+        "sym.UserService.get_user",
+        "test.profile_query_returns_the_matching_user",
+        "test.profile_query_returns_none_for_unknown_user"
+      ],
+      "expected_invalidations": [
+        "crates/store/src/lib.rs",
+        "crates/service/src/lib.rs",
+        "crates/api/tests/profile.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "implements",
+        "trait_method",
+        "calls_trait_method"
+      ],
+      "stale_fact_negative_control": "The old trait contract must not remain reported after the edit; omitted impls are expected compiler errors, not valid semantic edges."
+    },
+    {
+      "id": "REPO-MUT-004",
+      "title": "Disable the audit feature",
+      "edit_intent": "Remove audit from default features while retaining the opt-in feature definition.",
+      "expected_impact": [
+        "feature.api.audit",
+        "sym.audit.AccessRecord",
+        "sym.audit.record_access"
+      ],
+      "expected_invalidations": [
+        "crates/api/Cargo.toml",
+        "crates/api/src/lib.rs",
+        "crates/api/src/audit.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "enables_module"
+      ],
+      "stale_fact_negative_control": "The audit module remains source-present but must be marked inactive under the default feature set."
+    },
+    {
+      "id": "REPO-MUT-005",
+      "title": "Remove the Windows native feature gate",
+      "edit_intent": "Remove windows-native from the API feature table and cfg expression while leaving the target-specific dependency declaration.",
+      "expected_impact": [
+        "feature.api.windows_native",
+        "target.api.windows",
+        "sym.windows.os_version"
+      ],
+      "expected_invalidations": [
+        "crates/api/Cargo.toml",
+        "crates/api/src/lib.rs",
+        "crates/api/src/windows_native.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "feature_gates_module",
+        "target_gates_module",
+        "target_dependency"
+      ],
+      "stale_fact_negative_control": "No default-target graph may treat windows_native as active; preserve the manifest target dependency fact separately."
+    },
+    {
+      "id": "REPO-MUT-006",
+      "title": "Delete a public service method",
+      "edit_intent": "Remove UserService::get_user and update one public API variant while leaving another call site stale.",
+      "expected_impact": [
+        "sym.UserService.get_user",
+        "sym.get_profile",
+        "test.profile_query_returns_the_matching_user",
+        "test.profile_query_returns_none_for_unknown_user"
+      ],
+      "expected_invalidations": [
+        "crates/service/src/lib.rs",
+        "crates/api/src/profile_api.rs",
+        "crates/api/tests/profile.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "calls_generic_method",
+        "calls"
+      ],
+      "stale_fact_negative_control": "Deleted method nodes and all incoming call edges must be absent from the rebuilt graph."
+    },
+    {
+      "id": "REPO-MUT-007",
+      "title": "Change the generic Store bound",
+      "edit_intent": "Add a new marker trait bound to UserService and propagate the impl/where-clause changes.",
+      "expected_impact": [
+        "sym.Store",
+        "sym.UserService",
+        "sym.UserService.new",
+        "sym.UserService.get_user",
+        "sym.get_profile",
+        "test.profile_query_returns_the_matching_user"
+      ],
+      "expected_invalidations": [
+        "crates/store/src/lib.rs",
+        "crates/service/src/lib.rs",
+        "crates/api/src/profile_api.rs",
+        "crates/api/tests/profile.rs"
+      ],
+      "expected_new_or_removed_edges": [
+        "generic_bound",
+        "implements",
+        "type_constraint"
+      ],
+      "stale_fact_negative_control": "The graph must distinguish a syntax-level where-clause from a compiler-confirmed trait-bound solution."
+    }
+  ]
+}

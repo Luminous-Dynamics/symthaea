@@ -1,0 +1,530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:schemas:ceb-task:0",
+  "title": "Computational Engineering Bench Task",
+  "description": "Versioned task definition. A design_only task is not executable and cannot contribute to benchmark scores.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "task_id",
+    "execution_status",
+    "lane",
+    "title",
+    "objective",
+    "agent_prompt",
+    "source_snapshot",
+    "environment",
+    "agent_policy",
+    "acceptance",
+    "budget",
+    "split"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "benchmark_id": {
+      "const": "CEB"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^CEB-[A-Z0-9]+-[0-9]{3}$"
+    },
+    "execution_status": {
+      "enum": [
+        "design_only",
+        "fixture_ready",
+        "qualified"
+      ]
+    },
+    "lane": {
+      "enum": [
+        "algorithms",
+        "rust_engineering",
+        "nix_build",
+        "linux_operations",
+        "distributed_systems",
+        "database_engineering",
+        "security_engineering",
+        "performance_engineering",
+        "systems_design",
+        "reliability_engineering",
+        "benchmark_integrity",
+        "repository_intelligence"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 180
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 30
+    },
+    "agent_prompt": {
+      "type": "string",
+      "minLength": 30
+    },
+    "source_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "uri",
+        "revision",
+        "tree_sha256",
+        "tree_digest_algorithm"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "synthetic_fixture",
+            "repository_snapshot",
+            "container_image",
+            "scenario_bundle"
+          ]
+        },
+        "uri": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tree_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "tree_digest_algorithm": {
+          "const": "ceb-tree-v1"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "image",
+        "toolchain_lock_sha256",
+        "runner_profile",
+        "network_policy",
+        "runner_policy_sha256"
+      ],
+      "properties": {
+        "image": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^.*@sha256:[0-9a-f]{64}$"
+        },
+        "toolchain_lock_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "runner_profile": {
+          "enum": [
+            "not_provisioned",
+            "isolated_microvm",
+            "isolated_container",
+            "trusted_host_development"
+          ]
+        },
+        "network_policy": {
+          "enum": [
+            "disabled",
+            "allowlisted",
+            "unrestricted_not_qualifying"
+          ]
+        },
+        "runner_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "agent_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "writable_paths",
+        "read_only_paths",
+        "secrets_exposed",
+        "grader_visible",
+        "human_approval_required"
+      ],
+      "properties": {
+        "writable_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "read_only_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "secrets_exposed": {
+          "const": false
+        },
+        "grader_visible": {
+          "const": false
+        },
+        "human_approval_required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_patch_sha256",
+        "empty_patch_must_fail",
+        "independent_grader",
+        "grader_sha256",
+        "checks"
+      ],
+      "properties": {
+        "reference_patch_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "empty_patch_must_fail": {
+          "const": true
+        },
+        "independent_grader": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "grader_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "check_id",
+              "kind",
+              "authority",
+              "required",
+              "description"
+            ],
+            "properties": {
+              "check_id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]+$"
+              },
+              "kind": {
+                "enum": [
+                  "compile",
+                  "unit_test",
+                  "hidden_test",
+                  "property",
+                  "mutation",
+                  "fuzz",
+                  "static_analysis",
+                  "security_negative_control",
+                  "runtime_invariant",
+                  "performance",
+                  "human_rubric",
+                  "formal_proof"
+                ]
+              },
+              "authority": {
+                "enum": [
+                  "task_spec",
+                  "independent_grader",
+                  "external_tool",
+                  "qualified_reviewer"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 10
+              }
+            }
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_clock_seconds",
+        "max_turns",
+        "max_tool_calls",
+        "input_token_budget",
+        "output_token_budget",
+        "cost_budget_usd"
+      ],
+      "properties": {
+        "wall_clock_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_turns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "input_token_budget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "output_token_budget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "cost_budget_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partition",
+        "sealed",
+        "leakage_groups",
+        "freshness_policy"
+      ],
+      "properties": {
+        "partition": {
+          "enum": [
+            "development",
+            "public_validation",
+            "private_holdout",
+            "rotating_fresh"
+          ]
+        },
+        "sealed": {
+          "type": "boolean"
+        },
+        "leakage_groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "freshness_policy": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution_status": {
+            "enum": [
+              "fixture_ready",
+              "qualified"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "source_snapshot": {
+            "properties": {
+              "uri": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tree_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "environment": {
+            "properties": {
+              "image": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^.*@sha256:[0-9a-f]{64}$"
+              },
+              "toolchain_lock_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "runner_profile": {
+                "enum": [
+                  "isolated_microvm",
+                  "isolated_container"
+                ]
+              },
+              "network_policy": {
+                "enum": [
+                  "disabled",
+                  "allowlisted"
+                ]
+              },
+              "runner_policy_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "acceptance": {
+            "properties": {
+              "reference_patch_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "independent_grader": {
+                "type": "string",
+                "minLength": 1
+              },
+              "grader_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "checks": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "execution_status": {
+            "const": "qualified"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "split": {
+            "properties": {
+              "partition": {
+                "enum": [
+                  "private_holdout",
+                  "rotating_fresh"
+                ]
+              },
+              "sealed": {
+                "const": true
+              }
+            }
+          },
+          "acceptance": {
+            "properties": {
+              "checks": {
+                "minItems": 2
+              }
+            }
+          },
+          "budget": {
+            "properties": {
+              "wall_clock_seconds": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_turns": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_tool_calls": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "input_token_budget": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "output_token_budget": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "cost_budget_usd": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
