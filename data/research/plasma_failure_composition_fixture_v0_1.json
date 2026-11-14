@@ -18840,6 +18840,502 @@
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
       "rationale": "The actual candidate cohort does not meet the preregistered cluster minimum."
+    },
+    {
+      "id": "count-fraction-must-be-one-hot",
+      "receipt": {
+        "receipt_id": "FMC-COUNT-FRACTION-ONE-HOT",
+        "category_ontology_id": "D5573-SMC-FAILURE-V1",
+        "category_ontology_version": "1.0.0",
+        "categories": [
+          {
+            "id": "adhesive_failure",
+            "label": "Adhesive failure"
+          },
+          {
+            "id": "cohesive_failure",
+            "label": "Cohesive failure"
+          },
+          {
+            "id": "thin_layer_cohesive",
+            "label": "Thin-layer cohesive failure"
+          },
+          {
+            "id": "fiber_tear",
+            "label": "Fiber-tear failure"
+          },
+          {
+            "id": "light_fiber_tear",
+            "label": "Light-fiber-tear failure"
+          },
+          {
+            "id": "stock_break",
+            "label": "Stock-break failure"
+          }
+        ],
+        "measurement_tolerance": 0.005,
+        "baseline": {
+          "cohort_id": "FMC-VALID-01-BASE",
+          "category_ontology_id": "D5573-SMC-FAILURE-V1",
+          "category_ontology_version": "1.0.0",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "measurement_basis": "specimen_count_fraction",
+          "fraction_protocol_id": "SPECIMEN-COUNT-CLASSIFICATION-01",
+          "fraction_protocol_sha256": "abababababababababababababababababababababababababababababababab",
+          "observer_reliability_sha256": "0000000000000000000000000000000000000000000000000000000000004e2b",
+          "unresolved_disagreement_count": 0,
+          "specimens": [
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-1-1",
+              "cluster_id": "LOT-B1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e20",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.5
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.5
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0
+                }
+              ]
+            },
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-1-2",
+              "cluster_id": "LOT-B1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e21",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            },
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-2-1",
+              "cluster_id": "LOT-B2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e22",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            },
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-2-2",
+              "cluster_id": "LOT-B2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e23",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            }
+          ],
+          "unclassifiable_specimen_ids": [],
+          "classification_receipt": {
+            "id": "FMC-VALID-01-BASE-CLASSIFICATION",
+            "method_id": "ASTM_D5573",
+            "edition": "D5573-99R19",
+            "evidence_kind": "classification_practice",
+            "material_pair_class": "frp_smc_joint",
+            "geometry": "failure_surface_classification",
+            "endpoint": "frp_joint_failure_mode_classification",
+            "requested_claim": "failure_mode_classification_reference",
+            "protocol_id": "D5573-VISUAL-PROTOCOL-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000004e2c",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000004e2d",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "FMC-VALID-01-BASE-SPEC-1-1",
+              "FMC-VALID-01-BASE-SPEC-1-2",
+              "FMC-VALID-01-BASE-SPEC-2-1",
+              "FMC-VALID-01-BASE-SPEC-2-2"
+            ]
+          }
+        },
+        "candidate": {
+          "cohort_id": "FMC-VALID-01-CAND",
+          "category_ontology_id": "D5573-SMC-FAILURE-V1",
+          "category_ontology_version": "1.0.0",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "measurement_basis": "specimen_count_fraction",
+          "fraction_protocol_id": "SPECIMEN-COUNT-CLASSIFICATION-01",
+          "fraction_protocol_sha256": "abababababababababababababababababababababababababababababababab",
+          "observer_reliability_sha256": "0000000000000000000000000000000000000000000000000000000000004e2e",
+          "unresolved_disagreement_count": 0,
+          "specimens": [
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-1-1",
+              "cluster_id": "LOT-C1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e24",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            },
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-1-2",
+              "cluster_id": "LOT-C1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e25",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            },
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-2-1",
+              "cluster_id": "LOT-C2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e26",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            },
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-2-2",
+              "cluster_id": "LOT-C2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e27",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ]
+            }
+          ],
+          "unclassifiable_specimen_ids": [],
+          "classification_receipt": {
+            "id": "FMC-VALID-01-CAND-CLASSIFICATION",
+            "method_id": "ASTM_D5573",
+            "edition": "D5573-99R19",
+            "evidence_kind": "classification_practice",
+            "material_pair_class": "frp_smc_joint",
+            "geometry": "failure_surface_classification",
+            "endpoint": "frp_joint_failure_mode_classification",
+            "requested_claim": "failure_mode_classification_reference",
+            "protocol_id": "D5573-VISUAL-PROTOCOL-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000004e2f",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000004e30",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "FMC-VALID-01-CAND-SPEC-1-1",
+              "FMC-VALID-01-CAND-SPEC-1-2",
+              "FMC-VALID-01-CAND-SPEC-2-1",
+              "FMC-VALID-01-CAND-SPEC-2-2"
+            ]
+          }
+        },
+        "analysis_plan": {
+          "plan_id": "FMC-VALID-01-PLAN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000004e28",
+          "analysis_profile": "clustered_compositional_effect_v1",
+          "analysis_method_ref": "statistics-owner:compositional-equivalence-method-v1",
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "changed_after_outcome": false,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "zero_policy": "model_based",
+          "pseudocount": null,
+          "joint_distance_margin": 0.25,
+          "category_margins": [
+            {
+              "category_id": "adhesive_failure",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "cohesive_failure",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "thin_layer_cohesive",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "fiber_tear",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "light_fiber_tear",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "stock_break",
+              "lower": -0.05,
+              "upper": 0.05
+            }
+          ],
+          "minimum_baseline_clusters": 2,
+          "minimum_candidate_clusters": 2,
+          "minimum_observer_agreement": 0.9,
+          "agreement_policy_ref": "MSA-AGREEMENT-POLICY-01"
+        },
+        "analysis_result": {
+          "result_id": "FMC-VALID-01-ANALYSIS",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000004e31",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000004e28",
+          "vector_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000004e29",
+          "analysis_profile": "clustered_compositional_effect_v1",
+          "baseline_specimen_count": 4,
+          "candidate_specimen_count": 4,
+          "baseline_cluster_count": 2,
+          "candidate_cluster_count": 2,
+          "observer_agreement": 0.96,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "category_effects": [
+            {
+              "category_id": "adhesive_failure",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "cohesive_failure",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "thin_layer_cohesive",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "fiber_tear",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "light_fiber_tear",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "stock_break",
+              "lower": -0.01,
+              "upper": 0.01
+            }
+          ],
+          "joint_distance_lower": 0.03,
+          "joint_distance_upper": 0.1,
+          "outcome": "COMPOSITIONAL_EQUIVALENCE_ESTABLISHED"
+        },
+        "vector_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000004e29"
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "A specimen-count composition records one classified category per specimen; a fractional mix belongs to a different measurement basis."
     }
   ]
 }
