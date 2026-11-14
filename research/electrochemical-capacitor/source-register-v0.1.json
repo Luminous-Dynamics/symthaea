@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "as_of": "2026-11-13",
-  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-13; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline. New dynamic-load and operando-characterization sources are classified as research comparators, not commercial SOTA or Luminous results.",
+  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-14; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline. New dynamic-load and operando-characterization sources are classified as research comparators, not commercial SOTA or Luminous results.",
   "sources": [
     {
       "id": "IEA-GEVO-2026",
