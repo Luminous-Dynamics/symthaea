@@ -18,6 +18,12 @@ macro_rules! string_id {
                 Self(value.to_owned())
             }
         }
+
+        impl From<String> for $name {
+            fn from(value: String) -> Self {
+                Self(value)
+            }
+        }
     };
 }
 
