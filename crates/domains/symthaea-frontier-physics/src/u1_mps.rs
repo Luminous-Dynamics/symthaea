@@ -2158,6 +2158,7 @@ impl U1TwoSiteGate {
             matrix,
             charge_conservation_residual: 0.0,
             unitarity_residual: 0.0,
+            hamiltonian_projection_error_operator_upper_bound: 0.0,
         }
     }
 }
