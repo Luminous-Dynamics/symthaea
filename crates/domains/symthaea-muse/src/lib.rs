@@ -126,6 +126,7 @@ pub mod music_edit_benchmark_adapter;
 pub mod music_edit_validity_envelope;
 pub mod music_reference_adjudication;
 pub mod music_edit_transaction_decision;
+pub mod music_realization_transaction_bridge;
 pub mod midi_loader;
 #[cfg(feature = "theory")]
 pub mod musical_policy;
