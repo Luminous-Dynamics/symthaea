@@ -547,7 +547,7 @@ pub fn evaluate_partial_identification(
     if !oracle.admissible_worlds.is_empty() {
         let lower = oracle.admissible_worlds.iter().map(|world| world.target_effect).min().unwrap_or(0);
         let upper = oracle.admissible_worlds.iter().map(|world| world.target_effect).max().unwrap_or(0);
-        if scenario.initial_bounds != EffectInterval { lower, upper } {
+        if scenario.initial_bounds != EffectInterval::new(lower, upper) {
             push_finding(&mut findings, PartialIdentificationFindingCode::InitialBoundsDoNotMatchFiniteWorldEnvelope,
                 None, None, "initial interval must equal the finite admissible-world effect envelope");
         }
@@ -578,6 +578,7 @@ pub fn evaluate_partial_identification(
 
     let actual_world = worlds[&oracle.actual_world_id];
     let mut selected_ids = Vec::new();
+    let mut selected_id_set = BTreeSet::new();
     let mut observed = BTreeMap::new();
     let mut total_cost = 0_u64;
     let mut total_risk = 0_u64;
@@ -590,10 +591,11 @@ pub fn evaluate_partial_identification(
                 Some(trial_index), Some(trial.probe_id.clone()), "selected experiment is undeclared");
             continue;
         };
-        if !selected_ids.insert(trial.probe_id.clone()) {
+        if !selected_id_set.insert(trial.probe_id.clone()) {
             push_finding(&mut findings, PartialIdentificationFindingCode::DuplicateSelectedExperiment,
                 Some(trial_index), Some(trial.probe_id.clone()), "an experiment was selected more than once");
         }
+        selected_ids.push(trial.probe_id.clone());
         if trial.observed_outcome.trim().is_empty() {
             push_finding(&mut findings, PartialIdentificationFindingCode::ObservationRejected,
                 Some(trial_index), Some(trial.probe_id.clone()), "observed experiment outcome is empty");
@@ -716,7 +718,7 @@ pub fn evaluate_partial_identification(
     );
     let selected_zero_potency_count = selected_vec.iter()
         .filter(|id| guaranteed_potency(&oracle.admissible_worlds, scenario.initial_bounds,
-            std::slice::from_ref(id)) == 0)
+            std::slice::from_ref(*id)) == 0)
         .count();
     let zero_potency_experiment_count = scenario.experiments.iter()
         .filter(|experiment| guaranteed_potency(&oracle.admissible_worlds,
