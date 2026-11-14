@@ -48,7 +48,7 @@
     },
     {
       "plan_id": "plan:defer",
-      "disposition": "valid_fallback",
+      "disposition": "defer",
       "reason_codes": [
         "preserves_unknown",
         "no_unsupported_mutation"
@@ -118,5 +118,21 @@
   ],
   "claim_ceiling": "One synthetic known-answer case only. No actual development trajectory, budget forecast, owner conformance, implementation or planning performance is established.",
   "document_type": "development_trajectory_planning_oracle",
-  "benchmark_id": "DYNPLAN-001"
+  "benchmark_id": "DYNPLAN-001",
+  "candidate_plan_ids": [
+    "plan:immediate-implementation",
+    "plan:evidence-first",
+    "plan:broad-scan",
+    "plan:unrelated-benchmark",
+    "plan:defer"
+  ],
+  "action_ids": [
+    "action:audit-exact-pins",
+    "action:owner-contract-review",
+    "action:consumer-conformance-fixtures",
+    "action:implement-consumer-now",
+    "action:broad-source-scan",
+    "action:unrelated-physics-benchmark",
+    "action:defer-until-owner-evidence"
+  ]
 }
