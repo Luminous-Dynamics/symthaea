@@ -499,7 +499,8 @@
             "development_action_proposed",
             "development_action_observed",
             "risk_opened",
-            "risk_closed"
+            "risk_closed",
+            "authority_evidence_recorded"
           ]
         },
         "occurred_at": {
@@ -659,7 +660,8 @@
         "policy_version",
         "outcome",
         "consulted_evidence",
-        "excluded_evidence"
+        "excluded_evidence",
+        "actor_authority"
       ],
       "properties": {
         "decision_at": {
@@ -712,6 +714,94 @@
             "string",
             "null"
           ]
+        },
+        "actor_authority": {
+          "$ref": "#/$defs/decision_authority"
+        }
+      }
+    },
+    "decision_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "owner_repository",
+        "owner_record_ref",
+        "owner_record_type",
+        "actor_id",
+        "authority_scope",
+        "policy_version",
+        "source_observed_at",
+        "available_to_actor_at",
+        "valid_from",
+        "valid_through",
+        "owner_record_disposition",
+        "reason"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_record_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner_record_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_to_actor_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_through": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "owner_record_disposition": {
+          "enum": [
+            "source_declares_authorized",
+            "source_declares_unauthorized",
+            "expired",
+            "revoked",
+            "contested",
+            "indeterminate"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
