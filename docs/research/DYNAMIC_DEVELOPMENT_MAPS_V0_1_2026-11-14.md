@@ -346,6 +346,22 @@ Report confidence intervals, per-relation/task-family breakdowns, cost, latency,
 - Measure actual acceptance, regressions, review time and resource consumption.
 - Retain failed hypotheses and forecast calibration.
 
+### Rust validator and decision-time fixture increment — 2026-11-14
+
+A standalone Rust crate has been authored at `tools/development-map-validator/`. It is deliberately outside the root workspace, has its own Cargo workspace, reads one JSON file, and never follows source URLs or executes repository commands. Its current contract checks include graph references, provenance/lifecycle shape, evidence invalidation/supersession, authority promotion, event targets, containment cycles, and decision-time evidence availability. It uses RFC 3339 timestamp parsing for decision-time comparisons.
+
+The crate includes unit tests for the public temporal fixtures and adversarial mutations. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
+
+A second public known-answer fixture now exists:
+
+- `docs/development-map/fixtures/decision-time-admissibility-v0.1.map.json`
+- `docs/development-map/fixtures/decision-time-admissibility-v0.1.expected.json`
+- Tracking: [DTEA-001 #12042](https://github.com/Luminous-Dynamics/symthaea/issues/12042)
+
+It models a decision made at 10:00Z. Evidence E1 was available by the cutoff and is cited. Evidence E2 describes a test that completed at 09:10Z but was not observed until 11:30Z and available to the actor until 11:45Z, so it cannot support the 10:00Z decision. A correction at 11:50Z later makes E1 stale in the current map, while the historical decision record remains intact and continues to state that E1 was admissible at decision time.
+
+The fixture has five graph nodes, five edges, six events and eight authored negative controls. Runner-independent checks re-fetched the artifacts and checked unique node/event IDs, graph/event references, provenance field presence, schema-local reference resolution, the late-arrival timing relationships, the decision event's timestamp/cutoff, and the later invalidation linkage. These are structural and arithmetic checks over the authored JSON, not Rust test execution, a full JSON Schema validator or independent benchmark qualification.
+
 ### Runner-independent temporal fixture increment — 2026-11-14
 
 A first public known-answer fixture was added at:
