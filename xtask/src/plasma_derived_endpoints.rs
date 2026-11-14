@@ -108,7 +108,9 @@ struct AgedRetentionEvidence {
     geometry: String,
     baseline_receipt: ScopeEvidence,
     conditioned_receipt: ScopeEvidence,
-    conditioning: ConditioningEvidence,
+    #[serde(default)]
+    conditioning: Option<ConditioningEvidence>,
+    requested_claim: String,
     design: StudyDesign,
     baseline_samples: Vec<SpecimenUnit>,
     conditioned_samples: Vec<SpecimenUnit>,
@@ -422,8 +424,6 @@ fn validate_sample_cohorts(
 
 fn validate_conditioning(
     conditioning: &ConditioningEvidence,
-    expected_material: &str,
-    expected_geometry: &str,
     expected_specimens: &[String],
 ) -> std::result::Result<(), Decision> {
     let receipt = &conditioning.receipt;
@@ -459,8 +459,13 @@ fn validate_conditioning(
     {
         return Err(Decision::blocked("conditioning exposure profile, raw trace, duration, environment or time interval is incomplete"));
     }
-    if conditioning.cycle_count > 0 && conditioning.cycle_protocol_id.as_deref().is_none_or(str::is_empty) {
-        return Err(Decision::blocked("cyclic conditioning has no explicit cycle-protocol identity"));
+    if receipt.method_id == "ASTM_D1183"
+        && (conditioning.cycle_count == 0 || conditioning.cycle_protocol_id.as_deref().is_none_or(str::is_empty))
+    {
+        return Err(Decision::blocked("D1183 cyclic conditioning requires a positive cycle count and an explicit cycle-protocol identity"));
+    }
+    if receipt.method_id == "ASTM_D1151" && conditioning.cycle_count != 0 {
+        return Err(Decision::rejected("D1151 continuous conditioning cannot be represented as a cyclic exposure"));
     }
     let specimen_ids = receipt.specimen_ids.clone();
     if !unique_nonempty(&specimen_ids)
@@ -469,15 +474,15 @@ fn validate_conditioning(
     {
         return Err(Decision::rejected("conditioning specimen set does not exactly match the post-conditioning measurement cohort"));
     }
-    if !nonempty(expected_material) || !nonempty(expected_geometry) {
-        return Err(Decision::blocked("derived endpoint material or geometry identity is missing"));
-    }
     Ok(())
 }
 
 fn audit_aged_retention(evidence: &AgedRetentionEvidence) -> Decision {
     if evidence.endpoint_id != "aged_strength_retention_ratio" {
         return Decision::rejected("aged-retention result uses an unsupported endpoint identity");
+    }
+    if evidence.requested_claim != "aged_strength_retention" {
+        return Decision::rejected("aged-retention derivation cannot be promoted to service life, time-to-failure or another unsupported claim");
     }
     if evidence.material_pair_class != "rigid_plastic_pair" || evidence.geometry != "single_lap" {
         return Decision::blocked("this S0 aged-retention profile is limited to rigid-plastic single-lap specimens");
@@ -532,12 +537,10 @@ fn audit_aged_retention(evidence: &AgedRetentionEvidence) -> Decision {
         }
     }
 
-    if let Err(decision) = validate_conditioning(
-        &evidence.conditioning,
-        &evidence.material_pair_class,
-        &evidence.geometry,
-        &aged_ids,
-    ) {
+    let Some(conditioning) = evidence.conditioning.as_ref() else {
+        return Decision::blocked("aged-strength retention requires an explicit D1151 or D1183 conditioning receipt");
+    };
+    if let Err(decision) = validate_conditioning(conditioning, &aged_ids) {
         return decision;
     }
 
