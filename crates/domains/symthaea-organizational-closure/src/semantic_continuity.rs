@@ -7,9 +7,11 @@
 
 use crate::ContentDigest;
 use super::identity::{ContinuityQualification, RelationMode};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SemanticTransitionKey {
     pub action: String,
     pub target: String,
@@ -22,22 +24,26 @@ impl SemanticTransitionKey {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EvidenceStatus { Verified, Rejected, Unavailable }
 
 /// Disposition supplied by an independent receipt/oracle verifier.
 /// A caller-controlled Verified value is not itself a security boundary.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvidenceRef {
     pub reference: String,
     pub digest: ContentDigest,
     pub status: EvidenceStatus,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum GrantStatus { Active, Revoked, Unknown }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AuthorityBinding {
     pub principal_id: String,
     pub trust_root_digest: ContentDigest,
@@ -48,10 +54,12 @@ pub struct AuthorityBinding {
     pub evidence: EvidenceRef,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ConsentStatus { Active, Revoked, Unknown }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConsentBinding {
     pub subject_id: String,
     pub consent_id: String,
@@ -60,10 +68,12 @@ pub struct ConsentBinding {
     pub evidence: EvidenceRef,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EffectReversibility { Reversible, Irreversible, Unknown }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EffectRecord {
     pub effect_id: String,
     pub class: String,
@@ -72,7 +82,8 @@ pub struct EffectRecord {
     pub evidence: EvidenceRef,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LineageStep {
     pub input_digest: ContentDigest,
     pub output_digest: ContentDigest,
@@ -82,10 +93,12 @@ pub struct LineageStep {
     pub consumer_receipt: EvidenceRef,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DependencyStatus { Available, Unavailable, Denied, Unknown }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SubstrateDependency {
     pub dependency_id: String,
     pub status: DependencyStatus,
@@ -94,7 +107,8 @@ pub struct SubstrateDependency {
 
 /// Semantic envelope for one externally observable transition.
 /// effect_inventory_complete must be asserted by an independent observer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SemanticTransition {
     pub key: SemanticTransitionKey,
     pub authority: AuthorityBinding,
@@ -106,7 +120,8 @@ pub struct SemanticTransition {
     pub substrate: BTreeMap<String, SubstrateDependency>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SemanticContinuityPolicy {
     pub mode: RelationMode,
     pub consent_required_for_actions: BTreeSet<String>,
@@ -129,12 +144,14 @@ impl Default for SemanticContinuityPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SemanticPlane {
     TransitionCoverage, Authority, Consent, Effects, Provenance, Substrate,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SemanticFindingCode {
     EmptyBaselineTransitions,
     EmptyCandidateTransitions,
@@ -171,7 +188,8 @@ pub enum SemanticFindingCode {
     SubstrateStatusChanged,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SemanticFinding {
     pub plane: SemanticPlane,
     pub code: SemanticFindingCode,
@@ -179,7 +197,8 @@ pub struct SemanticFinding {
     pub detail: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SemanticContinuityReport {
     pub qualification: ContinuityQualification,
     /// Per-plane results are retained independently; no plane compensates.
