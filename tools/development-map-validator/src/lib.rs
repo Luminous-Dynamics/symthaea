@@ -5,6 +5,7 @@
 //! full JSON Schema 2020-12 specification.
 
 pub mod cargo_manifest;
+pub mod rust_syntax;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
