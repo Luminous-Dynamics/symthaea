@@ -252,6 +252,49 @@ mod tests {
     }
 
     #[test]
+    fn synthetic_hmp_bench_fixture_has_unique_cases_and_expected_controls() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../research-fixtures/hmp-bench/synthetic-adversarial-v0.1.0.json"
+        ))
+        .expect("synthetic HMP-Bench fixture must be valid JSON");
+        assert_eq!(
+            fixture["benchmark_id"].as_str(),
+            Some("HMP-BENCH-SYNTHETIC-ADVERSARIAL-001")
+        );
+        assert_eq!(fixture["status"].as_str(), Some("synthetic_fixture_only"));
+        let cases = fixture["cases"]
+            .as_array()
+            .expect("benchmark cases must be an array");
+        assert_eq!(cases.len(), 6, "pilot fixture case count changed");
+
+        let mut ids = BTreeSet::new();
+        let mut tracks = BTreeSet::new();
+        for case in cases {
+            let id = case["case_id"]
+                .as_str()
+                .expect("each case needs a case_id");
+            let track = case["track"]
+                .as_str()
+                .expect("each case needs a track");
+            assert!(ids.insert(id.to_owned()), "duplicate case id: {id}");
+            tracks.insert(track.to_owned());
+            assert!(
+                case["expected_behaviors"].as_array().is_some_and(|v| !v.is_empty()),
+                "case {id} needs expected behaviors"
+            );
+            assert!(
+                case["forbidden_behaviors"].as_array().is_some_and(|v| !v.is_empty()),
+                "case {id} needs forbidden behaviors"
+            );
+            assert!(
+                case["hard_fail_conditions"].as_array().is_some_and(|v| !v.is_empty()),
+                "case {id} needs hard-fail conditions"
+            );
+        }
+        assert_eq!(tracks.len(), 6, "each starter case should cover a distinct track");
+    }
+
+    #[test]
     fn schema_header_uses_draft_2020_12() {
         let schema: Value = serde_json::from_str(include_str!(
             "../../schemas/pluralistic-knowledge-record-v0.1.0.schema.json"
