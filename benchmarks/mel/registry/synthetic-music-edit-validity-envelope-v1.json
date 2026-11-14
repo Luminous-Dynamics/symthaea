@@ -1,0 +1,159 @@
+{
+  "schema_version": "mel-music-edit-validity-envelope-v1",
+  "envelope_id": "synthetic.instrument-replacement.multireference",
+  "envelope_version": "v1",
+  "dataset_id": "mel-validity-envelope-synthetic",
+  "dataset_version": "synthetic-2026-11-14",
+  "benchmark_track_id": "public-development",
+  "sample_id": "sample-001",
+  "source_lineage_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+  "split": "development",
+  "operation": "replace_instrument",
+  "target_scope": "instrument",
+  "target_selector_sha256": "0404040404040404040404040404040404040404040404040404040404040404",
+  "requested_change": [
+    {
+      "constraint_id": "change.from-original",
+      "property": "instrument_identity",
+      "scope": "target_part",
+      "relation": "different_from",
+      "expected_value": "clarinet",
+      "evidence": "symbolic",
+      "rationale": "The replacement must differ from the source instrument identity."
+    },
+    {
+      "constraint_id": "change.instrument",
+      "property": "instrument_identity",
+      "scope": "target_part",
+      "relation": "member_of_set",
+      "allowed_values": [
+        "flute",
+        "oboe"
+      ],
+      "evidence": "symbolic",
+      "rationale": "Replace the selected part with one of the explicitly permitted instrument identities."
+    }
+  ],
+  "protected_invariants": [
+    {
+      "constraint_id": "protect.harmony",
+      "property": "harmony",
+      "scope": "composition",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The edit must not alter the composition's harmonic content."
+    },
+    {
+      "constraint_id": "protect.melody",
+      "property": "melody_pitch",
+      "scope": "unaffected_parts",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "Melodic pitch content outside the selected part remains protected."
+    },
+    {
+      "constraint_id": "protect.part-duration",
+      "property": "duration_ticks",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves source event duration ticks."
+    },
+    {
+      "constraint_id": "protect.part-lineage",
+      "property": "event_lineage",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves the source part's event lineage."
+    },
+    {
+      "constraint_id": "protect.part-onset",
+      "property": "onset_ticks",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves the source event onset ticks."
+    },
+    {
+      "constraint_id": "protect.part-pitch",
+      "property": "melody_pitch",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves the target part's pitch sequence."
+    }
+  ],
+  "permitted_variations": [
+    {
+      "constraint_id": "variation.dynamic-range",
+      "property": "dynamic_contour",
+      "scope": "target_part",
+      "relation": "within_range",
+      "minimum": -3,
+      "maximum": 3,
+      "unit": "dB",
+      "evidence": "acoustic",
+      "rationale": "A bounded expressive dynamic variation is permitted."
+    }
+  ],
+  "forbidden_changes": [
+    {
+      "constraint_id": "forbid.global-tempo",
+      "property": "tempo",
+      "scope": "whole_mixture",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The edit must not change the global tempo."
+    }
+  ],
+  "references": [
+    {
+      "reference_id": "alt-a",
+      "role": "valid_alternative",
+      "adequacy": "validated",
+      "source_lineage_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+      "audio_sha256": "2121212121212121212121212121212121212121212121212121212121212121",
+      "renderer_profile_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+      "symbolic_target_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+      "review": {
+        "review_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "reviewer_set_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+        "reviewer_count": 2,
+        "independent_reviewers_attested": true,
+        "adjudication_method_id": "synthetic_blind_panel_v1",
+        "reviewed_at_utc": "2026-11-14T00:00:00Z"
+      },
+      "notes": "Synthetic valid alternative A; no audio asset is included."
+    },
+    {
+      "reference_id": "alt-b",
+      "role": "valid_alternative",
+      "adequacy": "validated",
+      "source_lineage_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+      "audio_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "renderer_profile_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+      "symbolic_target_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+      "review": {
+        "review_evidence_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+        "reviewer_set_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+        "reviewer_count": 2,
+        "independent_reviewers_attested": true,
+        "adjudication_method_id": "synthetic_blind_panel_v1",
+        "reviewed_at_utc": "2026-11-14T00:00:00Z"
+      },
+      "notes": "Synthetic valid alternative B; it is a distinct realization, not a duplicate score."
+    },
+    {
+      "reference_id": "wrong-instrument",
+      "role": "negative_control",
+      "adequacy": "invalid",
+      "source_lineage_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+      "audio_sha256": "2323232323232323232323232323232323232323232323232323232323232323",
+      "renderer_profile_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+      "symbolic_target_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+      "notes": "Synthetic negative control with a wrong instrument identity."
+    }
+  ],
+  "reference_policy": "require_reviewed_alternative"
+}

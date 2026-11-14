@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-validity-envelope-v1.schema.json",
+  "title": "Melothaea musical edit validity envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "envelope_id",
+    "envelope_version",
+    "dataset_id",
+    "dataset_version",
+    "benchmark_track_id",
+    "sample_id",
+    "source_lineage_sha256",
+    "split",
+    "operation",
+    "target_scope",
+    "target_selector_sha256",
+    "requested_change",
+    "protected_invariants",
+    "references",
+    "reference_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-validity-envelope-v1"
+    },
+    "envelope_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "envelope_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_track_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "test"
+      ]
+    },
+    "operation": {
+      "enum": [
+        "remove_instrument",
+        "replace_instrument",
+        "extract_instrument",
+        "double_instrument",
+        "remove_drums",
+        "replace_drums",
+        "extract_drums",
+        "staccato",
+        "legato",
+        "crescendo",
+        "decrescendo",
+        "tuning_correction_440"
+      ]
+    },
+    "target_scope": {
+      "enum": [
+        "instrument",
+        "drum_kit",
+        "mixture"
+      ]
+    },
+    "target_selector_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "requested_change": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "protected_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "permitted_variations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "forbidden_changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "reference_policy": {
+      "enum": [
+        "constraint_only",
+        "require_reviewed_alternative"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "property",
+        "scope",
+        "relation",
+        "evidence",
+        "rationale"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property": {
+          "enum": [
+            "articulation",
+            "audio_artifact",
+            "drum_kit_identity",
+            "duration_ticks",
+            "dynamic_contour",
+            "event_lineage",
+            "event_presence",
+            "form",
+            "global_loudness",
+            "harmony",
+            "instrument_identity",
+            "melody_pitch",
+            "meter",
+            "onset_ticks",
+            "phrase_coherence",
+            "rhythm",
+            "stereo_image",
+            "tempo",
+            "timbre_family",
+            "tuning_cents",
+            "velocity_contour",
+            "duration_to_inter_onset_ratio"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "target_part",
+            "edited_support",
+            "unaffected_parts",
+            "whole_mixture",
+            "composition"
+          ]
+        },
+        "relation": {
+          "enum": [
+            "equal_to",
+            "different_from",
+            "within_range",
+            "member_of_set",
+            "not_member_of_set",
+            "present",
+            "absent",
+            "no_change",
+            "monotonic_increase",
+            "monotonic_decrease"
+          ]
+        },
+        "expected_value": {
+          "type": "string"
+        },
+        "allowed_values": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "enum": [
+            "symbolic",
+            "acoustic",
+            "human_adjudication",
+            "renderer_bound",
+            "combined"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "review_evidence_sha256",
+        "reviewer_set_sha256",
+        "reviewer_count",
+        "independent_reviewers_attested",
+        "adjudication_method_id",
+        "reviewed_at_utc"
+      ],
+      "properties": {
+        "review_evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reviewer_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "independent_reviewers_attested": {
+          "type": "boolean"
+        },
+        "adjudication_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewed_at_utc": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_id",
+        "role",
+        "adequacy",
+        "source_lineage_sha256",
+        "audio_sha256",
+        "renderer_profile_sha256",
+        "notes"
+      ],
+      "properties": {
+        "reference_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "valid_alternative",
+            "demonstration",
+            "negative_control"
+          ]
+        },
+        "adequacy": {
+          "enum": [
+            "validated",
+            "ambiguous",
+            "inaudible",
+            "invalid",
+            "unreviewed"
+          ]
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "renderer_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "symbolic_target_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "review": {
+          "$ref": "#/$defs/review"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
