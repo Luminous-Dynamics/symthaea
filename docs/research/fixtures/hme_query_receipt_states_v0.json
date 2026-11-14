@@ -1,0 +1,447 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-QUERY-RECEIPT-STATES-2026-11-07",
+  "status": "synthetic_contract_examples_not_runtime_receipts",
+  "receipts": [
+    {
+      "schema_version": "0.1.0",
+      "query": {
+        "query_id": "fixture-query-001",
+        "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "representation": "continuous_f32",
+        "dimension": 2048,
+        "metric": "cosine",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+        "top_k": 2,
+        "tie_policy": "score_desc_item_id_asc"
+      },
+      "generation": {
+        "segment_generation": 7,
+        "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "requested": {
+        "exactness": "exact_only",
+        "approximation_profile_id": null,
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 8192,
+          "deadline_unix_ns": null
+        }
+      },
+      "status": "ExactComplete",
+      "stop_reason": "Completed",
+      "resource_usage": {
+        "candidate_evaluations": 4,
+        "payload_bytes_inspected": 8192,
+        "coordinates_evaluated": 8192,
+        "elapsed_ns": 1000000,
+        "peak_temporary_bytes": 4096
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 4,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 0
+      },
+      "results": [
+        {
+          "rank": 1,
+          "item_id": "mem-001",
+          "score": 0.91,
+          "score_kind": "exact",
+          "provisional": false
+        },
+        {
+          "rank": 2,
+          "item_id": "mem-002",
+          "score": 0.83,
+          "score_kind": "exact",
+          "provisional": false
+        }
+      ],
+      "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility": {
+        "policy_id": "hme-eligibility-fixture-v1",
+        "policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "authorization_generation": 3,
+        "source_ledger_generation": 9,
+        "valid_at": "2026-11-07T00:00:00Z",
+        "known_at": "2026-11-07T16:00:00Z",
+        "principal_scope_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hme_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "physical_count": 6,
+        "eligible_count": 4,
+        "excluded_count": 2,
+        "primary_exclusion_counts": {
+          "outside_valid_time": 0,
+          "not_known_at_known_time": 0,
+          "retracted_or_superseded": 0,
+          "quarantined": 0,
+          "out_of_scope": 1,
+          "unauthorized_or_revoked": 0,
+          "forgotten_from_active_index": 0,
+          "privacy_erased_or_unavailable": 0,
+          "retention_expired": 1,
+          "invalid_metadata": 0
+        },
+        "exclusion_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "payload_reads_for_excluded_count": 0,
+        "snapshot_consistent": true
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "query": {
+        "query_id": "fixture-query-001",
+        "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "representation": "continuous_f32",
+        "dimension": 2048,
+        "metric": "cosine",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+        "top_k": 2,
+        "tie_policy": "score_desc_item_id_asc"
+      },
+      "generation": {
+        "segment_generation": 7,
+        "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "requested": {
+        "exactness": "exact_only",
+        "approximation_profile_id": null,
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 8192,
+          "deadline_unix_ns": null
+        }
+      },
+      "status": "ExactComplete",
+      "stop_reason": "Completed",
+      "resource_usage": {
+        "candidate_evaluations": 4,
+        "payload_bytes_inspected": 4096,
+        "coordinates_evaluated": 4096,
+        "elapsed_ns": 600000,
+        "peak_temporary_bytes": 2048
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 2,
+        "safely_pruned_count": 2,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 0
+      },
+      "results": [
+        {
+          "rank": 1,
+          "item_id": "mem-001",
+          "score": 0.91,
+          "score_kind": "exact",
+          "provisional": false
+        },
+        {
+          "rank": 2,
+          "item_id": "mem-002",
+          "score": 0.83,
+          "score_kind": "exact",
+          "provisional": false
+        }
+      ],
+      "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility": {
+        "policy_id": "hme-eligibility-fixture-v1",
+        "policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "authorization_generation": 3,
+        "source_ledger_generation": 9,
+        "valid_at": "2026-11-07T00:00:00Z",
+        "known_at": "2026-11-07T16:00:00Z",
+        "principal_scope_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hme_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "physical_count": 6,
+        "eligible_count": 4,
+        "excluded_count": 2,
+        "primary_exclusion_counts": {
+          "outside_valid_time": 0,
+          "not_known_at_known_time": 0,
+          "retracted_or_superseded": 0,
+          "quarantined": 0,
+          "out_of_scope": 1,
+          "unauthorized_or_revoked": 0,
+          "forgotten_from_active_index": 0,
+          "privacy_erased_or_unavailable": 0,
+          "retention_expired": 1,
+          "invalid_metadata": 0
+        },
+        "exclusion_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "payload_reads_for_excluded_count": 0,
+        "snapshot_consistent": true
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "query": {
+        "query_id": "fixture-query-001",
+        "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "representation": "continuous_f32",
+        "dimension": 2048,
+        "metric": "cosine",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+        "top_k": 2,
+        "tie_policy": "score_desc_item_id_asc"
+      },
+      "generation": {
+        "segment_generation": 7,
+        "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "requested": {
+        "exactness": "approximate_allowed",
+        "approximation_profile_id": "lsh-v1",
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 8192,
+          "deadline_unix_ns": null
+        }
+      },
+      "status": "ApproximateComplete",
+      "stop_reason": "Completed",
+      "resource_usage": {
+        "candidate_evaluations": 3,
+        "payload_bytes_inspected": 6144,
+        "coordinates_evaluated": 6144,
+        "elapsed_ns": 400000,
+        "peak_temporary_bytes": 2048
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 0,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 3,
+        "excluded_by_approximate_policy_count": 1,
+        "unprocessed_count": 0
+      },
+      "approximation": {
+        "profile_id": "lsh-v1",
+        "quality_receipt_id": "recall-fixture-v1",
+        "candidate_policy_completed": true,
+        "exact_rerank": true
+      },
+      "results": [
+        {
+          "rank": 1,
+          "item_id": "mem-001",
+          "score": 0.91,
+          "score_kind": "exact",
+          "provisional": false
+        },
+        {
+          "rank": 2,
+          "item_id": "mem-002",
+          "score": 0.83,
+          "score_kind": "exact",
+          "provisional": false
+        }
+      ],
+      "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility": {
+        "policy_id": "hme-eligibility-fixture-v1",
+        "policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "authorization_generation": 3,
+        "source_ledger_generation": 9,
+        "valid_at": "2026-11-07T00:00:00Z",
+        "known_at": "2026-11-07T16:00:00Z",
+        "principal_scope_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hme_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "physical_count": 6,
+        "eligible_count": 4,
+        "excluded_count": 2,
+        "primary_exclusion_counts": {
+          "outside_valid_time": 0,
+          "not_known_at_known_time": 0,
+          "retracted_or_superseded": 0,
+          "quarantined": 0,
+          "out_of_scope": 1,
+          "unauthorized_or_revoked": 0,
+          "forgotten_from_active_index": 0,
+          "privacy_erased_or_unavailable": 0,
+          "retention_expired": 1,
+          "invalid_metadata": 0
+        },
+        "exclusion_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "payload_reads_for_excluded_count": 0,
+        "snapshot_consistent": true
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "query": {
+        "query_id": "fixture-query-001",
+        "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "representation": "continuous_f32",
+        "dimension": 2048,
+        "metric": "cosine",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+        "top_k": 2,
+        "tie_policy": "score_desc_item_id_asc"
+      },
+      "generation": {
+        "segment_generation": 7,
+        "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "requested": {
+        "exactness": "best_effort",
+        "approximation_profile_id": null,
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 8192,
+          "deadline_unix_ns": null
+        }
+      },
+      "status": "Incomplete",
+      "stop_reason": "BudgetExhausted",
+      "resource_usage": {
+        "candidate_evaluations": 2,
+        "payload_bytes_inspected": 4096,
+        "coordinates_evaluated": 4096,
+        "elapsed_ns": 400000,
+        "peak_temporary_bytes": 1024
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 2,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 2
+      },
+      "results": [
+        {
+          "rank": 1,
+          "item_id": "mem-001",
+          "score": 0.91,
+          "score_kind": "exact",
+          "provisional": true
+        }
+      ],
+      "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility": {
+        "policy_id": "hme-eligibility-fixture-v1",
+        "policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "authorization_generation": 3,
+        "source_ledger_generation": 9,
+        "valid_at": "2026-11-07T00:00:00Z",
+        "known_at": "2026-11-07T16:00:00Z",
+        "principal_scope_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hme_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "physical_count": 6,
+        "eligible_count": 4,
+        "excluded_count": 2,
+        "primary_exclusion_counts": {
+          "outside_valid_time": 0,
+          "not_known_at_known_time": 0,
+          "retracted_or_superseded": 0,
+          "quarantined": 0,
+          "out_of_scope": 1,
+          "unauthorized_or_revoked": 0,
+          "forgotten_from_active_index": 0,
+          "privacy_erased_or_unavailable": 0,
+          "retention_expired": 1,
+          "invalid_metadata": 0
+        },
+        "exclusion_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "payload_reads_for_excluded_count": 0,
+        "snapshot_consistent": true
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "query": {
+        "query_id": "fixture-query-001",
+        "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "representation": "continuous_f32",
+        "dimension": 2048,
+        "metric": "cosine",
+        "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+        "top_k": 2,
+        "tie_policy": "score_desc_item_id_asc"
+      },
+      "generation": {
+        "segment_generation": 7,
+        "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "requested": {
+        "exactness": "exact_only",
+        "approximation_profile_id": null,
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 8192,
+          "deadline_unix_ns": null
+        }
+      },
+      "status": "UnavailableOrInvalid",
+      "stop_reason": "StaleGeneration",
+      "resource_usage": {
+        "candidate_evaluations": 0,
+        "payload_bytes_inspected": 0,
+        "coordinates_evaluated": 0,
+        "elapsed_ns": 10000,
+        "peak_temporary_bytes": 0
+      },
+      "candidate_accounting": {
+        "eligible_count": 0,
+        "fully_scored_count": 0,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 0
+      },
+      "results": [],
+      "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "eligibility": {
+        "policy_id": "hme-eligibility-fixture-v1",
+        "policy_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "authorization_generation": 0,
+        "source_ledger_generation": 0,
+        "valid_at": "2026-11-07T00:00:00Z",
+        "known_at": "2026-11-07T16:00:00Z",
+        "principal_scope_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hme_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "physical_count": 0,
+        "eligible_count": 0,
+        "excluded_count": 0,
+        "primary_exclusion_counts": {
+          "outside_valid_time": 0,
+          "not_known_at_known_time": 0,
+          "retracted_or_superseded": 0,
+          "quarantined": 0,
+          "out_of_scope": 0,
+          "unauthorized_or_revoked": 0,
+          "forgotten_from_active_index": 0,
+          "privacy_erased_or_unavailable": 0,
+          "retention_expired": 0,
+          "invalid_metadata": 0
+        },
+        "exclusion_set_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "payload_reads_for_excluded_count": 0,
+        "snapshot_consistent": false
+      }
+    }
+  ],
+  "semantic_checks": [
+    "ExactComplete requires fully_scored_count + safely_pruned_count == eligible_count.",
+    "ApproximateComplete has a completed candidate policy but is not an exactness claim.",
+    "Incomplete results are provisional and cannot be promoted to completed top-k.",
+    "BudgetExhausted is represented as stop_reason on an Incomplete result, not as a separate completion status.",
+    "UnavailableOrInvalid returns no memory result payload.",
+    "These examples use synthetic IDs, digests, scores and resource values solely to exercise the contract.",
+    "Eligibility is pinned to policy, authorization, source-ledger and HME manifest generations before vector payload access.",
+    "Primary exclusion counts are mutually exclusive in these fixtures; no excluded payload is read.",
+    "UnavailableOrInvalid does not claim an eligible population from a stale/unverified manifest."
+  ]
+}

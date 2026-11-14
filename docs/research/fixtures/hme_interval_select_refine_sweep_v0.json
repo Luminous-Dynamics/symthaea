@@ -1,0 +1,111 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-INTERVAL-SELECT-REFINE-SWEEP-2026-11-08",
+  "status": "deterministic_generated_property_sweep_not_formal_proof_or_runtime_benchmark",
+  "algorithm": "kth_largest_lower_bound_then_retain_upper_greater_than_or_equal_to_threshold",
+  "generator": {
+    "prng": "xorshift32",
+    "seed": "0x5eed1234",
+    "trials": 50000,
+    "corpus_size_range_inclusive": [
+      1,
+      32
+    ],
+    "k": "uniform integer in [1,N]",
+    "exact_score_domain": "integers from -5 through 5 inclusive",
+    "lower_slack_domain": "integers from 0 through 5 inclusive",
+    "upper_slack_domain": "integers from 0 through 5 inclusive",
+    "interval_generation": "L = exact_score - lower_slack; U = exact_score + upper_slack",
+    "stable_tie_policy": "score_desc_item_id_asc"
+  },
+  "observed": {
+    "trials": 50000,
+    "false_prunes": 0,
+    "threshold_equal_candidates_observed": 39456,
+    "max_corpus_size": 32
+  },
+  "first_examples": [
+    {
+      "n": 14,
+      "k": 2,
+      "threshold": 3,
+      "full_top_k": [
+        "007",
+        "010"
+      ],
+      "retained_count": 7,
+      "excluded_count": 7
+    },
+    {
+      "n": 18,
+      "k": 15,
+      "threshold": -8,
+      "full_top_k": [
+        "002",
+        "015",
+        "009",
+        "016",
+        "005",
+        "008",
+        "012",
+        "014",
+        "017",
+        "013",
+        "010",
+        "000",
+        "003",
+        "004",
+        "007"
+      ],
+      "retained_count": 18,
+      "excluded_count": 0
+    },
+    {
+      "n": 25,
+      "k": 2,
+      "threshold": 2,
+      "full_top_k": [
+        "015",
+        "002"
+      ],
+      "retained_count": 12,
+      "excluded_count": 13
+    },
+    {
+      "n": 22,
+      "k": 8,
+      "threshold": 0,
+      "full_top_k": [
+        "001",
+        "016",
+        "021",
+        "005",
+        "006",
+        "004",
+        "011",
+        "014"
+      ],
+      "retained_count": 18,
+      "excluded_count": 4
+    },
+    {
+      "n": 15,
+      "k": 2,
+      "threshold": 4,
+      "full_top_k": [
+        "003",
+        "000"
+      ],
+      "retained_count": 6,
+      "excluded_count": 9
+    }
+  ],
+  "invariant_checked": "The exact top-k IDs/order over all N rows equal the exact top-k IDs/order after retaining all rows with U >= kthLargest(L).",
+  "interpretation": "The deterministic generated sweep found no false prune for the stated small integer domain and valid interval generator. It does not prove production interval validity, floating-point outward rounding, or whole-corpus eligibility coverage.",
+  "nonclaims": [
+    "No residual encoder/certificate was tested.",
+    "No canonical f32 interval arithmetic was tested.",
+    "No HME implementation or runtime benchmark was tested.",
+    "No probabilistic interval was tested."
+  ]
+}

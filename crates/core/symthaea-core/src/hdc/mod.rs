@@ -23,6 +23,7 @@ Backward-compatible alias: `RealHV = ContinuousHV`.
 |--------|---------|
 | `binary_hv` | `BinaryHV` type, SIMD ops, batch similarity, binding |
 | `unified_hv` | `ContinuousHV`, `HV` enum, normalize/scale/permute |
+| `continuous_hv_interval` | Conservative canonical f32 score intervals for bounded residuals |
 | `simd_ops` | Low-level SIMD kernels (popcount, bundle, XOR) |
 | `hv_pool` | Arena-based pooling for zero-allocation HV reuse |
 | `integrated_information` | IIT Φ measurement over HV ensembles |
@@ -298,6 +299,7 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 // pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
 pub mod config; // Centralized HDC configuration (runtime dimension management)
 pub mod projection;
+pub mod continuous_hv_interval; // Conservative canonical f32 score intervals
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
 // Grid encoding for 2D spatial reasoning (ARC-style puzzles)

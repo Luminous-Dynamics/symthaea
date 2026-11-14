@@ -1,0 +1,114 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-QUERY-COST-ESTIMATION-2026-11-07",
+  "status": "research_protocol_matrix_no_runtime_predictions_or_benchmarks",
+  "paper_baselines": [
+    {
+      "id": "annie",
+      "method": "graph-query cost GBDT",
+      "output": "cost estimate for target recall",
+      "guarantee_class": "population_quantile_under_ideal_optimizer_and_training_distribution",
+      "ood_warning": "empirical RTG can fail under modality/query-distribution shift",
+      "url": "https://doi.org/10.14778/3836663.3836728"
+    },
+    {
+      "id": "qbat",
+      "method": "GBDT and AlphaEvolve-derived rule",
+      "output": "per-query clustering search budget",
+      "guarantee_class": "paper-reported recall-consistency objective",
+      "url": "https://doi.org/10.14778/3836663.3836675"
+    },
+    {
+      "id": "darth_plus",
+      "method": "dynamic recall prediction",
+      "output": "estimated per-query recall and optional probabilistic quality guarantee",
+      "guarantee_class": "probabilistic prediction guarantee under paper assumptions",
+      "url": "https://mchatzakis.github.io/declarative-recall/"
+    },
+    {
+      "id": "ada_ef",
+      "method": "distribution-aware HNSW exploration",
+      "output": "query-specific ef",
+      "guarantee_class": "statistical target-recall approach; not deterministic exactness",
+      "url": "https://arxiv.org/abs/2512.06636"
+    },
+    {
+      "id": "pqr_search",
+      "method": "rotated residual 1-bit codes and exact quantiles",
+      "output": "per-fixed-query probabilistic recall",
+      "guarantee_class": "probability over index random transform under query/update independence",
+      "url": "https://arxiv.org/abs/2611.07579"
+    },
+    {
+      "id": "octopus_ann",
+      "method": "I/O-first disk-resident graph layout and search",
+      "output": "matched-recall throughput",
+      "guarantee_class": "empirical matched-recall system performance",
+      "url": "https://doi.org/10.14778/3801059.3801064"
+    },
+    {
+      "id": "svfusion",
+      "method": "CPU-GPU-disk co-processing",
+      "output": "streaming real-time vector search",
+      "guarantee_class": "empirical system performance",
+      "url": "https://doi.org/10.14778/3796195.3796216"
+    }
+  ],
+  "hme_action_kinds": [
+    "read_eligibility_metadata",
+    "read_candidate_block",
+    "exact_score_candidate",
+    "verify_bound_metadata",
+    "prefetch_candidate_page",
+    "canonical_full_scan"
+  ],
+  "pre_action_feature_groups": [
+    "query_representation_and_dimension",
+    "query_block_norms_and_energy",
+    "current_exact_top_k_threshold_and_margin",
+    "candidate_upper_bound_gap",
+    "certified_block_norms_or_residuals",
+    "segment_generation_and_corpus_statistics",
+    "page_layout_and_byte_cost",
+    "observed_bound_shrink_history",
+    "active_model_and_calibration_generation"
+  ],
+  "predicted_targets": [
+    "future_payload_bytes_safely_avoided",
+    "bound_reduction_per_payload_byte",
+    "exact_kth_threshold_improvement",
+    "exact_completion_candidates_and_bytes",
+    "exact_completion_latency",
+    "approximate_profile_cost_for_declared_target"
+  ],
+  "model_trust_states": [
+    "qualified_in_distribution",
+    "shift_suspected",
+    "coverage_breach",
+    "generation_mismatch",
+    "profile_disabled",
+    "recalibration_pending"
+  ],
+  "fallback_policy": {
+    "exact_only": "ignore untrusted model ordering; use a qualified exact schedule; if deterministic budget expires return Incomplete",
+    "approximate_allowed": "disable empirical guarantee when its calibration profile breaches; exact fallback only when explicitly permitted, otherwise UncertifiedOrIncomplete",
+    "best_effort": "provisional output remains Incomplete until the declared completion contract is met"
+  },
+  "exact_invariants": [
+    "Predicted utility is ordering only.",
+    "Learned score, cost estimate, quantile estimate or OOD score cannot authorize exact pruning.",
+    "Only canonical exact scores and conservative independently verified bounds can remove candidates in ExactOnly mode.",
+    "Every eligible candidate is fully scored, safely pruned or explicitly unprocessed.",
+    "Stale or unbound generation metadata fails closed.",
+    "The query budget API and completion semantics remain owned by issue 10973."
+  ],
+  "promotion_targets": {
+    "exact_oracle_agreement": 1,
+    "false_prunes": 0,
+    "model_inference_overhead_fraction": 0.05,
+    "exact_throughput_improvement_target": 1.5,
+    "p95_latency_regression_max_fraction": 0.1,
+    "note": "Project targets only; none are measured or industry standards."
+  },
+  "no_results_claimed": true
+}

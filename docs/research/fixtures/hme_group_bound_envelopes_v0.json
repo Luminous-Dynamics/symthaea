@@ -1,0 +1,201 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-GROUP-ENVELOPE-2026-11-08",
+  "status": "synthetic_real_arithmetic_examples_not_outward_rounding_proof_or_benchmark",
+  "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+  "examples": [
+    {
+      "id": "positive_cosine_group_prunable",
+      "query": [
+        1,
+        -1,
+        0.5,
+        0.5,
+        0,
+        0
+      ],
+      "note": "candidate vectors and exact values are explicitly recorded below in candidates_vectors",
+      "candidates_vectors": [
+        {
+          "id": "a",
+          "values": [
+            0.1,
+            -0.5,
+            0.4,
+            0.2,
+            0.8,
+            0.8
+          ]
+        },
+        {
+          "id": "b",
+          "values": [
+            -0.2,
+            0.2,
+            -0.1,
+            0.2,
+            1,
+            0.8
+          ]
+        }
+      ],
+      "coordinate_lower": [
+        -0.2,
+        -0.5,
+        -0.1,
+        0.2,
+        0.8,
+        0.8
+      ],
+      "coordinate_upper": [
+        0.1,
+        0.2,
+        0.4,
+        0.2,
+        1,
+        0.8
+      ],
+      "query_norm": 1.5811388300841898,
+      "candidate_norm_sq_interval": [
+        1.74,
+        1.77
+      ],
+      "box_dot_upper": 0.9,
+      "cosine_upper": 0.4315169713368457,
+      "exact_cosines": [
+        0.4315169713368457,
+        -0.1663839409895349
+      ],
+      "kth_threshold": 0.44,
+      "expected": "safe_group_prune_in_real_arithmetic",
+      "reason": "All candidates in the group have canonical mathematical cosine below the threshold; the conservative box/norm envelope upper bound is also below it. Runtime use still requires outward-rounded f32 proof."
+    },
+    {
+      "id": "negative_cosine_group_uses_maximum_norm",
+      "query": [
+        1,
+        0,
+        0
+      ],
+      "candidates_vectors": [
+        {
+          "id": "c",
+          "values": [
+            -0.5,
+            1,
+            1
+          ]
+        },
+        {
+          "id": "d",
+          "values": [
+            -1,
+            -1,
+            -1
+          ]
+        }
+      ],
+      "coordinate_lower": [
+        -1,
+        -1,
+        -1
+      ],
+      "coordinate_upper": [
+        -0.5,
+        1,
+        1
+      ],
+      "query_norm": 1,
+      "candidate_norm_sq_interval": [
+        1.25,
+        3
+      ],
+      "box_dot_upper": -0.5,
+      "cosine_upper": -0.2886751345948129,
+      "exact_cosines": [
+        -0.3333333333333333,
+        -0.5773502691896258
+      ],
+      "kth_threshold": -0.2,
+      "expected": "safe_group_prune_in_real_arithmetic",
+      "reason": "The dot upper bound is negative, so the largest candidate norm gives the least-negative and therefore conservative cosine upper bound."
+    },
+    {
+      "id": "zero_norm_lower_bound_disables_positive_prune",
+      "query": [
+        1,
+        0
+      ],
+      "coordinate_lower": [
+        -1,
+        -1
+      ],
+      "coordinate_upper": [
+        1,
+        1
+      ],
+      "query_norm": 1,
+      "candidate_norm_sq_interval": [
+        0,
+        2
+      ],
+      "box_dot_upper": 1,
+      "cosine_upper": 1,
+      "kth_threshold": 0.9,
+      "expected": "do_not_group_prune",
+      "reason": "Positive numerator plus zero lower norm bound cannot produce a useful finite cosine upper bound; refine or score members individually."
+    },
+    {
+      "id": "threshold_equality_must_continue",
+      "query": [
+        1,
+        -1,
+        0.5,
+        0.5,
+        0,
+        0
+      ],
+      "coordinate_lower": [
+        -0.2,
+        -0.5,
+        -0.1,
+        0.2,
+        0.8,
+        0.8
+      ],
+      "coordinate_upper": [
+        0.1,
+        0.2,
+        0.4,
+        0.2,
+        1,
+        0.8
+      ],
+      "query_norm": 1.5811388300841898,
+      "candidate_norm_sq_interval": [
+        1.74,
+        1.77
+      ],
+      "box_dot_upper": 0.9,
+      "cosine_upper": 0.4315169713368457,
+      "kth_threshold": 0.4315169713368457,
+      "expected": "continue_on_equality",
+      "reason": "Strict upper-bound < kth threshold is required; equality and interval overlap cannot prune."
+    }
+  ],
+  "invariants": [
+    "Every candidate component must be inside the declared admitted ContinuousHV profile.",
+    "Coordinate minima/maxima must cover every eligible member of the pinned group generation.",
+    "Norm-squared interval must contain the canonical candidate norm-squared for every group member.",
+    "The cosine upper-bound branch uses minimum denominator for a nonnegative dot upper bound and maximum denominator for a negative dot upper bound.",
+    "A checksum binds synopsis bytes but does not prove extrema or norm bounds are correct.",
+    "Runtime pruning requires directed/outward rounding matching the canonical f32 score contract.",
+    "Mixed-eligibility groups require an eligibility-homogeneous synopsis or per-item refinement before payload access.",
+    "Equality, numerical uncertainty, stale metadata or invalid ranges cause continued scanning or fail-closed fallback."
+  ],
+  "nonclaims": [
+    "No HME implementation or runtime benchmark is represented.",
+    "The arithmetic examples are not a floating-point proof.",
+    "Group box pruning, vector approximation, VA-files and metric-tree bounds are established prior art; HME novelty is an empirical HDC-specific adaptation only if demonstrated."
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "HME-CERT-COMPRESS-BLOCK-BOUNDS-2026-11-07",
+  "status": "synthetic_arithmetic_comparison_not_benchmark_or_production_certificate",
+  "dimension": 4,
+  "block_layout": [
+    [
+      0,
+      1
+    ],
+    [
+      2,
+      3
+    ]
+  ],
+  "query": [
+    10,
+    0,
+    1,
+    0
+  ],
+  "reconstructed_candidate": [
+    0,
+    20,
+    0,
+    0
+  ],
+  "actual_residual_for_fixture_only": [
+    0.1,
+    0,
+    1,
+    0
+  ],
+  "block_residual_upper_bounds_l2": [
+    0.1,
+    1
+  ],
+  "query_block_norms": [
+    10,
+    1
+  ],
+  "query_norm": 10.04987562112089,
+  "reconstructed_candidate_norm": 20,
+  "total_residual_norm_upper_bound": 1.004987562112089,
+  "global_dot_residual_bound": 10.1,
+  "blockwise_dot_residual_bound": 2,
+  "actual_dot_query_original": 2,
+  "global_cosine_upper_bound_using_candidate_norm_interval": 0.052907970731701996,
+  "blockwise_cosine_upper_bound_using_candidate_norm_interval": 0.010476825887465742,
+  "candidate_norm_lower_bound": 18.99501243788791,
+  "interpretation": [
+    "The blockwise bound uses sum_b ||q_b|| * epsilon_b; the global bound uses ||q|| * sqrt(sum_b epsilon_b^2).",
+    "This fixture has query block norms 10 and 1, with residual bounds 0.1 and 1.0; the blockwise dot upper bound is much tighter.",
+    "The fixture demonstrates only real-arithmetic bound geometry; production must use outward-rounded intervals and prove that each epsilon certificate is conservative.",
+    "actual_residual_for_fixture_only is revealed to build the test oracle; query-time code is only allowed to use certified upper bounds."
+  ]
+}

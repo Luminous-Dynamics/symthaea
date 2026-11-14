@@ -1,0 +1,147 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-PER-QUERY-RELIABILITY-2026-11-07",
+  "status": "synthetic_protocol_matrix_not_runtime_results_or_guarantee",
+  "guarantee_classes": [
+    {
+      "id": "exact_full",
+      "probability_source": "none",
+      "exact_oracle_required": true,
+      "false_pruning_allowed": false
+    },
+    {
+      "id": "exact_progressive",
+      "probability_source": "none",
+      "exact_oracle_required": true,
+      "false_pruning_allowed": false
+    },
+    {
+      "id": "probabilistic_per_query",
+      "probability_source": "declared_index_randomness",
+      "exact_oracle_required": true,
+      "per_query_tau_delta_required": true,
+      "query_update_independence_required": true
+    },
+    {
+      "id": "empirical_selective",
+      "probability_source": "held_out_sampling_process",
+      "exact_oracle_required": true,
+      "finite_sample_upper_limit_required": true,
+      "distribution_shift_scope_required": true
+    },
+    {
+      "id": "incomplete_or_uncertified",
+      "probability_source": "none",
+      "exact_oracle_required": false,
+      "promotion_to_completed_class_allowed": false
+    }
+  ],
+  "query_strata": [
+    "in_distribution",
+    "held_out_domain_or_encoder_shift",
+    "sparse_support",
+    "localized_coordinate",
+    "periodic_or_phase_structured",
+    "near_duplicate_or_high_interference",
+    "low_margin_kth_boundary",
+    "norm_extreme_within_admitted_domain",
+    "adversarial_fixed_before_transform",
+    "adaptive_feedback_after_index_responses"
+  ],
+  "query_transform_independence": {
+    "non_adaptive_panel": "query list frozen before transform generation or reveal",
+    "adaptive_panel": "separate threat-model audit; no per-query theorem claim unless a proof covers adaptive interaction",
+    "transform_seed_storage": "commitment_digest_before_queries_and_reveal_after_audit",
+    "note": "Commit/reveal is an audit control, not proof that operational queries are independent of the hidden transform."
+  },
+  "dynamic_update_fields": [
+    "index_generation",
+    "update_batch_id",
+    "update_watermark",
+    "query_sequence_number",
+    "transform_generation",
+    "retune_or_rebuild_occurred",
+    "stale_metadata_detected",
+    "candidate_resurrection_detected"
+  ],
+  "required_metrics": [
+    "recall_at_1",
+    "recall_at_5",
+    "recall_at_10",
+    "recall_at_100",
+    "exact_top_k_id_order_agreement",
+    "candidate_coverage_before_rerank",
+    "query_failure_indicator_for_each_tau",
+    "exact_kth_margin",
+    "payload_bytes_read",
+    "candidate_evaluations",
+    "p50_p95_p99_latency",
+    "batch_throughput",
+    "index_memory_bytes",
+    "build_update_compaction_cost"
+  ],
+  "audit_planning": {
+    "method": "zero-failure one-sided exact binomial upper bound",
+    "formula": "p_upper = 1 - alpha^(1/n)",
+    "examples": [
+      {
+        "delta": 0.01,
+        "confidence": 0.95,
+        "min_independent_transform_trials_per_fixed_query": 299
+      },
+      {
+        "delta": 0.01,
+        "confidence": 0.99,
+        "min_independent_transform_trials_per_fixed_query": 459
+      },
+      {
+        "delta": 0.001,
+        "confidence": 0.95,
+        "min_independent_transform_trials_per_fixed_query": 2995
+      },
+      {
+        "delta": 0.001,
+        "confidence": 0.99,
+        "min_independent_transform_trials_per_fixed_query": 4603
+      }
+    ],
+    "limitations": [
+      "These are audit planning counts, not proof of an algorithmic theorem.",
+      "Use an exact binomial upper limit when failures are observed.",
+      "Do not pool across query strata to claim a per-query guarantee.",
+      "Predeclare multiplicity control across strata and simultaneous claims."
+    ]
+  },
+  "exact_invariants": [
+    "Every exact candidate is fully scored or safely pruned by an independently admissible conservative bound.",
+    "Approximate candidate coverage and exact reranking are measured separately.",
+    "A statistical interval cannot authorize deterministic exact pruning.",
+    "A checksum does not prove the truth of a residual bound.",
+    "Uncertain or threshold-equal bounds continue scoring unless the canonical stable-ID tie rule proves exclusion.",
+    "IncompleteOrUncertified never promotes to a completed guarantee class."
+  ],
+  "promotion_targets": [
+    {
+      "profile": "exact",
+      "target": "100% canonical oracle agreement; zero false pruning"
+    },
+    {
+      "profile": "probabilistic_standard",
+      "target": "tau >= 0.99, delta <= 0.01 per fixed query under reviewed proof and assumptions"
+    },
+    {
+      "profile": "probabilistic_stretch",
+      "target": "tau >= 0.999, delta <= 0.001 only if practical and proven"
+    },
+    {
+      "profile": "empirical_selective",
+      "target": "predeclared held-out risk and valid finite-sample upper confidence limit; not a theorem"
+    }
+  ],
+  "nonclaims": [
+    "No PQR-Search implementation is provided by this fixture.",
+    "No HME runtime result or SOTA result is represented.",
+    "No synthetic fixture proves a theorem or benchmark outcome.",
+    "Commit/reveal does not establish query-transform independence."
+  ]
+}

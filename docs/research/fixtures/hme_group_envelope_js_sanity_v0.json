@@ -1,0 +1,72 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-GROUP-ENVELOPE-JS-SANITY-2026-11-08",
+  "status": "independent_javascript_float32_model_not_rust_execution_or_benchmark",
+  "score_contract_id": "continuous_hv_cosine_full_f32_group8_v1",
+  "model": {
+    "arithmetic": "JavaScript Math.fround model of canonical binary32 multiply/add/sqrt/divide and adjacent-value interval expansion",
+    "group_ball_bound": "centroid plus verified-or-synthetically-known L2 radius; Cauchy-Schwarz dot interval; reverse-triangle norm interval; gamma_n plus subnormal eta error envelope",
+    "not_executed": [
+      "Rust source code",
+      "Cargo test target",
+      "SIMD or non-SIMD Rust build",
+      "physical storage I/O",
+      "persistent segment read/reopen"
+    ]
+  },
+  "experiments": [
+    {
+      "id": "coordinate_box_random_groups",
+      "dimensions": [8, 17, 64, 257, 1024],
+      "groups": 7200,
+      "members_per_group": 8,
+      "member_scores_checked": 57600,
+      "interval_escapes": 0,
+      "false_prune_disagreements": 0,
+      "groups_pruned": 0,
+      "interpretation": "Coordinate-wise extrema were conservative in this random high-dimensional control but too loose to prune a group."
+    },
+    {
+      "id": "centroid_ball_clustered_random_queries",
+      "dimensions": [64, 256, 1024],
+      "queries": 90,
+      "groups_per_query": 48,
+      "members_per_group": 8,
+      "group_bounds_checked": 4320,
+      "member_scores_checked": 34560,
+      "groups_pruned": 4138,
+      "member_payloads_saved": 33104,
+      "member_payloads_total": 34560,
+      "member_payload_fraction_saved": 0.9578703703703704,
+      "false_prune_disagreements": 0,
+      "mean_group_interval_width": 0.0010735010220536702,
+      "data_generation": "Random normalized group centers; per-coordinate member perturbation bounded by 0.0008/sqrt(D); independent random normalized query; top_k=10.",
+      "interpretation": "A very tight synthetic cluster workload showed high theoretical payload selectivity. This is not representative of a measured HME corpus and does not measure bytes, page reads or latency."
+    },
+    {
+      "id": "centroid_ball_numeric_adversarial_strata",
+      "dimensions": [1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 32, 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 1024, 4096, 16384],
+      "groups": 1000,
+      "members_per_group": 8,
+      "member_scores_checked": 8000,
+      "interval_escapes": 0,
+      "uninformative_intervals": 144,
+      "data_strata": [
+        "zero centers",
+        "near-zero centers and queries",
+        "small-amplitude centers",
+        "alternating +/-1 extrema",
+        "random values in [-1,1]"
+      ],
+      "interpretation": "No score escaped the modeled interval. Near-zero/ambiguous cases deliberately fell back to [-1,1]."
+    }
+  ],
+  "claim_boundary": [
+    "These are mathematical and binary32 simulation checks, not Rust tests.",
+    "The clustered data are deliberately easy to separate and do not establish typical HME workload selectivity.",
+    "The centroid radius was computed from synthetic source members in the JS model, not via the production Rust residual verifier.",
+    "A simulated group payload fraction is not a measured storage byte/page/latency saving.",
+    "A zero-escape finite experiment is not a formal proof of the f32 error envelope.",
+    "No ExactComplete, production certificate, SOTA or throughput claim follows."
+  ]
+}

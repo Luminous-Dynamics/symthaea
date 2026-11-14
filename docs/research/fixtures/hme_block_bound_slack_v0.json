@@ -1,0 +1,149 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-BOUND-SLACK-ORDER-2026-11-07",
+  "status": "synthetic_real_arithmetic_ordering_example_not_a_runtime_result",
+  "metric": "raw_dot_product",
+  "query": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "candidate": [
+    -1,
+    0.75,
+    0.25,
+    -0.5
+  ],
+  "blocks": [
+    {
+      "id": "b0",
+      "coordinate_range": [
+        0,
+        1
+      ],
+      "q_norm": 1,
+      "x_norm": 1,
+      "exact_dot": -1,
+      "exact_bound_slack_reduction": 2,
+      "payload_bytes": 4
+    },
+    {
+      "id": "b1",
+      "coordinate_range": [
+        1,
+        2
+      ],
+      "q_norm": 1,
+      "x_norm": 0.75,
+      "exact_dot": 0.75,
+      "exact_bound_slack_reduction": 0,
+      "payload_bytes": 4
+    },
+    {
+      "id": "b2",
+      "coordinate_range": [
+        2,
+        3
+      ],
+      "q_norm": 1,
+      "x_norm": 0.25,
+      "exact_dot": 0.25,
+      "exact_bound_slack_reduction": 0,
+      "payload_bytes": 4
+    },
+    {
+      "id": "b3",
+      "coordinate_range": [
+        3,
+        4
+      ],
+      "q_norm": 1,
+      "x_norm": 0.5,
+      "exact_dot": -0.5,
+      "exact_bound_slack_reduction": 1,
+      "payload_bytes": 4
+    }
+  ],
+  "exact_total_dot": -0.5,
+  "initial_upper_bound": 2.5,
+  "prune_threshold": 0,
+  "order_comparisons": [
+    {
+      "order_id": "positive_blocks_before_negative",
+      "block_order": [
+        "b1",
+        "b2",
+        "b0",
+        "b3"
+      ],
+      "upper_bound_after_each_block": [
+        2.5,
+        2.5,
+        0.5,
+        -0.5
+      ],
+      "blocks_read_before_termination": 4,
+      "terminated_before_full_payload": false,
+      "termination_kind": "fully_scored_then_not_in_top_k",
+      "exact_result_agrees": true
+    },
+    {
+      "order_id": "exact_slack_oracle_order",
+      "block_order": [
+        "b0",
+        "b3",
+        "b1",
+        "b2"
+      ],
+      "upper_bound_after_each_block": [
+        0.5,
+        -0.5
+      ],
+      "blocks_read_before_termination": 2,
+      "terminated_before_full_payload": true,
+      "termination_kind": "strict_bound_prune",
+      "exact_result_agrees": true,
+      "note": "This is a hindsight oracle order computed from exact block dots. It demonstrates the potential value of a predictor but is not itself a deployable ordering policy."
+    },
+    {
+      "order_id": "descending_query_energy_times_candidate_block_norm",
+      "block_order": [
+        "b0",
+        "b1",
+        "b3",
+        "b2"
+      ],
+      "upper_bound_after_each_block": [
+        0.5,
+        0.5,
+        -0.5
+      ],
+      "blocks_read_before_termination": 3,
+      "terminated_before_full_payload": true,
+      "termination_kind": "strict_bound_prune",
+      "exact_result_agrees": true
+    }
+  ],
+  "mathematical_identity": {
+    "per_block_remaining_upper_bound": "r_b = ||q_b||_2 * ||x_b||_2",
+    "exact_block_contribution": "s_b = q_b dot x_b",
+    "bound_tightening_after_examining_block": "delta_b = r_b - s_b >= 0",
+    "upper_bound_for_examined_set_E": "U(E) = sum_{b in E} s_b + sum_{b not in E} r_b",
+    "remaining_bound_slack": "U(E) - exact_dot = sum_{b not in E} delta_b",
+    "proposed_predictor_order": "descending (r_b - predicted_s_b) / payload_cost_b"
+  },
+  "implementation_boundary": [
+    "The exact block dot is available only after reading/evaluating that payload block.",
+    "A compact sketch or learned predictor may estimate predicted_s_b for ordering only.",
+    "No predicted score or predicted slack may authorize pruning.",
+    "Pruning uses the independently conservative bound and outward-rounded arithmetic.",
+    "If the bound interval touches the threshold or tie boundary, continue exact scoring.",
+    "The deployed policy must include predictor metadata bytes, compute, cache misses and ranking overhead."
+  ],
+  "nonclaims": [
+    "This is a four-coordinate synthetic example, not a measured speedup.",
+    "The exact-slack oracle order uses hindsight and is not a deployable algorithm.",
+    "The formula is a real-arithmetic identity; floating-point safety remains owned by #10918 and #10945."
+  ]
+}

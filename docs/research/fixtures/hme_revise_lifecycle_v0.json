@@ -1,0 +1,439 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-REVISE-2026-11-08",
+  "status": "synthetic_bitemporal_dependency_contract_not_runtime_or_benchmark_result",
+  "owner_issues": [
+    9075,
+    8427,
+    9139,
+    9048
+  ],
+  "semantics": {
+    "valid_time": "When an assertion applies in the modeled world",
+    "knowledge_time": "When the system admitted, superseded, retracted or deleted the assertion",
+    "query_shape": "query(valid_at, known_at, principal_scope, policy_generation)",
+    "distinction": "HME vector/index records are rebuildable materialized views; source events and proof dependencies remain authoritative outside HME",
+    "answer_states": [
+      "supported",
+      "contested",
+      "unknown",
+      "stale",
+      "superseded",
+      "retracted",
+      "not_authorized",
+      "not_observed"
+    ]
+  },
+  "cases": [
+    {
+      "id": "late_arriving_retrospective_correction_invalidates_dependent_claim",
+      "description": "A correction received later applies to an earlier valid-time interval. As-known queries must not leak it backward; current-belief queries must not reuse dependent conclusions derived from the superseded assertion.",
+      "source_events": [
+        {
+          "id": "home-r1",
+          "kind": "assertion",
+          "subject": "user-1",
+          "attribute": "home_area",
+          "value": "Northside",
+          "valid_from": "2026-01-01T00:00:00Z",
+          "valid_to": null,
+          "recorded_at": "2026-01-02T09:00:00Z",
+          "supersedes": null,
+          "supersession_effective_valid_from": "2026-01-10T00:00:00Z"
+        },
+        {
+          "id": "office-r1",
+          "kind": "assertion",
+          "subject": "user-1",
+          "attribute": "office_area",
+          "value": "Central",
+          "valid_from": "2026-01-01T00:00:00Z",
+          "valid_to": null,
+          "recorded_at": "2026-01-02T09:05:00Z",
+          "supersedes": null
+        },
+        {
+          "id": "home-r2",
+          "kind": "correction",
+          "subject": "user-1",
+          "attribute": "home_area",
+          "value": "Riverside",
+          "valid_from": "2026-01-10T00:00:00Z",
+          "valid_to": null,
+          "recorded_at": "2026-03-01T12:00:00Z",
+          "supersedes": "home-r1",
+          "supersession_effective_valid_from": "2026-01-10T00:00:00Z"
+        }
+      ],
+      "derived_claims": [
+        {
+          "id": "commute-r1",
+          "attribute": "estimated_commute_minutes",
+          "value": 20,
+          "derived_from": [
+            "home-r1",
+            "office-r1"
+          ],
+          "rule_id": "commute-estimator-v1",
+          "created_at": "2026-01-03T10:00:00Z"
+        },
+        {
+          "id": "commute-r2",
+          "attribute": "estimated_commute_minutes",
+          "value": 12,
+          "derived_from": [
+            "home-r2",
+            "office-r1"
+          ],
+          "rule_id": "commute-estimator-v1",
+          "created_at": "2026-03-02T10:00:00Z"
+        }
+      ],
+      "queries": [
+        {
+          "id": "as_known_before_correction",
+          "valid_at": "2026-01-15T00:00:00Z",
+          "known_at": "2026-02-01T00:00:00Z",
+          "expected": {
+            "home_area": {
+              "status": "supported",
+              "value": "Northside",
+              "support": [
+                "home-r1"
+              ]
+            },
+            "estimated_commute_minutes": {
+              "status": "supported",
+              "value": 20,
+              "support": [
+                "commute-r1"
+              ]
+            }
+          }
+        },
+        {
+          "id": "as_known_after_correction_before_recompute",
+          "valid_at": "2026-01-15T00:00:00Z",
+          "known_at": "2026-03-01T18:00:00Z",
+          "expected": {
+            "home_area": {
+              "status": "supported",
+              "value": "Riverside",
+              "support": [
+                "home-r2"
+              ]
+            },
+            "estimated_commute_minutes": {
+              "status": "unknown",
+              "reason": "dependency_superseded_no_replacement_yet",
+              "must_not_return": [
+                "commute-r1"
+              ]
+            }
+          }
+        },
+        {
+          "id": "as_known_after_recompute",
+          "valid_at": "2026-01-15T00:00:00Z",
+          "known_at": "2026-03-03T00:00:00Z",
+          "expected": {
+            "home_area": {
+              "status": "supported",
+              "value": "Riverside",
+              "support": [
+                "home-r2"
+              ]
+            },
+            "estimated_commute_minutes": {
+              "status": "supported",
+              "value": 12,
+              "support": [
+                "commute-r2"
+              ]
+            }
+          }
+        }
+      ],
+      "invariants": [
+        "The late correction is invisible to known_at before its recorded_at timestamp.",
+        "The correction can change the current belief about an earlier valid date.",
+        "A dependent conclusion is not valid merely because its vector remains indexed.",
+        "Between correction and recomputation, the dependent conclusion is unknown, not the old value and not false.",
+        "The audit retains the old revision without making it eligible for current retrieval.",
+        "A supersession recorded later may revise the effective valid-time cutoff without changing what was known at an earlier knowledge-time."
+      ]
+    },
+    {
+      "id": "deletion_cascades_through_derived_views_and_survives_reopen",
+      "description": "A source item is deleted under the governing erasure/retention contract. All dependent derived results and HME materialized views must cease to be retrievable; stale indexes cannot resurrect them after restart.",
+      "source_events": [
+        {
+          "id": "diet-r1",
+          "kind": "assertion",
+          "subject": "user-1",
+          "attribute": "dietary_constraint",
+          "value": "peanut-free",
+          "valid_from": "2026-04-01T00:00:00Z",
+          "valid_to": null,
+          "recorded_at": "2026-04-01T00:00:00Z"
+        },
+        {
+          "id": "diet-delete-r2",
+          "kind": "delete",
+          "target": "diet-r1",
+          "recorded_at": "2026-06-10T10:00:00Z",
+          "reason": "user_request"
+        }
+      ],
+      "derived_claims": [
+        {
+          "id": "meal-plan-r1",
+          "attribute": "meal_plan",
+          "value": "peanut-free weekly plan",
+          "derived_from": [
+            "diet-r1"
+          ],
+          "created_at": "2026-04-02T00:00:00Z"
+        },
+        {
+          "id": "shopping-list-r1",
+          "attribute": "shopping_list",
+          "value": "ingredients for meal-plan-r1",
+          "derived_from": [
+            "meal-plan-r1"
+          ],
+          "created_at": "2026-04-02T00:01:00Z"
+        }
+      ],
+      "materialized_views": [
+        {
+          "id": "hme-vector-diet-r1",
+          "source_id": "diet-r1",
+          "generation": 8
+        },
+        {
+          "id": "hme-vector-meal-plan-r1",
+          "source_id": "meal-plan-r1",
+          "generation": 8
+        },
+        {
+          "id": "hme-summary-shopping-list-r1",
+          "source_id": "shopping-list-r1",
+          "generation": 8
+        }
+      ],
+      "queries": [
+        {
+          "id": "before_delete",
+          "valid_at": "2026-05-01T00:00:00Z",
+          "known_at": "2026-05-02T00:00:00Z",
+          "expected": {
+            "dietary_constraint": {
+              "status": "supported",
+              "value": "peanut-free"
+            },
+            "meal_plan": {
+              "status": "supported"
+            }
+          }
+        },
+        {
+          "id": "after_delete",
+          "valid_at": "2026-05-01T00:00:00Z",
+          "known_at": "2026-06-11T00:00:00Z",
+          "expected": {
+            "dietary_constraint": {
+              "status": "retracted",
+              "reason": "deleted"
+            },
+            "meal_plan": {
+              "status": "unavailable",
+              "reason": "dependency_deleted"
+            },
+            "shopping_list": {
+              "status": "unavailable",
+              "reason": "ancestor_dependency_deleted"
+            }
+          }
+        }
+      ],
+      "restart_control": {
+        "old_hme_generation": 8,
+        "current_ledger_generation": 9,
+        "stale_index_hit_ids": [
+          "hme-vector-diet-r1",
+          "hme-vector-meal-plan-r1",
+          "hme-summary-shopping-list-r1"
+        ],
+        "expected": "stale generation is rejected before payload decode or scoring; no old item or descendant is emitted",
+        "physical_erasure_note": "Logical ineligibility is not proof of physical erasure. Apply the existing deletion/retention owner and report physical purge or cryptographic erasure separately."
+      },
+      "invariants": [
+        "Deletion is applied to source and every dependent derived view.",
+        "A stale HME hit is a hint only and cannot override ledger generation.",
+        "No descendant may be returned after invalidation merely because it has its own embedding.",
+        "Compaction, restore and replay cannot resurrect a deleted item.",
+        "Logical deletion, physical purge and cryptographic erasure remain distinct statuses."
+      ]
+    },
+    {
+      "id": "alternative_proof_preserves_conclusion_when_one_justification_is_retracted",
+      "description": "A conclusion has two independent proof alternatives. Invalidating one proof must not invalidate the other complete, still-eligible proof.",
+      "source_events": [
+        {
+          "id": "permit-r1",
+          "kind": "assertion",
+          "subject": "project-1",
+          "attribute": "site_access",
+          "value": "allowed",
+          "recorded_at": "2026-05-01T00:00:00Z"
+        },
+        {
+          "id": "owner-r1",
+          "kind": "assertion",
+          "subject": "project-1",
+          "attribute": "site_owner_approval",
+          "value": "approved",
+          "recorded_at": "2026-05-01T00:01:00Z"
+        },
+        {
+          "id": "regulator-r1",
+          "kind": "assertion",
+          "subject": "project-1",
+          "attribute": "regulatory_exemption",
+          "value": "active",
+          "recorded_at": "2026-05-02T00:00:00Z"
+        },
+        {
+          "id": "permit-retract-r2",
+          "kind": "retraction",
+          "target": "permit-r1",
+          "recorded_at": "2026-06-01T00:00:00Z"
+        }
+      ],
+      "conclusion": {
+        "id": "access-conclusion-r1",
+        "attribute": "site_access_eligibility",
+        "value": "eligible",
+        "proof_alternatives": [
+          {
+            "proof_id": "proof-a",
+            "requires_all": [
+              "permit-r1",
+              "owner-r1"
+            ]
+          },
+          {
+            "proof_id": "proof-b",
+            "requires_all": [
+              "regulator-r1"
+            ]
+          }
+        ]
+      },
+      "expected_after_retraction": {
+        "conclusion_status": "supported",
+        "valid_proof_ids": [
+          "proof-b"
+        ],
+        "invalid_proof_ids": [
+          "proof-a"
+        ],
+        "must_not_happen": [
+          "delete conclusion while a complete independent proof remains",
+          "treat two correlated references to regulator-r1 as independent proofs"
+        ]
+      },
+      "invariants": [
+        "Alternative justifications are OR-of-AND proof sets, not an undifferentiated dependency list.",
+        "A conclusion is eligible when at least one complete, authorized, temporally valid proof remains.",
+        "Source independence must be represented; duplicated citations to the same source do not create independent corroboration."
+      ]
+    },
+    {
+      "id": "absence_is_not_falsehood_and_unknown_is_typed",
+      "description": "A source is corrected but no replacement value is supplied. Queries must distinguish unknown from false, not-observed, retracted and not-authorized.",
+      "source_events": [
+        {
+          "id": "vehicle-r1",
+          "kind": "assertion",
+          "subject": "user-1",
+          "attribute": "vehicle",
+          "value": "Model-A",
+          "valid_from": "2026-01-01T00:00:00Z",
+          "valid_to": null,
+          "recorded_at": "2026-01-01T00:00:00Z"
+        },
+        {
+          "id": "vehicle-retract-r2",
+          "kind": "retraction",
+          "target": "vehicle-r1",
+          "recorded_at": "2026-05-01T00:00:00Z",
+          "replacement": null
+        }
+      ],
+      "queries": [
+        {
+          "id": "current_vehicle_query",
+          "valid_at": "2026-05-02T00:00:00Z",
+          "known_at": "2026-05-02T00:00:00Z",
+          "expected": {
+            "vehicle": {
+              "status": "unknown",
+              "reason": "previous_assertion_retracted_no_replacement"
+            }
+          }
+        },
+        {
+          "id": "vehicle_is_not_model_a",
+          "valid_at": "2026-05-02T00:00:00Z",
+          "known_at": "2026-05-02T00:00:00Z",
+          "expected": {
+            "vehicle_model_a": {
+              "status": "not_supported",
+              "reason": "no_current_positive_evidence"
+            },
+            "must_not_infer": "vehicle_is_false_or_user_has_no_vehicle"
+          }
+        }
+      ],
+      "invariants": [
+        "Absence of a supporting item is not proof of negation.",
+        "Unknown due to retraction differs from never observed.",
+        "Not authorized differs from unknown and must not leak excluded content.",
+        "A reader must receive a typed abstention reason."
+      ]
+    }
+  ],
+  "metrics": {
+    "dependency_cascade_precision": "fraction of invalidated descendants correctly invalidated",
+    "dependency_cascade_recall": "fraction of all invalidated descendants detected",
+    "stale_emission_rate": "obsolete dependent claims returned / queries that could expose them",
+    "false_absence_rate": "valid supported claims incorrectly reported absent",
+    "bitemporal_leakage_rate": "answers using events recorded after known_at",
+    "deletion_resurrection_rate": "deleted items or descendants re-emitted after compaction/reopen/replay",
+    "invalidation_latency_ms": "time from authoritative change to no-longer-retrievable materialized view",
+    "proof_alternative_retention": "correctly preserved conclusions with at least one remaining complete proof",
+    "authorization_pre_read_violation_count": "excluded payload reads before eligibility decision"
+  },
+  "protocol": {
+    "reader_and_prompt_frozen": true,
+    "all_events_have_monotonic_recorded_at": true,
+    "replay_and_compaction_required": true,
+    "public_benchmark_scores_reported_separately": [
+      "MEME",
+      "DyadMem",
+      "Memora_FAMA",
+      "LongMemEval",
+      "MemoryAgentBench"
+    ],
+    "fixture_is_not_a_runtime_security_test": true,
+    "fixture_is_not_a_benchmark_result": true
+  },
+  "nonclaims": [
+    "This fixture does not implement the authoritative event ledger or dependency engine.",
+    "This fixture does not prove runtime deletion, physical erasure, authorization safety or side-channel resistance.",
+    "This fixture does not claim benchmark performance or SOTA.",
+    "HME remains a derived retrieval materialization; authoritative event, temporal, authorization and proof semantics belong to their existing owners."
+  ]
+}

@@ -1,0 +1,548 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-BRIDGE-PROJECTION-FOOTPRINT-2026-11-07",
+  "status": "analytical_source_derived_sizing_not_rss_or_benchmark",
+  "source_file": "src/hdc_ltc_bridge.rs",
+  "input_output_width": 256,
+  "formulae": {
+    "dense_projection_bytes": "4 * input_or_output_width * D",
+    "dense_pair_bytes": "8 * 256 * D",
+    "exact_rank_r_update_bytes": "4 * r * (D + output_width)",
+    "dense_projection_mac_per_map": "D * 256",
+    "structured_fwht_butterflies_per_transform": "D * log2(D) / 2"
+  },
+  "dense_projection_matrix": [
+    {
+      "hdc_dimension": 16384,
+      "input_projection_f32_bytes": 16777216,
+      "output_projection_f32_bytes": 16777216,
+      "dense_pair_f32_bytes": 33554432,
+      "input_projection_mac_per_call": 4194304,
+      "output_projection_mac_per_call": 4194304,
+      "paired_projection_mac_per_step": 8388608,
+      "fwht_butterflies_per_transform": 114688,
+      "two_fwht_candidate_butterflies": 229376,
+      "two_fwht_candidate_add_sub_ops": 458752
+    },
+    {
+      "hdc_dimension": 32768,
+      "input_projection_f32_bytes": 33554432,
+      "output_projection_f32_bytes": 33554432,
+      "dense_pair_f32_bytes": 67108864,
+      "input_projection_mac_per_call": 8388608,
+      "output_projection_mac_per_call": 8388608,
+      "paired_projection_mac_per_step": 16777216,
+      "fwht_butterflies_per_transform": 245760,
+      "two_fwht_candidate_butterflies": 491520,
+      "two_fwht_candidate_add_sub_ops": 983040
+    },
+    {
+      "hdc_dimension": 65536,
+      "input_projection_f32_bytes": 67108864,
+      "output_projection_f32_bytes": 67108864,
+      "dense_pair_f32_bytes": 134217728,
+      "input_projection_mac_per_call": 16777216,
+      "output_projection_mac_per_call": 16777216,
+      "paired_projection_mac_per_step": 33554432,
+      "fwht_butterflies_per_transform": 524288,
+      "two_fwht_candidate_butterflies": 1048576,
+      "two_fwht_candidate_add_sub_ops": 2097152
+    },
+    {
+      "hdc_dimension": 131072,
+      "input_projection_f32_bytes": 134217728,
+      "output_projection_f32_bytes": 134217728,
+      "dense_pair_f32_bytes": 268435456,
+      "input_projection_mac_per_call": 33554432,
+      "output_projection_mac_per_call": 33554432,
+      "paired_projection_mac_per_step": 67108864,
+      "fwht_butterflies_per_transform": 1114112,
+      "two_fwht_candidate_butterflies": 2228224,
+      "two_fwht_candidate_add_sub_ops": 4456448
+    },
+    {
+      "hdc_dimension": 262144,
+      "input_projection_f32_bytes": 268435456,
+      "output_projection_f32_bytes": 268435456,
+      "dense_pair_f32_bytes": 536870912,
+      "input_projection_mac_per_call": 67108864,
+      "output_projection_mac_per_call": 67108864,
+      "paired_projection_mac_per_step": 134217728,
+      "fwht_butterflies_per_transform": 2359296,
+      "two_fwht_candidate_butterflies": 4718592,
+      "two_fwht_candidate_add_sub_ops": 9437184
+    }
+  ],
+  "output_projection_rank_update_storage": [
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 1,
+      "u_factor_bytes": 65536,
+      "v_factor_bytes": 1024,
+      "total_exact_rank_factor_bytes": 66560,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.00396728515625
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 2,
+      "u_factor_bytes": 131072,
+      "v_factor_bytes": 2048,
+      "total_exact_rank_factor_bytes": 133120,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.0079345703125
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 4,
+      "u_factor_bytes": 262144,
+      "v_factor_bytes": 4096,
+      "total_exact_rank_factor_bytes": 266240,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.015869140625
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 8,
+      "u_factor_bytes": 524288,
+      "v_factor_bytes": 8192,
+      "total_exact_rank_factor_bytes": 532480,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.03173828125
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 16,
+      "u_factor_bytes": 1048576,
+      "v_factor_bytes": 16384,
+      "total_exact_rank_factor_bytes": 1064960,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.0634765625
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 32,
+      "u_factor_bytes": 2097152,
+      "v_factor_bytes": 32768,
+      "total_exact_rank_factor_bytes": 2129920,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.126953125
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 64,
+      "u_factor_bytes": 4194304,
+      "v_factor_bytes": 65536,
+      "total_exact_rank_factor_bytes": 4259840,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.25390625
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 128,
+      "u_factor_bytes": 8388608,
+      "v_factor_bytes": 131072,
+      "total_exact_rank_factor_bytes": 8519680,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 0.5078125
+    },
+    {
+      "hdc_dimension": 16384,
+      "output_width": 256,
+      "exact_rank_update_rank": 256,
+      "u_factor_bytes": 16777216,
+      "v_factor_bytes": 262144,
+      "total_exact_rank_factor_bytes": 17039360,
+      "dense_output_projection_bytes": 16777216,
+      "factor_vs_dense_output_ratio": 1.015625
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 1,
+      "u_factor_bytes": 131072,
+      "v_factor_bytes": 1024,
+      "total_exact_rank_factor_bytes": 132096,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.003936767578125
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 2,
+      "u_factor_bytes": 262144,
+      "v_factor_bytes": 2048,
+      "total_exact_rank_factor_bytes": 264192,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.00787353515625
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 4,
+      "u_factor_bytes": 524288,
+      "v_factor_bytes": 4096,
+      "total_exact_rank_factor_bytes": 528384,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.0157470703125
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 8,
+      "u_factor_bytes": 1048576,
+      "v_factor_bytes": 8192,
+      "total_exact_rank_factor_bytes": 1056768,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.031494140625
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 16,
+      "u_factor_bytes": 2097152,
+      "v_factor_bytes": 16384,
+      "total_exact_rank_factor_bytes": 2113536,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.06298828125
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 32,
+      "u_factor_bytes": 4194304,
+      "v_factor_bytes": 32768,
+      "total_exact_rank_factor_bytes": 4227072,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.1259765625
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 64,
+      "u_factor_bytes": 8388608,
+      "v_factor_bytes": 65536,
+      "total_exact_rank_factor_bytes": 8454144,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.251953125
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 128,
+      "u_factor_bytes": 16777216,
+      "v_factor_bytes": 131072,
+      "total_exact_rank_factor_bytes": 16908288,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 0.50390625
+    },
+    {
+      "hdc_dimension": 32768,
+      "output_width": 256,
+      "exact_rank_update_rank": 256,
+      "u_factor_bytes": 33554432,
+      "v_factor_bytes": 262144,
+      "total_exact_rank_factor_bytes": 33816576,
+      "dense_output_projection_bytes": 33554432,
+      "factor_vs_dense_output_ratio": 1.0078125
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 1,
+      "u_factor_bytes": 262144,
+      "v_factor_bytes": 1024,
+      "total_exact_rank_factor_bytes": 263168,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.0039215087890625
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 2,
+      "u_factor_bytes": 524288,
+      "v_factor_bytes": 2048,
+      "total_exact_rank_factor_bytes": 526336,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.007843017578125
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 4,
+      "u_factor_bytes": 1048576,
+      "v_factor_bytes": 4096,
+      "total_exact_rank_factor_bytes": 1052672,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.01568603515625
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 8,
+      "u_factor_bytes": 2097152,
+      "v_factor_bytes": 8192,
+      "total_exact_rank_factor_bytes": 2105344,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.0313720703125
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 16,
+      "u_factor_bytes": 4194304,
+      "v_factor_bytes": 16384,
+      "total_exact_rank_factor_bytes": 4210688,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.062744140625
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 32,
+      "u_factor_bytes": 8388608,
+      "v_factor_bytes": 32768,
+      "total_exact_rank_factor_bytes": 8421376,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.12548828125
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 64,
+      "u_factor_bytes": 16777216,
+      "v_factor_bytes": 65536,
+      "total_exact_rank_factor_bytes": 16842752,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.2509765625
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 128,
+      "u_factor_bytes": 33554432,
+      "v_factor_bytes": 131072,
+      "total_exact_rank_factor_bytes": 33685504,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 0.501953125
+    },
+    {
+      "hdc_dimension": 65536,
+      "output_width": 256,
+      "exact_rank_update_rank": 256,
+      "u_factor_bytes": 67108864,
+      "v_factor_bytes": 262144,
+      "total_exact_rank_factor_bytes": 67371008,
+      "dense_output_projection_bytes": 67108864,
+      "factor_vs_dense_output_ratio": 1.00390625
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 1,
+      "u_factor_bytes": 524288,
+      "v_factor_bytes": 1024,
+      "total_exact_rank_factor_bytes": 525312,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.00391387939453125
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 2,
+      "u_factor_bytes": 1048576,
+      "v_factor_bytes": 2048,
+      "total_exact_rank_factor_bytes": 1050624,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.0078277587890625
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 4,
+      "u_factor_bytes": 2097152,
+      "v_factor_bytes": 4096,
+      "total_exact_rank_factor_bytes": 2101248,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.015655517578125
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 8,
+      "u_factor_bytes": 4194304,
+      "v_factor_bytes": 8192,
+      "total_exact_rank_factor_bytes": 4202496,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.03131103515625
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 16,
+      "u_factor_bytes": 8388608,
+      "v_factor_bytes": 16384,
+      "total_exact_rank_factor_bytes": 8404992,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.0626220703125
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 32,
+      "u_factor_bytes": 16777216,
+      "v_factor_bytes": 32768,
+      "total_exact_rank_factor_bytes": 16809984,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.125244140625
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 64,
+      "u_factor_bytes": 33554432,
+      "v_factor_bytes": 65536,
+      "total_exact_rank_factor_bytes": 33619968,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.25048828125
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 128,
+      "u_factor_bytes": 67108864,
+      "v_factor_bytes": 131072,
+      "total_exact_rank_factor_bytes": 67239936,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 0.5009765625
+    },
+    {
+      "hdc_dimension": 131072,
+      "output_width": 256,
+      "exact_rank_update_rank": 256,
+      "u_factor_bytes": 134217728,
+      "v_factor_bytes": 262144,
+      "total_exact_rank_factor_bytes": 134479872,
+      "dense_output_projection_bytes": 134217728,
+      "factor_vs_dense_output_ratio": 1.001953125
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 1,
+      "u_factor_bytes": 1048576,
+      "v_factor_bytes": 1024,
+      "total_exact_rank_factor_bytes": 1049600,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.003910064697265625
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 2,
+      "u_factor_bytes": 2097152,
+      "v_factor_bytes": 2048,
+      "total_exact_rank_factor_bytes": 2099200,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.00782012939453125
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 4,
+      "u_factor_bytes": 4194304,
+      "v_factor_bytes": 4096,
+      "total_exact_rank_factor_bytes": 4198400,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.0156402587890625
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 8,
+      "u_factor_bytes": 8388608,
+      "v_factor_bytes": 8192,
+      "total_exact_rank_factor_bytes": 8396800,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.031280517578125
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 16,
+      "u_factor_bytes": 16777216,
+      "v_factor_bytes": 16384,
+      "total_exact_rank_factor_bytes": 16793600,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.06256103515625
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 32,
+      "u_factor_bytes": 33554432,
+      "v_factor_bytes": 32768,
+      "total_exact_rank_factor_bytes": 33587200,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.1251220703125
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 64,
+      "u_factor_bytes": 67108864,
+      "v_factor_bytes": 65536,
+      "total_exact_rank_factor_bytes": 67174400,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.250244140625
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 128,
+      "u_factor_bytes": 134217728,
+      "v_factor_bytes": 131072,
+      "total_exact_rank_factor_bytes": 134348800,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 0.50048828125
+    },
+    {
+      "hdc_dimension": 262144,
+      "output_width": 256,
+      "exact_rank_update_rank": 256,
+      "u_factor_bytes": 268435456,
+      "v_factor_bytes": 262144,
+      "total_exact_rank_factor_bytes": 268697600,
+      "dense_output_projection_bytes": 268435456,
+      "factor_vs_dense_output_ratio": 1.0009765625
+    }
+  ],
+  "structured_transform_candidate": {
+    "candidate": "zero-pad/signed-permute 256D input followed by FWHT; for readout, FWHT HDC state then select output coordinates",
+    "transforms_per_bridge_step": 2,
+    "operation_model": "D*log2(D) butterflies total for two transforms; each butterfly uses one add and one subtract",
+    "no_claims": [
+      "This is not implemented or proven equivalent to the current dense random map.",
+      "The structured map changes the projection distribution/geometry and requires downstream task/trajectory testing.",
+      "Operation counts are arithmetic models, not measured FLOPs, throughput, energy or speedup.",
+      "Memory metadata, permutation/sign profiles, buffers, and training adapter overhead must be included."
+    ]
+  },
+  "interpretation": [
+    "At D=256K each dense 256-wide f32 projection is 256 MiB and the pair is 512 MiB.",
+    "Each exact rank-one output update stores a D-vector and a 256-vector if represented as explicit outer-product factors; r updates cost 4*r*(D+256) bytes before IDs/metadata.",
+    "Factor updates remain algebraically exact relative to sequential rank-one updates; actual floating-point output parity depends on accumulation order and numerical profile.",
+    "At sufficient rank, exact factors approach or exceed dense matrix storage; measure and consolidate only under explicit exact/approximate contracts.",
+    "The source currently initializes input_projection from deterministic seed/GenesisSeed and the audited methods read it and rebuild it at resize; no trainer write was found in inspected paths, but full writer audit remains a gate.",
+    "The output_projection is updated in train_step by a rank-one outer-product gradient.",
+    "All values are logical arithmetic, not measured resident memory or runtime performance."
+  ]
+}

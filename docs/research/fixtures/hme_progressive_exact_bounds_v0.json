@@ -1,0 +1,189 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "HME-PROGRESSIVE-EXACT-BOUNDS-2026-11-07",
+  "status": "synthetic_mathematical_sanity_check_not_floating_point_proof_or_benchmark",
+  "dimension": 4,
+  "continuous_exhaustive_check": {
+    "alphabet": [
+      -1,
+      0,
+      1
+    ],
+    "vector_count": 81,
+    "ordered_nonzero_vector_pairs": 6400,
+    "prefix_lengths": [
+      1,
+      2,
+      3
+    ],
+    "bound_checks": 19200,
+    "underbounds": 0,
+    "minimum_computed_slack_f64": -2.220446049250313e-16,
+    "tolerance_for_enumeration_check": 1e-12,
+    "interpretation": "The small exhaustive enumeration supports the real-arithmetic inequality; the tiny negative f64 slack is rounding noise. It does not prove conservative production f32/FMA/metadata behavior."
+  },
+  "binary_exhaustive_check": {
+    "alphabet": [
+      0,
+      1
+    ],
+    "vector_count": 16,
+    "ordered_vector_pairs": 256,
+    "prefix_lengths": [
+      1,
+      2,
+      3
+    ],
+    "bound_checks": 768,
+    "underbounds": 0,
+    "interpretation": "For 4-bit Hamming similarity, the observed mismatches provide a real-arithmetic upper bound on final similarity."
+  },
+  "continuous_cases": [
+    {
+      "id": "suffix_rescues_negative_prefix",
+      "query": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "candidate": [
+        -1,
+        1,
+        1,
+        1
+      ],
+      "prefix_length": 1,
+      "kth_threshold": 0.25,
+      "expected_prune": false,
+      "partial_dot": -1,
+      "query_suffix_norm": 1.7320508075688772,
+      "candidate_suffix_norm": 1.7320508075688772,
+      "upper_bound": 0.4999999999999999,
+      "exact_cosine": 0.5
+    },
+    {
+      "id": "naive_f64_rounding_can_false_prune",
+      "query": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "candidate": [
+        -1,
+        1,
+        1,
+        1
+      ],
+      "prefix_length": 1,
+      "kth_threshold": 0.49999999999999994,
+      "partial_dot": -1,
+      "query_suffix_norm": 1.7320508075688772,
+      "candidate_suffix_norm": 1.7320508075688772,
+      "naive_f64_upper_bound": 0.4999999999999999,
+      "exact_cosine": 0.5,
+      "naive_comparison_would_prune": true,
+      "expected_prune": false,
+      "reason": "The computed real-arithmetic expression rounds slightly below the exact score in binary64. A conservative interval must expand the bound upward; using this rounded scalar directly could reject a true kth item."
+    },
+    {
+      "id": "safe_prune_below_threshold",
+      "query": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "candidate": [
+        -1,
+        -1,
+        -1,
+        1
+      ],
+      "prefix_length": 3,
+      "kth_threshold": -0.2,
+      "expected_prune": true,
+      "partial_dot": -3,
+      "query_suffix_norm": 1,
+      "candidate_suffix_norm": 1,
+      "upper_bound": -0.5,
+      "exact_cosine": -0.5
+    },
+    {
+      "id": "tie_must_continue",
+      "query": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "candidate": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "prefix_length": 3,
+      "kth_threshold": 1,
+      "expected_prune": false,
+      "partial_dot": 3,
+      "query_suffix_norm": 1,
+      "candidate_suffix_norm": 1,
+      "upper_bound": 1,
+      "exact_cosine": 1
+    }
+  ],
+  "binary_cases": [
+    {
+      "id": "safe_prune",
+      "query": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "candidate": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "prefix_length": 2,
+      "kth_threshold": 0.6,
+      "expected_prune": true,
+      "prefix_mismatches": 2,
+      "best_possible_final_similarity": 0.5,
+      "exact_similarity": 0.5
+    },
+    {
+      "id": "tie_must_continue",
+      "query": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "candidate": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "prefix_length": 1,
+      "kth_threshold": 0.75,
+      "expected_prune": false,
+      "prefix_mismatches": 1,
+      "best_possible_final_similarity": 0.75,
+      "exact_similarity": 0.75
+    }
+  ],
+  "invariants": [
+    "Prune only if a conservative upper bound is strictly below the current kth exact score.",
+    "If upper bound equals threshold, continue scoring to preserve stable-ID tie ordering.",
+    "A checksum binds metadata bytes but does not prove that a suffix norm is mathematically conservative.",
+    "Production floating-point bounds require outward rounding / interval analysis consistent with the canonical score algorithm.",
+    "This fixture is not a performance benchmark and does not qualify a production pruning implementation.",
+    "The f64 rounding adversary deliberately demonstrates that evaluating the Cauchy–Schwarz expression in ordinary floating point is not itself a conservative upper bound."
+  ]
+}

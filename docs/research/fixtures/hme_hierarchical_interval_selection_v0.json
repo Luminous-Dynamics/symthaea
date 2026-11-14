@@ -1,0 +1,255 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-HIERARCHICAL-EXACT-REFINEMENT-2026-11-09",
+  "status": "synthetic_algorithm_contract_not_runtime_or_benchmark_result",
+  "task": {
+    "metric": "canonical ContinuousHV cosine similarity; larger is better",
+    "top_k": 2,
+    "score_contract": "continuous_hv_cosine_full_f32_group8_v1",
+    "manifest_generation": 71,
+    "eligibility_generation": 19,
+    "query_digest": "synthetic-query-digest-q0",
+    "required_same_query_for_all_group_and_member_intervals": true,
+    "required_same_snapshot_for_all_groups": true,
+    "groups_must_form_a_disjoint_partition_of_the_eligible_set": true
+  },
+  "group_intervals": [
+    {
+      "group_id": "g-high",
+      "member_ids": [
+        "h-1",
+        "h-2",
+        "h-3"
+      ],
+      "member_count": 3,
+      "lower": 0.9,
+      "upper": 0.98,
+      "member_set_digest": "synthetic-members-high",
+      "content_digest": "synthetic-content-high",
+      "query_digest": "synthetic-query-digest-q0"
+    },
+    {
+      "group_id": "g-middle",
+      "member_ids": [
+        "m-1",
+        "m-2"
+      ],
+      "member_count": 2,
+      "lower": 0.1,
+      "upper": 0.95,
+      "member_set_digest": "synthetic-members-middle",
+      "content_digest": "synthetic-content-middle",
+      "query_digest": "synthetic-query-digest-q0"
+    },
+    {
+      "group_id": "g-low",
+      "member_ids": [
+        "l-1",
+        "l-2"
+      ],
+      "member_count": 2,
+      "lower": -0.95,
+      "upper": -0.75,
+      "member_set_digest": "synthetic-members-low",
+      "content_digest": "synthetic-content-low",
+      "query_digest": "synthetic-query-digest-q0"
+    }
+  ],
+  "stage_1": {
+    "algorithm": "repeat each group's lower endpoint member_count times; choose kth-largest weighted endpoint; retain groups whose upper endpoint is >= threshold",
+    "weighted_lower_multiset": [
+      0.9,
+      0.9,
+      0.9,
+      0.1,
+      0.1,
+      -0.95,
+      -0.95
+    ],
+    "threshold": 0.9,
+    "refinement_group_ids": [
+      "g-high",
+      "g-middle"
+    ],
+    "excluded_group_ids": [
+      "g-low"
+    ],
+    "refinement_record_count": 5,
+    "excluded_record_count": 2,
+    "strict_exclusion": "upper < threshold; equality remains selected"
+  },
+  "verified_member_receipts": [
+    {
+      "group_id": "g-high",
+      "member_id": "h-1",
+      "original_payload_digest": "synthetic-payload-h1",
+      "reconstruction_digest": "synthetic-reconstruction-h1",
+      "transform_profile_digest": "synthetic-transform-v1",
+      "residual_l2_upper": 0.01,
+      "residual_verified_at_ingest": true
+    },
+    {
+      "group_id": "g-high",
+      "member_id": "h-2",
+      "original_payload_digest": "synthetic-payload-h2",
+      "reconstruction_digest": "synthetic-reconstruction-h2",
+      "transform_profile_digest": "synthetic-transform-v1",
+      "residual_l2_upper": 0.01,
+      "residual_verified_at_ingest": true
+    },
+    {
+      "group_id": "g-high",
+      "member_id": "h-3",
+      "original_payload_digest": "synthetic-payload-h3",
+      "reconstruction_digest": "synthetic-reconstruction-h3",
+      "transform_profile_digest": "synthetic-transform-v1",
+      "residual_l2_upper": 0.02,
+      "residual_verified_at_ingest": true
+    },
+    {
+      "group_id": "g-middle",
+      "member_id": "m-1",
+      "original_payload_digest": "synthetic-payload-m1",
+      "reconstruction_digest": "synthetic-reconstruction-m1",
+      "transform_profile_digest": "synthetic-transform-v1",
+      "residual_l2_upper": 0.03,
+      "residual_verified_at_ingest": true
+    },
+    {
+      "group_id": "g-middle",
+      "member_id": "m-2",
+      "original_payload_digest": "synthetic-payload-m2",
+      "reconstruction_digest": "synthetic-reconstruction-m2",
+      "transform_profile_digest": "synthetic-transform-v1",
+      "residual_l2_upper": 0.02,
+      "residual_verified_at_ingest": true
+    }
+  ],
+  "stage_2_member_intervals": [
+    {
+      "group_id": "g-high",
+      "member_id": "h-1",
+      "raw_member_interval": {
+        "lower": 0.96,
+        "upper": 0.98
+      },
+      "group_intersection": {
+        "lower": 0.96,
+        "upper": 0.98
+      },
+      "exact_score": 0.97
+    },
+    {
+      "group_id": "g-high",
+      "member_id": "h-2",
+      "raw_member_interval": {
+        "lower": 0.95,
+        "upper": 0.97
+      },
+      "group_intersection": {
+        "lower": 0.95,
+        "upper": 0.97
+      },
+      "exact_score": 0.96
+    },
+    {
+      "group_id": "g-high",
+      "member_id": "h-3",
+      "raw_member_interval": {
+        "lower": 0.88,
+        "upper": 0.92
+      },
+      "group_intersection": {
+        "lower": 0.9,
+        "upper": 0.92
+      },
+      "exact_score": 0.9
+    },
+    {
+      "group_id": "g-middle",
+      "member_id": "m-1",
+      "raw_member_interval": {
+        "lower": 0.89,
+        "upper": 0.96
+      },
+      "group_intersection": {
+        "lower": 0.89,
+        "upper": 0.95
+      },
+      "exact_score": 0.95
+    },
+    {
+      "group_id": "g-middle",
+      "member_id": "m-2",
+      "raw_member_interval": {
+        "lower": 0.05,
+        "upper": 0.15
+      },
+      "group_intersection": {
+        "lower": 0.1,
+        "upper": 0.15
+      },
+      "exact_score": 0.1
+    }
+  ],
+  "stage_2_selection": {
+    "algorithm": "intersect each member interval with its verified parent-group interval; run the global per-record interval selector on selected groups",
+    "threshold": 0.95,
+    "refinement_member_ids": [
+      "h-1",
+      "h-2",
+      "m-1"
+    ],
+    "excluded_member_ids": [
+      "h-3",
+      "m-2"
+    ],
+    "exact_payload_reads_expected": 3,
+    "strict_exclusion": "member upper < threshold; equality remains selected"
+  },
+  "expected_result": {
+    "exact_top_k": [
+      {
+        "member_id": "h-1",
+        "score": 0.97
+      },
+      {
+        "member_id": "h-2",
+        "score": 0.96
+      }
+    ],
+    "exact_top_k_matches_full_scan": true,
+    "no_false_prune": true
+  },
+  "expected_io_accounting": {
+    "all_eligible_records": 7,
+    "group_synopses_scanned": 3,
+    "group_members_excluded_before_member_metadata": 2,
+    "compact_member_receipts_and_reconstructions_loaded": 5,
+    "original_payloads_exact_scored": 3,
+    "original_payloads_not_read_for_excluded_members": 4,
+    "note": "These are fixture counts, not measured bytes, disk I/O, latency or a system benchmark."
+  },
+  "negative_controls": [
+    "Reject any group whose manifest_generation differs from the pinned manifest.",
+    "Reject any group whose eligibility_generation differs from the pinned eligibility generation.",
+    "Reject any group interval whose query digest differs from the exact query-vector digest.",
+    "Reject overlapping member IDs across groups, even when aggregate member counts happen to match.",
+    "Reject any group with member_count != member_ids.len or member_payload_digests.len != member_ids.len.",
+    "Reject duplicate or missing member receipts inside a selected group.",
+    "Reject a member receipt with a mismatching group identity, original payload digest, reconstruction digest or transform profile digest.",
+    "Reject a per-member interval disjoint from its parent-group interval.",
+    "Reject a member interval produced for a different query.",
+    "Never exclude on upper == threshold."
+  ],
+  "promotion_gates": {
+    "rust_unit_and_property_tests_executed": false,
+    "full_scan_differential_test_executed": false,
+    "persistent_receipt_manifest_authentication": false,
+    "segment_reopen_recovery_qualified": false,
+    "cold_payload_io_measured": false,
+    "target_compiler_numeric_contract_qualified": false,
+    "selector_exact_completion_receipt_integrated": false,
+    "note": "The fixture specifies expected algorithm behavior. It does not establish any listed promotion gate."
+  }
+}

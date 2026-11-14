@@ -68,6 +68,44 @@ pub fn get_cognitive_stride() -> usize {
     STRIDE.load(Ordering::Relaxed)
 }
 
+/// Stable identifier for the full-resolution scalar cosine score contract.
+///
+/// Contract v1 uses f32 arithmetic, contiguous groups of eight coordinates,
+/// then an ordered tail; it preserves the legacy scalar near-zero denominator
+/// threshold. Inputs admitted for this profile must be finite and in [-1, 1].
+pub const CONTINUOUS_HV_FULL_RESOLUTION_SCORE_CONTRACT_V1: &str =
+    "continuous_hv_cosine_full_f32_group8_v1";
+
+/// Errors returned when a vector is not admissible for the full-resolution
+/// continuous-HV score contract.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ContinuousHVProfileError {
+    /// Query and candidate dimensions differ.
+    #[error("continuous-HV dimension mismatch: query={query_dim}, candidate={candidate_dim}")]
+    DimensionMismatch {
+        /// Query dimension.
+        query_dim: usize,
+        /// Candidate dimension.
+        candidate_dim: usize,
+    },
+    /// A component is NaN or infinite.
+    #[error("{operand} component at index {index} is not finite")]
+    NonFiniteComponent {
+        /// Which input failed validation (for example, "query" or "candidate").
+        operand: &'static str,
+        /// Component index.
+        index: usize,
+    },
+    /// A component is outside the admitted closed interval [-1, 1].
+    #[error("{operand} component at index {index} is outside the admitted [-1, 1] range")]
+    OutOfRangeComponent {
+        /// Which input failed validation (for example, "query" or "candidate").
+        operand: &'static str,
+        /// Component index.
+        index: usize,
+    },
+}
+
 /// Standard HDC dimension (2^14 = 16,384)
 /// This is SIMD-optimized and matches research consensus.
 pub const HDC_DIMENSION: usize = 16_384;
@@ -510,6 +548,135 @@ impl ContinuousHV {
 
             (dot / denom).clamp(-1.0, 1.0)
         }
+    }
+
+    /// Validate this vector for the full-resolution continuous-HV cosine profile.
+    ///
+    /// This is intended for segment/query admission, not for every scoring
+    /// operation. Validate persisted vectors once when admitting an immutable
+    /// segment, and validate each query before searching. The named profile
+    /// requires finite f32 components in the closed interval [-1, 1].
+    pub fn validate_full_resolution_profile(
+        &self,
+        operand: &'static str,
+    ) -> Result<(), ContinuousHVProfileError> {
+        for (index, &value) in self.values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(ContinuousHVProfileError::NonFiniteComponent {
+                    operand,
+                    index,
+                });
+            }
+            if !(-1.0..=1.0).contains(&value) {
+                return Err(ContinuousHVProfileError::OutOfRangeComponent {
+                    operand,
+                    index,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate both operands for the full-resolution continuous-HV profile.
+    ///
+    /// This checks equal dimensions and finite, in-range components. It does
+    /// not compute a score or alter either vector.
+    pub fn validate_full_resolution_pair(
+        &self,
+        candidate: &Self,
+    ) -> Result<(), ContinuousHVProfileError> {
+        if self.values.len() != candidate.values.len() {
+            return Err(ContinuousHVProfileError::DimensionMismatch {
+                query_dim: self.values.len(),
+                candidate_dim: candidate.values.len(),
+            });
+        }
+        self.validate_full_resolution_profile("query")?;
+        candidate.validate_full_resolution_profile("candidate")?;
+        Ok(())
+    }
+
+    /// Full-resolution scalar cosine similarity, independent of cognitive stride.
+    ///
+    /// This method always visits every coordinate and uses the same scalar
+    /// eight-coordinate accumulation grouping as the non-SIMD similarity path
+    /// when the global cognitive stride is 1. It does not read STRIDE and does
+    /// not dispatch on the simd feature, making it the reference score path
+    /// for exact retrieval and differential SIMD qualification.
+    ///
+    /// The canonical reduction order is part of this method's contract:
+    /// contiguous groups of eight are reduced in coordinate order, followed
+    /// by the remaining tail coordinates in order. A different reduction
+    /// order may differ in f32 rounding and must not be presumed bitwise equal.
+    ///
+    /// As with the legacy scalar path, vectors whose combined norm is below
+    /// 1e-10 return 0.0. Callers that require an admitted exact-retrieval
+    /// profile must validate dimensions and finite/in-range payload values
+    /// before calling this method; this method deliberately does not sanitize
+    /// NaN or infinity.
+    ///
+    /// # Panics
+    /// Panics if dimensions do not match.
+    #[inline]
+    pub fn similarity_full_resolution(&self, other: &Self) -> f32 {
+        assert_eq!(
+            self.values.len(),
+            other.values.len(),
+            "Dimension mismatch in similarity_full_resolution(): {} vs {}",
+            self.values.len(),
+            other.values.len()
+        );
+
+        let mut dot = 0.0f32;
+        let mut norm_a_sq = 0.0f32;
+        let mut norm_b_sq = 0.0f32;
+
+        let mut self_chunks = self.values.chunks_exact(8);
+        let mut other_chunks = other.values.chunks_exact(8);
+
+        for (a, b) in self_chunks.by_ref().zip(other_chunks.by_ref()) {
+            dot += a[0] * b[0]
+                + a[1] * b[1]
+                + a[2] * b[2]
+                + a[3] * b[3]
+                + a[4] * b[4]
+                + a[5] * b[5]
+                + a[6] * b[6]
+                + a[7] * b[7];
+            norm_a_sq += a[0] * a[0]
+                + a[1] * a[1]
+                + a[2] * a[2]
+                + a[3] * a[3]
+                + a[4] * a[4]
+                + a[5] * a[5]
+                + a[6] * a[6]
+                + a[7] * a[7];
+            norm_b_sq += b[0] * b[0]
+                + b[1] * b[1]
+                + b[2] * b[2]
+                + b[3] * b[3]
+                + b[4] * b[4]
+                + b[5] * b[5]
+                + b[6] * b[6]
+                + b[7] * b[7];
+        }
+
+        for (&a, &b) in self_chunks
+            .remainder()
+            .iter()
+            .zip(other_chunks.remainder().iter())
+        {
+            dot += a * b;
+            norm_a_sq += a * a;
+            norm_b_sq += b * b;
+        }
+
+        let denom = (norm_a_sq * norm_b_sq).sqrt();
+        if denom < 1e-10 {
+            return 0.0;
+        }
+
+        (dot / denom).clamp(-1.0, 1.0)
     }
 
     /// Raw dot product (inner product) of two hypervectors.
@@ -1129,6 +1296,121 @@ impl HV {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_full_resolution_profile_accepts_closed_unit_interval() {
+        let hv = ContinuousHV::from_values(vec![-1.0, 0.0, 1.0]);
+        assert!(hv.validate_full_resolution_profile("candidate").is_ok());
+    }
+
+    #[test]
+    fn test_full_resolution_profile_rejects_nan_and_infinities() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let hv = ContinuousHV::from_values(vec![0.0, invalid, 1.0]);
+            assert!(matches!(
+                hv.validate_full_resolution_profile("candidate"),
+                Err(ContinuousHVProfileError::NonFiniteComponent {
+                    operand: "candidate",
+                    index: 1
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn test_full_resolution_profile_rejects_out_of_range_components() {
+        for invalid in [-1.000_001, 1.000_001] {
+            let hv = ContinuousHV::from_values(vec![invalid]);
+            assert!(matches!(
+                hv.validate_full_resolution_profile("query"),
+                Err(ContinuousHVProfileError::OutOfRangeComponent {
+                    operand: "query",
+                    index: 0
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn test_full_resolution_pair_checks_dimensions_and_both_inputs() {
+        let query = ContinuousHV::from_values(vec![0.0, 0.0]);
+        let wrong_dimension = ContinuousHV::from_values(vec![0.0]);
+        assert!(matches!(
+            query.validate_full_resolution_pair(&wrong_dimension),
+            Err(ContinuousHVProfileError::DimensionMismatch {
+                query_dim: 2,
+                candidate_dim: 1
+            })
+        ));
+
+        let invalid_candidate = ContinuousHV::from_values(vec![0.0, f32::NAN]);
+        assert!(matches!(
+            query.validate_full_resolution_pair(&invalid_candidate),
+            Err(ContinuousHVProfileError::NonFiniteComponent {
+                operand: "candidate",
+                index: 1
+            })
+        ));
+    }
+
+    #[test]
+    fn test_full_resolution_similarity_preserves_separate_f32_rounding() {
+        // This cancellation fixture distinguishes a separately rounded
+        // multiply followed by add from a fused multiply-add. The exact real
+        // product is just above the rounded product, and the following term
+        // cancels that rounded product to zero.
+        //
+        // If an optimized build contracts the first multiply/add, the dot
+        // becomes nonzero (~2^-48) and this test fails. Keep this in the
+        // canonical scorer module because the HME interval proofs depend on
+        // the actual compiled operation sequence.
+        let one = 1.0f32;
+        let a0 = one - f32::EPSILON / 2.0;
+        let b1 = one - f32::EPSILON;
+        let query = ContinuousHV::from_values(vec![a0, one, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let candidate =
+            ContinuousHV::from_values(vec![a0, -b1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+
+        assert_eq!(a0 * a0, b1);
+        assert_eq!(query.similarity_full_resolution(&candidate), 0.0);
+    }
+
+    #[test]
+    fn test_full_resolution_similarity_reads_all_coordinates() {
+        // The only non-zero component is outside the default stride-4 sample.
+        let query = ContinuousHV::from_values(vec![0.0, 0.0, 0.0, 1.0]);
+        let candidate = ContinuousHV::from_values(vec![0.0, 0.0, 0.0, 1.0]);
+
+        assert_eq!(query.similarity_full_resolution(&candidate), 1.0);
+    }
+
+    #[test]
+    fn test_full_resolution_similarity_handles_non_multiple_of_eight() {
+        let mut values = vec![0.0; 9];
+        values[8] = 1.0;
+        let query = ContinuousHV::from_values(values);
+        let candidate = query.clone();
+
+        assert_eq!(query.similarity_full_resolution(&candidate), 1.0);
+    }
+
+    #[test]
+    fn test_full_resolution_similarity_zero_vector_contract() {
+        let zero = ContinuousHV::zero(9);
+        let nonzero = ContinuousHV::from_values(vec![1.0; 9]);
+
+        assert_eq!(zero.similarity_full_resolution(&nonzero), 0.0);
+        assert_eq!(nonzero.similarity_full_resolution(&zero), 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Dimension mismatch in similarity_full_resolution()")]
+    fn test_full_resolution_similarity_rejects_dimension_mismatch() {
+        let a = ContinuousHV::zero(8);
+        let b = ContinuousHV::zero(9);
+
+        let _ = a.similarity_full_resolution(&b);
+    }
 
     #[test]
     fn test_continuous_random_orthogonality() {

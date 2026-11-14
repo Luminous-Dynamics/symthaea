@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "HME-QUANTIZED-DECISION-MARGINS-2026-11-07",
+  "status": "synthetic_arithmetic_decision_fixture_not_empirical_quantizer_result",
+  "cases": [
+    {
+      "id": "same_residuals_large_margin",
+      "exact_scores": {
+        "candidate_a": 0.81,
+        "candidate_b": 0.61
+      },
+      "exact_margin": 0.2,
+      "approximate_residuals": {
+        "candidate_a": -0.006,
+        "candidate_b": 0.006
+      },
+      "approximate_scores": {
+        "candidate_a": 0.804,
+        "candidate_b": 0.616
+      },
+      "decision_preserved": true
+    },
+    {
+      "id": "same_residuals_small_margin",
+      "exact_scores": {
+        "candidate_a": 0.81,
+        "candidate_b": 0.8
+      },
+      "exact_margin": 0.01,
+      "approximate_residuals": {
+        "candidate_a": -0.006,
+        "candidate_b": 0.006
+      },
+      "approximate_scores": {
+        "candidate_a": 0.804,
+        "candidate_b": 0.806
+      },
+      "decision_preserved": false
+    },
+    {
+      "id": "shared_query_positive_residual_correlation",
+      "exact_scores": {
+        "candidate_a": 0.81,
+        "candidate_b": 0.8
+      },
+      "exact_margin": 0.01,
+      "approximate_residuals": {
+        "candidate_a": 0.05,
+        "candidate_b": 0.045
+      },
+      "approximate_scores": {
+        "candidate_a": 0.86,
+        "candidate_b": 0.845
+      },
+      "residual_difference": 0.005,
+      "decision_preserved": true,
+      "interpretation": "Large same-sign residuals nearly cancel in the pairwise comparison."
+    },
+    {
+      "id": "anti_correlated_residuals",
+      "exact_scores": {
+        "candidate_a": 0.81,
+        "candidate_b": 0.8
+      },
+      "exact_margin": 0.01,
+      "approximate_residuals": {
+        "candidate_a": -0.05,
+        "candidate_b": 0.045
+      },
+      "approximate_scores": {
+        "candidate_a": 0.76,
+        "candidate_b": 0.845
+      },
+      "residual_difference": 0.095,
+      "decision_preserved": false,
+      "interpretation": "Residuals of similar individual magnitude can flip the ranking when their difference crosses the exact margin."
+    }
+  ],
+  "invariants": [
+    "A quantized score's individual error magnitude does not determine whether the candidate ordering is preserved; compare the residual difference with the exact decision margin.",
+    "Hard-margin pairs near zero are disproportionately important to ranking and pruning decisions.",
+    "Residual covariance for pairs sharing a query/candidate must be measured; independence is not a default assumption.",
+    "A statistical/held-out decision certificate yields a probabilistic profile, not a deterministic ExactComplete pruning proof.",
+    "The fixture demonstrates arithmetic only and contains no measured quantizer, benchmark or confidence guarantee."
+  ]
+}
