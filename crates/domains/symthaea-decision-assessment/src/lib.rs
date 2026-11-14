@@ -459,7 +459,7 @@ pub struct EventTraceQualification {
 /// Order of the first event relative to the second event supplied to the
 /// comparator. In `EventOrderReport.effect_orders`, the first event is the
 /// irreversible effect and the second is the stop trigger.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EventOrder {
     Before,
