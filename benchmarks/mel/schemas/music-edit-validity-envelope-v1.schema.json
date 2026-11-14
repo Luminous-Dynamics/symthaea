@@ -168,7 +168,8 @@
             "tempo",
             "timbre_family",
             "tuning_cents",
-            "velocity_contour"
+            "velocity_contour",
+            "duration_to_inter_onset_ratio"
           ]
         },
         "scope": {
