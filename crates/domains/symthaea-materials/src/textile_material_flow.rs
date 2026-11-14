@@ -415,6 +415,14 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "receiver organization must be independent of the incoming inventory or process-trial issuer",
                     );
                 }
+                if acceptance.evidence.verifier_id.as_deref() == Some(basis_issuer) {
+                    add(
+                        &mut findings,
+                        "RECEIVER_VERIFIER_NOT_INDEPENDENT_OF_PROCESS",
+                        &lot.lot_id,
+                        "independent verifier must also be distinct from the incoming inventory or process-trial issuer",
+                    );
+                }
                 if acceptance.evidence.sha256 == basis_digest {
                     add(
                         &mut findings,
@@ -1153,11 +1161,133 @@ mod tests {
     }
 
     #[test]
+    fn multi_stage_lineage_counts_only_terminal_mass_once() {
+        let mut ledger = sorting_split_ledger();
+        ledger.lots = vec![
+            incoming_lot("incoming-001", 10_000, "inventory-001", 'a'),
+            output_lot("cotton-stream", 6_000, "sort-001", LotDisposition::InProcess),
+            output_lot("poly-stream", 3_800, "sort-001", LotDisposition::InProcess),
+            output_lot("cotton-fibre", 5_900, "open-cotton", LotDisposition::AwaitingReceiver),
+            output_lot("poly-downcycle", 3_730, "downcycle-poly", LotDisposition::AwaitingReceiver),
+        ];
+        ledger.events = vec![
+            event(
+                "sort-001",
+                FlowProcess::Sorting,
+                &["incoming-001"],
+                &["cotton-stream", "poly-stream"],
+                200,
+                10,
+                "sort-evidence-001",
+                'b',
+                20,
+            ),
+            event(
+                "open-cotton",
+                FlowProcess::MechanicalOpening,
+                &["cotton-stream"],
+                &["cotton-fibre"],
+                100,
+                10,
+                "open-evidence-001",
+                'c',
+                30,
+            ),
+            event(
+                "downcycle-poly",
+                FlowProcess::Downcycling,
+                &["poly-stream"],
+                &["poly-downcycle"],
+                70,
+                10,
+                "downcycle-evidence-001",
+                'd',
+                35,
+            ),
+        ];
+        for item in &mut ledger.events {
+            item.max_unaccounted_ppm = 30_000;
+        }
+
+        let report = validate_material_flow(&ledger);
+        assert!(report.valid, "{:#?}", report.findings);
+        assert_eq!(report.totals.incoming_mass_mg, 10_000);
+        assert_eq!(report.totals.awaiting_receiver_mass_mg, 9_630);
+        assert_eq!(report.totals.unaccounted_mass_mg, 370);
+    }
+
+    #[test]
+    fn receiver_issuer_and_verifier_must_be_independent_of_producer() {
+        let mut issuer_conflict = sorting_split_ledger();
+        attach_receiver(
+            &mut issuer_conflict.lots[1],
+            AcceptanceOutcome::Accepted,
+            "receiver-issuer-conflict",
+            'c',
+        );
+        issuer_conflict.lots[1]
+            .receiver_acceptance
+            .as_mut()
+            .unwrap()
+            .evidence
+            .issuer_id = "process-operator".to_owned();
+        assert!(
+            validate_material_flow(&issuer_conflict)
+                .findings
+                .iter()
+                .any(|item| item.code == "RECEIVER_NOT_INDEPENDENT_OF_PROCESS")
+        );
+
+        let mut verifier_conflict = sorting_split_ledger();
+        attach_receiver(
+            &mut verifier_conflict.lots[1],
+            AcceptanceOutcome::Accepted,
+            "receiver-verifier-conflict",
+            'c',
+        );
+        verifier_conflict.lots[1]
+            .receiver_acceptance
+            .as_mut()
+            .unwrap()
+            .evidence
+            .verifier_id = Some("process-operator".to_owned());
+        assert!(
+            validate_material_flow(&verifier_conflict)
+                .findings
+                .iter()
+                .any(|item| item.code == "RECEIVER_VERIFIER_NOT_INDEPENDENT_OF_PROCESS")
+        );
+    }
+
+    #[test]
+    fn receiver_decision_cannot_predate_the_producing_trial() {
+        let mut ledger = sorting_split_ledger();
+        attach_receiver(
+            &mut ledger.lots[1],
+            AcceptanceOutcome::Accepted,
+            "receiver-too-early",
+            'c',
+        );
+        ledger.lots[1]
+            .receiver_acceptance
+            .as_mut()
+            .unwrap()
+            .evidence
+            .observed_at_ns = 15;
+        assert!(
+            validate_material_flow(&ledger)
+                .findings
+                .iter()
+                .any(|item| item.code == "RECEIVER_DECISION_PRECEDES_OUTPUT")
+        );
+    }
+
+    #[test]
     fn unique_receiver_evidence_cannot_reuse_process_bytes() {
         let mut ledger = sorting_split_ledger();
         attach_receiver(&mut ledger.lots[1], AcceptanceOutcome::Accepted, "receiver-001", 'b');
         let report = validate_material_flow(&ledger);
         assert!(!report.valid);
-        assert!(report.findings.iter().any(|item| item.code == "DUPLICATE_EVIDENCE_DIGEST"));
+        assert!(report.findings.iter().any(|item| item.code == "RECEIVER_EVIDENCE_REUSES_BASIS_BYTES"));
     }
 }
