@@ -221,3 +221,10 @@ A zero-failure synthetic suite is a falsification gate, not a population reliabi
 
 
 A stop trigger also remains active until a distinct `StopObligationDischarged` event is qualified by the stop-disposition owner and established to occur after the trigger. A post-trigger operation start, retry or irreversible effect is not accepted merely because it appears after the trigger in the event array; it must be definitely after that qualified discharge. A discharge is not accepted while any started operation remains unreconciled. This avoids treating "no post-trigger effect was observed" as equivalent to "the system is requalified to resume."
+
+
+### Stop-disposition receipt binding
+
+A stop-disposition PASS is not a transferable boolean. The event-trace qualification must bind a non-empty owner receipt reference, a lowercase SHA-256 receipt digest, the exact evaluator-observed trigger event ID and the exact stop-discharge event ID. The composition adapter fails closed when any of these four bindings is absent, malformed or mismatched. The synthetic fixture uses domain-separated deterministic receipt digests to exercise this identity contract; it does not authenticate real owner receipts. Signature, timestamp, scope and semantic validation remain with the external owner. The Rust reference test includes wrong-trigger, wrong-discharge and malformed-digest controls.
+
+At the current source-level read-back, the eleven event-trace commitments and eleven synthetic stop-disposition receipt projections independently reproduce. This is fixture integrity only; it is not execution of the Rust tests or proof of real owner authentication.
