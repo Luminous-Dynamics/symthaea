@@ -1,9 +1,9 @@
-# MUSE-MIR-019 — Multidimensional MusicXML score-event evaluation (V1)
+# MUSE-MIR-019 — Multidimensional MusicXML score-event evaluation (Evaluator V1, report schema V2)
 
 **Issue:** #11901  
 **Parent implementation:** MUSE-MIR-018 source-native MusicXML notation events  
 **Date:** 14 November 2026  
-**Status:** evaluator and 29 focused tests authored; focused Rust 1.96 workflow configured; not compiled or executed in this authoring environment
+**Status:** evaluator implementation and 32 focused tests authored; report schema V2; focused Rust 1.96 workflow configured; not compiled or executed in this authoring environment
 
 ## Why this benchmark exists
 
@@ -79,6 +79,7 @@ Auxiliary events match on element family and score position. Attribute events ma
 | Duration presence | Whether both events carry a performed duration |
 | Performed duration | Absolute rational quarter-beat error distribution and within-tolerance rate |
 | Written value | Exact note type and dot-count accuracy |
+| Note performance directives | time-only equality and exact attack/release equality after converting source divisions to quarter-note-beat rationals; unresolved legacy offsets reported separately |
 | Grace semantics | Grace presence plus slash, steal-time and make-time attributes |
 | Cue semantics | Exact cue-note marker accuracy |
 | Chord membership | Exact chord-member flag accuracy |
@@ -99,19 +100,20 @@ Percentiles use the nearest-rank rule ceil(p * n) - 1. If both sides have no obs
 
 ## Report integrity
 
+The report uses schema V2 / algorithm V2 after correcting a V1 report-commitment omission. It binds every public report field except its own self-digest, including the note performance-directive metric and the unresolved-directive count.
 The report binds:
 - reference and prediction graph SHA-256;
 - part ID, score-clock ID and canonicalization version;
 - evaluator algorithm version and complete tolerance/budget config;
 - all event counts, independent metrics, onset/duration error distributions and assignment coverage counts.
 
-Replay recomputes the graph digests, matching, every reported dimension and the domain-separated report commitment. A changed input, config, count or metric invalidates the replay result.
+Replay recomputes the graph digests, matching, every reported dimension and the domain-separated report commitment. A changed input, config, count or metric invalidates the replay result. The V1 commitment omitted the note-performance-directive metric; V2 closes that gap and adds a regression test that mutates both that metric and its unresolved count.
 
 The hashes establish content consistency, not the identity of the parser, truth annotator or model producer.
 
 ## Tests authored
 
-29 focused tests currently cover:
+32 focused tests currently cover:
 - identical graph yields perfect independent dimensions, including onset, duration, note, auxiliary, attribute and cursor outputs;
 - wrong pitch spelling does not suppress note-event presence;
 - equivalent decimal alteration lexemes compare numerically exactly, including implicit natural versus explicit zero;
@@ -126,9 +128,12 @@ The hashes establish content consistency, not the identity of the parser, truth 
 - event, candidate-comparison and augmenting-path work budgets fail closed;
 - augmenting-path matching reaches maximum cardinality where a greedy first pairing would fail;
 - grace slash/steal-time, cue flags, chord-member flags and chord-anchor relationships are independently scored;
-- note-level `time-only`, signed `attack` and `release` directives are scored separately from written rhythmic values and score-clock duration.
+- note-level `time-only`, signed `attack` and `release` directives are scored separately from written rhythmic values and score-clock duration;
+- equivalent attack/release offsets such as -1 and +1 at 4 divisions versus -2 and +2 at 8 divisions compare equal in exact quarter-beat units;
+- invalid/missing divisions scales for legacy attack/release fields are counted as unresolved rather than assumed correct or incorrect;
+- report commitment changes when the directive metric or unresolved-directive count is tampered with.
 
-All 29 focused tests are authored, not compiled or run. The final tranche independently mutates part name/abbreviation, nested MIDI setup, metadata presence/absence and legacy metadata-layer coverage, and rejects pathological source-tree depth.
+All 32 focused tests are authored, not compiled or run. The final tranche independently mutates part name/abbreviation, nested MIDI setup, metadata presence/absence and legacy metadata-layer coverage, and rejects pathological source-tree depth.
 
 ## External comparison and honest SOTA strategy
 
