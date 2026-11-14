@@ -953,6 +953,25 @@ pub fn evaluate_event_order(
         map
     };
 
+    // Every operation-scoped event must join to an exact start event. A
+    // complete trace with orphaned operation events is a critical integrity
+    // failure; an incomplete trace cannot establish the missing relationship.
+    for event in events.iter().filter(|event| {
+        event_requires_operation_id(event.kind)
+            && event.kind != DecisionEventKind::OperationStarted
+    }) {
+        let operation_id = event.operation_id.as_deref().unwrap_or_default();
+        if !started.contains_key(operation_id) {
+            if qualification.completeness == GateState::Pass {
+                critical_failure = true;
+                reasons.insert(format!("OPERATION_EVENT_WITHOUT_START:{}", event.event_id));
+            } else {
+                indeterminate = true;
+                reasons.insert(format!("OPERATION_EVENT_START_UNOBSERVED:{}", event.event_id));
+            }
+        }
+    }
+
     let mut pending_operations = BTreeSet::new();
     let mut retry_before_reconciliation_count = 0usize;
 
@@ -1064,7 +1083,127 @@ pub fn evaluate_event_order(
         }
     }
 
-    for (operation_id, _start_event) in &started {
+    for (operation_id, start_event) in &started {
+        let cancellation_requests: Vec<&DecisionEvent> = events
+            .iter()
+            .filter(|event| {
+                event.kind == DecisionEventKind::CancellationRequested
+                    && event.operation_id.as_deref() == Some(operation_id.as_str())
+            })
+            .collect();
+        let cancellation_acks: Vec<&DecisionEvent> = events
+            .iter()
+            .filter(|event| {
+                event.kind == DecisionEventKind::CancellationAcknowledged
+                    && event.operation_id.as_deref() == Some(operation_id.as_str())
+            })
+            .collect();
+
+        if !cancellation_acks.is_empty() && cancellation_requests.is_empty() {
+            critical_failure = true;
+            reasons.insert(format!("CANCELLATION_ACK_WITHOUT_REQUEST:{operation_id}"));
+        }
+
+        for request in &cancellation_requests {
+            match compare_decision_events(start_event, request, &by_id, qualification) {
+                EventOrder::Before => {}
+                EventOrder::After | EventOrder::Inconsistent => {
+                    critical_failure = true;
+                    reasons.insert(format!("CANCELLATION_REQUEST_BEFORE_START:{operation_id}"));
+                }
+                EventOrder::Overlapping | EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!("CANCELLATION_REQUEST_START_ORDER_UNRESOLVED:{operation_id}"));
+                }
+            }
+        }
+
+        for ack in &cancellation_acks {
+            let mut acknowledgement_follows_request = false;
+            let mut acknowledgement_order_unknown = false;
+            for request in &cancellation_requests {
+                match compare_decision_events(request, ack, &by_id, qualification) {
+                    EventOrder::Before => acknowledgement_follows_request = true,
+                    EventOrder::Overlapping | EventOrder::Unknown => acknowledgement_order_unknown = true,
+                    EventOrder::After | EventOrder::Inconsistent => {}
+                }
+            }
+            if !acknowledgement_follows_request {
+                if acknowledgement_order_unknown {
+                    indeterminate = true;
+                    reasons.insert(format!("CANCELLATION_ACK_ORDER_UNRESOLVED:{operation_id}"));
+                } else {
+                    critical_failure = true;
+                    reasons.insert(format!("CANCELLATION_ACK_WITHOUT_PRIOR_REQUEST:{operation_id}"));
+                }
+            }
+        }
+
+        match compare_decision_events(start_event, outcome_event, &by_id, qualification) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical_failure = true;
+                reasons.insert(format!("OPERATION_OUTCOME_PRECEDES_START:{operation_id}"));
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("OPERATION_OUTCOME_START_ORDER_UNRESOLVED:{operation_id}"));
+            }
+        }
+
+        for unknown_event in events.iter().filter(|event| {
+            event.kind == DecisionEventKind::OperationOutcomeUnknown
+                && event.operation_id.as_deref() == Some(operation_id.as_str())
+        }) {
+            match compare_decision_events(start_event, unknown_event, &by_id, qualification) {
+                EventOrder::Before => {}
+                EventOrder::After | EventOrder::Inconsistent => {
+                    critical_failure = true;
+                    reasons.insert(format!("UNKNOWN_OUTCOME_BEFORE_OPERATION_START:{operation_id}"));
+                }
+                EventOrder::Overlapping | EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!("UNKNOWN_OUTCOME_START_ORDER_UNRESOLVED:{operation_id}"));
+                }
+            }
+        }
+
+        if let Some(discharge_event) = discharge.filter(|_| discharge_valid) {
+            match compare_decision_events(start_event, discharge_event, &by_id, qualification) {
+                EventOrder::Before => {
+                    if let Some((outcome_event, _)) = outcomes.get(operation_id) {
+                        match compare_decision_events(outcome_event, discharge_event, &by_id, qualification) {
+                            EventOrder::Before => {}
+                            EventOrder::After => {
+                                critical_failure = true;
+                                reasons.insert(format!("STOP_DISCHARGE_WITH_UNRECONCILED_OPERATION:{operation_id}"));
+                            }
+                            EventOrder::Overlapping | EventOrder::Unknown => {
+                                indeterminate = true;
+                                reasons.insert(format!("STOP_DISCHARGE_OPERATION_OUTCOME_ORDER_UNRESOLVED:{operation_id}"));
+                            }
+                            EventOrder::Inconsistent => {
+                                critical_failure = true;
+                                reasons.insert(format!("STOP_DISCHARGE_OPERATION_OUTCOME_ORDER_INCONSISTENT:{operation_id}"));
+                            }
+                        }
+                    } else {
+                        critical_failure = true;
+                        reasons.insert(format!("STOP_DISCHARGE_WITH_UNRECONCILED_OPERATION:{operation_id}"));
+                    }
+                }
+                EventOrder::After => {}
+                EventOrder::Overlapping | EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!("STOP_DISCHARGE_OPERATION_START_ORDER_UNRESOLVED:{operation_id}"));
+                }
+                EventOrder::Inconsistent => {
+                    critical_failure = true;
+                    reasons.insert(format!("STOP_DISCHARGE_OPERATION_START_ORDER_INCONSISTENT:{operation_id}"));
+                }
+            }
+        }
+
         let Some((outcome_event, outcome)) = outcomes.get(operation_id) else {
             pending_operations.insert(operation_id.clone());
             indeterminate = true;
@@ -1121,6 +1260,17 @@ pub fn evaluate_event_order(
                     continue;
                 };
                 for effect_event in operation_effects {
+                    match compare_decision_events(start_event, effect_event, &by_id, qualification) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical_failure = true;
+                            reasons.insert(format!("EFFECT_PRECEDES_OPERATION_START:{operation_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("EFFECT_START_ORDER_UNRESOLVED:{operation_id}"));
+                        }
+                    }
                     match compare_decision_events(effect_event, outcome_event, &by_id, qualification) {
                         EventOrder::Before => {}
                         EventOrder::After | EventOrder::Inconsistent => {
@@ -1152,10 +1302,7 @@ pub fn evaluate_event_order(
         }
     }
 
-    if !pending_operations.is_empty() && discharge.is_some() {
-        indeterminate = true;
-        reasons.insert("STOP_DISCHARGE_WITH_PENDING_OPERATIONS".to_owned());
-    }
+
 
     let disposition = if critical_failure {
         EventTraceDisposition::CriticalFailure
