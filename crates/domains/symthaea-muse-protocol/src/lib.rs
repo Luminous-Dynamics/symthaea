@@ -259,6 +259,16 @@ pub struct ImportedNotationStructureSummary {
     pub voice_assignment_count: usize,
     #[serde(default)]
     pub staff_assignment_count: usize,
+    /// Score-part declarations outside the MusicXML part bodies.
+    #[serde(default)]
+    pub part_metadata_count: usize,
+    #[serde(default)]
+    pub score_instrument_count: usize,
+    #[serde(default)]
+    pub midi_instrument_count: usize,
+    /// Note <instrument> references with no matching score-instrument ID.
+    #[serde(default)]
+    pub unresolved_note_instrument_reference_count: usize,
     pub unavailable_part_ids: Vec<String>,
     pub explanation: Option<String>,
 }
