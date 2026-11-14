@@ -294,14 +294,15 @@ pub fn parse_musicxml_part_metadata(
     root: roxmltree::Node<'_, '_>,
     part_id: &str,
 ) -> Result<Option<MusicXmlPartMetadataV1>, String> {
-    if !root.has_tag_name("score-partwise") || part_id.trim().is_empty() {
+    let namespace = root.tag_name().namespace();
+    if !is_musicxml_element(root, "score-partwise", namespace) || part_id.trim().is_empty() {
         return Err("invalid MusicXML root or empty part identity".into());
     }
-    let Some(part_list) = root.children().find(|node| node.has_tag_name("part-list")) else {
+    let Some(part_list) = root.children().find(|node| is_musicxml_element(*node, "part-list", namespace)) else {
         return Ok(None);
     };
     let mut matching = part_list.children().filter(|node| {
-        node.has_tag_name("score-part") && node.attribute("id") == Some(part_id)
+        is_musicxml_element(*node, "score-part", namespace) && node.attribute("id") == Some(part_id)
     });
     let Some(score_part) = matching.next() else {
         return Ok(None);
@@ -314,13 +315,13 @@ pub fn parse_musicxml_part_metadata(
         .map_err(|error| error.reason())?;
     let score_instrument_ids = score_part
         .children()
-        .filter(|node| node.has_tag_name("score-instrument"))
+        .filter(|node| is_musicxml_element(*node, "score-instrument", namespace))
         .filter_map(|node| node.attribute("id").map(str::to_string))
         .collect();
     Ok(Some(MusicXmlPartMetadataV1 {
         source_part_id: part_id.to_string(),
-        part_name: child_text(score_part, "part-name"),
-        part_abbreviation: child_text(score_part, "part-abbreviation"),
+        part_name: child_text(score_part, "part-name", namespace),
+        part_abbreviation: child_text(score_part, "part-abbreviation", namespace),
         score_instrument_ids,
         source_score_part,
     }))
@@ -340,7 +341,8 @@ pub fn parse_musicxml_part_notation_events(
     if part_id.trim().is_empty() {
         return unknown(part_id, "empty MusicXML part identity");
     }
-    if !part.has_tag_name("part") || part.attribute("id") != Some(part_id) {
+    let namespace = part.tag_name().namespace();
+    if !is_musicxml_element(part, "part", namespace) || part.attribute("id") != Some(part_id) {
         return unknown(
             part_id,
             "supplied part identity does not match the source MusicXML part locator",
@@ -374,9 +376,10 @@ fn parse_part_events(
     ),
     ParseEventError,
 > {
+    let namespace = part.tag_name().namespace();
     let measure_nodes: Vec<_> = part
         .children()
-        .filter(|node| node.has_tag_name("measure"))
+        .filter(|node| is_musicxml_element(*node, "measure", namespace))
         .collect();
     if measure_nodes.len() != measure_spans.len() || measure_nodes.is_empty() {
         return Err(ParseEventError::Unknown(
@@ -404,9 +407,11 @@ fn parse_part_events(
         let mut chord_anchor: Option<ChordAnchor> = None;
 
         for element in measure.children().filter(|node| node.is_element()) {
-            if element.has_tag_name("attributes") {
+            if is_musicxml_element(element, "attributes", namespace) {
                 chord_anchor = None;
-                for attribute in element.children().filter(|node| node.is_element()) {
+                for attribute in element.children().filter(|node| {
+                    node.is_element() && node.tag_name().namespace() == namespace
+                }) {
                     let source = source_node(attribute, 0, &mut source_tree_nodes)?;
                     attribute_events.push(MusicXmlAttributeEventV1 {
                         source_order,
@@ -419,7 +424,7 @@ fn parse_part_events(
                         source,
                     });
                     source_order = next_order(source_order)?;
-                    if attribute.has_tag_name("divisions") {
+                    if is_musicxml_element(attribute, "divisions", namespace) {
                         let value = parse_i64(attribute.text()).ok_or_else(|| {
                             ParseEventError::Unknown("invalid MusicXML divisions value".into())
                         })?;
@@ -431,18 +436,18 @@ fn parse_part_events(
                         divisions = Some(value);
                     }
                 }
-            } else if element.has_tag_name("note") {
+            } else if is_musicxml_element(element, "note", namespace) {
                 if note_events.len() >= MAX_NOTATION_EVENTS_PER_PART {
                     return Err(ParseEventError::Unknown(
                         "MusicXML note-event budget exceeded".into(),
                     ));
                 }
-                let is_grace = element.children().any(|node| node.has_tag_name("grace"));
-                let is_cue = element.children().any(|node| node.has_tag_name("cue"));
-                let is_chord_member = element.children().any(|node| node.has_tag_name("chord"));
+                let is_grace = element.children().any(|node| is_musicxml_element(*node, "grace", namespace));
+                let is_cue = element.children().any(|node| is_musicxml_element(*node, "cue", namespace));
+                let is_chord_member = element.children().any(|node| is_musicxml_element(*node, "chord", namespace));
                 let duration_node = element
                     .children()
-                    .find(|node| node.has_tag_name("duration"));
+                    .find(|node| is_musicxml_element(*node, "duration", namespace));
                 let performed_duration = match duration_node {
                     Some(node) => {
                         let raw = parse_i64(node.text()).ok_or_else(|| {
@@ -506,10 +511,10 @@ fn parse_part_events(
                 let score_offset = measure_start
                     .checked_add(note_onset)
                     .map_err(|_| ParseEventError::Unknown("note score offset overflow".into()))?;
-                let kind = parse_event_kind(element)?;
+                let kind = parse_event_kind(element, namespace)?;
                 let grace = element
                     .children()
-                    .find(|node| node.has_tag_name("grace"))
+                    .find(|node| is_musicxml_element(*node, "grace", namespace))
                     .map(|node| {
                         Ok(MusicXmlGraceV1 {
                             slash: node.attribute("slash").map(str::to_string),
@@ -522,62 +527,62 @@ fn parse_part_events(
                     .transpose()?;
                 let time_modification = element
                     .children()
-                    .find(|node| node.has_tag_name("time-modification"))
-                    .map(parse_time_modification)
+                    .find(|node| is_musicxml_element(*node, "time-modification", namespace))
+                    .map(|node| parse_time_modification(node, namespace))
                     .transpose()?;
                 let source_note = source_node(element, 0, &mut source_tree_nodes)?;
                 let sound_ties = element
                     .children()
-                    .filter(|node| node.has_tag_name("tie"))
+                    .filter(|node| is_musicxml_element(*node, "tie", namespace))
                     .map(parse_tie)
                     .collect();
                 let visual_ties = element
                     .children()
-                    .filter(|node| node.has_tag_name("notations"))
+                    .filter(|node| is_musicxml_element(*node, "notations", namespace))
                     .flat_map(|node| node.children())
-                    .filter(|node| node.has_tag_name("tied"))
+                    .filter(|node| is_musicxml_element(*node, "tied", namespace))
                     .map(parse_tie)
                     .collect();
                 let tuplet_notations = element
                     .children()
-                    .filter(|node| node.has_tag_name("notations"))
+                    .filter(|node| is_musicxml_element(*node, "notations", namespace))
                     .flat_map(|node| node.children())
-                    .filter(|node| node.has_tag_name("tuplet"))
+                    .filter(|node| is_musicxml_element(*node, "tuplet", namespace))
                     .map(|node| source_node(node, 0, &mut source_tree_nodes))
                     .collect::<Result<Vec<_>, _>>()?;
                 let instrument_ids = element
                     .children()
-                    .filter(|node| node.has_tag_name("instrument"))
+                    .filter(|node| is_musicxml_element(*node, "instrument", namespace))
                     .filter_map(|node| node.attribute("id").map(str::to_string))
                     .collect();
                 let beams = element
                     .children()
-                    .filter(|node| node.has_tag_name("beam"))
+                    .filter(|node| is_musicxml_element(*node, "beam", namespace))
                     .map(|node| MusicXmlBeamV1 {
                         number: node.attribute("number").map(str::to_string),
                         value: node.text().map(|value| value.trim().to_string()),
                         attributes: attributes(node),
                     })
                     .collect();
-                let note_type = child_text(element, "type");
+                let note_type = child_text(element, "type", namespace);
                 let dot_count = element
                     .children()
-                    .filter(|node| node.has_tag_name("dot"))
+                    .filter(|node| is_musicxml_element(*node, "dot", namespace))
                     .count()
                     .min(255) as u8;
-                let stem = child_text(element, "stem");
+                let stem = child_text(element, "stem", namespace);
                 let notehead = element
                     .children()
-                    .find(|node| node.has_tag_name("notehead"))
+                    .find(|node| is_musicxml_element(*node, "notehead", namespace))
                     .map(|node| source_node(node, 0, &mut source_tree_nodes))
                     .transpose()?;
                 let accidental = element
                     .children()
-                    .find(|node| node.has_tag_name("accidental"))
+                    .find(|node| is_musicxml_element(*node, "accidental", namespace))
                     .map(|node| source_node(node, 0, &mut source_tree_nodes))
                     .transpose()?;
-                let voice = child_text(element, "voice");
-                let staff = child_text(element, "staff");
+                let voice = child_text(element, "voice", namespace);
+                let staff = child_text(element, "staff", namespace);
 
                 note_events.push(MusicXmlNotationEventV1 {
                     source_order,
@@ -627,11 +632,13 @@ fn parse_part_events(
                         }
                     }
                 }
-            } else if element.has_tag_name("backup") || element.has_tag_name("forward") {
+            } else if is_musicxml_element(element, "backup", namespace)
+                || is_musicxml_element(element, "forward", namespace)
+            {
                 chord_anchor = None;
                 let duration_node = element
                     .children()
-                    .find(|node| node.has_tag_name("duration"))
+                    .find(|node| is_musicxml_element(*node, "duration", namespace))
                     .ok_or_else(|| ParseEventError::Unknown("backup/forward has no duration".into()))?;
                 let raw = parse_i64(duration_node.text()).ok_or_else(|| {
                     ParseEventError::Unknown("invalid backup/forward duration".into())
@@ -649,7 +656,8 @@ fn parse_part_events(
                 let duration = RationalBeat::new(raw, division_value)
                     .map_err(|_| ParseEventError::Unknown("backup/forward duration overflow".into()))?;
                 let before = cursor;
-                cursor = if element.has_tag_name("backup") {
+                let is_backup = is_musicxml_element(element, "backup", namespace);
+                cursor = if is_backup {
                     cursor
                         .checked_sub(duration)
                         .map_err(|_| ParseEventError::Unknown("MusicXML backup underflow".into()))?
@@ -668,9 +676,9 @@ fn parse_part_events(
                     measure_index,
                     measure_number: measure_number.clone(),
                     part_id: part_id.to_string(),
-                    direction: if element.has_tag_name("backup") { "backup" } else { "forward" }.into(),
-                    voice: child_text(element, "voice"),
-                    staff: child_text(element, "staff"),
+                    direction: if is_backup { "backup" } else { "forward" }.into(),
+                    voice: child_text(element, "voice", namespace),
+                    staff: child_text(element, "staff", namespace),
                     score_offset_before: measure_start
                         .checked_add(before)
                         .map_err(|_| ParseEventError::Unknown("cursor move offset overflow".into()))?,
@@ -688,7 +696,7 @@ fn parse_part_events(
                 // divisions and must not be silently rounded or discarded.
                 let offset = element
                     .children()
-                    .find(|node| node.has_tag_name("offset"))
+                    .find(|node| is_musicxml_element(*node, "offset", namespace))
                     .map(|node| {
                         let raw = parse_i64(node.text()).ok_or_else(|| {
                             ParseEventError::Unknown("invalid MusicXML auxiliary offset".into())
@@ -748,10 +756,11 @@ fn parse_part_events(
 
 fn parse_event_kind(
     note: roxmltree::Node<'_, '_>,
+    namespace: Option<&str>,
 ) -> Result<MusicXmlNotationEventKindV1, ParseEventError> {
-    let pitched = note.children().find(|node| node.has_tag_name("pitch"));
-    let rest = note.children().find(|node| node.has_tag_name("rest"));
-    let unpitched = note.children().find(|node| node.has_tag_name("unpitched"));
+    let pitched = note.children().find(|node| is_musicxml_element(*node, "pitch", namespace));
+    let rest = note.children().find(|node| is_musicxml_element(*node, "rest", namespace));
+    let unpitched = note.children().find(|node| is_musicxml_element(*node, "unpitched", namespace));
     let present = (pitched.is_some() as usize)
         + (rest.is_some() as usize)
         + (unpitched.is_some() as usize);
@@ -761,56 +770,57 @@ fn parse_event_kind(
         ));
     }
     if let Some(pitch) = pitched {
-        let step = child_text(pitch, "step")
+        let step = child_text(pitch, "step", namespace)
             .ok_or_else(|| ParseEventError::Unknown("pitched note has no step".into()))?;
         if !matches!(step.as_str(), "A" | "B" | "C" | "D" | "E" | "F" | "G") {
             return Err(ParseEventError::Unknown("invalid MusicXML pitch step".into()));
         }
-        let octave = child_text(pitch, "octave")
+        let octave = child_text(pitch, "octave", namespace)
             .and_then(|value| value.parse::<i32>().ok())
             .ok_or_else(|| ParseEventError::Unknown("pitched note has invalid octave".into()))?;
         Ok(MusicXmlNotationEventKindV1::Pitched(MusicXmlWrittenPitchV1 {
             step,
-            alter: child_text(pitch, "alter"),
+            alter: child_text(pitch, "alter", namespace),
             octave,
         }))
     } else if let Some(rest) = rest {
         Ok(MusicXmlNotationEventKindV1::Rest {
             measure: rest.attribute("measure").is_some_and(|value| value == "yes"),
-            display: display_pitch(rest),
+            display: display_pitch(rest, namespace),
         })
     } else {
         Ok(MusicXmlNotationEventKindV1::Unpitched {
-            display: display_pitch(unpitched.unwrap()),
+            display: display_pitch(unpitched.unwrap(), namespace),
         })
     }
 }
 
-fn display_pitch(node: roxmltree::Node<'_, '_>) -> MusicXmlDisplayPitchV1 {
+fn display_pitch(node: roxmltree::Node<'_, '_>, namespace: Option<&str>) -> MusicXmlDisplayPitchV1 {
     MusicXmlDisplayPitchV1 {
-        step: child_text(node, "display-step"),
-        octave: child_text(node, "display-octave").and_then(|value| value.parse::<i32>().ok()),
+        step: child_text(node, "display-step", namespace),
+        octave: child_text(node, "display-octave", namespace).and_then(|value| value.parse::<i32>().ok()),
     }
 }
 
 fn parse_time_modification(
     node: roxmltree::Node<'_, '_>,
+    namespace: Option<&str>,
 ) -> Result<MusicXmlTimeModificationV1, ParseEventError> {
-    let actual_notes = child_text(node, "actual-notes")
+    let actual_notes = child_text(node, "actual-notes", namespace)
         .and_then(|value| value.parse::<u32>().ok())
         .filter(|value| *value > 0)
         .ok_or_else(|| ParseEventError::Unknown("invalid tuplet actual-notes".into()))?;
-    let normal_notes = child_text(node, "normal-notes")
+    let normal_notes = child_text(node, "normal-notes", namespace)
         .and_then(|value| value.parse::<u32>().ok())
         .filter(|value| *value > 0)
         .ok_or_else(|| ParseEventError::Unknown("invalid tuplet normal-notes".into()))?;
     Ok(MusicXmlTimeModificationV1 {
         actual_notes,
         normal_notes,
-        normal_type: child_text(node, "normal-type"),
+        normal_type: child_text(node, "normal-type", namespace),
         normal_dot_count: node
             .children()
-            .filter(|child| child.has_tag_name("normal-dot"))
+            .filter(|child| is_musicxml_element(*child, "normal-dot", namespace))
             .count()
             .min(255) as u8,
     })
@@ -885,12 +895,29 @@ fn attributes(node: roxmltree::Node<'_, '_>) -> Vec<(String, String)> {
         .collect()
 }
 
-fn child_text(node: roxmltree::Node<'_, '_>, name: &str) -> Option<String> {
+fn child_text(
+    node: roxmltree::Node<'_, '_>,
+    name: &str,
+    namespace: Option<&str>,
+) -> Option<String> {
     node.children()
-        .find(|child| child.has_tag_name(name))
+        .find(|child| is_musicxml_element(*child, name, namespace))
         .and_then(|child| child.text())
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+/// Match a MusicXML core element by both local name and the document's
+/// namespace. Foreign extension elements may reuse core local names; they are
+/// retained as opaque source nodes and must not alter score semantics.
+fn is_musicxml_element(
+    node: roxmltree::Node<'_, '_>,
+    name: &str,
+    namespace: Option<&str>,
+) -> bool {
+    node.is_element()
+        && node.tag_name().name() == name
+        && node.tag_name().namespace() == namespace
 }
 
 fn parse_i64(value: Option<&str>) -> Option<i64> {
