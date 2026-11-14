@@ -932,6 +932,32 @@ pub fn evaluate_partial_identification(
             scenario.initial_bounds, std::slice::from_ref(&experiment.id)) == 0)
         .count();
 
+    let mut path_interception_candidate_count = 0usize;
+    let mut path_interception_confirmed_count = 0usize;
+    let mut path_interception_disagreement_count = 0usize;
+    for experiment in &scenario.experiments {
+        if all_paths_blocked_for_experiment(&scenario.graph, &scenario.query, experiment) {
+            path_interception_candidate_count += 1;
+            let exact_singleton_potency = guaranteed_potency(
+                &oracle.admissible_worlds,
+                scenario.initial_bounds,
+                std::slice::from_ref(&experiment.id),
+            );
+            if exact_singleton_potency == 0 {
+                path_interception_confirmed_count += 1;
+            } else {
+                path_interception_disagreement_count += 1;
+                push_finding(
+                    &mut findings,
+                    PartialIdentificationFindingCode::GraphPruningCertificateDisagreement,
+                    None,
+                    Some(experiment.id.clone()),
+                    "AllPathsBlocked predicts zero potency but the finite-world oracle shows a positive singleton effect; do not prune this candidate",
+                );
+            }
+        }
+    }
+
     let (optimal_potency, optimal_ids) = match enumeration_optimum(scenario, oracle, policy) {
         Ok(value) => value,
         Err(code) => {
@@ -954,6 +980,9 @@ pub fn evaluate_partial_identification(
                 oracle_optimal_experiment_ids: Vec::new(),
                 zero_potency_experiment_count,
                 selected_zero_potency_count,
+                path_interception_candidate_count,
+                path_interception_confirmed_count,
+                path_interception_disagreement_count,
                 findings,
             };
         }
@@ -983,6 +1012,9 @@ pub fn evaluate_partial_identification(
             oracle_optimal_experiment_ids: optimal_ids,
             zero_potency_experiment_count,
             selected_zero_potency_count,
+            path_interception_candidate_count,
+            path_interception_confirmed_count,
+            path_interception_disagreement_count,
             findings,
         };
     };
@@ -1059,6 +1091,9 @@ pub fn evaluate_partial_identification(
         oracle_optimal_experiment_ids: optimal_ids,
         zero_potency_experiment_count,
         selected_zero_potency_count,
+        path_interception_candidate_count,
+        path_interception_confirmed_count,
+        path_interception_disagreement_count,
         findings,
     }
 }
