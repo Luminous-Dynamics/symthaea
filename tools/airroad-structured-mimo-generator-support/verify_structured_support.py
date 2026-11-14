@@ -338,14 +338,24 @@ def run_negative_controls(data: dict[str, Any], basis: Matrix) -> None:
     else:
         raise AssertionError("an allowed imaginary basis generator was accepted")
 
-    dependent_basis = [basis[0][:], basis[0][:]]
-    if rank(dependent_basis) == 2:
+    dependent_basis = [vector[:] for vector in basis]
+    for row in dependent_basis:
+        row[1] = row[0]
+    try:
+        validate_structural_contract(data, dependent_basis)
+    except ValueError:
+        pass
+    else:
         raise AssertionError("dependent support basis was accepted")
 
     bad_gram_basis = [vector[:] for vector in basis]
     bad_gram_basis[0][0] = Fraction(2)
-    if matmul(transpose(bad_gram_basis), bad_gram_basis) == identity(2):
-        raise AssertionError("non-orthonormal basis was accepted")
+    try:
+        validate_structural_contract(data, bad_gram_basis)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("non-orthonormal support basis was accepted")
 
     bad_normal_simplex = json.loads(json.dumps(data["simplex"]))
     bad_normal_simplex["normals"][1][0] = {"numerator": "-1", "denominator": "2"}
