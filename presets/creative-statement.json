@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "preset_id": "creative-statement",
+  "name": "Creative / Statement",
+  "revision": 1,
+  "compatible_families": ["top", "bottom", "outerwear", "dress", "one_piece", "accessory"],
+  "intent_defaults": {
+    "description": "An exploratory starting point for expressive shape, proportion, surface and construction; the wearer defines what makes the design successful.",
+    "style_tags": ["experimental", "expressive", "sculptural", "author-directed"],
+    "silhouette": "Open exploration: asymmetric, layered, oversized, fitted or user-defined",
+    "component_defaults": {"proportion": "Explore non-standard proportion while preserving user-selected protected features", "surface": "User-directed texture, color and embellishment", "construction": "Allow multiple construction routes and expose feasibility trade-offs"},
+    "fit_intent": "user_defined"
+  },
+  "objective_defaults": [
+    {"metric": "design_novelty", "direction": "maximize", "weight": 95},
+    {"metric": "appearance_preference", "direction": "maximize", "weight": 100},
+    {"metric": "comfort_preference", "direction": "maximize", "weight": 65},
+    {"metric": "manufacturing_simplicity", "direction": "minimize", "weight": 35},
+    {"metric": "repairability", "direction": "maximize", "weight": 45}
+  ],
+  "hard_constraints": [],
+  "accessibility_defaults": ["The user decides which expressive features are essential and which may be changed for construction."],
+  "circularity_defaults": ["When embellishments or mixed materials are used, document their attachment and separation method."],
+  "manufacturing_defaults": {"preferred_route": "unknown", "allowed_operations": []},
+  "caveats": ["Novelty is not an objective truth; evaluate against the user's own brief and rights-cleared references.", "Unusual or complex geometry may require specialist sampling and physical validation before production."]
+}
