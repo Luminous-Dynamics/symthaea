@@ -6,6 +6,7 @@ Dependency-free Rust semantic guardrails for the Luminous Atelier design-brief b
 
 - Checks brief identity, revision and SHA-256 digest shape.
 - Checks unique hard-constraint, objective and suggestion-decision identifiers.
+- Exposes `preset_stack`, a deterministic style/function preset composer with source-revision provenance, conflict detection and explicit user overrides.
 - Rejects objective weights outside the declared range and all-zero objective sets.
 - Detects simple contradictions among constraints on the same field: conflicting categorical requirements, required-and-forbidden values, incompatible units and inverted numeric bounds.
 - Binds suggestion decisions to the exact brief revision/digest and requires an actor reference for accepted, rejected or edited suggestions.
