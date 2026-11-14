@@ -1,0 +1,792 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-shallow-water-site-v0.1.0.schema.json",
+  "title": "Marine shallow-water URN site qualification audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "minimum_runs",
+    "maximum_depth_range_fraction",
+    "maximum_seabed_sound_speed_range_fraction",
+    "maximum_ctd_sound_speed_range_fraction",
+    "maximum_stw_relative_deviation",
+    "maximum_cross_site_seabed_sound_speed_difference_fraction",
+    "campaigns",
+    "propagation_transfer_receipts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "minimum_runs": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "maximum_depth_range_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "maximum_seabed_sound_speed_range_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "maximum_ctd_sound_speed_range_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "maximum_stw_relative_deviation": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "maximum_cross_site_seabed_sound_speed_difference_fraction": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/campaign"
+      }
+    },
+    "propagation_transfer_receipts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/propagationTransferReceipt"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaign_id",
+        "site",
+        "vessel",
+        "hydrophones",
+        "in_situ_pre_deployment_calibration_sha256",
+        "in_situ_post_recovery_calibration_sha256",
+        "runs",
+        "bands"
+      ],
+      "properties": {
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "site": {
+          "$ref": "#/$defs/site"
+        },
+        "vessel": {
+          "$ref": "#/$defs/vessel"
+        },
+        "hydrophones": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/hydrophone"
+          }
+        },
+        "in_situ_pre_deployment_calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "in_situ_post_recovery_calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/band"
+          }
+        }
+      }
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site_id",
+        "site_revision",
+        "bathymetry_source_sha256",
+        "bathymetry_method_id",
+        "water_depth_samples",
+        "seabed_profile_source_sha256",
+        "seabed_method_id",
+        "seabed_samples",
+        "ctd_profile",
+        "current",
+        "ambient_background"
+      ],
+      "properties": {
+        "site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "site_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bathymetry_source_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "bathymetry_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "water_depth_samples": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/waterDepthSample"
+          }
+        },
+        "seabed_profile_source_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "seabed_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seabed_samples": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/seabedSample"
+          }
+        },
+        "ctd_profile": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ctdProfile"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "current": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/currentObservation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ambient_background": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ambientBackground"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "waterDepthSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "along_track_position_m",
+        "cross_track_position_m",
+        "depth_m",
+        "expanded_uncertainty_m"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "along_track_position_m": {
+          "type": "number"
+        },
+        "cross_track_position_m": {
+          "type": "number"
+        },
+        "depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expanded_uncertainty_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "seabedSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "along_track_position_m",
+        "cross_track_position_m",
+        "substrate",
+        "sound_speed_m_s",
+        "expanded_uncertainty_m_s",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "along_track_position_m": {
+          "type": "number"
+        },
+        "cross_track_position_m": {
+          "type": "number"
+        },
+        "substrate": {
+          "enum": [
+            "sand",
+            "rock",
+            "mud",
+            "gravel",
+            "mixed",
+            "other",
+            "unknown"
+          ]
+        },
+        "sound_speed_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expanded_uncertainty_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "ctdProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "method_id",
+        "calibration_certificate_sha256",
+        "evidence_sha256",
+        "samples"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "samples": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/ctdSample"
+          }
+        }
+      }
+    },
+    "ctdSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "depth_m",
+        "sound_speed_m_s",
+        "expanded_uncertainty_m_s",
+        "temperature_c",
+        "salinity_psu"
+      ],
+      "properties": {
+        "depth_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sound_speed_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expanded_uncertainty_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "temperature_c": {
+          "type": "number"
+        },
+        "salinity_psu": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "currentObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "method_id",
+        "evidence_sha256",
+        "speed_m_s",
+        "direction_deg_true",
+        "observed_at_utc"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "speed_m_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "direction_deg_true": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "observed_at_utc": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ambientBackground": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_id",
+        "method_id",
+        "raw_trace_sha256",
+        "measured_at_utc"
+      ],
+      "properties": {
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "measured_at_utc": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vessel_id",
+        "overall_ship_length_m",
+        "acoustic_ship_length_m",
+        "acoustic_reference_point_id",
+        "gps_to_acoustic_centre_offset_m",
+        "propulsion_configuration_sha256",
+        "service_fingerprint_sha256",
+        "loading_fingerprint_sha256",
+        "draft_m",
+        "hull_condition",
+        "propeller_condition",
+        "last_dry_dock_date"
+      ],
+      "properties": {
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overall_ship_length_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_ship_length_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_reference_point_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gps_to_acoustic_centre_offset_m": {
+          "type": "number"
+        },
+        "propulsion_configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "loading_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hull_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "last_dry_dock_date": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hydrophone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "x_m",
+        "y_m",
+        "depth_m",
+        "orientation_azimuth_deg",
+        "orientation_elevation_deg",
+        "calibration_certificate_sha256",
+        "calibrated_min_frequency_hz",
+        "calibrated_max_frequency_hz"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "orientation_azimuth_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "orientation_elevation_deg": {
+          "type": "number"
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "calibrated_min_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "calibrated_max_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "aspect",
+        "timebase_receipt_sha256",
+        "operating_point_receipt_sha256",
+        "background_trace_sha256",
+        "propulsion_configuration_sha256",
+        "service_fingerprint_sha256",
+        "loading_fingerprint_sha256",
+        "draft_m",
+        "hull_condition",
+        "propeller_condition",
+        "speed_through_water_knots",
+        "speed_over_ground_knots",
+        "shaft_rotation_rate_rpm",
+        "propulsion_power_kw",
+        "heading_deg_true",
+        "cpa_distance_m",
+        "data_window_duration_s",
+        "run_start_utc"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aspect": {
+          "enum": [
+            "port",
+            "starboard"
+          ]
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "background_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "propulsion_configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "loading_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hull_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "speed_through_water_knots": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "speed_over_ground_knots": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "shaft_rotation_rate_rpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "propulsion_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "heading_deg_true": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "cpa_distance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "data_window_duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "run_start_utc": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "center_frequency_hz",
+        "evidence_sha256",
+        "expanded_uncertainty_confidence_level",
+        "expanded_uncertainty_db",
+        "propagation_method_id",
+        "propagation_method_revision",
+        "quantity",
+        "site_cutoff_frequency_hz"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity": {
+          "enum": [
+            "received_spl",
+            "radiated_noise_level",
+            "source_level",
+            "deep_water_equivalent_radiated_noise_level"
+          ]
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "site_cutoff_frequency_hz": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "propagation_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propagation_method_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "expanded_uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "propagationTransferReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_site_id",
+        "to_site_id",
+        "contract_id",
+        "receipt_sha256",
+        "independently_reviewed",
+        "per_band_validated",
+        "validated_band_ids"
+      ],
+      "properties": {
+        "from_site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        },
+        "per_band_validated": {
+          "type": "boolean"
+        },
+        "validated_band_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
