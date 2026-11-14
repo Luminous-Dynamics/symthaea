@@ -141,7 +141,7 @@ fn is_known_overclaim(claim: &str) -> bool {
     )
 }
 
-pub(super) pub(super) fn decide(case: &ScopeEvidence) -> Decision {
+pub(super) fn decide(case: &ScopeEvidence) -> Decision {
     let blocked = |reason, ceiling| Decision {
         disposition: Disposition::Blocked,
         reason,
