@@ -816,6 +816,9 @@ mod tests {
                 constraint("protect.harmony", MusicEditValidityPropertyV1::Harmony, MusicEditValidityScopeV1::Composition, MusicEditValidityRelationV1::NoChange),
                 constraint("protect.melody", MusicEditValidityPropertyV1::MelodyPitch, MusicEditValidityScopeV1::UnaffectedParts, MusicEditValidityRelationV1::NoChange),
                 constraint("protect.part-lineage", MusicEditValidityPropertyV1::EventLineage, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-pitch", MusicEditValidityPropertyV1::MelodyPitch, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-onset", MusicEditValidityPropertyV1::OnsetTicks, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-duration", MusicEditValidityPropertyV1::DurationTicks, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
             ],
             permitted_variations: vec![variation],
             forbidden_changes: vec![

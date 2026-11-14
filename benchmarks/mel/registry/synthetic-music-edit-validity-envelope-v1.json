@@ -52,12 +52,36 @@
       "rationale": "Melodic pitch content outside the selected part remains protected."
     },
     {
+      "constraint_id": "protect.part-duration",
+      "property": "duration_ticks",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves source event duration ticks."
+    },
+    {
       "constraint_id": "protect.part-lineage",
       "property": "event_lineage",
       "scope": "target_part",
       "relation": "no_change",
       "evidence": "symbolic",
       "rationale": "The replacement preserves the source part's event lineage."
+    },
+    {
+      "constraint_id": "protect.part-onset",
+      "property": "onset_ticks",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves the source event onset ticks."
+    },
+    {
+      "constraint_id": "protect.part-pitch",
+      "property": "melody_pitch",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves the target part's pitch sequence."
     }
   ],
   "permitted_variations": [
