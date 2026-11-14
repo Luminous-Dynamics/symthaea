@@ -129,6 +129,24 @@ The per-gate contributions are accumulated by the triangle inequality, and the g
 
 
 
+
+## Hamiltonian-generated gates and symmetric Strang TEBD
+
+The next execution increment adds a closed-form local exponential for any Hermitian, U(1)-preserving two-qubit Hamiltonian in basis order \(|00\rangle,|01\rangle,|10\rangle,|11\rangle\).
+
+- Charge-0 and charge-2 blocks are scalar phases.
+- The charge-1 block is exponentiated analytically as a Hermitian \(2\times2\) matrix. This handles complex exchange phases and does not require a general matrix exponential.
+- The constructor checks finite entries, Hermiticity and absence of cross-charge-sector Hamiltonian terms before validating the generated gate's unitarity and U(1) conservation.
+- A source receipt reports the Hamiltonian Hermiticity residual, charge-leakage residual, time step, and generated gate residuals.
+
+\`U1TeBDStrangStepper\` then builds the second-order composition
+\[
+e^{-i\,dt\,H_{\rm even}/2}\;e^{-i\,dt\,H_{\rm odd}}\;e^{-i\,dt\,H_{\rm even}/2}.
+\]
+Even and odd bonds are disjoint within each layer. The step result carries all three layer receipts, input/output norms, the order (2), and a separately qualified bound for MPS compression/gauge/gate defects.
+
+**Important separation:** \`global_compression_error_bound_upper\` bounds approximation of the *discrete Strang gate product*. It is not a bound on the difference between that product and exact continuous-time evolution. \`trotter_error_bound\` is deliberately \`None\` until a Hamiltonian-specific commutator bound is supplied. The expected second-order convergence is tested independently against exact dense three-site single-excitation dynamics.
+
 ## Explicit limitations
 
 This increment now includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate-quality checks, and a global circuit L2 error ledger for the deterministic nearest-neighbour parity-layer executor. It does **not** yet implement:
