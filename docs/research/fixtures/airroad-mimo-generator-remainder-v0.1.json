@@ -1,0 +1,355 @@
+{
+  "schema": "luminous.airroad.mimo_inter_frequency_generator_remainder.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_generator_cover_certificate",
+  "model_identity": "sha256:synthetic-quartic-mimo-interpolation-curve-v0.1",
+  "topology_identity": "sha256:two-port-generator-cover-reference-v0.1",
+  "operating_point_identity": "sha256:synthetic-fixed-operating-point-v0.1",
+  "frequency_unit": "normalized_frequency",
+  "matrix_norm": "frobenius_norm",
+  "ports": [
+    "bus-a",
+    "bus-b"
+  ],
+  "matrix_factor": [
+    [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    ],
+    [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    ]
+  ],
+  "scalar_curve": {
+    "expression": "16*omega*(1-omega)*(omega-1/2)^2",
+    "polynomial_coefficients_ascending": [
+      "0",
+      "4",
+      "-20",
+      "32",
+      "-16"
+    ],
+    "t_substitution": "t=omega-1/2",
+    "u_substitution": "u=t^2",
+    "u_polynomial": "4*u-16*u^2"
+  },
+  "frequency_band": {
+    "lower": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "upper": {
+      "numerator": "1",
+      "denominator": "1"
+    }
+  },
+  "interpolation_knots": [
+    {
+      "knot_id": "omega-0",
+      "omega": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "matrix_value": [
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      ]
+    },
+    {
+      "knot_id": "omega-half",
+      "omega": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "matrix_value": [
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      ]
+    },
+    {
+      "knot_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "matrix_value": [
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      ]
+    }
+  ],
+  "interpolation_partition": [
+    {
+      "interval_id": "interval-0-half",
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "interval_id": "interval-half-1",
+      "lower": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    }
+  ],
+  "exact_certificate": {
+    "interpolant": "zero_matrix_on_both_intervals",
+    "residual_curve": "Phi(omega)-L(Phi)(omega)=d(omega)*P",
+    "frobenius_norm_of_P_squared": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "exact_supremum_remainder_radius": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "maximum_location_u": {
+      "numerator": "1",
+      "denominator": "8"
+    },
+    "derivative_expression_in_t": "8*t-64*t^3",
+    "derivative_absolute_bound": {
+      "numerator": "4",
+      "denominator": "1"
+    },
+    "derivative_squared_bound": {
+      "numerator": "16",
+      "denominator": "1"
+    },
+    "derivative_proof_u_expression": "64*u*(1-8*u)^2",
+    "derivative_proof_normalized_expression": "4*u*(1-8*u)^2"
+  },
+  "grid_comparison": {
+    "knot_grid": [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    ],
+    "knot_grid_maximum": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "five_point_grid": [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      {
+        "numerator": "3",
+        "denominator": "4"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    ],
+    "five_point_grid_maximum": {
+      "numerator": "3",
+      "denominator": "16"
+    },
+    "exact_radius": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "five_point_grid_underestimation": {
+      "numerator": "1",
+      "denominator": "16"
+    }
+  },
+  "generator_cover": {
+    "form": "L(Phi)(omega)+r*B_F",
+    "declared_radius": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "expected": "covers_every_frequency_in_complete_band"
+  },
+  "counterfactuals": {
+    "understated_radius": {
+      "numerator": "1",
+      "denominator": "5"
+    },
+    "understated_lipschitz": {
+      "numerator": "39",
+      "denominator": "10"
+    },
+    "missing_endpoint_partition": [
+      {
+        "interval_id": "interval-0-half",
+        "lower": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "upper": {
+          "numerator": "1",
+          "denominator": "2"
+        }
+      }
+    ],
+    "non_unit_frobenius_matrix": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "wrong_model_identity": "sha256:stale-model",
+    "wrong_frequency_unit": "Hz"
+  },
+  "negative_controls": [
+    {
+      "id": "all-knot-values-zero",
+      "expected": "does-not-imply-zero-remainder"
+    },
+    {
+      "id": "knot-grid-radius-zero",
+      "expected": "reject-universal-bound"
+    },
+    {
+      "id": "five-point-grid-radius-three-sixteenths",
+      "expected": "reject-universal-bound"
+    },
+    {
+      "id": "radius-one-fifth",
+      "expected": "reject"
+    },
+    {
+      "id": "missing-interval-endpoint",
+      "expected": "not-established"
+    },
+    {
+      "id": "non-unit-frobenius-matrix-with-unit-norm-claim",
+      "expected": "reject"
+    },
+    {
+      "id": "lipschitz-bound-below-four",
+      "expected": "reject"
+    },
+    {
+      "id": "stale-model-identity",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "frequency-unit-mismatch",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "statistical-covariance-labelled-hard-generator-ball",
+      "expected": "reject-claim-class"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact polynomial matrix-curve interpolation remainder only.",
+    "The radius is for the declared Frobenius norm and complete normalized interval.",
+    "No IQC synthesis, physical FRF validity, aircraft robustness or certification is established."
+  ]
+}
