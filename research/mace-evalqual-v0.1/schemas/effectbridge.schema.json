@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-effectbridge-v1.json",
+  "title": "MACE Effect Bridge v1",
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["idempotency_key", "principal", "target", "payload_sha256"],
+      "properties": {
+        "idempotency_key": {"type": "string", "minLength": 1, "pattern": "^[^/\\\\]+$"},
+        "principal": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "payload_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "record_kind", "durability_mode", "sequence", "idempotency_key", "intent_sha256", "principal", "target", "payload_sha256", "effect_id", "previous_sha256", "record_sha256"],
+      "properties": {
+        "schema_version": {"const": "mace-effectbridge/v1"},
+        "record_kind": {"enum": ["effect_committed", "fence_committed"]},
+        "durability_mode": {"const": "fsync_per_record"},
+        "sequence": {"type": "integer", "minimum": 1},
+        "idempotency_key": {"type": "string", "minLength": 1},
+        "intent_sha256": {"$ref": "#/$defs/sha256"},
+        "principal": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "payload_sha256": {"$ref": "#/$defs/sha256"},
+        "effect_id": {"type": "string"},
+        "previous_sha256": {"oneOf": [{"const": ""}, {"$ref": "#/$defs/sha256"}]},
+        "record_sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "allOf": [
+        {"if": {"properties": {"record_kind": {"const": "effect_committed"}}, "required": ["record_kind"]}, "then": {"properties": {"effect_id": {"type": "string", "minLength": 1}}}},
+        {"if": {"properties": {"record_kind": {"const": "fence_committed"}}, "required": ["record_kind"]}, "then": {"properties": {"effect_id": {"const": ""}}}}
+      ]
+    },
+    "journal_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["durability_mode", "sequence", "head_sha256", "complete"],
+      "properties": {
+        "durability_mode": {"const": "fsync_per_record"},
+        "sequence": {"type": "integer", "minimum": 0},
+        "head_sha256": {"oneOf": [{"const": ""}, {"$ref": "#/$defs/sha256"}]},
+        "complete": {"type": "boolean"}
+      }
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/request"},
+    {"$ref": "#/$defs/receipt"},
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "status", "idempotency_key", "journal"],
+      "properties": {
+        "schema_version": {"const": "mace-effectbridge/v1"},
+        "status": {"enum": ["found", "not_executed_fenced", "not_found_unfenced", "indeterminate"]},
+        "idempotency_key": {"type": "string", "minLength": 1},
+        "journal": {"$ref": "#/$defs/journal_summary"},
+        "receipt": {"$ref": "#/$defs/receipt"}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "found"}}, "required": ["status"]}, "then": {"required": ["receipt"], "properties": {"journal": {"properties": {"complete": {"const": true}}}, "receipt": {"properties": {"record_kind": {"const": "effect_committed"}}}}}},
+        {"if": {"properties": {"status": {"const": "not_executed_fenced"}}, "required": ["status"]}, "then": {"required": ["receipt"], "properties": {"journal": {"properties": {"complete": {"const": true}}}, "receipt": {"properties": {"record_kind": {"const": "fence_committed"}}}}}},
+        {"if": {"properties": {"status": {"const": "not_found_unfenced"}}, "required": ["status"]}, "then": {"not": {"required": ["receipt"]}, "properties": {"journal": {"properties": {"complete": {"const": true}}}}}},
+        {"if": {"properties": {"status": {"const": "indeterminate"}}, "required": ["status"]}, "then": {"properties": {"journal": {"properties": {"complete": {"const": false}}}}}}
+      ]
+    }
+  ]
+}
