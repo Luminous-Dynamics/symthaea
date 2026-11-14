@@ -163,6 +163,23 @@ The receipt reports dense entries, symmetry-allowed entries, forbidden entries, 
 
 The ideal packed byte count assumes forbidden-sector values are exactly zero. Tolerated forbidden nonzero values are surfaced separately and cannot be silently dropped by a future packed representation. This is a storage audit, **not** a block-sparse production tensor or an observed memory reduction. The next storage milestone is a packed charge-block tensor with dense round-trip and exact operation equivalence tests.
 
+
+## Reversible packed charge-block tensor prototype
+
+The new U1MpsPackedTensor prototype stores each allowed charge sector as a contiguous row-major matrix block. Rows correspond to (left virtual index, physical bit) pairs with q_left+s=q; columns correspond to right virtual indices carrying q.
+
+Forbidden-sector exact zeros are omitted. Tolerated forbidden nonzero amplitudes are retained in an explicit leakage sidecar. Forbidden amplitudes exceeding the supplied tolerance cause packing to fail. Non-finite values are rejected. The dense round-trip reconstructs both allowed blocks and leakage sidecar entries.
+
+The prototype also reports a logical storage estimate including:
+- dense or packed container headers;
+- left/right charge labels;
+- per-block headers;
+- row and column maps;
+- packed complex values;
+- leakage sidecar entries.
+
+The estimate uses Rust type sizes and vector lengths, not allocator RSS or spare capacity. This is still a per-site prototype: production ComplexU1Mps continues to store dense U1MpsTensor values, and contractions/gates are not yet rewritten to consume packed storage. A measured end-to-end memory or runtime gain is therefore not claimed.
+
 ## Explicit limitations
 
 This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:

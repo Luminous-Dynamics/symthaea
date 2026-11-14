@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Source-authored: U1 MPS storage/factorization/gates/exact split/fixed truncation/adaptive error-budget compression, mixed-canonical receipts, global gate/model/compression ledger, and Strang TEBD. Structural-zero storage audit is added; packed block-sparse storage remains future work. Exact-head harness pending.",
+  "execution_status": "Source-authored: U1 MPS core, charge-block factorization, local gates, exact/truncated/error-budgeted splits, mixed-canonical receipts and Strang TEBD. Structural-zero storage audit and a reversible per-site packed charge-block prototype are added; production MPS storage remains dense. Exact-head Rust 1.96 harness pending.",
   "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -358,6 +358,38 @@
         "storage_audit_does_not_classify_nonfinite_forbidden_entries_as_zeros"
       ],
       "claim_ceiling": "Audit only. Current U1MpsTensor data remains dense; ideal packed bytes are theoretical and omit index/metadata overhead. No measured memory/performance gain."
+    },
+    "packed_charge_block_prototype": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "U1MpsPackedTensor::from_dense(tensor,tolerance)",
+        "U1MpsPackedTensor::to_dense()",
+        "U1MpsPackedTensor::get(left,physical,right)",
+        "U1MpsPackedTensor::storage_audit()"
+      ],
+      "representation": "Per-charge contiguous row-major dense matrices plus explicit leakage sidecar for tolerated forbidden nonzero entries.",
+      "semantics": [
+        "exact forbidden zeros omitted",
+        "forbidden nonzero amplitude above tolerance rejected",
+        "forbidden nonzero amplitude within tolerance preserved losslessly in sidecar",
+        "non-finite components rejected"
+      ],
+      "storage_accounting": [
+        "container headers",
+        "charge label arrays",
+        "per-block headers",
+        "row and column maps",
+        "complex value payload",
+        "forbidden leakage sidecar"
+      ],
+      "authored_tests": [
+        "packed_charge_block_tensor_round_trips_entangled_w_state_sites",
+        "packed_tensor_preserves_tolerated_forbidden_values_in_leakage_sidecar",
+        "packed_tensor_rejects_forbidden_nonzero_above_tolerance",
+        "packed_tensor_rejects_nonfinite_input_and_invalid_tolerance",
+        "packed_storage_audit_includes_mapping_and_sidecar_metadata"
+      ],
+      "claim_ceiling": "Standalone per-tensor reversible prototype only. Production MPS remains dense, and no MPS contraction/gate kernels consume this packed representation yet. Logical size estimate excludes allocator slack and must be followed by actual RSS/runtime benchmarks."
     }
   },
   "known_answers": [
@@ -564,6 +596,32 @@
         "metadata and index overhead included in byte accounting",
         "measured peak memory compared with dense layout"
       ]
+    },
+    {
+      "id": "MPS-0C-A",
+      "name": "Reversible per-site packed U1 charge-block storage",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "dense-to-packed-to-dense round-trip preserves every allowed amplitude",
+        "tolerated forbidden values are preserved in leakage sidecar",
+        "forbidden values above tolerance fail closed",
+        "non-finite input rejected",
+        "logical byte accounting includes metadata and sidecar",
+        "production dense path remains unchanged until integration tests pass"
+      ]
+    },
+    {
+      "id": "MPS-0C-B",
+      "name": "Packed storage integration into MPS kernels",
+      "status": "planned",
+      "acceptance": [
+        "norm and overlap contractions match dense path",
+        "canonical sweeps match dense path",
+        "two-site gate/split match dense path",
+        "TEBD dense-oracle outputs match",
+        "actual peak RSS and runtime compared on matched workloads",
+        "packed layout wins after metadata overhead at representative bond dimensions"
+      ]
     }
   ],
   "negative_controls": [
@@ -620,7 +678,12 @@
     "storage audit charge-block counts do not sum to allowed entry count",
     "ideal packed value bytes reported as measured production allocation",
     "packed storage drops tolerated forbidden leakage without a receipt",
-    "storage audit classifies non-finite forbidden entries as structural zeros"
+    "storage audit classifies non-finite forbidden entries as structural zeros",
+    "packed tensor silently discards tolerated forbidden-sector components",
+    "packed tensor accepts forbidden amplitude above tolerance",
+    "packed storage audit omits row/column map metadata",
+    "packed tensor round-trip changes a dense amplitude",
+    "packed logical bytes are reported as measured allocator RSS"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -705,7 +768,16 @@
     "storage_dense_payload_bytes",
     "storage_ideal_packed_value_bytes",
     "storage_ideal_value_payload_savings_fraction",
-    "storage_forbidden_non_finite_entry_count"
+    "storage_forbidden_non_finite_entry_count",
+    "packed_dense_logical_bytes",
+    "packed_storage_logical_bytes",
+    "packed_metadata_bytes",
+    "packed_dense_value_bytes",
+    "packed_value_bytes",
+    "packed_leakage_sidecar_entries",
+    "packed_block_count",
+    "packed_logical_savings_bytes",
+    "packed_logical_savings_fraction"
   ],
   "competitive_baseline_matrix": {
     "quimb": {

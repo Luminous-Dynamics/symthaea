@@ -73,6 +73,57 @@ pub struct U1MpsStorageAudit {
 }
 
 
+/// One forbidden-sector entry preserved losslessly by packed storage.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsForbiddenEntry {
+    pub left: usize,
+    pub physical: usize,
+    pub right: usize,
+    pub value: Complex64,
+}
+
+/// One contiguous dense matrix block for a fixed intermediate U(1) charge.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1MpsPackedChargeBlock {
+    charge: i32,
+    rows: Vec<(usize, usize)>,
+    columns: Vec<usize>,
+    values: Vec<Complex64>,
+}
+
+/// Reversible packed prototype for one U(1)-labelled site tensor.
+///
+/// Allowed entries are stored in per-charge dense blocks. Tolerated forbidden
+/// nonzero entries are kept in an explicit sidecar. Exact forbidden zeros are
+/// omitted. This is not yet the production MPS site-tensor representation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1MpsPackedTensor {
+    left_charges: Vec<i32>,
+    right_charges: Vec<i32>,
+    blocks: Vec<U1MpsPackedChargeBlock>,
+    leakage_sidecar: Vec<U1MpsForbiddenEntry>,
+}
+
+/// Logical byte accounting, including container and block-header sizes.
+///
+/// This is an architecture-aware size estimate based on Rust type sizes and
+/// vector lengths, not allocator RSS or reserved capacity.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1MpsPackedStorageAudit {
+    pub dense_logical_bytes: usize,
+    pub packed_logical_bytes: usize,
+    pub packed_metadata_bytes: usize,
+    pub dense_value_bytes: usize,
+    pub packed_value_bytes: usize,
+    pub leakage_sidecar_entries: usize,
+    pub block_count: usize,
+    pub logical_savings_bytes: isize,
+    pub logical_savings_fraction: f64,
+}
+
+
+
+
 
 /// Validation or numerical failure in a complex U(1) MPS.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -387,6 +438,286 @@ impl core::fmt::Display for U1MpsError {
 }
 
 impl std::error::Error for U1MpsError {}
+
+
+
+impl U1MpsPackedTensor {
+    /// Pack a finite dense tensor without dropping any nonzero amplitude.
+    ///
+    /// Forbidden-sector entries above the configured tolerance are rejected.
+    /// Nonzero forbidden entries within tolerance are preserved in a sidecar.
+    pub fn from_dense(
+        tensor: &U1MpsTensor,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        for (index, value) in tensor.data.iter().enumerate() {
+            if !value.re.is_finite() || !value.im.is_finite() {
+                return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+            }
+        }
+
+        let mut charges = std::collections::BTreeSet::new();
+        for charge in &tensor.left_charges {
+            charges.insert(*charge);
+            charges.insert(charge.checked_add(1).ok_or(U1MpsError::DimensionOverflow)?);
+        }
+
+        let mut blocks = Vec::new();
+        for charge in charges {
+            let mut rows = Vec::new();
+            for left in 0..tensor.left_dimension() {
+                for physical in 0..2 {
+                    if tensor.left_charges[left] + physical as i32 == charge {
+                        rows.push((left, physical));
+                    }
+                }
+            }
+            let columns = tensor
+                .right_charges
+                .iter()
+                .enumerate()
+                .filter_map(|(right, right_charge)| (*right_charge == charge).then_some(right))
+                .collect::<Vec<_>>();
+            if rows.is_empty() || columns.is_empty() {
+                continue;
+            }
+            let value_count = rows
+                .len()
+                .checked_mul(columns.len())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut values = Vec::with_capacity(value_count);
+            for &(left, physical) in &rows {
+                for &right in &columns {
+                    values.push(tensor.get(left, physical, right));
+                }
+            }
+            blocks.push(U1MpsPackedChargeBlock {
+                charge,
+                rows,
+                columns,
+                values,
+            });
+        }
+
+        let mut leakage_sidecar = Vec::new();
+        for left in 0..tensor.left_dimension() {
+            for physical in 0..2 {
+                for right in 0..tensor.right_dimension() {
+                    if tensor.right_charges[right]
+                        == tensor.left_charges[left] + physical as i32
+                    {
+                        continue;
+                    }
+                    let value = tensor.get(left, physical, right);
+                    let amplitude = value.norm();
+                    if amplitude > tolerance {
+                        return Err(U1MpsError::ChargeSelectionRule {
+                            site: 0,
+                            left_charge: tensor.left_charges[left],
+                            physical,
+                            right_charge: tensor.right_charges[right],
+                            amplitude,
+                            tolerance,
+                        });
+                    }
+                    if amplitude > 0.0 {
+                        leakage_sidecar.push(U1MpsForbiddenEntry {
+                            left,
+                            physical,
+                            right,
+                            value,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(Self {
+            left_charges: tensor.left_charges.clone(),
+            right_charges: tensor.right_charges.clone(),
+            blocks,
+            leakage_sidecar,
+        })
+    }
+
+    pub fn left_charges(&self) -> &[i32] {
+        &self.left_charges
+    }
+
+    pub fn right_charges(&self) -> &[i32] {
+        &self.right_charges
+    }
+
+    pub fn blocks(&self) -> &[U1MpsPackedChargeBlock] {
+        &self.blocks
+    }
+
+    pub fn leakage_sidecar(&self) -> &[U1MpsForbiddenEntry] {
+        &self.leakage_sidecar
+    }
+
+    pub fn get(&self, left: usize, physical: usize, right: usize) -> Complex64 {
+        if self.right_charges[right] == self.left_charges[left] + physical as i32 {
+            let charge = self.right_charges[right];
+            if let Some(block) = self.blocks.iter().find(|block| block.charge == charge) {
+                let row = block
+                    .rows
+                    .iter()
+                    .position(|entry| *entry == (left, physical));
+                let column = block.columns.iter().position(|entry| *entry == right);
+                if let (Some(row), Some(column)) = (row, column) {
+                    return block.values[row * block.columns.len() + column];
+                }
+            }
+            Complex64::new(0.0, 0.0)
+        } else {
+            self.leakage_sidecar
+                .iter()
+                .find(|entry| {
+                    entry.left == left && entry.physical == physical && entry.right == right
+                })
+                .map_or(Complex64::new(0.0, 0.0), |entry| entry.value)
+        }
+    }
+
+    /// Reconstruct the exact dense tensor, including tolerated leakage entries.
+    pub fn to_dense(&self) -> Result<U1MpsTensor, U1MpsError> {
+        let entries = self
+            .left_charges
+            .len()
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(self.right_charges.len()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut data = vec![Complex64::new(0.0, 0.0); entries];
+        for block in &self.blocks {
+            let expected = block
+                .rows
+                .len()
+                .checked_mul(block.columns.len())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            if block.values.len() != expected {
+                return Err(U1MpsError::EntryCount {
+                    expected,
+                    actual: block.values.len(),
+                });
+            }
+            for (row_index, &(left, physical)) in block.rows.iter().enumerate() {
+                for (column_index, &right) in block.columns.iter().enumerate() {
+                    let index = (left * 2 + physical) * self.right_charges.len() + right;
+                    data[index] = block.values[row_index * block.columns.len() + column_index];
+                }
+            }
+        }
+        for entry in &self.leakage_sidecar {
+            if entry.left >= self.left_charges.len()
+                || entry.physical >= 2
+                || entry.right >= self.right_charges.len()
+                || self.right_charges[entry.right]
+                    == self.left_charges[entry.left] + entry.physical as i32
+                || !entry.value.re.is_finite()
+                || !entry.value.im.is_finite()
+                || entry.value.norm_sqr() == 0.0
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "packed U(1) leakage sidecar invariant",
+                ));
+            }
+            let index =
+                (entry.left * 2 + entry.physical) * self.right_charges.len() + entry.right;
+            data[index] = entry.value;
+        }
+        U1MpsTensor::new(self.left_charges.clone(), self.right_charges.clone(), data)
+    }
+
+    /// Compare logical container+payload bytes, including row/column maps and
+    /// leakage sidecar. Vector capacity and allocator bookkeeping are excluded.
+    pub fn storage_audit(&self) -> Result<U1MpsPackedStorageAudit, U1MpsError> {
+        let dense_entries = self
+            .left_charges
+            .len()
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(self.right_charges.len()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let dense_value_bytes = dense_entries
+            .checked_mul(core::mem::size_of::<Complex64>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let charge_label_bytes = self
+            .left_charges
+            .len()
+            .checked_add(self.right_charges.len())
+            .and_then(|count| count.checked_mul(core::mem::size_of::<i32>()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let dense_logical_bytes = core::mem::size_of::<U1MpsTensor>()
+            .checked_add(charge_label_bytes)
+            .and_then(|value| value.checked_add(dense_value_bytes))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+
+        let packed_value_count = self.blocks.iter().try_fold(0_usize, |sum, block| {
+            sum.checked_add(block.values.len())
+                .ok_or(U1MpsError::DimensionOverflow)
+        })?;
+        let packed_value_bytes = packed_value_count
+            .checked_mul(core::mem::size_of::<Complex64>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let row_map_count = self.blocks.iter().try_fold(0_usize, |sum, block| {
+            sum.checked_add(block.rows.len())
+                .ok_or(U1MpsError::DimensionOverflow)
+        })?;
+        let column_map_count = self.blocks.iter().try_fold(0_usize, |sum, block| {
+            sum.checked_add(block.columns.len())
+                .ok_or(U1MpsError::DimensionOverflow)
+        })?;
+        let row_map_bytes = row_map_count
+            .checked_mul(core::mem::size_of::<(usize, usize)>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let column_map_bytes = column_map_count
+            .checked_mul(core::mem::size_of::<usize>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let block_header_bytes = self
+            .blocks
+            .len()
+            .checked_mul(core::mem::size_of::<U1MpsPackedChargeBlock>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let sidecar_bytes = self
+            .leakage_sidecar
+            .len()
+            .checked_mul(core::mem::size_of::<U1MpsForbiddenEntry>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let packed_metadata_bytes = core::mem::size_of::<U1MpsPackedTensor>()
+            .checked_add(block_header_bytes)
+            .and_then(|value| value.checked_add(row_map_bytes))
+            .and_then(|value| value.checked_add(column_map_bytes))
+            .and_then(|value| value.checked_add(sidecar_bytes))
+            .and_then(|value| value.checked_add(charge_label_bytes))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let packed_logical_bytes = packed_metadata_bytes
+            .checked_add(packed_value_bytes)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let savings = dense_logical_bytes as i128 - packed_logical_bytes as i128;
+        let logical_savings_bytes = savings.clamp(isize::MIN as i128, isize::MAX as i128) as isize;
+        let logical_savings_fraction = if dense_logical_bytes == 0 {
+            0.0
+        } else {
+            savings as f64 / dense_logical_bytes as f64
+        };
+
+        Ok(U1MpsPackedStorageAudit {
+            dense_logical_bytes,
+            packed_logical_bytes,
+            packed_metadata_bytes,
+            dense_value_bytes,
+            packed_value_bytes,
+            leakage_sidecar_entries: self.leakage_sidecar.len(),
+            block_count: self.blocks.len(),
+            logical_savings_bytes,
+            logical_savings_fraction,
+        })
+    }
+}
+
 
 impl U1MpsTensor {
     /// Construct one complex qubit tensor with left/right virtual charge labels.
@@ -3867,7 +4198,7 @@ impl U1TeBDStrangStepper {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsStorageAudit, U1MpsTensor, U1MpsTruncationLedger,
+        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsPackedTensor, U1MpsPackedStorageAudit, U1MpsStorageAudit, U1MpsTensor, U1MpsTruncationLedger,
         U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
         U1TeBDStepResult, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
         U1TwoSiteState,
@@ -5946,6 +6277,126 @@ mod tests {
         assert_eq!(audit.forbidden_non_finite_entry_count, 1);
         assert_eq!(audit.structurally_forbidden_zero_count, 0);
         assert_eq!(audit.forbidden_nonzero_entry_count, 0);
+    }
+
+
+    #[test]
+    fn packed_charge_block_tensor_round_trips_entangled_w_state_sites() {
+        let state = canonical_w_state();
+        for dense in state.tensors() {
+            let packed = U1MpsPackedTensor::from_dense(dense, 1.0e-12).unwrap();
+            assert_eq!(packed.to_dense().unwrap(), *dense);
+            for left in 0..dense.left_dimension() {
+                for physical in 0..2 {
+                    for right in 0..dense.right_dimension() {
+                        assert_eq!(
+                            packed.get(left, physical, right),
+                            dense.get(left, physical, right)
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn packed_tensor_preserves_tolerated_forbidden_values_in_leakage_sidecar() {
+        let dense = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0e-13, -2.0e-13),
+            ],
+        )
+        .unwrap();
+        let packed = U1MpsPackedTensor::from_dense(&dense, 1.0e-12).unwrap();
+        assert_eq!(packed.leakage_sidecar().len(), 1);
+        assert_eq!(packed.to_dense().unwrap(), dense);
+        assert_eq!(packed.get(0, 1, 0), dense.get(0, 1, 0));
+        let audit = packed.storage_audit().unwrap();
+        assert_eq!(audit.leakage_sidecar_entries, 1);
+    }
+
+    #[test]
+    fn packed_tensor_rejects_forbidden_nonzero_above_tolerance() {
+        let dense = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0e-3, 0.0),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            U1MpsPackedTensor::from_dense(&dense, 1.0e-6),
+            Err(U1MpsError::ChargeSelectionRule { physical: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn packed_tensor_rejects_nonfinite_input_and_invalid_tolerance() {
+        let dense = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(f64::NAN, 0.0),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            U1MpsPackedTensor::from_dense(&dense, 1.0e-12),
+            Err(U1MpsError::NonFiniteTensorEntry { .. })
+        ));
+        assert!(matches!(
+            U1MpsPackedTensor::from_dense(&dense, 0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        ));
+    }
+
+    #[test]
+    fn packed_storage_audit_includes_mapping_and_sidecar_metadata() {
+        let dense = U1MpsTensor::new(
+            vec![0, 1, 1, 2],
+            vec![0, 1, 1, 2],
+            vec![Complex64::new(0.0, 0.0); 4 * 2 * 4],
+        )
+        .unwrap();
+        let packed = U1MpsPackedTensor::from_dense(&dense, 1.0e-12).unwrap();
+        let audit: U1MpsPackedStorageAudit = packed.storage_audit().unwrap();
+        assert!(audit.packed_metadata_bytes >= core::mem::size_of::<U1MpsPackedTensor>());
+        assert_eq!(
+            audit.packed_logical_bytes,
+            audit.packed_metadata_bytes + audit.packed_value_bytes
+        );
+        assert!(audit.dense_logical_bytes > 0);
+    }
+
+
+    #[test]
+    fn packed_storage_shows_metadata_inclusive_savings_for_many_charge_sectors() {
+        let charges = vec![0, 0, 1, 1, 2, 2, 3, 3];
+        let mut values = vec![Complex64::new(0.0, 0.0); charges.len() * 2 * charges.len()];
+        for left in 0..charges.len() {
+            for physical in 0..2 {
+                for right in 0..charges.len() {
+                    if charges[right] == charges[left] + physical as i32 {
+                        let index = (left * 2 + physical) * charges.len() + right;
+                        values[index] = Complex64::new((index + 1) as f64 / 100.0, 0.0);
+                    }
+                }
+            }
+        }
+        let dense = U1MpsTensor::new(charges.clone(), charges, values).unwrap();
+        let packed = U1MpsPackedTensor::from_dense(&dense, 1.0e-12).unwrap();
+        let audit = packed.storage_audit().unwrap();
+        assert!(audit.packed_value_bytes < audit.dense_value_bytes);
+        assert!(audit.logical_savings_bytes > 0);
+        assert!(audit.logical_savings_fraction > 0.0);
+        assert!(audit.logical_savings_fraction < 1.0);
+        assert_eq!(packed.to_dense().unwrap(), dense);
     }
 
 }
