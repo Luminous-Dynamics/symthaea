@@ -315,6 +315,22 @@
         "disposition": "ineligible",
         "reason": "FibreLengthMeasurementUncertaintyAbovePolicy"
       }
+    },
+    {
+      "case_id": "ROUTE-040-FIBRE-SAMPLING-PLAN-DIGEST-INVALID",
+      "mutation": "The exact fibre sampling plan is named but its content digest is malformed.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthMeasurementProtocol"
+      }
+    },
+    {
+      "case_id": "ROUTE-041-FIBRE-UNCERTAINTY-COVERAGE-MISSING",
+      "mutation": "Fibre-length expanded uncertainty has no valid coverage probability.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthMeasurementProtocol"
+      }
     }
   ]
 }
