@@ -1,0 +1,141 @@
+{
+  "fixture_id": "synthetic:temporal-event-ledger-v0.1",
+  "status": "design_only_known_answer",
+  "ledger_path": "docs/development-map/fixtures/temporal-event-ledger-v0.1.json",
+  "expected_ledger": {
+    "event_count": 4,
+    "head_hash": "5de55bd46b1b43ad3a8b8e2183e17f15126f3b92a6fa91734e6ce3b39244ad04"
+  },
+  "queries": {
+    "temporal-replay-actor-knowledge-v0.1.json": {
+      "included_event_ids": [
+        "evt-001",
+        "evt-003"
+      ],
+      "facts": {
+        "evt-001": {
+          "lifecycle": "current",
+          "effective_at_query": true,
+          "temporally_admissible": true,
+          "payload": {
+            "contract": "v1",
+            "result": "pass",
+            "test": "receipt-contract"
+          }
+        },
+        "evt-003": {
+          "lifecycle": "current",
+          "effective_at_query": true,
+          "temporally_admissible": true,
+          "payload": {
+            "capture": "late-ingest",
+            "result": "pass",
+            "test": "build-check"
+          }
+        }
+      },
+      "proposals": [],
+      "excluded_event_ids": [
+        "evt-002",
+        "evt-004"
+      ],
+      "interpretation": "Retrospective actor-knowledge view: late-captured evt-003 is included because its actor-availability claim is before the cutoff; evt-002 is excluded because it became available after the cutoff."
+    },
+    "temporal-replay-ledger-as-of-v0.1.json": {
+      "included_event_ids": [
+        "evt-001"
+      ],
+      "facts": {
+        "evt-001": {
+          "lifecycle": "current",
+          "effective_at_query": true,
+          "temporally_admissible": true
+        }
+      },
+      "proposals": [],
+      "excluded_event_ids": [
+        "evt-002",
+        "evt-003",
+        "evt-004"
+      ],
+      "interpretation": "Ledger-as-recorded view: all events recorded after the ledger cutoff are excluded, even when actor availability is asserted earlier."
+    },
+    "temporal-replay-restated-v0.1.json": {
+      "included_event_ids": [
+        "evt-001",
+        "evt-002",
+        "evt-003"
+      ],
+      "facts": {
+        "evt-001": {
+          "lifecycle": "stale",
+          "effective_at_query": true,
+          "temporally_admissible": false
+        },
+        "evt-003": {
+          "lifecycle": "current",
+          "effective_at_query": true,
+          "temporally_admissible": true
+        }
+      },
+      "proposals": [],
+      "excluded_event_ids": [
+        "evt-004"
+      ],
+      "interpretation": "Retrospective restatement: once evt-002 is available to the actor, its 09:30 effective-time invalidation marks evt-001 stale for a 10:00 valid-time query."
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "D2-NC-001",
+      "attack": "Change event_id without resealing the event hash",
+      "expected": "reject_event_hash_mismatch"
+    },
+    {
+      "id": "D2-NC-002",
+      "attack": "Change repository identity without resealing events",
+      "expected": "reject_event_hash_mismatch"
+    },
+    {
+      "id": "D2-NC-003",
+      "attack": "Make an invalidation available before its target assertion is available to the same actor",
+      "expected": "reject_transition_availability_order"
+    },
+    {
+      "id": "D2-NC-004",
+      "attack": "Apply a second terminal transition to one assertion",
+      "expected": "reject_duplicate_terminal_transition"
+    },
+    {
+      "id": "D2-NC-005",
+      "attack": "Include an event captured after the ledger cutoff in ledger-as-recorded view",
+      "expected": "exclude_late_record"
+    },
+    {
+      "id": "D2-NC-006",
+      "attack": "Apply a correction before it becomes available to the queried actor",
+      "expected": "retain_historical_actor_view"
+    },
+    {
+      "id": "D2-NC-007",
+      "attack": "Treat an incomplete validity interval as admissible",
+      "expected": "indeterminate_not_admissible"
+    },
+    {
+      "id": "D2-NC-008",
+      "attack": "Change replay cursor state but retain old checkpoint digest",
+      "expected": "reject_checkpoint_hash_mismatch"
+    },
+    {
+      "id": "D2-NC-009",
+      "attack": "Append a transition to an unknown target",
+      "expected": "reject_and_rollback_append"
+    },
+    {
+      "id": "D2-NC-010",
+      "attack": "Convert a proposal into an observed mutation",
+      "expected": "proposal_never_mutates_facts"
+    }
+  ],
+  "claim_ceiling": "Synthetic design fixture only. It does not authenticate source observations, actor availability, Git objects, timestamps, ledger completeness, authority, CI, or runtime outcomes. Expected states are hand-derived known answers, not an executed implementation result."
+}
