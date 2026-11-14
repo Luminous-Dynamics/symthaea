@@ -1019,7 +1019,6 @@ mod tests {
             None,
             Vec::new(),
         );
-        forbidden.unit = Some("bpm".to_owned());
         e.forbidden_changes.push(forbidden);
         let mut o = observations(&e, CANDIDATE);
         o.push(MusicEditValidityObservationV1 {
