@@ -388,7 +388,7 @@ Report confidence intervals, per-relation/task-family breakdowns, cost, latency,
 
 A standalone Rust crate has been authored at `tools/development-map-validator/`. It is deliberately outside the root workspace, has its own Cargo workspace, reads one JSON file, and never follows source URLs or executes repository commands. Its current contract checks include graph references, provenance/lifecycle shape, evidence invalidation/supersession, authority promotion, event targets, containment cycles, and decision-time evidence availability. It uses RFC 3339 timestamp parsing for decision-time comparisons.
 
-The crate now contains 41 authored unit-test cases across map snapshots, decision-time authority, development-trajectory planning and federation manifests. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
+The crate now contains 50 authored unit-test cases across map snapshots, decision-time authority, development-trajectory planning, fixed-budget retrieval/exploration and federation manifests. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
 
 A second public known-answer fixture now exists:
 
@@ -439,6 +439,28 @@ A public synthetic known-answer case is authored at:
 It uses the actual pinned Symthaea/Mycelix map and schema identities but retains the shared contract as `contract_versioned_unqualified`, with no two-sided conformance receipt. The expected plan is evidence-first: exact pin audit, owner contract review, then conformance-fixture design; implementation remains blocked. Broad source scanning is over budget and does not close the critical contract gap; an unrelated physics benchmark is dominated; defer is a valid fallback if owner evidence is unavailable.
 
 The case is synthetic. Its effort units are not real engineering estimates, and it does not assert integration success, owner approval, execution authority or implementation.
+
+### Fixed-budget retrieval and exploration — DYNRETR-001
+
+The retrieval/exploration lane now has its own child under CEB: [DYNRETR-001 #12080](https://github.com/Luminous-Dynamics/symthaea/issues/12080), composed with [CEB intelligence #10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419), [repository-twin #10173](https://github.com/Luminous-Dynamics/symthaea/issues/10173), and [judge/oracle qualification #11772](https://github.com/Luminous-Dynamics/symthaea/issues/11772). It does not introduce a new task, receipt, retrieval engine or evaluator platform.
+
+Public synthetic corpus and oracle:
+- `docs/development-map/fixtures/retrieval-exploration-v0.1.schema.json`
+- `docs/development-map/fixtures/retrieval-exploration-v0.1.json`
+- `docs/development-map/fixtures/retrieval-exploration-v0.1.expected.json`
+
+The corpus has seven cases and eight negative controls:
+1. positive contract/type/test retrieval;
+2. natural no-gold (requested protobuf migration adapter absent);
+3. wrong-repository counterfactual no-gold, scored separately;
+4. inactive feature/configuration decoy;
+5. stale-revision evidence;
+6. non-local change impact across caller, test and feature manifest;
+7. lexical UI decoys versus cryptographic primitive and invariant test.
+
+Each case now pins its own repository revision and tree; candidate regions bind exact source revisions, line spans, token estimates, authority and availability. The validator checks that available/inactive evidence belongs to that exact case revision, stale evidence differs from it, and feature requirements agree with the case's configuration world. Natural no-gold must abstain; lexical resemblance is not evidence.
+
+The synthetic fixture and expected oracle were parsed and inspected statically. This does not measure a retrieval system, validate actual tokenizer costs, reproduce Agent Retrieval Bench or SWE-Explore, or establish downstream repair gains. The Rust validator adds five authored retrieval tests for local shape, oracle shape, no-gold separation, config/temporal decoys, per-case revision/world isolation and oracle overlap.
 
 ### Four-repository adoption and federated directory — 2026-11-14
 
