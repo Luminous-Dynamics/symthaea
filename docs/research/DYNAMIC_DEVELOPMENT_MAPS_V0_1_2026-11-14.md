@@ -62,6 +62,24 @@ These limitations matter as much as the headline results:
 
 The differentiating research hypotheses are therefore: deterministic and auditable multi-source reconciliation; bitemporal evidence validity; explicit capability/requirement-to-proof traceability; prospective and retrospective cross-domain impact; incremental updates that converge exactly with clean rebuilds; and experimentally calibrated development planning. Each is an independent benchmark claim and must be evaluated separately.
 
+### Retrieval and repository exploration deserve a first-class lane
+
+Two 2026 benchmarks show why a graph's usefulness must be measured at the context budget actually available to an agent:
+
+- **Agent Retrieval Bench (July 2026)** evaluates 427 workflow-derived samples across 25 repositories, with 345 positive cases and 82 no-gold cases over 308 frozen base-commit snapshots, 392,000 files and 7.9 million chunks. The four positive tasks are code2test, comment2context, trace2code and edit2ripple. Its current weighted results show Qwen3-Embedding-4B leading MRR at 0.2379, Qwen3-Embedding-8B leading Recall@20 at 0.7029, and RepoMap leading 8K-token budgeted context yield (BCY@8k) at 0.3788. Rankings vary by task and repository weighting; the natural no-gold abstention results expose a real calibration problem. Source: https://arxiv.org/abs/2607.24882 and https://agent-retrieval-bench.github.io/
+- **SWE-Explore (June 2026)** measures ranked code-region retrieval under a fixed line budget across 848 issues, 10 languages and 203 repositories. It derives line-level ground truth from successful agent trajectories and links exploration metrics to downstream repair. In its K=5 comparison, CoSIL reports non-oracle line recall of 0.788 and F1 of 0.602, while general coding agents' line recall is around 0.14–0.19 despite much stronger file-hit rates. Context Efficiency and Recall@100 correlate strongly with downstream resolve rate. Source: https://arxiv.org/abs/2606.07297
+
+This suggests a further paradigm shift: **the graph should not only describe a repository; it should actively guide evidence-efficient exploration.** EGDDM's retrieval lane should use typed graph expansion, change history, ownership and evidence scope to select the next useful source spans, while retaining lexical and embedding retrieval as complementary signals.
+
+A promising hybrid is:
+1. deterministic structural/semantic seed selection (exports, reverse dependencies, tests, changed symbols, owners);
+2. query-aware lexical/embedding ranking for semantically relevant context;
+3. temporal and configuration-world filters to reject irrelevant historical or inactive facts;
+4. evidence/authority filters to prevent an unqualified declaration from being presented as a verified result;
+5. budget-aware region packing with explicit abstention when the repository or available evidence cannot answer the task.
+
+The target is not "more context." It is greater **useful evidence yield per token/line**, with lower missed-critical-context and false-context rates.
+
 ## 2. Existing Luminous ownership — compose, do not duplicate
 
 The Symthaea repository already has foundational work:
@@ -272,6 +290,7 @@ DynaMapBench is a proposed evaluation profile, not a new task/receipt/evaluator 
 | Track | Main question | Primary measures |
 |---|---|---|
 | Structure | Is the graph correct? | Per-relation precision/recall/F1; symbol retrieval Recall@k; source-span accuracy |
+| Retrieval / exploration | Does the map surface the next useful evidence under a fixed budget? | File/region/line precision-recall; MRR/nDCG; Recall@k; context yield at 8K tokens and fixed line budgets; natural no-gold selective success; downstream repair effect |
 | Temporal backward | Can the system reconstruct why the repository is in this state? | First-bad-commit top-1/top-3; regression cause precision; supersession accuracy |
 | Temporal forward | Can it forecast consequences before editing? | Affected-component/test/interface Recall@k and precision; critical-impact false negatives |
 | Invalidation | Does change invalidate the right facts? | Stale-fact rate/lifetime; exact incremental vs clean-rebuild graph equivalence |
@@ -296,6 +315,9 @@ DynaMapBench is a proposed evaluation profile, not a new task/receipt/evaluator 
 9. Full EGDDM with intent, evidence, temporal and cross-repository layers.
 10. Same-model/same-tool matched ablations to isolate the contribution of each layer.
 11. Development-trajectory baselines: issue-priority/recency, dependency-only topological ordering, shortest-path planning, text-only LLM planning, EGDDM without evidence/federation, and full EGDDM under identical budgets. Reuse #8908's value-of-information outputs and #6206's usefulness/calibration/abstention measures; do not merge their scores into DynaMapBench.
+12. **Agent Retrieval Bench** on its exact frozen commits and official tokenizer/cost protocol: lexical/BM25, Qwen3-Embedding-4B/8B, RepoMap, and a structural+semantic EGDDM hybrid; report per-task MRR, Recall@20, BCY@8k and the natural versus counterfactual no-gold strata separately.
+13. **SWE-Explore** on the same K=5 region interface and fixed line budget: general agentic explorers, CoSIL, RepoMap-style retrieval, and EGDDM graph-guided exploration; report HitFile, HitRegion, line precision/recall/F1, nDCG@500, Context Efficiency, and restricted-context downstream resolution.
+14. **TEMPO/TEMPS** as separate temporal retrieval comparators: preserve official task/scoring and evaluate map-grounded temporal evidence retrieval as an additional track, not as an interchangeable repository benchmark.
 
 Use SWE-Time as an external temporal comparator when its public benchmark materials, task rules and license permit. Preserve the official SWE-Time scoring as a separate result; do not relabel a custom score as SWE-Time.
 
@@ -315,6 +337,7 @@ These are research hypotheses, not achieved results or industry standards:
 - Zero unsupported evidence promotion and zero unauthorized mutation in deterministic adversarial controls.
 - DTEA pilot: 100% detection of the explicitly planted future-evidence and unauthorized-source negative controls; ≥0.95 precision/recall on adjudicated decision-time admissibility labels, after calibration and power analysis; report decision correctness separately from evidence-admissibility correctness.
 - Federation pilot: 100% of exact artifact path/blob pins resolve at the pinned artifact commit; 100% separation of subject-source and map-artifact identity; zero independently-qualified edges without two-sided conformance evidence; missing or mismatched owner contracts remain unjoined/unknown; zero authority transfer.
+- Retrieval pilot: reproduce official Agent Retrieval Bench and SWE-Explore baselines first. On held-out repository families, target a statistically supported ≥5 percentage-point improvement in SWE-Explore line recall at the same K=5/line budget over the strongest matched non-oracle baseline, without >1 percentage-point precision regression; target ≥5% relative improvement in Agent Retrieval Bench BCY@8k over the strongest matched baseline on at least three of four positive task families. Preserve task-level, repository-macro and natural no-gold results; no pooling of wrong-repository counterfactuals into the natural no-gold primary score.
 
 Report confidence intervals, per-relation/task-family breakdowns, cost, latency, memory, human minutes and abstention. Do not publish one aggregate score that can hide a critical failure. Use repository-family/time-held-out splits and keep development, calibration and confirmatory answer custody separate.
 
@@ -363,7 +386,7 @@ Report confidence intervals, per-relation/task-family breakdowns, cost, latency,
 
 A standalone Rust crate has been authored at `tools/development-map-validator/`. It is deliberately outside the root workspace, has its own Cargo workspace, reads one JSON file, and never follows source URLs or executes repository commands. Its current contract checks include graph references, provenance/lifecycle shape, evidence invalidation/supersession, authority promotion, event targets, containment cycles, and decision-time evidence availability. It uses RFC 3339 timestamp parsing for decision-time comparisons.
 
-The crate now contains 30 authored unit-test cases across map-snapshot, decision-time authority and federation-manifest checks. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
+The crate now contains 41 authored unit-test cases across map snapshots, decision-time authority, development-trajectory planning and federation manifests. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
 
 A second public known-answer fixture now exists:
 
@@ -432,15 +455,15 @@ Project review tracks:
 - Symtropy: [#5134](https://github.com/Luminous-Dynamics/symtropy/pull/5134), tracked by [#5132](https://github.com/Luminous-Dynamics/symtropy/issues/5132)
 - Sol Atlas: [#792](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/792), tracked by [#791](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/791)
 
-The federation directory is `docs/development-map/federation-v0.1.json`, governed by `docs/development-map/federation-v0.1.schema.json`. It contains four pinned project members and nine source-declared / unqualified cross-project relationships. It pins, separately:
+The federation directory is `docs/development-map/federation-v0.1.json`, governed by `docs/development-map/federation-v0.1.schema.json`; the versioned successor is `docs/development-map/federation-v0.1.1.json`, governed by `federation-v0.1.1.schema.json`. The v0.1.1 directory contains four pinned project members and eleven source-declared / unqualified cross-project relationships. It pins, separately:
 1. each mapped project source revision and root tree;
 2. each map artifact path and blob OID;
 3. the branch commit and tree containing each exact map artifact;
 4. the exact provisional shared map-schema blob and the commit containing that schema.
 
-A runner-independent Git-tree check fetched each member's **exact artifact commit** and confirmed that the map path exists and its observed blob OID matches the manifest. All four exact map path/blob comparisons matched. The federation Rust validator adds local checks for unique member/repository/map identities, graph-independent relationship endpoints, source refs, exact artifact URLs, hub self-map identity, schema bindings and authority non-transfer. Its authored test cases remain uncompiled/unexecuted.
+A runner-independent Git-tree check fetched each member's **exact artifact commit** and confirmed that the map path exists and its observed blob OID matches the manifest. All four exact map path/blob comparisons matched. The federation Rust validator adds local checks for unique member/repository/map identities, graph-independent relationship endpoints, source refs, exact artifact URLs, hub self-map identity, schema bindings and authority non-transfer. Federation v0.1.1 additionally requires the shared-schema candidate to match the exact hub schema blob; an independently-qualified edge requires a two-sided receipt matching both pinned member revisions/trees, exact contract blob, verifier build, configuration-world digest and passing outcome. Three new negative-control tests exercise receipt omission, one-sided/mismatched pins and endpoint-source mismatch. All Rust test cases remain uncompiled/unexecuted.
 
-This is a **directory of independent maps, not a merged graph**. The nine current relationships are source-declared integration/role statements or contract-versioned-but-unqualified shared-schema candidates. No API compatibility, end-to-end runtime, data exchange or cross-project authority is inferred. Member maps keep their own owner-native authority and evidence; federation edges cannot grant governance, identity, financial, deployment, sensor or physical-actuation authority.
+This is a **directory of independent maps, not a merged graph**. The eleven current relationships are source-declared integration/role statements or contract-versioned-but-unqualified shared-schema candidates. No API compatibility, end-to-end runtime, data exchange or cross-project authority is inferred. Member maps keep their own owner-native authority and evidence; federation edges cannot grant governance, identity, financial, deployment, sensor or physical-actuation authority.
 
 
 ## 8. Runner-independent work and safety boundary
