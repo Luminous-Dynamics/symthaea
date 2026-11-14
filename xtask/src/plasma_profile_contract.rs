@@ -375,6 +375,52 @@ mod tests {
         assert_eq!(audit_profile(case).disposition, Disposition::Rejected);
     }
 
+    fn rehash(profile: &mut Profile) {
+        let bytes = serde_json::to_vec(&profile.content).expect("profile serializes");
+        profile.profile_sha256 = format!("{:x}", Sha256::digest(bytes));
+    }
+
+    #[test]
+    fn lap_shear_method_cannot_be_declared_as_failure_classification() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
+        let mut case = fixture.cases.into_iter().find(|case| case.id == "valid-pp-profile-without-classification").expect("case exists");
+        let role = &mut case.profile.content.claim_requirements[1].roles[0];
+        role.method_id = "ASTM_D3163".to_owned();
+        role.edition = "D3163-01R23".to_owned();
+        role.evidence_kind = "measurement".to_owned();
+        role.material_pair_class = "rigid_plastic_pair".to_owned();
+        role.geometry = "single_lap".to_owned();
+        role.endpoint = "apparent_shear_strength".to_owned();
+        role.requested_claim = "comparative_screening".to_owned();
+        rehash(&mut case.profile);
+        assert_eq!(audit_profile(&case).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn d5573_cannot_be_declared_for_non_smc_profile_even_before_evidence_arrives() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
+        let mut case = fixture.cases.into_iter().find(|case| case.id == "valid-pp-profile-without-classification").expect("case exists");
+        let role = &mut case.profile.content.claim_requirements[1].roles[0];
+        role.method_id = "ASTM_D5573".to_owned();
+        role.edition = "D5573-99R19".to_owned();
+        role.evidence_kind = "classification_practice".to_owned();
+        role.material_pair_class = "frp_smc_joint".to_owned();
+        role.geometry = "failure_surface_classification".to_owned();
+        role.endpoint = "frp_joint_failure_mode_classification".to_owned();
+        role.requested_claim = "failure_mode_classification_reference".to_owned();
+        rehash(&mut case.profile);
+        assert_eq!(audit_profile(&case).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn unknown_claim_family_is_rejected() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
+        let mut case = fixture.cases.into_iter().find(|case| case.id == "valid-pp-profile-without-classification").expect("case exists");
+        case.profile.content.claim_requirements[0].claim_family = "quality_score".to_owned();
+        rehash(&mut case.profile);
+        assert_eq!(audit_profile(&case).disposition, Disposition::Rejected);
+    }
+
     #[test]
     fn aged_strength_requires_same_specimen_cohort_for_conditioning_and_measurement() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
