@@ -187,3 +187,12 @@ The runner pins the stable TLA+ tools v1.7.4 release using the upstream-publishe
 Added public CHECKPOINT_CHAIN.md, a Draft 2020-12 JSON schema and a synthetic cross-language test vector publishing exact canonical signing bytes, public key, signature hex/base64 and envelope digest. The v1 contract uses Ed25519 over a fixed domain-separated binary encoding, links each checkpoint to the previous signed envelope and requires an external monotonic consumer cursor to reject rollback/forks.
 
 The Go verifier and its 16 test functions are in the separate local companion package, not the public PR diff. It validates signature, database/key identity, sequence continuity, predecessor, journal-head progress, issue-time monotonicity, exact replay and malformed trust state. It does not run a witness service, protect private keys, persist the trusted cursor or solve key rotation/quorum/split-view detection. No E3/E4 deployment claim is made.
+
+
+## 14 November 2026 — signed checkpoint verifier promoted to public branch
+
+The standard-library Go Ed25519 checkpoint verifier is now committed under `checkpoints/`, along with 16 focused tests, README and a package-local copy of the published synthetic interoperability vector. It implements the fixed domain-separated binary signing representation, detached signature verification, envelope digest, bootstrap identity binding and monotonic `AcceptNext` rules. The public root `verify.sh` now runs the package under default/race/vet checks, builds all three public CLIs, and conditionally invokes TLC only when a pinned v1.7.4 JAR is supplied.
+
+Local verification of the assembled v0.8 companion source after aligning the public package contents: focused checkpoint tests, focused checkpoint race test and vet passed; full `bash verify.sh` passed, including default and SQLite-tagged suites/race/vet/build legs. The local companion has 68 named test functions in the default build and 90 with the optional SQLite tag. Those aggregate counts and SQLite-tagged results describe the local companion, not the exact public checkout; the public PR now includes the 16-test checkpoint package and the updated public verifier script.
+
+The public verifier is a building block, not a deployed witness. It does not provision or custody production keys, protect its own trusted cursor, operate a quorum/transparency log, provide split-view gossip, or prove downstream effect occurrence. TLC remains pending unless the pinned runner is executed and its state counts/results are archived.
