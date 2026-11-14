@@ -109,3 +109,15 @@ The MACE client must not mint authority, and the destination must not trust call
 ## Claim ceiling
 
 The local JSONL service models the business effect as the journal commit. The optional SQLite backend additionally commits a separate business row and effect/fence receipt in one SQLite transaction. Both are local reference fixtures. Neither is a third-party payment/service/database integration, remote attestation, power-loss hardware qualification, multi-host consensus system, or an independent physical observer.
+
+
+## Bounded model-check profile
+
+The public reference tests now include two complementary bounded analyses:
+
+1. A history-based linearizability checker records invocation/return order for concurrent append, fence, lookup and changed-intent operations, then searches for a sequential history that respects real-time precedence.
+2. A finite-state explorer enumerates a two-intent destination model with delayed delivery, effect/fence serialization, receipt/business-row transaction staging, atomic commit, rollback/crash-before-commit and reconciliation.
+
+The current abstract model reaches 68 states and 200 transitions (maximum shortest trace depth 7) without finding a registered safety counterexample. The model invariants are deliberately narrow: effect implies receipt plus business row; fence implies receipt and no business row; a terminal decision is immutable; and unfenced absence remains indeterminate.
+
+This is a finite abstraction, not a proof of the implementation or the unbounded distributed protocol. The next tier should model-check the protocol in TLA+/PlusCal and check implementation histories using an independent checker such as [Porcupine](https://github.com/anishathalye/porcupine). TLA+ tooling separates explicit-state exploration from symbolic bounded checking; [Apalache's manual](https://apalache-mc.org/docs/apalache/index.html) documents the latter's finite-parameter/bounded-execution assumptions. Do not represent either tool as having been run until a pinned version, model configuration and reproducible artifact are published.
