@@ -4260,10 +4260,11 @@ impl U1TeBDStrangStepper {
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsErrorBudgetFractions,
-        U1MpsErrorBudgetPlan, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
-        U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
-        U1TeBDStrangStepper, U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate,
-        U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        U1MpsErrorBudgetPlan, U1MpsObservableErrorTarget, U1MpsTensor,
+        U1MpsTruncationLedger, U1TeBDGate, U1TeBDGateReceipt,
+        U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult, U1TeBDStrangStepper,
+        U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
+        U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
@@ -6434,6 +6435,172 @@ mod tests {
             ),
             Err(U1MpsError::InvalidErrorBudget)
         );
+    }
+
+
+    fn entangled_single_excitation_two_site_state() -> ComplexU1Mps {
+        let inverse_root_two = 1.0 / 2.0_f64.sqrt();
+        let left = U1MpsTensor::new(
+            vec![0],
+            vec![0, 1],
+            vec![
+                Complex64::new(inverse_root_two, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(inverse_root_two, 0.0),
+            ],
+        )
+        .unwrap();
+        let right = U1MpsTensor::new(
+            vec![0, 1],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+        )
+        .unwrap();
+        ComplexU1Mps::new(vec![left, right], 1, 1.0e-12).unwrap()
+    }
+
+    fn truncating_entangled_pair_layer() -> super::U1TeBDLayerResult {
+        let input = entangled_single_excitation_two_site_state();
+        let layer = U1TeBDLayer::new(
+            2,
+            0,
+            vec![U1TeBDGate::new(0, U1TwoSiteGate::identity())],
+        )
+        .unwrap();
+        layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn observable_target_compiles_state_l2_budget_from_operator_norm() {
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 1.3,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let budget = target
+            .compile_state_l2_error_budget(0.5_f64.sqrt())
+            .unwrap()
+            .unwrap();
+        assert!((budget - 1.3 / (1.0 + 0.5_f64.sqrt())).abs() <= 1.0e-12);
+
+        let zero_observable = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 0.0,
+            observable_operator_norm_upper_bound: 0.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        assert_eq!(
+            zero_observable
+                .compile_state_l2_error_budget(1.0)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn observable_certificate_uses_qualified_global_bound_and_reports_expectation_interval() {
+        let result = truncating_entangled_pair_layer();
+        assert!(result.global_l2_bound_qualified);
+        assert!((result.output_norm_squared - 0.5).abs() <= 1.0e-12);
+
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 1.3,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let receipt = target
+            .certify(&result.truncation_ledger, result.output_norm_squared)
+            .unwrap();
+        assert!(receipt.global_state_l2_error_bound >= 0.7);
+        assert!(receipt.expectation_error_upper_bound <= 1.3);
+        assert!(receipt.budget_satisfied);
+        assert!((receipt.compiled_state_l2_error_budget.unwrap()
+            - 1.3 / (1.0 + 0.5_f64.sqrt()))
+            .abs()
+            <= 1.0e-12);
+    }
+
+    #[test]
+    fn observable_certificate_marks_too_strict_expectation_target_unsatisfied() {
+        let result = truncating_entangled_pair_layer();
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 1.0,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let receipt = target
+            .certify(&result.truncation_ledger, result.output_norm_squared)
+            .unwrap();
+        assert!(receipt.expectation_error_upper_bound > 1.0);
+        assert!(!receipt.budget_satisfied);
+    }
+
+    #[test]
+    fn observable_certificate_rejects_unqualified_global_state_error_ledger() {
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 0.1,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        assert_eq!(
+            target.certify(&U1MpsTruncationLedger::default(), 1.0),
+            Err(U1MpsError::GlobalErrorBoundNotQualified)
+        );
+    }
+
+    #[test]
+    fn zero_operator_observable_is_exact_even_without_global_state_error_receipt() {
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 0.0,
+            observable_operator_norm_upper_bound: 0.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let receipt = target
+            .certify(&U1MpsTruncationLedger::default(), 0.7)
+            .unwrap();
+        assert_eq!(receipt.expectation_error_upper_bound, 0.0);
+        assert!(receipt.budget_satisfied);
+        assert_eq!(receipt.compiled_state_l2_error_budget, None);
+    }
+
+    #[test]
+    fn observable_target_rejects_nonfinite_or_negative_inputs() {
+        for target in [
+            U1MpsObservableErrorTarget {
+                maximum_expectation_error: -0.1,
+                observable_operator_norm_upper_bound: 1.0,
+                exact_state_norm_upper_bound: 1.0,
+            },
+            U1MpsObservableErrorTarget {
+                maximum_expectation_error: 0.1,
+                observable_operator_norm_upper_bound: f64::NAN,
+                exact_state_norm_upper_bound: 1.0,
+            },
+            U1MpsObservableErrorTarget {
+                maximum_expectation_error: 0.1,
+                observable_operator_norm_upper_bound: 1.0,
+                exact_state_norm_upper_bound: f64::INFINITY,
+            },
+        ] {
+            assert_eq!(
+                target.compile_state_l2_error_budget(1.0),
+                Err(U1MpsError::InvalidErrorBudget)
+            );
+        }
     }
 
 }
