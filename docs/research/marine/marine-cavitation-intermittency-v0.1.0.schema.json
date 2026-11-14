@@ -1,0 +1,449 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json",
+  "title": "Marine cavitation intermittency audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "band",
+    "calibration_certificate_sha256",
+    "case_id",
+    "cavitation_calibration_or_validation_sha256",
+    "cavitation_instrument_id",
+    "cavitation_observation_method_id",
+    "environment_fingerprint_sha256",
+    "evidence_kind",
+    "hydrophone_instrument_id",
+    "maximum_sync_alignment_uncertainty_s",
+    "minimum_runs",
+    "minimum_usable_windows_per_run",
+    "operating_condition_id",
+    "reference_run_id",
+    "runs",
+    "schema_version",
+    "service_fingerprint_sha256",
+    "source",
+    "window_duration_s"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "operating_condition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "hydrophone_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_certificate_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "band": {
+      "$ref": "#/$defs/band"
+    },
+    "window_duration_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "minimum_usable_windows_per_run": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_runs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "cavitation_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cavitation_observation_method_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cavitation_calibration_or_validation_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "maximum_sync_alignment_uncertainty_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "reference_run_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "quantity_id",
+        "center_frequency_hz"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_id": {
+          "const": "received_spl_db_re_1upa"
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acoustic_cavitation_sync_receipt_sha256",
+        "background_method",
+        "background_trace_sha256",
+        "calibration_certificate_sha256",
+        "environment_fingerprint_sha256",
+        "hydrophone_instrument_id",
+        "operating_point_receipt_sha256",
+        "run_id",
+        "service_fingerprint_sha256",
+        "timebase_receipt_sha256",
+        "water_condition",
+        "windows"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "background_method": {
+          "enum": [
+            "bare_hub",
+            "pressure_suppressed",
+            "unknown"
+          ]
+        },
+        "background_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "windows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/window"
+          }
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "water_condition": {
+          "$ref": "#/$defs/waterCondition"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "acoustic_cavitation_sync_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acoustic_cavitation_alignment_expanded_uncertainty_s",
+        "acoustic_cavitation_alignment_offset_s",
+        "acoustic_trace_sha256",
+        "background_expanded_uncertainty_db",
+        "background_spl_db",
+        "cavitation_observation_sha256",
+        "cavitation_present",
+        "end_time_s",
+        "start_time_s",
+        "total_expanded_uncertainty_db",
+        "total_spl_db",
+        "window_id"
+      ],
+      "properties": {
+        "window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_time_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cavitation_observation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cavitation_present": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "total_spl_db": {
+          "type": "number"
+        },
+        "background_spl_db": {
+          "type": "number"
+        },
+        "total_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "background_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_cavitation_alignment_offset_s": {
+          "type": "number"
+        },
+        "acoustic_cavitation_alignment_expanded_uncertainty_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "waterCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measure",
+        "value",
+        "unit",
+        "expanded_uncertainty",
+        "equivalence_tolerance",
+        "method_id",
+        "instrument_id",
+        "calibration_certificate_sha256",
+        "evidence_sha256",
+        "nuclei_distribution"
+      ],
+      "properties": {
+        "measure": {
+          "enum": [
+            "total_gas_content",
+            "cavitation_susceptibility_alpha"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "equivalence_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "nuclei_distribution": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/nucleiDistribution"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "nucleiDistribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bins",
+        "calibration_certificate_sha256",
+        "evidence_sha256",
+        "expanded_uncertainty_confidence_level",
+        "instrument_id",
+        "measurement_id",
+        "method_id",
+        "number_concentration_equivalence_tolerance_per_ml",
+        "sample_volume_ml",
+        "wasserstein1_equivalence_tolerance_um"
+      ],
+      "properties": {
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_volume_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "number_concentration_equivalence_tolerance_per_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wasserstein1_equivalence_tolerance_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bins": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/nucleiBin"
+          }
+        },
+        "expanded_uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "nucleiBin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diameter_lower_um",
+        "diameter_upper_um",
+        "number_concentration_per_ml",
+        "expanded_uncertainty_per_ml"
+      ],
+      "properties": {
+        "diameter_lower_um": {
+          "type": "number",
+          "minimum": 0
+        },
+        "diameter_upper_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "number_concentration_per_ml": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expanded_uncertainty_per_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}
