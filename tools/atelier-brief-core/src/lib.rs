@@ -88,7 +88,11 @@ pub fn validate_brief(brief: &DesignBrief) -> Vec<ValidationIssue> {
         ));
     }
 
-    check_unique_ids(brief.hard_constraints.iter().map(|v| v.id.as_str()), "hard_constraints", &mut issues);
+    check_unique_ids(
+        brief.hard_constraints.iter().map(|v| v.id.as_str()),
+        "hard_constraints",
+        &mut issues,
+    );
     check_unique_ids(brief.objectives.iter().map(|v| v.id.as_str()), "objectives", &mut issues);
     check_unique_ids(
         brief.suggestion_decisions.iter().map(|v| v.id.as_str()),
@@ -99,15 +103,21 @@ pub fn validate_brief(brief: &DesignBrief) -> Vec<ValidationIssue> {
     for (index, constraint) in brief.hard_constraints.iter().enumerate() {
         if constraint.id.trim().is_empty() {
             issues.push(ValidationIssue::new(
-                "empty_constraint_id", format!("hard_constraints[{index}].id"), "constraint id must be non-empty",
+                "empty_constraint_id",
+                format!("hard_constraints[{index}].id"),
+                "constraint id must be non-empty",
             ));
         }
         if constraint.field.trim().is_empty() {
             issues.push(ValidationIssue::new(
-                "empty_constraint_field", format!("hard_constraints[{index}].field"), "field must be non-empty",
+                "empty_constraint_field",
+                format!("hard_constraints[{index}].field"),
+                "field must be non-empty",
             ));
         }
-        if let ConstraintRule::Minimum { unit, .. } | ConstraintRule::Maximum { unit, .. } = &constraint.rule {
+        if let ConstraintRule::Minimum { unit, .. }
+        | ConstraintRule::Maximum { unit, .. } = &constraint.rule
+        {
             if unit.trim().is_empty() {
                 issues.push(ValidationIssue::new(
                     "empty_constraint_unit", format!("hard_constraints[{index}].rule"),
@@ -120,7 +130,9 @@ pub fn validate_brief(brief: &DesignBrief) -> Vec<ValidationIssue> {
     for (index, objective) in brief.objectives.iter().enumerate() {
         if objective.id.trim().is_empty() {
             issues.push(ValidationIssue::new(
-                "empty_objective_id", format!("objectives[{index}].id"), "objective id must be non-empty",
+                "empty_objective_id",
+                format!("objectives[{index}].id"),
+                "objective id must be non-empty",
             ));
         }
         if objective.weight_bps > 10_000 {
@@ -132,7 +144,9 @@ pub fn validate_brief(brief: &DesignBrief) -> Vec<ValidationIssue> {
     }
     if brief.objectives.iter().all(|v| v.weight_bps == 0) {
         issues.push(ValidationIssue::new(
-            "no_active_objective", "objectives", "at least one objective must have a positive weight",
+            "no_active_objective",
+            "objectives",
+            "at least one objective must have a positive weight",
         ));
     }
 
@@ -181,7 +195,10 @@ fn check_unique_ids<'a>(
     }
 }
 
-fn validate_constraint_consistency(constraints: &[HardConstraint], issues: &mut Vec<ValidationIssue>) {
+fn validate_constraint_consistency(
+    constraints: &[HardConstraint],
+    issues: &mut Vec<ValidationIssue>,
+) {
     let mut by_field: BTreeMap<&str, Vec<&ConstraintRule>> = BTreeMap::new();
     for constraint in constraints {
         by_field.entry(constraint.field.as_str()).or_default().push(&constraint.rule);
@@ -284,7 +301,8 @@ pub fn evaluate_handoff(
         let id = observation.constraint_id.as_str();
         if !known.contains(id) {
             invalid.push(ValidationIssue::new(
-                "observation_for_unknown_constraint", format!("observations[{index}].constraint_id"),
+                "observation_for_unknown_constraint",
+                format!("observations[{index}].constraint_id"),
                 format!("`{id}` is not declared by this brief"),
             ));
         } else if !seen.insert(id) {
@@ -454,7 +472,10 @@ mod tests {
                 evidence_ref: Some("fixture:pass-2".to_owned()),
             },
         ];
-        assert_eq!(evaluate_handoff(&brief, &observations), ReleaseDisposition::ReadyForEngineeringHandoff);
+        assert_eq!(
+            evaluate_handoff(&brief, &observations),
+            ReleaseDisposition::ReadyForEngineeringHandoff
+        );
     }
 
     #[test]
@@ -472,7 +493,10 @@ mod tests {
                 evidence_ref: Some("fixture:duplicate".to_owned()),
             },
         ];
-        assert!(matches!(evaluate_handoff(&brief, &observations), ReleaseDisposition::Invalid { .. }));
+        assert!(matches!(
+            evaluate_handoff(&brief, &observations),
+            ReleaseDisposition::Invalid { .. }
+        ));
     }
 
     #[test]
