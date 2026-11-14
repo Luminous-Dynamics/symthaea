@@ -918,6 +918,10 @@ pub fn evaluate_event_order(
                 event.kind == DecisionEventKind::CancellationRequested
                     && event.operation_id.as_deref() == Some(operation_id.as_str())
             });
+            let has_unknown_outcome = events.iter().any(|event| {
+                event.kind == DecisionEventKind::OperationOutcomeUnknown
+                    && event.operation_id.as_deref() == Some(operation_id.as_str())
+            });
             if has_cancel_ack {
                 reasons.insert(format!("CANCELLATION_ACK_NOT_FINAL:{operation_id}"));
             } else if has_cancel_request {
@@ -925,8 +929,28 @@ pub fn evaluate_event_order(
             } else {
                 reasons.insert(format!("OPERATION_OUTCOME_UNRECONCILED:{operation_id}"));
             }
+            if has_unknown_outcome {
+                reasons.insert(format!("OPERATION_OUTCOME_UNKNOWN:{operation_id}"));
+            }
             continue;
         };
+
+        for unknown_event in events.iter().filter(|event| {
+            event.kind == DecisionEventKind::OperationOutcomeUnknown
+                && event.operation_id.as_deref() == Some(operation_id.as_str())
+        }) {
+            match compare_decision_events(unknown_event, outcome_event, &by_id, qualification) {
+                EventOrder::Before => {}
+                EventOrder::After | EventOrder::Inconsistent => {
+                    critical_failure = true;
+                    reasons.insert(format!("OUTCOME_RECONCILIATION_PRECEDES_UNKNOWN:{operation_id}"));
+                }
+                EventOrder::Overlapping | EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!("OUTCOME_RECONCILIATION_ORDER_UNRESOLVED:{operation_id}"));
+                }
+            }
+        }
 
         let operation_effects = effects_by_operation.get(operation_id);
         match outcome {
