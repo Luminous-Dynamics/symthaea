@@ -44,7 +44,33 @@ Public documentation:
 
 A fair comparison must configure each product competently and score only capabilities that belong to its intended scope. A discussion platform should not be marked as failing to verify a physical transfer; it should be marked out of scope for that measure.
 
-## 4. Current research says not to trust the easy scores
+## 4. Family-office technology baseline: integrate, do not displace
+
+The family-office market has its own mature platform categories. A general “private family office operating system” claim would be difficult to defend:
+
+| Platform/category | Publicly documented position | Luminous implication |
+|---|---|---|
+| Addepar | Consolidated multi-custodian and alternative-asset data, complex legal-entity mapping, portfolio analysis, granular permissioning and APIs | Do not compete on wealth aggregation, look-through exposure or investment reporting |
+| Masttro | Whole-family-office visibility across asset classes and entities, data feeds, reporting and AI-powered intelligence | Do not claim to be the unified wealth data platform |
+| Eton Solutions / AtlasFive | Broad integrated family-office ERP / operational platform | Do not reproduce general ledger, accounting, billing or office administration |
+| Specialist collection systems / custodians | Collection records, loans, custody, conservation and provenance within their respective domains | Preserve domain-native records and evidence ownership |
+| Legal, tax and cybersecurity specialists | Jurisdiction-specific advice and specialist services often delivered outside the office | Support evidence and workflow coordination; do not claim to replace professional advice |
+
+Vendor pages:
+- Addepar family office platform: https://addepar.com/family-office-software
+- Masttro family office platform: https://masttro.com/family-office-software
+- Eton Solutions: https://eton-solutions.com/
+
+Market research suggests a buy-and-integrate posture:
+- Citi's 2026 *AI in the Family Office* research says most family offices prefer readily available software over building their own AI tools. The report notes that some offices set a high acceptance threshold (e.g. 80%+ efficiency gain) before adopting custom AI development and describes modular tools as a way to solve one problem at a time. https://www.citigroup.com/rcs/citigpa/storage/public/ai_in_the_family_office.pdf
+- UBS's 2026 Global Family Office Report says strategic asset allocation (86%), portfolio risk management (80%) and financial reporting (75%) are commonly handled in-house; legal services (75% outsourced) and cybersecurity (52% outsourced) are more commonly sourced externally. Succession planning and art/collection work are often handled internally by offices preparing for these responsibilities. https://www.ubs.com/content/dam/assets/wm/static/gfo/global-family-office-report-en-2026.pdf
+- PwC's 2026 Family Office Survey describes technology use for asset aggregation, accounting, cost monitoring, asset allocation and reporting on illiquid assets, while noting preference for third-party software. https://www.pwc.com/it/it/publications/family-office/docs/2026-report-family-office-survey-en.pdf
+
+**Strategic implication:** enter through a narrowly bounded capability that complements the existing family-office stack: source/claim separation for complex non-financial assets, evidence-backed governance and approval reconstruction, succession/provider continuity, confidential cross-system requirements intake, and estate/infrastructure resilience. Let Addepar/Masttro/ERP/accounting systems remain the source of truth for the financial functions they already perform well.
+
+Do not promise an 80% efficiency gain. Treat the Citi observation as a market adoption signal, then measure each pilot's actual time, error and review burden against the family's current workflow.
+
+## 5. Current research says not to trust the easy scores
 
 Recent studies provide important warnings:
 
@@ -56,7 +82,7 @@ Recent studies provide important warnings:
 
 Implication: do not optimize for BLEU-like similarity, fluent prose, an LLM judge score, raw requirement count or one-shot acceptance rate. Optimize for adjudicated completeness, source fidelity, modality fidelity, correct uncertainty, traceability, change impact and lower human rework without increasing critical defects.
 
-## 5. Differentiation hypotheses worth testing
+## 6. Differentiation hypotheses worth testing
 
 ### H1 — Source-grounded intent, not prompt-only drafting
 
@@ -90,7 +116,7 @@ When the brief is incomplete, rank clarifications or source requests by expected
 
 Test contradictory principals, malicious or mistaken insiders, stale authority, compromised providers, colluding vendors, source disagreement, conflicting jurisdictions, emergency exceptions, partial outage and attempted coercive recovery.
 
-## 6. Benchmark protocol
+## 7. Benchmark protocol
 
 ### 6.1 Arms
 
@@ -147,7 +173,7 @@ A tool can perform well in Contest 1 and poorly in Contest 2. Do not combine the
 
 Report confidence intervals, per-domain distributions, denominators and critical-error counts. An aggregate score cannot compensate for a critical false-clear.
 
-## 7. Target ladder (prospective, not achieved)
+## 8. Target ladder (prospective, not achieved)
 
 ### P0 — safety semantics
 
@@ -176,7 +202,7 @@ Report confidence intervals, per-domain distributions, denominators and critical
 
 These are stretch targets. Freeze and preregister exact definitions before held-out evaluation. Do not tune thresholds after seeing the holdout.
 
-## 8. How to win without trying to replace incumbents
+## 9. How to win without trying to replace incumbents
 
 1. **Integrate with DOORS Next, Polarion and Jama.** Send accepted, human-reviewed requirements and evidence references to the customer’s chosen system of record; retrieve status and change events through supported APIs or exports.
 2. **Own the difficult intake boundary.** Focus on complex, multi-stakeholder briefs where obligations span different systems, entities, jurisdictions and asset domains.
@@ -187,7 +213,7 @@ These are stretch targets. Freeze and preregister exact definitions before held-
 
 The wedge is not “better requirements software.” It is a verified bridge from messy institutional intent to an existing engineering/governance/asset ecosystem.
 
-## 9. Immediate engineering priorities
+## 10. Immediate engineering priorities
 
 1. Finish the standalone strict Rust manifest validator; treat its current status as authored source/tests until exact-head compile and test evidence exists.
 2. Add a frozen 20-case known-answer/adversarial corpus and an independently implemented reference evaluator.
@@ -196,7 +222,7 @@ The wedge is not “better requirements software.” It is a verified bridge fro
 5. Add a benchmark runner that measures semantic-quality metrics using adjudicated human labels rather than calling the production validator as its own oracle.
 6. Define ReqIF and API adapter experiments only after the static requirement contract and privacy boundary stabilize.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 The v0.1 validator only checks structural consistency of the supplied manifest. It cannot establish that a requirement is complete, true, feasible, legally valid, safe, authorised, or an accurate interpretation of customer intent.
 
