@@ -47,12 +47,12 @@ pub(super) struct PowerReceipt {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(super) struct EquivalenceAnalysisResult {
-    result_id: String,
-    result_sha256: String,
-    design_id: String,
-    plan_sha256: String,
-    endpoint_id: String,
-    analysis_profile: String,
+    pub(super) result_id: String,
+    pub(super) result_sha256: String,
+    pub(super) design_id: String,
+    pub(super) plan_sha256: String,
+    pub(super) endpoint_id: String,
+    pub(super) analysis_profile: String,
     margin_lower: f64,
     margin_upper: f64,
     alpha: f64,
@@ -71,7 +71,7 @@ pub(super) struct EquivalenceAnalysisResult {
 #[serde(deny_unknown_fields)]
 pub(super) struct EquivalenceDesignReceipt {
     pub(super) design_id: String,
-    plan_sha256: String,
+    pub(super) plan_sha256: String,
     pub(super) endpoint_id: String,
     #[serde(default)]
     pub(super) endpoint_transform_id: Option<String>,
@@ -83,7 +83,7 @@ pub(super) struct EquivalenceDesignReceipt {
     pub(super) receipt_sha256: Option<String>,
     estimand: String,
     quantity_unit: String,
-    analysis_profile: String,
+    pub(super) analysis_profile: String,
     grouping_scheme: String,
     independent_unit: String,
     margin_lower: f64,
@@ -117,7 +117,7 @@ pub(super) struct EquivalenceDesignReceipt {
     sample_manifest_sha256: String,
     baseline_method_receipt: ScopeEvidence,
     candidate_method_receipt: ScopeEvidence,
-    analysis_result: EquivalenceAnalysisResult,
+    pub(super) analysis_result: EquivalenceAnalysisResult,
 }
 
 #[derive(Debug, Deserialize)]
