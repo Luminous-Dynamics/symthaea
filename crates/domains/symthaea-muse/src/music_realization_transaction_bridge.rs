@@ -61,9 +61,14 @@ pub enum MusicRealizerObservedDispositionV1 {
 #[serde(deny_unknown_fields)]
 pub struct MusicRealizerControlBindingV1 {
     pub control_id: String,
+    /// Commitment to this exact requested control in the frozen realization request.
+    pub request_control_sha256: String,
     pub requirement: MusicRealizerControlRequirementV1,
     pub declared_fidelity: MusicRealizerDeclaredFidelityV1,
-    /// Provider-reported observation, not independent proof of musical success.
+    /// Required for Bounded controls; commits the explicit permitted bound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fidelity_bound_sha256: Option<String>,
+    /// Provider/adapter-reported observation, not independent proof of musical success.
     pub observed_disposition: MusicRealizerObservedDispositionV1,
 }
 
@@ -164,6 +169,7 @@ pub enum MusicRealizationBridgeIssueV1 {
     NonCanonicalExecutionOrder,
     InvalidExecutionTransition,
     InvalidReconciliationBinding,
+    ProviderRequestIdentityMismatch,
     MissingIdempotencyKeyForRetry,
     SubmissionBudgetUnderCounted,
     ExecutionOutcomeMismatch,
@@ -253,6 +259,9 @@ fn validate_execution_events(
         if event.sequence != expected {
             issues.push(MusicRealizationBridgeIssueV1::NonCanonicalExecutionOrder);
         }
+        if !event.provider_request_id.as_deref().is_some_and(nonempty) {
+            issues.push(MusicRealizationBridgeIssueV1::ProviderRequestIdentityMismatch);
+        }
 
         match event.state {
             S::Submitted => {
@@ -271,6 +280,13 @@ fn validate_execution_events(
                 }
             }
             S::Completed => {
+                let matches_submission = index > 0
+                    && payload.execution_events[index - 1].state == S::Submitted
+                    && payload.execution_events[index - 1].provider_request_id
+                        == event.provider_request_id;
+                if !matches_submission {
+                    issues.push(MusicRealizationBridgeIssueV1::ProviderRequestIdentityMismatch);
+                }
                 if event.reconciles_sequence.is_some()
                     || event.reconciliation_receipt_sha256.is_some()
                     || event.reason_code.is_some()
@@ -279,6 +295,13 @@ fn validate_execution_events(
                 }
             }
             S::Failed | S::OutcomeUnknown => {
+                let matches_submission = index > 0
+                    && payload.execution_events[index - 1].state == S::Submitted
+                    && payload.execution_events[index - 1].provider_request_id
+                        == event.provider_request_id;
+                if !matches_submission {
+                    issues.push(MusicRealizationBridgeIssueV1::ProviderRequestIdentityMismatch);
+                }
                 if !event.reason_code.as_deref().is_some_and(nonempty)
                     || event.reconciles_sequence.is_some()
                     || event.reconciliation_receipt_sha256.is_some()
@@ -308,7 +331,11 @@ fn validate_execution_events(
                         .is_none_or(|reason| reason.trim().is_empty()),
                     _ => false,
                 };
+                let request_identity_matches = index > 0
+                    && payload.execution_events[index - 1].provider_request_id
+                        == event.provider_request_id;
                 if !previous_unknown
+                    || !request_identity_matches
                     || !reference.is_some_and(|sequence| unknown_sequences.contains(&sequence))
                     || !receipt_valid
                     || !reason_valid
@@ -386,6 +413,25 @@ fn validate_controls(
         }
         if !seen.insert(control.control_id.clone()) {
             issues.push(MusicRealizationBridgeIssueV1::DuplicateControl(
+                control.control_id.clone(),
+            ));
+        }
+        if !is_sha256(&control.request_control_sha256) {
+            issues.push(MusicRealizationBridgeIssueV1::InvalidControl(
+                control.control_id.clone(),
+            ));
+        }
+        if control.declared_fidelity == F::Bounded
+            && !control.fidelity_bound_sha256.as_deref().is_some_and(is_sha256)
+        {
+            issues.push(MusicRealizationBridgeIssueV1::InvalidControl(
+                control.control_id.clone(),
+            ));
+        }
+        if control.declared_fidelity != F::Bounded
+            && control.fidelity_bound_sha256.is_some()
+        {
+            issues.push(MusicRealizationBridgeIssueV1::InvalidControl(
                 control.control_id.clone(),
             ));
         }
@@ -850,8 +896,10 @@ mod tests {
         let mut receipt = completed_receipt(&tx, bytes);
         receipt.payload.controls.push(MusicRealizerControlBindingV1 {
             control_id: "preserve_melody_pitch".to_owned(),
+            request_control_sha256: d(61),
             requirement: MusicRealizerControlRequirementV1::Hard,
             declared_fidelity: MusicRealizerDeclaredFidelityV1::BestEffort,
+            fidelity_bound_sha256: None,
             observed_disposition: MusicRealizerObservedDispositionV1::BestEffort,
         });
         receipt.payload.controls.sort_by(|a, b| a.control_id.cmp(&b.control_id));
@@ -868,6 +916,79 @@ mod tests {
     }
 
     #[test]
+    fn bounded_hard_control_requires_a_bound_commitment() {
+        let bytes = b"candidate";
+        let output_sha = sha256_bytes(bytes);
+        let tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        let mut receipt = completed_receipt(&tx, bytes);
+        receipt.payload.controls.push(MusicRealizerControlBindingV1 {
+            control_id: "maximum_pitch_deviation".to_owned(),
+            request_control_sha256: d(63),
+            requirement: MusicRealizerControlRequirementV1::Hard,
+            declared_fidelity: MusicRealizerDeclaredFidelityV1::Bounded,
+            fidelity_bound_sha256: None,
+            observed_disposition: MusicRealizerObservedDispositionV1::Applied,
+        });
+        receipt.payload.controls.sort_by(|a, b| a.control_id.cmp(&b.control_id));
+        receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &receipt,
+            Some(bytes)
+        )
+        .unwrap_err()
+        .contains(&MusicRealizationBridgeIssueV1::InvalidControl(
+            "maximum_pitch_deviation".to_owned()
+        )));
+
+        let mut receipt = completed_receipt(&tx, bytes);
+        receipt.payload.controls.push(MusicRealizerControlBindingV1 {
+            control_id: "maximum_pitch_deviation".to_owned(),
+            request_control_sha256: d(63),
+            requirement: MusicRealizerControlRequirementV1::Hard,
+            declared_fidelity: MusicRealizerDeclaredFidelityV1::Bounded,
+            fidelity_bound_sha256: Some(d(64)),
+            observed_disposition: MusicRealizerObservedDispositionV1::Applied,
+        });
+        receipt.payload.controls.sort_by(|a, b| a.control_id.cmp(&b.control_id));
+        receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &receipt,
+            Some(bytes)
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn completion_cannot_be_bound_to_a_different_provider_request() {
+        let bytes = b"candidate";
+        let output_sha = sha256_bytes(bytes);
+        let tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        let mut receipt = completed_receipt(&tx, bytes);
+        receipt.payload.execution_events[1].provider_request_id =
+            Some("different-provider-request".to_owned());
+        receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &receipt,
+            Some(bytes)
+        )
+        .unwrap_err()
+        .contains(&MusicRealizationBridgeIssueV1::ProviderRequestIdentityMismatch));
+    }
+
+    #[test]
     fn best_effort_advisory_control_is_audited_but_not_a_hard_failure() {
         let bytes = b"candidate";
         let output_sha = sha256_bytes(bytes);
@@ -880,8 +1001,10 @@ mod tests {
         let mut receipt = completed_receipt(&tx, bytes);
         receipt.payload.controls.push(MusicRealizerControlBindingV1 {
             control_id: "suggest_sparse_texture".to_owned(),
+            request_control_sha256: d(62),
             requirement: MusicRealizerControlRequirementV1::Advisory,
             declared_fidelity: MusicRealizerDeclaredFidelityV1::BestEffort,
+            fidelity_bound_sha256: None,
             observed_disposition: MusicRealizerObservedDispositionV1::BestEffort,
         });
         receipt.payload.controls.sort_by(|a, b| a.control_id.cmp(&b.control_id));
