@@ -21,32 +21,19 @@ pub enum MusicXmlMeasureAdapterError {
     MalformedXml(String),
     EmptySourceId,
     EmptyScoreClockId,
-    InvalidDivisions {
-        value: i64,
-    },
-    InvalidDuration {
-        value: i64,
-    },
+    InvalidDivisions { value: i64 },
+    InvalidDuration { value: i64 },
     ArithmeticOverflow,
     MissingPartId,
-    UnsupportedRoot {
-        root: String,
-    },
+    UnsupportedRoot { root: String },
     NoParts,
-    UnsupportedPartMap {
-        part_id: String,
-    },
+    UnsupportedPartMap { part_id: String },
     PartClockMismatch,
     PartCanonicalizationMismatch,
     SamePartCompared,
-    DuplicatePartId {
-        id: String,
-    },
+    DuplicatePartId { id: String },
     PartMetadata(String),
-    ForeignNamespaceCoreElement {
-        element: String,
-        namespace: String,
-    },
+    ForeignNamespaceCoreElement { element: String, namespace: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -542,16 +529,10 @@ pub fn parse_musicxml_part_notation_graph(
                     });
                     start = end;
                 }
-                let barline_events = parse_barline_events_for_part(
-                    part,
-                    part_id,
-                    &measures,
-                    &spans,
-                )?;
-                let playback_controls =
-                    parse_playback_controls_for_part(part, part_id);
-                let notation_events =
-                    parse_musicxml_part_notation_events(part, part_id, &spans);
+                let barline_events =
+                    parse_barline_events_for_part(part, part_id, &measures, &spans)?;
+                let playback_controls = parse_playback_controls_for_part(part, part_id);
+                let notation_events = parse_musicxml_part_notation_events(part, part_id, &spans);
                 let map = MeasureMap {
                     source_id: format!("{source_id}#part={part_id}"),
                     score_clock_id: score_clock_id.to_string(),
@@ -663,8 +644,6 @@ pub fn validate_musicxml_notation_graph_replay(
     Ok(replayed == supplied)
 }
 
-
-
 /// The legacy measure/barline parser uses MusicXML local element names.
 /// Reject foreign-namespace elements that collide with those names until
 /// every legacy branch is namespace-aware. The notation-event layer itself
@@ -733,9 +712,7 @@ fn foreign_namespace_core_element(root: roxmltree::Node<'_, '_>) -> Option<(Stri
         })
 }
 
-fn parse_measure_locators_for_part(
-    part: roxmltree::Node<'_, '_>,
-) -> Vec<MusicXmlMeasureLocatorV1> {
+fn parse_measure_locators_for_part(part: roxmltree::Node<'_, '_>) -> Vec<MusicXmlMeasureLocatorV1> {
     part.children()
         .filter(|node| node.has_tag_name("measure"))
         .enumerate()
