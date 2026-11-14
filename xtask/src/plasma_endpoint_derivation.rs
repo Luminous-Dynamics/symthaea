@@ -874,7 +874,7 @@ fn read_fixture(path: &Path) -> Result<Fixture> {
 
 pub fn run(path: &Path) -> Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-endpoint-derivation-fixture-v0.1" {
+    if fixture.schema_version != "plasma-endpoint-derivation-fixture-v0.2" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
     let mut counts = [0usize; 3];
@@ -910,7 +910,7 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_endpoint_derivation_fixture_v0_1.json");
+        include_str!("../../data/research/plasma_endpoint_derivation_fixture_v0_2.json");
 
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
@@ -955,7 +955,23 @@ mod tests {
     }
 
     #[test]
-    fn d5573_does_not_apply_to_polypropylene_joint() {
+    fn iso_10365_supports_polypropylene_failure_pattern_classification() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint derivation fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-iso-10365-polypropylene-failure-pattern-fraction").expect("case exists");
+        assert_eq!(audit_case(case).disposition, Disposition::Pass);
+    }
+
+    #[test]
+    fn iso_10365_mixed_failure_requires_percentages_and_total_100() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint derivation fixture");
+        let missing = fixture.cases.iter().find(|case| case.id == "iso-10365-mixed-pattern-missing-percentages").expect("case exists");
+        let bad_sum = fixture.cases.iter().find(|case| case.id == "iso-10365-mixed-percentages-do-not-sum-to-100").expect("case exists");
+        assert_eq!(audit_case(missing).disposition, Disposition::Blocked);
+        assert_eq!(audit_case(bad_sum).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn d5573_on_polypropylene_blocks() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint derivation fixture");
         let case = fixture.cases.iter().find(|case| case.id == "d5573-on-polypropylene-blocked").expect("case exists");
         assert_eq!(audit_case(case).disposition, Disposition::Blocked);
