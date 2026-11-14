@@ -94,7 +94,11 @@
           ]
         },
         "reason_codes": []
-      }
+      },
+      "target_configuration": "CFG-7",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-POS-001",
+      "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
     },
     {
       "id": "ME-NEG-001",
@@ -146,7 +150,11 @@
           "COMMON_CAUSE_ROOT_COLLAPSE",
           "INSUFFICIENT_INDEPENDENT_ROOTS:bond_strength_limit"
         ]
-      }
+      },
+      "target_configuration": "BOND-4",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-NEG-001",
+      "source_inventory_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
     },
     {
       "id": "ME-NEG-002",
@@ -195,7 +203,11 @@
           "LAST_SUFFICIENT_ROOT_REMOVED",
           "INSUFFICIENT_INDEPENDENT_ROOTS:thermal_runaway_limit"
         ]
-      }
+      },
+      "target_configuration": "PACK-3",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-NEG-002",
+      "source_inventory_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
     },
     {
       "id": "ME-NEG-003",
@@ -246,7 +258,11 @@
           "INADMISSIBLE_LOOKALIKE_REJECTED:E-BOLT-B",
           "INSUFFICIENT_INDEPENDENT_ROOTS:bolt_preload_limit"
         ]
-      }
+      },
+      "target_configuration": "JOINT-NEW",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-NEG-003",
+      "source_inventory_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
     },
     {
       "id": "ME-POS-002",
@@ -301,7 +317,11 @@
           ]
         },
         "reason_codes": []
-      }
+      },
+      "target_configuration": "VESSEL-2",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-POS-002",
+      "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
     },
     {
       "id": "ME-POS-003",
@@ -371,7 +391,11 @@
         "reason_codes": [
           "DERIVATIVE_NOT_COUNTED_AS_INDEPENDENT:E-CORR-A-SUMMARY"
         ]
-      }
+      },
+      "target_configuration": "PIPE-6",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-POS-003",
+      "source_inventory_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
     },
     {
       "id": "ME-POS-004",
@@ -409,7 +433,9 @@
             "E-TORQUE-A",
             "E-TORQUE-B"
           ],
-          "expected_action": "revalidate"
+          "expected_action": "revalidate",
+          "target_configuration": "ACT-9",
+          "source_inventory_state": "complete_frozen"
         },
         {
           "world_id": "SUBSTITUTED",
@@ -439,7 +465,9 @@
             "E-TORQUE-A",
             "E-TORQUE-C"
           ],
-          "expected_action": "revalidate"
+          "expected_action": "revalidate",
+          "target_configuration": "ACT-9",
+          "source_inventory_state": "complete_frozen"
         }
       ],
       "expected": {
@@ -458,7 +486,11 @@
           ]
         },
         "reason_codes": []
-      }
+      },
+      "target_configuration": "ACT-9",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-POS-004",
+      "source_inventory_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
     },
     {
       "id": "ME-UNK-001",
@@ -510,7 +542,11 @@
         "reason_codes": [
           "PROVENANCE_INDEPENDENCE_UNKNOWN:E-SEISMIC-UNK"
         ]
-      }
+      },
+      "target_configuration": "ANCHOR-5",
+      "source_inventory_state": "complete_frozen",
+      "source_inventory_ref": "synthetic://source-inventory/ME-UNK-001",
+      "source_inventory_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
     }
   ],
   "intervention_pairs": [
@@ -556,5 +592,12 @@
       "expected_relation": "invariant",
       "expected_action": "revalidate"
     }
-  ]
+  ],
+  "provenance_contract": {
+    "root_id_semantics": "root_id identifies a qualified independent acquisition/measurement origin; it is assigned by evaluator-side provenance adjudication, not candidate-selected",
+    "derivative_semantics": "derived_from records retain their source root unless an independently qualified new acquisition boundary is recorded",
+    "scope_rule": "evidence configuration must equal target_configuration and admissibility must be admissible before a root can support a mandatory predicate",
+    "inventory_rule": "source_inventory_state must be complete_frozen for a completeness claim; unknown or incomplete inventory cannot produce supported",
+    "unknown_rule": "null root_id with unknown provenance is not an independent root and remains explicitly indeterminate"
+  }
 }
