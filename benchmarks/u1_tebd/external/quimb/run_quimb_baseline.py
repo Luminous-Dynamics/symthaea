@@ -160,24 +160,57 @@ def maybe_max_bond(circuit: Any) -> int | None:
     return None
 
 
-def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: int):
+def run_once(
+    case: dict[str, Any],
+    cutoff: float,
+    cutoff_mode: str,
+    max_bond: int,
+    engine: str = "eager",
+    lazy_method: str = "dm",
+    compress_every: int = 2,
+):
     n = int(case["site_count"])
     bits = "".join(str(int(bit)) for bit in case["initial_bits"])
     psi0 = qtn.MPS_computational_state(bits)
-    circuit = qtn.CircuitMPS(
-        N=n,
-        psi0=psi0,
-        max_bond=max_bond,
-        cutoff=cutoff,
-        gate_opts={
-            "max_bond": max_bond,
-            "cutoff": cutoff,
-            "cutoff_mode": cutoff_mode,
-            "renorm": 0,
-        },
-        gate_contract="auto-mps",
-        dtype="complex128",
-    )
+    gate_opts = {
+        "max_bond": max_bond,
+        "cutoff": cutoff,
+        "cutoff_mode": cutoff_mode,
+        "renorm": 0,
+    }
+    if engine == "eager":
+        circuit = qtn.CircuitMPS(
+            N=n,
+            psi0=psi0,
+            max_bond=max_bond,
+            cutoff=cutoff,
+            gate_opts=gate_opts,
+            gate_contract="auto-mps",
+            dtype="complex128",
+        )
+        compression_policy = "eager_gate_split"
+    elif engine == "lazy":
+        if compress_every < 1:
+            raise ValueError("compress_every must be >= 1")
+        circuit = qtn.CircuitMPSLazy(
+            N=n,
+            psi0=psi0,
+            max_bond=max_bond,
+            cutoff=cutoff,
+            gate_opts=gate_opts,
+            compress_opts={
+                "cutoff_mode": cutoff_mode,
+                "normalize": False,
+                "equalize_norms": False,
+            },
+            method=lazy_method,
+            compress_every=compress_every,
+            dtype="complex128",
+        )
+        compression_policy = "lazy_sub_mpo_periodic_compression"
+    else:
+        raise ValueError(f"unknown Quimb engine {engine!r}")
+
     gate_count = 0
     start = time.perf_counter()
     for bond, gate in ordered_strang_gates(case):
@@ -185,6 +218,8 @@ def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: in
         gate_count += 1
     elapsed = time.perf_counter() - start
 
+    # Accessing the state forces CircuitMPSLazy to flush pending gates and
+    # apply its configured compression before measuring the result.
     state_dense = None
     dense_metrics = None
     continuous_metrics = None
@@ -211,7 +246,11 @@ def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: in
         quimb_error = None
 
     result = {
-        "implementation": "quimb.CircuitMPS",
+        "implementation": "quimb.CircuitMPS" if engine == "eager" else "quimb.CircuitMPSLazy",
+        "quimb_engine": engine,
+        "quimb_lazy_method": lazy_method if engine == "lazy" else None,
+        "quimb_compress_every": compress_every if engine == "lazy" else None,
+        "compression_policy": compression_policy,
         "quimb_version": getattr(quimb, "__version__", "unknown"),
         "numpy_version": np.__version__,
         "scipy_version": scipy.__version__,
@@ -226,7 +265,7 @@ def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: in
         "cutoff": cutoff,
         "cutoff_mode": cutoff_mode,
         "max_bond": max_bond,
-        "renormalization": "disabled_via_renorm_0",
+        "renormalization": "disabled",
         "runtime_seconds": elapsed,
         "gate_throughput_per_second": gate_count / elapsed if elapsed > 0 else None,
         "peak_rss_platform_units": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
@@ -242,6 +281,7 @@ def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: in
     return result
 
 
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", type=Path, default=Path(__file__).parents[2] / "fixtures" / "u1_tebd_cases_v1.json")
@@ -250,6 +290,9 @@ def main() -> int:
     parser.add_argument("--cutoff", type=float, default=None)
     parser.add_argument("--cutoff-mode", choices=("rel", "rsum2"), default="rel")
     parser.add_argument("--max-bond", type=int, default=None)
+    parser.add_argument("--engine", choices=("eager", "lazy"), default="eager")
+    parser.add_argument("--lazy-method", choices=("dm", "direct", "src"), default="dm")
+    parser.add_argument("--compress-every", type=int, default=2)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--repeats", type=int, default=20)
     parser.add_argument("--output", type=Path, default=None)
@@ -267,14 +310,28 @@ def main() -> int:
         cutoff = 1e-8 if args.cutoff is None else args.cutoff
         max_bond = 256 if args.max_bond is None else args.max_bond
 
+    if args.engine == "lazy" and args.compress_every < 1:
+        raise SystemExit("--compress-every must be >= 1")
     for _ in range(max(0, args.warmups)):
-        run_once(case, cutoff, args.cutoff_mode, max_bond)
-    records = [run_once(case, cutoff, args.cutoff_mode, max_bond) for _ in range(max(1, args.repeats))]
+        run_once(
+            case, cutoff, args.cutoff_mode, max_bond,
+            args.engine, args.lazy_method, args.compress_every
+        )
+    records = [
+        run_once(
+            case, cutoff, args.cutoff_mode, max_bond,
+            args.engine, args.lazy_method, args.compress_every
+        )
+        for _ in range(max(1, args.repeats))
+    ]
     times = [float(record["runtime_seconds"]) for record in records]
     summary = {
         "schema": "luminous.u1_tebd_benchmark_result.v1",
         "fixture_schema": fixture.get("schema"),
         "track": args.track,
+        "engine": args.engine,
+        "lazy_method": args.lazy_method if args.engine == "lazy" else None,
+        "compress_every": args.compress_every if args.engine == "lazy" else None,
         "case_id": case["id"],
         "repeats": len(records),
         "warmups": max(0, args.warmups),
