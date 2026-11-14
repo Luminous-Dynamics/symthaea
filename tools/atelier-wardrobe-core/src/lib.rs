@@ -167,7 +167,7 @@ pub fn search_exact(
     let mut optional: Vec<&WardrobeChoice> = Vec::new();
 
     for choice in choices {
-        if choice.currency_code != policy.currency_code {
+        if choice.currency_code.as_str() != policy.currency_code.as_str() {
             return Err(WardrobeError::MixedCurrencyCodes {
                 choice_id: choice.id.clone(),
                 expected: policy.currency_code.clone(),
@@ -587,9 +587,9 @@ mod tests {
                 &choices,
                 WardrobePolicy {
                     allow_borrowing: false,
-                allow_renting: false,
-                allow_second_hand: false,
-                allow_purchase: false,
+                    allow_renting: false,
+                    allow_second_hand: false,
+                    allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 }
@@ -599,7 +599,7 @@ mod tests {
     }
 
     #[test]
-    fn protected_new_acquisition_conflicts_with_no_additions_policy() {
+    fn protected_new_acquisition_conflicts_with_no_acquisition_policy() {
         let needs = vec![need("daily")];
         let mut protected = choice("new-coat", &["daily"], ChoiceOrigin::Purchase, 5000, 10);
         protected.must_keep = true;
@@ -609,9 +609,9 @@ mod tests {
                 &[protected],
                 WardrobePolicy {
                     allow_borrowing: false,
-                allow_renting: false,
-                allow_second_hand: false,
-                allow_purchase: false,
+                    allow_renting: false,
+                    allow_second_hand: false,
+                    allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 }
@@ -657,9 +657,9 @@ mod tests {
                 &choices,
                 WardrobePolicy {
                     allow_borrowing: false,
-                allow_renting: false,
-                allow_second_hand: false,
-                allow_purchase: false,
+                    allow_renting: false,
+                    allow_second_hand: false,
+                    allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 }
@@ -681,9 +681,9 @@ mod tests {
                 &[mixed],
                 WardrobePolicy {
                     allow_borrowing: false,
-                allow_renting: false,
-                allow_second_hand: false,
-                allow_purchase: false,
+                    allow_renting: false,
+                    allow_second_hand: false,
+                    allow_purchase: false,
                     allow_made_to_order: false,
                     currency_code: "ZAR".to_owned(),
                 },
