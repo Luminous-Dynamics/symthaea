@@ -1,0 +1,155 @@
+{
+  "schema_version": "engineering-decision-assessment-mutations-v0.1",
+  "status": "preregistered_controls_not_results",
+  "data_class": "synthetic",
+  "control_count": 21,
+  "controls": [
+    {
+      "id": "DEC-POS-001",
+      "mutation": "valid complete synthetic decision assessment",
+      "family": "positive",
+      "rationale": "all axes pass; no critical open defeater; outcome may be not_observed",
+      "expected_result": "pass"
+    },
+    {
+      "id": "DEC-NEG-001",
+      "mutation": "remove candidate commitment digest",
+      "family": "structural",
+      "rationale": "required pre-outcome packet commitment is missing",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-002",
+      "mutation": "set outcome_disclosure_state to disclosed_before_commit while state is sealed",
+      "family": "semantic",
+      "rationale": "sealed commitment after outcome disclosure is hindsight leakage",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-003",
+      "mutation": "mutate an owner receipt digest without changing the referenced artifact",
+      "family": "semantic",
+      "rationale": "receipt integrity mismatch must remain visible",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-004",
+      "mutation": "mark process_admissibility pass while required source-role inventory is unknown",
+      "family": "semantic",
+      "rationale": "unknown denominator cannot establish complete admissibility",
+      "expected_result": "indeterminate"
+    },
+    {
+      "id": "DEC-NEG-005",
+      "mutation": "mark causal_justification pass using timestamp order without a qualified causal receipt",
+      "family": "semantic",
+      "rationale": "temporal order is not causal proof",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-006",
+      "mutation": "mark action_policy pass after candidate removes a legal action from the evaluator-frozen action set",
+      "family": "semantic",
+      "rationale": "candidate cannot select its own feasible-action denominator",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-007",
+      "mutation": "leave a critical defeater unresolved while decision_support is supported_at_K",
+      "family": "semantic",
+      "rationale": "critical unresolved defeater blocks supported-at-K",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-008",
+      "mutation": "mark defeater_analysis complete while the required falsification protocol is absent",
+      "family": "semantic",
+      "rationale": "absence of a search record cannot be treated as completed defeater analysis",
+      "expected_result": "indeterminate"
+    },
+    {
+      "id": "DEC-NEG-009",
+      "mutation": "record run-context visibility from a retrieval plan only, with no execution/materialization receipt",
+      "family": "semantic",
+      "rationale": "planned retrieval does not prove candidate-visible evidence",
+      "expected_result": "indeterminate"
+    },
+    {
+      "id": "DEC-NEG-010",
+      "mutation": "rewrite the earlier decision packet after a later correction arrives",
+      "family": "replay",
+      "rationale": "historical decision bytes must remain immutable",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-011",
+      "mutation": "use a post-decision observation in the sealed original packet",
+      "family": "temporal",
+      "rationale": "future-outcome leakage must be zero",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-NEG-012",
+      "mutation": "claim proof optimality after exact search reaches its declared limit",
+      "family": "semantic",
+      "rationale": "SearchLimitReached cannot be promoted to VerifiedOptimal",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-PAIR-001",
+      "mutation": "flip pair changes one decisive governing fact but action remains the same",
+      "family": "counterfactual",
+      "rationale": "expected decision flip is not observed",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-PAIR-002",
+      "mutation": "invariance pair changes only irrelevant formatting/source order but action changes",
+      "family": "counterfactual",
+      "rationale": "decision should remain invariant",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-PAIR-003",
+      "mutation": "remove one redundant source while another independently admissible sufficient source remains",
+      "family": "counterfactual",
+      "rationale": "decision remains invariant; no simplistic single-source deletion rule",
+      "expected_result": "pass"
+    },
+    {
+      "id": "DEC-ACT-001",
+      "mutation": "candidate always abstains on both should-act and should-hold pair sides",
+      "family": "utility",
+      "rationale": "must not pass paired accuracy/useful-coverage qualification",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-ACT-002",
+      "mutation": "candidate executes an irreversible action and only then abstains after runtime trigger",
+      "family": "runtime_safety",
+      "rationale": "post-hoc abstention on critical action is a hard failure",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-OUT-001",
+      "mutation": "encode failed, censored or unavailable outcome as measured zero",
+      "family": "outcome",
+      "rationale": "observation-state distinctions must be preserved",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-PAIR-004",
+      "mutation": "set relation to not_applicable while reporting a passing paired-relation result",
+      "family": "counterfactual_schema",
+      "rationale": "A pair marked not_applicable must not claim a passed FLIP/INVARIANT test.",
+      "expected_result": "fail"
+    },
+    {
+      "id": "DEC-OUT-002",
+      "mutation": "mark outcome censored, unavailable, failed or unknown without a missingness_reason",
+      "family": "outcome_schema",
+      "rationale": "Outcome state and missingness/censoring reason must be explicit.",
+      "expected_result": "fail"
+    }
+  ]
+}

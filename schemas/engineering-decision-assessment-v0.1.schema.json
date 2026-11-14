@@ -1,0 +1,1121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/engineering-decision-assessment-v0.1.schema.json",
+  "title": "Engineering Decision Assessment v0.1",
+  "description": "Evaluator-side, non-authoritative assessment envelope that references owner-native engineering decision receipts without reimplementing their semantics. Structural validity is not semantic qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "assessment_id",
+    "artifact_visibility",
+    "decision_episode",
+    "candidate_commitment",
+    "owner_receipts",
+    "axes",
+    "defeater_analysis",
+    "counterfactual_adjudication",
+    "outcome",
+    "evaluator",
+    "assessment_result",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "engineering-decision-assessment-v0.1"
+    },
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_visibility": {
+      "enum": [
+        "public_synthetic",
+        "evaluator_restricted",
+        "confidential"
+      ]
+    },
+    "decision_episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "baseline_sha256",
+        "proposed_change_sha256",
+        "target_world_time",
+        "decision_frontier",
+        "selected_action"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "proposed_change_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target_world_time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "observation_ref"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "known",
+                "unknown"
+              ]
+            },
+            "instant": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "observation_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "known"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "then": {
+                "required": [
+                  "instant"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "unknown"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "then": {
+                "not": {
+                  "required": [
+                    "instant"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "decision_frontier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instant",
+            "boundary",
+            "frontier_ref",
+            "ordering_model",
+            "causal_frontier_state"
+          ],
+          "properties": {
+            "instant": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "boundary": {
+              "enum": [
+                "inclusive",
+                "exclusive"
+              ]
+            },
+            "frontier_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ordering_model": {
+              "enum": [
+                "single_source_authoritative_clock_or_monotonic_sequence",
+                "multi_source_causal_partial_order",
+                "hybrid_clock_plus_causal_partial_order"
+              ]
+            },
+            "causal_frontier_state": {
+              "enum": [
+                "complete",
+                "incomplete",
+                "unknown",
+                "not_required"
+              ]
+            }
+          }
+        },
+        "selected_action": {
+          "enum": [
+            "preserve",
+            "review",
+            "reverify",
+            "revalidate",
+            "block",
+            "request_evidence",
+            "abstain",
+            "escalate",
+            "defer",
+            "other"
+          ]
+        },
+        "selected_action_detail": {
+          "type": "string"
+        }
+      }
+    },
+    "candidate_commitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "decision_packet_sha256",
+        "evidence_manifest_sha256",
+        "action_set_sha256",
+        "loss_model_sha256",
+        "committed_at",
+        "outcome_disclosure_state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "sealed",
+            "unsealed",
+            "not_recorded"
+          ]
+        },
+        "decision_packet_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "evidence_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "action_set_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "loss_model_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "committed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "outcome_disclosure_state": {
+          "enum": [
+            "not_disclosed_before_commit",
+            "disclosed_before_commit",
+            "unknown"
+          ]
+        },
+        "outcome_disclosed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "owner_receipts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "temporal_admissibility",
+        "run_context_visibility",
+        "evidence_use_validity",
+        "engineering_applicability",
+        "causal_frontier",
+        "action_policy"
+      ],
+      "properties": {
+        "temporal_admissibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "artifact_ref",
+            "artifact_sha256",
+            "contract_version",
+            "claim_ceiling"
+          ],
+          "properties": {
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contract_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "native_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_ceiling": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "run_context_visibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "artifact_ref",
+            "artifact_sha256",
+            "contract_version",
+            "claim_ceiling"
+          ],
+          "properties": {
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contract_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "native_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_ceiling": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "evidence_use_validity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "artifact_ref",
+            "artifact_sha256",
+            "contract_version",
+            "claim_ceiling"
+          ],
+          "properties": {
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contract_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "native_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_ceiling": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "engineering_applicability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "artifact_ref",
+            "artifact_sha256",
+            "contract_version",
+            "claim_ceiling"
+          ],
+          "properties": {
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contract_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "native_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_ceiling": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "causal_frontier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "artifact_ref",
+            "artifact_sha256",
+            "contract_version",
+            "claim_ceiling"
+          ],
+          "properties": {
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contract_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "native_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_ceiling": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "action_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner_id",
+            "artifact_ref",
+            "artifact_sha256",
+            "contract_version",
+            "claim_ceiling"
+          ],
+          "properties": {
+            "owner_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "contract_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "native_status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_ceiling": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_admissibility",
+        "evidence_use_validity",
+        "engineering_applicability",
+        "causal_justification",
+        "action_policy"
+      ],
+      "properties": {
+        "process_admissibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "result",
+            "reason_codes",
+            "receipt_ref"
+          ],
+          "properties": {
+            "result": {
+              "enum": [
+                "pass",
+                "fail",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "receipt_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "evidence_use_validity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "result",
+            "reason_codes",
+            "receipt_ref"
+          ],
+          "properties": {
+            "result": {
+              "enum": [
+                "pass",
+                "fail",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "receipt_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "engineering_applicability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "result",
+            "reason_codes",
+            "receipt_ref"
+          ],
+          "properties": {
+            "result": {
+              "enum": [
+                "pass",
+                "fail",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "receipt_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "causal_justification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "result",
+            "reason_codes",
+            "receipt_ref"
+          ],
+          "properties": {
+            "result": {
+              "enum": [
+                "pass",
+                "fail",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "receipt_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "action_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "result",
+            "reason_codes",
+            "receipt_ref"
+          ],
+          "properties": {
+            "result": {
+              "enum": [
+                "pass",
+                "fail",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "reason_codes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "receipt_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "defeater_analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "protocol_ref",
+        "protocol_sha256",
+        "findings"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "not_run"
+          ]
+        },
+        "protocol_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "defeater_id",
+              "claim_ref",
+              "category",
+              "severity",
+              "state",
+              "evidence_refs"
+            ],
+            "properties": {
+              "defeater_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "claim_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "category": {
+                "enum": [
+                  "missing_premise",
+                  "temporal_invalidity",
+                  "evidence_use_invalidity",
+                  "common_cause_or_dependence",
+                  "causal_alternative",
+                  "scope_or_configuration_mismatch",
+                  "rights_or_authority",
+                  "source_authenticity",
+                  "measurement_or_uncertainty",
+                  "action_set_or_loss_mismatch",
+                  "outcome_censoring",
+                  "adversarial_change",
+                  "other"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "critical",
+                  "major",
+                  "minor"
+                ]
+              },
+              "state": {
+                "enum": [
+                  "unresolved",
+                  "resolved",
+                  "accepted_residual"
+                ]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "resolution_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "residual_rationale": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "const": "resolved"
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "resolution_ref"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "state": {
+                      "const": "accepted_residual"
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "residual_rationale"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "counterfactual_adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relation",
+        "result"
+      ],
+      "properties": {
+        "relation": {
+          "enum": [
+            "flip",
+            "invariant",
+            "not_applicable"
+          ]
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "fail",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "expected_original_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_paired_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_original_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_paired_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "enum": [
+                  "flip",
+                  "invariant"
+                ]
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "required": [
+              "pair_id",
+              "expected_original_action",
+              "expected_paired_action",
+              "observed_original_action",
+              "observed_paired_action"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "relation": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "relation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "result": {
+                "const": "not_applicable"
+              }
+            },
+            "not": {
+              "required": [
+                "pair_id"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "not_observed",
+            "observed",
+            "censored",
+            "unavailable",
+            "failed",
+            "unknown"
+          ]
+        },
+        "outcome_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "horizon": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missingness_reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "outcome_ref",
+              "outcome_sha256",
+              "observed_at",
+              "horizon"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not_observed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "outcome_ref"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "censored",
+                  "unavailable",
+                  "failed",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "missingness_reason"
+            ]
+          }
+        }
+      ]
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluator_id",
+        "build_sha256",
+        "assessed_at",
+        "assessment_kind",
+        "independent_assessment"
+      ],
+      "properties": {
+        "evaluator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "assessed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "assessment_kind": {
+          "enum": [
+            "synthetic_known_answer",
+            "independent_adjudication",
+            "automated_replay",
+            "pilot_observation"
+          ]
+        },
+        "independent_assessment": {
+          "type": "boolean"
+        },
+        "assessor_record_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assessment_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_support",
+        "critical_gate_failure_count",
+        "indeterminate_axis_count",
+        "non_authoritative",
+        "effect_authority"
+      ],
+      "properties": {
+        "decision_support": {
+          "enum": [
+            "supported_at_K",
+            "not_supported_at_K",
+            "indeterminate",
+            "not_assessed"
+          ]
+        },
+        "critical_gate_failure_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "indeterminate_axis_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "non_authoritative": {
+          "const": true
+        },
+        "effect_authority": {
+          "const": "none"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "bounded_engineering_decision_assessment_no_release_or_effect_authority"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "candidate_commitment": {
+            "properties": {
+              "state": {
+                "const": "sealed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "required": [
+          "candidate_commitment"
+        ]
+      },
+      "then": {
+        "properties": {
+          "candidate_commitment": {
+            "properties": {
+              "outcome_disclosure_state": {
+                "const": "not_disclosed_before_commit"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assessment_result": {
+            "properties": {
+              "decision_support": {
+                "const": "supported_at_K"
+              }
+            },
+            "required": [
+              "decision_support"
+            ]
+          }
+        },
+        "required": [
+          "assessment_result"
+        ]
+      },
+      "then": {
+        "properties": {
+          "assessment_result": {
+            "properties": {
+              "critical_gate_failure_count": {
+                "const": 0
+              },
+              "indeterminate_axis_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
