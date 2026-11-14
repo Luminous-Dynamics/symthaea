@@ -124,14 +124,14 @@ It rejects promotion of these observations to product safety, food-contact safet
 
 ## Frozen challenge results
 
-The surface-integrity fixture contains 17 synthetic known-answer cases:
+The surface-integrity fixture contains 18 synthetic known-answer cases:
 
 | Disposition | Cases |
 |---|---:|
 | PASS | 3 |
-| BLOCKED | 7 |
+| BLOCKED | 8 |
 | REJECTED | 7 |
-| **Total** | **17** |
+| **Total** | **18** |
 
 It covers:
 - barrier and tensile limits met;
@@ -153,7 +153,7 @@ It covers:
 The v0.4 method-scope fixture contains 61 cases (16 SUPPORTED, 14 BLOCKED, 31 REJECTED).
 
 Latest exact-branch source and fixtures were fetched back and independently replayed in JavaScript:
-- surface-integrity fixture: **17/17** expected dispositions;
+- surface-integrity fixture: **18/18** expected dispositions;
 - method-claim fixture: **61/61** expected dispositions.
 
 This is synthetic contract replay. It is not a physical experiment or a Rust execution.
@@ -200,11 +200,15 @@ Prospective targets—not achieved results:
 
 No duplicate statistics engine, calibration registry, material-lot authority, DOE engine or plasma controller is introduced.
 
+## Transfer integration boundary
+
+The surface-integrity audit is currently a separate application-qualification command. It is **not yet a mandatory prerequisite** inside `plasma-transfer-audit` or the Bond Qualification Passport. That separation is intentional for this increment: the current transfer fixture is a PP-GRADE-A rigid-plastic single-lap profile, while these substrate hard limits need an application-specific product-function profile and controlled baseline data. A follow-on integration should add an exact `surface_integrity_case_id` to the transfer bridge and bind its substrate/exposure digests to the same material lot and process profile before using the result in a transfer decision.
+
 ## Validation boundary
 
-- Surface-integrity synthetic replay: **17/17**.
+- Surface-integrity synthetic replay: **18/18**.
 - Method-claim synthetic replay: **61/61**.
-- Eight surface-integrity Rust tests and eleven claim-scope Rust tests are authored but **not executed**.
+- Nine surface-integrity Rust tests and eleven claim-scope Rust tests are authored but **not executed**.
 - Rust formatting, compilation, Clippy and exact-head hosted CI are **not verified**.
 - The audit does not calculate WVTR, OTR, tensile retention, uncertainty intervals or bond strength.
 - Referenced artifact bytes, calibration, lab custody, clock trust, actual sample/roll identity and standard execution are not authenticated.
