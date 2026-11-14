@@ -212,3 +212,67 @@ fn main() {
     };
     process::exit(code);
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load(raw: &str) -> Value {
+        serde_json::from_str(raw).expect("fixture JSON parses")
+    }
+
+    #[test]
+    fn valid_fixture_has_no_structural_faults() {
+        let manifest = load(include_str!("../../fixtures/valid.json"));
+        assert!(evaluate(&manifest).is_empty());
+    }
+
+    #[test]
+    fn missing_trace_is_rejected() {
+        let manifest = load(include_str!("../../fixtures/missing-trace.json"));
+        assert_eq!(
+            evaluate(&manifest),
+            BTreeSet::from(["accepted_without_trace".to_owned()])
+        );
+    }
+
+    #[test]
+    fn source_and_span_negative_controls_are_detected() {
+        let unknown = load(include_str!("../../fixtures/unknown-source.json"));
+        assert_eq!(evaluate(&unknown), BTreeSet::from(["unknown_source".to_owned()]));
+
+        let out_of_bounds = load(include_str!("../../fixtures/span-out-of-bounds.json"));
+        assert_eq!(
+            evaluate(&out_of_bounds),
+            BTreeSet::from(["invalid_source_span".to_owned()])
+        );
+    }
+
+    #[test]
+    fn review_modality_dependency_and_baseline_controls_are_detected() {
+        let unapproved = load(include_str!("../../fixtures/unapproved-modality.json"));
+        assert_eq!(evaluate(&unapproved), BTreeSet::from(["missing_decision".to_owned()]));
+
+        let unreviewed = load(include_str!("../../fixtures/unreviewed-acceptance.json"));
+        assert_eq!(evaluate(&unreviewed), BTreeSet::from(["missing_decision".to_owned()]));
+
+        let dependency = load(include_str!("../../fixtures/dependency-unaccepted.json"));
+        assert_eq!(
+            evaluate(&dependency),
+            BTreeSet::from(["accepted_dependency_not_accepted".to_owned()])
+        );
+
+        let stale = load(include_str!("../../fixtures/stale-decision.json"));
+        assert_eq!(
+            evaluate(&stale),
+            BTreeSet::from(["decision_baseline_mismatch".to_owned()])
+        );
+    }
+
+    #[test]
+    fn empty_requirement_manifest_is_rejected() {
+        let manifest = load(include_str!("../../fixtures/empty-requirements.json"));
+        assert_eq!(evaluate(&manifest), BTreeSet::from(["empty_requirements".to_owned()]));
+    }
+}
