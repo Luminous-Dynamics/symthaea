@@ -220,6 +220,28 @@ impl MusicRealizationVerifiedBindingV1 {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct MusicRealizationVerifiedBindingReportV1 {
+    transaction_id: String,
+    attempt_id: String,
+    candidate_id: String,
+    source_lineage_sha256: String,
+    realization_request_id: String,
+    realization_request_sha256: String,
+    capability_manifest_sha256: String,
+    upstream_realization_receipt_sha256: String,
+    realization_receipt_sha256: String,
+    backend_id: String,
+    backend_version: String,
+    adapter_id: String,
+    adapter_version: String,
+    output_modality: MusicRealizationOutputModalityV1,
+    final_execution_state: MusicRealizerExecutionEventStateV1,
+    submission_count: u64,
+    observed_output_sha256: Option<String>,
+    observed_output_byte_length: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MusicRealizationBridgeIssueV1 {
     WrongSchema,
@@ -584,6 +606,7 @@ fn find_attempt<'a>(
 /// without recomputing the digest over those bytes.
 pub fn verify_music_realization_transaction_binding_v1(
     transaction: &MusicEditTransactionV1,
+    expected: &MusicRealizationExpectedBindingV1,
     receipt: &MusicRealizationBridgeReceiptV1,
     actual_output_bytes: Option<&[u8]>,
 ) -> Result<MusicRealizationVerifiedBindingV1, Vec<MusicRealizationBridgeIssueV1>> {
@@ -593,6 +616,74 @@ pub fn verify_music_realization_transaction_binding_v1(
     use MusicRealizerExecutionEventStateV1 as S;
 
     let mut issues = validate_payload_shape(&receipt.payload);
+
+    // These expected identities must come from the upstream realization
+    // request/manifest verifier and the caller's frozen execution context.
+    for (field, value) in [
+        ("expected_transaction_id", expected.transaction_id.as_str()),
+        ("expected_attempt_id", expected.attempt_id.as_str()),
+        ("expected_candidate_id", expected.candidate_id.as_str()),
+        ("expected_source_lineage", expected.source_lineage_sha256.as_str()),
+        ("expected_realization_request_id", expected.realization_request_id.as_str()),
+        ("expected_backend_id", expected.backend_id.as_str()),
+        ("expected_backend_version", expected.backend_version.as_str()),
+        ("expected_adapter_id", expected.adapter_id.as_str()),
+        ("expected_adapter_version", expected.adapter_version.as_str()),
+    ] {
+        if !nonempty(value) {
+            issues.push(MusicRealizationBridgeIssueV1::EmptyField(field));
+        }
+    }
+    for (field, value) in [
+        ("expected_request_sha256", expected.realization_request_sha256.as_str()),
+        ("expected_capability_manifest_sha256", expected.capability_manifest_sha256.as_str()),
+        (
+            "expected_upstream_receipt_sha256",
+            expected.upstream_realization_receipt_sha256.as_str(),
+        ),
+        ("expected_source_lineage_sha256", expected.source_lineage_sha256.as_str()),
+    ] {
+        if !is_sha256(value) {
+            issues.push(MusicRealizationBridgeIssueV1::InvalidDigest(field));
+        }
+    }
+
+    let payload = &receipt.payload;
+    for (field, matches) in [
+        ("transaction_id", expected.transaction_id == payload.transaction_id),
+        ("attempt_id", expected.attempt_id == payload.attempt_id),
+        ("candidate_id", expected.candidate_id == payload.candidate_id),
+        (
+            "source_lineage_sha256",
+            expected.source_lineage_sha256 == payload.source_lineage_sha256,
+        ),
+        (
+            "realization_request_id",
+            expected.realization_request_id == payload.realization_request_id,
+        ),
+        (
+            "realization_request_sha256",
+            expected.realization_request_sha256 == payload.realization_request_sha256,
+        ),
+        (
+            "capability_manifest_sha256",
+            expected.capability_manifest_sha256 == payload.capability_manifest_sha256,
+        ),
+        (
+            "upstream_realization_receipt_sha256",
+            expected.upstream_realization_receipt_sha256
+                == payload.upstream_realization_receipt_sha256,
+        ),
+        ("backend_id", expected.backend_id == payload.backend_id),
+        ("backend_version", expected.backend_version == payload.backend_version),
+        ("adapter_id", expected.adapter_id == payload.adapter_id),
+        ("adapter_version", expected.adapter_version == payload.adapter_version),
+        ("output_modality", expected.output_modality == payload.output_modality),
+    ] {
+        if !matches {
+            issues.push(MusicRealizationBridgeIssueV1::ExpectedBindingMismatch(field));
+        }
+    }
 
     if !is_sha256(&receipt.receipt_sha256) {
         issues.push(MusicRealizationBridgeIssueV1::InvalidDigest("receipt_sha256"));
@@ -715,20 +806,55 @@ pub fn verify_music_realization_transaction_binding_v1(
     } else {
         None
     };
+    let final_execution_state = state.expect("execution trace was checked as non-empty");
+    let report_payload = MusicRealizationVerifiedBindingReportV1 {
+        transaction_id: transaction.transaction_id.clone(),
+        attempt_id: attempt.attempt_id.clone(),
+        candidate_id: attempt.candidate_id.clone(),
+        source_lineage_sha256: transaction.source_lineage_sha256.clone(),
+        realization_request_id: receipt.payload.realization_request_id.clone(),
+        realization_request_sha256: receipt.payload.realization_request_sha256.clone(),
+        capability_manifest_sha256: receipt.payload.capability_manifest_sha256.clone(),
+        upstream_realization_receipt_sha256: receipt
+            .payload
+            .upstream_realization_receipt_sha256
+            .clone(),
+        realization_receipt_sha256: receipt.receipt_sha256.clone(),
+        backend_id: receipt.payload.backend_id.clone(),
+        backend_version: receipt.payload.backend_version.clone(),
+        adapter_id: receipt.payload.adapter_id.clone(),
+        adapter_version: receipt.payload.adapter_version.clone(),
+        output_modality: receipt.payload.output_modality,
+        final_execution_state,
+        submission_count: submissions,
+        observed_output_sha256: observed_output_sha256.clone(),
+        observed_output_byte_length: receipt.payload.output_byte_length,
+    };
+    let report_sha256 = domain_digest(BINDING_REPORT_DOMAIN, &report_payload)
+        .map_err(|issue| vec![issue])?;
     Ok(MusicRealizationVerifiedBindingV1 {
         transaction_id: transaction.transaction_id.clone(),
         attempt_id: attempt.attempt_id.clone(),
         candidate_id: attempt.candidate_id.clone(),
+        source_lineage_sha256: transaction.source_lineage_sha256.clone(),
+        realization_request_id: receipt.payload.realization_request_id.clone(),
         request_sha256: receipt.payload.realization_request_sha256.clone(),
         capability_manifest_sha256: receipt.payload.capability_manifest_sha256.clone(),
         upstream_realization_receipt_sha256: receipt
             .payload
             .upstream_realization_receipt_sha256
             .clone(),
-        final_execution_state: state.expect("execution trace was checked as non-empty"),
+        realization_receipt_sha256: receipt.receipt_sha256.clone(),
+        backend_id: receipt.payload.backend_id.clone(),
+        backend_version: receipt.payload.backend_version.clone(),
+        adapter_id: receipt.payload.adapter_id.clone(),
+        adapter_version: receipt.payload.adapter_version.clone(),
+        output_modality: receipt.payload.output_modality,
+        final_execution_state,
         submission_count: submissions,
         observed_output_sha256,
         observed_output_byte_length: receipt.payload.output_byte_length,
+        report_sha256,
     })
 }
 
