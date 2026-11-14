@@ -59,12 +59,155 @@ pub struct MusicEditMetamorphicPairV1 {
     pub admissibility_reason: Option<String>,
 }
 
+pub const MUSIC_EDIT_METAMORPHIC_TRANSFORM_RECEIPT_SCHEMA_V1: &str =
+    "mel-music-edit-metamorphic-transform-receipt-v1";
+
+/// Content-addressed summary of the transformation that produced a paired input.
+/// The hashes must be computed from the actual input/output bytes by the transform
+/// executor; this structure alone does not prove the executor read those bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicTransformReceiptV1 {
+    pub schema_version: String,
+    pub pair_id: String,
+    pub dataset_id: String,
+    pub dataset_version: String,
+    pub benchmark_track_id: String,
+    pub base_sample_id: String,
+    pub transformed_sample_id: String,
+    pub source_lineage_sha256: String,
+    pub split: MusicEditSplitV1,
+    pub transform_family: MusicEditMetamorphicTransformFamilyV1,
+    pub input_audio_sha256: String,
+    pub output_audio_sha256: String,
+    pub base_instruction_sha256: String,
+    pub transformed_instruction_sha256: String,
+    pub transform_implementation_sha256: String,
+    pub transform_version: String,
+    pub transform_parameters_sha256: String,
+    /// SHA-256 of the canonical receipt commitment with this field empty.
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct MusicEditMetamorphicTransformReceiptCommitmentV1<'a> {
+    schema_version: &'a str,
+    pair_id: &'a str,
+    dataset_id: &'a str,
+    dataset_version: &'a str,
+    benchmark_track_id: &'a str,
+    base_sample_id: &'a str,
+    transformed_sample_id: &'a str,
+    source_lineage_sha256: &'a str,
+    split: MusicEditSplitV1,
+    transform_family: MusicEditMetamorphicTransformFamilyV1,
+    input_audio_sha256: &'a str,
+    output_audio_sha256: &'a str,
+    base_instruction_sha256: &'a str,
+    transformed_instruction_sha256: &'a str,
+    transform_implementation_sha256: &'a str,
+    transform_version: &'a str,
+    transform_parameters_sha256: &'a str,
+}
+
+pub fn music_edit_metamorphic_transform_receipt_digest_v1(
+    receipt: &MusicEditMetamorphicTransformReceiptV1,
+) -> Result<String, MusicEditMetamorphicIssueV1> {
+    let commitment = MusicEditMetamorphicTransformReceiptCommitmentV1 {
+        schema_version: &receipt.schema_version,
+        pair_id: &receipt.pair_id,
+        dataset_id: &receipt.dataset_id,
+        dataset_version: &receipt.dataset_version,
+        benchmark_track_id: &receipt.benchmark_track_id,
+        base_sample_id: &receipt.base_sample_id,
+        transformed_sample_id: &receipt.transformed_sample_id,
+        source_lineage_sha256: &receipt.source_lineage_sha256,
+        split: receipt.split,
+        transform_family: receipt.transform_family,
+        input_audio_sha256: &receipt.input_audio_sha256,
+        output_audio_sha256: &receipt.output_audio_sha256,
+        base_instruction_sha256: &receipt.base_instruction_sha256,
+        transformed_instruction_sha256: &receipt.transformed_instruction_sha256,
+        transform_implementation_sha256: &receipt.transform_implementation_sha256,
+        transform_version: &receipt.transform_version,
+        transform_parameters_sha256: &receipt.transform_parameters_sha256,
+    };
+    let bytes = serde_json::to_vec(&commitment)
+        .map_err(|_| MusicEditMetamorphicIssueV1::SerializationError)?;
+    let mut hasher = Sha256::new();
+    hasher.update(DOMAIN);
+    hasher.update(b"\0transform-receipt\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Bind a transform receipt to the exact pair declarations. This validates the
+/// receipt commitment and field correspondence; actual-byte hashing remains the
+/// responsibility of the materializer/transform executor.
+pub fn verify_music_edit_metamorphic_transform_receipt_v1(
+    pair: &MusicEditMetamorphicPairV1,
+    receipt: &MusicEditMetamorphicTransformReceiptV1,
+) -> Vec<MusicEditMetamorphicIssueV1> {
+    let mut issues = Vec::new();
+    if receipt.schema_version != MUSIC_EDIT_METAMORPHIC_TRANSFORM_RECEIPT_SCHEMA_V1 {
+        issues.push(MusicEditMetamorphicIssueV1::WrongTransformReceiptSchema);
+    }
+    if receipt.pair_id != pair.pair_id
+        || receipt.dataset_id != pair.dataset_id
+        || receipt.dataset_version != pair.dataset_version
+        || receipt.benchmark_track_id != pair.benchmark_track_id
+        || receipt.base_sample_id != pair.base_sample_id
+        || receipt.transformed_sample_id != pair.transformed_sample_id
+    {
+        issues.push(MusicEditMetamorphicIssueV1::TransformReceiptIdentityMismatch);
+    }
+    if receipt.source_lineage_sha256 != pair.base_source_lineage_sha256 {
+        issues.push(MusicEditMetamorphicIssueV1::SourceLineageMismatch);
+    }
+    if receipt.split != pair.base_split || pair.base_split != pair.transformed_split {
+        issues.push(MusicEditMetamorphicIssueV1::SplitMismatch);
+    }
+    if receipt.transform_family != pair.transform_family
+        || receipt.transform_implementation_sha256 != pair.transform_implementation_sha256
+        || receipt.transform_version != pair.transform_version
+        || receipt.transform_parameters_sha256 != pair.transform_parameters_sha256
+    {
+        issues.push(MusicEditMetamorphicIssueV1::TransformReceiptConfigurationMismatch);
+    }
+    if receipt.input_audio_sha256 != pair.base_source_audio_sha256
+        || receipt.output_audio_sha256 != pair.transformed_source_audio_sha256
+        || receipt.base_instruction_sha256 != pair.base_instruction_sha256
+        || receipt.transformed_instruction_sha256 != pair.transformed_instruction_sha256
+    {
+        issues.push(MusicEditMetamorphicIssueV1::TransformReceiptArtifactMismatch);
+    }
+    if !is_sha256(&receipt.input_audio_sha256)
+        || !is_sha256(&receipt.output_audio_sha256)
+        || !is_sha256(&receipt.source_lineage_sha256)
+        || !is_sha256(&receipt.transform_implementation_sha256)
+        || !is_sha256(&receipt.transform_parameters_sha256)
+        || !is_sha256(&receipt.base_instruction_sha256)
+        || !is_sha256(&receipt.transformed_instruction_sha256)
+    {
+        issues.push(MusicEditMetamorphicIssueV1::TransformReceiptInvalidDigest);
+    }
+    match music_edit_metamorphic_transform_receipt_digest_v1(receipt) {
+        Ok(digest) if digest == receipt.receipt_sha256 && digest == pair.transform_receipt_sha256 => {}
+        _ => issues.push(MusicEditMetamorphicIssueV1::TransformReceiptDigestMismatch),
+    }
+    issues
+}
+
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MusicEditMetamorphicIssueV1 {
     WrongSchema, EmptyField(&'static str), MutableVersion, InvalidDigest(&'static str),
     SameSampleIdentity, SourceLineageMismatch, SplitMismatch,
     InvariantInstructionChanged, InvariantEnvelopeChanged, RelationMapMissing,
     AdmissibilityReasonMissing, UnexpectedAdmissibilityReason,
+    WrongTransformReceiptSchema, TransformReceiptIdentityMismatch,
+    TransformReceiptConfigurationMismatch, TransformReceiptArtifactMismatch,
+    TransformReceiptInvalidDigest, TransformReceiptDigestMismatch,
     InvalidPair, SerializationError,
 }
 
@@ -646,6 +789,34 @@ mod tests {
     }
 
 
+    fn matching_transform_receipt(
+        pair: &MusicEditMetamorphicPairV1,
+    ) -> MusicEditMetamorphicTransformReceiptV1 {
+        let mut receipt = MusicEditMetamorphicTransformReceiptV1 {
+            schema_version: MUSIC_EDIT_METAMORPHIC_TRANSFORM_RECEIPT_SCHEMA_V1.to_owned(),
+            pair_id: pair.pair_id.clone(),
+            dataset_id: pair.dataset_id.clone(),
+            dataset_version: pair.dataset_version.clone(),
+            benchmark_track_id: pair.benchmark_track_id.clone(),
+            base_sample_id: pair.base_sample_id.clone(),
+            transformed_sample_id: pair.transformed_sample_id.clone(),
+            source_lineage_sha256: pair.base_source_lineage_sha256.clone(),
+            split: pair.base_split,
+            transform_family: pair.transform_family,
+            input_audio_sha256: pair.base_source_audio_sha256.clone(),
+            output_audio_sha256: pair.transformed_source_audio_sha256.clone(),
+            base_instruction_sha256: pair.base_instruction_sha256.clone(),
+            transformed_instruction_sha256: pair.transformed_instruction_sha256.clone(),
+            transform_implementation_sha256: pair.transform_implementation_sha256.clone(),
+            transform_version: pair.transform_version.clone(),
+            transform_parameters_sha256: pair.transform_parameters_sha256.clone(),
+            receipt_sha256: String::new(),
+        };
+        receipt.receipt_sha256 =
+            music_edit_metamorphic_transform_receipt_digest_v1(&receipt).unwrap();
+        receipt
+    }
+
     fn observation(
         pair: &MusicEditMetamorphicPairV1,
         pair_sha: &str,
@@ -823,6 +994,36 @@ mod tests {
         let base = observation(&pair, &pair_sha, true, 440.0);
         let transformed = observation(&pair, &pair_sha, false, 445.0);
         assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).is_err());
+    }
+
+    #[test]
+    fn transform_receipt_binds_pair_artifacts_and_configuration() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let receipt = matching_transform_receipt(&pair);
+        pair.transform_receipt_sha256 = receipt.receipt_sha256.clone();
+        assert!(validate_music_edit_metamorphic_pair_v1(&pair).is_empty());
+        assert!(verify_music_edit_metamorphic_transform_receipt_v1(&pair, &receipt).is_empty());
+    }
+
+    #[test]
+    fn transform_receipt_rejects_output_substitution_and_digest_tampering() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let mut receipt = matching_transform_receipt(&pair);
+        pair.transform_receipt_sha256 = receipt.receipt_sha256.clone();
+        receipt.output_audio_sha256 = d(99);
+        let issues = verify_music_edit_metamorphic_transform_receipt_v1(&pair, &receipt);
+        assert!(issues.contains(&MusicEditMetamorphicIssueV1::TransformReceiptArtifactMismatch));
+        assert!(issues.contains(&MusicEditMetamorphicIssueV1::TransformReceiptDigestMismatch));
+    }
+
+    #[test]
+    fn transform_receipt_rejects_wrong_implementation_identity() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let mut receipt = matching_transform_receipt(&pair);
+        pair.transform_receipt_sha256 = receipt.receipt_sha256.clone();
+        receipt.transform_implementation_sha256 = d(55);
+        assert!(verify_music_edit_metamorphic_transform_receipt_v1(&pair, &receipt)
+            .contains(&MusicEditMetamorphicIssueV1::TransformReceiptConfigurationMismatch));
     }
 
     #[test] fn invariant_pair_passes_and_commits() {
