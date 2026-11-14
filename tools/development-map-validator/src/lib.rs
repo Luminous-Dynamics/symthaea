@@ -1731,11 +1731,137 @@ fn validate_federation_member(
     }
 }
 
+
+fn validate_federation_compatibility_receipt(
+    value: &Value,
+    path: &str,
+    from_project: Option<&str>,
+    to_project: Option<&str>,
+    members: &HashMap<String, (String, String, String)>,
+    contract_blob_oid: Option<&str>,
+    report: &mut ValidationReport,
+) {
+    let Some(receipt) = object(value, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        receipt,
+        &[
+            "receipt_id", "receipt_sha256", "verifier_build_sha256",
+            "source_project_id", "source_revision", "source_tree_oid",
+            "target_project_id", "target_revision", "target_tree_oid",
+            "contract_id", "contract_version", "contract_blob_oid",
+            "configuration_world_digest", "outcome", "tested_at",
+        ],
+        path,
+        report,
+    );
+
+    for key in ["receipt_id", "contract_id", "contract_version"] {
+        if let Some(item) = field(value, key, path, report) {
+            string(item, &format!("{path}.{key}"), report);
+        }
+    }
+    for key in ["receipt_sha256", "verifier_build_sha256", "configuration_world_digest"] {
+        if let Some(item) = field(value, key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{key}"), report))
+        {
+            if item.len() != 64 || !hex_string(item) {
+                report.error(
+                    "EGDDM-FEDERATION-029",
+                    format!("{path}.{key}"),
+                    "compatibility receipt digest must be 64-character hexadecimal SHA-256",
+                );
+            }
+        }
+    }
+
+    let source_project = field(value, "source_project_id", path, report)
+        .and_then(|v| string(v, &format!("{path}.source_project_id"), report));
+    let target_project = field(value, "target_project_id", path, report)
+        .and_then(|v| string(v, &format!("{path}.target_project_id"), report));
+
+    if source_project != from_project {
+        report.error(
+            "EGDDM-FEDERATION-030",
+            format!("{path}.source_project_id"),
+            "compatibility receipt source_project_id must match the directed relationship source",
+        );
+    }
+    if target_project != to_project {
+        report.error(
+            "EGDDM-FEDERATION-031",
+            format!("{path}.target_project_id"),
+            "compatibility receipt target_project_id must match the directed relationship target",
+        );
+    }
+
+    for (project_id, revision_key, tree_key) in [
+        (source_project, "source_revision", "source_tree_oid"),
+        (target_project, "target_revision", "target_tree_oid"),
+    ] {
+        let revision = field(value, revision_key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{revision_key}"), report));
+        let tree = field(value, tree_key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{tree_key}"), report));
+        if let Some(revision) = revision {
+            if revision.len() != 40 || !hex_string(revision) {
+                report.error("EGDDM-FEDERATION-032", format!("{path}.{revision_key}"), "revision must be a 40-character Git commit OID");
+            }
+        }
+        if let Some(tree) = tree {
+            if tree.len() != 40 || !hex_string(tree) {
+                report.error("EGDDM-FEDERATION-033", format!("{path}.{tree_key}"), "tree must be a 40-character Git tree OID");
+            }
+        }
+        if let (Some(project_id), Some(revision), Some(tree)) = (project_id, revision, tree) {
+            match members.get(project_id) {
+                Some((_, _, snapshot_pin)) => {
+                    let expected = format!("{revision}:{tree}");
+                    if snapshot_pin != &expected {
+                        report.error(
+                            "EGDDM-FEDERATION-034",
+                            format!("{path}.{revision_key}"),
+                            format!("receipt source snapshot for {project_id:?} does not match the pinned federation member map"),
+                        );
+                    }
+                }
+                None => report.error(
+                    "EGDDM-FEDERATION-009",
+                    format!("{path}.{revision_key}"),
+                    format!("unknown receipt project_id {project_id:?}"),
+                ),
+            }
+        }
+    }
+
+    let receipt_contract_blob = field(value, "contract_blob_oid", path, report)
+        .and_then(|v| string(v, &format!("{path}.contract_blob_oid"), report));
+    if let Some(blob) = receipt_contract_blob {
+        if blob.len() != 40 || !hex_string(blob) {
+            report.error("EGDDM-FEDERATION-018", format!("{path}.contract_blob_oid"), "contract_blob_oid must be a 40-character Git object OID");
+        }
+        if contract_blob_oid != Some(blob) {
+            report.error("EGDDM-FEDERATION-035", format!("{path}.contract_blob_oid"), "receipt contract blob must match the relationship's exact contract binding");
+        }
+    }
+
+    if let Some(outcome) = field(value, "outcome", path, report) {
+        if outcome.as_str() != Some("passed") {
+            report.error("EGDDM-FEDERATION-036", format!("{path}.outcome"), "independent compatibility receipt must record outcome=passed");
+        }
+    }
+    if let Some(tested_at) = field(value, "tested_at", path, report) {
+        parse_rfc3339(tested_at, &format!("{path}.tested_at"), report);
+    }
+}
+
 fn validate_federation_relationship(
     value: &Value,
     index: usize,
     report: &mut ValidationReport,
     members: &HashMap<String, (String, String, String)>,
+    shared_schema_blob_oid: Option<&str>,
 ) {
     let path = format!("relationships[{index}]");
     let Some(relationship) = object(value, &path, report) else {
@@ -1745,7 +1871,7 @@ fn validate_federation_relationship(
         relationship,
         &[
             "from_project_id", "relation", "to_project_id", "status",
-            "authority", "source_refs", "contract_binding", "claim_limitations",
+            "authority", "source_refs", "contract_binding", "compatibility_receipt", "claim_limitations",
         ],
         &path,
         report,
@@ -1787,6 +1913,28 @@ fn validate_federation_relationship(
     {
         report.error("EGDDM-FEDERATION-012", format!("{path}.contract_binding"), "contract_versioned_unqualified relationship requires an exact contract binding");
     }
+    if status.as_deref() == Some("independently_qualified")
+        && value.get("compatibility_receipt").is_none_or(Value::is_null)
+    {
+        report.error(
+            "EGDDM-FEDERATION-037",
+            format!("{path}.compatibility_receipt"),
+            "independently_qualified relationship requires a two-sided compatibility receipt",
+        );
+    }
+    if relation.as_deref() == Some("shared_schema_candidate") {
+        let bound_blob = value
+            .get("contract_binding")
+            .and_then(|binding| binding.get("contract_blob_oid"))
+            .and_then(Value::as_str);
+        if bound_blob != shared_schema_blob_oid {
+            report.error(
+                "EGDDM-FEDERATION-038",
+                format!("{path}.contract_binding.contract_blob_oid"),
+                "shared_schema_candidate must bind the exact schema blob pinned by shared_contract",
+            );
+        }
+    }
 
     if let Some(sources) = field(value, "source_refs", &path, report)
         .and_then(|v| array(v, &format!("{path}.source_refs"), report))
@@ -1811,6 +1959,18 @@ fn validate_federation_relationship(
             if let Some(source_repo) = source_repo {
                 if !members.values().any(|(repository, _, _)| repository.as_str() == source_repo) {
                     report.error("EGDDM-FEDERATION-014", format!("{source_path}.repository_full_name"), format!("source repository {source_repo:?} is not a federation member"));
+                }
+                let endpoint_repositories = [from, to]
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|project_id| members.get(project_id).map(|(repository, _, _)| repository.as_str()))
+                    .collect::<HashSet<_>>();
+                if !endpoint_repositories.contains(source_repo) {
+                    report.error(
+                        "EGDDM-FEDERATION-039",
+                        format!("{source_path}.repository_full_name"),
+                        "relationship source evidence must originate from one of its two endpoint repositories",
+                    );
                 }
             } else if !source.contains_key("repository_full_name") {
                 report.error("EGDDM-REQUIRED-001", format!("{source_path}.repository_full_name"), "required field is missing");
@@ -1839,6 +1999,23 @@ fn validate_federation_relationship(
         }
     }
 
+    if let Some(receipt) = relationship.get("compatibility_receipt") {
+        if !receipt.is_null() {
+            let bound_contract = relationship
+                .get("contract_binding")
+                .and_then(|binding| binding.get("contract_blob_oid"))
+                .and_then(Value::as_str);
+            validate_federation_compatibility_receipt(
+                receipt,
+                &format!("{path}.compatibility_receipt"),
+                from,
+                to,
+                members,
+                bound_contract,
+                report,
+            );
+        }
+    }
     if let Some(binding) = relationship.get("contract_binding") {
         if !binding.is_null() {
             if let Some(binding) = object(binding, &format!("{path}.contract_binding"), report) {
@@ -2027,7 +2204,13 @@ pub fn validate_federation_value(value: &Value) -> ValidationReport {
         .and_then(|v| array(v, "$.relationships", &mut report))
     {
         for (index, relationship) in relationship_values.iter().enumerate() {
-            validate_federation_relationship(relationship, index, &mut report, &members);
+            let shared_schema_blob = value
+                .get("shared_contract")
+                .and_then(|contract| contract.get("schema_blob_oid"))
+                .and_then(Value::as_str);
+            validate_federation_relationship(
+                relationship, index, &mut report, &members, shared_schema_blob,
+            );
         }
     }
     if let Some(policy) = field(value, "join_policy", "$", &mut report) {
@@ -2762,6 +2945,45 @@ mod tests {
             Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
         let report = validate_federation_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-026"));
+    }
+
+    #[test]
+    fn federation_shared_schema_binding_must_match_current_contract_blob() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        let relationship = value["relationships"]
+            .as_array_mut().expect("relationships")
+            .iter_mut()
+            .find(|item| item["relation"] == "shared_schema_candidate")
+            .expect("shared schema relationship");
+        relationship["contract_binding"]["contract_blob_oid"] =
+            Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-038"));
+    }
+
+    #[test]
+    fn federation_independent_qualification_requires_two_sided_receipt() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        let relationship = value["relationships"]
+            .as_array_mut().expect("relationships")
+            .iter_mut()
+            .find(|item| item["relation"] == "shared_schema_candidate")
+            .expect("shared schema relationship");
+        relationship["status"] = Value::String("independently_qualified".to_owned());
+        relationship["authority"] = Value::String("independently_adjudicated".to_owned());
+        relationship["contract_binding"]["status"] =
+            Value::String("independently_conformance_tested".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-037"));
+    }
+
+    #[test]
+    fn federation_relationship_source_must_belong_to_an_endpoint() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["relationships"][0]["source_refs"][0]["repository_full_name"] =
+            Value::String("Luminous-Dynamics/mycelix".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-039"));
     }
 
     #[test]
