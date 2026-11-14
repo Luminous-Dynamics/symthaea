@@ -212,6 +212,8 @@
         "case_id",
         "case_kind",
         "repository_id",
+        "repository_revision",
+        "repository_tree_oid",
         "query",
         "configuration_world",
         "token_budget",
@@ -283,6 +285,14 @@
         },
         "notes": {
           "type": "string"
+        },
+        "repository_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "repository_tree_oid": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
         }
       }
     }
