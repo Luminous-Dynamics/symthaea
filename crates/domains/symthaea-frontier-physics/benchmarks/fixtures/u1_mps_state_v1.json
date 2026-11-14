@@ -407,14 +407,15 @@
         "global_state_l2_error_bound",
         "compiled_state_l2_error_budget",
         "expectation_error_upper_bound",
-        "budget_satisfied"
+        "budget_satisfied",
+        "trotter_error_included"
       ],
       "assumptions": [
         "observable operator norm upper bound is supplied and valid",
         "exact reference state norm upper bound is supplied and justified",
         "global state L2 ledger is qualified; local Frobenius receipts alone are rejected"
       ],
-      "claim_boundary": "Error envelope only; no arbitrary MPO observable contraction or automatic observable norm estimation is implemented."
+      "claim_boundary": "Error envelope only; it inherits the global ledger scope and excludes Trotter/time-discretization error. For Strang TEBD, it is relative to the executed discrete gate sequence. No arbitrary MPO observable contraction or automatic observable norm estimation is implemented."
     }
   },
   "known_answers": [
@@ -632,7 +633,8 @@
         "strict target marked unsatisfied without suppressing the upper bound",
         "unqualified global ledger rejected",
         "zero-norm observable recognized as state-error insensitive",
-        "operator/exact-state norm assumptions appear in receipt"
+        "operator/exact-state norm assumptions appear in receipt",
+        "Trotter/time-discretization explicitly remains outside this receipt"
       ]
     }
   ],
@@ -791,7 +793,8 @@
     "observable_expectation_error_upper_bound",
     "observable_requested_expectation_error",
     "observable_budget_satisfied",
-    "observable_compiled_state_l2_error_budget"
+    "observable_compiled_state_l2_error_budget",
+    "observable_trotter_error_included"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
