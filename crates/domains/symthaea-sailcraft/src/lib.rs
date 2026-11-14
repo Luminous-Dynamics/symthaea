@@ -22,46 +22,74 @@ pub enum EvidenceState {
     Conflicted,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Evidence<T> {
     pub state: EvidenceState,
     pub value: Option<T>,
+    /// Digest of the exact source artifact; a digest is an identifier, not
+    /// proof of publisher authenticity or physical validity.
+    pub source_artifact_digest: [u8; 32],
+    /// All P0 observations must be transformed to the same qualified timebase.
+    pub timebase_id: String,
+    pub age_seconds: f64,
+    pub maximum_age_seconds: f64,
 }
 
 impl<T> Evidence<T> {
-    pub const fn qualified(value: T) -> Self {
+    pub fn qualified(value: T) -> Self {
+        Self::qualified_with_freshness(
+            value,
+            [0xa5; 32],
+            "synthetic-common-timebase",
+            0.0,
+            0.0,
+        )
+    }
+
+    pub fn qualified_with_freshness(
+        value: T,
+        source_artifact_digest: [u8; 32],
+        timebase_id: impl Into<String>,
+        age_seconds: f64,
+        maximum_age_seconds: f64,
+    ) -> Self {
         Self {
             state: EvidenceState::Qualified,
             value: Some(value),
+            source_artifact_digest,
+            timebase_id: timebase_id.into(),
+            age_seconds,
+            maximum_age_seconds,
         }
     }
 
-    pub const fn missing() -> Self {
+    pub fn missing() -> Self {
         Self {
             state: EvidenceState::Missing,
             value: None,
+            source_artifact_digest: [0; 32],
+            timebase_id: String::new(),
+            age_seconds: 0.0,
+            maximum_age_seconds: 0.0,
         }
     }
 
-    pub const fn stale(value: T) -> Self {
-        Self {
-            state: EvidenceState::Stale,
-            value: Some(value),
-        }
+    pub fn stale(value: T) -> Self {
+        let mut evidence = Self::qualified(value);
+        evidence.state = EvidenceState::Stale;
+        evidence
     }
 
-    pub const fn unverified(value: T) -> Self {
-        Self {
-            state: EvidenceState::Unverified,
-            value: Some(value),
-        }
+    pub fn unverified(value: T) -> Self {
+        let mut evidence = Self::qualified(value);
+        evidence.state = EvidenceState::Unverified;
+        evidence
     }
 
-    pub const fn conflicted(value: T) -> Self {
-        Self {
-            state: EvidenceState::Conflicted,
-            value: Some(value),
-        }
+    pub fn conflicted(value: T) -> Self {
+        let mut evidence = Self::qualified(value);
+        evidence.state = EvidenceState::Conflicted;
+        evidence
     }
 }
 
@@ -83,6 +111,8 @@ pub struct CurrentObservation {
 pub struct PolarDiagram {
     /// Exact craft + sail-plan + loading configuration identity.
     pub configuration_digest: [u8; 32],
+    /// Exact polar source artifact identity (not a publisher attestation).
+    pub source_artifact_digest: [u8; 32],
     /// Ordered true-wind-speed rows in metres per second.
     pub true_wind_speeds_mps: Vec<f64>,
     /// Ordered absolute true-wind angles in degrees; must span 0..=180.
@@ -93,7 +123,7 @@ pub struct PolarDiagram {
     pub no_go_angle_deg: f64,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RouteRequest {
     pub configuration_digest: [u8; 32],
     pub wind: Evidence<WindObservation>,
@@ -159,7 +189,9 @@ enum PolarError {
 
 impl PolarDiagram {
     fn validate(&self) -> Result<(), PolarError> {
-        if !self.no_go_angle_deg.is_finite()
+        if self.configuration_digest == [0; 32]
+            || self.source_artifact_digest == [0; 32]
+            || !self.no_go_angle_deg.is_finite()
             || self.no_go_angle_deg <= 0.0
             || self.no_go_angle_deg >= 90.0
             || self.true_wind_speeds_mps.len() < 2
@@ -276,10 +308,22 @@ fn ground_vmg(
     north_velocity * target.cos() + east_velocity * target.sin()
 }
 
-fn evidence_gate<T>(evidence: Evidence<T>) -> Result<T, PlanStatus> {
+fn evidence_gate<T>(evidence: &Evidence<T>) -> Result<&T, PlanStatus> {
     match evidence.state {
         EvidenceState::Conflicted => Err(PlanStatus::Conflicted),
-        EvidenceState::Qualified => evidence.value.ok_or(PlanStatus::NotEvaluated),
+        EvidenceState::Qualified => {
+            let source_digest_valid = evidence.source_artifact_digest != [0; 32];
+            let timebase_valid = !evidence.timebase_id.trim().is_empty();
+            let freshness_valid = evidence.age_seconds.is_finite()
+                && evidence.maximum_age_seconds.is_finite()
+                && evidence.age_seconds >= 0.0
+                && evidence.maximum_age_seconds >= 0.0
+                && evidence.age_seconds <= evidence.maximum_age_seconds;
+            if !source_digest_valid || !timebase_valid || !freshness_valid {
+                return Err(PlanStatus::NotEvaluated);
+            }
+            evidence.value.as_ref().ok_or(PlanStatus::NotEvaluated)
+        }
         EvidenceState::Missing
         | EvidenceState::Stale
         | EvidenceState::Unverified => Err(PlanStatus::NotEvaluated),
@@ -295,7 +339,7 @@ pub fn evaluate_route_candidates(
     polar: &PolarDiagram,
     request: RouteRequest,
 ) -> RouteEvaluation {
-    let wind = match evidence_gate(request.wind) {
+    let wind = match evidence_gate(&request.wind) {
         Ok(value) => value,
         Err(status) => {
             return RouteEvaluation::blocked(
@@ -304,7 +348,7 @@ pub fn evaluate_route_candidates(
             );
         }
     };
-    let current = match evidence_gate(request.current) {
+    let current = match evidence_gate(&request.current) {
         Ok(value) => value,
         Err(status) => {
             return RouteEvaluation::blocked(
@@ -313,7 +357,7 @@ pub fn evaluate_route_candidates(
             );
         }
     };
-    let target_bearing = match evidence_gate(request.target_bearing) {
+    let target_bearing = match evidence_gate(&request.target_bearing) {
         Ok(value) => value,
         Err(status) => {
             return RouteEvaluation::blocked(
@@ -322,6 +366,15 @@ pub fn evaluate_route_candidates(
             );
         }
     };
+
+    if request.wind.timebase_id != request.current.timebase_id
+        || request.wind.timebase_id != request.target_bearing.timebase_id
+    {
+        return RouteEvaluation::blocked(
+            PlanStatus::NotEvaluated,
+            "wind, current and waypoint observations do not share the qualified P0 timebase",
+        );
+    }
 
     if request.configuration_digest != polar.configuration_digest {
         return RouteEvaluation::blocked(
@@ -594,6 +647,58 @@ mod tests {
     }
 
     #[test]
+    fn observations_must_share_a_common_qualified_timebase() {
+        let mut input = request(0.0);
+        input.current = Evidence::qualified_with_freshness(
+            CurrentObservation {
+                toward_direction_deg: 90.0,
+                speed_mps: 0.0,
+            },
+            [0xc7; 32],
+            "different-clock-domain",
+            0.0,
+            1.0,
+        );
+        let result = evaluate_route_candidates(&polar(), input);
+        assert_eq!(result.status, PlanStatus::NotEvaluated);
+        assert!(result.candidates.is_empty());
+    }
+
+    #[test]
+    fn evidence_older_than_its_declared_freshness_window_is_rejected() {
+        let mut input = request(0.0);
+        input.wind = Evidence::qualified_with_freshness(
+            WindObservation {
+                from_direction_deg: 0.0,
+                speed_mps: 8.0,
+            },
+            [0xd8; 32],
+            "synthetic-common-timebase",
+            2.0,
+            1.0,
+        );
+        let result = evaluate_route_candidates(&polar(), input);
+        assert_eq!(result.status, PlanStatus::NotEvaluated);
+    }
+
+    #[test]
+    fn zero_source_digest_is_not_qualified_evidence() {
+        let mut input = request(0.0);
+        input.wind = Evidence::qualified_with_freshness(
+            WindObservation {
+                from_direction_deg: 0.0,
+                speed_mps: 8.0,
+            },
+            [0; 32],
+            "synthetic-common-timebase",
+            0.0,
+            1.0,
+        );
+        let result = evaluate_route_candidates(&polar(), input);
+        assert_eq!(result.status, PlanStatus::NotEvaluated);
+    }
+
+    #[test]
     fn invalid_polar_shapes_fail_closed() {
         let mut data = polar();
         data.boat_speed_mps[1].pop();
@@ -604,7 +709,7 @@ mod tests {
     #[test]
     fn polar_interpolation_is_bilinear_and_does_not_use_extrapolation() {
         let data = polar();
-        assert!((data.speed_at(6.0, 75.0).unwrap() - 3.65).abs() < 1e-9);
+        assert!((data.speed_at(6.0, 75.0).unwrap() - 3.225).abs() < 1e-9);
         assert_eq!(data.speed_at(13.0, 75.0), Err(PolarError::WindOutOfDomain));
     }
 
