@@ -120,9 +120,9 @@ Do not use the modeled 20–30% fleet penalty or indicative 1–5% portal saving
 
 ## 8. Industry and SOTA comparison
 
-Existing methods include IMO MEPC.378(80) biofouling guidance, MEPC.1/Circ.918 in-water cleaning guidance, ISO 19030 same-ship hull/propeller performance trend methods, and specialist inspection/cleaning equipment. The forthcoming ISO 6319:2026 gives a new method/documentation reference for in-water cleaning.
+Existing methods include IMO MEPC.378(80) biofouling guidance, MEPC.1/Circ.918 in-water cleaning guidance, ISO 19030 same-ship hull/propeller performance trend methods, and specialist inspection/cleaning equipment. ISO 6319:2026 (published March 2026) gives a new method/documentation reference for conducting and documenting in-water cleaning.
 
-The Luminous opportunity is a lifecycle evidence thread that joins route exposure, surface/coating revision, inspection coverage, species/waste evidence, measured resistance/shaft-power change, acoustic effect, maintenance cost and delivered cargo service. It should interoperate with qualified inspection and cleaning providers rather than invent organism identification or cleaning authorization.
+The Luminous opportunity is a lifecycle evidence thread that joins route exposure, surface/coating revision, inspection coverage, species/waste evidence, measured resistance/shaft-power change, acoustic effect, maintenance cost and delivered cargo service. It should interoperate with qualified inspection and cleaning providers rather than invent organism identification or cleaning authorization. A July 2026 physics-guided incremental-learning paper provides a new comparison method for detecting gradual performance degradation and post-cleaning recovery, but its data are not permissioned for sharing; reproduce only the stated method with an independently admitted dataset. ISO 19030-1 is scoped to conventional fixed-pitch propeller ships and must not be presented as directly applicable to PWC waterjets or tug azimuth/VSP systems without a validated extension.
 
 ## 9. Standards and sources
 
@@ -138,3 +138,70 @@ The Luminous opportunity is a lifecycle evidence thread that joins route exposur
 ## 10. Claim ceiling
 
 A fouling classifier pass is not species identification. A hull inspection is not full-surface coverage. A cleaning record is not proof of zero biological release. A fuel reduction after cleaning is not causal without matched conditions and uncertainty. ISO 6319 documentation does not replace local statutory authorization, port rules or operator biosecurity obligations.
+
+
+## 11. SOTA update — physics-guided incremental drift and post-cleaning recovery (14 November 2026)
+
+### 11.1 New comparator
+
+Lang et al., *Physics-guided machine learning for ship biofouling assessment in support of maritime decarbonization*, Transportation Research Part D, Volume 156, July 2026, Article 105364, DOI https://doi.org/10.1016/j.trd.2026.105364.
+
+The study combines a physics-informed warm-up set representing ideal, unfouled calm-water vessel states with incremental model updates over sliding temporal windows. It applies updated models at reference conditions to quantify performance change and reports improved tracking of gradual degradation and rapid post-cleaning recovery compared with conventional retraining and ISO 19030 assessment in its study.
+
+The publisher's record states that the authors do not have permission to share the data. This is a methodological comparator, not an open reproduction dataset. Its ship-performance context does not establish transfer to PWC waterjets or harbour-tug azimuth/VSP configurations.
+
+Source: https://www.sciencedirect.com/science/article/pii/S1361920926001574
+
+### 11.2 Attribution boundary and causal confounders
+
+A rising fuel/shaft-power residual or a speed loss can trigger inspection, but it does not independently diagnose biofouling. Competing causes include:
+- wind, waves, current, water density/temperature, depth and route;
+- payload, displacement, draft, trim and speed/control changes;
+- propeller/impeller/nozzle/azimuth/VSP damage, wear, cavitation or ventilation;
+- intake blockage, debris, cooling degradation or machinery efficiency changes;
+- battery SOH, generator state, engine/gearbox/inverter/motor changes;
+- hull/coating repair, sensor relocation, recalibration or data-pipeline changes.
+
+Separate: observed performance residual; model/domain uncertainty; candidate-cause attribution; independent inspected hull-zone evidence; cleaning authorization/capture/waste evidence; and matched post-intervention response. The estimator must be able to abstain when causes are not identifiable.
+
+Incremental updates must be time-causal: no future telemetry, post-cleaning observations, future inspection labels or revised calibration may leak into prior decisions. Preserve each baseline model and its historical predictions; an update is a versioned successor with explicit training window, input cutoff, configuration and source digests.
+
+### 11.3 Standards and applicability correction
+
+- **ISO 6319:2026** (published March 2026) covers planning, conducting and documenting in-water cleaning of external submerged surfaces, including hull and niche areas and all levels of biofouling, with or without capture. It does not cover internal piping. https://www.iso.org/standard/85997.html
+- **ISO 20679:2025** (published January 2025) provides independent performance testing procedures for in-water cleaning systems, including efficacy/safety and capture/processing/disposal of debris. It does not establish universal cleaning-performance criteria; authorities remain responsible for those. https://www.iso.org/standard/86393.html
+- **ISO 19030-1:2016** was confirmed current in 2022 and defines same-vessel performance-trend principles for conventional fixed-pitch propeller ships. Do not claim its direct conformance for PWC waterjet or tug azimuth/VSP architectures without a validated extension. https://www.iso.org/standard/63774.html
+- IMO **MEPC.378(80)** (2023) and **MEPC.1/Circ.918** (29 April 2025) remain key biofouling-management / in-water-cleaning guidance references. https://www.imo.org/en/ourwork/environment/pages/biofouling.aspx
+
+Keep cleaning execution/documentation, independent cleaning-system efficacy testing and hull/propulsor performance trending as different evidence families.
+
+### 11.4 South African practical engagement context
+
+The IMO's Regional In-Water Cleaning Technology Demonstration and Workshop took place in Cape Town on 5–8 October 2026. It brought agencies from 12 countries, industry and South African technology providers together. The National Department of Transport hosted with SAMSA and TNPA as implementing agencies. IMO reported live demonstrations by licensed South African service providers; SAMSA's 21 October sector report describes inspection, cleaning, capture, filtration, verification and documentation.
+
+- IMO (8 October 2026): https://www.imo.org/en/mediacentre/pages/whatsnew-2511.aspx
+- SAMSA sector report (21 October 2026): https://blog.samsa.org.za/2026/10/21/samsa-participates-in-test-biofouling-regional-in-water-cleaning-technology-demonstration-and-workshop/
+
+This is evidence of a local provider/regulatory ecosystem to investigate, not an endorsement, invitation, permit or data-access grant to Luminous. First map provider capabilities and permissions; do not assume all ports, coatings or cleaning systems are authorized.
+
+### 11.5 Future v0.2 implementation requirements
+
+Do not silently add unreviewed fields to the v0.1.0 schema. A new version should add explicit, separately typed references for:
+- normalized performance observation, raw trace, calibration and reference-condition fingerprint;
+- model identity/version, training-data cutoff/window, source/configuration digests and update parent;
+- time-of-decision availability, forecast/observation timing and evidence freshness;
+- residual interval, uncertainty method and model-domain disposition;
+- candidate causes and confounder coverage (weather, load, propulsion, condition, sensor);
+- independent hull-inspection evidence and coverage;
+- post-cleaning matched observation, cleaning authorization, capture and waste receipts;
+- ATTRIBUTED, NOT_ATTRIBUTED, INDETERMINATE and OUT_OF_DOMAIN outcomes that cannot be conflated with simple evidence-record validity.
+
+Reuse MARINE-SHIFT-001 #8171 for conditional calibration under hydrodynamic regime shift; do not create another conformal-prediction engine. The marine v0.2 work should adapt that qualified owner to distinguish performance residual from cause attribution and support abstention.
+
+## 12. Product-family transfer limits
+
+- **PWC-SIT:** inspect hull and niche areas as well as intake, grate, impeller, stator/nozzle and reverse system. Distinguish fouling from debris blockage, ventilation/cavitation, impeller damage and engine/motor/controller changes. ISO 19030 conventional-propeller indicators are not direct waterjet-PWC conformance.
+- **HARBOUR-TUG:** separate hull resistance and propeller/azimuth/VSP fouling from shaft/gearbox/engine/battery/drive efficiency and dispatch mix. Match energy per completed job at comparable draft, load, speed, assist/escort task and environmental state.
+- **Both:** a measured cleaning-related energy recovery needs independent pre/post matched-condition evidence with uncertainty. Cleaning legality, species risk, capture, disposal and coating integrity remain non-compensatory gates.
+
+Linked product owners: Symthaea PWC #12095 / installed waterjet #12135; tug #12096 / EMS #12136; contextual evidence join #11612; marine configuration/lifecycle #6154.
