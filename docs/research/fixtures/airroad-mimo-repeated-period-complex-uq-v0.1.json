@@ -1,0 +1,674 @@
+{
+  "schema": "luminous.airroad.mimo_repeated_period_complex_uq.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_repeated_period_complex_mimo_statistics",
+  "uncertainty_semantics": "statistical_covariance_and_complementary_covariance",
+  "campaign_id": "mimo-period-campaign-001",
+  "acquisition_id": "mimo-period-acquisition-001",
+  "model_identity": "sha256:mimo-period-model-v0.1",
+  "topology_identity": "sha256:mimo-two-coordinate-frf-v0.1",
+  "sample_clock_identity": "mimo-period-clock-001",
+  "sample_period_identity": "mimo-period-interval-001",
+  "vectorization_order": [
+    "f0:Re(z0)",
+    "f1:Re(z1)",
+    "f0:Im(z0)",
+    "f1:Im(z1)"
+  ],
+  "coordinates": [
+    {
+      "coordinate_id": "f0",
+      "kind": "complex_frf_coordinate",
+      "frequency_id": "frequency-0",
+      "port_element": [
+        0,
+        1
+      ]
+    },
+    {
+      "coordinate_id": "f1",
+      "kind": "complex_frf_coordinate",
+      "frequency_id": "frequency-1",
+      "port_element": [
+        0,
+        1
+      ]
+    }
+  ],
+  "calibration": {
+    "nuisance_id": "mimo-period-calibration-common-001",
+    "scope": "campaign_fixed_across_all_periods_and_coordinates",
+    "semantics": "deterministic_hard_nuisance_not_estimated_by_centered_period_covariance",
+    "value": {
+      "re": {
+        "numerator": "7",
+        "denominator": "3"
+      },
+      "im": {
+        "numerator": "-2",
+        "denominator": "5"
+      }
+    }
+  },
+  "periods": [
+    {
+      "period_id": "period-001",
+      "campaign_id": "mimo-period-campaign-001",
+      "acquisition_id": "mimo-period-acquisition-001",
+      "model_identity": "sha256:mimo-period-model-v0.1",
+      "topology_identity": "sha256:mimo-two-coordinate-frf-v0.1",
+      "sample_clock_identity": "mimo-period-clock-001",
+      "sample_period_identity": "mimo-period-interval-001",
+      "calibration_nuisance_id": "mimo-period-calibration-common-001",
+      "values": [
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ]
+    },
+    {
+      "period_id": "period-002",
+      "campaign_id": "mimo-period-campaign-001",
+      "acquisition_id": "mimo-period-acquisition-001",
+      "model_identity": "sha256:mimo-period-model-v0.1",
+      "topology_identity": "sha256:mimo-two-coordinate-frf-v0.1",
+      "sample_clock_identity": "mimo-period-clock-001",
+      "sample_period_identity": "mimo-period-interval-001",
+      "calibration_nuisance_id": "mimo-period-calibration-common-001",
+      "values": [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ]
+    },
+    {
+      "period_id": "period-003",
+      "campaign_id": "mimo-period-campaign-001",
+      "acquisition_id": "mimo-period-acquisition-001",
+      "model_identity": "sha256:mimo-period-model-v0.1",
+      "topology_identity": "sha256:mimo-two-coordinate-frf-v0.1",
+      "sample_clock_identity": "mimo-period-clock-001",
+      "sample_period_identity": "mimo-period-interval-001",
+      "calibration_nuisance_id": "mimo-period-calibration-common-001",
+      "values": [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ]
+    },
+    {
+      "period_id": "period-004",
+      "campaign_id": "mimo-period-campaign-001",
+      "acquisition_id": "mimo-period-acquisition-001",
+      "model_identity": "sha256:mimo-period-model-v0.1",
+      "topology_identity": "sha256:mimo-two-coordinate-frf-v0.1",
+      "sample_clock_identity": "mimo-period-clock-001",
+      "sample_period_identity": "mimo-period-interval-001",
+      "calibration_nuisance_id": "mimo-period-calibration-common-001",
+      "values": [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ]
+    },
+    {
+      "period_id": "period-005",
+      "campaign_id": "mimo-period-campaign-001",
+      "acquisition_id": "mimo-period-acquisition-001",
+      "model_identity": "sha256:mimo-period-model-v0.1",
+      "topology_identity": "sha256:mimo-two-coordinate-frf-v0.1",
+      "sample_clock_identity": "mimo-period-clock-001",
+      "sample_period_identity": "mimo-period-interval-001",
+      "calibration_nuisance_id": "mimo-period-calibration-common-001",
+      "values": [
+        {
+          "re": {
+            "numerator": "-1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "-1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "1"
+          }
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "period_count": 5,
+    "sample_mean": [
+      {
+        "re": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "im": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "re": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "im": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    ],
+    "real_covariance_of_mean": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "20"
+        },
+        {
+          "numerator": "1",
+          "denominator": "10"
+        }
+      ]
+    ],
+    "real_covariance_determinant": {
+      "numerator": "1",
+      "denominator": "32000"
+    },
+    "real_covariance_leading_principal_minors": [
+      {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      {
+        "numerator": "3",
+        "denominator": "400"
+      },
+      {
+        "numerator": "1",
+        "denominator": "2000"
+      },
+      {
+        "numerator": "1",
+        "denominator": "32000"
+      }
+    ],
+    "complex_covariance": [
+      [
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "5",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "10",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "10",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "5",
+            "denominator": "1"
+          }
+        }
+      ]
+    ],
+    "complementary_covariance": [
+      [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ]
+    ],
+    "augmented_covariance": [
+      [
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "5",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "10",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "10",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "5",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "5",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "10",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "10",
+            "denominator": "1"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "5",
+            "denominator": "1"
+          }
+        }
+      ]
+    ],
+    "augmented_covariance_determinant": {
+      "numerator": "1",
+      "denominator": "2000"
+    },
+    "augmented_leading_principal_minors": [
+      {
+        "numerator": "1",
+        "denominator": "5"
+      },
+      {
+        "numerator": "3",
+        "denominator": "100"
+      },
+      {
+        "numerator": "1",
+        "denominator": "250"
+      },
+      {
+        "numerator": "1",
+        "denominator": "2000"
+      }
+    ],
+    "augmented_determinant_factor_over_real": 16,
+    "proper": false,
+    "common_offset_invariance": true,
+    "four_period_rank_upper_bound": 3,
+    "four_period_real_covariance_singular": true,
+    "four_period_augmented_covariance_singular": true
+  },
+  "negative_controls": [
+    {
+      "id": "fewer-than-two-periods",
+      "expected": "reject"
+    },
+    {
+      "id": "duplicate-period-id",
+      "expected": "reject"
+    },
+    {
+      "id": "stale-campaign-or-acquisition-id",
+      "expected": "reject"
+    },
+    {
+      "id": "split-calibration-nuisance-id",
+      "expected": "reject-dependency"
+    },
+    {
+      "id": "coordinate-order-mismatch",
+      "expected": "reject-schema"
+    },
+    {
+      "id": "silent-complementary-covariance-drop",
+      "expected": "reject"
+    },
+    {
+      "id": "statistical-covariance-promoted-to-hard-set",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "unknown-cross-source-dependence-added-as-zero",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "four-period-positive-definite-claim",
+      "expected": "reject-rank-claim"
+    },
+    {
+      "id": "diagonal-jitter-to-hide-rank-deficiency",
+      "expected": "reject"
+    }
+  ],
+  "claim_ceiling": [
+    "Exact-rational repeated-period sample statistics for the two-coordinate synthetic fixture only.",
+    "The calibration offset is declared campaign-fixed and is not identified by centered repeated-period covariance.",
+    "No independence, Gaussianity, properness, physical calibration variance, finite-sample coverage or hard bound is inferred.",
+    "No continuous-frequency adequacy, IQC, robust stability or airworthiness claim is established."
+  ]
+}
