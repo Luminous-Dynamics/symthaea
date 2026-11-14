@@ -141,6 +141,7 @@ pub enum U1MpsError {
         max_bond_dimension: usize,
     },
     InvalidErrorBudget,
+    GlobalErrorBoundNotQualified,
     InvalidTeBDParity(u8),
     TeBDGateOutOfRange {
         bond_index: usize,
@@ -312,6 +313,9 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::InvalidErrorBudget => {
                 write!(f, "error budget must be positive, finite, and allocated fractions must sum to at most one")
+            },
+            Self::GlobalErrorBoundNotQualified => {
+                write!(f, "global observable error cannot be certified without a qualified global state-error bound")
             },
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
@@ -2377,6 +2381,147 @@ pub struct U1MpsErrorBudgetPlan {
     pub reserved_l2_error: f64,
 }
 
+
+
+/// Requested absolute error for the expectation of a bounded observable.
+///
+/// The exact-state norm upper bound must be justified by the caller from the
+/// exact reference dynamics (for unitary reference evolution, the initial
+/// state norm is sufficient). This type never assumes the approximate MPS is
+/// normalized.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsObservableErrorTarget {
+    pub maximum_expectation_error: f64,
+    pub observable_operator_norm_upper_bound: f64,
+    pub exact_state_norm_upper_bound: f64,
+}
+
+/// Observable-level error interval derived from a qualified global state L2 bound.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsObservableErrorReceipt {
+    pub requested_expectation_error: f64,
+    pub observable_operator_norm_upper_bound: f64,
+    pub approximate_state_norm_upper_bound: f64,
+    pub exact_state_norm_upper_bound: f64,
+    pub global_state_l2_error_bound: f64,
+    pub compiled_state_l2_error_budget: Option<f64>,
+    pub expectation_error_upper_bound: f64,
+    /// Always false in this API: Strang/Trotter time-discretization error is separate.
+    pub trotter_error_included: bool,
+    pub budget_satisfied: bool,
+}
+
+impl U1MpsObservableErrorTarget {
+    fn validate(&self) -> Result<(), U1MpsError> {
+        if !self.maximum_expectation_error.is_finite()
+            || self.maximum_expectation_error < 0.0
+            || !self.observable_operator_norm_upper_bound.is_finite()
+            || self.observable_operator_norm_upper_bound < 0.0
+            || !self.exact_state_norm_upper_bound.is_finite()
+            || self.exact_state_norm_upper_bound < 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        Ok(())
+    }
+
+    /// Convert an absolute expectation-error target into a sufficient global
+    /// state L2 budget using
+    /// |<a|A|a>-<b|A|b>| <= ||A|| ||a-b|| (||a||+||b||).
+    ///
+    /// None means the supplied observable norm bound is zero, so its
+    /// expectation is insensitive to state error under this bound.
+    pub fn compile_state_l2_error_budget(
+        &self,
+        approximate_state_norm_upper_bound: f64,
+    ) -> Result<Option<f64>, U1MpsError> {
+        self.validate()?;
+        if !approximate_state_norm_upper_bound.is_finite()
+            || approximate_state_norm_upper_bound < 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        if self.observable_operator_norm_upper_bound == 0.0 {
+            return Ok(None);
+        }
+        let denominator = self.observable_operator_norm_upper_bound
+            * (approximate_state_norm_upper_bound + self.exact_state_norm_upper_bound);
+        if !denominator.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "observable error-budget denominator",
+            ));
+        }
+        if denominator == 0.0 {
+            return Ok(None);
+        }
+        let budget = self.maximum_expectation_error / denominator;
+        if !budget.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "compiled observable state-error budget",
+            ));
+        }
+        Ok(Some(budget))
+    }
+
+    /// Certify an expectation-error envelope using the global ledger.
+    ///
+    /// The ledger must have a qualified global state-vector bound. A local
+    /// tensor Frobenius ledger is deliberately insufficient.
+    pub fn certify(
+        &self,
+        ledger: &U1MpsTruncationLedger,
+        approximate_state_norm_squared: f64,
+    ) -> Result<U1MpsObservableErrorReceipt, U1MpsError> {
+        self.validate()?;
+        if !approximate_state_norm_squared.is_finite() || approximate_state_norm_squared < 0.0 {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let approximate_state_norm_upper_bound = approximate_state_norm_squared.sqrt();
+        if self.observable_operator_norm_upper_bound == 0.0 {
+            return Ok(U1MpsObservableErrorReceipt {
+                requested_expectation_error: self.maximum_expectation_error,
+                observable_operator_norm_upper_bound: 0.0,
+                approximate_state_norm_upper_bound,
+                exact_state_norm_upper_bound: self.exact_state_norm_upper_bound,
+                global_state_l2_error_bound: 0.0,
+                compiled_state_l2_error_budget: None,
+                expectation_error_upper_bound: 0.0,
+                trotter_error_included: false,
+                budget_satisfied: true,
+            });
+        }
+        if !ledger.global_state_error_bound_qualified {
+            return Err(U1MpsError::GlobalErrorBoundNotQualified);
+        }
+        let global_state_l2_error_bound = ledger
+            .global_state_error_bound_upper
+            .filter(|bound| bound.is_finite() && *bound >= 0.0)
+            .ok_or(U1MpsError::GlobalErrorBoundNotQualified)?;
+        let compiled_state_l2_error_budget =
+            self.compile_state_l2_error_budget(approximate_state_norm_upper_bound)?;
+        let expectation_error_upper_bound = self.observable_operator_norm_upper_bound
+            * global_state_l2_error_bound
+            * (approximate_state_norm_upper_bound + self.exact_state_norm_upper_bound);
+        if !expectation_error_upper_bound.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "observable expectation error bound",
+            ));
+        }
+        Ok(U1MpsObservableErrorReceipt {
+            requested_expectation_error: self.maximum_expectation_error,
+            observable_operator_norm_upper_bound: self.observable_operator_norm_upper_bound,
+            approximate_state_norm_upper_bound,
+            exact_state_norm_upper_bound: self.exact_state_norm_upper_bound,
+            global_state_l2_error_bound,
+            compiled_state_l2_error_budget,
+            expectation_error_upper_bound,
+            trotter_error_included: false,
+            budget_satisfied: expectation_error_upper_bound <= self.maximum_expectation_error,
+        })
+    }
+}
+
+
 impl U1MpsErrorBudgetPlan {
     pub fn compile(
         total_l2_error: f64,
@@ -4119,10 +4264,11 @@ impl U1TeBDStrangStepper {
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsErrorBudgetFractions,
-        U1MpsErrorBudgetPlan, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
-        U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
-        U1TeBDStrangStepper, U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate,
-        U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        U1MpsErrorBudgetPlan, U1MpsObservableErrorTarget, U1MpsTensor,
+        U1MpsTruncationLedger, U1TeBDGate, U1TeBDGateReceipt,
+        U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult, U1TeBDStrangStepper,
+        U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
+        U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
@@ -6293,6 +6439,174 @@ mod tests {
             ),
             Err(U1MpsError::InvalidErrorBudget)
         );
+    }
+
+
+    fn entangled_single_excitation_two_site_state() -> ComplexU1Mps {
+        let inverse_root_two = 1.0 / 2.0_f64.sqrt();
+        let left = U1MpsTensor::new(
+            vec![0],
+            vec![0, 1],
+            vec![
+                Complex64::new(inverse_root_two, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(inverse_root_two, 0.0),
+            ],
+        )
+        .unwrap();
+        let right = U1MpsTensor::new(
+            vec![0, 1],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+        )
+        .unwrap();
+        ComplexU1Mps::new(vec![left, right], 1, 1.0e-12).unwrap()
+    }
+
+    fn truncating_entangled_pair_layer() -> super::U1TeBDLayerResult {
+        let input = entangled_single_excitation_two_site_state();
+        let layer = U1TeBDLayer::new(
+            2,
+            0,
+            vec![U1TeBDGate::new(0, U1TwoSiteGate::identity())],
+        )
+        .unwrap();
+        layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn observable_target_compiles_state_l2_budget_from_operator_norm() {
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 1.3,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let budget = target
+            .compile_state_l2_error_budget(0.5_f64.sqrt())
+            .unwrap()
+            .unwrap();
+        assert!((budget - 1.3 / (1.0 + 0.5_f64.sqrt())).abs() <= 1.0e-12);
+
+        let zero_observable = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 0.0,
+            observable_operator_norm_upper_bound: 0.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        assert_eq!(
+            zero_observable
+                .compile_state_l2_error_budget(1.0)
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn observable_certificate_uses_qualified_global_bound_and_reports_expectation_interval() {
+        let result = truncating_entangled_pair_layer();
+        assert!(result.global_l2_bound_qualified);
+        assert!((result.output_norm_squared - 0.5).abs() <= 1.0e-12);
+
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 1.3,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let receipt = target
+            .certify(&result.truncation_ledger, result.output_norm_squared)
+            .unwrap();
+        assert!(receipt.global_state_l2_error_bound >= 0.7);
+        assert!(receipt.expectation_error_upper_bound <= 1.3);
+        assert!(!receipt.trotter_error_included);
+        assert!(receipt.budget_satisfied);
+        assert!((receipt.compiled_state_l2_error_budget.unwrap()
+            - 1.3 / (1.0 + 0.5_f64.sqrt()))
+            .abs()
+            <= 1.0e-12);
+    }
+
+    #[test]
+    fn observable_certificate_marks_too_strict_expectation_target_unsatisfied() {
+        let result = truncating_entangled_pair_layer();
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 1.0,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let receipt = target
+            .certify(&result.truncation_ledger, result.output_norm_squared)
+            .unwrap();
+        assert!(receipt.expectation_error_upper_bound > 1.0);
+        assert!(!receipt.trotter_error_included);
+        assert!(!receipt.budget_satisfied);
+    }
+
+    #[test]
+    fn observable_certificate_rejects_unqualified_global_state_error_ledger() {
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 0.1,
+            observable_operator_norm_upper_bound: 1.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        assert_eq!(
+            target.certify(&U1MpsTruncationLedger::default(), 1.0),
+            Err(U1MpsError::GlobalErrorBoundNotQualified)
+        );
+    }
+
+    #[test]
+    fn zero_operator_observable_is_exact_even_without_global_state_error_receipt() {
+        let target = U1MpsObservableErrorTarget {
+            maximum_expectation_error: 0.0,
+            observable_operator_norm_upper_bound: 0.0,
+            exact_state_norm_upper_bound: 1.0,
+        };
+        let receipt = target
+            .certify(&U1MpsTruncationLedger::default(), 0.7)
+            .unwrap();
+        assert_eq!(receipt.expectation_error_upper_bound, 0.0);
+        assert!(receipt.budget_satisfied);
+        assert_eq!(receipt.compiled_state_l2_error_budget, None);
+    }
+
+    #[test]
+    fn observable_target_rejects_nonfinite_or_negative_inputs() {
+        for target in [
+            U1MpsObservableErrorTarget {
+                maximum_expectation_error: -0.1,
+                observable_operator_norm_upper_bound: 1.0,
+                exact_state_norm_upper_bound: 1.0,
+            },
+            U1MpsObservableErrorTarget {
+                maximum_expectation_error: 0.1,
+                observable_operator_norm_upper_bound: f64::NAN,
+                exact_state_norm_upper_bound: 1.0,
+            },
+            U1MpsObservableErrorTarget {
+                maximum_expectation_error: 0.1,
+                observable_operator_norm_upper_bound: 1.0,
+                exact_state_norm_upper_bound: f64::INFINITY,
+            },
+        ] {
+            assert_eq!(
+                target.compile_state_l2_error_budget(1.0),
+                Err(U1MpsError::InvalidErrorBudget)
+            );
+        }
     }
 
 }
