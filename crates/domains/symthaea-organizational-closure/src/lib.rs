@@ -24,6 +24,7 @@ pub mod assay;
 pub mod experiment_design;
 pub mod identity;
 pub mod model_refinement;
+pub mod partial_identification;
 pub mod reconfiguration;
 pub mod semantic_continuity;
 pub mod viability;
@@ -50,6 +51,14 @@ pub use model_refinement::{
     ModelRefinementFindingCode, ModelRefinementOracle, ModelRefinementProposal,
     ModelRefinementQualification, ModelRefinementReport, RefinementProbe,
     evaluate_model_refinement,
+};
+pub use partial_identification::{
+    AdmissibleCausalWorld, BidirectedCausalEdge, CausalEffectQuery, CausalGraphDescriptor,
+    DecisionQuality, DirectedCausalEdge, EffectInterval, PartialIdentificationExperiment,
+    PartialIdentificationFinding, PartialIdentificationFindingCode,
+    PartialIdentificationOracle, PartialIdentificationPolicy, PartialIdentificationQualification,
+    PartialIdentificationReport, PartialIdentificationScenario, PartialIdentificationTrace,
+    RobustDecision, evaluate_partial_identification,
 };
 pub use semantic_continuity::{
     AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
