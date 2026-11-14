@@ -965,6 +965,15 @@ pub fn build_musicxml_correction_ledger(
     Ok(report)
 }
 
+/// Validate the report's canonical content commitment without needing
+/// the source graphs. Full source replay remains the responsibility of
+/// `validate_musicxml_correction_ledger_replay`.
+pub fn validate_musicxml_correction_ledger_commitment(
+    report: &MusicXmlCorrectionLedgerReportV1,
+) -> Result<bool, MusicXmlCorrectionLedgerErrorV1> {
+    Ok(ledger_commitment(report)? == report.ledger_sha256)
+}
+
 pub fn validate_musicxml_correction_ledger_replay(
     reference: &MusicXmlPartNotationGraphV1,
     prediction: &MusicXmlPartNotationGraphV1,
