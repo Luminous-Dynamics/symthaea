@@ -50,7 +50,7 @@ For (N\le12), compute two independent references:
 1. **Discrete-circuit oracle**: apply the identical ordered sequence of two-site matrices to a dense state vector without compression. This isolates MPS representation, gauge and compression error from Trotter error.
 2. **Continuous-time oracle**: diagonalize/exponentiate the full dense Hamiltonian (H=\sum_j H_j) and compare at the same physical time. This measures Strang discretization error separately.
 
-For larger N, do not construct a dense state. Compare conserved-charge expectation/variance, norm drift, local density profiles, energy, current, entanglement/bond profiles, and time-step refinement.
+For larger N, do not construct a dense state. Compare conserved-charge expectation/variance, norm drift, local density profiles, energy, current, entanglement/bond profiles, and time-step refinement. Implementation-specific continuous-time-oracle limits must be recorded: the current Symthaea dense Taylor oracle is capped at N<=8, ITensor's full dense oracle at N<=10, while Quimb uses a sparse `expm_multiply` path up to N<=12.
 
 A passing global error certificate must bind the exact initial-state fingerprint, gate sequence digest, Hamiltonian digest, canonical-gauge receipts, gate-unitarity/charge residuals, projection residuals, and the cumulative bound. The certificate is for the discrete Strang circuit; it is not a bound on Trotter error.
 
