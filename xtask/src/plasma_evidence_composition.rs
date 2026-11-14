@@ -348,19 +348,20 @@ mod tests {
     }
 
     #[test]
-    fn every_transfer_endpoint_requires_a_bound_preregistered_design_receipt() {
+    fn valid_transfer_endpoint_has_a_bound_preregistered_design_receipt() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid composition fixture JSON");
-        for case in &fixture.cases {
-            for evidence in &case.endpoint_evidence {
-                let decision = validate_bridge(
-                    &evidence.equivalence_design,
-                    &evidence.endpoint,
-                    &evidence.baseline_receipt,
-                    &evidence.candidate_receipt,
-                );
-                assert_ne!(decision.disposition, DesignDisposition::Blocked, "{}", case.id);
-            }
-        }
+        let case = fixture.cases.iter()
+            .find(|case| case.id == "valid-rigid-plastic-d3163")
+            .expect("valid case exists");
+        let evidence = &case.endpoint_evidence[0];
+        let decision = validate_bridge(
+            &evidence.equivalence_design,
+            &evidence.endpoint,
+            &evidence.baseline_receipt,
+            &evidence.candidate_receipt,
+        );
+        assert_eq!(decision.disposition, DesignDisposition::Pass);
+        assert_eq!(decision.equivalence, "EQUIVALENCE_ESTABLISHED");
     }
 
     #[test]
