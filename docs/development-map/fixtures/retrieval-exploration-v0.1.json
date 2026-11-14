@@ -126,7 +126,9 @@
         }
       ],
       "expected_disposition": "retrieve",
-      "notes": "The smallest sufficient context is the verifier implementation + type constraints + contract test. Cargo feature evidence is useful but not mandatory if the query is limited to the active world."
+      "notes": "The smallest sufficient context is the verifier implementation + type constraints + contract test. Cargo feature evidence is useful but not mandatory if the query is limited to the active world.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "case_id": "DYNRETR-SYN-002",
@@ -195,7 +197,9 @@
         }
       ],
       "expected_disposition": "abstain",
-      "notes": "Repository contains receipt contract/version material but no protobuf migration adapter or protobuf compatibility test. Similar words are not sufficient evidence."
+      "notes": "Repository contains receipt contract/version material but no protobuf migration adapter or protobuf compatibility test. Similar words are not sufficient evidence.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "case_id": "DYNRETR-SYN-003",
@@ -245,7 +249,9 @@
         }
       ],
       "expected_disposition": "abstain",
-      "notes": "Counterfactual repository has coincidental protobuf terms, but not the requested migration contract. Score separately from natural no-gold."
+      "notes": "Counterfactual repository has coincidental protobuf terms, but not the requested migration contract. Score separately from natural no-gold.",
+      "repository_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repository_tree_oid": "dddddddddddddddddddddddddddddddddddddddd"
     },
     {
       "case_id": "DYNRETR-SYN-004",
@@ -314,7 +320,9 @@
         }
       ],
       "expected_disposition": "retrieve",
-      "notes": "The feature-gated payments-v2 region is a hard negative for this world even though it is lexically attractive."
+      "notes": "The feature-gated payments-v2 region is a hard negative for this world even though it is lexically attractive.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "case_id": "DYNRETR-SYN-005",
@@ -384,7 +392,9 @@
         }
       ],
       "expected_disposition": "retrieve",
-      "notes": "The old revision region may explain history but must not be returned as current implementation evidence."
+      "notes": "The old revision region may explain history but must not be returned as current implementation evidence.",
+      "repository_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repository_tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
     },
     {
       "case_id": "DYNRETR-SYN-006",
@@ -485,7 +495,9 @@
         }
       ],
       "expected_disposition": "retrieve",
-      "notes": "The correct set includes caller, test and feature declaration; pure lexical ranking may over-select the unrelated UI documentation."
+      "notes": "The correct set includes caller, test and feature declaration; pure lexical ranking may over-select the unrelated UI documentation.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "case_id": "DYNRETR-SYN-007",
@@ -573,7 +585,9 @@
         }
       ],
       "expected_disposition": "retrieve",
-      "notes": "The UI and changelog are lexical decoys; the primitive and invariant test are the gold context."
+      "notes": "The UI and changelog are lexical decoys; the primitive and invariant test are the gold context.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
     }
   ],
   "claim_ceiling": "Seven public synthetic known-answer retrieval tasks only. Token estimates and line ranges are authored scenario metadata, not measured tokenizer costs or source-code benchmark results. No retriever performance, downstream repair effect or SOTA claim is established."
