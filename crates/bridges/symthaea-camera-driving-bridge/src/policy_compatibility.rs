@@ -19,8 +19,8 @@ const ACTION_SCHEMA_DESCRIPTION: &str =
 fn digest_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     let mut result = String::with_capacity(64);
-    for byte in digest {
-        use std::fmt::Write as _;
+    use std::fmt::Write as _;
+    for byte in digest.iter() {
         let _ = write!(result, "{byte:02x}");
     }
     result
