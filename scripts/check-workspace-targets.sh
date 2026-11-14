@@ -34,6 +34,8 @@ EXCLUDES=(
   "crates/domains/symthaea-dishwasher-design"
   "crates/domains/symthaea-rea-compat"
   "crates/domains/symthaea-rea-evidence-verifier"
+  # AOBench is independently locked and built from its nested workspace.
+  "crates/domains/symthaea-organizational-closure"
   "crates/domains/symthaea-spore/fuzz"
   "crates/domains/spark-engine"
   "crates/domains/symthaea-lab"
