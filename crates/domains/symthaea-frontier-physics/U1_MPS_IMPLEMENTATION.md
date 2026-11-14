@@ -149,6 +149,22 @@ The latest increment connects local gates to an actual nearest-neighbour Hamilto
 
 The dense three-site one-excitation test checks the exact hopping-chain solution and a roughly fourfold reduction in global error when the time step is halved. A separate multi-step test checks that the global ledger is carried forward instead of being reset. These are authored acceptance tests until the consolidated exact-head runner passes.
 
+
+## Goal-driven error-budget compilation
+
+The new adaptive path reverses the traditional tuning workflow. Instead of selecting a relative singular-value cutoff and inspecting the error afterward, the caller supplies an absolute local two-site L2 projection target and a global maximum bond dimension:
+
+- \`U1TwoSiteState::split_with_error_budget\` estimates the smallest bond rank from the exact charge-block Schmidt spectrum.
+- It then checks the measured reconstruction residual. If finite-precision SVD error makes the residual exceed the target, it retains more modes and retries.
+- The policy is global across charge sectors; selection is by largest Schmidt values, with charge labels preserved.
+- If the maximum bond cannot meet the requested residual, the method returns \`TruncationBudgetInfeasible\` with the best measured residual under the cap. It does not return an under-qualified state.
+- No implicit renormalization occurs.
+- The receipt reports requested and achieved local residual, selected/minimum bond dimension, cap headroom and SVD factorization passes. The pass count is intentionally visible because the first version re-factorizes to validate the measured residual; reducing that overhead is a separate optimization target.
+
+The accompanying \`U1MpsErrorBudgetPlan\` compiles an end-to-end L2 target into explicit canonicalization, gate-quality, Hamiltonian-projection, compression and time-discretization allowances. Fractions must be finite, non-negative and sum to at most one. The unallocated fraction is retained as an explicit reserve. Its equal-per-gate compression allocation is a baseline for unitary/equal-sensitivity circuits; a later sensitivity-weighted planner must account for downstream operator-norm amplification and exterior gauge factors before claiming global optimality.
+
+**Error-domain boundary:** \`maximum_local_l2_error\` is a two-site tensor Frobenius target. It becomes a global state-vector target only after multiplying by qualified canonical-gauge exterior operator-norm bounds and accounting for all other error channels in the global ledger. The API does not silently reinterpret local residuals as global fidelity guarantees.
+
 ## Explicit limitations
 
 This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
@@ -157,7 +173,7 @@ This increment includes charge-block mixed-canonical sweeps, measured exterior-i
 - Independent Hamiltonian-to-MPO and local-effective-Hamiltonian qualification.
 - N=16–64 scale-out or accuracy-matched Quimb/ITensor/SeeMPS/cuQuantum performance evidence.
 
-The next stages are Trotter-envelope qualification, canonical-gauge TDVP/MPO exploration, lazy/nonlocal MPO support, and controlled accuracy-matched comparisons.
+The next stages are sensitivity-weighted error-budget allocation, one-pass adaptive SVD selection, Trotter-envelope qualification, canonical-gauge TDVP/MPO exploration, lazy/nonlocal MPO support, and controlled accuracy-matched comparisons.
 
 ## Competitive benchmark policy
 
