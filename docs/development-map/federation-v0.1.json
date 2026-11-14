@@ -305,7 +305,12 @@
           "line_end": 2
         }
       ],
-      "contract_binding": null,
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
+        "status": "declared"
+      },
       "claim_limitations": [
         "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
       ]
@@ -325,7 +330,12 @@
           "line_end": 2
         }
       ],
-      "contract_binding": null,
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
+        "status": "declared"
+      },
       "claim_limitations": [
         "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
       ]
@@ -345,7 +355,12 @@
           "line_end": 2
         }
       ],
-      "contract_binding": null,
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
+        "status": "declared"
+      },
       "claim_limitations": [
         "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
       ]
