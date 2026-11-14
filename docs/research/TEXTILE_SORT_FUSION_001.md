@@ -97,6 +97,17 @@ Primary industry sources:
 - Valvan Fibersort and Trimclean: https://www.valvan.com/en/solutions/textile-sorting-recycling
 - Refashion technical monitoring (sorting and unravelling technologies): https://media-pro.refashion.fr/2025/11/240428_synthese_veille-technos-tri-delissage_vf-en.pdf
 
+### 3.5 OpenTextile-NIR: sample-level evaluation, not pixel-level splitting
+
+OpenTextile-NIR adds paired hyperspectral/RGB spatial data for 71 post-industrial physical samples. It reports over 11 million spectra and more than 6 million annotated pixels, but those observations are nested within only 71 samples. Split at the **physical sample** level:
+- every pixel, tile, patch, crop, augmentation and mean-spectrum export from one sample remains in the same partition;
+- no spatially adjacent tiles from a sample may cross training/validation/test;
+- report sample-level metrics with a confidence interval clustered by physical sample, not confidence intervals treating pixels as independent;
+- distinguish supplier-sourced nominal composition from independently measured lab references; unknown or disputed labels remain unknown/open-set;
+- preserve instrument and sample-condition strata; report instrument/domain transfer separately where there is enough support.
+
+The executable split contract now has a negative control for two HSI tiles from one sample assigned to Train and Test. This validates grouping semantics only; it does not evaluate an HSI model.
+
 ### 3.4 Task separation
 
 | Benchmark | Valid question | It does not establish |
