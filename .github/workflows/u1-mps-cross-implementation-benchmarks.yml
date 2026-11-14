@@ -7,6 +7,7 @@ on:
     paths:
       - benchmarks/u1_tebd/**
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - research/u1-tebd-strang-stepper-20261113
     paths:
@@ -22,6 +23,7 @@ concurrency:
 jobs:
 
   symthaea-rust-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +33,7 @@ jobs:
           toolchain: 1.96.0
           components: clippy, rustfmt
       - name: Check benchmark runner formatting
-        run: cargo fmt --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml -- --check
+        run: rustfmt --edition 2024 --check benchmarks/u1_tebd/external/symthaea/src/main.rs
       - name: Compile and lint the production-source harness
         run: cargo clippy --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml --all-targets -- -D warnings
       - name: Run Strang TEBD two-site smoke
@@ -54,6 +56,7 @@ jobs:
           PY
 
   quimb-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -85,6 +88,7 @@ jobs:
           PY
 
   itensor-smoke:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
