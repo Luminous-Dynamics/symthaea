@@ -271,7 +271,7 @@ fn find_case<'a>(corpus: &'a Value, case_id: &str) -> &'a Value {
 }
 
 #[test]
-fn ten_known_answer_cases_match_K0_K1_reference_and_manifest_digests() {
+fn eleven_known_answer_cases_match_K0_K1_reference_and_manifest_digests() {
     let corpus: Value = serde_json::from_str(CASES).expect("valid requalification corpus");
     assert_eq!(string_at(&corpus, "schema_version"), "engineering-decision-requalification-v0.1");
     assert_eq!(array_at(&corpus, "cases").len(), 11);
