@@ -95,7 +95,7 @@ Resource budgets:
 
 ## Tests authored
 
-### Notation-event parser (18 tests)
+### Notation-event parser (19 tests)
 
 - rest and measure-rest, grace, cue, unpitched, microtonal pitch spelling, voice/staff and instrument ID;
 - chord member onset anchoring and no cursor advance;
@@ -104,6 +104,7 @@ Resource budgets:
 - score-order key/clef attribute changes at exact beat offsets;
 - backup/forward movement across simultaneous voices;
 - source order, unknown extension retention and namespace URI disambiguation for repeated local element/attribute names;
+- foreign-namespace core-name collision controls (ext:note, ext:attributes, ext:divisions) cannot alter MusicXML note or divisions semantics;
 - note-level time-only, attack and release annotations retained independently from notated timing;
 - event extent beyond the explicit measure span withholds all partial events;
 - ambiguous chord / invalid duration fail-closed behavior;
