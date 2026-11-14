@@ -180,27 +180,54 @@ pub struct MusicRealizationExpectedBindingV1 {
     pub controls: Vec<MusicRealizationExpectedControlV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Opaque proof token returned only by the verifier below. It intentionally
+/// has private fields and no Deserialize implementation: downstream code
+/// cannot construct, mutate, or deserialize a self-asserted "verified" value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MusicRealizationVerifiedBindingV1 {
-    pub transaction_id: String,
-    pub attempt_id: String,
-    pub candidate_id: String,
-    pub source_lineage_sha256: String,
-    pub realization_request_id: String,
-    pub request_sha256: String,
-    pub capability_manifest_sha256: String,
-    pub upstream_realization_receipt_sha256: String,
-    pub realization_receipt_sha256: String,
-    pub backend_id: String,
-    pub backend_version: String,
-    pub adapter_id: String,
-    pub adapter_version: String,
-    pub output_modality: MusicRealizationOutputModalityV1,
-    pub final_execution_state: MusicRealizerExecutionEventStateV1,
-    pub submission_count: u64,
-    pub observed_output_sha256: Option<String>,
-    pub observed_output_byte_length: u64,
-    pub report_sha256: String,
+    transaction_id: String,
+    attempt_id: String,
+    candidate_id: String,
+    source_lineage_sha256: String,
+    realization_request_id: String,
+    request_sha256: String,
+    capability_manifest_sha256: String,
+    upstream_realization_receipt_sha256: String,
+    realization_receipt_sha256: String,
+    backend_id: String,
+    backend_version: String,
+    adapter_id: String,
+    adapter_version: String,
+    output_modality: MusicRealizationOutputModalityV1,
+    final_execution_state: MusicRealizerExecutionEventStateV1,
+    submission_count: u64,
+    observed_output_sha256: Option<String>,
+    observed_output_byte_length: u64,
+    report_sha256: String,
+}
+
+impl MusicRealizationVerifiedBindingV1 {
+    pub fn transaction_id(&self) -> &str { &self.transaction_id }
+    pub fn attempt_id(&self) -> &str { &self.attempt_id }
+    pub fn candidate_id(&self) -> &str { &self.candidate_id }
+    pub fn source_lineage_sha256(&self) -> &str { &self.source_lineage_sha256 }
+    pub fn realization_request_id(&self) -> &str { &self.realization_request_id }
+    pub fn request_sha256(&self) -> &str { &self.request_sha256 }
+    pub fn capability_manifest_sha256(&self) -> &str { &self.capability_manifest_sha256 }
+    pub fn upstream_realization_receipt_sha256(&self) -> &str { &self.upstream_realization_receipt_sha256 }
+    pub fn realization_receipt_sha256(&self) -> &str { &self.realization_receipt_sha256 }
+    pub fn backend_id(&self) -> &str { &self.backend_id }
+    pub fn backend_version(&self) -> &str { &self.backend_version }
+    pub fn adapter_id(&self) -> &str { &self.adapter_id }
+    pub fn adapter_version(&self) -> &str { &self.adapter_version }
+    pub fn output_modality(&self) -> MusicRealizationOutputModalityV1 { self.output_modality }
+    pub fn final_execution_state(&self) -> MusicRealizerExecutionEventStateV1 { self.final_execution_state }
+    pub fn submission_count(&self) -> u64 { self.submission_count }
+    pub fn observed_output_sha256(&self) -> Option<&str> {
+        self.observed_output_sha256.as_deref()
+    }
+    pub fn observed_output_byte_length(&self) -> u64 { self.observed_output_byte_length }
+    pub fn report_sha256(&self) -> &str { &self.report_sha256 }
 }
 
 impl MusicRealizationVerifiedBindingV1 {
