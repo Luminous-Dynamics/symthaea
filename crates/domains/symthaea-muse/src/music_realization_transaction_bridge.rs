@@ -256,7 +256,13 @@ fn validate_execution_events(
 
         match event.state {
             S::Submitted => {
-                submissions = submissions.saturating_add(1);
+                submissions = match submissions.checked_add(1) {
+                    Some(value) => value,
+                    None => {
+                        issues.push(MusicRealizationBridgeIssueV1::InvalidExecutionTrace);
+                        u64::MAX
+                    }
+                };
                 if event.reconciles_sequence.is_some()
                     || event.reconciliation_receipt_sha256.is_some()
                     || event.reason_code.is_some()
@@ -285,6 +291,9 @@ fn validate_execution_events(
             }
             S::ReconciledNotExecuted | S::ReconciledCompleted | S::ReconciledFailed => {
                 let reference = event.reconciles_sequence;
+                let previous_unknown = index > 0
+                    && payload.execution_events[index - 1].state == S::OutcomeUnknown
+                    && reference == Some(payload.execution_events[index - 1].sequence);
                 let receipt_valid = event
                     .reconciliation_receipt_sha256
                     .as_deref()
@@ -299,7 +308,8 @@ fn validate_execution_events(
                         .is_none_or(|reason| reason.trim().is_empty()),
                     _ => false,
                 };
-                if !reference.is_some_and(|sequence| unknown_sequences.contains(&sequence))
+                if !previous_unknown
+                    || !reference.is_some_and(|sequence| unknown_sequences.contains(&sequence))
                     || !receipt_valid
                     || !reason_valid
                 {
