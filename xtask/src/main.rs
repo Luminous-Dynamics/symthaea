@@ -8,6 +8,7 @@ mod plasma_evidence_composition;
 mod plasma_claim_scope;
 mod plasma_equivalence_design;
 mod plasma_transfer;
+mod plasma_surface_integrity;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -87,6 +88,11 @@ enum Commands {
         fixture: PathBuf,
         #[arg(long, default_value = "data/research/plasma_transfer_composition_fixture_v0_1.json")]
         composition_fixture: PathBuf,
+    },
+    /// Audit plasma activation against application-specific substrate-integrity hard constraints.
+    PlasmaSurfaceIntegrityAudit {
+        #[arg(long, default_value = "data/research/plasma_surface_integrity_fixture_v0_1.json")]
+        fixture: PathBuf,
     },
     GenerateManifest {
         #[arg(long, default_value = ".")]
@@ -180,6 +186,14 @@ fn main() -> anyhow::Result<()> {
                 root.join(composition_fixture)
             };
             plasma_transfer::run(&fixture_path, &composition_path)?;
+        }
+        Commands::PlasmaSurfaceIntegrityAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() { fixture } else { root.join(fixture) };
+            plasma_surface_integrity::run(&fixture_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
