@@ -2,6 +2,7 @@
 //! S0 checks a frozen contract; it does not estimate physical outcomes or authorize changes.
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
+use crate::plasma_evidence_composition::{audit_transfer_bridge, Disposition as CompositionDisposition};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
@@ -80,6 +81,32 @@ fn audit_case(case: &Value, fixture: &Value) -> Disposition {
     let Some(min_confidence) = fixture.get("minimum_confidence_level").and_then(Value::as_f64) else { return Disposition::Blocked; };
     if !(0.0..=1.0).contains(&min_confidence) { return Disposition::Rejected; }
 
+    let Some(material_scope_map) = fixture.get("material_scope_map").and_then(Value::as_object) else {
+        return Disposition::Blocked;
+    };
+    let baseline_grade = baseline.get("substrate_grade").and_then(Value::as_str);
+    let candidate_grade = candidate.get("substrate_grade").and_then(Value::as_str);
+    let (Some(baseline_grade), Some(candidate_grade)) = (baseline_grade, candidate_grade) else {
+        return Disposition::Blocked;
+    };
+    let (Some(baseline_material_scope), Some(candidate_material_scope)) = (
+        material_scope_map.get(baseline_grade).and_then(Value::as_object),
+        material_scope_map.get(candidate_grade).and_then(Value::as_object),
+    ) else {
+        return Disposition::Blocked;
+    };
+    let (Some(material_pair_class), Some(geometry)) = (
+        baseline_material_scope.get("material_pair_class").and_then(Value::as_str),
+        baseline_material_scope.get("geometry").and_then(Value::as_str),
+    ) else {
+        return Disposition::Blocked;
+    };
+    if candidate_material_scope.get("material_pair_class").and_then(Value::as_str) != Some(material_pair_class)
+        || candidate_material_scope.get("geometry").and_then(Value::as_str) != Some(geometry)
+    {
+        return Disposition::Blocked;
+    }
+
     let mut seen_sets = HashSet::<String>::new();
     let mut individual = HashSet::<String>::new();
     let mut joint = false;
@@ -101,6 +128,16 @@ fn audit_case(case: &Value, fixture: &Value) -> Disposition {
         }
         let checked = validate_evidence(bridge, &required_endpoints, min_confidence, &mut seen_hashes);
         if checked != Disposition::Pass { return checked; }
+
+        let Some(composition_evidence) = bridge.get("composition_evidence") else {
+            return Disposition::Blocked;
+        };
+        match audit_transfer_bridge(composition_evidence, bridge, material_pair_class, geometry) {
+            CompositionDisposition::Pass => {}
+            CompositionDisposition::Blocked => return Disposition::Blocked,
+            CompositionDisposition::Rejected => return Disposition::Rejected,
+        }
+
         if keys.len() == 1 { individual.insert(keys[0].clone()); }
         else if keys == full_set { joint = true; }
         // Partial multi-factor bridges do not satisfy the full-vector interaction requirement.
