@@ -1,0 +1,14 @@
+[package]
+name = "airroad-clarabel-smoke"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+publish = false
+
+# This is intentionally an independent workspace. It keeps solver smoke tests
+# isolated from the large Symthaea workspace's manifest resolution.
+[workspace]
+
+[dependencies]
+clarabel = { version = "=0.11.1", features = ["sdp-openblas"] }

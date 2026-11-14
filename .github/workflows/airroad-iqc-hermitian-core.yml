@@ -1,0 +1,37 @@
+name: AIRROAD IQC Hermitian Core
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-airroad-iqc/**"
+      - ".github/workflows/airroad-iqc-hermitian-core.yml"
+  push:
+    branches:
+      - research/airroad-iqc-hermitian-core-v0.1
+    paths:
+      - "crates/domains/symthaea-airroad-iqc/**"
+      - ".github/workflows/airroad-iqc-hermitian-core.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-iqc-hermitian-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hermitian-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust with required components
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Compile and run isolated unit tests
+        run: |
+          rustc --edition 2024 --test crates/domains/symthaea-airroad-iqc/src/lib.rs -o "$RUNNER_TEMP/airroad-hermitian-tests"
+          "$RUNNER_TEMP/airroad-hermitian-tests"
+      - name: Run isolated Clippy without resolving the workspace
+        run: clippy-driver --edition 2024 --crate-name symthaea_airroad_iqc --crate-type lib --deny warnings crates/domains/symthaea-airroad-iqc/src/lib.rs
