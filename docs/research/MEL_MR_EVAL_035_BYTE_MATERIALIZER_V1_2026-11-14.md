@@ -13,7 +13,7 @@ The operation matrix remains unchanged: all twelve SMEBench operation families a
 
 ## Paradigm
 
-Treat a benchmark sample as a lineage-bound bundle of bytes and permissions, not a row of metadata. The materializer binds dataset ID, immutable version and benchmark track; manifest and artifact-map commitments; source recording, instruction and paired target; optional symbolic source, target selector and annotation metadata; source-lineage ID and split; local rights/access evidence when declared; and actual byte count and SHA-256 for every artifact role.
+Treat a benchmark sample as a lineage-bound bundle of bytes and permissions, not a row of metadata. The materializer binds dataset ID, immutable version and benchmark track; manifest and artifact-map commitments; source recording, instruction and paired target; optional symbolic source, target selector and annotation metadata; source-lineage ID and split; local permission/access evidence when declared; and actual byte count and SHA-256 for every artifact role.
 
 A deterministic receipt binds the complete materialization result. Its integrity verifier checks receipt structure, canonical ordering, manifest/map commitments, coverage and receipt digest. Re-running materialization reopens and rehashes files; receipt replay alone does not re-read them.
 
@@ -39,6 +39,13 @@ The path walk rejects observed symlinks and canonical escapes, but this is not a
 
 No real benchmark assets are committed or fetched by this PR. The synthetic artifact-map fixture is a schema/contract fixture only; its referenced paths are not present and it is not materializable.
 
+
+
+## Separation from legal-use admission
+
+EVAL-035 is a technical byte-integrity layer. A successful materialization receipt proves that the local files read in that invocation matched the declared manifest digests and artifact map. It does not decide whether those files may be used for a particular purpose, authenticate the source of a license, or approve an external evaluation.
+
+The component-level purpose policy is implemented separately in [MEL-MR-RIGHTS-001 / PR #12034](https://github.com/Luminous-Dynamics/symthaea/pull/12034). The joint gate that binds a specific Allowed rights decision to the exact EVAL-035 artifact receipt is tracked in [MEL-MR-INTEGRATION-001 / #12035](https://github.com/Luminous-Dynamics/symthaea/issues/12035). Until that joint gate exists, do not treat EVAL-035 byte materialization alone as authorization to run an external editor/scorer or use data for training/commercial evaluation.
 
 ## External dataset rights and target-validity warning
 
