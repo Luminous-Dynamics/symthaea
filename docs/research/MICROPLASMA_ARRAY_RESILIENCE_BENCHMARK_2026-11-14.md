@@ -186,10 +186,11 @@ No new solver, plasma chemistry model, optimizer, hardware controller, HAL comma
 
 ## 9. Validation record and limitations
 
-Validation planned/performed for this increment:
-- strict JSON parse and schema enforcement;
-- independent JavaScript known-answer replay of the frozen fixture;
-- Rust tests for fixture replay, missing diagnostics, isolated-cell output, faulted-active-cell rejection, aggregate reconciliation and product-quality rejection.
+Validation performed on the current frozen fixture:
+- strict JSON parse; unique case identities and required challenge-case presence checked after fetch-back;
+- an independently written JavaScript evaluator replayed **29/29** expected dispositions with zero mismatches: **6 PASS / 7 BLOCKED / 16 REJECTED**;
+- the independent replay includes the post-review negative control that rejects an isolated cell omitted from the fault receipt;
+- Rust unit tests are authored for fixture replay, missing diagnostics, isolated-cell output, faulted-active-cell rejection, aggregate reconciliation, isolated-cell receipt reconciliation and product-quality rejection.
 
 The current authoring environment has no Cargo, rustc, rustfmt or Nix. Rust compilation, tests, formatting and Clippy are therefore **not executed**. Hosted CI status is not assumed. No physical device, solver, HV/RF source, gas system, plasma cell or test coupon was energized or operated.
 
