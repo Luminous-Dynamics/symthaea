@@ -8,13 +8,13 @@ on:
     paths:
       - "crates/domains/symthaea-organizational-closure/**"
       - "Cargo.toml"
-      - "Cargo.lock"
+      - "scripts/check-workspace-targets.sh"
       - ".github/workflows/aobench-runtime.yml"
   pull_request:
     paths:
       - "crates/domains/symthaea-organizational-closure/**"
       - "Cargo.toml"
-      - "Cargo.lock"
+      - "scripts/check-workspace-targets.sh"
       - ".github/workflows/aobench-runtime.yml"
 
 permissions:
@@ -26,9 +26,13 @@ concurrency:
 
 jobs:
   verify:
-    name: Runtime verifier (exact package)
+    name: Runtime verifier (standalone exact package)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      CARGO_NET_RETRY: 10
+      CARGO_HTTP_TIMEOUT: 120
+      CARGO_HTTP_MULTIPLEXING: false
     steps:
       - uses: actions/checkout@v4
 
@@ -43,19 +47,23 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: ${{ runner.os }}-aobench-runtime-${{ hashFiles('**/Cargo.lock') }}
+            crates/domains/symthaea-organizational-closure/target
+          key: ${{ runner.os }}-aobench-runtime-${{ hashFiles('crates/domains/symthaea-organizational-closure/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-aobench-runtime-
 
       - name: Format check
-        run: cargo fmt -p symthaea-organizational-closure -- --check
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo fmt --all -- --check
 
       - name: Compile all package targets
-        run: cargo check --locked -p symthaea-organizational-closure --all-targets
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo check --locked --all-targets
 
       - name: Run deterministic verifier tests
-        run: cargo test --locked -p symthaea-organizational-closure
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo test --locked
 
       - name: Strict package Clippy
-        run: cargo clippy --locked -p symthaea-organizational-closure --all-targets -- -D warnings
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo clippy --locked --all-targets -- -D warnings
