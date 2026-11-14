@@ -1,0 +1,10 @@
+[package]
+name = "mel-muse-merge-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Pure-std reference preflight evaluator for semantic musical branch merges"
+
+# Keep this bounded research evaluator outside the large Symthaea workspace.
+[workspace]

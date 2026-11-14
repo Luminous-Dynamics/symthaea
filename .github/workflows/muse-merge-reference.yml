@@ -1,0 +1,52 @@
+name: MUSE Semantic Merge Reference
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-muse-merge/**"
+      - "docs/research/MUSE_MERGE_001_SEMANTIC_BRANCHING_V1_2026-11-11.md"
+      - "docs/research/fixtures/muse-merge-001-cases-v1.json"
+      - "docs/research/schemas/muse-merge-001-cases-v1.schema.json"
+      - ".github/workflows/muse-merge-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-merge-reference-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-merge-reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/mel-muse-merge/Cargo.toml --all -- --check
+
+      - name: Run deterministic reference tests
+        run: cargo test --manifest-path tools/mel-muse-merge/Cargo.toml --locked
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/mel-muse-merge/Cargo.toml --all-targets --locked -- -D warnings
