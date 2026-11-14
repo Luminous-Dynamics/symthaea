@@ -8,6 +8,7 @@ on:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
       - .github/workflows/u1-two-site-gates.yml
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - research/u1-charge-block-two-site-split-20261113
     paths:
@@ -23,6 +24,7 @@ concurrency:
 
 jobs:
   source-harness:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Rust 1.96 U1 truncation ledger exact-source validation
     runs-on: ubuntu-latest
     steps:

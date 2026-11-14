@@ -1,6 +1,6 @@
 # Complex U(1)-symmetric MPS state representation
 
-**Status:** the complex charge-labelled MPS core, charge-block dense factorization, U(1)-conserving two-site gates, exact two-site charge-block split, and explicit global truncation/error ledger are source-authored. The latest truncation branch is awaiting its exact-head Rust 1.96 harness. Full TEBD sequencing and scaling remain unimplemented.
+**Status:** source-authored implementation now includes complex U(1)-symmetric MPS storage, dense fixed-charge factorization, validated local gates, exact and truncated charge-block two-site SVD, deterministic even/odd TEBD layers, mixed-canonical gauge receipts, a gate/model-projection/truncation error ledger, analytic U(1) Hamiltonian gates, and a second-order even/odd/even Strang stepper. The latest consolidated exact-head Rust 1.96 harness is the remaining validation gate. Long-range MPO/TDVP and matched large-N performance remain unimplemented.
 
 ## Scope of this increment
 
@@ -104,25 +104,75 @@ The new scheduler composes the local gate, exact charge-aware contraction, and e
 
 This is a layer executor, not yet a complete TEBD time-stepper: second-order even/odd/even or odd/even/odd Trotter composition, Hamiltonian-to-gate exponentiation, adaptive time stepping, and a global canonical-gauge error certificate remain future increments.
 
+
+## Mixed-canonical gauge qualification
+
+The canonical-gauge branch adds charge-block left and right sweeps and a measured receipt for a two-site center:
+
+- \`ComplexU1Mps::canonicalize_for_bond(bond, tolerance)\` makes sites left of the center pair left-isometric and sites right of it right-isometric.
+- Each sweep factors only charge-compatible matrix blocks; no positive singular-value cutoff or bond cap is applied.
+- \`ComplexU1Mps::inner_product\` computes the overlap between two MPS representations with different virtual bond dimensions, without dense expansion.
+- The candidate gauge is built transactionally. If factorization, validation or overlap checks fail, the original MPS is unchanged.
+- The receipt includes each exterior site's Gram-isometry residual, the maximum residuals, conservative exterior operator-norm upper bounds, factorization residuals, a state-reconstruction L2 residual computed from the cross-MPS overlap, norm drift, charge residual and a qualification bit.
+
+For a site's left-isometry matrix \(A\), the receipt measures \(\|A^\dagger A-I\|_F=r\), which implies \(\|A\|_2\le\sqrt{1+r}\). The corresponding right-isometry bound is obtained from \(\|AA^\dagger-I\|_F\). Products of these per-site bounds provide a conservative upper bound for the exterior block maps. The local discarded Schmidt norm can then be multiplied by the left/right exterior operator-norm product to obtain a global projection-error contribution, provided the gate is unitary and the gauge receipt passes. Canonicalization's own state-reconstruction residual must also be included in the ledger.
+
+This receipt is an independent check of the canonical form, not a declaration that an arbitrary MPS was already canonical. The TEBD layer now calls this method immediately before each local gate/truncation, then keeps the canonicalization receipt adjacent to that gate's truncation and gate-quality measurements.
+
+The global error ledger separates three contributions per gate:
+
+1. **Canonicalization representation drift:** the measured cross-MPS state-reconstruction L2 residual.
+2. **Gate quality:** a polar-unitary correction bound derived from the Frobenius residual \(\|G^\dagger G-I\|_F\), plus a charge-off-block bound \(\sqrt{10}\,r_Q\) for the ten forbidden entries in a two-qubit \(4\times4\) gate, each multiplied by the pre-gate state norm.
+3. **Schmidt projection:** \(\sqrt{w_\mathrm{discarded}}\) multiplied by the measured product of left/right exterior operator-norm upper bounds.
+
+The per-gate contributions are accumulated by the triangle inequality, and the global flag remains false as soon as a gauge receipt or gate-quality check fails. No post-truncation renormalization is performed. The bound applies to the circuit formed by the closest charge-conserving unitary represented by each accepted gate matrix; gate defect contributions make the distinction from the supplied floating-point matrix explicit. It still excludes Trotter/discretization error because the layer executor is not yet a Hamiltonian time-stepper.
+
+
+
+
+## Hamiltonian-driven second-order Strang TEBD
+
+The latest increment connects local gates to an actual nearest-neighbour Hamiltonian evolution path.
+
+- \`U1TwoSiteHamiltonian\` validates finite entries, Hermiticity and U(1) charge conservation.
+- Its nearest Hermitian, charge-block-diagonal projection is computed explicitly. The Frobenius residual from the supplied matrix is recorded rather than silently discarded.
+- The \(q=0\) and \(q=2\) sectors exponentiate as scalar phases; the \(q=1\) sector uses the analytic exponential of a \(2\times2\) Hermitian matrix. No generic \(4\times4\) eigensolver is needed.
+- Every generated gate carries a Duhamel operator-norm upper bound for the difference between the supplied tolerance-qualified Hamiltonian and the Hermitian U(1)-block projection actually exponentiated.
+- \`U1TeBDStrangStepper\` constructs a symmetric even-half / odd-full / even-half composition. The same truncation/error ledger is carried through all three layers and can be continued across successive time steps with \`apply_with_ledger\`.
+
+### Four distinct error channels
+
+1. **Hamiltonian model projection:** discrepancy between the supplied tolerance-qualified local matrix and its exact Hermitian, U(1)-block projection. This is included in the global ledger using the measured Frobenius residual and a Duhamel exponential bound.
+2. **Representation/evolution implementation:** canonicalization reconstruction, gate unitarity defect and charge-sector leakage, propagated by subsequent gate operator-norm bounds.
+3. **Compression:** discarded Schmidt weight measured only after the relevant mixed-canonical exterior-isometry receipt passes. No implicit renormalization is performed.
+4. **Time discretization / Trotter splitting:** deliberately excluded from the global state-error ledger. The result reports \`time_discretization_error_qualified = false\`. The second-order claim is a numerical-method property, not a certified trajectory error; it must be established by a step-refinement envelope or an independent commutator bound.
+
+The dense three-site one-excitation test checks the exact hopping-chain solution and a roughly fourfold reduction in global error when the time step is halved. A separate multi-step test checks that the global ledger is carried forward instead of being reset. These are authored acceptance tests until the consolidated exact-head runner passes.
+
 ## Explicit limitations
 
-This increment does **not** yet implement:
-- Second-order even/odd/even or odd/even/odd Trotter time-stepper and Hamiltonian gate generation.
-- Mixed-canonical gauge sweeps with machine-checkable exterior-isometry receipts.
-- Global circuit-level state-vector and reduced-state error bounds.
-- Nonlocal MPO evolution, adaptive time stepping and any N=16–64 scaling or matched Quimb/ITensor performance claim.
+This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
+- A Trotter-error certificate, adaptive time-step controller, or higher-order TEBD4 integrator.
+- Long-range MPO application, lazy/nonlocal gate contraction, or TDVP.
+- Independent Hamiltonian-to-MPO and local-effective-Hamiltonian qualification.
+- N=16–64 scale-out or accuracy-matched Quimb/ITensor/SeeMPS/cuQuantum performance evidence.
 
-Those are the next stages. The implementation should add them in this order: Hamiltonian-to-gate generation and Strang layer composition, mixed-canonical sweeps and gauge receipts, global circuit-level error qualification, then controlled scaling against Quimb and ITensor.
+The next stages are Trotter-envelope qualification, canonical-gauge TDVP/MPO exploration, lazy/nonlocal MPO support, and controlled accuracy-matched comparisons.
 
 ## Competitive benchmark policy
 
-Quimb CircuitMPS exposes maximum bond dimension, singular-value cutoff and state-norm-based error/fidelity estimates; those are useful external controls, but raw elapsed time alone is not comparable. Match the gate tensors, qubit ordering, initial state, seeds, checkpoints, observables, bond cap and truncation policy. Compare error envelopes and dense overlap on small N before comparing throughput. ITensor's QN-conserving MPS facilities are another specialist implementation reference.
+Quimb CircuitMPS is a strong direct TEBD/MPS baseline: it supports maximum bond dimension, singular-value cutoff, swap-and-split two-qubit gates, nonlocal MPO contraction, lazy delayed compression, and norm-based fidelity/error estimates. Its lazy path is a required comparator, not an optional extra. ITensor supplies Abelian QN block-sparse MPS and symmetry-aware tensor operations. SeeMPS/TDVP and the standard TDVP reference are important long-range baselines: 2TDVP handles general MPO Hamiltonians and dynamic bond dimensions, while 1TDVP has different energy/norm-conservation and bond-growth trade-offs. We should compare at matched accuracy and include these modes rather than asserting TEBD is universally superior.
+
+Match the Hamiltonian, MPO or gate tensors, site ordering, initial state, precision, bond cap, truncation threshold, Krylov tolerance, time-step schedule, hardware/backend and output checkpoints. Compare error envelopes and dense overlap for small N before throughput.
 
 Primary external references:
 - Quimb CircuitMPS API: https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html
 - Quimb MPS circuit guide: https://quimb.readthedocs.io/en/latest/circuit/circuit-mps.html
 - ITensor QN conserving MPS documentation: https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html
+- Quimb lazy MPS and nonlocal MPO compression: https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html
+- TDVP errors and conservation trade-offs: https://tensornetwork.org/mps/algorithms/timeevo/tdvp.html
+- TEBD time-step error and higher-order splitting: https://tensornetwork.org/mps/algorithms/timeevo/tebd.html
 
 ## Claim ceiling
 
-A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It now includes a deterministic nearest-neighbour layer executor, but it does not yet establish a complete TEBD time-stepper, globally certified circuit error, an efficient large-scale tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing exact-head harness would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense factorization, local gates, exact and approximate charge-block splits, deterministic parity layers, mixed-canonical gauge receipts, a global bound covering canonicalization/gate/model-projection/compression defects, and a nearest-neighbour second-order Strang stepper. It would **not** establish a Trotter-error certificate, long-range MPO/TDVP support, advantage over Quimb/ITensor, large-N speedup, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.

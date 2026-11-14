@@ -100,6 +100,20 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    GateChargeConservationResidual {
+        residual: f64,
+        tolerance: f64,
+    },
+    TwoSiteHamiltonianHermiticityResidual {
+        residual: f64,
+        tolerance: f64,
+    },
+    TwoSiteHamiltonianChargeLeakage {
+        output_charge: u32,
+        input_charge: u32,
+        amplitude: f64,
+        tolerance: f64,
+    },
     TwoSiteBondMismatch,
     TwoSiteShapeMismatch,
     TwoSiteDenseExpansionRequiresOpenBoundaries,
@@ -136,6 +150,11 @@ pub enum U1MpsError {
     TeBDLayerSiteCountMismatch {
         layer_sites: usize,
         state_sites: usize,
+    },
+    TruncationLedgerStateMismatch,
+    CanonicalGaugeNotQualified {
+        residual: f64,
+        tolerance: f64,
     },
 }
 
@@ -232,6 +251,26 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "two-site gate unitarity residual {residual} exceeds tolerance {tolerance}"
             ),
+            Self::GateChargeConservationResidual {
+                residual,
+                tolerance,
+            } => write!(
+                f,
+                "two-site gate charge-conservation residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::TwoSiteHamiltonianHermiticityResidual { residual, tolerance } => write!(
+                f,
+                "two-site Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::TwoSiteHamiltonianChargeLeakage {
+                output_charge,
+                input_charge,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "two-site Hamiltonian couples excitation sector {input_charge} to {output_charge} with amplitude {amplitude}, tolerance {tolerance}"
+            ),
             Self::TwoSiteBondMismatch => write!(
                 f,
                 "adjacent MPS tensors have different virtual charge labels"
@@ -280,6 +319,17 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "TEBD layer was built for {layer_sites} sites, state has {state_sites}"
+            ),
+            Self::TruncationLedgerStateMismatch => write!(
+                f,
+                "truncation ledger is bound to a different input MPS state"
+            ),
+            Self::CanonicalGaugeNotQualified {
+                residual,
+                tolerance,
+            } => write!(
+                f,
+                "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -402,7 +452,778 @@ pub struct ComplexU1Mps {
     dense_svd_rank_by_charge_and_cut: Option<Vec<Vec<(i32, usize)>>>,
 }
 
+/// Measured mixed-canonical gauge receipt for a two-site center at a bond.
+///
+/// Sites [0,bond) are left-isometric and sites (bond+1,N) are right-isometric.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1CanonicalGaugeReceipt {
+    bond: usize,
+    site_count: usize,
+    total_charge: i32,
+    left_isometry_residuals: Vec<(usize, f64)>,
+    right_isometry_residuals: Vec<(usize, f64)>,
+    maximum_left_isometry_residual: f64,
+    maximum_right_isometry_residual: f64,
+    left_exterior_operator_norm_upper_bound: f64,
+    right_exterior_operator_norm_upper_bound: f64,
+    factorization_max_residual: f64,
+    factorization_l2_residual: f64,
+    state_reconstruction_l2_residual: f64,
+    exact_zero_singular_values_omitted: usize,
+    selection_rule_residual: f64,
+    input_norm_squared: f64,
+    output_norm_squared: f64,
+    relative_norm_drift: f64,
+    qualified: bool,
+}
+
+impl U1CanonicalGaugeReceipt {
+    fn required_left_exterior_bound(&self) -> f64 {
+        self.left_isometry_residuals
+            .iter()
+            .fold(1.0, |bound, (_, residual)| bound * (1.0 + residual).sqrt())
+    }
+
+    fn required_right_exterior_bound(&self) -> f64 {
+        self.right_isometry_residuals
+            .iter()
+            .fold(1.0, |bound, (_, residual)| bound * (1.0 + residual).sqrt())
+    }
+
+    pub fn bond(&self) -> usize { self.bond }
+    pub fn site_count(&self) -> usize { self.site_count }
+    pub fn total_charge(&self) -> i32 { self.total_charge }
+    pub fn left_isometry_residuals(&self) -> &[(usize, f64)] { &self.left_isometry_residuals }
+    pub fn right_isometry_residuals(&self) -> &[(usize, f64)] { &self.right_isometry_residuals }
+    pub fn maximum_left_isometry_residual(&self) -> f64 { self.maximum_left_isometry_residual }
+    pub fn maximum_right_isometry_residual(&self) -> f64 { self.maximum_right_isometry_residual }
+    pub fn left_exterior_operator_norm_upper_bound(&self) -> f64 {
+        self.left_exterior_operator_norm_upper_bound
+    }
+    pub fn right_exterior_operator_norm_upper_bound(&self) -> f64 {
+        self.right_exterior_operator_norm_upper_bound
+    }
+    pub fn factorization_max_residual(&self) -> f64 { self.factorization_max_residual }
+    pub fn factorization_l2_residual(&self) -> f64 { self.factorization_l2_residual }
+    pub fn state_reconstruction_l2_residual(&self) -> f64 {
+        self.state_reconstruction_l2_residual
+    }
+    pub fn exact_zero_singular_values_omitted(&self) -> usize {
+        self.exact_zero_singular_values_omitted
+    }
+    pub fn selection_rule_residual(&self) -> f64 { self.selection_rule_residual }
+    pub fn input_norm_squared(&self) -> f64 { self.input_norm_squared }
+    pub fn output_norm_squared(&self) -> f64 { self.output_norm_squared }
+    pub fn relative_norm_drift(&self) -> f64 { self.relative_norm_drift }
+    pub fn is_qualified(&self) -> bool { self.qualified }
+
+    pub fn qualifies(&self, tolerance: f64) -> bool {
+        tolerance.is_finite()
+            && tolerance > 0.0
+            && self.site_count >= 2
+            && self.bond < self.site_count - 1
+            && self.qualified
+            && self.maximum_left_isometry_residual.is_finite()
+            && self.maximum_left_isometry_residual >= 0.0
+            && self.maximum_left_isometry_residual <= tolerance
+            && self.maximum_right_isometry_residual.is_finite()
+            && self.maximum_right_isometry_residual >= 0.0
+            && self.maximum_right_isometry_residual <= tolerance
+            && self.factorization_max_residual.is_finite()
+            && self.factorization_max_residual >= 0.0
+            && self.factorization_max_residual <= tolerance
+            && self.factorization_l2_residual.is_finite()
+            && self.factorization_l2_residual >= 0.0
+            && self.factorization_l2_residual <= tolerance
+            && self.state_reconstruction_l2_residual.is_finite()
+            && self.state_reconstruction_l2_residual >= 0.0
+            && self.state_reconstruction_l2_residual <= tolerance
+            && self.relative_norm_drift.is_finite()
+            && self.relative_norm_drift >= 0.0
+            && self.relative_norm_drift <= tolerance
+            && self.selection_rule_residual.is_finite()
+            && self.selection_rule_residual >= 0.0
+            && self.selection_rule_residual <= tolerance
+            && self.left_exterior_operator_norm_upper_bound.is_finite()
+            && self.left_exterior_operator_norm_upper_bound
+                + 8.0 * f64::EPSILON * self.required_left_exterior_bound().max(1.0)
+                >= self.required_left_exterior_bound()
+            && self.right_exterior_operator_norm_upper_bound.is_finite()
+            && self.right_exterior_operator_norm_upper_bound
+                + 8.0 * f64::EPSILON * self.required_right_exterior_bound().max(1.0)
+                >= self.required_right_exterior_bound()
+            && self.exterior_operator_norm_product_upper_bound().is_finite()
+            && self.left_isometry_residuals.len() == self.bond
+            && self
+                .left_isometry_residuals
+                .iter()
+                .enumerate()
+                .all(|(index, (site, residual))| {
+                    *site == index
+                        && residual.is_finite()
+                        && *residual >= 0.0
+                        && *residual <= tolerance
+                })
+            && self.right_isometry_residuals.len()
+                == self.site_count.saturating_sub(self.bond + 2)
+            && self
+                .right_isometry_residuals
+                .iter()
+                .enumerate()
+                .all(|(index, (site, residual))| {
+                    *site == self.bond + 2 + index
+                        && residual.is_finite()
+                        && *residual >= 0.0
+                        && *residual <= tolerance
+                })
+            && self.input_norm_squared.is_finite()
+            && self.input_norm_squared > 0.0
+            && self.output_norm_squared.is_finite()
+            && self.output_norm_squared > 0.0
+    }
+
+    pub fn exterior_operator_norm_product_upper_bound(&self) -> f64 {
+        self.left_exterior_operator_norm_upper_bound * self.right_exterior_operator_norm_upper_bound
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CanonicalizationStats {
+    max_residual: f64,
+    residual_squared: f64,
+    exact_zero_singular_values_omitted: usize,
+}
+
+fn left_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
+    let dimension = tensor.right_dimension();
+    let mut squared = 0.0;
+    for row in 0..dimension {
+        for column in 0..dimension {
+            let mut gram = Complex64::new(0.0, 0.0);
+            for left in 0..tensor.left_dimension() {
+                for physical in 0..2 {
+                    gram +=
+                        tensor.get(left, physical, row).conj() * tensor.get(left, physical, column);
+                }
+            }
+            let expected = if row == column {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
+            squared += (gram - expected).norm_sqr();
+        }
+    }
+    let residual = squared.sqrt();
+    if !residual.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "left-canonical isometry residual",
+        ));
+    }
+    Ok(residual)
+}
+
+fn right_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
+    let dimension = tensor.left_dimension();
+    let mut squared = 0.0;
+    for row in 0..dimension {
+        for column in 0..dimension {
+            let mut gram = Complex64::new(0.0, 0.0);
+            for physical in 0..2 {
+                for right in 0..tensor.right_dimension() {
+                    gram += tensor.get(row, physical, right)
+                        * tensor.get(column, physical, right).conj();
+                }
+            }
+            let expected = if row == column {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
+            squared += (gram - expected).norm_sqr();
+        }
+    }
+    let residual = squared.sqrt();
+    if !residual.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "right-canonical isometry residual",
+        ));
+    }
+    Ok(residual)
+}
+
+fn left_canonicalize_site(
+    tensors: &mut [U1MpsTensor],
+    site: usize,
+    tolerance: f64,
+) -> Result<CanonicalizationStats, U1MpsError> {
+    if site + 1 >= tensors.len() {
+        return Err(U1MpsError::TwoSiteShapeMismatch);
+    }
+    if tensors[site].right_charges != tensors[site + 1].left_charges {
+        return Err(U1MpsError::TwoSiteBondMismatch);
+    }
+
+    struct Block {
+        charge: i32,
+        rows: Vec<(usize, usize)>,
+        columns: Vec<usize>,
+        u: DMatrix<Complex64>,
+        v_t: DMatrix<Complex64>,
+        singular_values: Vec<f64>,
+    }
+
+    let current = &tensors[site];
+    let next = &tensors[site + 1];
+    let old_right_dimension = current.right_dimension();
+    let mut row_groups: Vec<(i32, Vec<(usize, usize)>)> = Vec::new();
+    for left in 0..current.left_dimension() {
+        for physical in 0..2 {
+            let charge = current.left_charges[left] + physical as i32;
+            if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+                rows.push((left, physical));
+            } else {
+                row_groups.push((charge, vec![(left, physical)]));
+            }
+        }
+    }
+
+    let max_dimension = current
+        .left_dimension()
+        .saturating_mul(2)
+        .max(old_right_dimension);
+    let max_iterations =
+        10_000usize.max(64usize.saturating_mul(max_dimension.saturating_mul(max_dimension)));
+    let mut blocks = Vec::new();
+    let mut stats = CanonicalizationStats::default();
+
+    for (charge, rows) in row_groups {
+        let columns = current
+            .right_charges
+            .iter()
+            .enumerate()
+            .filter_map(|(index, candidate)| (*candidate == charge).then_some(index))
+            .collect::<Vec<_>>();
+        if rows.is_empty() || columns.is_empty() {
+            continue;
+        }
+        let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+        for (row_index, &(left, physical)) in rows.iter().enumerate() {
+            for (column_index, &right) in columns.iter().enumerate() {
+                block[(row_index, column_index)] = current.get(left, physical, right);
+            }
+        }
+
+        let row_count = block.nrows();
+        let column_count = block.ncols();
+        let decomposition = block
+            .clone()
+            .try_svd(true, true, tolerance, max_iterations)
+            .ok_or(U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            })?;
+        let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
+            rows: row_count,
+            columns: column_count,
+        })?;
+        let v_t = decomposition.v_t.ok_or(U1MpsError::SvdFailed {
+            rows: row_count,
+            columns: column_count,
+        })?;
+
+        let mut kept = Vec::new();
+        for (index, value) in decomposition.singular_values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "left-canonical singular value",
+                ));
+            }
+            if *value > 0.0 {
+                kept.push(index);
+            } else {
+                stats.exact_zero_singular_values_omitted += 1;
+            }
+        }
+        if kept.is_empty() {
+            continue;
+        }
+
+        let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| {
+            u[(row, kept[column])]
+        });
+        let kept_v_t = DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| {
+            v_t[(kept[row], column)]
+        });
+        let singular_values = kept
+            .iter()
+            .map(|&index| decomposition.singular_values[index])
+            .collect::<Vec<_>>();
+
+        for row in 0..rows.len() {
+            for column in 0..columns.len() {
+                let mut reconstructed = Complex64::new(0.0, 0.0);
+                for mode in 0..kept.len() {
+                    reconstructed +=
+                        kept_u[(row, mode)] * singular_values[mode] * kept_v_t[(mode, column)];
+                }
+                let residual = (reconstructed - block[(row, column)]).norm();
+                stats.max_residual = stats.max_residual.max(residual);
+                stats.residual_squared += residual * residual;
+            }
+        }
+        blocks.push(Block {
+            charge,
+            rows,
+            columns,
+            u: kept_u,
+            v_t: kept_v_t,
+            singular_values,
+        });
+    }
+
+    let new_dimension = blocks.iter().try_fold(0_usize, |sum, block| {
+        sum.checked_add(block.singular_values.len())
+            .ok_or(U1MpsError::DimensionOverflow)
+    })?;
+    if new_dimension == 0 {
+        return Err(U1MpsError::ZeroDenseState);
+    }
+    let current_left_dimension = current.left_dimension();
+    let next_right_dimension = next.right_dimension();
+    let current_entries = current_left_dimension
+        .checked_mul(2)
+        .and_then(|value| value.checked_mul(new_dimension))
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let transfer_entries = new_dimension
+        .checked_mul(old_right_dimension)
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let next_entries = new_dimension
+        .checked_mul(2)
+        .and_then(|value| value.checked_mul(next_right_dimension))
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let mut current_data = vec![Complex64::new(0.0, 0.0); current_entries];
+    let mut transfer_data = vec![Complex64::new(0.0, 0.0); transfer_entries];
+    let mut next_charges = Vec::with_capacity(new_dimension);
+    let mut offset = 0;
+
+    for block in blocks {
+        let rank = block.singular_values.len();
+        next_charges.extend(core::iter::repeat_n(block.charge, rank));
+        for mode in 0..rank {
+            let new_index = offset + mode;
+            for (row_index, &(left, physical)) in block.rows.iter().enumerate() {
+                let index = (left * 2 + physical) * new_dimension + new_index;
+                current_data[index] = block.u[(row_index, mode)];
+            }
+            for (column_index, &old_right) in block.columns.iter().enumerate() {
+                let index = new_index * old_right_dimension + old_right;
+                transfer_data[index] =
+                    block.singular_values[mode] * block.v_t[(mode, column_index)];
+            }
+        }
+        offset += rank;
+    }
+
+    let mut next_data = vec![Complex64::new(0.0, 0.0); next_entries];
+    for new_left in 0..new_dimension {
+        for physical in 0..2 {
+            for right in 0..next_right_dimension {
+                let mut value = Complex64::new(0.0, 0.0);
+                for old_left in 0..old_right_dimension {
+                    value += transfer_data[new_left * old_right_dimension + old_left]
+                        * next.get(old_left, physical, right);
+                }
+                let index = (new_left * 2 + physical) * next_right_dimension + right;
+                next_data[index] = value;
+            }
+        }
+    }
+
+    let new_current = U1MpsTensor::new(
+        current.left_charges.clone(),
+        next_charges.clone(),
+        current_data,
+    )?;
+    let new_next = U1MpsTensor::new(next_charges, next.right_charges.clone(), next_data)?;
+    tensors[site] = new_current;
+    tensors[site + 1] = new_next;
+    Ok(stats)
+}
+
+fn right_canonicalize_site(
+    tensors: &mut [U1MpsTensor],
+    site: usize,
+    tolerance: f64,
+) -> Result<CanonicalizationStats, U1MpsError> {
+    if site == 0 || site >= tensors.len() {
+        return Err(U1MpsError::TwoSiteShapeMismatch);
+    }
+    if tensors[site - 1].right_charges != tensors[site].left_charges {
+        return Err(U1MpsError::TwoSiteBondMismatch);
+    }
+
+    struct Block {
+        charge: i32,
+        rows: Vec<usize>,
+        columns: Vec<(usize, usize)>,
+        u: DMatrix<Complex64>,
+        v_t: DMatrix<Complex64>,
+        singular_values: Vec<f64>,
+    }
+
+    let previous = &tensors[site - 1];
+    let current = &tensors[site];
+    let old_left_dimension = current.left_dimension();
+    let mut row_groups: Vec<(i32, Vec<usize>)> = Vec::new();
+    for left in 0..old_left_dimension {
+        let charge = current.left_charges[left];
+        if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+            rows.push(left);
+        } else {
+            row_groups.push((charge, vec![left]));
+        }
+    }
+
+    let max_dimension = old_left_dimension.max(current.right_dimension().saturating_mul(2));
+    let max_iterations =
+        10_000usize.max(64usize.saturating_mul(max_dimension.saturating_mul(max_dimension)));
+    let mut blocks = Vec::new();
+    let mut stats = CanonicalizationStats::default();
+
+    for (charge, rows) in row_groups {
+        let mut columns = Vec::new();
+        for physical in 0..2 {
+            for right in 0..current.right_dimension() {
+                if current.right_charges[right] == charge + physical as i32 {
+                    columns.push((physical, right));
+                }
+            }
+        }
+        if rows.is_empty() || columns.is_empty() {
+            continue;
+        }
+
+        let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+        for (row_index, &left) in rows.iter().enumerate() {
+            for (column_index, &(physical, right)) in columns.iter().enumerate() {
+                block[(row_index, column_index)] = current.get(left, physical, right);
+            }
+        }
+
+        let row_count = block.nrows();
+        let column_count = block.ncols();
+        let decomposition = block
+            .clone()
+            .try_svd(true, true, tolerance, max_iterations)
+            .ok_or(U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            })?;
+        let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
+            rows: row_count,
+            columns: column_count,
+        })?;
+        let v_t = decomposition.v_t.ok_or(U1MpsError::SvdFailed {
+            rows: row_count,
+            columns: column_count,
+        })?;
+
+        let mut kept = Vec::new();
+        for (index, value) in decomposition.singular_values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "right-canonical singular value",
+                ));
+            }
+            if *value > 0.0 {
+                kept.push(index);
+            } else {
+                stats.exact_zero_singular_values_omitted += 1;
+            }
+        }
+        if kept.is_empty() {
+            continue;
+        }
+
+        let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| {
+            u[(row, kept[column])]
+        });
+        let kept_v_t = DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| {
+            v_t[(kept[row], column)]
+        });
+        let singular_values = kept
+            .iter()
+            .map(|&index| decomposition.singular_values[index])
+            .collect::<Vec<_>>();
+
+        for row in 0..rows.len() {
+            for column in 0..columns.len() {
+                let mut reconstructed = Complex64::new(0.0, 0.0);
+                for mode in 0..kept.len() {
+                    reconstructed +=
+                        kept_u[(row, mode)] * singular_values[mode] * kept_v_t[(mode, column)];
+                }
+                let residual = (reconstructed - block[(row, column)]).norm();
+                stats.max_residual = stats.max_residual.max(residual);
+                stats.residual_squared += residual * residual;
+            }
+        }
+
+        blocks.push(Block {
+            charge,
+            rows,
+            columns,
+            u: kept_u,
+            v_t: kept_v_t,
+            singular_values,
+        });
+    }
+
+    let new_dimension = blocks.iter().try_fold(0_usize, |sum, block| {
+        sum.checked_add(block.singular_values.len())
+            .ok_or(U1MpsError::DimensionOverflow)
+    })?;
+    if new_dimension == 0 {
+        return Err(U1MpsError::ZeroDenseState);
+    }
+
+    let previous_left_dimension = previous.left_dimension();
+    let current_right_dimension = current.right_dimension();
+    let previous_entries = previous_left_dimension
+        .checked_mul(2)
+        .and_then(|value| value.checked_mul(new_dimension))
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let current_entries = new_dimension
+        .checked_mul(2)
+        .and_then(|value| value.checked_mul(current_right_dimension))
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let mut previous_data = vec![Complex64::new(0.0, 0.0); previous_entries];
+    let mut current_data = vec![Complex64::new(0.0, 0.0); current_entries];
+    let mut new_left_charges = Vec::with_capacity(new_dimension);
+    let mut offset = 0;
+
+    for block in blocks {
+        let rank = block.singular_values.len();
+        new_left_charges.extend(core::iter::repeat_n(block.charge, rank));
+        for mode in 0..rank {
+            let new_left = offset + mode;
+            for (column_index, &(physical, right)) in block.columns.iter().enumerate() {
+                let index = (new_left * 2 + physical) * current_right_dimension + right;
+                current_data[index] = block.v_t[(mode, column_index)];
+            }
+            for (row_index, &old_left) in block.rows.iter().enumerate() {
+                let transfer = block.u[(row_index, mode)] * block.singular_values[mode];
+                for previous_left in 0..previous_left_dimension {
+                    for previous_physical in 0..2 {
+                        let index =
+                            (previous_left * 2 + previous_physical) * new_dimension + new_left;
+                        previous_data[index] +=
+                            previous.get(previous_left, previous_physical, old_left) * transfer;
+                    }
+                }
+            }
+        }
+        offset += rank;
+    }
+
+    let new_previous = U1MpsTensor::new(
+        previous.left_charges.clone(),
+        new_left_charges.clone(),
+        previous_data,
+    )?;
+    let new_current = U1MpsTensor::new(
+        new_left_charges,
+        current.right_charges.clone(),
+        current_data,
+    )?;
+    tensors[site - 1] = new_previous;
+    tensors[site] = new_current;
+    Ok(stats)
+}
+
 impl ComplexU1Mps {
+    fn state_fingerprint(&self) -> u128 {
+        // FNV-1a 128-bit fingerprint over dimensions, charge labels and exact
+        // IEEE-754 tensor bits. This binds a continuation ledger to the exact
+        // MPS value without retaining a second full state in memory.
+        // It is an integrity/misuse check, not a cryptographic authenticator.
+        let mut hash = 0x6c62272e07bb014262b821756295c58du128;
+        const PRIME: u128 = 0x0000000001000000000000000000013b;
+        let mut mix = |value: u64| {
+            for byte in value.to_le_bytes() {
+                hash ^= u128::from(byte);
+                hash = hash.wrapping_mul(PRIME);
+            }
+        };
+        mix(self.total_charge as u64);
+        mix(self.tensors.len() as u64);
+        for tensor in &self.tensors {
+            mix(tensor.left_dimension() as u64);
+            mix(tensor.right_dimension() as u64);
+            for charge in &tensor.left_charges { mix(*charge as u64); }
+            for charge in &tensor.right_charges { mix(*charge as u64); }
+            for value in &tensor.data {
+                mix(value.re.to_bits());
+                mix(value.im.to_bits());
+            }
+        }
+        hash
+    }
+
+    /// Stable norm of the difference between two same-sector MPS.
+    ///
+    /// The two networks are embedded into a direct-sum virtual space. The
+    /// subtraction is applied at the first site, then the two paths propagate
+    /// in block-diagonal form and are recombined only at the right boundary.
+    /// This computes ||A-B||² without subtracting nearly equal O(1) norm and
+    /// overlap scalars.
+    fn difference_norm_squared(&self, other: &Self, tolerance: f64) -> Result<f64, U1MpsError> {
+        if self.site_count() != other.site_count() || self.total_charge != other.total_charge {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let site_count = self.site_count();
+        let mut difference_tensors = Vec::with_capacity(site_count);
+
+        if site_count == 1 {
+            let left = &self.tensors[0];
+            let right = &other.tensors[0];
+            if left.left_charges != right.left_charges || left.right_charges != right.right_charges
+            {
+                return Err(U1MpsError::TwoSiteBondMismatch);
+            }
+            let data = (0..left.left_dimension())
+                .flat_map(|left_index| {
+                    (0..2).flat_map(move |physical| {
+                        (0..left.right_dimension()).map(move |right_index| {
+                            left.get(left_index, physical, right_index)
+                                - right.get(left_index, physical, right_index)
+                        })
+                    })
+                })
+                .collect();
+            difference_tensors.push(U1MpsTensor::new(
+                left.left_charges.clone(),
+                left.right_charges.clone(),
+                data,
+            )?);
+        } else {
+            // First site: share the charge-zero left boundary and branch into
+            // the A and -B right virtual spaces.
+            let first_a = &self.tensors[0];
+            let first_b = &other.tensors[0];
+            let first_right_dimension = first_a
+                .right_dimension()
+                .checked_add(first_b.right_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let first_entries = 2_usize
+                .checked_mul(first_right_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut first_data = vec![Complex64::new(0.0, 0.0); first_entries];
+            for physical in 0..2 {
+                for right in 0..first_a.right_dimension() {
+                    first_data[physical * first_right_dimension + right] =
+                        first_a.get(0, physical, right);
+                }
+                for right in 0..first_b.right_dimension() {
+                    first_data
+                        [physical * first_right_dimension + first_a.right_dimension() + right] =
+                        -first_b.get(0, physical, right);
+                }
+            }
+            let mut first_right_charges = first_a.right_charges.clone();
+            first_right_charges.extend_from_slice(&first_b.right_charges);
+            difference_tensors.push(U1MpsTensor::new(
+                first_a.left_charges.clone(),
+                first_right_charges,
+                first_data,
+            )?);
+
+            // Middle sites: propagate A and B in separate diagonal blocks.
+            for site in 1..(site_count - 1) {
+                let tensor_a = &self.tensors[site];
+                let tensor_b = &other.tensors[site];
+                let left_dimension = tensor_a
+                    .left_dimension()
+                    .checked_add(tensor_b.left_dimension())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let right_dimension = tensor_a
+                    .right_dimension()
+                    .checked_add(tensor_b.right_dimension())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let entries = left_dimension
+                    .checked_mul(2)
+                    .and_then(|value| value.checked_mul(right_dimension))
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let mut data = vec![Complex64::new(0.0, 0.0); entries];
+
+                for left in 0..tensor_a.left_dimension() {
+                    for physical in 0..2 {
+                        for right in 0..tensor_a.right_dimension() {
+                            let index = (left * 2 + physical) * right_dimension + right;
+                            data[index] = tensor_a.get(left, physical, right);
+                        }
+                    }
+                }
+                for left in 0..tensor_b.left_dimension() {
+                    for physical in 0..2 {
+                        for right in 0..tensor_b.right_dimension() {
+                            let index = ((tensor_a.left_dimension() + left) * 2 + physical)
+                                * right_dimension
+                                + tensor_a.right_dimension()
+                                + right;
+                            data[index] = tensor_b.get(left, physical, right);
+                        }
+                    }
+                }
+
+                let mut left_charges = tensor_a.left_charges.clone();
+                left_charges.extend_from_slice(&tensor_b.left_charges);
+                let mut right_charges = tensor_a.right_charges.clone();
+                right_charges.extend_from_slice(&tensor_b.right_charges);
+                difference_tensors.push(U1MpsTensor::new(left_charges, right_charges, data)?);
+            }
+
+            // Final site: add the two branch amplitudes at the common
+            // total-charge right boundary.
+            let final_a = self.tensors.last().expect("nonempty MPS");
+            let final_b = other.tensors.last().expect("nonempty MPS");
+            let final_left_dimension = final_a
+                .left_dimension()
+                .checked_add(final_b.left_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let final_entries = final_left_dimension
+                .checked_mul(2)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut final_data = vec![Complex64::new(0.0, 0.0); final_entries];
+            for left in 0..final_a.left_dimension() {
+                for physical in 0..2 {
+                    final_data[left * 2 + physical] = final_a.get(left, physical, 0);
+                }
+            }
+            for left in 0..final_b.left_dimension() {
+                for physical in 0..2 {
+                    final_data[(final_a.left_dimension() + left) * 2 + physical] =
+                        final_b.get(left, physical, 0);
+                }
+            }
+            let mut final_left_charges = final_a.left_charges.clone();
+            final_left_charges.extend_from_slice(&final_b.left_charges);
+            difference_tensors.push(U1MpsTensor::new(
+                final_left_charges,
+                final_a.right_charges.clone(),
+                final_data,
+            )?);
+        }
+
+        let difference = Self::new(difference_tensors, self.total_charge, tolerance)?;
+        difference.norm_squared(tolerance)
+    }
+
     /// Validate a complete open-boundary MPS and its charge-selection rules.
     pub fn new(
         tensors: Vec<U1MpsTensor>,
@@ -497,6 +1318,127 @@ impl ComplexU1Mps {
         Self::new(tensors, prefix_charge, 0.0_f64.max(1.0e-14))
     }
 
+    /// Move the MPS into mixed-canonical form around a two-site center.
+    ///
+    /// Sites before the bond are left-isometric; sites after the bond plus one
+    /// are right-isometric. All factorizations are charge-blocked and retain
+    /// every positive singular value. The center pair remains available for a
+    /// local two-site operation.
+    pub fn canonicalize_for_bond(
+        &mut self,
+        bond: usize,
+        tolerance: f64,
+    ) -> Result<U1CanonicalGaugeReceipt, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if self.site_count() < 2 || bond >= self.site_count() - 1 {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+
+        let input_norm_squared = self.norm_squared(tolerance)?;
+        if input_norm_squared <= 0.0 {
+            return Err(U1MpsError::ZeroDenseState);
+        }
+        let mut tensors = self.tensors.clone();
+        let mut factorization_stats = CanonicalizationStats::default();
+
+        for site in 0..bond {
+            let stats = left_canonicalize_site(&mut tensors, site, tolerance)?;
+            factorization_stats.max_residual =
+                factorization_stats.max_residual.max(stats.max_residual);
+            factorization_stats.residual_squared += stats.residual_squared;
+            factorization_stats.exact_zero_singular_values_omitted +=
+                stats.exact_zero_singular_values_omitted;
+        }
+
+        for site in ((bond + 2)..self.site_count()).rev() {
+            let stats = right_canonicalize_site(&mut tensors, site, tolerance)?;
+            factorization_stats.max_residual =
+                factorization_stats.max_residual.max(stats.max_residual);
+            factorization_stats.residual_squared += stats.residual_squared;
+            factorization_stats.exact_zero_singular_values_omitted +=
+                stats.exact_zero_singular_values_omitted;
+        }
+
+        // Validate a candidate first. On any failure the original MPS is unchanged.
+        let candidate = Self::new(tensors, self.total_charge, tolerance)?;
+        let output_norm_squared = candidate.norm_squared(tolerance)?;
+        let difference_squared = self.difference_norm_squared(&candidate, tolerance)?;
+        if difference_squared < 0.0 {
+            return Err(U1MpsError::NegativeNormSquared(difference_squared));
+        }
+        let state_reconstruction_l2_residual = difference_squared.sqrt();
+        // This is relative to the input norm even for subnormalized states.
+        // A max(..., 1) denominator would silently turn it into an absolute
+        // criterion for physically small states.
+        let relative_norm_drift =
+            (output_norm_squared - input_norm_squared).abs() / input_norm_squared;
+
+        let mut left_isometry_residuals = Vec::with_capacity(bond);
+        let mut right_isometry_residuals =
+            Vec::with_capacity(self.site_count().saturating_sub(bond + 2));
+        let mut maximum_left_isometry_residual: f64 = 0.0;
+        let mut maximum_right_isometry_residual: f64 = 0.0;
+        let mut left_exterior_operator_norm_upper_bound = 1.0;
+        let mut right_exterior_operator_norm_upper_bound = 1.0;
+
+        for site in 0..bond {
+            let residual = left_isometry_residual(&candidate.tensors[site])?;
+            maximum_left_isometry_residual = maximum_left_isometry_residual.max(residual);
+            left_exterior_operator_norm_upper_bound *= (1.0 + residual).sqrt();
+            left_isometry_residuals.push((site, residual));
+        }
+        for site in ((bond + 2)..self.site_count()).rev() {
+            let residual = right_isometry_residual(&candidate.tensors[site])?;
+            maximum_right_isometry_residual = maximum_right_isometry_residual.max(residual);
+            right_exterior_operator_norm_upper_bound *= (1.0 + residual).sqrt();
+            right_isometry_residuals.push((site, residual));
+        }
+        right_isometry_residuals.sort_by_key(|(site, _)| *site);
+
+        let factorization_l2_residual = factorization_stats.residual_squared.sqrt();
+        let qualified = maximum_left_isometry_residual <= tolerance
+            && maximum_right_isometry_residual <= tolerance
+            && factorization_stats.max_residual <= tolerance
+            && factorization_l2_residual <= tolerance
+            && state_reconstruction_l2_residual <= tolerance
+            && relative_norm_drift <= tolerance
+            && candidate.selection_rule_residual <= tolerance
+            && left_exterior_operator_norm_upper_bound.is_finite()
+            && right_exterior_operator_norm_upper_bound.is_finite();
+
+        let receipt = U1CanonicalGaugeReceipt {
+            bond,
+            site_count: self.site_count(),
+            total_charge: self.total_charge,
+            left_isometry_residuals,
+            right_isometry_residuals,
+            maximum_left_isometry_residual,
+            maximum_right_isometry_residual,
+            left_exterior_operator_norm_upper_bound,
+            right_exterior_operator_norm_upper_bound,
+            factorization_max_residual: factorization_stats.max_residual,
+            factorization_l2_residual,
+            state_reconstruction_l2_residual,
+            exact_zero_singular_values_omitted: factorization_stats
+                .exact_zero_singular_values_omitted,
+            selection_rule_residual: candidate.selection_rule_residual,
+            input_norm_squared,
+            output_norm_squared,
+            relative_norm_drift,
+            qualified,
+        };
+        *self = candidate;
+        Ok(receipt)
+    }
+
+    /// Mixed-canonicalize the MPS around a two-site center at (bond, bond+1).
+    ///
+    /// Sites before bond are left-isometric; sites after bond+1 are
+    /// right-isometric. The active two-site center is not canonicalized.
+    /// Charge-block SVD sweeps retain every positive singular value and omit
+    /// exact zeros only.
     pub fn site_count(&self) -> usize {
         self.tensors.len()
     }
@@ -852,6 +1794,67 @@ impl ComplexU1Mps {
         Ok(state)
     }
 
+    /// Contract the overlap <self|other> without dense expansion.
+    pub fn inner_product(&self, other: &Self) -> Result<Complex64, U1MpsError> {
+        if self.site_count() != other.site_count() {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let mut environment = vec![Complex64::new(1.0, 0.0)];
+        let mut bra_dimension = 1_usize;
+        let mut ket_dimension = 1_usize;
+
+        for (bra_tensor, ket_tensor) in self.tensors.iter().zip(other.tensors.iter()) {
+            if bra_dimension != bra_tensor.left_dimension()
+                || ket_dimension != ket_tensor.left_dimension()
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "inconsistent overlap transfer-environment dimension",
+                ));
+            }
+            let next_bra_dimension = bra_tensor.right_dimension();
+            let next_ket_dimension = ket_tensor.right_dimension();
+            let next_entries = next_bra_dimension
+                .checked_mul(next_ket_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut next = vec![Complex64::new(0.0, 0.0); next_entries];
+
+            for bra_left in 0..bra_dimension {
+                for ket_left in 0..ket_dimension {
+                    let env = environment[bra_left * ket_dimension + ket_left];
+                    for physical in 0..2 {
+                        for bra_right in 0..next_bra_dimension {
+                            let bra = bra_tensor.get(bra_left, physical, bra_right).conj();
+                            for ket_right in 0..next_ket_dimension {
+                                let ket = ket_tensor.get(ket_left, physical, ket_right);
+                                next[bra_right * next_ket_dimension + ket_right] += env * bra * ket;
+                            }
+                        }
+                    }
+                }
+            }
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "overlap transfer environment",
+                ));
+            }
+            environment = next;
+            bra_dimension = next_bra_dimension;
+            ket_dimension = next_ket_dimension;
+        }
+
+        if bra_dimension != 1 || ket_dimension != 1 || environment.len() != 1 {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let overlap = environment[0];
+        if !overlap.re.is_finite() || !overlap.im.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction("MPS overlap"));
+        }
+        Ok(overlap)
+    }
+
     /// Compute the MPS norm by contracting the double-layer transfer matrices.
     pub fn norm_squared(&self, tolerance: f64) -> Result<f64, U1MpsError> {
         if !tolerance.is_finite() || tolerance <= 0.0 {
@@ -921,7 +1924,188 @@ pub struct U1TwoSiteGate {
     matrix: [[Complex64; 4]; 4],
     charge_conservation_residual: f64,
     unitarity_residual: f64,
+    /// Operator-norm bound for replacing a tolerance-qualified source
+    /// Hamiltonian by its exact Hermitian, U(1)-block-diagonal projection.
+    hamiltonian_projection_error_operator_upper_bound: f64,
 }
+
+
+
+/// Hermitian nearest-neighbour two-qubit Hamiltonian restricted to U(1) sectors.
+///
+/// Basis order is |00>, |01>, |10>, |11>. The only coupled block is the
+/// single-excitation sector {|01>,|10>}; zero- and two-excitation sectors
+/// contribute independent real energies.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteHamiltonian {
+    matrix: [[Complex64; 4]; 4],
+    hermiticity_residual: f64,
+    charge_conservation_residual: f64,
+    /// Frobenius residual from the closest Hermitian block-diagonal U(1) model.
+    projection_residual_frobenius: f64,
+}
+
+impl U1TwoSiteHamiltonian {
+    /// Construct a finite Hermitian two-site Hamiltonian with zero U(1) flux.
+    pub fn new(
+        matrix: [[Complex64; 4]; 4],
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        for row in 0..4 {
+            for column in 0..4 {
+                let value = matrix[row][column];
+                if !value.re.is_finite() || !value.im.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry {
+                        site: 0,
+                        index: row * 4 + column,
+                    });
+                }
+            }
+        }
+
+        let mut hermiticity_residual: f64 = 0.0;
+        let mut charge_conservation_residual: f64 = 0.0;
+        let mut charge_witness = (0_usize, 0_usize);
+        for row in 0_usize..4 {
+            for column in 0_usize..4 {
+                hermiticity_residual = hermiticity_residual
+                    .max((matrix[row][column] - matrix[column][row].conj()).norm());
+                if row.count_ones() != column.count_ones() {
+                    let amplitude = matrix[row][column].norm();
+                    if amplitude > charge_conservation_residual {
+                        charge_conservation_residual = amplitude;
+                        charge_witness = (row, column);
+                    }
+                }
+            }
+        }
+        if hermiticity_residual > tolerance {
+            return Err(U1MpsError::TwoSiteHamiltonianHermiticityResidual {
+                residual: hermiticity_residual,
+                tolerance,
+            });
+        }
+        if charge_conservation_residual > tolerance {
+            return Err(U1MpsError::TwoSiteHamiltonianChargeLeakage {
+                output_charge: charge_witness.0.count_ones(),
+                input_charge: charge_witness.1.count_ones(),
+                amplitude: charge_conservation_residual,
+                tolerance,
+            });
+        }
+
+        let mut projected = [[Complex64::new(0.0, 0.0); 4]; 4];
+        projected[0][0] = Complex64::new(matrix[0][0].re, 0.0);
+        projected[3][3] = Complex64::new(matrix[3][3].re, 0.0);
+        projected[1][1] = Complex64::new(matrix[1][1].re, 0.0);
+        projected[2][2] = Complex64::new(matrix[2][2].re, 0.0);
+        let projected_coupling = 0.5 * (matrix[1][2] + matrix[2][1].conj());
+        projected[1][2] = projected_coupling;
+        projected[2][1] = projected_coupling.conj();
+        let projection_residual_frobenius = matrix
+            .iter()
+            .zip(projected.iter())
+            .flat_map(|(row, projected_row)| {
+                row.iter().zip(projected_row.iter())
+            })
+            .map(|(value, projected_value)| (*value - *projected_value).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        if !projection_residual_frobenius.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian symmetry/Hermiticity projection residual",
+            ));
+        }
+
+        Ok(Self {
+            matrix,
+            hermiticity_residual,
+            charge_conservation_residual,
+            projection_residual_frobenius,
+        })
+    }
+
+    pub fn matrix(&self) -> &[[Complex64; 4]; 4] {
+        &self.matrix
+    }
+
+    pub fn hermiticity_residual(&self) -> f64 {
+        self.hermiticity_residual
+    }
+
+    pub fn charge_conservation_residual(&self) -> f64 {
+        self.charge_conservation_residual
+    }
+
+    pub fn projection_residual_frobenius(&self) -> f64 {
+        self.projection_residual_frobenius
+    }
+
+    /// Compute exp(-i dt H) analytically, block-by-block in the U(1) sectors.
+    ///
+    /// The single-excitation block is a closed-form 2x2 Hermitian exponential;
+    /// this avoids a generic 4x4 matrix exponential and preserves block
+    /// structure by construction.
+    pub fn evolution_gate(
+        &self,
+        dt: f64,
+        gate_tolerance: f64,
+    ) -> Result<U1TwoSiteGate, U1MpsError> {
+        if !dt.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site Hamiltonian time step",
+            ));
+        }
+        if !gate_tolerance.is_finite() || gate_tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(gate_tolerance));
+        }
+
+        let h00 = self.matrix[0][0].re;
+        let h11 = self.matrix[1][1].re;
+        let h22 = self.matrix[2][2].re;
+        let h33 = self.matrix[3][3].re;
+        let mean = 0.5 * (h11 + h22);
+        let difference = 0.5 * (h11 - h22);
+        let coupling = 0.5 * (self.matrix[1][2] + self.matrix[2][1].conj());
+        let radius = (difference * difference + coupling.norm_sqr()).sqrt();
+        let angle = dt * radius;
+        let cosine = angle.cos();
+        let sine_over_radius = if radius <= f64::EPSILON * (1.0 + mean.abs()) {
+            dt
+        } else {
+            angle.sin() / radius
+        };
+        let phase_single = Complex64::from_polar(1.0, -dt * mean);
+        let imaginary_factor = Complex64::new(0.0, -sine_over_radius);
+
+        let mut gate = [[Complex64::new(0.0, 0.0); 4]; 4];
+        gate[0][0] = Complex64::from_polar(1.0, -dt * h00);
+        gate[3][3] = Complex64::from_polar(1.0, -dt * h33);
+        gate[1][1] =
+            phase_single * (Complex64::new(cosine, 0.0) + imaginary_factor * difference);
+        gate[1][2] = phase_single * imaginary_factor * coupling;
+        gate[2][1] = phase_single * imaginary_factor * coupling.conj();
+        gate[2][2] =
+            phase_single * (Complex64::new(cosine, 0.0) - imaginary_factor * difference);
+
+        let gate = U1TwoSiteGate::new(gate, gate_tolerance)?;
+        // Duhamel's bound for H = H_projected + Delta, with H_projected
+        // Hermitian and ||Delta||_2 <= ||Delta||_F:
+        // ||exp(-i H dt)-exp(-i H_projected dt)||
+        //   <= |dt| ||Delta|| exp(|dt| ||Delta||).
+        // This remains conservative even when the supplied H is only
+        // approximately Hermitian or U(1)-conserving.
+        let projection_residual = self.projection_residual_frobenius;
+        let exponential_growth = (dt.abs() * projection_residual).exp();
+        let projection_operator_error_upper_bound =
+            dt.abs() * projection_residual * exponential_growth;
+        gate.with_hamiltonian_projection_error(projection_operator_error_upper_bound)
+    }
+}
+
 
 /// The exact two-site tensor obtained after contracting an MPS bond and
 /// applying one U(1)-conserving two-qubit gate.
@@ -1005,6 +2189,7 @@ impl U1TwoSiteGate {
             matrix,
             charge_conservation_residual,
             unitarity_residual,
+            hamiltonian_projection_error_operator_upper_bound: 0.0,
         })
     }
 
@@ -1020,6 +2205,23 @@ impl U1TwoSiteGate {
         self.unitarity_residual
     }
 
+    pub fn hamiltonian_projection_error_operator_upper_bound(&self) -> f64 {
+        self.hamiltonian_projection_error_operator_upper_bound
+    }
+
+    fn with_hamiltonian_projection_error(
+        mut self,
+        bound: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !bound.is_finite() || bound < 0.0 {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian projection error bound",
+            ));
+        }
+        self.hamiltonian_projection_error_operator_upper_bound = bound;
+        Ok(self)
+    }
+
     /// Exact identity gate.
     pub fn identity() -> Self {
         let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
@@ -1030,6 +2232,7 @@ impl U1TwoSiteGate {
             matrix,
             charge_conservation_residual: 0.0,
             unitarity_residual: 0.0,
+            hamiltonian_projection_error_operator_upper_bound: 0.0,
         }
     }
 
@@ -1044,6 +2247,7 @@ impl U1TwoSiteGate {
             matrix,
             charge_conservation_residual: 0.0,
             unitarity_residual: 0.0,
+            hamiltonian_projection_error_operator_upper_bound: 0.0,
         }
     }
 }
@@ -1728,16 +2932,103 @@ impl U1TwoSiteState {
 /// precondition, so global qualification remains false.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct U1MpsTruncationLedger {
-    pub gate_count: usize,
-    pub accumulated_discarded_weight: f64,
-    pub cumulative_local_l2_error_bound: f64,
-    pub maximum_single_gate_relative_discarded_weight: f64,
-    pub global_state_error_bound_qualified: bool,
+    gate_count: usize,
+    accumulated_discarded_weight: f64,
+    cumulative_local_l2_error_bound: f64,
+    cumulative_canonicalization_l2_error_bound: f64,
+    cumulative_gate_quality_l2_error_bound: f64,
+    cumulative_hamiltonian_projection_l2_error_bound: f64,
+    cumulative_projection_l2_error_bound: f64,
+    maximum_single_gate_relative_discarded_weight: f64,
+    canonical_gauge_receipt_count: usize,
+    global_state_error_bound_qualified: bool,
+    global_state_error_bound_upper: Option<f64>,
+    input_state_fingerprint: Option<u128>,
 }
 
+fn gate_quality_error_bounds_from_residuals(
+    unitarity_residual: f64,
+    charge_residual: f64,
+    pre_gate_norm_squared: f64,
+) -> Result<(f64, f64), U1MpsError> {
+    if !pre_gate_norm_squared.is_finite() || pre_gate_norm_squared < 0.0 {
+        return Err(U1MpsError::NonFiniteContraction(
+            "pre-gate norm in canonical error ledger",
+        ));
+    }
+    // U1TwoSiteGate stores the maximum absolute entry of U†U-I.
+    // For a 4x4 matrix, ||R||_2 <= ||R||_F <= 4 * max_ij |R_ij|.
+    // Use this operator-norm bound before converting it into a bound on ||U||.
+    let unitarity_operator_residual_upper = 4.0 * unitarity_residual;
+    // There are exactly ten matrix entries coupling distinct excitation sectors.
+    // Their Frobenius norm, and hence operator norm, is bounded by sqrt(10)*max.
+    let off_sector_operator_error = 10.0_f64.sqrt() * charge_residual;
+    let gate_operator_norm_upper = (1.0 + unitarity_operator_residual_upper).sqrt();
+    // Let D = G - E be the block-diagonal part of G, with E its off-sector part.
+    // ||D†D-I|| <= ||G†G-I|| + 2||G||||E|| + ||E||².
+    let block_unitarity_residual = unitarity_operator_residual_upper
+        + 2.0 * gate_operator_norm_upper * off_sector_operator_error
+        + off_sector_operator_error * off_sector_operator_error;
+    if !block_unitarity_residual.is_finite() || block_unitarity_residual >= 1.0 {
+        return Err(U1MpsError::GateUnitarityResidual {
+            residual: block_unitarity_residual,
+            tolerance: 1.0,
+        });
+    }
+    let polar_distance = ((1.0 + block_unitarity_residual).sqrt() - 1.0)
+        .max(1.0 - (1.0 - block_unitarity_residual).sqrt());
+    let quality_error =
+        (off_sector_operator_error + polar_distance) * pre_gate_norm_squared.sqrt();
+    if !gate_operator_norm_upper.is_finite() || !quality_error.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "gate quality operator bound",
+        ));
+    }
+    Ok((gate_operator_norm_upper, quality_error))
+}
+
+fn gate_quality_error_bounds(
+    gate: &U1TwoSiteGate,
+    pre_gate_norm_squared: f64,
+) -> Result<(f64, f64), U1MpsError> {
+    gate_quality_error_bounds_from_residuals(
+        gate.unitarity_residual(),
+        gate.charge_conservation_residual(),
+        pre_gate_norm_squared,
+    )
+}
+
+
 impl U1MpsTruncationLedger {
-    /// Record one local truncation. Fails closed on non-finite or overflowed data.
-    pub fn record(
+    pub fn gate_count(&self) -> usize { self.gate_count }
+    pub fn accumulated_discarded_weight(&self) -> f64 { self.accumulated_discarded_weight }
+    pub fn cumulative_local_l2_error_bound(&self) -> f64 { self.cumulative_local_l2_error_bound }
+    pub fn cumulative_canonicalization_l2_error_bound(&self) -> f64 {
+        self.cumulative_canonicalization_l2_error_bound
+    }
+    pub fn cumulative_gate_quality_l2_error_bound(&self) -> f64 {
+        self.cumulative_gate_quality_l2_error_bound
+    }
+    pub fn cumulative_hamiltonian_projection_l2_error_bound(&self) -> f64 {
+        self.cumulative_hamiltonian_projection_l2_error_bound
+    }
+    pub fn cumulative_projection_l2_error_bound(&self) -> f64 {
+        self.cumulative_projection_l2_error_bound
+    }
+    pub fn maximum_single_gate_relative_discarded_weight(&self) -> f64 {
+        self.maximum_single_gate_relative_discarded_weight
+    }
+    pub fn canonical_gauge_receipt_count(&self) -> usize {
+        self.canonical_gauge_receipt_count
+    }
+    pub fn global_state_error_bound_qualified(&self) -> bool {
+        self.global_state_error_bound_qualified
+    }
+    pub fn global_state_error_bound_upper(&self) -> Option<f64> {
+        self.global_state_error_bound_upper
+    }
+
+    fn record_local(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
     ) -> Result<(), U1MpsError> {
@@ -1753,7 +3044,19 @@ impl U1MpsTruncationLedger {
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound = self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
+        if !diagnostics.reconstruction_l2_residual.is_finite()
+            || diagnostics.reconstruction_l2_residual < 0.0
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site reconstruction residual in truncation ledger",
+            ));
+        }
+        // Use the measured pre/post two-site tensor residual, not merely the
+        // ideal discarded Schmidt weight. The measured residual also includes
+        // finite-precision factorization error and tolerated forbidden-sector
+        // components that are absent from the Schmidt-weight sum.
+        let next_bound =
+            self.cumulative_local_l2_error_bound + diagnostics.reconstruction_l2_residual;
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
@@ -1765,6 +3068,188 @@ impl U1MpsTruncationLedger {
         self.maximum_single_gate_relative_discarded_weight = self
             .maximum_single_gate_relative_discarded_weight
             .max(diagnostics.relative_discarded_weight);
+        Ok(())
+    }
+
+    /// Record local tensor truncation diagnostics without claiming a global
+    /// state-vector bound.
+    fn record(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+    ) -> Result<(), U1MpsError> {
+        self.record_local(diagnostics)?;
+        self.global_state_error_bound_qualified = false;
+        self.global_state_error_bound_upper = None;
+        Ok(())
+    }
+
+    /// Compatibility helper for callers that have already established an
+    /// exactly unitary, charge-conserving two-site gate. Production TEBD should
+    /// use record_with_canonical_gauge_and_gate so gate defects are included.
+    fn record_with_canonical_gauge(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+        receipt: &U1CanonicalGaugeReceipt,
+        tolerance: f64,
+    ) -> Result<(), U1MpsError> {
+        self.record_with_gate_error_bounds(
+            diagnostics,
+            receipt,
+            0.0,
+            0.0,
+            0.0,
+            receipt.output_norm_squared,
+            tolerance,
+        )
+    }
+
+    /// Record a truncation with a measured mixed-canonical gauge receipt and
+    /// explicitly measured gate quality. The matrix residuals are converted
+    /// into conservative operator-error bounds before they enter the ledger.
+    fn record_with_canonical_gauge_and_gate(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+        receipt: &U1CanonicalGaugeReceipt,
+        gate: &U1TwoSiteGate,
+        tolerance: f64,
+    ) -> Result<(), U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        let unitarity_residual = gate.unitarity_residual();
+        let charge_residual = gate.charge_conservation_residual();
+        if !unitarity_residual.is_finite() || unitarity_residual > tolerance {
+            return Err(U1MpsError::GateUnitarityResidual {
+                residual: unitarity_residual,
+                tolerance,
+            });
+        }
+        if !charge_residual.is_finite() || charge_residual > tolerance {
+            return Err(U1MpsError::GateChargeConservationResidual {
+                residual: charge_residual,
+                tolerance,
+            });
+        }
+        self.record_with_gate_error_bounds(
+            diagnostics,
+            receipt,
+            unitarity_residual,
+            charge_residual,
+            gate.hamiltonian_projection_error_operator_upper_bound(),
+            receipt.output_norm_squared,
+            tolerance,
+        )
+    }
+
+    fn record_with_gate_error_bounds(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+        receipt: &U1CanonicalGaugeReceipt,
+        gate_unitarity_residual: f64,
+        gate_charge_residual: f64,
+        hamiltonian_projection_operator_error_upper_bound: f64,
+        pre_gate_norm_squared: f64,
+        tolerance: f64,
+    ) -> Result<(), U1MpsError> {
+        let prior_count = self.gate_count;
+        let prior_qualified = self.global_state_error_bound_qualified;
+        let prior_bound = self.global_state_error_bound_upper;
+        let prior_canonicalization_error = self.cumulative_canonicalization_l2_error_bound;
+        let prior_gate_quality_error = self.cumulative_gate_quality_l2_error_bound;
+        let prior_hamiltonian_projection_error =
+            self.cumulative_hamiltonian_projection_l2_error_bound;
+        let prior_projection_error = self.cumulative_projection_l2_error_bound;
+
+        if !gate_unitarity_residual.is_finite()
+            || !(0.0..1.0).contains(&gate_unitarity_residual)
+            || !gate_charge_residual.is_finite()
+            || gate_charge_residual < 0.0
+        {
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+            return Err(U1MpsError::NonFiniteContraction(
+                "gate quality residual in canonical error ledger",
+            ));
+        }
+
+        if !hamiltonian_projection_operator_error_upper_bound.is_finite()
+            || hamiltonian_projection_operator_error_upper_bound < 0.0
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian projection operator-error bound",
+            ));
+        }
+        let (gate_operator_norm_upper, gate_quality_error) =
+            gate_quality_error_bounds_from_residuals(
+                gate_unitarity_residual,
+                gate_charge_residual,
+                pre_gate_norm_squared,
+            )?;
+        let hamiltonian_projection_error = hamiltonian_projection_operator_error_upper_bound
+            * pre_gate_norm_squared.sqrt();
+        if !receipt.qualifies(tolerance) {
+            self.record_local(diagnostics)?;
+            self.canonical_gauge_receipt_count = self
+                .canonical_gauge_receipt_count
+                .checked_add(1)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+            return Ok(());
+        }
+
+        let projection_error = diagnostics.reconstruction_l2_residual
+            * receipt.exterior_operator_norm_product_upper_bound();
+        let canonicalization_error = receipt.state_reconstruction_l2_residual;
+        // Canonicalization and prior-state errors occur before G and must be
+        // propagated by the certified operator-norm bound of the actual gate.
+        let contribution = canonicalization_error * gate_operator_norm_upper
+            + gate_quality_error
+            + hamiltonian_projection_error
+            + projection_error;
+        if !contribution.is_finite()
+            || !gate_operator_norm_upper.is_finite()
+            || !gate_quality_error.is_finite()
+            || !hamiltonian_projection_error.is_finite()
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "canonical-gauge global truncation contribution",
+            ));
+        }
+
+        self.record_local(diagnostics)?;
+        self.canonical_gauge_receipt_count = self
+            .canonical_gauge_receipt_count
+            .checked_add(1)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+
+        let next_bound = if prior_count == 0 {
+            Some(contribution)
+        } else if prior_qualified {
+            prior_bound
+                .map(|bound| bound * gate_operator_norm_upper + contribution)
+                .filter(|bound| bound.is_finite())
+        } else {
+            None
+        };
+
+        if let Some(bound) = next_bound {
+            self.global_state_error_bound_qualified = true;
+            self.global_state_error_bound_upper = Some(bound);
+            self.cumulative_canonicalization_l2_error_bound =
+                prior_canonicalization_error * gate_operator_norm_upper
+                    + canonicalization_error * gate_operator_norm_upper;
+            self.cumulative_gate_quality_l2_error_bound =
+                prior_gate_quality_error * gate_operator_norm_upper + gate_quality_error;
+            self.cumulative_hamiltonian_projection_l2_error_bound =
+                prior_hamiltonian_projection_error * gate_operator_norm_upper
+                    + hamiltonian_projection_error;
+            self.cumulative_projection_l2_error_bound =
+                prior_projection_error * gate_operator_norm_upper + projection_error;
+        } else {
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+        }
         Ok(())
     }
 }
@@ -1799,12 +3284,32 @@ pub struct U1TeBDLayer {
 }
 
 /// Result of one TEBD layer, including its output MPS and per-gate error receipts.
+/// Per-gate evidence bundle. Fields are kept together so truncation,
+/// canonical-gauge and gate-quality receipts cannot be detached by index.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDGateReceipt {
+    pub bond_index: usize,
+    pub gate_unitarity_residual: f64,
+    pub gate_charge_conservation_residual: f64,
+    pub gate_quality_error_upper_bound: f64,
+    pub canonical_gauge: U1CanonicalGaugeReceipt,
+    pub truncation: U1TwoSiteTruncationDiagnostics,
+    pub local_projection_error_upper_bound: f64,
+    pub global_l2_error_contribution: Option<f64>,
+    pub global_l2_error_bound_after_gate: Option<f64>,
+    pub global_projection_error_upper_bound: f64,
+    pub hamiltonian_projection_operator_error_upper_bound: f64,
+    pub hamiltonian_projection_error_upper_bound: f64,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct U1TeBDLayerResult {
     pub state: ComplexU1Mps,
     pub parity: u8,
     pub bond_indices: Vec<usize>,
     pub gate_truncations: Vec<U1TwoSiteTruncationDiagnostics>,
+    pub canonical_gauge_receipts: Vec<U1CanonicalGaugeReceipt>,
+    pub gate_receipts: Vec<U1TeBDGateReceipt>,
     pub truncation_ledger: U1MpsTruncationLedger,
     pub input_norm_squared: f64,
     pub output_norm_squared: f64,
@@ -1885,35 +3390,93 @@ impl U1TeBDLayer {
         input: &ComplexU1Mps,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TeBDLayerResult, U1MpsError> {
+        self.apply_with_ledger(input, policy, U1MpsTruncationLedger::default())
+    }
+
+    fn apply_with_ledger(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+        mut truncation_ledger: U1MpsTruncationLedger,
+    ) -> Result<U1TeBDLayerResult, U1MpsError> {
         if input.site_count() != self.site_count {
             return Err(U1MpsError::TeBDLayerSiteCountMismatch {
                 layer_sites: self.site_count,
                 state_sites: input.site_count(),
             });
         }
+        if let Some(expected_fingerprint) = truncation_ledger.input_state_fingerprint {
+            if expected_fingerprint != input.state_fingerprint() {
+                return Err(U1MpsError::TruncationLedgerStateMismatch);
+            }
+        } else if truncation_ledger.gate_count != 0 {
+            return Err(U1MpsError::TruncationLedgerStateMismatch);
+        }
         let input_norm_squared = input.norm_squared(policy.tolerance)?;
         let input_total_charge = input.total_charge;
-        let mut tensors = input.tensors.clone();
-        let mut truncation_ledger = U1MpsTruncationLedger::default();
+        let mut state = input.clone();
         let mut gate_truncations = Vec::with_capacity(self.gates.len());
+        let mut canonical_gauge_receipts = Vec::with_capacity(self.gates.len());
+        let mut gate_receipts = Vec::with_capacity(self.gates.len());
 
         for entry in &self.gates {
             let bond = entry.bond_index;
+            let gauge_receipt = state.canonicalize_for_bond(bond, policy.tolerance)?;
             let pair = U1TwoSiteState::from_adjacent_tensors(
-                &tensors[bond],
-                &tensors[bond + 1],
+                &state.tensors[bond],
+                &state.tensors[bond + 1],
                 policy.tolerance,
             )?;
             let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
             let truncation = evolved_pair.split_truncated(policy)?;
-            truncation_ledger.record(&truncation)?;
-            tensors[bond] = truncation.left_tensor.clone();
-            tensors[bond + 1] = truncation.right_tensor.clone();
+            let prior_global_bound = truncation_ledger.global_state_error_bound_upper;
+            let (gate_operator_norm_upper, gate_quality_error_upper_bound) =
+                gate_quality_error_bounds(&entry.gate, gauge_receipt.output_norm_squared)?;
+            let global_projection_error_upper_bound = truncation.reconstruction_l2_residual
+                * gauge_receipt.exterior_operator_norm_product_upper_bound();
+            truncation_ledger.record_with_canonical_gauge_and_gate(
+                &truncation,
+                &gauge_receipt,
+                &entry.gate,
+                policy.tolerance,
+            )?;
+            let propagated_prior_bound =
+                prior_global_bound.unwrap_or(0.0) * gate_operator_norm_upper;
+            let global_l2_error_contribution = truncation_ledger
+                .global_state_error_bound_upper
+                .map(|after| after - propagated_prior_bound);
+            let global_l2_error_bound_after_gate =
+                truncation_ledger.global_state_error_bound_upper;
+            let local_projection_error_upper_bound = truncation.reconstruction_l2_residual;
+            let hamiltonian_projection_operator_error_upper_bound =
+                entry.gate.hamiltonian_projection_error_operator_upper_bound();
+            let hamiltonian_projection_error_upper_bound =
+                hamiltonian_projection_operator_error_upper_bound
+                    * gauge_receipt.output_norm_squared.sqrt();
+            state.tensors[bond] = truncation.left_tensor.clone();
+            state.tensors[bond + 1] = truncation.right_tensor.clone();
+            state = ComplexU1Mps::new(state.tensors.clone(), input_total_charge, policy.tolerance)?;
+            canonical_gauge_receipts.push(gauge_receipt.clone());
+            gate_receipts.push(U1TeBDGateReceipt {
+                bond_index: bond,
+                gate_unitarity_residual: entry.gate.unitarity_residual(),
+                gate_charge_conservation_residual: entry.gate.charge_conservation_residual(),
+                gate_quality_error_upper_bound,
+                canonical_gauge: gauge_receipt,
+                truncation: truncation.clone(),
+                local_projection_error_upper_bound,
+                global_l2_error_contribution,
+                global_l2_error_bound_after_gate,
+                global_projection_error_upper_bound,
+                hamiltonian_projection_operator_error_upper_bound,
+                hamiltonian_projection_error_upper_bound,
+            });
             gate_truncations.push(truncation);
         }
 
-        let state = ComplexU1Mps::new(tensors, input_total_charge, policy.tolerance)?;
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        truncation_ledger.input_state_fingerprint = Some(state.state_fingerprint());
+        let global_l2_bound_qualified = truncation_ledger.global_state_error_bound_qualified;
         Ok(U1TeBDLayerResult {
             output_selection_rule_residual: state.selection_rule_residual(),
             output_total_charge: state.total_charge(),
@@ -1921,20 +3484,230 @@ impl U1TeBDLayer {
             parity: self.parity,
             bond_indices: self.bond_indices(),
             gate_truncations,
+            canonical_gauge_receipts,
+            gate_receipts,
             truncation_ledger,
             input_norm_squared,
             output_norm_squared,
             input_total_charge,
-            global_l2_bound_qualified: false,
+            global_l2_bound_qualified,
         })
     }
 }
 
+
+
+/// One nearest-neighbour two-site Hamiltonian term in a U(1) chain.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDHamiltonianTerm {
+    bond_index: usize,
+    hamiltonian: U1TwoSiteHamiltonian,
+}
+
+impl U1TeBDHamiltonianTerm {
+    pub fn new(bond_index: usize, hamiltonian: U1TwoSiteHamiltonian) -> Self {
+        Self { bond_index, hamiltonian }
+    }
+
+    pub const fn bond_index(&self) -> usize {
+        self.bond_index
+    }
+
+    pub fn hamiltonian(&self) -> &U1TwoSiteHamiltonian {
+        &self.hamiltonian
+    }
+}
+
+/// Second-order nearest-neighbour TEBD stepper using Strang composition.
+///
+/// A full step applies exp(-i dt H_even/2), exp(-i dt H_odd), then
+/// exp(-i dt H_even/2). Same-parity terms act on disjoint bonds and commute
+/// within each layer. The truncation ledger is passed through all three
+/// layers rather than reset at each composition boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepper {
+    site_count: usize,
+    terms: Vec<U1TeBDHamiltonianTerm>,
+}
+
+/// Result of one second-order Strang TEBD time step.
+///
+/// The global L2 receipt covers representation, canonicalization, gate quality
+/// and local truncation errors. Trotter error is not bounded by this receipt;
+/// it requires a step-refinement study or an independent commutator bound.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStepResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub splitting_order: u8,
+    pub layer_parities: Vec<u8>,
+    pub layer_bond_indices: Vec<Vec<usize>>,
+    pub gate_receipts: Vec<U1TeBDGateReceipt>,
+    pub truncation_ledger: U1MpsTruncationLedger,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+    pub input_total_charge: i32,
+    pub output_total_charge: i32,
+    pub output_selection_rule_residual: f64,
+    pub global_l2_bound_qualified: bool,
+    pub time_discretization_error_qualified: bool,
+}
+
+impl U1TeBDStrangStepper {
+    /// Construct a fixed nearest-neighbour Hamiltonian decomposition.
+    ///
+    /// Every bond index must be unique and in range. Terms are stored in
+    /// deterministic ascending bond order.
+    pub fn new(
+        site_count: usize,
+        mut terms: Vec<U1TeBDHamiltonianTerm>,
+    ) -> Result<Self, U1MpsError> {
+        if site_count == 0 {
+            return Err(U1MpsError::EmptyChain);
+        }
+        for term in &terms {
+            if term.bond_index >= site_count.saturating_sub(1) {
+                return Err(U1MpsError::TeBDGateOutOfRange {
+                    bond_index: term.bond_index,
+                    site_count,
+                });
+            }
+        }
+        terms.sort_by_key(U1TeBDHamiltonianTerm::bond_index);
+        for pair in terms.windows(2) {
+            if pair[0].bond_index == pair[1].bond_index {
+                return Err(U1MpsError::DuplicateTeBDGate {
+                    bond_index: pair[0].bond_index,
+                });
+            }
+        }
+        Ok(Self { site_count, terms })
+    }
+
+    pub const fn site_count(&self) -> usize {
+        self.site_count
+    }
+
+    pub fn terms(&self) -> &[U1TeBDHamiltonianTerm] {
+        &self.terms
+    }
+
+    /// Apply one symmetric second-order even/odd/even step.
+    ///
+    /// Trotter error is intentionally separate from the compression ledger.
+    /// Callers should establish time-discretization convergence independently.
+    pub fn apply(
+        &self,
+        input: &ComplexU1Mps,
+        dt: f64,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStepResult, U1MpsError> {
+        self.apply_with_ledger(
+            input,
+            dt,
+            policy,
+            U1MpsTruncationLedger::default(),
+        )
+    }
+
+    /// Apply one Strang step while continuing an existing error ledger.
+    ///
+    /// Pass the ledger from the prior time step to keep the global state-vector
+    /// bound cumulative across the full evolution. A fresh ledger is a new
+    /// qualification segment and does not include earlier time steps.
+    pub fn apply_with_ledger(
+        &self,
+        input: &ComplexU1Mps,
+        dt: f64,
+        policy: U1TwoSiteTruncationPolicy,
+        initial_ledger: U1MpsTruncationLedger,
+    ) -> Result<U1TeBDStepResult, U1MpsError> {
+        if !dt.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction("TEBD Strang time step"));
+        }
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+
+        let mut even_half_gates = Vec::new();
+        let mut odd_full_gates = Vec::new();
+        for term in &self.terms {
+            let gate = if term.bond_index % 2 == 0 {
+                term.hamiltonian.evolution_gate(0.5 * dt, policy.tolerance)?
+            } else {
+                term.hamiltonian.evolution_gate(dt, policy.tolerance)?
+            };
+            let entry = U1TeBDGate::new(term.bond_index, gate);
+            if term.bond_index % 2 == 0 {
+                even_half_gates.push(entry);
+            } else {
+                odd_full_gates.push(entry);
+            }
+        }
+
+        let even_first = U1TeBDLayer::new(self.site_count, 0, even_half_gates.clone())?;
+        let odd = U1TeBDLayer::new(self.site_count, 1, odd_full_gates)?;
+        let even_last = U1TeBDLayer::new(self.site_count, 0, even_half_gates)?;
+
+        let first = even_first.apply_with_ledger(input, policy, initial_ledger)?;
+        let second = odd.apply_with_ledger(
+            &first.state,
+            policy,
+            first.truncation_ledger.clone(),
+        )?;
+        let third = even_last.apply_with_ledger(
+            &second.state,
+            policy,
+            second.truncation_ledger.clone(),
+        )?;
+
+        let mut gate_receipts = first.gate_receipts;
+        gate_receipts.extend(second.gate_receipts);
+        gate_receipts.extend(third.gate_receipts);
+        let layer_bond_indices = vec![
+            even_first.bond_indices(),
+            odd.bond_indices(),
+            even_last.bond_indices(),
+        ];
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let output_norm_squared = third.state.norm_squared(policy.tolerance)?;
+        let output_selection_rule_residual = third.state.selection_rule_residual();
+        let output_total_charge = third.state.total_charge();
+        let global_l2_bound_qualified =
+            third.truncation_ledger.global_state_error_bound_qualified;
+
+        Ok(U1TeBDStepResult {
+            state: third.state,
+            time_step: dt,
+            splitting_order: 2,
+            layer_parities: vec![0, 1, 0],
+            layer_bond_indices,
+            gate_receipts,
+            truncation_ledger: third.truncation_ledger,
+            input_norm_squared,
+            output_norm_squared,
+            input_total_charge: input.total_charge(),
+            output_total_charge,
+            output_selection_rule_residual,
+            global_l2_bound_qualified,
+            time_discretization_error_qualified: false,
+        })
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate, U1TeBDLayer,
-        U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
+        U1TeBDStepResult, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
+        U1TwoSiteState,
+        U1TwoSiteTruncationPolicy,
+        left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -2722,7 +4495,6 @@ mod tests {
         let mut norm_squared = 0.0;
         for first_physical in 0..2 {
             for second_physical in 0..2 {
-                let pair = first_physical * 2 + second_physical;
                 let mut amplitude = Complex64::new(0.0, 0.0);
                 for middle in 0..result.left_tensor.right_dimension() {
                     amplitude += result.left_tensor.get(0, first_physical, middle)
@@ -2753,6 +4525,42 @@ mod tests {
         assert!((ledger.cumulative_local_l2_error_bound - 1.2).abs() <= 1.0e-12);
         assert!(!ledger.global_state_error_bound_qualified);
         assert!((ledger.maximum_single_gate_relative_discarded_weight - 0.36).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn truncation_ledger_uses_measured_residual_for_tolerated_charge_leakage() {
+        // |00> is outside the declared total-charge-one sector, but its
+        // amplitude is below the constructor tolerance. It contributes no
+        // Schmidt weight to the charge-block SVD, yet the reconstruction
+        // residual must still be counted by the ledger.
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(1.0e-13, 0.0),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        let diagnostics = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 2,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(diagnostics.discarded_weight, 0.0);
+        assert!(diagnostics.reconstruction_l2_residual >= 1.0e-13);
+
+        let mut ledger = U1MpsTruncationLedger::default();
+        ledger.record(&diagnostics).unwrap();
+        assert!(
+            ledger.cumulative_local_l2_error_bound >= diagnostics.reconstruction_l2_residual
+        );
+        assert!(!ledger.global_state_error_bound_qualified);
     }
 
     #[test]
@@ -2843,7 +4651,14 @@ mod tests {
         assert!((result.output_norm_squared - 1.0).abs() <= 1.0e-10);
         assert_eq!(result.truncation_ledger.gate_count, 2);
         assert_eq!(result.gate_truncations.len(), 2);
-        assert!(!result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 2);
+        assert!(result.global_l2_bound_qualified);
+        assert!(
+            result
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .is_some()
+        );
 
         let dense = result.state.to_dense(8).unwrap();
         assert!((dense[5] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
@@ -2874,7 +4689,14 @@ mod tests {
         assert_eq!(result.output_total_charge, 1);
         assert!((result.output_norm_squared - result.input_norm_squared).abs() <= 1.0e-10);
         assert!(result.gate_truncations[0].discarded_weight <= 1.0e-12);
-        assert!(!result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 1);
+        assert!(result.global_l2_bound_qualified);
+        assert!(
+            result
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .is_some()
+        );
         let dense = result.state.to_dense(4).unwrap();
         assert!((dense[1] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
     }
@@ -2925,5 +4747,968 @@ mod tests {
                 state_sites: 3
             })
         ));
+    }
+
+    fn four_site_two_excitation_dense_fixture() -> Vec<Complex64> {
+        let mut dense = vec![complex_zero(); 16];
+        dense[3] = Complex64::new(0.3, 0.1);
+        dense[5] = Complex64::new(-0.2, 0.4);
+        dense[6] = Complex64::new(0.5, -0.1);
+        dense[9] = Complex64::new(0.1, 0.2);
+        dense[10] = Complex64::new(-0.3, -0.2);
+        dense[12] = Complex64::new(0.4, 0.3);
+        let norm = dense
+            .iter()
+            .map(|value| value.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        for value in &mut dense {
+            *value /= norm;
+        }
+        dense
+    }
+
+    #[test]
+    fn canonicalization_preserves_dense_state_and_qualifies_all_two_site_centers() {
+        let dense = four_site_two_excitation_dense_fixture();
+        let original = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let original_norm = original.norm_squared(1.0e-12).unwrap();
+
+        for bond in 0..3 {
+            let mut canonical = original.clone();
+            let receipt = canonical.canonicalize_for_bond(bond, 1.0e-10).unwrap();
+            assert!(
+                receipt.qualifies(1.0e-10),
+                "bond={bond}, receipt={receipt:?}"
+            );
+            assert_eq!(receipt.bond, bond);
+            assert_eq!(receipt.site_count, 4);
+            assert_eq!(receipt.total_charge, 2);
+            assert_eq!(receipt.left_isometry_residuals.len(), bond);
+            assert_eq!(receipt.right_isometry_residuals.len(), 2 - bond);
+            assert!(receipt.maximum_left_isometry_residual <= 1.0e-10);
+            assert!(receipt.maximum_right_isometry_residual <= 1.0e-10);
+            assert!(receipt.factorization_max_residual <= 1.0e-10);
+            assert!(receipt.state_reconstruction_l2_residual <= 1.0e-9);
+            assert!(receipt.relative_norm_drift <= 1.0e-10);
+            assert!(receipt.exterior_operator_norm_product_upper_bound() >= 1.0);
+            assert!(
+                receipt
+                    .exterior_operator_norm_product_upper_bound()
+                    .is_finite()
+            );
+
+            let reconstructed = canonical.to_dense(8).unwrap();
+            for (index, (actual, expected)) in reconstructed.iter().zip(dense.iter()).enumerate() {
+                assert!(
+                    (*actual - *expected).norm() <= 1.0e-9,
+                    "bond={bond}, basis={index}, actual={actual:?}, expected={expected:?}"
+                );
+            }
+            assert!((canonical.norm_squared(1.0e-12).unwrap() - original_norm).abs() <= 1.0e-10);
+            assert_eq!(canonical.total_charge(), original.total_charge());
+            assert!(canonical.selection_rule_residual() <= 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn canonicalization_receipt_is_bound_to_measured_external_isometries() {
+        let dense = four_site_two_excitation_dense_fixture();
+        let mut state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let receipt: U1CanonicalGaugeReceipt = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+
+        for &(site, residual) in &receipt.left_isometry_residuals {
+            assert_eq!(site, 0);
+            assert!(
+                (left_isometry_residual(&state.tensors()[site]).unwrap() - residual).abs()
+                    <= 1.0e-14
+            );
+        }
+        for &(site, residual) in &receipt.right_isometry_residuals {
+            assert_eq!(site, 3);
+            assert!(
+                (right_isometry_residual(&state.tensors()[site]).unwrap() - residual).abs()
+                    <= 1.0e-14
+            );
+        }
+        assert!(receipt.qualifies(1.0e-10));
+        assert!(!receipt.qualifies(f64::NAN));
+        assert!(!receipt.qualifies(0.0));
+
+        let mut missing_site = receipt.clone();
+        missing_site.right_isometry_residuals.pop();
+        assert!(!missing_site.qualifies(1.0e-10));
+        let mut misbound_site = receipt.clone();
+        misbound_site.right_isometry_residuals[0].0 = 2;
+        assert!(!misbound_site.qualifies(1.0e-10));
+    }
+
+    #[test]
+    fn mps_overlap_matches_norm_and_survives_gauge_rebasing() {
+        let dense = four_site_two_excitation_dense_fixture();
+        let original = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let mut rebased = original.clone();
+        let receipt = rebased.canonicalize_for_bond(2, 1.0e-10).unwrap();
+        let overlap = original.inner_product(&rebased).unwrap();
+        let original_norm = original.norm_squared(1.0e-12).unwrap();
+        let rebased_norm = rebased.norm_squared(1.0e-12).unwrap();
+
+        assert!(receipt.qualifies(1.0e-10));
+        assert!((overlap.re - original_norm).abs() <= 1.0e-10);
+        assert!(overlap.im.abs() <= 1.0e-10);
+        assert!((original_norm - rebased_norm).abs() <= 1.0e-10);
+        assert!(original.inner_product(&original).unwrap().im.abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn canonicalization_rejects_invalid_center_without_mutating_state() {
+        let dense = four_site_two_excitation_dense_fixture();
+        let mut state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let before = state.to_dense(8).unwrap();
+
+        assert_eq!(
+            state.canonicalize_for_bond(3, 1.0e-10),
+            Err(U1MpsError::TwoSiteShapeMismatch)
+        );
+        assert!(matches!(
+            state.canonicalize_for_bond(0, f64::NAN),
+            Err(U1MpsError::InvalidTolerance(value)) if value.is_nan()
+        ));
+        let after = state.to_dense(8).unwrap();
+        for (actual, expected) in after.iter().zip(before.iter()) {
+            assert!((*actual - *expected).norm() <= 1.0e-14);
+        }
+    }
+
+    fn canonical_w_state() -> ComplexU1Mps {
+        let amplitude = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(amplitude, 0.0);
+        dense[2] = Complex64::new(amplitude, 0.0);
+        dense[4] = Complex64::new(amplitude, 0.0);
+        ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap()
+    }
+
+    #[test]
+    fn mixed_canonicalization_qualifies_both_two_site_centers_and_preserves_dense_state() {
+        let original = canonical_w_state();
+        let expected_dense = original.to_dense(4).unwrap();
+        let expected_norm = original.norm_squared(1.0e-12).unwrap();
+
+        for bond in [0, 1] {
+            let mut candidate = original.clone();
+            let receipt: U1CanonicalGaugeReceipt =
+                candidate.canonicalize_for_bond(bond, 1.0e-10).unwrap();
+
+            assert_eq!(receipt.bond, bond);
+            assert_eq!(receipt.site_count, 3);
+            assert_eq!(receipt.total_charge, 1);
+            assert!(receipt.qualifies(1.0e-10), "receipt={receipt:?}");
+            assert_eq!(
+                receipt
+                    .left_isometry_residuals
+                    .iter()
+                    .map(|(site, _)| *site)
+                    .collect::<Vec<_>>(),
+                (0..bond).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                receipt
+                    .right_isometry_residuals
+                    .iter()
+                    .map(|(site, _)| *site)
+                    .collect::<Vec<_>>(),
+                ((bond + 2)..3).collect::<Vec<_>>()
+            );
+            assert!(receipt.left_exterior_operator_norm_upper_bound >= 1.0);
+            assert!(receipt.right_exterior_operator_norm_upper_bound >= 1.0);
+            assert!(receipt.state_reconstruction_l2_residual <= 1.0e-10);
+            assert!((receipt.output_norm_squared - expected_norm).abs() <= 1.0e-10);
+
+            let actual_dense = candidate.to_dense(4).unwrap();
+            for (actual, expected) in actual_dense.iter().zip(expected_dense.iter()) {
+                assert!((*actual - *expected).norm() <= 1.0e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn canonical_gauge_receipt_fails_closed_for_invalid_tolerance_or_bond() {
+        let mut state = canonical_w_state();
+        let original_tensors = state.tensors().to_vec();
+        assert!(matches!(
+            state.canonicalize_for_bond(0, 0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        ));
+        assert!(matches!(
+            state.canonicalize_for_bond(2, 1.0e-12),
+            Err(U1MpsError::TwoSiteShapeMismatch)
+        ));
+        assert_eq!(state.tensors(), original_tensors.as_slice());
+        let receipt = U1CanonicalGaugeReceipt {
+            bond: 0,
+            site_count: 3,
+            total_charge: 1,
+            left_isometry_residuals: Vec::new(),
+            right_isometry_residuals: Vec::new(),
+            maximum_left_isometry_residual: 0.0,
+            maximum_right_isometry_residual: 0.0,
+            left_exterior_operator_norm_upper_bound: f64::NAN,
+            right_exterior_operator_norm_upper_bound: 1.0,
+            factorization_max_residual: 0.0,
+            factorization_l2_residual: 0.0,
+            state_reconstruction_l2_residual: 0.0,
+            exact_zero_singular_values_omitted: 0,
+            selection_rule_residual: 0.0,
+            input_norm_squared: 1.0,
+            output_norm_squared: 1.0,
+            relative_norm_drift: 0.0,
+            qualified: true,
+        };
+        assert!(!receipt.qualifies(1.0e-12));
+    }
+
+    #[test]
+    fn canonicalization_is_idempotent_at_a_fixed_two_site_center() {
+        let mut state = canonical_w_state();
+        let first = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+        let dense_after_first = state.to_dense(4).unwrap();
+        let second = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+        let dense_after_second = state.to_dense(4).unwrap();
+        assert!(first.qualifies(1.0e-10));
+        assert!(second.qualifies(1.0e-10));
+        for (first_value, second_value) in dense_after_first.iter().zip(dense_after_second.iter()) {
+            assert!((*first_value - *second_value).norm() <= 1.0e-10);
+        }
+    }
+
+    #[test]
+    fn tebd_global_error_bound_matches_dense_two_site_discarded_component() {
+        let mut dense = vec![complex_zero(); 4];
+        dense[1] = Complex64::new(0.8, 0.0);
+        dense[2] = Complex64::new(0.6, 0.0);
+        let input = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let layer =
+            U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, U1TwoSiteGate::identity())]).unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                },
+            )
+            .unwrap();
+
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 1);
+        assert!(result.canonical_gauge_receipts[0].qualifies(1.0e-10));
+        assert!((result.gate_truncations[0].discarded_weight - 0.36).abs() <= 1.0e-10);
+        let certified_bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .expect("qualified gauge must produce global error bound");
+        assert!((certified_bound - 0.6).abs() <= 1.0e-10);
+
+        let before = input.to_dense(4).unwrap();
+        let after = result.state.to_dense(4).unwrap();
+        let actual_error = before
+            .iter()
+            .zip(after.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!((actual_error - 0.6).abs() <= 1.0e-10);
+        assert!(certified_bound + 1.0e-10 >= actual_error);
+        assert!((result.output_norm_squared - 0.64).abs() <= 1.0e-10);
+    }
+
+    #[test]
+    fn tebd_rejects_a_gate_constructed_with_a_looser_unitarity_tolerance() {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        matrix[1][1] = Complex64::new(1.0 + 1.0e-7, 0.0);
+        let loose_gate = U1TwoSiteGate::new(matrix, 1.0e-6).unwrap();
+        assert!(loose_gate.unitarity_residual() > 1.0e-10);
+        let input = ComplexU1Mps::product_state(&[false, true]).unwrap();
+        let layer = U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, loose_gate)]).unwrap();
+        assert!(matches!(
+            layer.apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                }
+            ),
+            Err(U1MpsError::GateUnitarityResidual { .. })
+        ));
+    }
+
+    #[test]
+    fn tebd_global_error_receipt_includes_gate_unitarity_defect() {
+        let epsilon = 2.5e-8;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        matrix[1][1] = Complex64::new(1.0 + epsilon, 0.0);
+        let gate = U1TwoSiteGate::new(matrix, 1.0e-6).unwrap();
+        let input = ComplexU1Mps::product_state(&[false, true]).unwrap();
+        let layer = U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, gate)]).unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-6,
+                },
+            )
+            .unwrap();
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.gate_receipts.len(), 1);
+        let receipt: &U1TeBDGateReceipt = &result.gate_receipts[0];
+        assert_eq!(receipt.bond_index, 0);
+        assert!(receipt.gate_unitarity_residual > 0.0);
+        assert!(receipt.gate_quality_error_upper_bound >= epsilon * (1.0 - 1.0e-6));
+        assert!(receipt.global_l2_error_contribution.is_some());
+
+        let before = input.to_dense(4).unwrap();
+        let after = result.state.to_dense(4).unwrap();
+        let actual_error = before
+            .iter()
+            .zip(after.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .unwrap();
+        assert!(bound + 1.0e-12 >= actual_error);
+        assert!(
+            (result
+                .truncation_ledger
+                .cumulative_gate_quality_l2_error_bound
+                - receipt.gate_quality_error_upper_bound)
+                .abs()
+                <= 1.0e-12
+        );
+    }
+
+    #[test]
+    fn tebd_global_error_bound_propagates_through_nonunitary_gate_norms() {
+        let epsilon = 1.0e-3;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        matrix[2][2] = Complex64::new(1.0 + epsilon, 0.0);
+        let gate = U1TwoSiteGate::new(matrix, 1.0e-2).unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
+        let layer = U1TeBDLayer::new(
+            4,
+            0,
+            vec![
+                U1TeBDGate::new(0, gate.clone()),
+                U1TeBDGate::new(2, gate),
+            ],
+        )
+        .unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-2,
+                },
+            )
+            .unwrap();
+
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.truncation_ledger.gate_count, 2);
+        assert_eq!(result.gate_receipts.len(), 2);
+        let first = &result.gate_receipts[0];
+        let second = &result.gate_receipts[1];
+        assert!(first.global_l2_error_bound_after_gate.is_some());
+        assert!(second.global_l2_error_bound_after_gate.is_some());
+
+        let first_bound = first.global_l2_error_bound_after_gate.unwrap();
+        let second_bound = second.global_l2_error_bound_after_gate.unwrap();
+        let second_gate_operator_norm =
+            (1.0 + second.gate_unitarity_residual).sqrt();
+        let propagated_first = first_bound * second_gate_operator_norm;
+        let second_increment = second.global_l2_error_contribution.unwrap();
+        assert!(second_increment >= 0.0);
+        assert!(
+            (second_bound - propagated_first - second_increment).abs() <= 1.0e-12,
+            "second bound {second_bound}, propagated {propagated_first}, increment {second_increment}"
+        );
+
+        let before = input.to_dense(8).unwrap();
+        let after = result.state.to_dense(8).unwrap();
+        let actual_error = before
+            .iter()
+            .zip(after.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .unwrap();
+        assert!(bound + 1.0e-12 >= actual_error);
+        let component_sum = result.truncation_ledger.cumulative_canonicalization_l2_error_bound
+            + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+            + result.truncation_ledger.cumulative_projection_l2_error_bound;
+        assert!((component_sum - bound).abs() <= 1.0e-12);
+    }
+
+
+
+    #[test]
+    fn gate_quality_operator_bound_accounts_for_entrywise_to_spectral_norm_conversion() {
+        // In the {|01>, |10>} sector choose G = sqrt(I + a * ones).
+        // The max entry of G†G-I is a, while its spectral norm is 2a.
+        let a: f64 = 0.02;
+        let delta = (1.0 + 2.0 * a).sqrt() - 1.0;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[0][0] = Complex64::new(1.0, 0.0);
+        matrix[3][3] = Complex64::new(1.0, 0.0);
+        matrix[1][1] = Complex64::new(1.0 + 0.5 * delta, 0.0);
+        matrix[1][2] = Complex64::new(0.5 * delta, 0.0);
+        matrix[2][1] = Complex64::new(0.5 * delta, 0.0);
+        matrix[2][2] = Complex64::new(1.0 + 0.5 * delta, 0.0);
+        let gate = U1TwoSiteGate::new(matrix, 0.1).unwrap();
+        assert!((gate.unitarity_residual() - a).abs() <= 1.0e-12);
+
+        let (operator_norm_upper, quality_error_upper) =
+            super::gate_quality_error_bounds(&gate, 1.0).unwrap();
+        let actual_operator_norm = (1.0 + 2.0 * a).sqrt();
+        assert!(operator_norm_upper >= actual_operator_norm);
+        assert!(quality_error_upper >= actual_operator_norm - 1.0);
+        assert!(operator_norm_upper.is_finite());
+        assert!(quality_error_upper.is_finite());
+    }
+
+    #[test]
+    fn hamiltonian_projection_error_uses_deltas_own_duhamel_growth_bound() {
+        let delta: f64 = 0.05;
+        let dt: f64 = 2.0;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        // A small anti-Hermitian component makes H differ from its Hermitian
+        // U(1)-preserving projection by exactly |delta| in Frobenius norm.
+        matrix[0][0] = Complex64::new(0.0, delta);
+        let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 0.2).unwrap();
+        let gate = hamiltonian.evolution_gate(dt, 1.0e-12).unwrap();
+        let expected = dt.abs() * delta * (dt.abs() * delta).exp();
+        assert!(
+            (gate.hamiltonian_projection_error_operator_upper_bound() - expected).abs()
+                <= 1.0e-12
+        );
+        // The true scalar-channel amplitude error is exp(delta*dt)-1.
+        let true_error = (delta * dt).exp() - 1.0;
+        assert!(gate.hamiltonian_projection_error_operator_upper_bound() >= true_error);
+    }
+
+    #[test]
+    fn two_site_hamiltonian_exponential_matches_analytic_single_excitation_rabi_gate() {
+        let coupling = 0.7;
+        let dt = 0.31;
+        let mut hamiltonian = [[complex_zero(); 4]; 4];
+        hamiltonian[0][0] = Complex64::new(0.2, 0.0);
+        hamiltonian[3][3] = Complex64::new(-0.3, 0.0);
+        hamiltonian[1][1] = Complex64::new(0.1, 0.0);
+        hamiltonian[2][2] = Complex64::new(-0.1, 0.0);
+        hamiltonian[1][2] = Complex64::new(coupling, 0.0);
+        hamiltonian[2][1] = Complex64::new(coupling, 0.0);
+        let model = U1TwoSiteHamiltonian::new(hamiltonian, 1.0e-12).unwrap();
+        let gate = model.evolution_gate(dt, 1.0e-12).unwrap();
+        let matrix = gate.matrix();
+        let difference: f64 = 0.1;
+        let radius = (difference * difference + coupling * coupling).sqrt();
+        let cosine = (dt * radius).cos();
+        let sine_over_radius = (dt * radius).sin() / radius;
+        assert!((matrix[0][0] - Complex64::from_polar(1.0, -dt * 0.2)).norm() <= 1.0e-12);
+        assert!((matrix[3][3] - Complex64::from_polar(1.0, dt * 0.3)).norm() <= 1.0e-12);
+        assert!(
+            (matrix[1][2] - Complex64::new(0.0, -sine_over_radius * coupling)).norm()
+                <= 1.0e-12
+        );
+        assert!(
+            (matrix[2][1] - Complex64::new(0.0, -sine_over_radius * coupling)).norm()
+                <= 1.0e-12
+        );
+        assert!(
+            (matrix[1][1]
+                - Complex64::new(cosine, 0.0)
+                - Complex64::new(0.0, -sine_over_radius * difference))
+                .norm()
+                <= 1.0e-12
+        );
+        assert!(
+            (matrix[2][2]
+                - Complex64::new(cosine, 0.0)
+                + Complex64::new(0.0, -sine_over_radius * difference))
+                .norm()
+                <= 1.0e-12
+        );
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+        assert_eq!(gate.charge_conservation_residual(), 0.0);
+    }
+
+    #[test]
+    fn two_site_hamiltonian_rejects_nonhermitian_charge_leaking_and_nonfinite_inputs() {
+        let mut nonhermitian = [[complex_zero(); 4]; 4];
+        nonhermitian[1][2] = Complex64::new(0.5, 0.2);
+        nonhermitian[2][1] = Complex64::new(0.5, 0.2);
+        assert!(matches!(
+            U1TwoSiteHamiltonian::new(nonhermitian, 1.0e-12),
+            Err(U1MpsError::TwoSiteHamiltonianHermiticityResidual { .. })
+        ));
+
+        let mut charge_leaking = [[complex_zero(); 4]; 4];
+        charge_leaking[0][1] = Complex64::new(0.1, 0.0);
+        charge_leaking[1][0] = Complex64::new(0.1, 0.0);
+        assert!(matches!(
+            U1TwoSiteHamiltonian::new(charge_leaking, 1.0e-12),
+            Err(U1MpsError::TwoSiteHamiltonianChargeLeakage { .. })
+        ));
+
+        let mut nonfinite = [[complex_zero(); 4]; 4];
+        nonfinite[2][2] = Complex64::new(f64::NAN, 0.0);
+        assert!(matches!(
+            U1TwoSiteHamiltonian::new(nonfinite, 1.0e-12),
+            Err(U1MpsError::NonFiniteTensorEntry { .. })
+        ));
+    }
+
+    #[test]
+    fn two_site_hamiltonian_exponential_rejects_nonfinite_time_step() {
+        let model = U1TwoSiteHamiltonian::new([[complex_zero(); 4]; 4], 1.0e-12).unwrap();
+        assert!(model.evolution_gate(f64::INFINITY, 1.0e-12).is_err());
+        assert!(model.evolution_gate(0.1, f64::NAN).is_err());
+    }
+
+
+
+    fn nearest_neighbour_hopping_term(coupling: f64) -> U1TwoSiteHamiltonian {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[1][2] = Complex64::new(coupling, 0.0);
+        matrix[2][1] = Complex64::new(coupling, 0.0);
+        U1TwoSiteHamiltonian::new(matrix, 1.0e-12).unwrap()
+    }
+
+    fn one_excitation_chain_exact(time: f64, coupling: f64) -> Vec<Complex64> {
+        let angle = 2.0_f64.sqrt() * coupling * time;
+        vec![
+            Complex64::new((0.5 * angle).cos().powi(2), 0.0),
+            Complex64::new(0.0, -(1.0 / 2.0_f64.sqrt()) * angle.sin()),
+            Complex64::new(-(0.5 * angle).sin().powi(2), 0.0),
+        ]
+    }
+
+    #[test]
+    fn strang_stepper_builds_even_odd_even_layers_and_preserves_global_ledger() {
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(0.7)),
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(0.7)),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            stepper
+                .terms()
+                .iter()
+                .map(U1TeBDHamiltonianTerm::bond_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .apply(
+                &input,
+                0.2,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.splitting_order, 2);
+        assert_eq!(result.layer_parities, vec![0, 1, 0]);
+        assert_eq!(result.layer_bond_indices, vec![vec![0], vec![1], vec![0]]);
+        assert_eq!(result.input_total_charge, 1);
+        assert_eq!(result.output_total_charge, 1);
+        assert!(result.output_selection_rule_residual <= 1.0e-10);
+        assert!(result.global_l2_bound_qualified);
+        assert!(!result.time_discretization_error_qualified);
+        assert_eq!(result.truncation_ledger.gate_count, 3);
+        assert_eq!(result.gate_receipts.len(), 3);
+
+        let dense = result.state.to_dense(4).unwrap();
+        let exact = one_excitation_chain_exact(0.2, 0.7);
+        let actual = [dense[4], dense[2], dense[1]];
+        let error = actual
+            .iter()
+            .zip(exact.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!(error < 5.0e-3, "Strang one-step error {error}");
+    }
+
+    #[test]
+    fn strang_stepper_shows_second_order_global_convergence_against_dense_solution() {
+        let coupling = 0.55;
+        let total_time = 0.6;
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(coupling)),
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(coupling)),
+            ],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 4,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-11,
+        };
+
+        let evolve = |steps: usize| {
+            let dt = total_time / steps as f64;
+            let mut state = input.clone();
+            for _ in 0..steps {
+                state = stepper.apply(&state, dt, policy).unwrap().state;
+            }
+            state
+        };
+        let coarse = evolve(8).to_dense(4).unwrap();
+        let fine = evolve(16).to_dense(4).unwrap();
+        let exact = one_excitation_chain_exact(total_time, coupling);
+        let dense_components = |state: &[Complex64]| [state[4], state[2], state[1]];
+        let coarse_error = dense_components(&coarse)
+            .iter()
+            .zip(exact.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let fine_error = dense_components(&fine)
+            .iter()
+            .zip(exact.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!(coarse_error / fine_error > 3.2);
+        assert!(coarse_error / fine_error < 4.8);
+        assert!(fine_error < 5.0e-4);
+    }
+
+    #[test]
+    fn hamiltonian_projection_residual_is_measured_and_attached_to_evolution_gate() {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[0][0] = Complex64::new(0.2, 1.0e-8);
+        matrix[3][3] = Complex64::new(-0.3, 0.0);
+        matrix[1][1] = Complex64::new(0.1, 2.0e-8);
+        matrix[2][2] = Complex64::new(-0.1, 0.0);
+        matrix[1][2] = Complex64::new(0.7, 1.0e-8);
+        matrix[2][1] = Complex64::new(0.7, 0.0);
+        matrix[0][1] = Complex64::new(1.0e-8, 0.0);
+        matrix[1][0] = Complex64::new(1.0e-8, 0.0);
+
+        let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 1.0e-6).unwrap();
+        assert!(hamiltonian.hermiticity_residual() > 0.0);
+        assert!(hamiltonian.charge_conservation_residual() > 0.0);
+        assert!(hamiltonian.projection_residual_frobenius() > 0.0);
+
+        let gate = hamiltonian.evolution_gate(0.3, 1.0e-12).unwrap();
+        assert!(gate.hamiltonian_projection_error_operator_upper_bound() > 0.0);
+        assert!(gate.hamiltonian_projection_error_operator_upper_bound().is_finite());
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+        assert_eq!(gate.charge_conservation_residual(), 0.0);
+    }
+
+    #[test]
+    fn strang_global_error_ledger_accounts_for_hamiltonian_model_projection() {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[0][0] = Complex64::new(0.1, 1.0e-8);
+        matrix[1][1] = Complex64::new(0.0, 1.0e-8);
+        matrix[2][2] = Complex64::new(0.0, 0.0);
+        matrix[1][2] = Complex64::new(0.4, 0.0);
+        matrix[2][1] = Complex64::new(0.4, 0.0);
+        matrix[0][1] = Complex64::new(1.0e-8, 0.0);
+        matrix[1][0] = Complex64::new(1.0e-8, 0.0);
+        let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 1.0e-6).unwrap();
+
+        let stepper = U1TeBDStrangStepper::new(
+            2,
+            vec![U1TeBDHamiltonianTerm::new(0, hamiltonian)],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let result = stepper
+            .apply(
+                &input,
+                0.2,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-6,
+                },
+            )
+            .unwrap();
+        assert!(result.global_l2_bound_qualified);
+        assert!(result.gate_receipts.len() == 2);
+        assert!(
+            result
+                .truncation_ledger
+                .cumulative_hamiltonian_projection_l2_error_bound
+                > 0.0
+        );
+        let component_sum = result
+            .truncation_ledger
+            .cumulative_canonicalization_l2_error_bound
+            + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+            + result
+                .truncation_ledger
+                .cumulative_hamiltonian_projection_l2_error_bound
+            + result.truncation_ledger.cumulative_projection_l2_error_bound;
+        let bound = result.truncation_ledger.global_state_error_bound_upper.unwrap();
+        assert!((component_sum - bound).abs() <= 1.0e-12);
+        assert!(result.gate_receipts.iter().all(|receipt| {
+            receipt.hamiltonian_projection_operator_error_upper_bound.is_finite()
+                && receipt.hamiltonian_projection_error_upper_bound.is_finite()
+        }));
+    }
+
+    #[test]
+    fn strang_stepper_continues_global_error_ledger_across_time_steps() {
+        let coupling = 0.8;
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(coupling)),
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(coupling)),
+            ],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 1,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let first = stepper.apply(&input, 0.25, policy).unwrap();
+        let first_bound = first.truncation_ledger.global_state_error_bound_upper.unwrap();
+        assert_eq!(first.truncation_ledger.gate_count, 3);
+        let second = stepper
+            .apply_with_ledger(
+                &first.state,
+                0.25,
+                policy,
+                first.truncation_ledger.clone(),
+            )
+            .unwrap();
+        assert_eq!(second.truncation_ledger.gate_count, 6);
+        assert!(second.global_l2_bound_qualified);
+        assert!(second.truncation_ledger.global_state_error_bound_upper.unwrap() >= first_bound);
+        assert_eq!(
+            second.truncation_ledger.canonical_gauge_receipt_count,
+            6
+        );
+    }
+
+    #[test]
+    fn canonical_gauge_receipt_rejects_understated_operator_norm_bound() {
+        let mut state = canonical_w_state();
+        let mut receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(receipt.qualifies(1.0e-10));
+        receipt.left_exterior_operator_norm_upper_bound = 1.0;
+        assert!(!receipt.qualifies(1.0e-10));
+    }
+
+    #[test]
+    fn canonical_gauge_receipt_rejects_negative_residuals_even_if_qualified_flag_is_set() {
+        let mut state = canonical_w_state();
+        let mut receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        receipt.maximum_left_isometry_residual = -1.0;
+        assert!(!receipt.qualifies(1.0e-10));
+    }
+
+    #[test]
+    fn truncation_ledger_cannot_be_reused_with_a_different_mps_state() {
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(0.4)),
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(0.4)),
+            ],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 2,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let first = stepper.apply(&input, 0.1, policy).unwrap();
+        let unrelated = ComplexU1Mps::product_state(&[false, true, false]).unwrap();
+        assert!(matches!(
+            stepper.apply_with_ledger(
+                &unrelated,
+                0.1,
+                policy,
+                first.truncation_ledger.clone()
+            ),
+            Err(U1MpsError::TruncationLedgerStateMismatch)
+        ));
+        // The continuation is accepted when paired with the exact output state
+        // to which the ledger was bound.
+        assert!(
+            stepper
+                .apply_with_ledger(
+                    &first.state,
+                    0.1,
+                    policy,
+                    first.truncation_ledger.clone()
+                )
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn strang_stepper_rejects_duplicate_and_out_of_range_hamiltonian_bonds() {
+        let hamiltonian = nearest_neighbour_hopping_term(0.3);
+        assert!(matches!(
+            U1TeBDStrangStepper::new(
+                3,
+                vec![
+                    U1TeBDHamiltonianTerm::new(0, hamiltonian.clone()),
+                    U1TeBDHamiltonianTerm::new(0, hamiltonian.clone()),
+                ]
+            ),
+            Err(U1MpsError::DuplicateTeBDGate { bond_index: 0 })
+        ));
+        assert!(matches!(
+            U1TeBDStrangStepper::new(
+                3,
+                vec![U1TeBDHamiltonianTerm::new(3, hamiltonian)]
+            ),
+            Err(U1MpsError::TeBDGateOutOfRange { .. })
+        ));
+    }
+
+    #[test]
+    fn tebd_global_error_bound_stays_disabled_when_any_gauge_receipt_fails() {
+        let input = canonical_w_state();
+        let mut ledger = U1MpsTruncationLedger::default();
+        let diagnostics = single_excitation_pair(0.8, 0.6)
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        let mut bad_receipt = input.clone();
+        let mut receipt = bad_receipt.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        receipt.qualified = false;
+        ledger
+            .record_with_canonical_gauge(&diagnostics, &receipt, 1.0e-10)
+            .unwrap();
+        assert!(!ledger.global_state_error_bound_qualified);
+        assert!(ledger.global_state_error_bound_upper.is_none());
+    }
+
+    #[test]
+    fn mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 16];
+        dense[3] = Complex64::new(0.3, 0.1);
+        dense[5] = Complex64::new(-0.2, 0.25);
+        dense[6] = Complex64::new(0.4, -0.1);
+        dense[9] = Complex64::new(0.1, 0.3);
+        dense[10] = Complex64::new(-0.35, 0.2);
+        dense[12] = Complex64::new(0.2, -0.15);
+        let norm = dense
+            .iter()
+            .map(|value| value.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        for value in &mut dense {
+            *value /= norm;
+        }
+
+        let mut state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let before = state.to_dense(8).unwrap();
+        let input_norm = state.norm_squared(1.0e-12).unwrap();
+        let receipt = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+
+        assert_eq!(receipt.bond, 1);
+        assert_eq!(receipt.site_count, 4);
+        assert_eq!(receipt.total_charge, 2);
+        assert_eq!(receipt.left_isometry_residuals.len(), 1);
+        assert_eq!(receipt.right_isometry_residuals.len(), 1);
+        assert!(receipt.maximum_left_isometry_residual <= 1.0e-10);
+        assert!(receipt.maximum_right_isometry_residual <= 1.0e-10);
+        assert!(receipt.factorization_max_residual <= 1.0e-10);
+        assert!(receipt.relative_norm_drift <= 1.0e-10);
+        assert!(receipt.qualifies(1.0e-10), "canonical receipt: {receipt:?}");
+        assert!(receipt.exterior_operator_norm_product_upper_bound() >= 1.0);
+        assert_eq!(state.total_charge(), 2);
+        assert!(state.selection_rule_residual() <= 1.0e-10);
+        assert!((state.norm_squared(1.0e-10).unwrap() - input_norm).abs() <= 1.0e-10);
+
+        let after = state.to_dense(8).unwrap();
+        for (index, (actual, expected)) in after.iter().zip(before.iter()).enumerate() {
+            assert!(
+                (*actual - *expected).norm() <= 1.0e-10,
+                "basis={index}, actual={actual:?}, expected={expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn mixed_canonical_sweep_handles_left_and_right_boundary_centers() {
+        let dense = [
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let mut left_center = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let left_receipt = left_center.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(left_receipt.left_isometry_residuals.is_empty());
+        assert_eq!(left_receipt.right_isometry_residuals.len(), 0);
+        assert!(left_receipt.qualifies(1.0e-10));
+
+        let mut right_center =
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let right_receipt = right_center.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(right_receipt.qualifies(1.0e-10));
+        assert!(right_center.selection_rule_residual() <= 1.0e-10);
+    }
+
+    #[test]
+    fn mixed_canonicalization_rejects_invalid_center_and_tolerance_without_mutation() {
+        let mut state = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
+        let before = state.to_dense(8).unwrap();
+        assert!(matches!(
+            state.canonicalize_for_bond(3, 1.0e-12),
+            Err(U1MpsError::TwoSiteShapeMismatch)
+        ));
+        assert!(matches!(
+            state.canonicalize_for_bond(0, 0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        ));
+        assert_eq!(state.to_dense(8).unwrap(), before);
     }
 }
