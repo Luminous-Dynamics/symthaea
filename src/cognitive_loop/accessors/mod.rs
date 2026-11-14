@@ -19,7 +19,7 @@
 macro_rules! cognitive_accessors {
     ($(
         $(#[$meta:meta])*
-        $vis:vis fn $name:ident(& $self_:ident) -> $ret:ty { $($body:tt)+ }
+        $vis:vis fn $name:ident(& $self_:ident $(,)?) -> $ret:ty { $($body:tt)+ }
     )*) => {
         $(
             $(#[$meta])*
@@ -56,6 +56,12 @@ mod tests {
         s.enable_viability_horizon_modulation();
         assert!(s.viability_horizon_modulation_enabled());
         assert!((0.25..=1.0).contains(&s.viability_planning_horizon_scale()));
+    }
+
+    #[test]
+    fn viability_regulation_accessor_accepts_trailing_receiver_comma() {
+        let s = make_service();
+        let _ = s.viability_regulation();
     }
 
     #[test]
