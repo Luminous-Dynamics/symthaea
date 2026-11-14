@@ -655,6 +655,30 @@ mod tests {
     }
 
     #[test]
+    fn current_contributes_as_a_directional_ground_velocity_vector() {
+        let with_following_current = ground_vmg(
+            5.0,
+            90.0,
+            CurrentObservation {
+                toward_direction_deg: 90.0,
+                speed_mps: 1.0,
+            },
+            90.0,
+        );
+        let with_opposing_current = ground_vmg(
+            5.0,
+            90.0,
+            CurrentObservation {
+                toward_direction_deg: 270.0,
+                speed_mps: 1.0,
+            },
+            90.0,
+        );
+        assert!((with_following_current - 6.0).abs() < 1e-12);
+        assert!((with_opposing_current - 4.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn opposing_current_can_remove_all_positive_progress() {
         let mut input = request(0.0);
         input.current = Evidence::qualified(CurrentObservation {
