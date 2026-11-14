@@ -576,6 +576,7 @@ pub fn parse_musicxml_part_notation_graph(
                     },
                     measures: Vec::new(),
                 },
+                measure_locators,
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
