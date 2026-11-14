@@ -23,6 +23,7 @@ var (
 	ErrBrokenChain         = errors.New("checkpoint predecessor digest mismatch")
 	ErrNoProgress          = errors.New("checkpoint does not advance journal head")
 	ErrInvalidTrustedState = errors.New("invalid trusted checkpoint state")
+	ErrObservedHeadMismatch = errors.New("observed journal head does not match signed checkpoint")
 )
 
 const (
@@ -88,6 +89,14 @@ func (s TrustedState) Validate() error {
 		}
 	}
 	return nil
+}
+
+// ObservedHead is read from the destination by an observer independent of the
+// checkpoint signer. All fields must come from one consistent database snapshot.
+type ObservedHead struct {
+	DatabaseID        string
+	JournalSequence   uint64
+	JournalHeadSHA256 string
 }
 
 type AcceptResult uint8
@@ -308,4 +317,23 @@ func AcceptNext(s SignedCheckpoint, publicKey ed25519.PublicKey, current Trusted
 		JournalHeadSHA256: c.JournalHeadSHA256,
 		CheckpointDigestSHA256: digest, IssuedAtUnix: c.IssuedAtUnix,
 	}, AcceptedAdvanced, nil
+}
+
+
+// AcceptObserved first joins a signed checkpoint to an independently observed
+// destination snapshot, then applies the monotonic checkpoint-chain rules. It
+// prevents callers from accepting a validly signed checkpoint for a different
+// database head by forgetting to compare the observed sequence and digest. The
+// observer must obtain all three fields from one coherent snapshot.
+func AcceptObserved(s SignedCheckpoint, publicKey ed25519.PublicKey, current TrustedState, observed ObservedHead) (TrustedState, AcceptResult, error) {
+	if observed.DatabaseID == "" || observed.DatabaseID != s.Checkpoint.DatabaseID {
+		return TrustedState{}, 0, ErrWrongDatabase
+	}
+	if observed.JournalSequence == 0 || validateHexDigest("observed journal head", observed.JournalHeadSHA256, false) != nil {
+		return TrustedState{}, 0, ErrObservedHeadMismatch
+	}
+	if observed.JournalSequence != s.Checkpoint.JournalSequence || observed.JournalHeadSHA256 != s.Checkpoint.JournalHeadSHA256 {
+		return TrustedState{}, 0, ErrObservedHeadMismatch
+	}
+	return AcceptNext(s, publicKey, current)
 }
