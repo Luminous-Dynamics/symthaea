@@ -59,6 +59,26 @@
       "id": "TEMP-GOLD-NEG-009",
       "mutation": "Set target_world_time.state=unknown while outcome.evidence_validity_at_target_time=valid or invalid.",
       "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-010",
+      "mutation": "Select multi_source_causal_partial_order while causal_frontier.required=false or state=not_required.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-011",
+      "mutation": "Mark a required causal frontier complete while omitting an evidence-frontier digest, causal-history digest, source-set digest, verifier digest or verification receipt reference.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-012",
+      "mutation": "Set source_version.identity_state=unknown while outcome.source_availability=admissible.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-013",
+      "mutation": "Set evidence_validity_at_target_time=valid/invalid while either validity bound is Unknown or interval_evidence_ref is absent.",
+      "expected": "schema_reject"
     }
   ],
   "semantic_negative_controls": [
@@ -111,6 +131,31 @@
       "id": "TEMP-GOLD-SEM-010",
       "mutation": "Modify the temporal object after sealing without a superseding adjudication and new seal.",
       "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-011",
+      "mutation": "Compare local monotonic sequence numbers from different conductors or sort their wall-clock timestamps to claim a cross-conductor happens-before relation.",
+      "expected": "semantic_reject_or_indeterminate"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-012",
+      "mutation": "Use a scalar global maximum, sum or height as a complete causal frontier while a required source/conductor event or join is missing.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-013",
+      "mutation": "The causal-history receipt source set does not match the exact EvidenceFrontierV1 source-set digest.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-014",
+      "mutation": "Causal frontier is required but incomplete/unknown while system_availability=available or run_context_presence=included.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-015",
+      "mutation": "A causal edge has no evidence reference, a cycle exists, or a projection is not causally after its independently validated receipt.",
+      "expected": "semantic_reject"
     }
   ],
   "invariants": [
@@ -121,6 +166,12 @@
     "all_temporal_admissibility_fields_are_inside_the_sealed_gold_record",
     "schema_validity_does_not_prove_timestamp_truth_source_truth_assessor_independence_or_authority",
     "world_validity_at_T_is_separate_from_source_availability_by_K",
-    "a_K_admissibility_pass_does_not_imply_that_evidence_is_valid_at_T"
+    "a_K_admissibility_pass_does_not_imply_that_evidence_is_valid_at_T",
+    "timestamp_cutoff_alone_does_not_claim_source_set_or_corpus_completeness",
+    "wall_clock_timestamp_sorting_never_mints_cross_conductor_causal_edges",
+    "local_monotonic_indices_are_compared_only_within_their_own_conductor",
+    "missing_cross_conductor_causal_join_is_incomplete_or_unknown_not_pass",
+    "causal_frontier_binding_reuses_Mycelix_EPI_008_and_PULSE_MULTICONDUCTOR_OWNERS",
+    "multi_source_system_availability_requires_a_complete_verified_causal_cut_when_declared_required"
   ]
 }
