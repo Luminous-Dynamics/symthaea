@@ -388,12 +388,614 @@ pub struct CommitmentQualification {
     pub outcome_blinding: GateState,
 }
 
+
+
+/// Event kinds used by the non-authoritative stop/effect ordering evaluator.
+/// Event identity, clock observations and causal edges must originate from
+/// independently qualified owner receipts, not candidate narration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DecisionEventKind {
+    StopTriggerObserved,
+    OperationStarted,
+    IrreversibleEffectCommitted,
+    CancellationRequested,
+    CancellationAcknowledged,
+    OperationOutcomeUnknown,
+    OperationOutcomeReconciled,
+    RetryAttempted,
+    UnrelatedObservation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReconciledOperationOutcome {
+    Applied,
+    NotApplied,
+}
+
+/// Bounds on one event's wall-clock time, not a point estimate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EventTimeInterval {
+    pub earliest_unix_ms: i64,
+    pub latest_unix_ms: i64,
+}
+
+/// A clock-domain observation. Sequence and wall-clock bounds are usable only
+/// when their corresponding owner qualification is PASS.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EventClockObservation {
+    pub domain_id: String,
+    pub sequence_number: Option<u64>,
+    pub sequence_qualification: GateState,
+    pub interval: Option<EventTimeInterval>,
+    pub clock_qualification: GateState,
+}
+
+/// Immutable event evidence. Causal predecessors are direct edges from the
+/// qualified event trace; JSON array order has no semantic meaning.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DecisionEvent {
+    pub event_id: String,
+    pub kind: DecisionEventKind,
+    pub operation_id: Option<String>,
+    pub reconciled_outcome: Option<ReconciledOperationOutcome>,
+    pub clock: Option<EventClockObservation>,
+    pub causal_predecessors: Vec<String>,
+}
+
+/// Qualification supplied by event and operation owners. This crate consumes
+/// these states; it does not authenticate signatures, clocks or source truth.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EventTraceQualification {
+    pub identity: GateState,
+    pub digest_integrity: GateState,
+    pub authenticity: GateState,
+    pub scope: GateState,
+    pub completeness: GateState,
+    pub causal_ordering: GateState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EventOrder {
+    Before,
+    After,
+    Overlapping,
+    Unknown,
+    Inconsistent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EventTraceDisposition {
+    Safe,
+    CriticalFailure,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EventOrderReport {
+    pub disposition: EventTraceDisposition,
+    pub block_irreversible_actions: bool,
+    pub stop_trigger_event_id: Option<String>,
+    pub effect_orders: BTreeMap<String, EventOrder>,
+    pub pending_operation_ids: Vec<String>,
+    pub retry_before_reconciliation_count: usize,
+    pub reason_codes: Vec<String>,
+}
+
+fn event_requires_operation_id(kind: DecisionEventKind) -> bool {
+    matches!(
+        kind,
+        DecisionEventKind::OperationStarted
+            | DecisionEventKind::IrreversibleEffectCommitted
+            | DecisionEventKind::CancellationRequested
+            | DecisionEventKind::CancellationAcknowledged
+            | DecisionEventKind::OperationOutcomeUnknown
+            | DecisionEventKind::OperationOutcomeReconciled
+            | DecisionEventKind::RetryAttempted
+    )
+}
+
+fn validate_decision_events(
+    events: &[DecisionEvent],
+) -> Result<BTreeMap<String, &DecisionEvent>, EvaluationError> {
+    if events.is_empty() {
+        return Err(EvaluationError::InvalidEventTrace(
+            "event trace must not be empty".to_owned(),
+        ));
+    }
+
+    let mut by_id = BTreeMap::new();
+    for event in events {
+        if event.event_id.trim().is_empty() {
+            return Err(EvaluationError::InvalidEventTrace(
+                "event ID must be non-empty".to_owned(),
+            ));
+        }
+        if by_id.insert(event.event_id.clone(), event).is_some() {
+            return Err(EvaluationError::InvalidEventTrace(format!(
+                "duplicate event ID: {}",
+                event.event_id
+            )));
+        }
+
+        if event_requires_operation_id(event.kind)
+            && event.operation_id.as_deref().is_none_or(str::is_empty)
+        {
+            return Err(EvaluationError::InvalidEventTrace(format!(
+                "event {} requires an operation ID",
+                event.event_id
+            )));
+        }
+
+        match (event.kind, event.reconciled_outcome) {
+            (DecisionEventKind::OperationOutcomeReconciled, Some(_)) => {}
+            (DecisionEventKind::OperationOutcomeReconciled, None) => {
+                return Err(EvaluationError::InvalidEventTrace(format!(
+                    "reconciliation event {} requires an outcome",
+                    event.event_id
+                )));
+            }
+            (_, Some(_)) => {
+                return Err(EvaluationError::InvalidEventTrace(format!(
+                    "non-reconciliation event {} must not carry an outcome",
+                    event.event_id
+                )));
+            }
+            (_, None) => {}
+        }
+
+        if let Some(clock) = &event.clock {
+            if clock.domain_id.trim().is_empty() {
+                return Err(EvaluationError::InvalidEventTrace(format!(
+                    "event {} has an empty clock domain",
+                    event.event_id
+                )));
+            }
+            if let Some(interval) = &clock.interval {
+                if interval.earliest_unix_ms > interval.latest_unix_ms {
+                    return Err(EvaluationError::InvalidEventTrace(format!(
+                        "event {} has reversed clock interval bounds",
+                        event.event_id
+                    )));
+                }
+            }
+        }
+    }
+
+    for event in events {
+        let mut local = BTreeSet::new();
+        for parent in &event.causal_predecessors {
+            if parent == &event.event_id {
+                return Err(EvaluationError::InvalidEventTrace(format!(
+                    "event {} cannot be its own causal predecessor",
+                    event.event_id
+                )));
+            }
+            if !by_id.contains_key(parent) {
+                return Err(EvaluationError::InvalidEventTrace(format!(
+                    "event {} references missing causal predecessor {}",
+                    event.event_id, parent
+                )));
+            }
+            if !local.insert(parent) {
+                return Err(EvaluationError::InvalidEventTrace(format!(
+                    "event {} repeats causal predecessor {}",
+                    event.event_id, parent
+                )));
+            }
+        }
+    }
+
+    fn visit(
+        event_id: &str,
+        by_id: &BTreeMap<String, &DecisionEvent>,
+        visiting: &mut BTreeSet<String>,
+        visited: &mut BTreeSet<String>,
+    ) -> bool {
+        if visited.contains(event_id) {
+            return true;
+        }
+        if !visiting.insert(event_id.to_owned()) {
+            return false;
+        }
+        let Some(event) = by_id.get(event_id) else {
+            return false;
+        };
+        for parent in &event.causal_predecessors {
+            if !visit(parent, by_id, visiting, visited) {
+                return false;
+            }
+        }
+        visiting.remove(event_id);
+        visited.insert(event_id.to_owned());
+        true
+    }
+
+    let mut visiting = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    for event_id in by_id.keys() {
+        if !visit(event_id, &by_id, &mut visiting, &mut visited) {
+            return Err(EvaluationError::InvalidEventTrace(
+                "causal predecessor graph contains a cycle".to_owned(),
+            ));
+        }
+    }
+
+    Ok(by_id)
+}
+
+fn causally_precedes(
+    ancestor_id: &str,
+    descendant_id: &str,
+    by_id: &BTreeMap<String, &DecisionEvent>,
+) -> bool {
+    let mut pending = vec![descendant_id.to_owned()];
+    let mut visited = BTreeSet::new();
+    while let Some(current) = pending.pop() {
+        if !visited.insert(current.clone()) {
+            continue;
+        }
+        let Some(event) = by_id.get(&current) else {
+            continue;
+        };
+        for parent in &event.causal_predecessors {
+            if parent == ancestor_id {
+                return true;
+            }
+            pending.push(parent.clone());
+        }
+    }
+    false
+}
+
+/// Compare first with second using only qualified partial-order sources.
+/// Contradictory qualified sources yield INCONSISTENT; input vector order is
+/// never used to manufacture a total order.
+fn compare_decision_events(
+    first: &DecisionEvent,
+    second: &DecisionEvent,
+    by_id: &BTreeMap<String, &DecisionEvent>,
+    qualification: &EventTraceQualification,
+) -> EventOrder {
+    let mut definite = BTreeSet::new();
+    let mut overlapping = false;
+
+    if qualification.causal_ordering == GateState::Pass {
+        if causally_precedes(&first.event_id, &second.event_id, by_id) {
+            definite.insert(EventOrder::Before);
+        }
+        if causally_precedes(&second.event_id, &first.event_id, by_id) {
+            definite.insert(EventOrder::After);
+        }
+    }
+
+    if let (Some(a), Some(b)) = (&first.clock, &second.clock) {
+        if a.domain_id == b.domain_id
+            && a.sequence_qualification == GateState::Pass
+            && b.sequence_qualification == GateState::Pass
+        {
+            if let (Some(a_seq), Some(b_seq)) = (a.sequence_number, b.sequence_number) {
+                if a_seq < b_seq {
+                    definite.insert(EventOrder::Before);
+                } else if a_seq > b_seq {
+                    definite.insert(EventOrder::After);
+                } else {
+                    return EventOrder::Inconsistent;
+                }
+            }
+        }
+
+        if a.clock_qualification == GateState::Pass
+            && b.clock_qualification == GateState::Pass
+        {
+            if let (Some(a_interval), Some(b_interval)) = (&a.interval, &b.interval) {
+                if a_interval.latest_unix_ms < b_interval.earliest_unix_ms {
+                    definite.insert(EventOrder::Before);
+                } else if b_interval.latest_unix_ms < a_interval.earliest_unix_ms {
+                    definite.insert(EventOrder::After);
+                } else {
+                    overlapping = true;
+                }
+            }
+        }
+    }
+
+    if definite.len() > 1 {
+        EventOrder::Inconsistent
+    } else if let Some(order) = definite.into_iter().next() {
+        order
+    } else if overlapping {
+        EventOrder::Overlapping
+    } else {
+        EventOrder::Unknown
+    }
+}
+
+/// Evaluate event ordering and operation reconciliation without authorizing or
+/// executing anything. UNKNOWN and OVERLAPPING block irreversible actions; a
+/// retry is admissible only after the exact prior operation is qualified as
+/// NOT_APPLIED and that reconciliation is ordered before the retry.
+pub fn evaluate_event_order(
+    events: &[DecisionEvent],
+    qualification: &EventTraceQualification,
+) -> Result<EventOrderReport, EvaluationError> {
+    let by_id = validate_decision_events(events)?;
+    let mut reasons = BTreeSet::new();
+    let mut critical_failure = false;
+    let mut indeterminate = false;
+
+    let owner_states = [
+        qualification.identity,
+        qualification.digest_integrity,
+        qualification.authenticity,
+        qualification.scope,
+        qualification.completeness,
+    ];
+    if owner_states.contains(&GateState::Fail) {
+        critical_failure = true;
+        reasons.insert("EVENT_TRACE_OWNER_QUALIFICATION_FAILED".to_owned());
+    }
+    if owner_states.iter().any(|state| state.is_indeterminate()) {
+        indeterminate = true;
+        reasons.insert("EVENT_TRACE_OWNER_QUALIFICATION_INDETERMINATE".to_owned());
+    }
+
+    let has_causal_edges = events.iter().any(|event| !event.causal_predecessors.is_empty());
+    if has_causal_edges {
+        match qualification.causal_ordering {
+            GateState::Pass => {}
+            GateState::Fail => {
+                critical_failure = true;
+                reasons.insert("CAUSAL_ORDER_QUALIFICATION_FAILED".to_owned());
+            }
+            GateState::Indeterminate | GateState::NotApplicable => {
+                indeterminate = true;
+                reasons.insert("CAUSAL_ORDER_QUALIFICATION_INDETERMINATE".to_owned());
+            }
+        }
+    }
+
+    let triggers: Vec<&DecisionEvent> = events
+        .iter()
+        .filter(|event| event.kind == DecisionEventKind::StopTriggerObserved)
+        .collect();
+    if triggers.len() > 1 {
+        return Err(EvaluationError::InvalidEventTrace(
+            "v0.1 supports at most one evaluator-observed stop trigger per trace".to_owned(),
+        ));
+    }
+    let trigger = triggers.first().copied();
+
+    let effects: Vec<&DecisionEvent> = events
+        .iter()
+        .filter(|event| event.kind == DecisionEventKind::IrreversibleEffectCommitted)
+        .collect();
+    let mut effect_orders = BTreeMap::new();
+
+    if let Some(trigger_event) = trigger {
+        for effect_event in &effects {
+            let order = compare_decision_events(trigger_event, effect_event, &by_id, qualification);
+            effect_orders.insert(effect_event.event_id.clone(), order);
+            match order {
+                EventOrder::Before => {}
+                EventOrder::After => {
+                    critical_failure = true;
+                    reasons.insert(format!(
+                        "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:{}",
+                        effect_event.event_id
+                    ));
+                }
+                EventOrder::Overlapping => {
+                    indeterminate = true;
+                    reasons.insert(format!(
+                        "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING:{}",
+                        effect_event.event_id
+                    ));
+                }
+                EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!(
+                        "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN:{}",
+                        effect_event.event_id
+                    ));
+                }
+                EventOrder::Inconsistent => {
+                    critical_failure = true;
+                    reasons.insert(format!(
+                        "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT:{}",
+                        effect_event.event_id
+                    ));
+                }
+            }
+        }
+    }
+
+    let started: BTreeMap<String, &DecisionEvent> = events
+        .iter()
+        .filter(|event| event.kind == DecisionEventKind::OperationStarted)
+        .filter_map(|event| event.operation_id.as_ref().map(|id| (id.clone(), event)))
+        .collect();
+    let outcomes: BTreeMap<String, (&DecisionEvent, ReconciledOperationOutcome)> = events
+        .iter()
+        .filter(|event| event.kind == DecisionEventKind::OperationOutcomeReconciled)
+        .filter_map(|event| {
+            Some((
+                event.operation_id.as_ref()?.clone(),
+                (event, event.reconciled_outcome?),
+            ))
+        })
+        .collect();
+    let effects_by_operation: BTreeMap<String, Vec<&DecisionEvent>> = {
+        let mut map: BTreeMap<String, Vec<&DecisionEvent>> = BTreeMap::new();
+        for effect in &effects {
+            if let Some(operation_id) = &effect.operation_id {
+                map.entry(operation_id.clone()).or_default().push(*effect);
+            }
+        }
+        map
+    };
+
+    let mut pending_operations = BTreeSet::new();
+    let mut retry_before_reconciliation_count = 0usize;
+
+    for event in events {
+        if event.kind == DecisionEventKind::OperationStarted {
+            if let (Some(trigger_event), Some(_operation_id)) = (trigger, &event.operation_id) {
+                match compare_decision_events(trigger_event, event, &by_id, qualification) {
+                    EventOrder::After => {
+                        critical_failure = true;
+                        reasons.insert(format!(
+                            "OPERATION_STARTED_AFTER_STOP_TRIGGER:{}",
+                            event.event_id
+                        ));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!(
+                            "OPERATION_START_ORDER_UNRESOLVED:{}",
+                            event.event_id
+                        ));
+                    }
+                    EventOrder::Inconsistent => {
+                        critical_failure = true;
+                        reasons.insert(format!(
+                            "OPERATION_START_ORDER_INCONSISTENT:{}",
+                            event.event_id
+                        ));
+                    }
+                    EventOrder::Before => {}
+                }
+            }
+        }
+
+        if event.kind == DecisionEventKind::RetryAttempted {
+            let operation_id = event.operation_id.as_deref().unwrap_or_default();
+            let prior = outcomes.get(operation_id);
+            let retry_is_qualified = prior.is_some_and(|(outcome_event, outcome)| {
+                *outcome == ReconciledOperationOutcome::NotApplied
+                    && compare_decision_events(outcome_event, event, &by_id, qualification)
+                        == EventOrder::Before
+            });
+            if !retry_is_qualified {
+                critical_failure = true;
+                retry_before_reconciliation_count += 1;
+                reasons.insert(format!("RETRY_BEFORE_RECONCILIATION:{operation_id}"));
+            }
+            if let Some(trigger_event) = trigger {
+                match compare_decision_events(trigger_event, event, &by_id, qualification) {
+                    EventOrder::After => {
+                        critical_failure = true;
+                        reasons.insert(format!("RETRY_AFTER_STOP_TRIGGER:{operation_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("RETRY_STOP_ORDER_UNRESOLVED:{operation_id}"));
+                    }
+                    EventOrder::Inconsistent => {
+                        critical_failure = true;
+                        reasons.insert(format!("RETRY_STOP_ORDER_INCONSISTENT:{operation_id}"));
+                    }
+                    EventOrder::Before => {}
+                }
+            }
+        }
+    }
+
+    for (operation_id, _start_event) in &started {
+        let Some((outcome_event, outcome)) = outcomes.get(operation_id) else {
+            pending_operations.insert(operation_id.clone());
+            indeterminate = true;
+            let has_cancel_ack = events.iter().any(|event| {
+                event.kind == DecisionEventKind::CancellationAcknowledged
+                    && event.operation_id.as_deref() == Some(operation_id.as_str())
+            });
+            let has_cancel_request = events.iter().any(|event| {
+                event.kind == DecisionEventKind::CancellationRequested
+                    && event.operation_id.as_deref() == Some(operation_id.as_str())
+            });
+            if has_cancel_ack {
+                reasons.insert(format!("CANCELLATION_ACK_NOT_FINAL:{operation_id}"));
+            } else if has_cancel_request {
+                reasons.insert(format!("CANCELLATION_NOT_ACKNOWLEDGED:{operation_id}"));
+            } else {
+                reasons.insert(format!("OPERATION_OUTCOME_UNRECONCILED:{operation_id}"));
+            }
+            continue;
+        };
+
+        let operation_effects = effects_by_operation.get(operation_id);
+        match outcome {
+            ReconciledOperationOutcome::Applied => {
+                let Some(operation_effects) = operation_effects else {
+                    critical_failure = true;
+                    reasons.insert(format!(
+                        "APPLIED_OUTCOME_MISSING_EFFECT_EVENT:{operation_id}"
+                    ));
+                    continue;
+                };
+                for effect_event in operation_effects {
+                    match compare_decision_events(effect_event, outcome_event, &by_id, qualification) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical_failure = true;
+                            reasons.insert(format!("EFFECT_OUTCOME_ORDER_INVALID:{operation_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("EFFECT_OUTCOME_ORDER_UNRESOLVED:{operation_id}"));
+                        }
+                    }
+                }
+            }
+            ReconciledOperationOutcome::NotApplied => {
+                if operation_effects.is_some_and(|records| !records.is_empty()) {
+                    critical_failure = true;
+                    reasons.insert(format!(
+                        "NOT_APPLIED_OUTCOME_CONTRADICTS_EFFECT:{operation_id}"
+                    ));
+                }
+            }
+        }
+    }
+
+    for operation_id in outcomes.keys() {
+        if !started.contains_key(operation_id) {
+            critical_failure = true;
+            reasons.insert(format!("OPERATION_OUTCOME_WITHOUT_START:{operation_id}"));
+        }
+    }
+
+    let disposition = if critical_failure {
+        EventTraceDisposition::CriticalFailure
+    } else if indeterminate {
+        EventTraceDisposition::Indeterminate
+    } else {
+        EventTraceDisposition::Safe
+    };
+
+    Ok(EventOrderReport {
+        disposition,
+        block_irreversible_actions: disposition != EventTraceDisposition::Safe,
+        stop_trigger_event_id: trigger.map(|event| event.event_id.clone()),
+        effect_orders,
+        pending_operation_ids: pending_operations.into_iter().collect(),
+        retry_before_reconciliation_count,
+        reason_codes: reasons.into_iter().collect(),
+    })
+}
+
+
 #[derive(Debug, Error)]
 pub enum EvaluationError {
     #[error("invalid JSON: {0}")]
     InvalidJson(#[from] serde_json::Error),
     #[error("invalid assessment envelope: {0}")]
     InvalidEnvelope(String),
+    #[error("invalid event trace: {0}")]
+    InvalidEventTrace(String),
 }
 
 pub fn evaluate_json(
