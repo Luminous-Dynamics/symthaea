@@ -107,6 +107,11 @@ pub struct SubgoalProgressReport {
     pub physical_option_join_valid: bool,
     pub continuation_qualified: bool,
     pub continuation_unknown: bool,
+    /// Exact mandatory successor IDs that remain outstanding at this boundary.
+    pub required_mandatory_successor_ids: Vec<String>,
+    /// Successor IDs backed by a valid Qualified or Insufficient receipt.
+    /// Empty for missing or Unknown continuation evidence.
+    pub feasible_mandatory_successor_ids: Vec<String>,
     pub mandatory_successor_count: u16,
     pub feasible_mandatory_successor_count: u16,
 }
@@ -372,9 +377,9 @@ fn validate_transition(evaluation: &SubgoalEvaluation) -> Result<bool, ProgressE
 fn validate_continuation(
     evaluation: &SubgoalEvaluation,
     required_mandatory: &BTreeSet<String>,
-) -> Result<(bool, bool, u16), ProgressError> {
+) -> Result<(bool, bool, BTreeSet<String>), ProgressError> {
     let Some(receipt) = &evaluation.continuation else {
-        return Ok((false, true, 0));
+        return Ok((false, true, BTreeSet::new()));
     };
     require_nonempty("continuation_receipt_digest", &receipt.receipt_digest)?;
     require_nonempty("terminal_state_digest", &receipt.terminal_state_digest)?;
@@ -406,22 +411,22 @@ fn validate_continuation(
             evaluation.subgoal_id.clone(),
         ));
     }
-    let feasible_count =
-        u16::try_from(feasible.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
     match receipt.disposition {
         ContinuationDisposition::Qualified if feasible == required => {
-            Ok((true, false, feasible_count))
+            Ok((true, false, feasible))
         }
         ContinuationDisposition::Qualified => Err(ProgressError::InvalidContinuationCoverage(
             evaluation.subgoal_id.clone(),
         )),
         ContinuationDisposition::Insufficient if feasible != required => {
-            Ok((false, false, feasible_count))
+            Ok((false, false, feasible))
         }
         ContinuationDisposition::Insufficient => Err(ProgressError::InvalidContinuationCoverage(
             evaluation.subgoal_id.clone(),
         )),
-        ContinuationDisposition::Unknown => Ok((false, true, feasible_count)),
+        // Unknown evidence cannot promote a caller-supplied feasible subset
+        // into a reportable capability claim.
+        ContinuationDisposition::Unknown => Ok((false, true, BTreeSet::new())),
         ContinuationDisposition::Rejected => Err(ProgressError::RejectedContinuation(
             evaluation.subgoal_id.clone(),
         )),
@@ -455,6 +460,9 @@ pub fn evaluate_mission_progress(
         require_nonempty(name, value)?;
     }
     let mandatory = validate_mission(&input.mission)?;
+    // Validate the report's fixed-width counters before any increment can wrap.
+    let scheduled =
+        u16::try_from(input.mission.subgoals.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
     let mut evaluations = BTreeMap::new();
     for evaluation in &input.evaluations {
         if !mandatory.contains_key(&evaluation.subgoal_id) {
@@ -523,14 +531,18 @@ pub fn evaluate_mission_progress(
         total_rework_attempts = total_rework_attempts
             .checked_add(u64::from(evaluation.rework_attempt_count))
             .ok_or(ProgressError::ArithmeticOverflow)?;
-        let (qualified, continuation_unknown, feasible_count) = if safe {
+        let (qualified, continuation_unknown, feasible_ids) = if safe {
             validate_continuation(evaluation, &required)?
         } else {
             if evaluation.continuation.is_some() {
                 return Err(ProgressError::IncompleteAcceptedOutcome(id.clone()));
             }
-            (false, false, 0)
+            (false, false, BTreeSet::new())
         };
+        let required_ids = required.iter().cloned().collect::<Vec<_>>();
+        let feasible_count =
+            u16::try_from(feasible_ids.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
+        let feasible_ids = feasible_ids.into_iter().collect::<Vec<_>>();
         if qualified {
             continuation_count += 1;
         }
@@ -562,6 +574,8 @@ pub fn evaluate_mission_progress(
             ),
             continuation_qualified: qualified,
             continuation_unknown,
+            required_mandatory_successor_ids: required_ids,
+            feasible_mandatory_successor_ids: feasible_ids,
             mandatory_successor_count: u16::try_from(required.len())
                 .map_err(|_| ProgressError::ArithmeticOverflow)?,
             feasible_mandatory_successor_count: feasible_count,
@@ -583,9 +597,6 @@ pub fn evaluate_mission_progress(
             .find(|report| &report.subgoal_id == *id)
             .is_some_and(|report| report.continuation_qualified)
     });
-    let scheduled = u16::try_from(input.mission.subgoals.len())
-        .map_err(|_| ProgressError::ArithmeticOverflow)?;
-
     Ok(MissionProgressReport {
         mission_id: input.mission.mission_id.clone(),
         arm_id: input.arm.arm_id.clone(),
@@ -841,6 +852,82 @@ mod tests {
         let report = evaluate_mission_progress(&audit).unwrap();
         assert!(!report.subgoals[0].continuation_qualified);
         assert!(report.subgoals[0].continuation_unknown);
+    }
+
+    #[test]
+    fn partial_continuation_receipt_preserves_exact_feasible_successor_identity() {
+        let mut audit = input();
+        audit.mission.mission_order.insert(2, "d".into());
+        audit.mission.subgoals.push(SubgoalDefinition {
+            subgoal_id: "d".into(),
+            mandatory: true,
+        });
+        audit.mission.edges.push(SubgoalEdge {
+            from: "a".into(),
+            to: "d".into(),
+        });
+        audit.evaluations.push(evaluation("d", SubgoalOutcome::NotAttempted));
+        audit.evaluations[0].continuation = Some(continuation(
+            "state-a-after",
+            &["b", "d"],
+            &["b"],
+            ContinuationDisposition::Insufficient,
+            "partial",
+        ));
+        let report = evaluate_mission_progress(&audit).unwrap();
+        assert_eq!(
+            report.subgoals[0].required_mandatory_successor_ids,
+            vec!["b".to_owned(), "d".to_owned()]
+        );
+        assert_eq!(
+            report.subgoals[0].feasible_mandatory_successor_ids,
+            vec!["b".to_owned()]
+        );
+        assert_eq!(report.subgoals[0].mandatory_successor_count, 2);
+        assert_eq!(report.subgoals[0].feasible_mandatory_successor_count, 1);
+        assert!(!report.subgoals[0].continuation_qualified);
+    }
+
+    #[test]
+    fn unknown_continuation_does_not_publish_unqualified_feasible_ids() {
+        let mut audit = input();
+        audit.evaluations[0].continuation = Some(continuation(
+            "state-a-after",
+            &["b"],
+            &["b"],
+            ContinuationDisposition::Unknown,
+            "unknown-feasible-claim",
+        ));
+        let report = evaluate_mission_progress(&audit).unwrap();
+        assert!(report.subgoals[0].continuation_unknown);
+        assert!(report.subgoals[0].feasible_mandatory_successor_ids.is_empty());
+    }
+
+    #[test]
+    fn mission_size_outside_report_counter_range_is_rejected_before_evaluation() {
+        let count = usize::from(u16::MAX) + 1;
+        let ids = (0..count).map(|index| format!("g-{index}")).collect::<Vec<_>>();
+        let audit = MissionEvaluationInput {
+            mission: MissionManifest {
+                mission_id: "oversized-mission".into(),
+                graph_digest: "graph-sha256".into(),
+                mission_order: ids.clone(),
+                subgoals: ids
+                    .into_iter()
+                    .map(|subgoal_id| SubgoalDefinition {
+                        subgoal_id,
+                        mandatory: true,
+                    })
+                    .collect(),
+                edges: Vec::new(),
+            },
+            arm: arm(),
+            evaluations: Vec::new(),
+        };
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::ArithmeticOverflow)
+        );
     }
 
     #[test]
