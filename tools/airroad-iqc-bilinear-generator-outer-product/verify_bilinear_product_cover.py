@@ -118,6 +118,21 @@ def validate_unique_interval_ids(interval_ids: list[str]) -> None:
         raise ValueError("interval IDs must be unique")
 
 
+def validate_product_order(order: str) -> None:
+    if order != "A_then_B":
+        raise ValueError("product order must preserve the source A*B convention")
+
+
+def validate_product_claim(claim_class: str) -> None:
+    if claim_class != "deterministic_hard_set_outer_approximation":
+        raise ValueError("Equation (65) requires an outer-approximation claim")
+
+
+def validate_proof_method(method: str) -> None:
+    if method != "exact_convex_product_identity":
+        raise ValueError("sampled-grid product checks do not prove Equation (65) containment")
+
+
 def scalar_interval_products(interval: dict[str, Any]) -> list[dict[str, Any]]:
     a_generators = interval["A"]["generators"]
     b_generators = interval["B"]["generators"]
@@ -433,18 +448,7 @@ def run_negative_controls(data: dict[str, Any], scalar: dict[str, Any],
     require(expected_reverse != expected_forward,
             "reversed product order control was not detected")
 
-    # A reversed/inner approximation claim is outside the source contract.
-    source_claim = data["claim_class"]
-    require(source_claim == "deterministic_hard_set_outer_approximation",
-            "fixture does not identify the outer-approximation claim class")
-    try:
-        require(source_claim != "inner_approximation",
-                "inner approximation cannot satisfy Equation (65) outer-cover obligation")
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("inner-approximation claim was accepted")
-
+    # Claim-class and product-order controls are exercised through validators.
     # Duplicate interval identity and source provenance mutations are rejected.
     product_witness = data["scalar_interval"]["expected"]["pairwise_products"][0]
     require(product_witness["a_id"] == "A-k0-plus-a",
@@ -463,7 +467,8 @@ def run_negative_controls(data: dict[str, Any], scalar: dict[str, Any],
     ]
     validate_unique_interval_ids(intervals)
 
-    # An omitted cross product and a stale source ID fail the same provenance validator.
+    # Missing cross products and stale source IDs are rejected by the shared
+    # provenance validator used for the accepted witnesses.
     scalar_interval = data["scalar_interval"]
     all_products = scalar_interval_products(scalar_interval)
     try:
@@ -491,6 +496,34 @@ def run_negative_controls(data: dict[str, Any], scalar: dict[str, Any],
         pass
     else:
         raise AssertionError("stale generator ID witness was accepted")
+
+    try:
+        validate_unique_interval_ids(intervals + [intervals[0]])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("duplicate interval identity was accepted")
+
+    try:
+        validate_product_order("B_then_A")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("reversed product order was accepted")
+
+    try:
+        validate_product_claim("inner_approximation")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("inner-approximation claim was accepted")
+
+    try:
+        validate_proof_method("sampled_grid_maximum")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("sampled-grid proof method was accepted")
 
     try:
         validate_unique_interval_ids(["I0", "I1", "I0"])
@@ -521,7 +554,9 @@ def main() -> None:
     require(data["schema"] == "luminous.airroad.iqc_bilinear_generator_outer_product.v0_1",
             "unsupported bilinear product schema")
     require(data["schema_version"] == "0.1.0", "unsupported schema version")
-    require(data["product_order"] == "A_then_B", "ordered matrix product changed")
+    validate_product_order(data["product_order"])
+    validate_product_claim(data["claim_class"])
+    validate_proof_method("exact_convex_product_identity")
 
     scalar = scalar_midpoint_convex_witness(data["scalar_interval"])
     multi = multi_generator_witness(data["multi_generator_interval"])
