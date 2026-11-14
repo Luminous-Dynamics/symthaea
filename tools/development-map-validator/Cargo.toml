@@ -10,6 +10,8 @@ description = "Read-only EGDDM validator and Cargo manifest projection library"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
+syn = { version = "2.0", features = ["full", "visit"] }
+quote = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 
 [workspace]
