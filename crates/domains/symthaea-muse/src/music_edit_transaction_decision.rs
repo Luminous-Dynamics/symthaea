@@ -32,6 +32,8 @@ pub enum MusicEditEvidenceKindV1 {
     Metamorphic,
     RightsAdmission,
     ReferenceAdjudication,
+    /// Verified capability-qualified realization receipt bound to this attempt.
+    RealizationExecution,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
