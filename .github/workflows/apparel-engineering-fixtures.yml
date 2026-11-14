@@ -7,6 +7,10 @@ on:
       - "tools/apparel-benchmark-harness/**"
       - "tools/atelier-brief-core/**"
       - "tools/atelier-wardrobe-core/**"
+      - "tools/atelier-sewing-plan-core/**"
+      - "schemas/sewing-assembly-plan.schema.json"
+      - "examples/sewing-assembly-plan.overshirt.example.json"
+      - "docs/SEWING_PLAN_BENCHMARK_V0_1.md"
       - "docs/research/APPAREL_ENGINEERING_DIGITAL_THREAD_001.md"
       - "docs/research/fixtures/apparel_engineering_thread_v0_1/**"
       - "docs/PARADIGM_SHIFT_AND_BENCHMARKS_2026-11-14.md"
@@ -94,10 +98,14 @@ jobs:
       - name: Test Atelier wardrobe exact oracle
         run: cargo test --manifest-path tools/atelier-wardrobe-core/Cargo.toml --locked
 
+      - name: Test Atelier sewing plan graph validator
+        run: cargo test --manifest-path tools/atelier-sewing-plan-core/Cargo.toml --locked
+
       - name: Clippy Atelier Rust contracts
         run: |
           cargo clippy --manifest-path tools/atelier-brief-core/Cargo.toml --locked --all-targets -- -D warnings
           cargo clippy --manifest-path tools/atelier-wardrobe-core/Cargo.toml --locked --all-targets -- -D warnings
+          cargo clippy --manifest-path tools/atelier-sewing-plan-core/Cargo.toml --locked --all-targets -- -D warnings
 
       - name: Emit exact-head apparel receipt
         run: |
