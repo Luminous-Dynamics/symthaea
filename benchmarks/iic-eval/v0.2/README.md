@@ -60,3 +60,6 @@ Case IIC-010 asks for two views with different effective times but the same late
 
 
 See [Decision-time evidence coverage research](./DECISION_TIME_COVERAGE.md) for the distinction between temporal retrieval coverage and evidence completeness for a specific decision.
+
+
+See [Institutional assurance differentiation and competitive qualification](../../../docs/research/INSTITUTIONAL_ASSURANCE_DIFFERENTIATION_2026-11-14.md) for the updated Polarion/DOORS/Jama and Addepar/Masttro/AtlasFive capability map, product boundary, benchmark programme and commercial wedge.
