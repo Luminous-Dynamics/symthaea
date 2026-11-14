@@ -277,6 +277,8 @@ pub struct FibreLengthEvidence {
     pub replicate_count: u32,
     /// Declared relative expanded measurement uncertainty, parts per million.
     pub measurement_uncertainty_ppm: u32,
+    /// Coverage probability for the uncertainty declaration, parts per million (for example, 950_000 = 95%).
+    pub measurement_coverage_probability_ppm: u32,
     /// Exact accepted output lot physically sampled for this distribution.
     pub accepted_output_lot_id: String,
     /// Exact process-trial evidence ID which generated this accepted output lot.
@@ -691,6 +693,8 @@ fn fibre_length_protocol_valid(evidence: &FibreLengthEvidence) -> bool {
         && evidence.sample_mass_mg > 0
         && evidence.replicate_count > 0
         && evidence.measurement_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
+        && evidence.measurement_coverage_probability_ppm > 0
+        && evidence.measurement_coverage_probability_ppm <= FRACTION_SCALE_PPM as u32
         && evidence.evidence.method_ref == evidence.method_ref
 }
 
@@ -1246,6 +1250,7 @@ mod tests {
             sample_mass_mg: 25_000,
             replicate_count: 3,
             measurement_uncertainty_ppm: 20_000,
+            measurement_coverage_probability_ppm: 950_000,
             accepted_output_lot_id: "ACCEPTED-FIBRE-LOT-01".to_owned(),
             source_trial_evidence_id: "TRIAL-01".to_owned(),
             evidence: measurement,
