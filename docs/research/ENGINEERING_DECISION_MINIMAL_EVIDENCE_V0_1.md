@@ -21,6 +21,10 @@ The benchmark measures four distinct properties:
 
 A candidate cannot choose the source inventory, provenance-root grouping, required support count, or sufficient-set gold.
 
+The fixture separates the **evaluator-frozen source inventory** from the **candidate-visible evidence IDs**. The first defines what sources exist and which interventions changed the world; the second records what the candidate actually received or selected by frontier K. A source that exists in the evaluator inventory but was not materialized into candidate context cannot be silently counted as support for that candidate's decision. Conversely, evaluator gold may enumerate alternative sufficient sets across the complete frozen inventory so that a candidate is not rewarded for one arbitrary evidence subset.
+
+Each case freezes target configuration, source-inventory state/reference/digest, mandatory predicates, minimum independent-root thresholds, and candidate-visible IDs. The last-support case contains paired baseline and intervention worlds: the baseline inventory has two independent roots; the intervention inventory removes one root entirely. This prevents "not retrieved" and "not present in the world" from being conflated.
+
 ## 2. Formal object
 
 For a decision claim q, configuration c and knowledge frontier K, let E be the evaluator-frozen evidence inventory and R(e) the provenance root of evidence item e.
@@ -66,7 +70,7 @@ The companion JSON fixture contains eight known-answer scenarios:
 - admissible independent substitution;
 - unknown provenance that cannot establish independence.
 
-The expected results include effective roots per predicate, sufficient root sets, disposition and reason codes. These are synthetic oracle labels, not engineering facts.
+The expected results include effective candidate-visible roots per predicate, all valid sufficient root sets in the frozen world, disposition and exact reason codes. Paired worlds carry their own evidence manifests and source-inventory digests. These are synthetic oracle labels, not engineering facts.
 
 ## 5. Metrics
 
@@ -116,7 +120,7 @@ Key ablations:
 - source ID versus provenance-root identity;
 - provenance graph versus typed common-cause groups;
 - raw record count versus independent-root count;
-- candidate-selected versus evaluator-frozen source inventory;
+- candidate-visible evidence versus evaluator-frozen complete source inventory;
 - all retrieved evidence versus admissible evidence only;
 - single sufficient set versus all alternative sufficient sets;
 - full source corpus versus decision-minimal sufficient evidence;
