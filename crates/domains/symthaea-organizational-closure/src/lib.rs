@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
+pub mod stochastic_assay;
 pub mod viability;
 
 pub use assay::{
