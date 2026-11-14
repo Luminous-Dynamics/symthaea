@@ -438,3 +438,68 @@ Official product sheet: https://medialibrary.damen.com/m/17d9e60bcdcd2257/origin
 Combine this with Damen's 2 February 2021 operational description (manufacturer statement, not an independently audited duty-cycle distribution): at least two average-harbour berthing/unberthing operations on battery alone, 70 t push/pull for at least 30 minutes during those operations, two-hour shore recharge, four independent battery packs and an expected battery-system life of approximately 30,000 cycles. Source: https://www.damen.com/insights-center/articles/developing-zero-emissions-harbour-towage-capabilities
 
 **Competitive implication:** the benchmark should separately evaluate static pull, escort (F/B/V), transition time (C), complete harbour jobs, high-pull duration, reserve, charge turnaround, redundancy, actual availability and battery lifecycle. The manufacturer sheet's battery capacity and headline pull do not prove that a different tug architecture can complete the same job sequence.
+
+
+## 17. Hull biofouling, condition drift and clean-hull performance retention — SOTA update
+
+### 17.1 New physics-guided incremental-learning comparator
+
+Lang et al., *Physics-guided machine learning for ship biofouling assessment in support of maritime decarbonization*, Transportation Research Part D, Volume 156, July 2026, Article 105364, DOI https://doi.org/10.1016/j.trd.2026.105364.
+
+The study combines a physics-informed warm-up baseline representing ideal/unfouled calm-water vessel states with incremental model updates on sliding temporal windows. It evaluates degradation trends and post-cleaning recovery against conventional retraining and ISO 19030. The authors report better capture of gradual degradation and rapid recovery in their study context.
+
+**Limits:** the authors state they do not have permission to share the data. This is a method comparator, not an openly reproducible operational dataset or a model that can be transferred to PWC waterjets or harbour-tug azimuth/VSP propulsion without an independent domain-validity study. Do not infer its performance metrics or data availability beyond the published record.
+
+Source: https://www.sciencedirect.com/science/article/pii/S1361920926001574
+
+### 17.2 Separate observed drift from fouling attribution
+
+A rise in normalized fuel/shaft power or a speed loss is not uniquely identifiable as biofouling. It may also result from wave/current/weather, temperature/density, payload/draft/trim, speed profile, route, propulsion degradation, intake blockage, debris, impeller/nozzle/propeller damage, cavitation/ventilation, engine/motor/inverter/gearbox efficiency, battery SOH, control changes or sensor/calibration drift.
+
+Report independent stages:
+1. Observed performance residual at a declared reference condition.
+2. Candidate cause(s), with uncertainty and competing explanations.
+3. Independent hull-zone / niche-area / coating inspection evidence.
+4. Biosecurity and cleaning authorization/capture/waste disposition.
+5. Post-intervention matched performance response.
+6. Human/operator/authority disposition.
+
+A performance model may trigger inspection, but must not convert performance drift into confirmed biological fouling without inspection or other admitted reference evidence. Incremental model updates must be time-causal: no future measurements, post-cleaning traces or inspection labels may leak into prior online predictions. Preserve the original reference model and historical predictions; each update creates a versioned successor.
+
+### 17.3 New and corrected standards map
+
+- **ISO 19030-1:2016** (confirmed current in 2022): same-vessel hull/propeller performance measurement principles and indicators for conventional fixed-pitch propeller ships. It is not automatically a conformance procedure for PWC waterjets or tug azimuth/VSP configurations; any extension requires a declared scope and validation. Official record: https://www.iso.org/standard/63774.html
+- **ISO 6319:2026** (published March 2026): plans, conducts and documents in-water cleaning of external submerged hull/niche surfaces, across biofilm, microfouling and macrofouling, with or without capture. It does not cover internal piping. Official record: https://www.iso.org/standard/85997.html
+- **ISO 20679:2025** (published January 2025): independent performance testing of in-water cleaning systems, including efficacy/safety and captured/processed/disposed debris. It does not set universal cleaning acceptance criteria; these remain for competent authorities. Official record: https://www.iso.org/standard/86393.html
+- **IMO MEPC.378(80)** (2023) and **MEPC.1/Circ.918** (29 April 2025): biofouling management and in-water cleaning guidance. The latter expressly recognizes coating damage and release of harmful waste / invasive species as risks. Sources: https://www.imo.org/en/ourwork/environment/pages/biofouling.aspx and https://wwwcdn.imo.org/localresources/en/OurWork/Environment/Documents/Biofouling%20pages/MEPC.1-Circ.918%20-%20Guidance%20On%20In-Water%20Cleaning%20Of%20Ships%27%20Biofouling%20%28Secretariat%29.pdf
+
+Do not collapse performance trend measurement, cleaning execution/documentation and cleaning-system efficacy testing into one standard-conformance label.
+
+### 17.4 South African engagement window
+
+The IMO reports that a Regional In-Water Cleaning Technology Demonstration and Workshop took place in Cape Town on **5–8 October 2026**. It involved government agencies from 12 countries, industry, South African technology providers and experts. The National Department of Transport hosted with SAMSA and TNPA as implementing agencies. Live demonstrations by licensed South African providers covered in-water cleaning; SAMSA's sector report describes inspection, cleaning, capture, filtration, verification and documentation.
+
+Sources:
+- IMO (8 October 2026): https://www.imo.org/en/mediacentre/pages/whatsnew-2511.aspx
+- SAMSA sector report (21 October 2026): https://blog.samsa.org.za/2026/10/21/samsa-participates-in-test-biofouling-regional-in-water-cleaning-technology-demonstration-and-workshop/
+
+This is a concrete local stakeholder/technology landscape to research, not an endorsement, invitation, data licence or cleaning permit for Luminous. The follow-up should map provider capabilities and local requirements before any proposed trial.
+
+### 17.5 Extended benchmark panel — both product families, different methods
+
+**PWC-SIT:** fouling/debris/vegetation at hull and waterjet intake; distinguish hull resistance, intake blockage, ventilation/cavitation, pump/impeller/nozzle damage and motor/controller drift. Use a PWC-specific same-craft reference-condition method rather than claiming ISO 19030 compliance. Keep cleaning and biosecurity evidence separate.
+
+**HARBOUR-TUG:** distinguish hull/propeller/azimuth/VSP fouling from propulsion machinery, shaftline, battery/generator, loading and dispatch changes. Report energy per completed job and availability with configuration/condition normalization. Cleaning cannot be credited with recovery unless matched pre/post cases and uncertainty support it.
+
+**Shared metrics:** detection delay, drift-estimation residual, interval coverage, false fouling attribution, inspection false-negative and niche-area miss rates, inspected-area coverage, independently tested cleaning efficacy, captured fraction/waste disposition, coating damage, off-hire/service time, energy recovery, lifecycle cost and environmental/biosecurity disposition. Do not use a single composite score that allows an energy benefit to compensate for unauthorized cleaning or uncontrolled release.
+
+**Proposed integrity targets (not results):**
+- 100% exact vessel/configuration/coating/propulsor/condition fingerprint and calibration lineage for every performance observation.
+- Zero fouling confirmation from power/speed residual alone.
+- Zero future-data leakage into reference normalization or incremental updates.
+- Zero silent overwrite of reference baselines or historical predictions.
+- Zero unapproved cleaning, undocumented waste/capture or unsupported species claims.
+- All unknown/partial hull zones, niche areas and sensor coverage gaps preserved as unknown, not zero.
+- Performance recovery claims require independent matched-condition observations and uncertainty intervals excluding the pre-registered negligible-effect region.
+
+Linked owner work: Symthaea #11608 (biofouling/cleaning/biosecurity), #11612 (hull/acoustic/propulsion evidence join), #12095/#12135 (PWC), #12096/#12136 (tug). The biofouling auditor/schema/fixture already exist on the marine WAPS branch; this product baseline reuses them rather than creating a duplicate implementation.
