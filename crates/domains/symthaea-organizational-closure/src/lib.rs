@@ -111,7 +111,8 @@ pub struct ProcessSpec {
     pub optional_inputs: BTreeSet<ComponentId>,
     pub required_outputs: BTreeSet<ComponentId>,
     pub optional_outputs: BTreeSet<ComponentId>,
-    pub external_dependencies: BTreeSet<DependencyId>,
+    pub required_external_dependencies: BTreeSet<DependencyId>,
+    pub optional_external_dependencies: BTreeSet<DependencyId>,
 }
 
 impl ProcessSpec {
@@ -123,7 +124,8 @@ impl ProcessSpec {
             optional_inputs: BTreeSet::new(),
             required_outputs: BTreeSet::new(),
             optional_outputs: BTreeSet::new(),
-            external_dependencies: BTreeSet::new(),
+            required_external_dependencies: BTreeSet::new(),
+            optional_external_dependencies: BTreeSet::new(),
         }
     }
 
@@ -304,6 +306,7 @@ pub enum FindingCode {
     DuplicateExternalObservation,
     UndeclaredExternalDependency,
     AvailableReceiptMissingDigest,
+    MissingRequiredExternalObservation,
     SuccessfulExecutionWithUnavailableDependency,
     SuccessfulWriteWithoutPolicyDigest,
     NonSuccessCommittedOutput,
@@ -577,8 +580,11 @@ pub fn verify_trace(
                 );
             }
             if !process
-                .external_dependencies
+                .required_external_dependencies
                 .contains(&observation.dependency_id)
+                && !process
+                    .optional_external_dependencies
+                    .contains(&observation.dependency_id)
             {
                 event_finding(
                     &mut report,
@@ -606,6 +612,21 @@ pub fn verify_trace(
                 ExternalDependencyStatus::Unavailable | ExternalDependencyStatus::Denied => {
                     external_unavailable = true;
                 }
+            }
+        }
+
+        for required in &process.required_external_dependencies {
+            if !seen_external.contains(required) {
+                event_finding(
+                    &mut report,
+                    FindingCode::MissingRequiredExternalObservation,
+                    event,
+                    None,
+                    format!(
+                        "required external dependency {} has no runtime observation",
+                        required.0
+                    ),
+                );
             }
         }
 
@@ -1110,7 +1131,7 @@ mod tests {
 
     #[test]
     fn undeclared_external_dependency_is_rejected() {
-        let (mut organization, mut trace, store) = healthy_fixture();
+        let (organization, mut trace, store) = healthy_fixture();
         trace.events[0]
             .external_dependencies
             .push(ExternalDependencyObservation {
@@ -1128,14 +1149,6 @@ mod tests {
                 .any(|finding| { finding.code == FindingCode::UndeclaredExternalDependency })
         );
 
-        // Keep the fixture mutable in this test to make it explicit that an
-        // allow-list change is a new frozen organization declaration.
-        organization
-            .processes
-            .get_mut(&ProcessId::from("refresh-memory"))
-            .unwrap()
-            .external_dependencies
-            .insert("unlisted-network".into());
     }
 
     #[test]
@@ -1145,7 +1158,7 @@ mod tests {
             .processes
             .get_mut(&ProcessId::from("refresh-memory"))
             .unwrap()
-            .external_dependencies
+            .required_external_dependencies
             .insert("object-store".into());
         trace.events[0]
             .external_dependencies
@@ -1162,6 +1175,26 @@ mod tests {
                 .findings
                 .iter()
                 .any(|finding| { finding.code == FindingCode::AvailableReceiptMissingDigest })
+        );
+    }
+
+    #[test]
+    fn missing_required_external_dependency_observation_is_rejected() {
+        let (mut organization, trace, store) = healthy_fixture();
+        organization
+            .processes
+            .get_mut(&ProcessId::from("refresh-memory"))
+            .unwrap()
+            .required_external_dependencies
+            .insert("object-store".into());
+
+        let report = verify_trace(&organization, &trace, &store);
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::MissingRequiredExternalObservation })
         );
     }
 
