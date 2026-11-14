@@ -150,6 +150,9 @@ pub enum U1MpsError {
     DuplicateTeBDHamiltonianBond {
         bond_index: usize,
     },
+    InvalidAdaptivePolicy(&'static str),
+    InvalidAdaptiveTimeStep(f64),
+    AdaptiveGlobalErrorUnqualified,
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -317,6 +320,19 @@ impl core::fmt::Display for U1MpsError {
             Self::DuplicateTeBDHamiltonianBond { bond_index } => write!(
                 f,
                 "Hamiltonian contains more than one local term for bond {bond_index}"
+            ),
+            Self::InvalidAdaptivePolicy(name) => {
+                write!(f, "invalid adaptive TEBD policy field {name}")
+            }
+            Self::InvalidAdaptiveTimeStep(value) => {
+                write!(
+                    f,
+                    "adaptive TEBD requires a positive finite time step, got {value}"
+                )
+            }
+            Self::AdaptiveGlobalErrorUnqualified => write!(
+                f,
+                "adaptive TEBD requires globally qualified canonical-gauge compression receipts"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -620,14 +636,13 @@ fn left_canonicalize_site(
 
         let row_count = block.nrows();
         let column_count = block.ncols();
-        let decomposition =
-            block
-                .clone()
-                .try_svd(true, true, tolerance, max_iterations)
-                .ok_or(U1MpsError::SvdFailed {
-                    rows: row_count,
-                    columns: column_count,
-                })?;
+        let decomposition = block
+            .clone()
+            .try_svd(true, true, tolerance, max_iterations)
+            .ok_or(U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            })?;
         let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
             rows: row_count,
             columns: column_count,
@@ -818,14 +833,13 @@ fn right_canonicalize_site(
 
         let row_count = block.nrows();
         let column_count = block.ncols();
-        let decomposition =
-            block
-                .clone()
-                .try_svd(true, true, tolerance, max_iterations)
-                .ok_or(U1MpsError::SvdFailed {
-                    rows: row_count,
-                    columns: column_count,
-                })?;
+        let decomposition = block
+            .clone()
+            .try_svd(true, true, tolerance, max_iterations)
+            .ok_or(U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            })?;
         let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
             rows: row_count,
             columns: column_count,
@@ -951,6 +965,154 @@ fn right_canonicalize_site(
 
 impl ComplexU1Mps {
     /// Validate a complete open-boundary MPS and its charge-selection rules.
+    fn difference_norm_squared(&self, other: &Self, tolerance: f64) -> Result<f64, U1MpsError> {
+        if self.site_count() != other.site_count() || self.total_charge != other.total_charge {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let site_count = self.site_count();
+        let mut difference_tensors = Vec::with_capacity(site_count);
+
+        if site_count == 1 {
+            let left = &self.tensors[0];
+            let right = &other.tensors[0];
+            if left.left_charges != right.left_charges || left.right_charges != right.right_charges
+            {
+                return Err(U1MpsError::TwoSiteBondMismatch);
+            }
+            let data = (0..left.left_dimension())
+                .flat_map(|left_index| {
+                    (0..2).flat_map(move |physical| {
+                        (0..left.right_dimension()).map(move |right_index| {
+                            left.get(left_index, physical, right_index)
+                                - right.get(left_index, physical, right_index)
+                        })
+                    })
+                })
+                .collect();
+            difference_tensors.push(U1MpsTensor::new(
+                left.left_charges.clone(),
+                left.right_charges.clone(),
+                data,
+            )?);
+        } else {
+            // First site: share the charge-zero left boundary and branch into
+            // the A and -B right virtual spaces.
+            let first_a = &self.tensors[0];
+            let first_b = &other.tensors[0];
+            let first_right_dimension = first_a
+                .right_dimension()
+                .checked_add(first_b.right_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let first_entries = 2_usize
+                .checked_mul(first_right_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut first_data = vec![Complex64::new(0.0, 0.0); first_entries];
+            for physical in 0..2 {
+                for right in 0..first_a.right_dimension() {
+                    first_data[physical * first_right_dimension + right] =
+                        first_a.get(0, physical, right);
+                }
+                for right in 0..first_b.right_dimension() {
+                    first_data
+                        [physical * first_right_dimension + first_a.right_dimension() + right] =
+                        -first_b.get(0, physical, right);
+                }
+            }
+            let mut first_right_charges = first_a.right_charges.clone();
+            first_right_charges.extend_from_slice(&first_b.right_charges);
+            difference_tensors.push(U1MpsTensor::new(
+                first_a.left_charges.clone(),
+                first_right_charges,
+                first_data,
+            )?);
+
+            // Middle sites: propagate A and B in separate diagonal blocks.
+            for site in 1..(site_count - 1) {
+                let tensor_a = &self.tensors[site];
+                let tensor_b = &other.tensors[site];
+                let left_dimension = tensor_a
+                    .left_dimension()
+                    .checked_add(tensor_b.left_dimension())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let right_dimension = tensor_a
+                    .right_dimension()
+                    .checked_add(tensor_b.right_dimension())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let entries = left_dimension
+                    .checked_mul(2)
+                    .and_then(|value| value.checked_mul(right_dimension))
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let mut data = vec![Complex64::new(0.0, 0.0); entries];
+
+                for left in 0..tensor_a.left_dimension() {
+                    for physical in 0..2 {
+                        for right in 0..tensor_a.right_dimension() {
+                            let index = (left * 2 + physical) * right_dimension + right;
+                            data[index] = tensor_a.get(left, physical, right);
+                        }
+                    }
+                }
+                for left in 0..tensor_b.left_dimension() {
+                    for physical in 0..2 {
+                        for right in 0..tensor_b.right_dimension() {
+                            let index = ((tensor_a.left_dimension() + left) * 2 + physical)
+                                * right_dimension
+                                + tensor_a.right_dimension()
+                                + right;
+                            data[index] = tensor_b.get(left, physical, right);
+                        }
+                    }
+                }
+
+                let mut left_charges = tensor_a.left_charges.clone();
+                left_charges.extend_from_slice(&tensor_b.left_charges);
+                let mut right_charges = tensor_a.right_charges.clone();
+                right_charges.extend_from_slice(&tensor_b.right_charges);
+                difference_tensors.push(U1MpsTensor::new(left_charges, right_charges, data)?);
+            }
+
+            // Final site: add the two branch amplitudes at the common
+            // total-charge right boundary.
+            let final_a = self.tensors.last().expect("nonempty MPS");
+            let final_b = other.tensors.last().expect("nonempty MPS");
+            let final_left_dimension = final_a
+                .left_dimension()
+                .checked_add(final_b.left_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let final_entries = final_left_dimension
+                .checked_mul(2)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut final_data = vec![Complex64::new(0.0, 0.0); final_entries];
+            for left in 0..final_a.left_dimension() {
+                for physical in 0..2 {
+                    final_data[left * 2 + physical] = final_a.get(left, physical, 0);
+                }
+            }
+            for left in 0..final_b.left_dimension() {
+                for physical in 0..2 {
+                    final_data[(final_a.left_dimension() + left) * 2 + physical] =
+                        final_b.get(left, physical, 0);
+                }
+            }
+            let mut final_left_charges = final_a.left_charges.clone();
+            final_left_charges.extend_from_slice(&final_b.left_charges);
+            difference_tensors.push(U1MpsTensor::new(
+                final_left_charges,
+                final_a.right_charges.clone(),
+                final_data,
+            )?);
+        }
+
+        let difference = Self::new(difference_tensors, self.total_charge, tolerance)?;
+        difference.norm_squared(tolerance)
+    }
+
+    /// Validate a complete open-boundary MPS and its charge-selection rules.
+
     pub fn new(
         tensors: Vec<U1MpsTensor>,
         total_charge: i32,
@@ -3072,13 +3234,266 @@ impl U1TeBDStrangStepper {
     }
 }
 
+/// Error budgets and step-size safeguards for an adaptive Strang controller.
+///
+/// Time-discretization error is estimated by step doubling in the asymptotic
+/// second-order regime. Compression error is accepted only when the global
+/// canonical-gauge receipts qualify.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TeBDAdaptivePolicy {
+    pub target_trotter_error: f64,
+    pub target_compression_error: f64,
+    pub minimum_time_step: f64,
+    pub maximum_time_step: f64,
+    pub safety_factor: f64,
+    pub minimum_step_scale: f64,
+    pub maximum_step_scale: f64,
+}
+
+impl U1TeBDAdaptivePolicy {
+    pub fn validate(self) -> Result<(), U1MpsError> {
+        for (name, value) in [
+            ("target_trotter_error", self.target_trotter_error),
+            ("target_compression_error", self.target_compression_error),
+            ("minimum_time_step", self.minimum_time_step),
+            ("maximum_time_step", self.maximum_time_step),
+            ("safety_factor", self.safety_factor),
+            ("minimum_step_scale", self.minimum_step_scale),
+            ("maximum_step_scale", self.maximum_step_scale),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(U1MpsError::InvalidAdaptivePolicy(name));
+            }
+        }
+        if self.minimum_time_step > self.maximum_time_step {
+            return Err(U1MpsError::InvalidAdaptivePolicy(
+                "minimum_time_step > maximum_time_step",
+            ));
+        }
+        if self.safety_factor > 1.0 {
+            return Err(U1MpsError::InvalidAdaptivePolicy(
+                "safety_factor must be <= 1",
+            ));
+        }
+        if self.minimum_step_scale > 1.0
+            || self.maximum_step_scale < 1.0
+            || self.minimum_step_scale > self.maximum_step_scale
+        {
+            return Err(U1MpsError::InvalidAdaptivePolicy(
+                "step_scale interval must contain 1",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// One step-doubling decision. The accepted state is present only if both
+/// compression and estimated time-discretization budgets pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDAdaptiveStepResult {
+    pub accepted: bool,
+    pub accepted_state: Option<ComplexU1Mps>,
+    pub attempted_time_step: f64,
+    pub accepted_time_advance: Option<f64>,
+    pub recommended_next_time_step: f64,
+    pub coarse_fine_state_distance: f64,
+    pub compression_uncertainty_upper_bound: f64,
+    pub coarse_path_compression_error_upper_bound: f64,
+    pub fine_path_compression_error_upper_bound: f64,
+    pub trotter_error_estimate_lower: f64,
+    pub trotter_error_estimate_upper: f64,
+    pub total_error_estimate_upper: f64,
+    pub target_trotter_error: f64,
+    pub target_compression_error: f64,
+    pub method_order: usize,
+    pub uses_asymptotic_step_doubling_assumption: bool,
+    pub all_global_compression_bounds_qualified: bool,
+}
+
+fn mps_state_distance(
+    left: &ComplexU1Mps,
+    right: &ComplexU1Mps,
+    tolerance: f64,
+) -> Result<f64, U1MpsError> {
+    // Build the difference as a direct-sum MPS and contract its norm.
+    // This avoids cancellation in ||A||² + ||B||² - 2 Re<A|B> when
+    // the coarse and fine states are very close.
+    let squared = left.difference_norm_squared(right, tolerance)?;
+    if squared < 0.0 {
+        return Err(U1MpsError::NegativeNormSquared(squared));
+    }
+    let distance = squared.sqrt();
+    if !distance.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "step-doubling MPS state distance",
+        ));
+    }
+    Ok(distance)
+}
+
+impl U1TeBDStrangStepper {
+    /// Bound the operator norm of one exact Strang gate product. For each
+    /// gate, ||G||_2 <= sqrt(1 + ||G*G-I||_F).
+    fn strang_gate_operator_norm_upper_bound(
+        &self,
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<f64, U1MpsError> {
+        let mut upper_bound = 1.0_f64;
+        for (parity, scale) in [(0_u8, 0.5_f64), (1_u8, 1.0_f64), (0_u8, 0.5_f64)] {
+            for term in self
+                .terms
+                .iter()
+                .filter(|term| term.bond_index % 2 == parity as usize)
+            {
+                let gate = term.hamiltonian.to_gate(time_step * scale, tolerance)?;
+                let residual = gate.unitarity_residual();
+                if !residual.is_finite() || residual < 0.0 {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "adaptive gate operator-norm receipt",
+                    ));
+                }
+                upper_bound *= (1.0 + residual).sqrt();
+                if !upper_bound.is_finite() {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "adaptive gate operator-norm product",
+                    ));
+                }
+            }
+        }
+        Ok(upper_bound)
+    }
+
+    /// Compare one full Strang step with two half steps.
+    ///
+    /// The uncertainty in the coarse/fine difference is bounded by the
+    /// compression error of both paths. Dividing the remaining interval by 3
+    /// estimates the fine path's local defect for a second-order method.
+    /// This Richardson estimate assumes the asymptotic regime and is not a
+    /// rigorous global Trotter error theorem.
+    ///
+    /// The method fails closed unless the full step and both half steps return
+    /// globally qualified canonical-gauge compression receipts.
+    pub fn attempt_adaptive_step(
+        &self,
+        input: &ComplexU1Mps,
+        time_step: f64,
+        truncation_policy: U1TwoSiteTruncationPolicy,
+        adaptive_policy: U1TeBDAdaptivePolicy,
+    ) -> Result<U1TeBDAdaptiveStepResult, U1MpsError> {
+        adaptive_policy.validate()?;
+        truncation_policy.validate()?;
+        if !time_step.is_finite()
+            || time_step < adaptive_policy.minimum_time_step
+            || time_step > adaptive_policy.maximum_time_step
+        {
+            return Err(U1MpsError::InvalidAdaptiveTimeStep(time_step));
+        }
+
+        let half_step = 0.5 * time_step;
+        let coarse = self.step(input, time_step, truncation_policy)?;
+        let first_half = self.step(input, half_step, truncation_policy)?;
+        let second_half = self.step(&first_half.state, half_step, truncation_policy)?;
+
+        let all_qualified = coarse.global_l2_bound_qualified
+            && first_half.global_l2_bound_qualified
+            && second_half.global_l2_bound_qualified
+            && coarse.total_global_l2_error_bound.is_some()
+            && first_half.total_global_l2_error_bound.is_some()
+            && second_half.total_global_l2_error_bound.is_some();
+        if !all_qualified {
+            return Err(U1MpsError::AdaptiveGlobalErrorUnqualified);
+        }
+
+        let coarse_compression = coarse
+            .total_global_l2_error_bound
+            .ok_or(U1MpsError::AdaptiveGlobalErrorUnqualified)?;
+        let first_half_compression = first_half
+            .total_global_l2_error_bound
+            .ok_or(U1MpsError::AdaptiveGlobalErrorUnqualified)?;
+        let second_half_compression = second_half
+            .total_global_l2_error_bound
+            .ok_or(U1MpsError::AdaptiveGlobalErrorUnqualified)?;
+
+        // The first half-step error is propagated through the second
+        // half-step's gate product before its own compression error is added.
+        let second_half_operator_norm =
+            self.strang_gate_operator_norm_upper_bound(half_step, truncation_policy.tolerance)?;
+        let fine_compression =
+            first_half_compression * second_half_operator_norm + second_half_compression;
+        let uncertainty = coarse_compression + fine_compression;
+        if !fine_compression.is_finite() || !uncertainty.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive compression uncertainty",
+            ));
+        }
+
+        let coarse_fine_distance = mps_state_distance(
+            &coarse.state,
+            &second_half.state,
+            truncation_policy.tolerance,
+        )?;
+        let trotter_difference_lower = (coarse_fine_distance - uncertainty).max(0.0);
+        let trotter_difference_upper = coarse_fine_distance + uncertainty;
+        let trotter_error_lower = trotter_difference_lower / 3.0;
+        let trotter_error_upper = trotter_difference_upper / 3.0;
+        let total_error_upper = fine_compression + trotter_error_upper;
+        if !trotter_error_upper.is_finite() || !total_error_upper.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive Trotter error estimate",
+            ));
+        }
+
+        let accepted = fine_compression <= adaptive_policy.target_compression_error
+            && trotter_error_upper <= adaptive_policy.target_trotter_error;
+        let raw_scale = if trotter_error_upper <= f64::MIN_POSITIVE {
+            adaptive_policy.maximum_step_scale
+        } else {
+            adaptive_policy.safety_factor
+                * (adaptive_policy.target_trotter_error / trotter_error_upper).cbrt()
+        };
+        let mut step_scale = raw_scale.clamp(
+            adaptive_policy.minimum_step_scale,
+            adaptive_policy.maximum_step_scale,
+        );
+        if fine_compression > adaptive_policy.target_compression_error {
+            step_scale = step_scale.min(1.0);
+        }
+        let recommended_next_time_step = (time_step * step_scale).clamp(
+            adaptive_policy.minimum_time_step,
+            adaptive_policy.maximum_time_step,
+        );
+
+        Ok(U1TeBDAdaptiveStepResult {
+            accepted,
+            accepted_state: accepted.then_some(second_half.state),
+            attempted_time_step: time_step,
+            accepted_time_advance: accepted.then_some(time_step),
+            recommended_next_time_step,
+            coarse_fine_state_distance: coarse_fine_distance,
+            compression_uncertainty_upper_bound: uncertainty,
+            coarse_path_compression_error_upper_bound: coarse_compression,
+            fine_path_compression_error_upper_bound: fine_compression,
+            trotter_error_estimate_lower: trotter_error_lower,
+            trotter_error_estimate_upper: trotter_error_upper,
+            total_error_estimate_upper: total_error_upper,
+            target_trotter_error: adaptive_policy.target_trotter_error,
+            target_compression_error: adaptive_policy.target_compression_error,
+            method_order: 2,
+            uses_asymptotic_step_doubling_assumption: true,
+            all_global_compression_bounds_qualified: all_qualified,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
+        U1TeBDAdaptivePolicy, U1TeBDGate, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
         U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
+        U1TwoSiteTruncationPolicy, left_isometry_residual, mps_state_distance,
+        right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -4552,4 +4967,185 @@ mod tests {
         assert!((dense[2].im + 1.0_f64.sin()).abs() <= 1.0e-12);
         assert!(gate.unitarity_residual() <= 1.0e-12);
     }
+
+    fn adaptive_policy(target_trotter_error: f64) -> U1TeBDAdaptivePolicy {
+        U1TeBDAdaptivePolicy {
+            target_trotter_error,
+            target_compression_error: 1.0e-9,
+            minimum_time_step: 1.0e-3,
+            maximum_time_step: 1.0,
+            safety_factor: 0.9,
+            minimum_step_scale: 0.5,
+            maximum_step_scale: 2.0,
+        }
+    }
+
+    #[test]
+    fn mps_state_distance_uses_stable_direct_difference_for_near_identical_states() {
+        let left = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let identical = left.clone();
+        assert_eq!(mps_state_distance(&left, &identical, 1.0e-12).unwrap(), 0.0);
+
+        let phase = 1.0e-9_f64;
+        let mut tensors = left.tensors.clone();
+        tensors[1].data[0] = Complex64::new(phase.cos(), phase.sin());
+        let nearby = ComplexU1Mps::new(tensors, 1, 1.0e-12).unwrap();
+        let measured = mps_state_distance(&left, &nearby, 1.0e-12).unwrap();
+        assert!((measured - phase).abs() <= 2.0e-16);
+        assert!(measured > 0.0);
+    }
+
+    #[test]
+    fn stable_mps_difference_supports_distinct_virtual_bond_dimensions() {
+        let minimal = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let redundant = ComplexU1Mps::new(
+            vec![
+                U1MpsTensor::new(
+                    vec![0],
+                    vec![1, 1],
+                    vec![complex_zero(), complex_zero(), Complex64::new(1.0, 0.0), complex_zero()],
+                )
+                .unwrap(),
+                U1MpsTensor::new(
+                    vec![1, 1],
+                    vec![1],
+                    vec![
+                        Complex64::new(1.0, 0.0),
+                        complex_zero(),
+                        Complex64::new(1.0, 0.0),
+                        complex_zero(),
+                    ],
+                )
+                .unwrap(),
+                U1MpsTensor::new(
+                    vec![1],
+                    vec![1],
+                    vec![Complex64::new(1.0, 0.0), complex_zero()],
+                )
+                .unwrap(),
+            ],
+            1,
+            1.0e-12,
+        )
+        .unwrap();
+        assert_eq!(minimal.tensors[0].right_dimension(), 1);
+        assert_eq!(redundant.tensors[0].right_dimension(), 2);
+        let distance = mps_state_distance(&minimal, &redundant, 1.0e-12).unwrap();
+        assert!(distance <= 1.0e-12);
+    }
+
+    #[test]
+    fn adaptive_strang_accepts_zero_hamiltonian_with_zero_estimated_error() {
+        let zero_hamiltonian = U1TwoSiteHamiltonian::new(0.0, 0.0, 0.0, complex_zero()).unwrap();
+        let stepper = U1TeBDStrangStepper::new(
+            2,
+            vec![U1TeBDHamiltonianTerm {
+                bond_index: 0,
+                hamiltonian: zero_hamiltonian,
+            }],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.1,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+                adaptive_policy(1.0e-9),
+            )
+            .unwrap();
+
+        assert!(result.accepted);
+        assert!(result.accepted_state.is_some());
+        assert_eq!(result.accepted_time_advance, Some(0.1));
+        assert!(result.coarse_fine_state_distance <= 1.0e-12);
+        assert!(result.trotter_error_estimate_upper <= 1.0e-12);
+        assert!(result.all_global_compression_bounds_qualified);
+        assert_eq!(result.method_order, 2);
+    }
+
+    #[test]
+    fn adaptive_strang_rejects_step_when_trotter_budget_is_too_small() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.8,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 3,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-11,
+                },
+                adaptive_policy(1.0e-18),
+            )
+            .unwrap();
+
+        assert!(!result.accepted);
+        assert!(result.accepted_state.is_none());
+        assert!(result.accepted_time_advance.is_none());
+        assert!(result.coarse_fine_state_distance > 0.0);
+        assert!(result.trotter_error_estimate_upper > 1.0e-18);
+        assert!(result.recommended_next_time_step < result.attempted_time_step);
+        assert!(result.all_global_compression_bounds_qualified);
+    }
+
+    #[test]
+    fn adaptive_strang_reports_compression_uncertainty_separately_from_trotter_error() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.35,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-11,
+                },
+                U1TeBDAdaptivePolicy {
+                    target_trotter_error: 1.0,
+                    target_compression_error: 1.0,
+                    minimum_time_step: 1.0e-3,
+                    maximum_time_step: 1.0,
+                    safety_factor: 0.9,
+                    minimum_step_scale: 0.5,
+                    maximum_step_scale: 2.0,
+                },
+            )
+            .unwrap();
+
+        assert!(result.all_global_compression_bounds_qualified);
+        assert!(result.fine_path_compression_error_upper_bound.is_finite());
+        assert!(result.coarse_path_compression_error_upper_bound.is_finite());
+        assert!(result.compression_uncertainty_upper_bound >= 0.0);
+        assert!(result.total_error_estimate_upper >= result.trotter_error_estimate_upper);
+    }
+
+    #[test]
+    fn adaptive_strang_rejects_invalid_error_budgets_and_time_step_ranges() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let truncation = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 3,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-11,
+        };
+        let mut invalid = adaptive_policy(1.0e-6);
+        invalid.safety_factor = 1.1;
+        assert!(matches!(
+            stepper.attempt_adaptive_step(&input, 0.1, truncation, invalid),
+            Err(U1MpsError::InvalidAdaptivePolicy(_))
+        ));
+
+        assert!(matches!(
+            stepper.attempt_adaptive_step(&input, 1.1, truncation, adaptive_policy(1.0e-6)),
+            Err(U1MpsError::InvalidAdaptiveTimeStep(1.1))
+        ));
+    }
+
 }
