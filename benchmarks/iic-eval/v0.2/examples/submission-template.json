@@ -1,0 +1,248 @@
+{
+  "system_id": "REPLACE_WITH_SYSTEM_ID",
+  "build_sha": "REPLACE_WITH_BUILD_SHA",
+  "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "review_time_seconds": 0,
+  "results": [
+    {
+      "case_id": "IIC-001",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-002",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-003",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-004",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-005",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-006",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-007",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-008",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-009",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-010",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-011",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-012",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-013",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-014",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-015",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-016",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-017",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-018",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-019",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-020",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-021",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-022",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-023",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-024",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-025",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-026",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-027",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-028",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-029",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-030",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-031",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-032",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-033",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-034",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-035",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-036",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-037",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-038",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-039",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    },
+    {
+      "case_id": "IIC-040",
+      "candidates": [],
+      "unresolved_questions": [],
+      "prohibited_inference_flags": []
+    }
+  ]
+}
