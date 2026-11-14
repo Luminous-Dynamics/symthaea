@@ -463,6 +463,18 @@ mod tests {
     }
 
     #[test]
+    fn empty_question_sets_are_perfect_only_when_both_are_empty() {
+        let empty: Vec<String> = Vec::new();
+        let nonempty = vec!["Who approves?".to_owned()];
+        let (_, _, _, p0, r0, _) = exact_list_metrics(&empty,&empty);
+        let (_, _, _, p1, r1, _) = exact_list_metrics(&empty,&nonempty);
+        assert_eq!(p0,1.0);
+        assert_eq!(r0,1.0);
+        assert_eq!(p1,0.0);
+        assert_eq!(r1,0.0);
+    }
+
+    #[test]
     fn accepts_exact_ascii_byte_span() {
         let source = "Inspect the north gate.";
         assert!(span_matches(source, 0, 7, "Inspect"));
