@@ -957,11 +957,16 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
     }
 
     findings.sort_by(|left, right| {
-        (&left.entity_id, left.code, &left.message).cmp(&(
-            &right.entity_id,
-            right.code,
-            &right.message,
-        ))
+        (
+            left.entity_id.as_str(),
+            left.code.as_str(),
+            left.message.as_str(),
+        )
+            .cmp(&(
+                right.entity_id.as_str(),
+                right.code.as_str(),
+                right.message.as_str(),
+            ))
     });
 
     MaterialFlowReport {
