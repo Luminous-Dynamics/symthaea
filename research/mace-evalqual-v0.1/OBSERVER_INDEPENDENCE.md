@@ -123,3 +123,6 @@ This is a caller-supplied checkpoint comparison, not remote signing or key custo
 ## Signed checkpoint chain
 
 The detached Ed25519 checkpoint contract and cross-language test vector now appear in [CHECKPOINT_CHAIN.md](CHECKPOINT_CHAIN.md). This extends the earlier caller-supplied expected-head concept with signature verification and a monotonic predecessor chain. It remains a protocol/verifier building block: the local Go verifier is a separate companion artifact, and the public PR does not deploy a witness, key custody, transparency log or protected external trust-state service. Its consumer cursor must be stored outside the database and outside the database administrator's trust domain.
+
+
+The Ed25519 checkpoint contract is now backed by a public Go verifier under `checkpoints/` plus a versioned test vector. This lets independent implementations verify the binary signing preimage and monotonic-cursor behavior. It still does not deploy the witness or protect its signing key, nor persist the consumer cursor in an external trust domain; those are separate E3/E4 engineering gates.
