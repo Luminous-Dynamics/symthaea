@@ -838,6 +838,34 @@ mod tests {
     }
 
     #[test]
+    fn design_receipt_for_a_different_transform_is_rejected() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-direct-initial-strength").expect("case exists");
+        let mut graph = case.graph.clone();
+        graph.design_receipt.endpoint_transform_id = Some("aged_strength_retention_ratio_v1".to_owned());
+        assert_eq!(audit_graph(&graph).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn design_receipt_digest_must_match_the_analysis_link() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-direct-initial-strength").expect("case exists");
+        let mut graph = case.graph.clone();
+        graph.analysis.design_sha256 = "ff".repeat(32);
+        assert_eq!(audit_graph(&graph).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn aged_retention_binds_conditioning_and_exposure_receipts() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-aged-retention-four-cohort-graph").expect("case exists");
+        let result = audit_graph(&case.graph);
+        assert_eq!(result.disposition, Disposition::Pass);
+        assert_eq!(case.graph.analysis.source_receipt_ids.len(), 8);
+        assert_eq!(case.graph.analysis.source_artifact_digests.len(), 8);
+    }
+
+    #[test]
     fn valid_graph_can_fail_to_establish_equivalence() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
         let case = fixture.cases.iter().find(|case| case.id == "valid-direct-strength-outside-margin").expect("case exists");
