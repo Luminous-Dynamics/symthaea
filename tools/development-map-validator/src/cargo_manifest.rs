@@ -49,8 +49,8 @@ pub struct DependencyDeclaration {
     pub tag: Option<String>,
     pub rev: Option<String>,
     pub registry: Option<String>,
-    pub optional: bool,
-    pub default_features: bool,
+    pub optional: Option<bool>,
+    pub default_features: Option<bool>,
     pub workspace_inherited: bool,
     pub features: Vec<String>,
 }
@@ -252,8 +252,8 @@ fn parse_dependency_spec(
             tag: None,
             rev: None,
             registry: None,
-            optional: false,
-            default_features: true,
+            optional: Some(false),
+            default_features: Some(true),
             workspace_inherited: false,
             features: Vec::new(),
         });
@@ -296,8 +296,8 @@ fn parse_dependency_spec(
         tag: get_string("tag")?,
         rev: get_string("rev")?,
         registry: get_string("registry")?,
-        optional,
-        default_features,
+        optional: if dependency.get("optional").is_some() || !workspace_inherited { Some(optional) } else { None },
+        default_features: if dependency.get("default-features").is_some() || !workspace_inherited { Some(default_features) } else { None },
         workspace_inherited,
         features,
     })
@@ -539,9 +539,9 @@ mod tests {
         let projection = project_cargo_manifest(VIRTUAL_WORKSPACE, anchor()).expect("projection");
         assert_eq!(projection.manifest_kind, "virtual_workspace");
         let workspace = projection.workspace.expect("workspace");
-        assert_eq!(workspace.members, vec!["apps/*", "crates/*"]);
-        assert_eq!(workspace.default_members, vec!["apps/cli"]);
-        assert_eq!(workspace.exclude, vec!["crates/experimental"]);
+        assert_eq!(workspace.members, vec!["apps/*".to_owned(), "crates/*".to_owned()]);
+        assert_eq!(workspace.default_members, vec!["apps/cli".to_owned()]);
+        assert_eq!(workspace.exclude, vec!["crates/experimental".to_owned()]);
         assert_eq!(workspace.resolver.as_deref(), Some("3"));
         assert_eq!(workspace.shared_dependency_aliases, vec!["serde"]);
     }
@@ -595,9 +595,9 @@ mod tests {
         let tokio = projection.dependencies.iter().find(|dependency| dependency.alias == "tokio").expect("tokio");
         assert!(tokio.optional);
         assert!(!tokio.default_features);
-        assert_eq!(tokio.features, vec!["macros", "rt"]);
+        assert_eq!(tokio.features, vec!["macros".to_owned(), "rt".to_owned()]);
         let network = projection.features.iter().find(|feature| feature.name == "network").expect("network");
-        assert_eq!(network.members, vec!["dep:tokio"]);
+        assert_eq!(network.members, vec!["dep:tokio".to_owned()]);
     }
 
     #[test]
