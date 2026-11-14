@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/textile-sort-fusion/0.1/cases.json",
+  "title": "Textile sensing and sorting evidence cases v0.1",
+  "description": "Synthetic test-intention corpus for visual garment-family and NIR fibre-composition evidence. This schema validates case shape only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "fixture_class",
+    "cases",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "corpus_id": {
+      "const": "TEXTILE-SORT-FUSION-CASES-001"
+    },
+    "fixture_class": {
+      "const": "synthetic"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "case_kind",
+          "mutation",
+          "expected",
+          "invariant"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "case_kind": {
+            "enum": [
+              "spectral_admission",
+              "visual_admission",
+              "paired_identity",
+              "dataset_split"
+            ]
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "disposition",
+              "reason"
+            ],
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "admitted",
+                  "unknown",
+                  "rejected",
+                  "group_leakage",
+                  "valid_split"
+                ]
+              },
+              "reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "invariant": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "maxItems": 16
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

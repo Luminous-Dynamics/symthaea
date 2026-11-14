@@ -2,12 +2,12 @@ name: Melothaea music benchmark registry
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-muse/src/benchmark_registry.rs"
       - "benchmarks/mel/registry/**"
       - "benchmarks/mel/schemas/**"
       - "tools/mel-benchmark-registry-harness/**"
-      - ".github/workflows/mel-benchmark-registry.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,13 +15,14 @@ permissions:
 
 jobs:
   benchmark-registry-contract:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Check out exact pull request branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Verify exact pull request head
         shell: bash

@@ -1,0 +1,376 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "TEXTILE-ROUTE-CASES-001",
+  "fixture_class": "synthetic",
+  "claim_ceiling": "Synthetic route-contract outcomes only; no real garment, process trial, fibre sampling campaign, yarn acceptance, chemical compatibility or environmental result.",
+  "cases": [
+    {
+      "case_id": "ROUTE-001-REUSE-ACCEPTED",
+      "mutation": "Complete physical condition, safety and receiving acceptance",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-002-VISUAL-INFERENCE-ONLY",
+      "mutation": "Replace human inspection tier with model inference",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "MissingConditionInspection"
+      }
+    },
+    {
+      "case_id": "ROUTE-003-REUSE-SAFETY-FAIL",
+      "mutation": "Set safety outcome to failed",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "UseSafetyNotPassed"
+      }
+    },
+    {
+      "case_id": "ROUTE-004-REPAIR-ACCEPTED",
+      "mutation": "Complete repair trial and post-repair acceptance",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-005-COMPONENT-RECOVERY",
+      "mutation": "Physical component recovery, closed mass balance and receiver acceptance",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-006-MECHANICAL-ACCEPTED",
+      "mutation": "Composition, fibre length, opening trial and yarn receiver all pass",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-007-MODEL-COMPOSITION",
+      "mutation": "Promote a model inference to composition evidence",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidCompositionEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-008-UNKNOWN-FIBRE-FRACTION",
+      "mutation": "Unidentified upper-bound exceeds route policy",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "UnknownFibreFractionAbovePolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-009-MISSING-FIBRE-LENGTH",
+      "mutation": "Omit measured output fibre-length distribution",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "MissingFibreLengthEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-010-SHORT-FIBRE-OUTPUT",
+      "mutation": "Measured output fails receiving length requirement",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthBelowPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-011-MALFORMED-FIBRE-BINS",
+      "mutation": "Fibre-length bins do not sum to 1,000,000 ppm",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthDistribution"
+      }
+    },
+    {
+      "case_id": "ROUTE-012-CHEMICAL-ACCEPTED",
+      "mutation": "Compatibility trial, chemical process and receiver all pass",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-013-CHEMICAL-COMPATIBILITY-MISSING",
+      "mutation": "Do not infer chemistry compatibility from fibre labels",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "MissingChemicalCompatibilityEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-014-MASS-NOT-CLOSED",
+      "mutation": "Destructive trial leaves unexplained mass beyond uncertainty",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "MassBalanceNotClosed"
+      }
+    },
+    {
+      "case_id": "ROUTE-015-SELF-ISSUED-ACCEPTANCE",
+      "mutation": "Receiver and independent verifier IDs are identical",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDownstreamAcceptance"
+      }
+    },
+    {
+      "case_id": "ROUTE-016-SYNTHETIC-PHYSICAL-TRIAL",
+      "mutation": "Try to promote synthetic evidence to a physical trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidProcessTrialEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-017-CORRUPTED-DIGEST",
+      "mutation": "Change acceptance digest to malformed text",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDownstreamAcceptance"
+      }
+    },
+    {
+      "case_id": "ROUTE-018-RECEIVER-REJECTED",
+      "mutation": "Receiver explicitly rejects output under versioned specification",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceRejected"
+      }
+    },
+    {
+      "case_id": "ROUTE-019-RECEIVER-CONDITIONAL",
+      "mutation": "Receiver has not issued final acceptance",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "DownstreamAcceptanceUnresolved"
+      }
+    },
+    {
+      "case_id": "ROUTE-020-TRIAL-UNKNOWN",
+      "mutation": "Process outcome remains unknown",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "ProcessTrialUnknown"
+      }
+    },
+    {
+      "case_id": "ROUTE-021-TRIAL-INPUT-MISMATCH",
+      "mutation": "Trial input mass differs from item/lot inventory mass",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "MassBalanceInputMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-022-CHEMICAL-COMPATIBILITY-FAIL",
+      "mutation": "Chemical compatibility trial fails",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "ChemicalCompatibilityFailed"
+      }
+    },
+    {
+      "case_id": "ROUTE-023-EVIDENCE-ID-DUPLICATE",
+      "mutation": "Reuse an evidence ID for separate claims",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DuplicateEvidenceIdentity"
+      }
+    },
+    {
+      "case_id": "ROUTE-024-POLICY-INVALID",
+      "mutation": "Set a policy fraction above 100 percent",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-025-CONDITION-UNKNOWN",
+      "mutation": "Physical condition remains unknown",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "ProductConditionUnknown"
+      }
+    },
+    {
+      "case_id": "ROUTE-026-USE-SAFETY-UNKNOWN",
+      "mutation": "Use safety/hygiene inspection remains unresolved",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "UseSafetyUnknown"
+      }
+    },
+    {
+      "case_id": "ROUTE-027-DOWNCYCLING-ACCEPTED",
+      "mutation": "Physical downcycling trial and receiver acceptance pass",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-028-DESIGN-REVISION-BOUND",
+      "mutation": "Physical component trial binds exact product, revision, dossier digest and specimen",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-029-DESIGN-DOSSIER-DIGEST-INVALID",
+      "mutation": "Design-linked physical trial carries malformed dossier digest",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDesignRevisionBinding"
+      }
+    },
+    {
+      "case_id": "ROUTE-030-DESIGN-SPECIMEN-MISMATCH",
+      "mutation": "Design conformity refers to a different physical specimen than the trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDesignRevisionBinding"
+      }
+    },
+    {
+      "case_id": "ROUTE-031-FIBRE-LENGTH-TRIAL-MISMATCH",
+      "mutation": "Attach fibre-length data from a different mechanical-recycling trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthTrialBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-032-FIBRE-LENGTH-OUTPUT-LOT-MISMATCH",
+      "mutation": "Attach fibre-length data from an unrelated accepted output lot",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthTrialBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-033-RECEIVER-OUTPUT-LOT-MISMATCH",
+      "mutation": "Reuse a receiver acceptance from an unrelated output lot",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-034-RECEIVER-BASIS-TRIAL-MISMATCH",
+      "mutation": "Reuse a receiver acceptance from a different process trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-035-RECEIVER-ISSUER-IS-PROCESS-ISSUER",
+      "mutation": "Receiver organization is the same as the originating process issuer",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceNotIndependentOfBasis"
+      }
+    },
+    {
+      "case_id": "ROUTE-036-RECEIVER-VERIFIER-IS-PROCESS-ISSUER",
+      "mutation": "Independent verifier identity is the same as the originating process issuer",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceNotIndependentOfBasis"
+      }
+    },
+    {
+      "case_id": "ROUTE-037-FIBRE-LENGTH-PROTOCOL-INCOMPLETE",
+      "mutation": "Fibre length histogram lacks a sampling plan and positive replicate count.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthMeasurementProtocol"
+      }
+    },
+    {
+      "case_id": "ROUTE-038-FIBRE-LENGTH-SAMPLE-EXCEEDS-OUTPUT",
+      "mutation": "Fibre-length sample mass exceeds the measured accepted-output mass for the exact lot.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthSampleExceedsOutput"
+      }
+    },
+    {
+      "case_id": "ROUTE-039-FIBRE-LENGTH-UNCERTAINTY-ABOVE-POLICY",
+      "mutation": "Fibre-length measurement expanded uncertainty exceeds the receiver's declared maximum.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthMeasurementUncertaintyAbovePolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-040-FIBRE-SAMPLING-PLAN-DIGEST-INVALID",
+      "mutation": "The exact fibre sampling plan is named but its content digest is malformed.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthMeasurementProtocol"
+      }
+    },
+    {
+      "case_id": "ROUTE-041-FIBRE-UNCERTAINTY-COVERAGE-MISSING",
+      "mutation": "Fibre-length expanded uncertainty has no valid coverage probability.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthMeasurementProtocol"
+      }
+    },
+    {
+      "case_id": "ROUTE-042-SAMPLING-PLAN-MEASUREMENT-EVIDENCE-REUSED",
+      "mutation": "The same evidence identity is reused for the sampling protocol and the fibre-length measurement.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DuplicateEvidenceIdentity"
+      }
+    },
+    {
+      "case_id": "ROUTE-043-FIBRE-HISTOGRAM-GAP-OR-TAIL-OMISSION",
+      "mutation": "Fibre-length bins have a gap or omit the open-ended upper tail while their mass fractions appear to close.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthDistribution"
+      }
+    },
+    {
+      "case_id": "ROUTE-044-LENGTH-UNCERTAINTY-OVERLAPS-RECEIVER-FLOOR",
+      "mutation": "A measured bin nominally above the receiving fibre-length floor falls below the floor after applying declared relative expanded uncertainty.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthBelowPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-045-SAMPLE-MASS-BELOW-RECEIVER-PROTOCOL",
+      "mutation": "Fibre-length sample mass or independent replicate count is below the receiving sampling protocol.",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "FibreLengthSamplingBelowPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-046-COVERAGE-BELOW-RECEIVER-PROTOCOL",
+      "mutation": "Expanded-uncertainty coverage probability is below the receiving sampling protocol.",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "FibreLengthCoverageBelowPolicy"
+      }
+    }
+  ]
+}
