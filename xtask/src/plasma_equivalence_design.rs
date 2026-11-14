@@ -567,19 +567,26 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
             "candidate_unaged_strength" | "candidate_aged_strength" => &candidate_primary,
             _ => return rejected("auxiliary cohort role is not registered"),
         };
-        let primary_role = match binding.cohort_role.as_str() {
-            "baseline_unaged_strength" | "baseline_aged_strength" => "baseline",
-            "candidate_unaged_strength" | "candidate_aged_strength" => "candidate",
-            _ => unreachable!(),
-        };
         match binding.cohort_role.as_str() {
             "baseline_unaged_strength" | "candidate_unaged_strength" => {
                 let cluster_set: HashSet<&str> = binding.samples.iter().map(|s| s.cluster_id.as_str()).collect();
                 let primary_cluster_set: HashSet<&str> = primary.values().copied().collect();
+                let planned_specimens = if binding.cohort_role == "baseline_unaged_strength" {
+                    receipt.planned_min_baseline_specimens
+                } else {
+                    receipt.planned_min_candidate_specimens
+                };
+                let planned_clusters = if binding.cohort_role == "baseline_unaged_strength" {
+                    receipt.planned_min_baseline_clusters
+                } else {
+                    receipt.planned_min_candidate_clusters
+                };
                 if cluster_set != primary_cluster_set
+                    || binding.samples.len() < planned_specimens
+                    || cluster_set.len() < planned_clusters
                     || binding.samples.iter().any(|sample| primary.contains_key(sample.specimen_id.as_str()))
                 {
-                    return rejected("unaged auxiliary cohort must use the corresponding arm's independent clusters and distinct specimens");
+                    return rejected("unaged auxiliary cohort must meet the frozen minima, use the corresponding arm's clusters and contain distinct specimens");
                 }
             }
             "baseline_aged_strength" | "candidate_aged_strength" => {
@@ -593,7 +600,31 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
             }
             _ => unreachable!(),
         }
-        let _ = primary_role;
+    }
+
+    if receipt.endpoint_transform_id.as_deref() == Some("aged_strength_retention_ratio_v1") {
+        let baseline_unaged = cohort_sample_maps.get("baseline_unaged_strength").ok_or_else(|| blocked("baseline unaged source manifest is missing"))?;
+        let candidate_unaged = cohort_sample_maps.get("candidate_unaged_strength").ok_or_else(|| blocked("candidate unaged source manifest is missing"))?;
+        let baseline_aged = &baseline_primary;
+        let candidate_aged = &candidate_primary;
+        let cohorts = [baseline_unaged, candidate_unaged, baseline_aged, candidate_aged];
+        let mut all_specimens = HashSet::new();
+        for cohort in cohorts {
+            for specimen in cohort.keys() {
+                if !all_specimens.insert(*specimen) {
+                    return rejected("unaged and aged source cohorts reuse a physical specimen identity");
+                }
+            }
+        }
+        let cluster_ids = |cohort: &HashMap<&str, &str>| -> HashSet<&str> {
+            cohort.values().copied().collect()
+        };
+        if cluster_ids(baseline_unaged) != cluster_ids(baseline_aged)
+            || cluster_ids(candidate_unaged) != cluster_ids(candidate_aged)
+            || !cluster_ids(baseline_aged).is_disjoint(&cluster_ids(candidate_aged))
+        {
+            return rejected("four-cohort retention design does not preserve within-arm lot pairing and between-arm independence");
+        }
     }
     if expected_auxiliary_roles
         .iter()
