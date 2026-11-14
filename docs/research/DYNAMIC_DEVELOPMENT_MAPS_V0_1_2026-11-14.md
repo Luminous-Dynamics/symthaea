@@ -70,6 +70,8 @@ The Symthaea repository already has foundational work:
 - **#10419** owns context retrieval, code review, secure correctness and Rust semantic capability evaluation.
 - **#10637** owns process adherence, human/agent collaboration, evidence-first communication and handoff quality.
 - **#11772** owns independent task-judge and oracle qualification.
+- **#8908 CMAQ-002** owns active causal learning / value-of-information experiment selection; EGDDM planning must consume its qualified outputs rather than implement another EVoI engine.
+- **#6206 SE-FOSS-003H** owns engineering-cognition usefulness, calibration, abstention and non-authority qualification; development-plan usefulness and abstention should compose its outputs.
 - **#10064** is the OS-level isolation prerequisite for executing repository-controlled code.
 - Existing CEB task, run-receipt, trust and custody work remains authoritative for task identity, execution accounting, signatures and evaluator boundaries.
 
@@ -276,7 +278,7 @@ DynaMapBench is a proposed evaluation profile, not a new task/receipt/evaluator 
 | Configuration | Does the map understand actual build worlds? | Feature/target activation accuracy; false-active/inactive facts; abstention on unsupported worlds |
 | Capability traceability | Can intent be traced to proof of implementation? | Requirement-to-implementation/test/evidence coverage; unsupported-claim detection |
 | Cross-repository | Can contract breaks be detected across projects? | Version mismatch recall/precision; compatibility false negatives; map reconciliation correctness |
-| Planning | Does map-guided development improve outcomes? | Independently accepted capability gain per budget; expected/observed calibration; human review effort |
+| Planning | Does map-guided development improve outcomes? | Independently accepted capability gain per budget; expected/observed calibration; human review effort; prerequisite closure; hard-constraint violations; budget-normalized regret; Pareto-front coverage |
 | Decision-time admissibility | Was the decision justified using only evidence available and authorized at the decision time? | Admissible-evidence precision/recall; future-evidence leakage; backdated/late-arrival rejection; decision-time reconstruction accuracy; abstention correctness |
 | Federation integrity | Are local maps joined only through exact, owner-published identities and contracts without transferring authority? | Exact map-blob resolution; source-snapshot vs artifact-pin accuracy; cross-project edge precision; contract-version/digest match; stale-member detection; false-qualified-edge rate; authority-transfer violations |
 | Safety/evidence | Does the map resist false confidence? | False-current acceptance; authority inflation; fabricated evidence detection; unauthorized mutation rate |
@@ -293,6 +295,7 @@ DynaMapBench is a proposed evaluation profile, not a new task/receipt/evaluator 
 8. Existing #10173 repository-twin graph.
 9. Full EGDDM with intent, evidence, temporal and cross-repository layers.
 10. Same-model/same-tool matched ablations to isolate the contribution of each layer.
+11. Development-trajectory baselines: issue-priority/recency, dependency-only topological ordering, shortest-path planning, text-only LLM planning, EGDDM without evidence/federation, and full EGDDM under identical budgets. Reuse #8908's value-of-information outputs and #6206's usefulness/calibration/abstention measures; do not merge their scores into DynaMapBench.
 
 Use SWE-Time as an external temporal comparator when its public benchmark materials, task rules and license permit. Preserve the official SWE-Time scoring as a separate result; do not relabel a custom score as SWE-Time.
 
@@ -394,6 +397,23 @@ The provisional snapshot schema now accepts an optional event slice with separat
 The fixture is public and deliberately not a sealed benchmark. Its identifiers are synthetic placeholders, not real Git object hashes or cryptographic attestations.
 
 A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection, Symtropy architecture projection, Sol Atlas source projection, temporal invalidation fixture, decision-time admissibility fixture and four-project federation manifest were checked against the provisional v0.1 contracts' selected required fields, enumerations, provenance/lifecycle structure, event/graph references, decision-time cutoffs, exact artifact pins and local schema references. Selected structural checks reported **zero findings**. These checks are not a full JSON Schema 2020-12 implementation, Rust execution, authenticated Git verification or independent qualification. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
+
+### Counterfactual development trajectory planning — DYNPLAN-001
+
+DynaMapBench's planning lane now has a dedicated child: [DYNPLAN-001 #12071](https://github.com/Luminous-Dynamics/symthaea/issues/12071). It evaluates whether a planner chooses a feasible development path under resource, dependency, evidence and authority constraints.
+
+This is deliberately narrower than general active experiment selection:
+- #8908 owns EVoI / active causal-learning methods;
+- #6206 owns engineering-cognition usefulness, calibration, abstention and non-authority;
+- DYNPLAN owns bounded development-trajectory cases and their feasibility/reference oracle.
+
+A public synthetic known-answer case is authored at:
+- `docs/development-map/fixtures/development-trajectory-planning-v0.1.json`
+- `docs/development-map/fixtures/development-trajectory-planning-v0.1.expected.json`
+
+It uses the actual pinned Symthaea/Mycelix map and schema identities but retains the shared contract as `contract_versioned_unqualified`, with no two-sided conformance receipt. The expected plan is evidence-first: exact pin audit, owner contract review, then conformance-fixture design; implementation remains blocked. Broad source scanning is over budget and does not close the critical contract gap; an unrelated physics benchmark is dominated; defer is a valid fallback if owner evidence is unavailable.
+
+The case is synthetic. Its effort units are not real engineering estimates, and it does not assert integration success, owner approval, execution authority or implementation.
 
 ### Four-repository adoption and federated directory — 2026-11-14
 
