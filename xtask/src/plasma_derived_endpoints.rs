@@ -792,7 +792,7 @@ fn audit_failure_mode_distribution(evidence: &FailureModeDistributionEvidence) -
     }
     if result.category_registry_id != evidence.category_registry_id
         || result.category_registry_sha256 != evidence.category_registry_sha256
-        || result.input_manifest_sha256 != evidence.classification_receipt.raw_data_sha256.as_deref().unwrap_or("")
+        || result.input_manifest_sha256 != evidence.sample_manifest_sha256
         || result.analysis_profile != evidence.design.analysis_profile
     {
         return Decision::rejected("failure-mode distribution result is not bound to the exact category registry, D5573 source and study plan");
