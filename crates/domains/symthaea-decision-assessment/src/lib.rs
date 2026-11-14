@@ -323,6 +323,10 @@ pub fn evaluate_act_hold_pair(
         _ => {}
     }
 
+    if !trigger_timing_known {
+        reasons.insert("TIMELY_INTERRUPTION_NOT_OBSERVABLE".to_owned());
+    }
+
     if should_hold.disposition == ActHoldDisposition::Act {
         if let Some(trigger) = trigger_step {
             if effect_step.is_none_or(|effect| effect > trigger) {
@@ -563,13 +567,14 @@ pub fn evaluate_json(
     })
 }
 
-/// Compute the canonical SHA-256 commitment over the decision inputs.
+/// Compute the canonical SHA-256 commitment over candidate-visible pre-outcome inputs.
 ///
-/// The projection excludes its own digest and all post-decision assessment
-/// fields (outcome, evaluator record and assessment result). It includes the
-/// schema version, decision episode, remaining commitment fields, owner receipt
-/// references, axis declarations, defeater ledger and counterfactual contract.
-/// serde_json::Value uses deterministic map ordering for this canonical form.
+/// The projection excludes its own digest and all evaluator-authored assessment
+/// fields (axis dispositions, defeater findings, counterfactual labels, outcome,
+/// evaluator record and assessment result). It binds the schema/assessment identity,
+/// artifact visibility, decision episode, remaining commitment fields and the
+/// exact owner-receipt references. serde_json::Value uses deterministic map
+/// ordering for this canonical form.
 fn candidate_commitment_digest(
     packet: &serde_json::Value,
 ) -> Result<String, EvaluationError> {
@@ -1621,7 +1626,7 @@ mod tests {
         assert!(!report.hold_side_success);
         assert!(report.critical_premature_action);
         assert!(report.reason_codes.contains(&"IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned()));
-        assert_eq!(report.interruption_latency_steps, Some(2));
+        assert_eq!(report.interruption_latency_steps, Some(4));
     }
 
     #[test]
@@ -1667,7 +1672,7 @@ mod tests {
             "../../../../benchmarks/engineering-change-impact/act-hold-pairs-v0.1.json"
         )).unwrap();
         let cases = fixture["cases"].as_array().unwrap();
-        assert_eq!(cases.len(), 5);
+        assert_eq!(cases.len(), 7);
         for case in cases {
             let id = case["id"].as_str().unwrap();
             let act = fixture_episode(&case["act_side"]);
