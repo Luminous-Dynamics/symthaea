@@ -1,0 +1,446 @@
+{
+  "schema": "luminous.airroad.iqc_source_equation_audit.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_primary_source_equation_conformance",
+  "source": {
+    "arxiv_id": "2610.20248",
+    "version": "v1",
+    "submitted": "2026-10-14",
+    "title": "Robust Data-Driven Controller Synthesis from Sampled and Uncertain Frequency Response Estimates using Integral Quadratic Constraints"
+  },
+  "dimensions": {
+    "n_z": 1,
+    "n_w": 1,
+    "n_y": 2,
+    "n_u": 2
+  },
+  "generalized_plant": {
+    "P_zw": [
+      [
+        {
+          "numerator": "5",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "P_zu": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "P_yw": [
+      [
+        {
+          "numerator": "3",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "4",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "P_yu": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ]
+  },
+  "controller_rcf": {
+    "U": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "V": [
+      [
+        {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "X": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "Y": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
+    ]
+  },
+  "plant_lcf": {
+    "D": [
+      [
+        {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "N": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ]
+  },
+  "expected": {
+    "P_yu_from_D_inverse_N": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "K_U_V_inverse": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        }
+      ]
+    ],
+    "bezout_XV_plus_YU": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "Lambda_DV_minus_NU": [
+      [
+        {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "2"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "Lambda_inverse": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "16"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        }
+      ]
+    ],
+    "direct_feedback_Tzw": [
+      [
+        {
+          "numerator": "43",
+          "denominator": "4"
+        }
+      ]
+    ],
+    "rcf_Tzw": [
+      [
+        {
+          "numerator": "43",
+          "denominator": "4"
+        }
+      ]
+    ],
+    "M": [
+      [
+        {
+          "numerator": "-3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "6",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "4",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        {
+          "numerator": "5",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "lft_identity_Tzw": [
+      [
+        {
+          "numerator": "43",
+          "denominator": "4"
+        }
+      ]
+    ],
+    "wrong_feedback_sign_Tzw": [
+      [
+        {
+          "numerator": "41",
+          "denominator": "4"
+        }
+      ]
+    ],
+    "wrong_D_Lambda_order_Tzw": [
+      [
+        {
+          "numerator": "11",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "lft_identity_matrix": "Tzw = M22 + M21 * (I - M11)^(-1) * M12"
+  },
+  "negative_controls": [
+    {
+      "id": "P_yu_factorization_order_swapped",
+      "expected": "reject-known-answer"
+    },
+    {
+      "id": "controller_U_V_shapes_swapped",
+      "expected": "reject-dimension"
+    },
+    {
+      "id": "wrong_feedback_sign_plus",
+      "expected": "reject-known-answer"
+    },
+    {
+      "id": "wrong_D_Lambda_inverse_order",
+      "expected": "reject-known-answer"
+    },
+    {
+      "id": "wrong_LFT_block_orientation",
+      "expected": "reject-dimension-or-known-answer"
+    },
+    {
+      "id": "singular_V",
+      "expected": "reject-rcf"
+    },
+    {
+      "id": "bezout_identity_broken",
+      "expected": "reject-rcf"
+    },
+    {
+      "id": "stale_generalized_plant_port_dimension",
+      "expected": "reject-dimension"
+    }
+  ],
+  "claim_ceiling": [
+    "Exact finite-dimensional algebra conformance for Equations (4), (13), (15) and (16) on one synthetic plant/controller instance.",
+    "This fixture does not establish stable rational realizability, interval generator containment, Theorem 3 assumptions, SDP feasibility, controller synthesis or robust stability."
+  ]
+}
