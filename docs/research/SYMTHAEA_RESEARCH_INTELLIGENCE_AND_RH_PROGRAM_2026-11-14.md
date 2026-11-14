@@ -484,3 +484,65 @@ Compare, at matched exact theorem/source snapshots and fully inclusive compute/t
 - independent mathematician review of the mathematical mechanism, not just the proof's appearance.
 
 Measure exact reproduction, valid candidate rate, pre-verification predicted floor calibration, certificate acceptance, exact improvement in κ, proof size, verification cost, checker agreement, full compute/token/tool/human cost, and transfer to new theorem/certificate families. A false theorem or an axiom/statement bypass remains a hard failure.
+
+
+## 11. Literature retrieval: from phrase search to evidence-coverage search
+
+The current retrieval baseline needs a dedicated evaluation dimension. Literature retrieval is not a solved utility step; it determines which hypotheses Symthaea can even consider.
+
+### 11.1 Industry reference: OpenScholar / ScholarQABench
+
+OpenScholar is a specialized scientific retrieval-augmented model built on an open corpus of 45 million papers and 236 million passage embeddings. Its accompanying ScholarQABench contains 2,967 expert-written multi-domain queries and 208 long-form answers spanning computer science, physics, neuroscience and biomedicine. It combines specialized retrieval, reranking and iterative self-feedback rather than relying on one exact phrase search.
+
+Source: https://www.nature.com/articles/s41586-025-10072-4 (Nature, 4 February 2026).
+
+This is an important industry baseline for research literature coverage and citation-backed synthesis. It is not a proof verifier, and a high retrieval or answer score does not establish that any particular source entails a claim.
+
+### 11.2 Symthaea's retrieval advantage to pursue
+
+The ambition should be **research coverage under a constrained evidence budget**, not simply a larger corpus.
+
+For every question, Symthaea should maintain distinct retrieval views:
+- exact title/abstract phrase;
+- all-field keyword conjunction and controlled terminology variants;
+- seminal/foundational works;
+- latest work when recency is explicitly requested;
+- cited references and forward-citation neighbors;
+- author, venue and cross-domain bridge trails;
+- negative, contradictory and replication literature.
+
+Each retrieved item is a candidate paper, not supporting evidence. Paper quality, topical relevance, source independence and claim-level stance remain separate.
+
+The immediate first increment is tracked by #12178 and draft PR #12179. It changes the arXiv API query from exact-phrase-only/newest-first/five-results to a bounded Boolean title/abstract plus all-field expression, uses relevance by default, allows submitted-date sorting only for explicit recency intent, queries academic APIs once for the original user request, and spaces consecutive arXiv requests by three seconds. It does **not** yet provide a multi-provider scholarly index, citation-graph expansion or verified claim entailment.
+
+Official arXiv API documentation:
+https://info.arxiv.org/help/api/user-manual.html
+
+### 11.3 Retrieval benchmark targets
+
+Use ScholarQABench where licensing and available task artifacts permit, and build a local domain-balanced, temporally frozen set with expert relevance judgments. Report:
+- Recall@5, Recall@10, Recall@20 and nDCG@k;
+- seminal/foundational-paper recall separately from recency recall;
+- query paraphrase stability and terminology-shift robustness;
+- citation-chain bridge recall;
+- duplicate, mirror and version-family rate;
+- source-family concentration and independent-source diversity;
+- source-supported, source-contradicted, qualified and unaddressed claim rates;
+- time-to-first-useful-source, fetched bytes, API calls, model/tool tokens, compute and human review cost.
+
+Evaluate against at least:
+1. exact phrase baseline;
+2. BM25 / lexical baseline;
+3. dense embedding retrieval;
+4. hybrid lexical+dense;
+5. citation graph expansion;
+6. OpenScholar or comparable published scientific RAG baseline where reproducibly accessible;
+7. Symthaea full policy and component ablations.
+
+Freeze the corpus and task cutoff before execution. Keep a private temporal holdout. Do not use a language model as the sole relevance/entailment judge. A retrieval improvement is accepted only if it improves expert-judged coverage at matched cost without raising duplicate concentration or claim-support false positives.
+
+### 11.4 Immediate acceptance and claim boundary
+
+The first PR's authored tests cover deterministic query normalization, term bounds, punctuation/Boolean-injection resistance, stopword-only prompts and relevance-versus-recency selection. They are unexecuted until a runner is available. The PR does not yet demonstrate Recall@k improvement.
+
+A broader search can make Symthaea less likely to overlook useful papers. It cannot establish that those papers are correct, independent, novel, or supportive of the current claim.
