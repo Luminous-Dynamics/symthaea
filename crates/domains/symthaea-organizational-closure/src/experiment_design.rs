@@ -171,10 +171,12 @@ pub struct TrialInformationAssessment {
     pub trial_index: usize,
     pub probe_id: ProbeId,
     pub target_classes_before: usize,
-    pub information_gain_bits: f64,
-    pub best_available_information_gain_bits: f64,
-    pub information_gain_per_cost_unit: f64,
-    pub best_available_information_gain_per_cost_unit: f64,
+    pub expected_information_gain_bits: f64,
+    /// Realized posterior entropy reduction; zero until evidence gates and model consistency pass.
+    pub observed_information_gain_bits: f64,
+    pub best_available_expected_information_gain_bits: f64,
+    pub expected_information_gain_per_cost_unit: f64,
+    pub best_available_expected_information_gain_per_cost_unit: f64,
     pub evidence_qualified: bool,
 }
 
@@ -189,10 +191,13 @@ pub struct SequentialExperimentReport {
     pub trials_used: usize,
     pub qualified_trial_count: usize,
     pub unqualified_trial_count: usize,
-    pub informative_trial_count: usize,
+    pub informative_probe_selection_count: usize,
     pub first_identified_after_trials: Option<usize>,
-    pub cumulative_information_gain_bits: f64,
-    pub cumulative_oracle_regret_bits_per_cost: f64,
+    pub cumulative_expected_information_gain_bits: f64,
+    /// Posterior entropy reduction credited only after qualified, model-consistent observations.
+    pub cumulative_observed_information_gain_bits: f64,
+    /// Sum of per-step regret versus the best currently eligible one-step probe; not global policy regret.
+    pub cumulative_myopic_efficiency_regret_bits_per_cost: f64,
     pub trial_assessments: Vec<TrialInformationAssessment>,
     pub findings: Vec<ExperimentFinding>,
 }
@@ -248,8 +253,22 @@ fn entropy(weights: &BTreeMap<String, f64>) -> f64 {
     }).sum()
 }
 
+
+/// Entropy of active target-equivalence classes under the frozen prior weights.
+fn target_class_entropy(active: &BTreeSet<HypothesisId>,
+    hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>) -> f64 {
+    let mut weights: BTreeMap<String, f64> = BTreeMap::new();
+    for id in active {
+        if let Some(hypothesis) = hypotheses.get(id) {
+            *weights.entry(hypothesis.target_class.clone()).or_default()
+                += hypothesis.prior_weight as f64;
+        }
+    }
+    entropy(&weights)
+}
+
 /// Expected reduction in target-class entropy under one frozen probe.
-fn information_gain_bits(active: &BTreeSet<HypothesisId>,
+fn expected_information_gain_bits(active: &BTreeSet<HypothesisId>,
     hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>,
     probe: &ExperimentProbe) -> f64 {
     let mut prior_by_class: BTreeMap<String, f64> = BTreeMap::new();
@@ -287,7 +306,7 @@ fn eligible_probe_utilities(active: &BTreeSet<HypothesisId>,
     probes.values()
         .filter(|probe| probe.cost_units <= remaining_cost && probe.risk_units <= remaining_risk)
         .map(|probe| {
-            let gain = information_gain_bits(active, hypotheses, probe);
+            let gain = expected_information_gain_bits(active, hypotheses, probe);
             let efficiency = gain / probe.cost_units.max(1) as f64;
             (probe.id.clone(), gain, efficiency)
         })
@@ -307,10 +326,11 @@ fn invalid_scenario_report(findings: Vec<ExperimentFinding>,
         trials_used: trace.trials.len(),
         qualified_trial_count: 0,
         unqualified_trial_count: 0,
-        informative_trial_count: 0,
+        informative_probe_selection_count: 0,
         first_identified_after_trials: None,
-        cumulative_information_gain_bits: 0.0,
-        cumulative_oracle_regret_bits_per_cost: 0.0,
+        cumulative_expected_information_gain_bits: 0.0,
+        cumulative_observed_information_gain_bits: 0.0,
+        cumulative_myopic_efficiency_regret_bits_per_cost: 0.0,
         trial_assessments: Vec::new(),
         findings,
     }
@@ -393,11 +413,12 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
     let mut total_risk = 0_u64;
     let mut qualified_trials = 0_usize;
     let mut unqualified_trials = 0_usize;
-    let mut informative_trials = 0_usize;
+    let mut informative_probe_selections = 0_usize;
     let mut first_identified_after_trials =
         if target_classes(&active, &hypotheses).len() == 1 { Some(0) } else { None };
-    let mut cumulative_information_gain = 0.0_f64;
-    let mut cumulative_oracle_regret = 0.0_f64;
+    let mut cumulative_expected_information_gain = 0.0_f64;
+    let mut cumulative_observed_information_gain = 0.0_f64;
+    let mut cumulative_myopic_efficiency_regret = 0.0_f64;
     let mut assessments = Vec::new();
 
     for (index, trial) in trace.trials.iter().enumerate() {
@@ -443,12 +464,13 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
         );
         let best_gain = utilities.iter().map(|(_, gain, _)| *gain).fold(0.0_f64, f64::max);
         let best_efficiency = utilities.iter().map(|(_, _, value)| *value).fold(0.0_f64, f64::max);
-        let chosen_gain = information_gain_bits(&active, &hypotheses, probe);
-        let chosen_efficiency = chosen_gain / probe.cost_units.max(1) as f64;
-        cumulative_information_gain += chosen_gain;
-        cumulative_oracle_regret += (best_efficiency - chosen_efficiency).max(0.0);
-        if chosen_gain > f64::EPSILON {
-            informative_trials += 1;
+        let chosen_expected_gain = expected_information_gain_bits(&active, &hypotheses, probe);
+        let target_entropy_before = target_class_entropy(&active, &hypotheses);
+        let chosen_efficiency = chosen_expected_gain / probe.cost_units.max(1) as f64;
+        cumulative_expected_information_gain += chosen_expected_gain;
+        cumulative_myopic_efficiency_regret += (best_efficiency - chosen_efficiency).max(0.0);
+        if chosen_expected_gain > f64::EPSILON {
+            informative_probe_selections += 1;
         }
 
         let mut evidence_qualified = true;
@@ -487,10 +509,11 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
             trial_index,
             probe_id: trial.probe_id.clone(),
             target_classes_before: target_classes(&active, &hypotheses).len(),
-            information_gain_bits: chosen_gain,
-            best_available_information_gain_bits: best_gain,
-            information_gain_per_cost_unit: chosen_efficiency,
-            best_available_information_gain_per_cost_unit: best_efficiency,
+            expected_information_gain_bits: chosen_expected_gain,
+            observed_information_gain_bits: 0.0,
+            best_available_expected_information_gain_bits: best_gain,
+            expected_information_gain_per_cost_unit: chosen_efficiency,
+            best_available_expected_information_gain_per_cost_unit: best_efficiency,
             evidence_qualified,
         });
         if !evidence_qualified {
@@ -507,7 +530,7 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
             continue;
         }
 
-        if chosen_gain <= f64::EPSILON && target_classes(&active, &hypotheses).len() > 1 {
+        if chosen_expected_gain <= f64::EPSILON && target_classes(&active, &hypotheses).len() > 1 {
             push_finding(&mut findings, ExperimentFindingCode::UninformativeProbe,
                 Some(trial_index), Some(trial.probe_id.clone()),
                 "selected probe does not distinguish the remaining target classes under the frozen model");
@@ -520,6 +543,11 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
                 Some(trial_index), Some(trial.probe_id.clone()),
                 "qualified observation leaves no consistent hypothesis including evaluator-only truth");
             continue;
+        }
+        let observed_gain = (target_entropy_before - target_class_entropy(&active, &hypotheses)).max(0.0);
+        cumulative_observed_information_gain += observed_gain;
+        if let Some(assessment) = assessments.last_mut() {
+            assessment.observed_information_gain_bits = observed_gain;
         }
         if first_identified_after_trials.is_none()
             && target_classes(&active, &hypotheses).len() == 1 {
@@ -576,10 +604,11 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
         trials_used: trace.trials.len(),
         qualified_trial_count: qualified_trials,
         unqualified_trial_count: unqualified_trials,
-        informative_trial_count: informative_trials,
+        informative_probe_selection_count: informative_probe_selections,
         first_identified_after_trials,
-        cumulative_information_gain_bits: cumulative_information_gain,
-        cumulative_oracle_regret_bits_per_cost: cumulative_oracle_regret,
+        cumulative_expected_information_gain_bits: cumulative_expected_information_gain,
+        cumulative_observed_information_gain_bits: cumulative_observed_information_gain,
+        cumulative_myopic_efficiency_regret_bits_per_cost: cumulative_myopic_efficiency_regret,
         trial_assessments: assessments,
         findings,
     }
@@ -634,7 +663,7 @@ mod tests {
         assert_eq!(report.remaining_hypotheses, vec![HypothesisId::from("model-fault")]);
         assert_eq!(report.first_identified_after_trials, Some(2));
         assert_eq!(report.qualified_trial_count, 2);
-        assert!(report.cumulative_information_gain_bits > 0.0);
+        assert!(report.cumulative_expected_information_gain_bits > 0.0);
     }
 
     #[test]
@@ -849,6 +878,94 @@ mod tests {
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Qualified);
-        assert!(report.cumulative_oracle_regret_bits_per_cost > 0.0);
+        assert!(report.cumulative_myopic_efficiency_regret_bits_per_cost > 0.0);
+    }
+
+    #[test]
+    fn unavailable_probe_separates_expected_value_from_realized_learning() {
+        let mut scenario = scenario();
+        scenario.budget.max_trials = 1;
+        let oracle = ExperimentOracle::new("memory-fault");
+        let mut trial = ExperimentTrial::qualified("inspect-model", "healthy");
+        trial.delivery = ExperimentEvidenceStatus::Unavailable;
+        let trace = SequentialExperimentTrace {
+            trials: vec![trial],
+            terminal: ExperimentTerminalDecision::Abstain { reason: "delivery receipt unavailable".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
+        assert_eq!(report.remaining_hypotheses.len(), 3);
+        assert!(report.cumulative_expected_information_gain_bits > 0.0);
+        assert_eq!(report.cumulative_observed_information_gain_bits, 0.0);
+        assert_eq!(report.informative_probe_selection_count, 1);
+        assert_eq!(report.qualified_trial_count, 0);
+        let assessment = &report.trial_assessments[0];
+        assert!(!assessment.evidence_qualified);
+        assert!(assessment.expected_information_gain_bits > 0.0);
+        assert_eq!(assessment.observed_information_gain_bits, 0.0);
+    }
+
+    #[test]
+    fn qualified_observation_credits_realized_posterior_entropy_reduction() {
+        let scenario = scenario();
+        let oracle = ExperimentOracle::new("model-fault");
+        let trace = SequentialExperimentTrace {
+            trials: vec![ExperimentTrial::qualified("inspect-model", "corrupt")],
+            terminal: ExperimentTerminalDecision::Stop { target_class: "model-corruption".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::Qualified);
+        assert!(report.cumulative_expected_information_gain_bits > 0.0);
+        assert!(report.cumulative_observed_information_gain_bits
+            > report.cumulative_expected_information_gain_bits);
+        assert_eq!(
+            report.trial_assessments[0].observed_information_gain_bits,
+            report.cumulative_observed_information_gain_bits
+        );
+    }
+
+    #[test]
+    fn common_positive_prior_weight_scaling_preserves_expected_information_gain() {
+        let original = scenario();
+        let mut scaled = scenario();
+        for hypothesis in &mut scaled.hypotheses {
+            hypothesis.prior_weight *= 17;
+        }
+        let trace = SequentialExperimentTrace {
+            trials: vec![ExperimentTrial::qualified("inspect-memory", "healthy")],
+            terminal: ExperimentTerminalDecision::Abstain { reason: "one target class remains unresolved".into() },
+        };
+        let oracle = ExperimentOracle::new("model-fault");
+        let a = evaluate_sequential_experiment(&original, &oracle, &trace);
+        let b = evaluate_sequential_experiment(&scaled, &oracle, &trace);
+        assert!((a.trial_assessments[0].expected_information_gain_bits
+            - b.trial_assessments[0].expected_information_gain_bits).abs() < 1e-12);
+        assert_eq!(a.remaining_target_classes, b.remaining_target_classes);
+    }
+
+    #[test]
+    fn hypothesis_and_probe_input_order_does_not_change_evaluation() {
+        let original = scenario();
+        let mut permuted = scenario();
+        permuted.hypotheses.reverse();
+        permuted.probes.reverse();
+        let trace = SequentialExperimentTrace {
+            trials: vec![
+                ExperimentTrial::qualified("inspect-memory", "healthy"),
+                ExperimentTrial::qualified("inspect-model", "corrupt"),
+            ],
+            terminal: ExperimentTerminalDecision::Stop { target_class: "model-corruption".into() },
+        };
+        let oracle = ExperimentOracle::new("model-fault");
+        let a = evaluate_sequential_experiment(&original, &oracle, &trace);
+        let b = evaluate_sequential_experiment(&permuted, &oracle, &trace);
+        assert_eq!(a.qualification, b.qualification);
+        assert_eq!(a.remaining_hypotheses, b.remaining_hypotheses);
+        assert_eq!(a.remaining_target_classes, b.remaining_target_classes);
+        assert_eq!(a.trials_used, b.trials_used);
+        assert!((a.cumulative_expected_information_gain_bits
+            - b.cumulative_expected_information_gain_bits).abs() < 1e-12);
+        assert!((a.cumulative_observed_information_gain_bits
+            - b.cumulative_observed_information_gain_bits).abs() < 1e-12);
     }
 }
