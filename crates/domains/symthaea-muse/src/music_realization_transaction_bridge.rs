@@ -1078,6 +1078,30 @@ mod tests {
         )
     }
 
+    fn expected_control(
+        control_id: &str,
+        request_control_sha256: &str,
+        requirement: MusicRealizerControlRequirementV1,
+        declared_fidelity: MusicRealizerDeclaredFidelityV1,
+        fidelity_bound_sha256: Option<&str>,
+    ) -> MusicRealizationExpectedControlV1 {
+        MusicRealizationExpectedControlV1 {
+            control_id: control_id.to_owned(),
+            request_control_sha256: request_control_sha256.to_owned(),
+            requirement,
+            declared_fidelity,
+            fidelity_bound_sha256: fidelity_bound_sha256.map(str::to_owned),
+        }
+    }
+
+    fn expected_binding_with_control(
+        control: MusicRealizationExpectedControlV1,
+    ) -> MusicRealizationExpectedBindingV1 {
+        let mut expected = expected_binding();
+        expected.controls.push(control);
+        expected
+    }
+
     fn attach_realization_evidence(
         tx: &mut MusicEditTransactionV1,
         evidence: MusicEditEvidenceRecordV1,
@@ -1276,6 +1300,13 @@ mod tests {
             bytes.len() as u64,
             1,
         );
+        let expected = expected_binding_with_control(expected_control(
+            "preserve_melody_pitch",
+            &d(61),
+            MusicRealizerControlRequirementV1::Hard,
+            MusicRealizerDeclaredFidelityV1::Exact,
+            None,
+        ));
         let mut receipt = completed_receipt(&tx, bytes);
         receipt.payload.controls.push(MusicRealizerControlBindingV1 {
             control_id: "preserve_melody_pitch".to_owned(),
@@ -1289,12 +1320,12 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
-            &expected_binding(),
+            &expected,
             &receipt,
             Some(bytes)
         )
         .unwrap_err()
-        .contains(&MusicRealizationBridgeIssueV1::HardControlNotHonored(
+        .contains(&MusicRealizationBridgeIssueV1::ExpectedControlBindingMismatch(
             "preserve_melody_pitch".to_owned()
         )));
     }
@@ -1309,6 +1340,13 @@ mod tests {
             bytes.len() as u64,
             1,
         );
+        let expected = expected_binding_with_control(expected_control(
+            "maximum_pitch_deviation",
+            &d(63),
+            MusicRealizerControlRequirementV1::Hard,
+            MusicRealizerDeclaredFidelityV1::Bounded,
+            Some(&d(64)),
+        ));
         let mut receipt = completed_receipt(&tx, bytes);
         receipt.payload.controls.push(MusicRealizerControlBindingV1 {
             control_id: "maximum_pitch_deviation".to_owned(),
@@ -1322,7 +1360,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
-            &expected_binding(),
+            &expected,
             &receipt,
             Some(bytes)
         )
@@ -1344,11 +1382,63 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
-            &expected_binding(),
+            &expected,
             &receipt,
             Some(bytes)
         )
         .is_ok());
+    }
+
+    #[test]
+    fn omitted_or_substituted_requested_controls_are_rejected() {
+        let bytes = b"candidate";
+        let output_sha = sha256_bytes(bytes);
+        let tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        let expected = expected_binding_with_control(expected_control(
+            "preserve_melody_pitch",
+            &d(61),
+            MusicRealizerControlRequirementV1::Hard,
+            MusicRealizerDeclaredFidelityV1::Exact,
+            None,
+        ));
+
+        // The provider cannot omit a hard control from its receipt.
+        let receipt = completed_receipt(&tx, bytes);
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected,
+            &receipt,
+            Some(bytes)
+        )
+        .unwrap_err()
+        .contains(&MusicRealizationBridgeIssueV1::ExpectedControlSetMismatch));
+
+        // Nor can it present the same control ID with a different request digest.
+        let mut receipt = completed_receipt(&tx, bytes);
+        receipt.payload.controls.push(MusicRealizerControlBindingV1 {
+            control_id: "preserve_melody_pitch".to_owned(),
+            request_control_sha256: d(62),
+            requirement: MusicRealizerControlRequirementV1::Hard,
+            declared_fidelity: MusicRealizerDeclaredFidelityV1::Exact,
+            fidelity_bound_sha256: None,
+            observed_disposition: MusicRealizerObservedDispositionV1::Applied,
+        });
+        receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected,
+            &receipt,
+            Some(bytes)
+        )
+        .unwrap_err()
+        .contains(&MusicRealizationBridgeIssueV1::ExpectedControlBindingMismatch(
+            "preserve_melody_pitch".to_owned()
+        )));
     }
 
     #[test]
@@ -1385,6 +1475,13 @@ mod tests {
             bytes.len() as u64,
             1,
         );
+        let expected = expected_binding_with_control(expected_control(
+            "suggest_sparse_texture",
+            &d(62),
+            MusicRealizerControlRequirementV1::Advisory,
+            MusicRealizerDeclaredFidelityV1::BestEffort,
+            None,
+        ));
         let mut receipt = completed_receipt(&tx, bytes);
         receipt.payload.controls.push(MusicRealizerControlBindingV1 {
             control_id: "suggest_sparse_texture".to_owned(),
@@ -1398,7 +1495,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
-            &expected_binding(),
+            &expected,
             &receipt,
             Some(bytes)
         )
