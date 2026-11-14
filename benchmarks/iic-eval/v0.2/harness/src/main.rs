@@ -138,6 +138,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         let mut seen = HashSet::new();
         let mut matched_keys = HashSet::new();
         let mut case_tp = 0usize;
+        let mut matched_candidate_refs: HashSet<String> = HashSet::new();
         let mut case_valid_spans = 0usize;
         let mut case_version = 0usize;
         let mut case_modality = 0usize;
@@ -198,6 +199,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             }
             true_positive += 1;
             case_tp += 1;
+            matched_candidate_refs.insert(required_str(gold_candidate, "candidate_ref", "oracle candidate")?.to_owned());
             matched_attributes += 1;
             let gold_modality = required_str(gold_candidate, "modality", "oracle candidate")?;
             if modality == gold_modality { modality_correct += 1; case_modality += 1; }
@@ -208,6 +210,18 @@ fn run() -> Result<(), Box<dyn Error>> {
             if state == required_str(gold_candidate, "adjudication_state", "oracle candidate")? {
                 state_correct += 1; case_state += 1;
             }
+        }
+
+        let temporal_queries = answer.get("temporal_queries").and_then(Value::as_array).cloned().unwrap_or_default();
+        let mut temporal_required = 0usize;
+        let mut temporal_complete = 0usize;
+        for query in &temporal_queries {
+            let refs = required_array(query, "required_candidate_refs", "oracle temporal query")?;
+            temporal_required += 1;
+            let all_present = refs.iter().all(|r| {
+                r.as_str().map(|id| matched_candidate_refs.contains(id)).unwrap_or(false)
+            });
+            if all_present { temporal_complete += 1; }
         }
 
         let mut case_gold_prohibitions = 0usize;
@@ -242,11 +256,16 @@ fn run() -> Result<(), Box<dyn Error>> {
             "conditions_exact": case_conditions,
             "adjudication_state_exact": case_state,
             "false_mandatory_promotions": case_false_mandatory,
-            "gold_prohibitions": case_gold_prohibitions
+            "gold_prohibitions": case_gold_prohibitions,
+            "temporal_query_slices": temporal_required,
+            "temporal_query_slices_complete": temporal_complete
         }));
     }
 
     let precision = if total_submitted == 0 { 0.0 } else { true_positive as f64 / total_submitted as f64 };
+    let total_temporal_queries: usize = per_case.iter().map(|v| v["temporal_query_slices"].as_u64().unwrap_or(0) as usize).sum();
+    let complete_temporal_queries: usize = per_case.iter().map(|v| v["temporal_query_slices_complete"].as_u64().unwrap_or(0) as usize).sum();
+    let temporal_coverage = if total_temporal_queries == 0 { 1.0 } else { complete_temporal_queries as f64 / total_temporal_queries as f64 };
     let recall = if total_gold == 0 { 0.0 } else { true_positive as f64 / total_gold as f64 };
     let f1 = if precision + recall == 0.0 { 0.0 } else { 2.0 * precision * recall / (precision + recall) };
     let attr_denominator = matched_attributes.max(1) as f64;
@@ -272,7 +291,10 @@ fn run() -> Result<(), Box<dyn Error>> {
             "false_mandatory_promotions":false_mandatory_promotions,
             "explicit_prohibitions_in_gold":gold_prohibitions,
             "explicit_prohibitions_preserved":preserved_prohibitions,
-            "duplicate_candidates":duplicate_candidates
+            "duplicate_candidates":duplicate_candidates,
+            "temporal_query_slice_count":total_temporal_queries,
+            "complete_temporal_query_slices":complete_temporal_queries,
+            "decision_time_evidence_coverage":temporal_coverage
         },
         "per_case":per_case,
         "interpretation_limits":[
