@@ -319,7 +319,7 @@ fn parse_dependency_table(
     Ok(())
 }
 
-fn parse_dependencies(root: &toml::map::Map<String, Value>) -> Result<Vec<DependencyDeclaration>, String> {
+fn parse_dependencies(root: &toml::Table) -> Result<Vec<DependencyDeclaration>, String> {
     let mut output = Vec::new();
     for (key, kind) in [
         ("dependencies", "normal"),
@@ -354,7 +354,7 @@ fn parse_dependencies(root: &toml::map::Map<String, Value>) -> Result<Vec<Depend
     Ok(output)
 }
 
-fn parse_features(root: &toml::map::Map<String, Value>) -> Result<Vec<FeatureDeclaration>, String> {
+fn parse_features(root: &toml::Table) -> Result<Vec<FeatureDeclaration>, String> {
     let Some(value) = root.get("features") else {
         return Ok(Vec::new());
     };
@@ -387,7 +387,7 @@ fn parse_target_entry(value: &Value, kind: &str, path: &str) -> Result<TargetDec
     })
 }
 
-fn parse_targets(root: &toml::map::Map<String, Value>) -> Result<Vec<TargetDeclaration>, String> {
+fn parse_targets(root: &toml::Table) -> Result<Vec<TargetDeclaration>, String> {
     let mut output = Vec::new();
     if let Some(lib) = root.get("lib") {
         output.push(parse_target_entry(lib, "lib", "lib")?);
@@ -543,7 +543,7 @@ mod tests {
         assert_eq!(workspace.default_members, vec!["apps/cli".to_owned()]);
         assert_eq!(workspace.exclude, vec!["crates/experimental".to_owned()]);
         assert_eq!(workspace.resolver.as_deref(), Some("3"));
-        assert_eq!(workspace.shared_dependency_aliases, vec!["serde"]);
+        assert_eq!(workspace.shared_dependency_aliases, vec!["serde".to_owned()]);
     }
 
     #[test]
@@ -593,8 +593,8 @@ mod tests {
     fn preserves_optional_and_default_feature_dependency_declarations() {
         let projection = project_cargo_manifest(PACKAGE_MANIFEST, anchor()).expect("projection");
         let tokio = projection.dependencies.iter().find(|dependency| dependency.alias == "tokio").expect("tokio");
-        assert!(tokio.optional);
-        assert!(!tokio.default_features);
+        assert_eq!(tokio.optional, Some(true));
+        assert_eq!(tokio.default_features, Some(false));
         assert_eq!(tokio.features, vec!["macros".to_owned(), "rt".to_owned()]);
         let network = projection.features.iter().find(|feature| feature.name == "network").expect("network");
         assert_eq!(network.members, vec!["dep:tokio".to_owned()]);
