@@ -272,6 +272,12 @@ fn decide(case: &Scenario, fixture: &Fixture) -> Outcome {
             }) {
                 return reject("an independently faulted cell is not recorded as isolated");
             }
+            if case.cells.iter().any(|cell| {
+                cell.state == "ISOLATED"
+                    && !case.fault.affected_cell_ids.iter().any(|id| id == &cell.cell_id)
+            }) {
+                return reject("an isolated cell is omitted from the fault receipt");
+            }
             if !case.fault.injection_confirmed || !case.fault.containment_verified {
                 return blocked("fault injection or cell isolation/containment evidence is missing");
             }
@@ -321,6 +327,7 @@ fn evaluate(fixture: &Fixture) -> anyhow::Result<Vec<Outcome>> {
         if case.id.trim().is_empty() || !case_ids.insert(case.id.as_str()) {
             bail!("fixture case identity is empty or duplicated: {}", case.id);
         }
+        let _rationale_for_review = case.rationale.as_str();
         let result = decide(case, fixture);
         if result.disposition.as_str() != case.expected_disposition {
             bail!(
@@ -392,7 +399,7 @@ mod tests {
         assert_eq!(outcomes.len(), fixture.cases.len());
         assert_eq!(fixture.counts_expected.pass, 6);
         assert_eq!(fixture.counts_expected.blocked, 7);
-        assert_eq!(fixture.counts_expected.rejected, 15);
+        assert_eq!(fixture.counts_expected.rejected, 16);
     }
 
     #[test]
@@ -420,6 +427,14 @@ mod tests {
     fn array_output_must_reconcile_to_cell_observations() {
         let fixture = fixture();
         let case = fixture.cases.iter().find(|x| x.id == "AGGREGATE_OUTPUT_DOES_NOT_RECONCILE").unwrap();
+        assert_eq!(decide(case, &fixture).disposition, Disposition::Rejected);
+    }
+
+
+    #[test]
+    fn every_isolated_cell_must_be_named_by_the_fault_receipt() {
+        let fixture = fixture();
+        let case = fixture.cases.iter().find(|x| x.id == "UNREPORTED_ISOLATED_CELL").unwrap();
         assert_eq!(decide(case, &fixture).disposition, Disposition::Rejected);
     }
 
