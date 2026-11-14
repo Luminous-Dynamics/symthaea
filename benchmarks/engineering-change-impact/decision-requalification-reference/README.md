@@ -7,15 +7,16 @@ From the repository root:
     cargo test --manifest-path benchmarks/engineering-change-impact/decision-requalification-reference/Cargo.toml
 
 The package independently checks:
-- decision dependency-manifest and event-inventory SHA-256 bindings;
-- candidate-visible event manifest binding;
+- decision dependency-manifest and complete owner event-inventory SHA-256 bindings;
+- separate K0 and K1 candidate-visible event manifest bindings;
 - as-of K0 versus current K1 evaluation;
 - late-arriving event non-retroactivity;
 - dependency-scoped invalidation;
+- relevant owner events missing from candidate-visible materialization;
 - unknown scope, incomplete inventory and unknown event ordering;
-- the eight preregistered intervention relations;
-- uniqueness and integrity of the mutation-control manifest.
+- nine preregistered intervention relations;
+- uniqueness and integrity of the 20-control mutation manifest.
 
 The package is outside the production workspace. It contains no event ingestion, trust root, temporal ledger, configuration service or authority API.
 
-The corpus is synthetic. Tests are authored but not claimed as executed until compiled and run at the exact branch head.
+The corpus is synthetic. Four Rust tests are authored but are not claimed as executed until compiled and run at the exact branch head.
