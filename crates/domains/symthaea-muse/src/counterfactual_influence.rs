@@ -1619,6 +1619,8 @@ mod tests {
         map: PerformedEventMap,
         map_bytes: Vec<u8>,
         midi: Vec<u8>,
+        score_bytes: Vec<u8>,
+        expected_primary_midi: Vec<u8>,
         process: RendererProcessObservation,
     }
 
@@ -1627,7 +1629,7 @@ mod tests {
         midi: &[u8],
         samples: &[f32],
     ) -> BoundRender {
-        build_render_with_gain(render_id, midi, samples, 0.8)
+        build_render_with_score_and_gain(render_id, midi, samples, SCORE_BYTES, &[60, 64], 0.8)
     }
 
     fn build_render_with_gain(
@@ -1636,9 +1638,37 @@ mod tests {
         samples: &[f32],
         gain: f32,
     ) -> BoundRender {
+        build_render_with_score_and_gain(render_id, midi, samples, SCORE_BYTES, &[60, 64], gain)
+    }
+
+    fn build_render_with_score(
+        render_id: &str,
+        midi: &[u8],
+        samples: &[f32],
+        score_bytes: &[u8],
+        expected_primary_midi: &[u8],
+    ) -> BoundRender {
+        build_render_with_score_and_gain(
+            render_id,
+            midi,
+            samples,
+            score_bytes,
+            expected_primary_midi,
+            0.8,
+        )
+    }
+
+    fn build_render_with_score_and_gain(
+        render_id: &str,
+        midi: &[u8],
+        samples: &[f32],
+        score_bytes: &[u8],
+        expected_primary_midi: &[u8],
+        gain: f32,
+    ) -> BoundRender {
         let wav = float_wav(samples);
         let view = audio(samples);
-        let score_sha256 = sha256_hex(SCORE_BYTES);
+        let score_sha256 = sha256_hex(score_bytes);
         let map = PerformedEventMap::from_midi_bytes(
             midi,
             &score_sha256,
@@ -1653,7 +1683,7 @@ mod tests {
         // Studio only includes this receipt field after full-score coverage
         // verifies. A counterfactual map deliberately excludes one source ID,
         // so it must remain an explicit map artifact, not a complete-map claim.
-        let complete_map_digest = if map.events.len() == 2 {
+        let complete_map_digest = if map.events.len() == expected_primary_midi.len() {
             Some(map.receipt_sha256.as_str())
         } else {
             None
@@ -1662,7 +1692,7 @@ mod tests {
             RendererReceiptInputs {
                 render_id,
                 backend: RendererBackend::FluidSynth,
-                score_bytes: SCORE_BYTES,
+                score_bytes,
                 render_config_bytes: CONFIG_BYTES,
                 input_midi_bytes: Some(midi),
                 performed_schedule_bytes: None,
@@ -1681,6 +1711,8 @@ mod tests {
             map,
             map_bytes,
             midi: midi.to_vec(),
+            score_bytes: score_bytes.to_vec(),
+            expected_primary_midi: expected_primary_midi.to_vec(),
             process,
         }
     }
@@ -1697,7 +1729,7 @@ mod tests {
             RendererReceiptInputs {
                 render_id: &render.receipt.render_id,
                 backend: RendererBackend::FluidSynth,
-                score_bytes: SCORE_BYTES,
+                score_bytes: &render.score_bytes,
                 render_config_bytes: CONFIG_BYTES,
                 input_midi_bytes: Some(&render.midi),
                 performed_schedule_bytes: None,
@@ -1709,8 +1741,8 @@ mod tests {
                 output_wav_bytes: &render.wav,
             },
             &render.map_bytes,
-            2,
-            &[60, 64],
+            render.expected_primary_midi.len(),
+            &render.expected_primary_midi,
             excluded_source_event_index,
             &audio(samples),
         )
