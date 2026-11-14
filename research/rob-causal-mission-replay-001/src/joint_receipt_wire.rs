@@ -7,18 +7,17 @@
 
 #![forbid(unsafe_code)]
 
+use super::joint_metrology_adapter::{
+    AssuranceDisposition, JointMetrologyEvidence, JointMetrologyReport, QualificationDisposition,
+    UpstreamEnergyDisposition, qualify_joint_metrology,
+};
+use super::{EventStamp, ReplayDisposition, replay_mission};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt;
-use super::joint_metrology_adapter::{
-    AssuranceDisposition, JointMetrologyEvidence,
-    JointMetrologyReport, QualificationDisposition, UpstreamEnergyDisposition,
-    qualify_joint_metrology,
-};
-use super::{EventStamp, ReplayDisposition, replay_mission};
 
 const MAX_SAFE_JSON_INTEGER: u64 = 9_007_199_254_740_991;
 const PROTOCOL_ID: &str = "LOCO-JOINT-RECEIPT-INTEROP-001";
@@ -184,8 +183,15 @@ pub enum WireError {
     /// Integrity object is malformed.
     InvalidIntegrityField(&'static str),
     /// Claimed and recomputed payload digests differ.
-    DigestMismatch { expected: String, observed: String },
-    BindingMismatch { field: String, expected: String, observed: String },
+    DigestMismatch {
+        expected: String,
+        observed: String,
+    },
+    BindingMismatch {
+        field: String,
+        expected: String,
+        observed: String,
+    },
     UnsupportedProfile(String),
     InvalidInterval(&'static str),
 }
@@ -548,7 +554,6 @@ mod tests {
     }
 }
 
-
 /// Independently supplied identities not stored as fields on MissionTrace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JointReceiptAuthorityBindings {
@@ -567,10 +572,7 @@ pub struct JointReceiptWireReport {
     pub actuation_authorized: bool,
 }
 
-fn path_value<'a>(
-    root: &'a JsonValue,
-    path: &[&'static str],
-) -> Result<&'a JsonValue, WireError> {
+fn path_value<'a>(root: &'a JsonValue, path: &[&'static str]) -> Result<&'a JsonValue, WireError> {
     let mut current = root;
     for key in path {
         let JsonValue::Object(fields) = current else {
@@ -615,18 +617,17 @@ fn path_u64_number(root: &JsonValue, path: &[&'static str]) -> Result<u64, WireE
     }
 }
 
-fn path_array<'a>(root: &'a JsonValue, path: &[&'static str]) -> Result<&'a [JsonValue], WireError> {
+fn path_array<'a>(
+    root: &'a JsonValue,
+    path: &[&'static str],
+) -> Result<&'a [JsonValue], WireError> {
     match path_value(root, path)? {
         JsonValue::Array(values) => Ok(values),
         _ => Err(WireError::InvalidField(path[path.len() - 1])),
     }
 }
 
-fn bind_text(
-    field: &'static str,
-    observed: &str,
-    expected: &str,
-) -> Result<(), WireError> {
+fn bind_text(field: &'static str, observed: &str, expected: &str) -> Result<(), WireError> {
     if observed != expected {
         return Err(WireError::BindingMismatch {
             field: field.to_owned(),
@@ -658,7 +659,11 @@ fn bind_event(
     bind_text("event_id", &path_string(root, &id_path)?, &stamp.event_id)?;
     let mut sequence_path = path.to_vec();
     sequence_path.push("sequence");
-    bind_u64("event_sequence", path_u64_string(root, &sequence_path)?, stamp.sequence)
+    bind_u64(
+        "event_sequence",
+        path_u64_string(root, &sequence_path)?,
+        stamp.sequence,
+    )
 }
 
 fn bind_stamp(
@@ -668,16 +673,32 @@ fn bind_stamp(
 ) -> Result<(), WireError> {
     let mut clock_path = path.to_vec();
     clock_path.push("clock_id");
-    bind_text("clock_id", &path_string(root, &clock_path)?, &stamp.clock_id)?;
+    bind_text(
+        "clock_id",
+        &path_string(root, &clock_path)?,
+        &stamp.clock_id,
+    )?;
     let mut epoch_path = path.to_vec();
     epoch_path.push("boot_epoch");
-    bind_u64("boot_epoch", path_u64_string(root, &epoch_path)?, stamp.boot_epoch)?;
+    bind_u64(
+        "boot_epoch",
+        path_u64_string(root, &epoch_path)?,
+        stamp.boot_epoch,
+    )?;
     let mut lower_path = path.to_vec();
     lower_path.push("lower_ns");
-    bind_u64("timestamp.lower_ns", path_u64_string(root, &lower_path)?, stamp.timestamp.lower_ns)?;
+    bind_u64(
+        "timestamp.lower_ns",
+        path_u64_string(root, &lower_path)?,
+        stamp.timestamp.lower_ns,
+    )?;
     let mut upper_path = path.to_vec();
     upper_path.push("upper_ns");
-    bind_u64("timestamp.upper_ns", path_u64_string(root, &upper_path)?, stamp.timestamp.upper_ns)
+    bind_u64(
+        "timestamp.upper_ns",
+        path_u64_string(root, &upper_path)?,
+        stamp.timestamp.upper_ns,
+    )
 }
 
 fn bind_interval(
@@ -687,10 +708,18 @@ fn bind_interval(
 ) -> Result<(), WireError> {
     let mut lower = path.to_vec();
     lower.push("lower_ns");
-    bind_u64("measurement.lower_ns", path_u64_string(root, &lower)?, expected.0)?;
+    bind_u64(
+        "measurement.lower_ns",
+        path_u64_string(root, &lower)?,
+        expected.0,
+    )?;
     let mut upper = path.to_vec();
     upper.push("upper_ns");
-    bind_u64("measurement.upper_ns", path_u64_string(root, &upper)?, expected.1)
+    bind_u64(
+        "measurement.upper_ns",
+        path_u64_string(root, &upper)?,
+        expected.1,
+    )
 }
 
 fn interval_difference(
@@ -726,8 +755,8 @@ fn verify_edges(root: &JsonValue) -> Result<(), WireError> {
     let mut events = Vec::with_capacity(stages.len());
     for stage in stages {
         events.push((
-            path_string(root, &["events", stage, "event_id"] )?,
-            path_u64_string(root, &["events", stage, "sequence"] )?,
+            path_string(root, &["events", stage, "event_id"])?,
+            path_u64_string(root, &["events", stage, "sequence"])?,
         ));
     }
     if events.windows(2).any(|pair| pair[0].1 >= pair[1].1) {
@@ -766,9 +795,18 @@ pub fn verify_and_join_joint_receipt(
     authority: &JointReceiptAuthorityBindings,
 ) -> Result<JointReceiptWireReport, WireError> {
     for (field, value) in [
-        ("mission_trace_digest", authority.mission_trace_digest.as_str()),
-        ("assurance_receipt_digest", authority.assurance_receipt_digest.as_str()),
-        ("terminal_receipt_digest", authority.terminal_receipt_digest.as_str()),
+        (
+            "mission_trace_digest",
+            authority.mission_trace_digest.as_str(),
+        ),
+        (
+            "assurance_receipt_digest",
+            authority.assurance_receipt_digest.as_str(),
+        ),
+        (
+            "terminal_receipt_digest",
+            authority.terminal_receipt_digest.as_str(),
+        ),
         ("same_clock_id", authority.same_clock_id.as_str()),
     ] {
         if value.trim().is_empty() {
@@ -780,15 +818,19 @@ pub fn verify_and_join_joint_receipt(
     let mut deserializer = serde_json::Deserializer::from_slice(packet);
     let root = JsonValue::deserialize(&mut deserializer)
         .map_err(|error| WireError::InvalidJson(error.to_string()))?;
-    deserializer.end().map_err(|error| WireError::InvalidJson(error.to_string()))?;
+    deserializer
+        .end()
+        .map_err(|error| WireError::InvalidJson(error.to_string()))?;
 
     let profile = path_string(&root, &["profile"])?;
     if profile != "synthetic_known_answer" && profile != "physical_measurement" {
         return Err(WireError::UnsupportedProfile(profile));
     }
     if path_string(&root, &["producer", "repository_full_name"])? != "Luminous-Dynamics/symtropy"
-        || path_string(&root, &["consumer_reference", "repository_full_name"])? != "Luminous-Dynamics/symthaea"
-        || path_string(&root, &["consumer_reference", "branch"])? != "research/rob-causal-mission-replay-001"
+        || path_string(&root, &["consumer_reference", "repository_full_name"])?
+            != "Luminous-Dynamics/symthaea"
+        || path_string(&root, &["consumer_reference", "branch"])?
+            != "research/rob-causal-mission-replay-001"
         || path_string(&root, &["consumer_reference", "module"])? != "joint_metrology_adapter"
     {
         return Err(WireError::InvalidField("producer_consumer_identity"));
@@ -818,42 +860,143 @@ pub fn verify_and_join_joint_receipt(
     let instruments = &evidence.instruments;
 
     for (field, observed, expected) in [
-        ("scope.mission_id", path_string(&root, &["scope", "mission_id"])?, mission.scope.mission_id.as_str()),
-        ("scope.robot_id", path_string(&root, &["scope", "robot_id"])?, mission.scope.robot_id.as_str()),
-        ("scope.clock_id", path_string(&root, &["scope", "clock_id"])?, mission.scope.clock_id.as_str()),
-        ("scope.scenario_manifest_digest", path_string(&root, &["scope", "scenario_manifest_digest"])?, mission.scope.scenario_manifest_digest.as_str()),
-        ("scope.mission_trace_digest", path_string(&root, &["scope", "mission_trace_digest"])?, authority.mission_trace_digest.as_str()),
-        ("scope.actuator_id", path_string(&root, &["scope", "actuator_id"])?, instruments.actuator_id.as_str()),
+        (
+            "scope.mission_id",
+            path_string(&root, &["scope", "mission_id"])?,
+            mission.scope.mission_id.as_str(),
+        ),
+        (
+            "scope.robot_id",
+            path_string(&root, &["scope", "robot_id"])?,
+            mission.scope.robot_id.as_str(),
+        ),
+        (
+            "scope.clock_id",
+            path_string(&root, &["scope", "clock_id"])?,
+            mission.scope.clock_id.as_str(),
+        ),
+        (
+            "scope.scenario_manifest_digest",
+            path_string(&root, &["scope", "scenario_manifest_digest"])?,
+            mission.scope.scenario_manifest_digest.as_str(),
+        ),
+        (
+            "scope.mission_trace_digest",
+            path_string(&root, &["scope", "mission_trace_digest"])?,
+            authority.mission_trace_digest.as_str(),
+        ),
+        (
+            "scope.actuator_id",
+            path_string(&root, &["scope", "actuator_id"])?,
+            instruments.actuator_id.as_str(),
+        ),
     ] {
         bind_text(field, &observed, expected)?;
     }
-    bind_u64("scope.boot_epoch", path_u64_string(&root, &["scope", "boot_epoch"] )?, mission.scope.boot_epoch)?;
+    bind_u64(
+        "scope.boot_epoch",
+        path_u64_string(&root, &["scope", "boot_epoch"])?,
+        mission.scope.boot_epoch,
+    )?;
 
     bind_event(&root, &["events", "source_observation"], &observation.stamp)?;
-    bind_stamp(&root, &["events", "source_observation", "capture"], &observation.stamp)?;
-    bind_text("source_observation.id", &path_string(&root, &["events", "source_observation", "observation_id"] )?, &observation.observation_id)?;
-    bind_text("source_observation.modality", &path_string(&root, &["events", "source_observation", "source_modality"] )?, &observation.modality)?;
-    bind_u64("source_observation.sequence", path_u64_string(&root, &["events", "source_observation", "source_sequence"] )?, observation.source_sequence)?;
-    bind_text("source_observation.sensor_calibration", &path_string(&root, &["events", "source_observation", "sensor_calibration_digest"] )?, &observation.sensor_digest)?;
+    bind_stamp(
+        &root,
+        &["events", "source_observation", "capture"],
+        &observation.stamp,
+    )?;
+    bind_text(
+        "source_observation.id",
+        &path_string(&root, &["events", "source_observation", "observation_id"])?,
+        &observation.observation_id,
+    )?;
+    bind_text(
+        "source_observation.modality",
+        &path_string(&root, &["events", "source_observation", "source_modality"])?,
+        &observation.modality,
+    )?;
+    bind_u64(
+        "source_observation.sequence",
+        path_u64_string(&root, &["events", "source_observation", "source_sequence"])?,
+        observation.source_sequence,
+    )?;
+    bind_text(
+        "source_observation.sensor_calibration",
+        &path_string(
+            &root,
+            &["events", "source_observation", "sensor_calibration_digest"],
+        )?,
+        &observation.sensor_digest,
+    )?;
 
     bind_event(&root, &["events", "decision"], &decision.stamp)?;
     for (field, observed, expected) in [
-        ("decision.id", path_string(&root, &["events", "decision", "decision_id"] )?, decision.decision_id.as_str()),
-        ("decision.model", path_string(&root, &["events", "decision", "model_digest"] )?, decision.loss_model_digest.as_str()),
-        ("decision.policy", path_string(&root, &["events", "decision", "policy_digest"] )?, decision.policy_digest.as_str()),
-        ("decision.action_domain", path_string(&root, &["events", "decision", "action_domain_digest"] )?, decision.action_domain_digest.as_str()),
-        ("decision.calibration", path_string(&root, &["events", "decision", "calibration_receipt_digest"] )?, decision.calibration_digest.as_str()),
+        (
+            "decision.id",
+            path_string(&root, &["events", "decision", "decision_id"])?,
+            decision.decision_id.as_str(),
+        ),
+        (
+            "decision.model",
+            path_string(&root, &["events", "decision", "model_digest"])?,
+            decision.loss_model_digest.as_str(),
+        ),
+        (
+            "decision.policy",
+            path_string(&root, &["events", "decision", "policy_digest"])?,
+            decision.policy_digest.as_str(),
+        ),
+        (
+            "decision.action_domain",
+            path_string(&root, &["events", "decision", "action_domain_digest"])?,
+            decision.action_domain_digest.as_str(),
+        ),
+        (
+            "decision.calibration",
+            path_string(&root, &["events", "decision", "calibration_receipt_digest"])?,
+            decision.calibration_digest.as_str(),
+        ),
     ] {
         bind_text(field, &observed, expected)?;
     }
-    bind_u64("decision.regret", path_u64_string(&root, &["events", "decision", "regret_upper_units"] )?, decision.regret_upper_units)?;
-    bind_u64("decision.epsilon", path_u64_string(&root, &["events", "decision", "epsilon_task_loss_units"] )?, decision.epsilon_task_loss_units)?;
-    bind_u64("decision.valid_through", path_u64_string(&root, &["events", "decision", "valid_through_tick"] )?, decision.valid_through_tick)?;
+    bind_u64(
+        "decision.regret",
+        path_u64_string(&root, &["events", "decision", "regret_upper_units"])?,
+        decision.regret_upper_units,
+    )?;
+    bind_u64(
+        "decision.epsilon",
+        path_u64_string(&root, &["events", "decision", "epsilon_task_loss_units"])?,
+        decision.epsilon_task_loss_units,
+    )?;
+    bind_u64(
+        "decision.valid_through",
+        path_u64_string(&root, &["events", "decision", "valid_through_tick"])?,
+        decision.valid_through_tick,
+    )?;
 
     bind_event(&root, &["events", "proposal"], &proposal.stamp)?;
-    bind_text("proposal.id", &path_string(&root, &["events", "proposal", "proposal_id"] )?, &proposal.proposal_id)?;
-    bind_text("proposal.prefix_expected", &path_string(&root, &["events", "proposal", "executed_prefix_expected_digest"] )?, &proposal.expected_executed_prefix_digest)?;
-    bind_text("proposal.prefix_observed", &path_string(&root, &["events", "proposal", "executed_prefix_observed_digest"] )?, &proposal.observed_executed_prefix_digest)?;
+    bind_text(
+        "proposal.id",
+        &path_string(&root, &["events", "proposal", "proposal_id"])?,
+        &proposal.proposal_id,
+    )?;
+    bind_text(
+        "proposal.prefix_expected",
+        &path_string(
+            &root,
+            &["events", "proposal", "executed_prefix_expected_digest"],
+        )?,
+        &proposal.expected_executed_prefix_digest,
+    )?;
+    bind_text(
+        "proposal.prefix_observed",
+        &path_string(
+            &root,
+            &["events", "proposal", "executed_prefix_observed_digest"],
+        )?,
+        &proposal.observed_executed_prefix_digest,
+    )?;
 
     bind_event(&root, &["events", "assurance"], &assurance.stamp)?;
     let expected_assurance = match assurance.disposition {
@@ -861,64 +1004,212 @@ pub fn verify_and_join_joint_receipt(
         AssuranceDisposition::Unknown => "Unknown",
         AssuranceDisposition::Rejected => "Rejected",
     };
-    bind_text("assurance.disposition", &path_string(&root, &["events", "assurance", "disposition"] )?, expected_assurance)?;
-    bind_text("assurance.receipt_digest", &path_string(&root, &["events", "assurance", "receipt_digest"] )?, &authority.assurance_receipt_digest)?;
+    bind_text(
+        "assurance.disposition",
+        &path_string(&root, &["events", "assurance", "disposition"])?,
+        expected_assurance,
+    )?;
+    bind_text(
+        "assurance.receipt_digest",
+        &path_string(&root, &["events", "assurance", "receipt_digest"])?,
+        &authority.assurance_receipt_digest,
+    )?;
 
-    bind_text("command.id", &path_string(&root, &["events", "command", "command_id"] )?, &application.command_id)?;
-    let command_sequence = path_u64_string(&root, &["events", "command", "sequence"] )?;
-    if !(assurance.stamp.sequence < command_sequence && command_sequence < application.stamp.sequence) {
+    bind_text(
+        "command.id",
+        &path_string(&root, &["events", "command", "command_id"])?,
+        &application.command_id,
+    )?;
+    let command_sequence = path_u64_string(&root, &["events", "command", "sequence"])?;
+    if !(assurance.stamp.sequence < command_sequence
+        && command_sequence < application.stamp.sequence)
+    {
         return Err(WireError::InvalidField("command_sequence"));
     }
 
-    bind_event(&root, &["events", "actuator_application"], &application.stamp)?;
-    bind_stamp(&root, &["events", "actuator_application", "stamp"], &application.stamp)?;
-    bind_text("application.receipt", &path_string(&root, &["events", "actuator_application", "application_receipt_digest"] )?, &application.application_receipt_digest)?;
-    bind_text("application.actuator", &path_string(&root, &["events", "actuator_application", "actuator_id"] )?, &application.actuator_id)?;
-    bind_u64("application.tick", path_u64_string(&root, &["events", "actuator_application", "tick"] )?, application.stamp.tick)?;
+    bind_event(
+        &root,
+        &["events", "actuator_application"],
+        &application.stamp,
+    )?;
+    bind_stamp(
+        &root,
+        &["events", "actuator_application", "stamp"],
+        &application.stamp,
+    )?;
+    bind_text(
+        "application.receipt",
+        &path_string(
+            &root,
+            &[
+                "events",
+                "actuator_application",
+                "application_receipt_digest",
+            ],
+        )?,
+        &application.application_receipt_digest,
+    )?;
+    bind_text(
+        "application.actuator",
+        &path_string(&root, &["events", "actuator_application", "actuator_id"])?,
+        &application.actuator_id,
+    )?;
+    bind_u64(
+        "application.tick",
+        path_u64_string(&root, &["events", "actuator_application", "tick"])?,
+        application.stamp.tick,
+    )?;
 
     bind_event(&root, &["events", "physical_transition"], &transition.stamp)?;
-    bind_stamp(&root, &["events", "physical_transition", "stamp"], &transition.stamp)?;
-    bind_text("physical.transition_id", &path_string(&root, &["events", "physical_transition", "physical_transition_id"] )?, &transition.transition_id)?;
-    bind_text("physical.predecessor", &path_string(&root, &["events", "physical_transition", "reserve_predecessor_digest"] )?, &transition.predecessor_state_digest)?;
-    bind_text("physical.result", &path_string(&root, &["events", "physical_transition", "reserve_result_digest"] )?, &transition.resulting_state_digest)?;
-    bind_text("physical.thermal_snapshot", &path_string(&root, &["events", "physical_transition", "thermal_snapshot_digest"] )?, &transition.thermal_snapshot_digest)?;
+    bind_stamp(
+        &root,
+        &["events", "physical_transition", "stamp"],
+        &transition.stamp,
+    )?;
+    bind_text(
+        "physical.transition_id",
+        &path_string(
+            &root,
+            &["events", "physical_transition", "physical_transition_id"],
+        )?,
+        &transition.transition_id,
+    )?;
+    bind_text(
+        "physical.predecessor",
+        &path_string(
+            &root,
+            &[
+                "events",
+                "physical_transition",
+                "reserve_predecessor_digest",
+            ],
+        )?,
+        &transition.predecessor_state_digest,
+    )?;
+    bind_text(
+        "physical.result",
+        &path_string(
+            &root,
+            &["events", "physical_transition", "reserve_result_digest"],
+        )?,
+        &transition.resulting_state_digest,
+    )?;
+    bind_text(
+        "physical.thermal_snapshot",
+        &path_string(
+            &root,
+            &["events", "physical_transition", "thermal_snapshot_digest"],
+        )?,
+        &transition.thermal_snapshot_digest,
+    )?;
 
     bind_event(&root, &["events", "terminal"], &terminal.stamp)?;
     bind_stamp(&root, &["events", "terminal", "stamp"], &terminal.stamp)?;
-    bind_text("terminal.receipt", &path_string(&root, &["events", "terminal", "terminal_receipt_digest"] )?, &authority.terminal_receipt_digest)?;
-    bind_text("terminal.reserve", &path_string(&root, &["events", "terminal", "reserve_digest"] )?, &terminal.reserve_state_digest)?;
+    bind_text(
+        "terminal.receipt",
+        &path_string(&root, &["events", "terminal", "terminal_receipt_digest"])?,
+        &authority.terminal_receipt_digest,
+    )?;
+    bind_text(
+        "terminal.reserve",
+        &path_string(&root, &["events", "terminal", "reserve_digest"])?,
+        &terminal.reserve_state_digest,
+    )?;
     bind_text(
         "terminal.safe_stop",
-        &path_bool(&root, &["events", "terminal", "safe_stop_qualified"] )?.to_string(),
+        &path_bool(&root, &["events", "terminal", "safe_stop_qualified"])?.to_string(),
         &(terminal.disposition == super::TerminalDisposition::SafeStopQualified).to_string(),
     )?;
 
     for (field, expected) in [
-        ("actuator_configuration_digest", instruments.actuator_configuration_digest.as_str()),
-        ("controller_configuration_digest", instruments.controller_configuration_digest.as_str()),
+        (
+            "actuator_configuration_digest",
+            instruments.actuator_configuration_digest.as_str(),
+        ),
+        (
+            "controller_configuration_digest",
+            instruments.controller_configuration_digest.as_str(),
+        ),
         ("policy_digest", instruments.policy_digest.as_str()),
         ("model_digest", instruments.model_digest.as_str()),
-        ("action_domain_digest", instruments.action_domain_digest.as_str()),
-        ("source_sensor_calibration_digest", instruments.sensor_calibration_digest.as_str()),
-        ("torque_transducer_calibration_digest", instruments.torque_transducer_calibration_digest.as_str()),
-        ("power_analyzer_calibration_digest", instruments.power_analyzer_calibration_digest.as_str()),
-        ("thermal_sensor_calibration_digest", instruments.thermal_sensor_calibration_digest.as_str()),
-        ("sampling_spec_digest", instruments.sampling_spec_digest.as_str()),
-        ("energy_boundary_manifest_digest", instruments.energy_boundary_manifest_digest.as_str()),
-        ("decision_calibration_receipt_digest", instruments.decision_calibration_receipt_digest.as_str()),
-        ("actuator_application_receipt_digest", instruments.actuator_application_receipt_digest.as_str()),
-        ("executed_prefix_expected_digest", instruments.executed_prefix_expected_digest.as_str()),
-        ("executed_prefix_observed_digest", instruments.executed_prefix_observed_digest.as_str()),
+        (
+            "action_domain_digest",
+            instruments.action_domain_digest.as_str(),
+        ),
+        (
+            "source_sensor_calibration_digest",
+            instruments.sensor_calibration_digest.as_str(),
+        ),
+        (
+            "torque_transducer_calibration_digest",
+            instruments.torque_transducer_calibration_digest.as_str(),
+        ),
+        (
+            "power_analyzer_calibration_digest",
+            instruments.power_analyzer_calibration_digest.as_str(),
+        ),
+        (
+            "thermal_sensor_calibration_digest",
+            instruments.thermal_sensor_calibration_digest.as_str(),
+        ),
+        (
+            "sampling_spec_digest",
+            instruments.sampling_spec_digest.as_str(),
+        ),
+        (
+            "energy_boundary_manifest_digest",
+            instruments.energy_boundary_manifest_digest.as_str(),
+        ),
+        (
+            "decision_calibration_receipt_digest",
+            instruments.decision_calibration_receipt_digest.as_str(),
+        ),
+        (
+            "actuator_application_receipt_digest",
+            instruments.actuator_application_receipt_digest.as_str(),
+        ),
+        (
+            "executed_prefix_expected_digest",
+            instruments.executed_prefix_expected_digest.as_str(),
+        ),
+        (
+            "executed_prefix_observed_digest",
+            instruments.executed_prefix_observed_digest.as_str(),
+        ),
     ] {
-        bind_text(field, &path_string(&root, &["configuration", field])?, expected)?;
+        bind_text(
+            field,
+            &path_string(&root, &["configuration", field])?,
+            expected,
+        )?;
     }
 
-    let app_tick = path_u64_string(&root, &["decision", "application_tick"] )?;
-    bind_u64("decision.application_tick", app_tick, application.stamp.tick)?;
-    bind_u64("decision.regret_top", path_u64_string(&root, &["decision", "regret_upper_units"] )?, decision.regret_upper_units)?;
-    bind_u64("decision.epsilon_top", path_u64_string(&root, &["decision", "epsilon_task_loss_units"] )?, decision.epsilon_task_loss_units)?;
-    bind_u64("decision.valid_tick_top", path_u64_string(&root, &["decision", "valid_through_tick"] )?, decision.valid_through_tick)?;
-    bind_text("decision.calibration_top", &path_string(&root, &["decision", "calibration_receipt_digest"] )?, &decision.calibration_digest)?;
+    let app_tick = path_u64_string(&root, &["decision", "application_tick"])?;
+    bind_u64(
+        "decision.application_tick",
+        app_tick,
+        application.stamp.tick,
+    )?;
+    bind_u64(
+        "decision.regret_top",
+        path_u64_string(&root, &["decision", "regret_upper_units"])?,
+        decision.regret_upper_units,
+    )?;
+    bind_u64(
+        "decision.epsilon_top",
+        path_u64_string(&root, &["decision", "epsilon_task_loss_units"])?,
+        decision.epsilon_task_loss_units,
+    )?;
+    bind_u64(
+        "decision.valid_tick_top",
+        path_u64_string(&root, &["decision", "valid_through_tick"])?,
+        decision.valid_through_tick,
+    )?;
+    bind_text(
+        "decision.calibration_top",
+        &path_string(&root, &["decision", "calibration_receipt_digest"])?,
+        &decision.calibration_digest,
+    )?;
     let expected_decision = if app_tick > decision.valid_through_tick {
         "Expired"
     } else if decision.calibration_disposition == super::CalibrationDisposition::Qualified
@@ -928,15 +1219,31 @@ pub fn verify_and_join_joint_receipt(
     } else {
         "Insufficient"
     };
-    bind_text("decision.disposition", &path_string(&root, &["decision", "disposition"] )?, expected_decision)?;
+    bind_text(
+        "decision.disposition",
+        &path_string(&root, &["decision", "disposition"])?,
+        expected_decision,
+    )?;
 
     // v0.1 single-clock profile: require the caller's clock identity before
     // any numeric age is accepted. Unknown mapping must carry null AoI.
     match authority.clock_relation {
         ClockAuthorityBinding::SameMonotonicClock => {
-            bind_text("clock_relation.kind", &path_string(&root, &["clock_relation", "kind"] )?, "same_monotonic_clock_verified")?;
-            bind_text("clock_relation.id", &path_string(&root, &["clock_relation", "clock_id"] )?, &authority.same_clock_id)?;
-            bind_u64("clock_relation.epoch", path_u64_string(&root, &["clock_relation", "boot_epoch"] )?, authority.boot_epoch)?;
+            bind_text(
+                "clock_relation.kind",
+                &path_string(&root, &["clock_relation", "kind"])?,
+                "same_monotonic_clock_verified",
+            )?;
+            bind_text(
+                "clock_relation.id",
+                &path_string(&root, &["clock_relation", "clock_id"])?,
+                &authority.same_clock_id,
+            )?;
+            bind_u64(
+                "clock_relation.epoch",
+                path_u64_string(&root, &["clock_relation", "boot_epoch"])?,
+                authority.boot_epoch,
+            )?;
             if observation.stamp.clock_id != authority.same_clock_id
                 || application.stamp.clock_id != authority.same_clock_id
                 || observation.stamp.boot_epoch != authority.boot_epoch
@@ -945,81 +1252,187 @@ pub fn verify_and_join_joint_receipt(
                 return Err(WireError::InvalidField("clock_authority_binding"));
             }
             let aoi = interval_difference(
-                (application.stamp.timestamp.lower_ns, application.stamp.timestamp.upper_ns),
-                (observation.stamp.timestamp.lower_ns, observation.stamp.timestamp.upper_ns),
+                (
+                    application.stamp.timestamp.lower_ns,
+                    application.stamp.timestamp.upper_ns,
+                ),
+                (
+                    observation.stamp.timestamp.lower_ns,
+                    observation.stamp.timestamp.upper_ns,
+                ),
                 "source_to_actuator_aoi",
             )?;
-            bind_text("aoi.disposition", &path_string(&root, &["measurements", "source_to_actuator_aoi", "disposition"] )?, "Qualified")?;
-            bind_interval(&root, &["measurements", "source_to_actuator_aoi", "value"], aoi.0, aoi.1)?;
+            bind_text(
+                "aoi.disposition",
+                &path_string(
+                    &root,
+                    &["measurements", "source_to_actuator_aoi", "disposition"],
+                )?,
+                "Qualified",
+            )?;
+            bind_interval(
+                &root,
+                &["measurements", "source_to_actuator_aoi", "value"],
+                aoi.0,
+                aoi.1,
+            )?;
         }
         ClockAuthorityBinding::Unknown => {
-            bind_text("clock_relation.kind", &path_string(&root, &["clock_relation", "kind"] )?, "unknown")?;
-            bind_text("aoi.disposition", &path_string(&root, &["measurements", "source_to_actuator_aoi", "disposition"] )?, "Unknown")?;
-            if !matches!(path_value(&root, &["measurements", "source_to_actuator_aoi", "value"] )?, JsonValue::Null) {
+            bind_text(
+                "clock_relation.kind",
+                &path_string(&root, &["clock_relation", "kind"])?,
+                "unknown",
+            )?;
+            bind_text(
+                "aoi.disposition",
+                &path_string(
+                    &root,
+                    &["measurements", "source_to_actuator_aoi", "disposition"],
+                )?,
+                "Unknown",
+            )?;
+            if !matches!(
+                path_value(&root, &["measurements", "source_to_actuator_aoi", "value"])?,
+                JsonValue::Null
+            ) {
                 return Err(WireError::InvalidField("aoi.value"));
             }
         }
     }
-    let onset = evidence.motion_onset.as_ref().ok_or(WireError::MissingField("motion_onset"))?;
-    bind_text("motion.command_id", &path_string(&root, &["events", "motion_onset", "command_id"] )?, &onset.command_id)?;
+    let onset = evidence
+        .motion_onset
+        .as_ref()
+        .ok_or(WireError::MissingField("motion_onset"))?;
+    bind_text(
+        "motion.command_id",
+        &path_string(&root, &["events", "motion_onset", "command_id"])?,
+        &onset.command_id,
+    )?;
     bind_stamp(&root, &["events", "motion_onset", "stamp"], &onset.stamp)?;
     if onset.stamp.clock_id == application.stamp.clock_id
         && onset.stamp.boot_epoch == application.stamp.boot_epoch
     {
         let response = interval_difference(
-            (onset.stamp.timestamp.lower_ns, onset.stamp.timestamp.upper_ns),
-            (application.stamp.timestamp.lower_ns, application.stamp.timestamp.upper_ns),
+            (
+                onset.stamp.timestamp.lower_ns,
+                onset.stamp.timestamp.upper_ns,
+            ),
+            (
+                application.stamp.timestamp.lower_ns,
+                application.stamp.timestamp.upper_ns,
+            ),
             "command_to_motion",
         )?;
-        bind_text("response.disposition", &path_string(&root, &["measurements", "command_to_motion", "disposition"] )?, "Qualified")?;
-        bind_interval(&root, &["measurements", "command_to_motion", "value"], response.0, response.1)?;
+        bind_text(
+            "response.disposition",
+            &path_string(&root, &["measurements", "command_to_motion", "disposition"])?,
+            "Qualified",
+        )?;
+        bind_interval(
+            &root,
+            &["measurements", "command_to_motion", "value"],
+            response.0,
+            response.1,
+        )?;
     }
 
     validate_edges(&root)?;
 
-    bind_text("thermal.transition_id", &path_string(&root, &["thermal", "physical_transition_id"] )?, &transition.transition_id)?;
-    bind_text("thermal.calibration", &path_string(&root, &["thermal", "sensor_calibration_digest"] )?, &instruments.thermal_sensor_calibration_digest)?;
-    bind_text("thermal.result", &path_string(&root, &["thermal", "result_digest"] )?, &transition.thermal_snapshot_digest)?;
-    bind_text("thermal.predecessor", &path_string(&root, &["thermal", "expected_predecessor_digest"] )?, &path_string(&root, &["thermal", "observed_predecessor_digest"] )?)?;
-    if path_bool(&root, &["thermal", "sequence_reset"] )? {
+    bind_text(
+        "thermal.transition_id",
+        &path_string(&root, &["thermal", "physical_transition_id"])?,
+        &transition.transition_id,
+    )?;
+    bind_text(
+        "thermal.calibration",
+        &path_string(&root, &["thermal", "sensor_calibration_digest"])?,
+        &instruments.thermal_sensor_calibration_digest,
+    )?;
+    bind_text(
+        "thermal.result",
+        &path_string(&root, &["thermal", "result_digest"])?,
+        &transition.thermal_snapshot_digest,
+    )?;
+    bind_text(
+        "thermal.predecessor",
+        &path_string(&root, &["thermal", "expected_predecessor_digest"])?,
+        &path_string(&root, &["thermal", "observed_predecessor_digest"])?,
+    )?;
+    if path_bool(&root, &["thermal", "sequence_reset"])? {
         return Err(WireError::InvalidField("thermal.sequence_reset"));
     }
 
-    bind_text("energy.boundary_manifest", &path_string(&root, &["energy", "boundary_manifest_digest"] )?, &evidence.energy.boundary_manifest_digest)?;
+    bind_text(
+        "energy.boundary_manifest",
+        &path_string(&root, &["energy", "boundary_manifest_digest"])?,
+        &evidence.energy.boundary_manifest_digest,
+    )?;
     let energy_kind = match evidence.energy.closure_disposition {
         UpstreamEnergyDisposition::Balanced => "Balanced",
         UpstreamEnergyDisposition::Unknown => "Unknown",
         UpstreamEnergyDisposition::Inconclusive => "Inconclusive",
         UpstreamEnergyDisposition::Invalid => "Invalid",
     };
-    bind_text("energy.disposition", &path_string(&root, &["energy", "upstream_disposition"] )?, energy_kind)?;
-    bind_text("energy.closure_digest", &path_string(&root, &["energy", "closure_receipt_digest"] )?, &evidence.energy.closure_receipt_digest)?;
-    if path_bool(&root, &["energy", "boundary_complete"] )? != evidence.energy.boundary_complete {
+    bind_text(
+        "energy.disposition",
+        &path_string(&root, &["energy", "upstream_disposition"])?,
+        energy_kind,
+    )?;
+    bind_text(
+        "energy.closure_digest",
+        &path_string(&root, &["energy", "closure_receipt_digest"])?,
+        &evidence.energy.closure_receipt_digest,
+    )?;
+    if path_bool(&root, &["energy", "boundary_complete"])? != evidence.energy.boundary_complete {
         return Err(WireError::InvalidField("energy.boundary_complete"));
     }
-    bind_u64("sampling.measured", path_u64_number(&root, &["sampling", "measured_rate_hz"] )?, instruments.measured_sample_rate_hz)?;
-    bind_u64("sampling.required", path_u64_number(&root, &["sampling", "required_rate_hz"] )?, instruments.required_sample_rate_hz)?;
-    bind_text("sampling.digest", &path_string(&root, &["sampling", "specification_digest"] )?, &instruments.sampling_spec_digest)?;
-    if path_bool(&root, &["sampling", "specification_qualified"] )? != instruments.sampling_spec_valid {
+    bind_u64(
+        "sampling.measured",
+        path_u64_number(&root, &["sampling", "measured_rate_hz"])?,
+        instruments.measured_sample_rate_hz,
+    )?;
+    bind_u64(
+        "sampling.required",
+        path_u64_number(&root, &["sampling", "required_rate_hz"])?,
+        instruments.required_sample_rate_hz,
+    )?;
+    bind_text(
+        "sampling.digest",
+        &path_string(&root, &["sampling", "specification_digest"])?,
+        &instruments.sampling_spec_digest,
+    )?;
+    if path_bool(&root, &["sampling", "specification_qualified"])?
+        != instruments.sampling_spec_valid
+    {
         return Err(WireError::InvalidField("sampling.specification_qualified"));
     }
 
-    bind_text("future_options.disposition", &path_string(&root, &["future_options", "disposition"] )?, "NotEvaluated")?;
-    if !path_array(&root, &["future_options", "observation_classes"] )?.is_empty() {
-        return Err(WireError::UnsupportedProfile("future-option proof is owned by the option-ledger consumer".to_owned()));
+    bind_text(
+        "future_options.disposition",
+        &path_string(&root, &["future_options", "disposition"])?,
+        "NotEvaluated",
+    )?;
+    if !path_array(&root, &["future_options", "observation_classes"])?.is_empty() {
+        return Err(WireError::UnsupportedProfile(
+            "future-option proof is owned by the option-ledger consumer".to_owned(),
+        ));
     }
 
     let joint_metrology = qualify_joint_metrology(evidence);
     let replay = replay_mission(mission);
     bind_text(
         "replay.causal_chain_complete",
-        &path_bool(&root, &["replay", "causal_chain_complete"] )?.to_string(),
+        &path_bool(&root, &["replay", "causal_chain_complete"])?.to_string(),
         &(replay.disposition == ReplayDisposition::Closed).to_string(),
     )?;
-    let closure = if joint_metrology.disposition == QualificationDisposition::Qualified { "Closed" } else { "Open" };
+    let closure = if joint_metrology.disposition == QualificationDisposition::Qualified {
+        "Closed"
+    } else {
+        "Open"
+    };
     bind_text(
         "replay.mission_closure",
-        &path_string(&root, &["replay", "mission_closure", "disposition"] )?,
+        &path_string(&root, &["replay", "mission_closure", "disposition"])?,
         closure,
     )?;
 
