@@ -162,3 +162,10 @@ This is exhaustive only for the small declared finite abstraction. It is not TLC
 Added `effectbridge/linearizability_schedules_test.go`. With a fixed reproducible seed, it generates 256 histories of six overlapping operations over two idempotency keys and two possible intents. Each operation is an append, fence or lookup. A legal sequential history must match every returned result and respect real-time precedence; each key's terminal lookup is also compared before and after journal restart.
 
 Local execution on the assembled companion snapshot (Go 1.23.2/Linux amd64): generated-history test passed; the three linearizability/model tests passed three consecutive race-detector runs; default tests, SQLite-tagged tests, `go vet`, and `CGO_ENABLED=0` tests passed. These 256 fixed-seed histories are a bounded conformance corpus, not IID trials or a population reliability estimate. The local companion snapshot has 52 named test functions by default and 67 with the SQLite tag. SQLite source remains outside this public PR diff.
+
+
+## 14 November 2026 — observer trust-domain qualification profile
+
+Added public OBSERVER_INDEPENDENCE.md to formalize a proposed E0–E4 observer classification and the full trust-domain vector (producer, process, host/kernel/storage, credentials/admin, network, clock/sequence, verifier and retention). The profile explicitly classifies the separate read-only SQLite audit companion as E2 only. It states that the companion verifies a database snapshot but cannot prove downstream payment/actuation, cannot independently attest the writer's connection-scoped synchronous pragma, and shares the same host/storage/admin failure domain.
+
+The E2 implementation is a local companion source artifact, not part of this public branch as of this document revision. Publicly committed are the profile, test protocol and next E3/E4 research gates. The companion's local tests and benchmarks remain reported separately in the handoff archive and must not be treated as hosted CI or independent certification.
