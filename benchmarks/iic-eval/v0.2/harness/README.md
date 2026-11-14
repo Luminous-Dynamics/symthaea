@@ -25,3 +25,8 @@ The evaluator rejects duplicate case IDs, missing cases, duplicate source docume
 ## Limits
 
 Exact quotation is not semantic equivalence. The oracle is a development seed without independent adjudication. The evaluator does not score clarification quality or reason semantically about prohibited inferences; those require blinded expert review. It does not implement legal interpretation or authority adjudication.
+
+
+## Reproducibility receipt
+
+The evaluator report includes SHA-256 digests for the exact corpus file, oracle file, submitted result file and evaluator executable. Preserve this receipt with the system build SHA and configuration digest when publishing results. A digest establishes file identity, not the correctness or truth of its contents.
