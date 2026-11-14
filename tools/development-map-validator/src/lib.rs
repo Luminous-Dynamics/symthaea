@@ -45,6 +45,8 @@ impl ValidationReport {
 struct NodeMeta {
     node_type: String,
     claim_state: String,
+    authority: String,
+    attributes: Value,
     lifecycle_state: String,
     invalidated_by: Option<String>,
 }
@@ -413,6 +415,8 @@ fn validate_node(
             NodeMeta {
                 node_type,
                 claim_state,
+                authority,
+                attributes: node.get("attributes").cloned().unwrap_or(Value::Null),
                 lifecycle_state,
                 invalidated_by,
             },
@@ -619,6 +623,207 @@ fn validate_decision_evidence_list(
     }
 }
 
+
+fn validate_decision_authority(
+    value: &Value,
+    path: &str,
+    actor_id: Option<&str>,
+    authority_scope: Option<&str>,
+    policy_version: Option<&str>,
+    outcome: Option<&str>,
+    cutoff: &DateTime<FixedOffset>,
+    decision_at: &DateTime<FixedOffset>,
+    nodes: &HashMap<String, NodeMeta>,
+    report: &mut ValidationReport,
+) {
+    let Some(authority) = object(value, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        authority,
+        &[
+            "evidence_id", "owner_repository", "owner_record_ref", "owner_record_type",
+            "actor_id", "authority_scope", "policy_version", "source_observed_at",
+            "available_to_actor_at", "valid_from", "valid_through",
+            "owner_record_disposition", "reason",
+        ],
+        path,
+        report,
+    );
+
+    let mut values = HashMap::new();
+    for key in [
+        "evidence_id", "owner_repository", "owner_record_ref", "owner_record_type",
+        "actor_id", "authority_scope", "policy_version", "reason",
+    ] {
+        if let Some(item) = field(value, key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{key}"), report))
+        {
+            values.insert(key, item.to_owned());
+        }
+    }
+    let evidence_id = values.get("evidence_id").map(String::as_str);
+    let status = field(value, "owner_record_disposition", path, report)
+        .and_then(|v| enum_value(
+            v,
+            &format!("{path}.owner_record_disposition"),
+            &[
+                "source_declares_authorized", "source_declares_unauthorized",
+                "expired", "revoked", "contested", "indeterminate",
+            ],
+            report,
+        ));
+
+    let source_observed = field(value, "source_observed_at", path, report)
+        .and_then(|v| parse_rfc3339(v, &format!("{path}.source_observed_at"), report));
+    let available = field(value, "available_to_actor_at", path, report)
+        .and_then(|v| parse_rfc3339(v, &format!("{path}.available_to_actor_at"), report));
+
+    let valid_from = field(value, "valid_from", path, report).and_then(|v| {
+        if v.is_null() {
+            None
+        } else {
+            parse_rfc3339(v, &format!("{path}.valid_from"), report)
+        }
+    });
+    let valid_through = field(value, "valid_through", path, report).and_then(|v| {
+        if v.is_null() {
+            None
+        } else {
+            parse_rfc3339(v, &format!("{path}.valid_through"), report)
+        }
+    });
+
+    if let (Some(source_observed), Some(available)) = (source_observed.as_ref(), available.as_ref()) {
+        if source_observed > available {
+            report.error(
+                "DTEA-AUTH-001",
+                format!("{path}.source_observed_at"),
+                "authority source observation cannot occur after it became available to the actor",
+            );
+        }
+        if available > cutoff || available > decision_at {
+            report.error(
+                "DTEA-AUTH-002",
+                format!("{path}.available_to_actor_at"),
+                "authority evidence was not available to the actor by the decision knowledge cutoff",
+            );
+        }
+    }
+
+    if let Some(valid_from) = valid_from.as_ref() {
+        if valid_from > decision_at {
+            report.error(
+                "DTEA-AUTH-003",
+                format!("{path}.valid_from"),
+                "authority evidence is not yet effective at the decision time",
+            );
+        }
+    }
+    if let Some(valid_through) = valid_through.as_ref() {
+        if valid_through < decision_at {
+            report.error(
+                "DTEA-AUTH-004",
+                format!("{path}.valid_through"),
+                "authority evidence expired before the decision time",
+            );
+        }
+    }
+
+    if status.as_deref() == Some("source_declares_authorized") {
+        if valid_from.is_none() || valid_through.is_none() {
+            report.error(
+                "DTEA-AUTH-005",
+                format!("{path}.valid_from"),
+                "a source-declared authorized disposition requires an explicit bounded validity interval; missing bounds remain indeterminate",
+            );
+        }
+    }
+
+    if let (Some(expected), Some(actual)) = (actor_id, values.get("actor_id").map(String::as_str)) {
+        if expected != actual {
+            report.error("DTEA-AUTH-006", format!("{path}.actor_id"), "authority evidence actor_id does not match the decision actor_id");
+        }
+    }
+    if let (Some(expected), Some(actual)) = (authority_scope, values.get("authority_scope").map(String::as_str)) {
+        if expected != actual {
+            report.error("DTEA-AUTH-007", format!("{path}.authority_scope"), "authority evidence scope does not match the decision authority_scope");
+        }
+    }
+    if let (Some(expected), Some(actual)) = (policy_version, values.get("policy_version").map(String::as_str)) {
+        if expected != actual {
+            report.error("DTEA-AUTH-008", format!("{path}.policy_version"), "authority evidence policy_version does not match the decision policy_version");
+        }
+    }
+
+    if let Some(evidence_id) = evidence_id {
+        match nodes.get(evidence_id) {
+            Some(node) if node.node_type == "evidence" => {
+                if node.lifecycle_state != "current" {
+                    report.error("DTEA-AUTH-009", format!("{path}.evidence_id"), "authority evidence node is not current in the resulting snapshot");
+                }
+                let attributes = &node.attributes;
+                for (authority_key, node_key) in [
+                    ("owner_repository", "owner_repository"),
+                    ("owner_record_ref", "owner_record_ref"),
+                    ("owner_record_type", "owner_record_type"),
+                    ("actor_id", "actor_id"),
+                    ("authority_scope", "authority_scope"),
+                    ("policy_version", "policy_version"),
+                    ("owner_record_disposition", "owner_record_disposition"),
+                ] {
+                    let from_record = values.get(authority_key).map(String::as_str)
+                        .or_else(|| status.as_deref().filter(|_| authority_key == "owner_record_disposition"));
+                    let from_node = attributes.get(node_key).and_then(Value::as_str);
+                    if from_record.is_some() && from_node != from_record {
+                        report.error(
+                            "DTEA-AUTH-010",
+                            format!("{path}.{authority_key}"),
+                            format!("authority record {authority_key} does not match the referenced evidence node"),
+                        );
+                    }
+                }
+                for key in ["source_observed_at", "available_to_actor_at", "valid_from", "valid_through"] {
+                    let record_time = value.get(key).and_then(Value::as_str);
+                    let node_time = attributes.get(key).and_then(Value::as_str);
+                    if record_time != node_time {
+                        report.error(
+                            "DTEA-AUTH-011",
+                            format!("{path}.{key}"),
+                            format!("authority record {key} does not match the referenced evidence node"),
+                        );
+                    }
+                }
+                if !matches!(node.authority.as_str(), "source_declared" | "manifest_resolved" | "runtime_observed" | "independently_adjudicated") {
+                    report.error("DTEA-AUTH-012", format!("{path}.evidence_id"), "authority evidence node carries an unsupported provenance authority");
+                }
+            }
+            Some(node) => report.error(
+                "DTEA-AUTH-013",
+                format!("{path}.evidence_id"),
+                format!("authority evidence reference must target an evidence node, not {}", node.node_type),
+            ),
+            None => report.error(
+                "DTEA-AUTH-014",
+                format!("{path}.evidence_id"),
+                format!("unknown authority evidence node {evidence_id:?}"),
+            ),
+        }
+    }
+
+    let action_requires_authority = matches!(
+        outcome,
+        Some("approved" | "accepted" | "released" | "executed" | "authorized")
+    );
+    if action_requires_authority && status.as_deref() != Some("source_declares_authorized") {
+        report.error(
+            "DTEA-AUTH-015",
+            format!("{path}.owner_record_disposition"),
+            "the recorded outcome requires source-declared authorization; unauthorized, expired, revoked, contested or indeterminate authority cannot support it",
+        );
+    }
+}
+
 fn validate_decision_payload(
     payload: &Value,
     path: &str,
@@ -636,7 +841,7 @@ fn validate_decision_payload(
         &[
             "decision_at", "knowledge_cutoff_at", "actor_id", "authority_scope",
             "policy_version", "outcome", "rationale_summary", "consulted_evidence",
-            "excluded_evidence", "later_corrections", "abstention_reason",
+            "excluded_evidence", "later_corrections", "abstention_reason", "actor_authority",
         ],
         path,
         report,
@@ -647,9 +852,12 @@ fn validate_decision_payload(
     let cutoff = field(payload, "knowledge_cutoff_at", path, report)
         .and_then(|v| parse_rfc3339(v, &format!("{path}.knowledge_cutoff_at"), report));
 
+    let mut decision_fields = HashMap::new();
     for key in ["actor_id", "authority_scope", "policy_version", "outcome"] {
-        if let Some(value) = field(payload, key, path, report) {
-            string(value, &format!("{path}.{key}"), report);
+        if let Some(value) = field(payload, key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{key}"), report))
+        {
+            decision_fields.insert(key, value.to_owned());
         }
     }
 
@@ -673,6 +881,21 @@ fn validate_decision_payload(
                 format!("{path}.decision_at"),
                 "decision_recorded requires a valid occurred_at timestamp",
             ),
+        }
+
+        if let Some(authority) = field(payload, "actor_authority", path, report) {
+            validate_decision_authority(
+                authority,
+                &format!("{path}.actor_authority"),
+                decision_fields.get("actor_id").map(String::as_str),
+                decision_fields.get("authority_scope").map(String::as_str),
+                decision_fields.get("policy_version").map(String::as_str),
+                decision_fields.get("outcome").map(String::as_str),
+                cutoff,
+                decision_at,
+                nodes,
+                report,
+            );
         }
 
         if let Some(consulted) = field(payload, "consulted_evidence", path, report) {
@@ -750,6 +973,7 @@ fn validate_event(
     event_ids: &mut HashSet<String>,
     nodes: &HashMap<String, NodeMeta>,
     invalidation_targets: &mut HashMap<String, String>,
+    authority_evidence_targets: &mut HashSet<String>,
 ) {
     let path = format!("events[{index}]");
     let Some(event) = object(value, &path, report) else {
@@ -858,6 +1082,29 @@ fn validate_event(
             let expected_effect = if kind == "evidence_invalidated" { "invalidates" } else { "supersedes" };
             if effect != expected_effect {
                 report.error("EGDDM-EVENT-007", format!("{path}.state_effect"), format!("{kind} must use state_effect={expected_effect}"));
+            }
+        }
+        if kind == "authority_evidence_recorded" {
+            for target in &targets_for_event {
+                authority_evidence_targets.insert(target.clone());
+            }
+            if effect != "observes" {
+                report.error(
+                    "DTEA-AUTH-016",
+                    format!("{path}.state_effect"),
+                    "authority_evidence_recorded must use state_effect=observes",
+                );
+            }
+            for target in &targets_for_event {
+                match nodes.get(target) {
+                    Some(node) if node.node_type == "evidence" => {}
+                    Some(node) => report.error(
+                        "DTEA-AUTH-017",
+                        format!("{path}.targets"),
+                        format!("authority evidence event must target evidence nodes, not {}", node.node_type),
+                    ),
+                    None => {}
+                }
             }
         }
         if kind == "decision_recorded" {
@@ -1047,10 +1294,14 @@ pub fn validate_value(value: &Value) -> ValidationReport {
 
     let mut event_ids = HashSet::new();
     let mut invalidation_targets = HashMap::new();
+    let mut authority_evidence_targets = HashSet::new();
     if let Some(event_values) = value.get("events") {
         if let Some(event_values) = array(event_values, "$.events", &mut report) {
             for (index, event) in event_values.iter().enumerate() {
-                validate_event(event, index, &mut report, &mut event_ids, &nodes, &mut invalidation_targets);
+                validate_event(
+                    event, index, &mut report, &mut event_ids, &nodes,
+                    &mut invalidation_targets, &mut authority_evidence_targets,
+                );
             }
         }
     }
@@ -1104,6 +1355,28 @@ pub fn validate_value(value: &Value) -> ValidationReport {
                             "later correction event requires a valid occurred_at timestamp",
                         ),
                     }
+                }
+            }
+        }
+    }
+
+    if let Some(event_values) = value.get("events").and_then(Value::as_array) {
+        for (index, event) in event_values.iter().enumerate() {
+            if event.get("kind").and_then(Value::as_str) != Some("decision_recorded") {
+                continue;
+            }
+            let authority_id = event
+                .get("payload")
+                .and_then(|payload| payload.get("actor_authority"))
+                .and_then(|authority| authority.get("evidence_id"))
+                .and_then(Value::as_str);
+            if let Some(authority_id) = authority_id {
+                if !authority_evidence_targets.contains(authority_id) {
+                    report.error(
+                        "DTEA-AUTH-018",
+                        format!("events[{index}].payload.actor_authority.evidence_id"),
+                        "decision authority evidence must have a corresponding authority_evidence_recorded event in the map event slice",
+                    );
                 }
             }
         }
@@ -1878,9 +2151,9 @@ mod tests {
     #[test]
     fn backdated_but_late_evidence_cannot_be_consulted() {
         let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
-        let late = value["events"][2]["payload"]["excluded_evidence"][0].clone();
-        value["events"][2]["payload"]["consulted_evidence"] = Value::Array(vec![late]);
-        value["events"][2]["payload"]["excluded_evidence"] = Value::Array(vec![]);
+        let late = value["events"][3]["payload"]["excluded_evidence"][0].clone();
+        value["events"][3]["payload"]["consulted_evidence"] = Value::Array(vec![late]);
+        value["events"][3]["payload"]["excluded_evidence"] = Value::Array(vec![]);
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-004"));
     }
@@ -1894,7 +2167,7 @@ mod tests {
     #[test]
     fn source_cannot_be_observed_after_actor_availability() {
         let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
-        value["events"][2]["payload"]["consulted_evidence"][0]["source_observed_at"] =
+        value["events"][3]["payload"]["consulted_evidence"][0]["source_observed_at"] =
             Value::String("2026-11-14T09:10:00Z".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-006"));
@@ -1903,7 +2176,7 @@ mod tests {
     #[test]
     fn decision_later_correction_must_resolve_and_follow_decision_time() {
         let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
-        value["events"][2]["payload"]["later_corrections"][0] = Value::String("missing:event".to_owned());
+        value["events"][3]["payload"]["later_corrections"][0] = Value::String("missing:event".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVENT-004"));
     }
@@ -1911,7 +2184,7 @@ mod tests {
     #[test]
     fn correction_effective_before_decision_is_not_a_later_correction() {
         let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
-        value["events"][4]["occurred_at"] = Value::String("2026-11-14T09:59:00Z".to_owned());
+        value["events"][5]["occurred_at"] = Value::String("2026-11-14T09:59:00Z".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVENT-005"));
     }
@@ -1919,10 +2192,66 @@ mod tests {
     #[test]
     fn knowledge_cutoff_cannot_be_after_decision() {
         let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
-        value["events"][2]["payload"]["knowledge_cutoff_at"] =
+        value["events"][3]["payload"]["knowledge_cutoff_at"] =
             Value::String("2026-11-14T10:01:00Z".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-TIME-001"));
+    }
+
+    #[test]
+    fn decision_authority_actor_must_match() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["actor_authority"]["actor_id"] =
+            Value::String("another-actor".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-006"));
+    }
+
+    #[test]
+    fn decision_authority_scope_must_match() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["actor_authority"]["authority_scope"] =
+            Value::String("release:production".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-007"));
+    }
+
+    #[test]
+    fn authority_evidence_must_be_available_by_decision_cutoff() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["actor_authority"]["available_to_actor_at"] =
+            Value::String("2026-11-14T10:15:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-002"));
+    }
+
+    #[test]
+    fn expired_authority_cannot_support_a_decision() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["actor_authority"]["valid_through"] =
+            Value::String("2026-11-14T09:59:00Z".to_owned());
+        value["nodes"][5]["attributes"]["valid_through"] =
+            Value::String("2026-11-14T09:59:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-004"));
+    }
+
+    #[test]
+    fn authority_evidence_reference_must_resolve_to_evidence_node() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["actor_authority"]["evidence_id"] =
+            Value::String("missing:authority".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-014"));
+    }
+
+    #[test]
+    fn decision_policy_must_match_owner_authority_record() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["actor_authority"]["policy_version"] =
+            Value::String("release-policy-v2".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-008"));
     }
 
     #[test]
@@ -1930,7 +2259,7 @@ mod tests {
         let value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
         assert_eq!(value["nodes"][2]["lifecycle"]["state"], "stale");
         assert_eq!(
-            value["events"][2]["payload"]["consulted_evidence"][0]["evidence_id"],
+            value["events"][3]["payload"]["consulted_evidence"][0]["evidence_id"],
             "dtea:evidence:E1"
         );
         let oracle: Value = serde_json::from_str(DTEA_EXPECTED).expect("DTEA expected JSON");
