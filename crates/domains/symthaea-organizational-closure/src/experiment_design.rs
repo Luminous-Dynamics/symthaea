@@ -650,7 +650,6 @@ mod tests {
 
     #[test]
     fn unavailable_evidence_never_updates_hypotheses() {
-        let scenario = scenario();
         let mut scenario = scenario();
         scenario.budget.max_trials = 1;
         let oracle = ExperimentOracle::new("memory-fault");
