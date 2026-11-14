@@ -112,7 +112,7 @@ pub struct MusicEditTransactionBudgetV1 {
 pub struct MusicEditTransactionPolicyV1 {
     pub schema_version: String,
     pub policy_id: String,
-    /// Canonical ascending enum order. Four core gates are always mandatory.
+    /// Canonical ascending enum order. Five core gates are always mandatory.
     pub required_evidence: Vec<MusicEditEvidenceKindV1>,
 }
 
@@ -1035,11 +1035,11 @@ mod tests {
         let mut tx = transaction();
         tx.policy
             .required_evidence
-            .retain(|kind| *kind != MusicEditEvidenceKindV1::ProtectedPreservation);
+            .retain(|kind| *kind != MusicEditEvidenceKindV1::ActualByteMaterialization);
         tx.policy_sha256 = digest(POLICY_DOMAIN, &tx.policy).unwrap();
         assert!(validate_music_edit_transaction_v1(&tx).contains(
             &MusicEditTransactionIssueV1::MissingMandatoryEvidence(
-                MusicEditEvidenceKindV1::ProtectedPreservation
+                MusicEditEvidenceKindV1::ActualByteMaterialization
             )
         ));
     }
@@ -1086,6 +1086,20 @@ mod tests {
             verify_music_edit_transaction_decision_v1(&tx, &tx.policy_sha256, &receipt),
             Err(MusicEditTransactionIssueV1::DecisionReceiptMismatch)
         );
+    }
+
+    #[test]
+    fn actual_byte_materialization_cannot_be_omitted_from_candidate_evidence() {
+        let mut tx = transaction();
+        tx.attempts[0]
+            .evidence
+            .retain(|record| record.kind != MusicEditEvidenceKindV1::ActualByteMaterialization);
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
+        assert!(receipt
+            .payload
+            .reasons
+            .contains(&MusicEditDecisionReasonV1::EvidenceMissing));
     }
 
     #[test]
