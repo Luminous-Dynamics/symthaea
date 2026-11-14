@@ -1,0 +1,1515 @@
+//! Deterministic constrained inference admission for optional robot-fleet requests.
+//!
+//! This reference only admits optional remote inference work. It does not
+//! schedule or authorize local control, RTA, interlocks, safe-stop or actuators.
+
+#![forbid(unsafe_code)]
+
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Whether optional compute extends a still-sufficient decision or replaces it
+/// after the selected decision has become insufficient.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionAdmissionMode {
+    /// The remote result is intended to improve/continue the current decision.
+    PreserveCurrentDecision,
+    /// The result is a replacement plan; the local fallback carries the robot meanwhile.
+    ReplanWithLocalFallback,
+}
+
+/// Qualification state of the selected decision's remaining sufficiency horizon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionSufficiencyDisposition {
+    /// The selected action remains sufficient over a finite, calibrated prefix.
+    Qualified,
+    /// The selected action is already insufficient at the current tick.
+    Insufficient,
+    /// Evidence is missing, expired, incomplete or uncalibrated.
+    Unknown,
+    /// The supplied decision/horizon evidence is contradictory or rejected.
+    Rejected,
+}
+
+/// Receipt-bound summary exported from the decision-sufficiency evaluator (#11650).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecisionSufficiencyReceipt {
+    /// Qualification disposition.
+    pub disposition: DecisionSufficiencyDisposition,
+    /// Exact receipt digest from the decision-sufficiency evaluator.
+    pub receipt_digest: Option<String>,
+    /// Decision identity.
+    pub decision_id: String,
+    /// Action whose sufficiency horizon was evaluated.
+    pub selected_action_id: String,
+    /// Robot clock/decision epoch identity.
+    pub decision_epoch_digest: String,
+    /// Exact control tick at which the receipt is being consumed.
+    pub current_control_tick: u64,
+    /// Task-loss unit scale used by the calibrated regret bound.
+    pub loss_scale_id: String,
+    /// Expected-loss model digest covered by the calibration.
+    pub loss_model_digest: String,
+    /// Candidate action-domain digest covered by the calibration.
+    pub action_domain_digest: String,
+    /// Conservative number of ticks before the selected action ceases to be sufficient.
+    pub remaining_sufficient_ticks: Option<u64>,
+}
+
+/// Request-specific evidence required before optional remote inference is considered.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InferenceRequest {
+    /// Unique request identity.
+    pub request_id: String,
+    /// Robot whose optional remote request is being considered.
+    pub robot_id: String,
+    /// Exact decision identity this request is intended to support.
+    pub decision_id: Option<String>,
+    /// Currently selected action identity.
+    pub selected_action_id: Option<String>,
+    /// Monotonic robot clock/decision epoch identity.
+    pub decision_epoch_digest: Option<String>,
+    /// Current control tick in that decision epoch.
+    pub current_control_tick: Option<u64>,
+    /// Expected-loss model digest used to qualify the selected decision.
+    pub decision_loss_model_digest: Option<String>,
+    /// Candidate action-domain digest used to qualify the selected decision.
+    pub decision_action_domain_digest: Option<String>,
+    /// How the request relates to the currently selected decision.
+    pub decision_admission_mode: DecisionAdmissionMode,
+    /// Calibrated decision-sufficiency receipt from #11650 / #11659.
+    pub decision_sufficiency: Option<DecisionSufficiencyReceipt>,
+    /// Versioned loss scale for this request's EVSI.
+    pub loss_scale_id: Option<String>,
+    /// Expected value of sample information in task-loss units.
+    pub evsi_units: Option<u64>,
+    /// Conservative p99 remote result return latency.
+    pub p99_return_ticks: Option<u64>,
+    /// Time until the local action buffer reaches its qualified fallback boundary.
+    pub action_buffer_slack_ticks: Option<u64>,
+    /// Remaining task/actuation deadline slack.
+    pub deadline_slack_ticks: Option<u64>,
+    /// Local projection/dispatch guard after remote result return.
+    pub local_projection_dispatch_guard_ticks: u64,
+    /// Qualified conservative source-to-actuator AoI upper bound.
+    pub actuation_aoi_upper_ticks: Option<u64>,
+    /// Maximum task-specific AoI permitted by the consumer contract.
+    pub max_actuation_aoi_ticks: u64,
+    /// Conservative upper bound on probability of missing the declared actuation window.
+    pub poma_upper_ppm: Option<u32>,
+    /// Per-request tolerated PoMA upper bound in parts per million.
+    pub poma_limit_ppm: u32,
+    /// GPU service demand.
+    pub gpu_micros: u64,
+    /// Declared memory-bandwidth service demand.
+    pub memory_bandwidth_units: u64,
+    /// Network payload/transfer demand in bytes.
+    pub network_bytes: u64,
+    /// Incremental KV-cache allocation required for this request; None is Unknown.
+    pub kv_cache_growth_tokens: Option<u64>,
+    /// Endpoint/session/model/request identity evidence is valid.
+    pub identity_valid: bool,
+    /// Source and decision receipt digests are complete and match.
+    pub evidence_digest_valid: bool,
+    /// Clock-domain relation is qualified for the supplied age and latency bounds.
+    pub clock_mapping_valid: bool,
+    /// A qualified local fallback remains available.
+    pub local_fallback_ready: bool,
+    /// Remote transmission is allowed by the request's privacy/data policy.
+    pub privacy_policy_allows_remote_data: bool,
+    /// Admitting this request would not preempt or displace any local hard-real-time safety work.
+    pub local_hard_safety_preserved: bool,
+    /// This robot is owed a declared optional-inference service floor.
+    pub service_floor_due: bool,
+    /// Current consecutive control ticks without a useful admitted remote result.
+    pub starvation_ticks: u64,
+    /// Maximum permitted starvation before a service-floor obligation is breached.
+    pub max_starvation_ticks: u64,
+}
+
+/// Simultaneous resource budget for one admission batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResourceBudget {
+    /// GPU execution budget in microseconds.
+    pub gpu_micros: u64,
+    /// Memory-bandwidth service budget in caller-defined calibrated units.
+    pub memory_bandwidth_units: u64,
+    /// Network transfer budget in bytes.
+    pub network_bytes: u64,
+    /// Available additional KV-cache token capacity.
+    pub kv_cache_growth_tokens: u64,
+}
+
+/// Resources consumed by an admitted batch.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ResourceUse {
+    /// GPU execution used in microseconds.
+    pub gpu_micros: u64,
+    /// Memory-bandwidth service used in calibrated units.
+    pub memory_bandwidth_units: u64,
+    /// Network bytes admitted.
+    pub network_bytes: u64,
+    /// Additional KV-cache tokens reserved by this batch.
+    pub kv_cache_growth_tokens: u64,
+}
+
+impl ResourceUse {
+    fn checked_add_request(&mut self, request: &InferenceRequest) -> Result<(), ReferenceError> {
+        self.gpu_micros = self
+            .gpu_micros
+            .checked_add(request.gpu_micros)
+            .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
+        self.memory_bandwidth_units = self
+            .memory_bandwidth_units
+            .checked_add(request.memory_bandwidth_units)
+            .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
+        self.network_bytes = self
+            .network_bytes
+            .checked_add(request.network_bytes)
+            .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
+        self.kv_cache_growth_tokens = self
+            .kv_cache_growth_tokens
+            .checked_add(request.kv_cache_growth_tokens.ok_or(
+                ReferenceError::UnknownKvCacheDemand(request.request_id.clone()),
+            )?)
+            .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
+        Ok(())
+    }
+
+    fn fits(self, budget: ResourceBudget) -> bool {
+        self.gpu_micros <= budget.gpu_micros
+            && self.memory_bandwidth_units <= budget.memory_bandwidth_units
+            && self.network_bytes <= budget.network_bytes
+            && self.kv_cache_growth_tokens <= budget.kv_cache_growth_tokens
+    }
+}
+
+/// Deterministic policy arms implemented by this reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SchedulerPolicy {
+    /// Robot-order rotation from the declared cursor.
+    RoundRobin,
+    /// Earliest minimum of action-buffer slack and deadline slack.
+    EarliestDeadlineFirst,
+    /// Highest EVSI per GPU-microsecond; requires one common task-loss scale.
+    EvsiPerCompute,
+    /// Constrained lexicographic mission-aware candidate.
+    Luminous,
+}
+
+/// Round-robin cursor: requests from robot IDs lexically after this robot are visited first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchedulerCursor {
+    /// Last robot ID serviced before the current scheduling decision.
+    pub last_robot_id: Option<String>,
+}
+
+/// Request-level disposition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RequestDisposition {
+    /// Request was selected for optional remote inference.
+    Admitted,
+    /// Request was blocked by one or more hard eligibility requirements.
+    Rejected(RejectReason),
+    /// Request was eligible but did not fit in remaining batch resources.
+    ResourceCapacity,
+}
+
+/// Reason a request cannot be admitted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RejectReason {
+    /// The request identity or endpoint evidence is invalid.
+    InvalidIdentity,
+    /// The source/decision receipt digest is incomplete or mismatched.
+    InvalidEvidenceDigest,
+    /// Clock mapping is not qualified.
+    UnknownClockRelation,
+    /// Actuation-side age upper bound is missing.
+    UnknownActuationAge,
+    /// Incremental KV-cache growth demand is missing.
+    UnknownKvCacheDemand,
+    /// Actuation-side age exceeds the task limit.
+    StaleActuationAge,
+    /// p99 return latency or action-buffer slack is missing.
+    UnknownTimingBound,
+    /// p99 result plus guard cannot fit in the action-buffer/deadline window.
+    ResultReturnsTooLate,
+    /// PoMA upper bound is missing.
+    UnknownMissRisk,
+    /// PoMA upper bound exceeds the request-specific limit.
+    MissRiskTooHigh,
+    /// Supplied probability-of-miss upper bound exceeds one million ppm.
+    InvalidProbabilityBound(u32),
+    /// Request probability threshold exceeds one million ppm.
+    InvalidProbabilityLimit(u32),
+    /// Local fallback is not ready.
+    NoLocalFallback,
+    /// Request data is not allowed to leave the robot/declared trust boundary.
+    PrivacyPolicyDenied,
+    /// Optional compute would displace local hard-real-time safety work.
+    LocalSafetyWouldBeDisplaced,
+    /// EVSI or loss-scale identity is missing.
+    UnknownDecisionValue,
+    /// Decision-sufficiency receipt or one of its required identities is missing.
+    UnknownDecisionSufficiency,
+    /// The selected action is already beyond its qualified sufficiency horizon.
+    DecisionAlreadyInsufficient,
+    /// Decision-sufficiency evidence was explicitly rejected.
+    RejectedDecisionSufficiencyEvidence,
+    /// Decision, action, epoch, loss model or action-domain identity does not match.
+    DecisionSufficiencyBindingMismatch,
+    /// Remote result would return after the selected decision ceases to be sufficient.
+    DecisionResultReturnsTooLate,
+    /// Optional remote request has exactly zero task-loss value.
+    ZeroEvsi,
+    /// The declared maximum starvation interval is invalid or zero.
+    StarvationEvidenceInvalid,
+}
+
+/// Typed input or policy error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReferenceError {
+    /// A request or robot identity is empty.
+    EmptyIdentity,
+    /// A request identity is duplicated in the same candidate batch.
+    DuplicateRequestId(String),
+    /// A request's upper probability bound is outside [0, 1].
+    InvalidProbabilityBound(u32),
+    /// A request-specific probability threshold is outside [0, 1].
+    InvalidProbabilityLimit(u32),
+    /// A zero GPU demand makes EVSI-per-compute undefined.
+    ZeroComputeDemand(String),
+    /// EVSI-per-compute cannot compare unrelated task-loss scales.
+    IncomparableLossScales,
+    /// Resource sum overflowed its integer representation.
+    ResourceArithmeticOverflow,
+    /// KV-cache growth demand was not supplied for the request.
+    UnknownKvCacheDemand(String),
+    /// Candidate robot identity was duplicated in a static-cap selection.
+    DuplicateRobotId(String),
+    /// A retained active episode was not in the candidate robot set.
+    UnknownActiveRobot(String),
+    /// Existing active episodes exceed a newly configured cap; no episode is silently preempted.
+    ActiveEpisodesExceedCap { active_count: usize, cap: usize },
+}
+
+/// One request's final disposition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestResult {
+    /// Request identity.
+    pub request_id: String,
+    /// Robot identity.
+    pub robot_id: String,
+    /// Request outcome.
+    pub disposition: RequestDisposition,
+}
+
+/// Result of one optional inference admission decision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmissionReport {
+    /// Policy that produced the report.
+    pub policy: SchedulerPolicy,
+    /// Request outcomes in the original input order.
+    pub requests: Vec<RequestResult>,
+    /// Requests admitted to the optional remote inference batch.
+    pub admitted_request_ids: Vec<String>,
+    /// Resources consumed by the admitted batch.
+    pub resource_use: ResourceUse,
+    /// Robots with service-floor obligations not fulfilled by this batch.
+    pub service_floor_violations: Vec<String>,
+    /// Robots whose maximum starvation interval was already exceeded before this batch.
+    pub preexisting_starvation_breaches: Vec<String>,
+    /// Whether all supplied service-floor obligations were met.
+    pub service_floors_met: bool,
+    /// Robot cursor to supply to the next Round Robin admission call.
+    pub next_cursor_robot_id: Option<String>,
+    /// Explicitly false: this report never authorizes actuator application.
+    pub actuation_authorized: bool,
+}
+
+fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<Option<u64>, RejectReason> {
+    let decision_id = request
+        .decision_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let selected_action_id = request
+        .selected_action_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let decision_epoch_digest = request
+        .decision_epoch_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let current_control_tick = request
+        .current_control_tick
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let loss_model_digest = request
+        .decision_loss_model_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let action_domain_digest = request
+        .decision_action_domain_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let loss_scale_id = request
+        .loss_scale_id
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+    let receipt = request
+        .decision_sufficiency
+        .as_ref()
+        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+
+    let remaining_sufficient_ticks = match receipt.disposition {
+        DecisionSufficiencyDisposition::Qualified => {
+            let remaining = receipt
+                .remaining_sufficient_ticks
+                .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+            if remaining == 0 {
+                return Err(RejectReason::DecisionAlreadyInsufficient);
+            }
+            Some(remaining)
+        }
+        DecisionSufficiencyDisposition::Insufficient => {
+            if request.decision_admission_mode == DecisionAdmissionMode::PreserveCurrentDecision {
+                return Err(RejectReason::DecisionAlreadyInsufficient);
+            }
+            if receipt.remaining_sufficient_ticks.is_some() {
+                return Err(RejectReason::DecisionSufficiencyBindingMismatch);
+            }
+            // This is a replacement plan, not an extension of the old action.
+            // Local fallback and current timing bounds bridge the inference interval.
+            None
+        }
+        DecisionSufficiencyDisposition::Unknown => {
+            return Err(RejectReason::UnknownDecisionSufficiency);
+        }
+        DecisionSufficiencyDisposition::Rejected => {
+            return Err(RejectReason::RejectedDecisionSufficiencyEvidence);
+        }
+    };
+
+    let receipt_digest = receipt
+        .receipt_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty());
+    if receipt_digest.is_none()
+        || receipt.decision_id != decision_id
+        || receipt.selected_action_id != selected_action_id
+        || receipt.decision_epoch_digest != decision_epoch_digest
+        || receipt.current_control_tick != current_control_tick
+        || receipt.loss_scale_id != loss_scale_id
+        || receipt.loss_model_digest != loss_model_digest
+        || receipt.action_domain_digest != action_domain_digest
+    {
+        return Err(RejectReason::DecisionSufficiencyBindingMismatch);
+    }
+
+    Ok(remaining_sufficient_ticks)
+}
+
+fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
+    if !request.identity_valid {
+        return Err(RejectReason::InvalidIdentity);
+    }
+    if !request.evidence_digest_valid {
+        return Err(RejectReason::InvalidEvidenceDigest);
+    }
+    if !request.clock_mapping_valid {
+        return Err(RejectReason::UnknownClockRelation);
+    }
+
+    let age = request
+        .actuation_aoi_upper_ticks
+        .ok_or(RejectReason::UnknownActuationAge)?;
+    if age > request.max_actuation_aoi_ticks {
+        return Err(RejectReason::StaleActuationAge);
+    }
+
+    let p99 = request
+        .p99_return_ticks
+        .ok_or(RejectReason::UnknownTimingBound)?;
+    let buffer_slack = request
+        .action_buffer_slack_ticks
+        .ok_or(RejectReason::UnknownTimingBound)?;
+    let deadline_slack = request
+        .deadline_slack_ticks
+        .ok_or(RejectReason::UnknownTimingBound)?;
+    let decision_slack = decision_sufficiency_slack(request)?;
+    let result_and_guard = p99
+        .checked_add(request.local_projection_dispatch_guard_ticks)
+        .ok_or(RejectReason::ResultReturnsTooLate)?;
+    if result_and_guard > buffer_slack.min(deadline_slack) {
+        return Err(RejectReason::ResultReturnsTooLate);
+    }
+    if decision_slack.is_some_and(|slack| result_and_guard > slack) {
+        return Err(RejectReason::DecisionResultReturnsTooLate);
+    }
+
+    let poma = request
+        .poma_upper_ppm
+        .ok_or(RejectReason::UnknownMissRisk)?;
+    if poma > 1_000_000 {
+        return Err(RejectReason::InvalidProbabilityBound(poma));
+    }
+    if request.poma_limit_ppm > 1_000_000 {
+        return Err(RejectReason::InvalidProbabilityLimit(
+            request.poma_limit_ppm,
+        ));
+    }
+    if poma > request.poma_limit_ppm {
+        return Err(RejectReason::MissRiskTooHigh);
+    }
+
+    if !request.local_fallback_ready {
+        return Err(RejectReason::NoLocalFallback);
+    }
+    if !request.privacy_policy_allows_remote_data {
+        return Err(RejectReason::PrivacyPolicyDenied);
+    }
+    if !request.local_hard_safety_preserved {
+        return Err(RejectReason::LocalSafetyWouldBeDisplaced);
+    }
+    if request.max_starvation_ticks == 0 {
+        return Err(RejectReason::StarvationEvidenceInvalid);
+    }
+
+    if request.kv_cache_growth_tokens.is_none() {
+        return Err(RejectReason::UnknownKvCacheDemand);
+    }
+
+    let evsi = request
+        .evsi_units
+        .ok_or(RejectReason::UnknownDecisionValue)?;
+    if request
+        .loss_scale_id
+        .as_ref()
+        .is_none_or(|value| value.trim().is_empty())
+    {
+        return Err(RejectReason::UnknownDecisionValue);
+    }
+    if evsi == 0 {
+        return Err(RejectReason::ZeroEvsi);
+    }
+
+    Ok(())
+}
+
+fn slack(request: &InferenceRequest) -> u64 {
+    request
+        .action_buffer_slack_ticks
+        .unwrap_or(u64::MAX)
+        .min(request.deadline_slack_ticks.unwrap_or(u64::MAX))
+}
+
+fn ratio_cmp(a_num: u64, a_den: u64, b_num: u64, b_den: u64) -> std::cmp::Ordering {
+    (a_num as u128 * b_den as u128).cmp(&(b_num as u128 * a_den as u128))
+}
+
+fn compare_request(
+    policy: SchedulerPolicy,
+    a: &InferenceRequest,
+    b: &InferenceRequest,
+) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match policy {
+        SchedulerPolicy::RoundRobin => a
+            .robot_id
+            .cmp(&b.robot_id)
+            .then(a.request_id.cmp(&b.request_id)),
+        SchedulerPolicy::EarliestDeadlineFirst => slack(a)
+            .cmp(&slack(b))
+            .then(a.request_id.cmp(&b.request_id)),
+        SchedulerPolicy::EvsiPerCompute => {
+            let ae = a.evsi_units.unwrap_or(0);
+            let be = b.evsi_units.unwrap_or(0);
+            let ag = a.gpu_micros.max(1);
+            let bg = b.gpu_micros.max(1);
+            ratio_cmp(be, bg, ae, ag).then(a.request_id.cmp(&b.request_id))
+        }
+        SchedulerPolicy::Luminous => {
+            // A lexicographic contract, not a scalar reward:
+            // service floor, starvation debt, minimum slack, PoMA urgency,
+            // then EVSI density only within the same declared loss scale.
+            let floor = b.service_floor_due.cmp(&a.service_floor_due);
+            if floor != Ordering::Equal {
+                return floor;
+            }
+
+            let starvation = ratio_cmp(
+                b.starvation_ticks,
+                b.max_starvation_ticks.max(1),
+                a.starvation_ticks,
+                a.max_starvation_ticks.max(1),
+            );
+            if starvation != Ordering::Equal {
+                return starvation;
+            }
+
+            let slack_order = slack(a).cmp(&slack(b));
+            if slack_order != Ordering::Equal {
+                return slack_order;
+            }
+
+            let risk_order = b
+                .poma_upper_ppm
+                .unwrap_or(0)
+                .cmp(&a.poma_upper_ppm.unwrap_or(0));
+            if risk_order != Ordering::Equal {
+                return risk_order;
+            }
+
+            if a.loss_scale_id == b.loss_scale_id && a.gpu_micros > 0 && b.gpu_micros > 0 {
+                let density = ratio_cmp(
+                    b.evsi_units.unwrap_or(0),
+                    b.gpu_micros,
+                    a.evsi_units.unwrap_or(0),
+                    a.gpu_micros,
+                );
+                if density != Ordering::Equal {
+                    return density;
+                }
+            }
+
+            a.robot_id
+                .cmp(&b.robot_id)
+                .then(a.request_id.cmp(&b.request_id))
+        }
+    }
+}
+
+/// Deterministic static active-episode cap baseline for shared brain/KV serving.
+///
+/// This is deliberately separate from request-level resource admission. It
+/// models the simple concurrency control used as a strong fleet-serving
+/// baseline: preserve already active episodes, then fill remaining slots in
+/// lexical robot-ID order. It never silently preempts an active episode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticEpisodeCapSelection {
+    /// Active robot episodes after applying the cap.
+    pub active_robot_ids: Vec<String>,
+    /// Candidate robot episodes deferred by the cap.
+    pub deferred_robot_ids: Vec<String>,
+    /// Configured maximum number of simultaneously active episodes.
+    pub maximum_active_episodes: usize,
+    /// Explicitly false: selecting serving slots does not authorize actuation.
+    pub actuation_authorized: bool,
+}
+
+/// Select active robot episodes under a fixed concurrency cap.
+///
+/// The input candidate set must contain unique, nonempty robot IDs. Existing
+/// active episodes are retained across calls to avoid cache/context churn.
+/// If a cap is lowered beneath the number of existing active episodes, this
+/// function returns an error instead of silently evicting a live episode.
+pub fn select_static_active_episodes(
+    candidate_robot_ids: &[String],
+    currently_active_robot_ids: &[String],
+    maximum_active_episodes: usize,
+) -> Result<StaticEpisodeCapSelection, ReferenceError> {
+    let mut candidates = BTreeSet::new();
+    for robot_id in candidate_robot_ids {
+        if robot_id.trim().is_empty() {
+            return Err(ReferenceError::EmptyIdentity);
+        }
+        if !candidates.insert(robot_id.as_str()) {
+            return Err(ReferenceError::DuplicateRobotId(robot_id.clone()));
+        }
+    }
+
+    let mut active = BTreeSet::new();
+    for robot_id in currently_active_robot_ids {
+        if !candidates.contains(robot_id.as_str()) {
+            return Err(ReferenceError::UnknownActiveRobot(robot_id.clone()));
+        }
+        if !active.insert(robot_id.clone()) {
+            return Err(ReferenceError::DuplicateRobotId(robot_id.clone()));
+        }
+    }
+
+    if active.len() > maximum_active_episodes {
+        return Err(ReferenceError::ActiveEpisodesExceedCap {
+            active_count: active.len(),
+            cap: maximum_active_episodes,
+        });
+    }
+
+    for robot_id in &candidates {
+        if active.len() >= maximum_active_episodes {
+            break;
+        }
+        active.insert((*robot_id).to_owned());
+    }
+
+    let active_robot_ids: Vec<String> = active.into_iter().collect();
+    let active_set: BTreeSet<&str> = active_robot_ids.iter().map(String::as_str).collect();
+    let deferred_robot_ids = candidates
+        .into_iter()
+        .filter(|robot_id| !active_set.contains(robot_id))
+        .map(str::to_owned)
+        .collect();
+
+    Ok(StaticEpisodeCapSelection {
+        active_robot_ids,
+        deferred_robot_ids,
+        maximum_active_episodes,
+        actuation_authorized: false,
+    })
+}
+
+/// Admit a batch of optional remote inference requests under the selected policy.
+///
+/// The function performs hard eligibility before sorting, enforces three
+/// simultaneous resource budgets, and returns request-level dispositions.
+/// It never authorizes use of the returned model result or any actuator command.
+pub fn admit_batch(
+    policy: SchedulerPolicy,
+    cursor: &SchedulerCursor,
+    budget: ResourceBudget,
+    requests: &[InferenceRequest],
+) -> Result<AdmissionReport, ReferenceError> {
+    if requests.is_empty() {
+        return Ok(AdmissionReport {
+            policy,
+            requests: Vec::new(),
+            admitted_request_ids: Vec::new(),
+            resource_use: ResourceUse::default(),
+            service_floor_violations: Vec::new(),
+            preexisting_starvation_breaches: Vec::new(),
+            service_floors_met: true,
+            next_cursor_robot_id: None,
+            actuation_authorized: false,
+        });
+    }
+
+    let mut seen_ids = BTreeSet::new();
+    for request in requests {
+        if request.request_id.trim().is_empty() || request.robot_id.trim().is_empty() {
+            return Err(ReferenceError::EmptyIdentity);
+        }
+        if !seen_ids.insert(request.request_id.as_str()) {
+            return Err(ReferenceError::DuplicateRequestId(
+                request.request_id.clone(),
+            ));
+        }
+        if let Some(poma) = request.poma_upper_ppm
+            && poma > 1_000_000
+        {
+            return Err(ReferenceError::InvalidProbabilityBound(poma));
+        }
+        if request.poma_limit_ppm > 1_000_000 {
+            return Err(ReferenceError::InvalidProbabilityLimit(
+                request.poma_limit_ppm,
+            ));
+        }
+    }
+
+    let mut eligible = Vec::new();
+    let mut outcomes: BTreeMap<String, RequestDisposition> = BTreeMap::new();
+    for request in requests {
+        match eligibility(request) {
+            Ok(()) => eligible.push(request),
+            Err(reason) => {
+                outcomes.insert(
+                    request.request_id.clone(),
+                    RequestDisposition::Rejected(reason),
+                );
+            }
+        }
+    }
+
+    if policy == SchedulerPolicy::EvsiPerCompute {
+        let scales: BTreeSet<&str> = eligible
+            .iter()
+            .filter_map(|request| request.loss_scale_id.as_deref())
+            .collect();
+        if scales.len() > 1 {
+            return Err(ReferenceError::IncomparableLossScales);
+        }
+        for request in &eligible {
+            if request.gpu_micros == 0 {
+                return Err(ReferenceError::ZeroComputeDemand(
+                    request.request_id.clone(),
+                ));
+            }
+        }
+    }
+
+    let mut ordered: Vec<&InferenceRequest> = eligible;
+    if policy == SchedulerPolicy::RoundRobin {
+        if let Some(last) = cursor.last_robot_id.as_deref() {
+            ordered.sort_by(|a, b| {
+                let a_after = a.robot_id.as_str() > last;
+                let b_after = b.robot_id.as_str() > last;
+                b_after
+                    .cmp(&a_after)
+                    .then_with(|| compare_request(policy, a, b))
+            });
+        } else {
+            ordered.sort_by(|a, b| compare_request(policy, a, b));
+        }
+    } else {
+        ordered.sort_by(|a, b| compare_request(policy, a, b));
+    }
+
+    let mut resource_use = ResourceUse::default();
+    let mut admitted_request_ids = Vec::new();
+    let mut admitted_robots = BTreeSet::new();
+    let mut next_cursor_robot_id = None;
+
+    for request in ordered {
+        let mut proposed = resource_use;
+        proposed.checked_add_request(request)?;
+        if proposed.fits(budget) {
+            resource_use = proposed;
+            admitted_request_ids.push(request.request_id.clone());
+            admitted_robots.insert(request.robot_id.clone());
+            next_cursor_robot_id = Some(request.robot_id.clone());
+            outcomes.insert(request.request_id.clone(), RequestDisposition::Admitted);
+        } else {
+            outcomes.insert(
+                request.request_id.clone(),
+                RequestDisposition::ResourceCapacity,
+            );
+        }
+    }
+
+    if next_cursor_robot_id.is_none() {
+        next_cursor_robot_id = cursor.last_robot_id.clone();
+    }
+
+    let service_floor_robots: BTreeSet<String> = requests
+        .iter()
+        .filter(|request| request.service_floor_due)
+        .map(|request| request.robot_id.clone())
+        .collect();
+    let service_floor_violations: Vec<String> = service_floor_robots
+        .iter()
+        .filter(|robot_id| !admitted_robots.contains(*robot_id))
+        .cloned()
+        .collect();
+    let preexisting_starvation_breaches: Vec<String> = requests
+        .iter()
+        .filter(|request| request.starvation_ticks > request.max_starvation_ticks)
+        .map(|request| request.robot_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    let results = requests
+        .iter()
+        .map(|request| RequestResult {
+            request_id: request.request_id.clone(),
+            robot_id: request.robot_id.clone(),
+            disposition: outcomes
+                .get(&request.request_id)
+                .cloned()
+                .unwrap_or(RequestDisposition::ResourceCapacity),
+        })
+        .collect();
+
+    Ok(AdmissionReport {
+        policy,
+        requests: results,
+        admitted_request_ids,
+        resource_use,
+        service_floors_met: service_floor_violations.is_empty()
+            && preexisting_starvation_breaches.is_empty(),
+        service_floor_violations,
+        preexisting_starvation_breaches,
+        next_cursor_robot_id,
+        actuation_authorized: false,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(id: &str, robot: &str) -> InferenceRequest {
+        InferenceRequest {
+            request_id: id.to_owned(),
+            robot_id: robot.to_owned(),
+            decision_id: Some(format!("decision-{id}")),
+            selected_action_id: Some(format!("action-{id}")),
+            decision_epoch_digest: Some("robot-epoch-1".into()),
+            current_control_tick: Some(100),
+            decision_loss_model_digest: Some("loss-model-v1".into()),
+            decision_action_domain_digest: Some("action-domain-v1".into()),
+            decision_admission_mode: DecisionAdmissionMode::PreserveCurrentDecision,
+            decision_sufficiency: Some(DecisionSufficiencyReceipt {
+                disposition: DecisionSufficiencyDisposition::Qualified,
+                receipt_digest: Some(format!("sufficiency-receipt-{id}")),
+                decision_id: format!("decision-{id}"),
+                selected_action_id: format!("action-{id}"),
+                decision_epoch_digest: "robot-epoch-1".into(),
+                current_control_tick: 100,
+                loss_scale_id: "task-loss-v1".into(),
+                loss_model_digest: "loss-model-v1".into(),
+                action_domain_digest: "action-domain-v1".into(),
+                remaining_sufficient_ticks: Some(1_000),
+            }),
+            loss_scale_id: Some("task-loss-v1".to_owned()),
+            evsi_units: Some(10),
+            p99_return_ticks: Some(2),
+            action_buffer_slack_ticks: Some(10),
+            deadline_slack_ticks: Some(10),
+            local_projection_dispatch_guard_ticks: 0,
+            actuation_aoi_upper_ticks: Some(3),
+            max_actuation_aoi_ticks: 5,
+            poma_upper_ppm: Some(10_000),
+            poma_limit_ppm: 50_000,
+            gpu_micros: 10,
+            memory_bandwidth_units: 10,
+            network_bytes: 10,
+            kv_cache_growth_tokens: Some(10),
+            identity_valid: true,
+            evidence_digest_valid: true,
+            clock_mapping_valid: true,
+            local_fallback_ready: true,
+            privacy_policy_allows_remote_data: true,
+            local_hard_safety_preserved: true,
+            service_floor_due: false,
+            starvation_ticks: 1,
+            max_starvation_ticks: 10,
+        }
+    }
+
+    fn budget() -> ResourceBudget {
+        ResourceBudget {
+            gpu_micros: 100,
+            memory_bandwidth_units: 100,
+            network_bytes: 100,
+            kv_cache_growth_tokens: 100,
+        }
+    }
+
+    fn cursor() -> SchedulerCursor {
+        SchedulerCursor {
+            last_robot_id: None,
+        }
+    }
+
+    #[test]
+    fn static_episode_cap_preserves_existing_active_episodes() {
+        let candidates = vec!["r1".into(), "r2".into(), "r3".into(), "r4".into()];
+        let active = vec!["r3".into(), "r4".into()];
+        let selected = select_static_active_episodes(&candidates, &active, 2).unwrap();
+        assert_eq!(selected.active_robot_ids, vec!["r3", "r4"]);
+        assert_eq!(selected.deferred_robot_ids, vec!["r1", "r2"]);
+        assert!(!selected.actuation_authorized);
+    }
+
+    #[test]
+    fn static_episode_cap_fills_remaining_slots_deterministically() {
+        let candidates = vec!["r4".into(), "r2".into(), "r3".into(), "r1".into()];
+        let active = vec!["r4".into()];
+        let selected = select_static_active_episodes(&candidates, &active, 3).unwrap();
+        assert_eq!(selected.active_robot_ids, vec!["r1", "r2", "r4"]);
+        assert_eq!(selected.deferred_robot_ids, vec!["r3"]);
+    }
+
+    #[test]
+    fn static_episode_cap_does_not_preempt_when_cap_is_lowered() {
+        let candidates = vec!["r1".into(), "r2".into()];
+        let active = vec!["r1".into(), "r2".into()];
+        assert_eq!(
+            select_static_active_episodes(&candidates, &active, 1),
+            Err(ReferenceError::ActiveEpisodesExceedCap {
+                active_count: 2,
+                cap: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn static_episode_cap_accepts_zero_as_explicit_pause() {
+        let candidates = vec!["r1".into(), "r2".into()];
+        let selected = select_static_active_episodes(&candidates, &[], 0).unwrap();
+        assert!(selected.active_robot_ids.is_empty());
+        assert_eq!(selected.deferred_robot_ids, vec!["r1", "r2"]);
+    }
+
+    #[test]
+    fn unknown_or_missing_decision_horizon_blocks_remote_admission() {
+        let mut missing = request("q1", "r1");
+        missing.decision_sufficiency = None;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[missing]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownDecisionSufficiency)
+        );
+
+        let mut unknown = request("q2", "r2");
+        unknown.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Unknown;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[unknown]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownDecisionSufficiency)
+        );
+    }
+
+    #[test]
+    fn insufficient_or_rejected_decision_horizon_blocks_remote_admission() {
+        let mut insufficient = request("q1", "r1");
+        insufficient
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[insufficient],
+        )
+        .unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionAlreadyInsufficient)
+        );
+
+        let mut rejected = request("q2", "r2");
+        rejected.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Rejected;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[rejected]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::RejectedDecisionSufficiencyEvidence)
+        );
+    }
+
+    #[test]
+    fn decision_horizon_must_bind_exact_decision_action_epoch_model_and_domain() {
+        let mut audit = request("q1", "r1");
+        audit.selected_action_id = Some("different-action".into());
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionSufficiencyBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn remote_result_must_return_before_decision_sufficiency_expires() {
+        let mut audit = request("q1", "r1");
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(1);
+        // The buffer and task deadline each have ten ticks of slack, but the
+        // calibrated decision horizon has only one tick remaining.
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn explicit_replan_can_use_local_fallback_after_current_decision_becomes_insufficient() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Insufficient;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = None;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
+        assert!(!report.actuation_authorized);
+    }
+
+    #[test]
+    fn replan_does_not_bypass_unknown_decision_sufficiency() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Unknown;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownDecisionSufficiency)
+        );
+    }
+
+    #[test]
+    fn insufficient_replan_receipt_cannot_claim_a_positive_remaining_horizon() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Insufficient;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionSufficiencyBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn replan_without_local_fallback_is_rejected() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Insufficient;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = None;
+        audit.local_fallback_ready = false;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::NoLocalFallback)
+        );
+    }
+
+    #[test]
+    fn replacement_mode_still_respects_a_still_valid_decision_horizon() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(1);
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn exact_decision_horizon_boundary_is_inclusive() {
+        let mut audit = request("q1", "r1");
+        audit.p99_return_ticks = Some(2);
+        audit.local_projection_dispatch_guard_ticks = 1;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(3);
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
+    }
+
+    #[test]
+    fn action_buffer_and_task_deadline_remain_independent_tighter_bounds() {
+        let mut buffer_limited = request("q1", "r1");
+        buffer_limited.action_buffer_slack_ticks = Some(1);
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[buffer_limited],
+        )
+        .unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
+
+        let mut deadline_limited = request("q2", "r2");
+        deadline_limited.deadline_slack_ticks = Some(1);
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[deadline_limited],
+        )
+        .unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn admits_eligible_positive_value_request() {
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[request("q1", "r1")],
+        )
+        .unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
+        assert!(report.service_floors_met);
+        assert!(!report.actuation_authorized);
+    }
+
+    #[test]
+    fn zero_evsi_is_declined_even_when_fresh() {
+        let mut q = request("q1", "r1");
+        q.evsi_units = Some(0);
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert!(report.admitted_request_ids.is_empty());
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ZeroEvsi)
+        );
+    }
+
+    #[test]
+    fn unknown_age_fails_closed() {
+        let mut q = request("q1", "r1");
+        q.actuation_aoi_upper_ticks = None;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownActuationAge)
+        );
+    }
+
+    #[test]
+    fn stale_age_is_rejected() {
+        let mut q = request("q1", "r1");
+        q.actuation_aoi_upper_ticks = Some(6);
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::StaleActuationAge)
+        );
+    }
+
+    #[test]
+    fn unknown_timing_is_rejected() {
+        let mut q = request("q1", "r1");
+        q.p99_return_ticks = None;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownTimingBound)
+        );
+    }
+
+    #[test]
+    fn late_result_cannot_enter_batch() {
+        let mut q = request("q1", "r1");
+        q.p99_return_ticks = Some(11);
+        q.action_buffer_slack_ticks = Some(10);
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn projection_dispatch_guard_is_reserved_before_admission() {
+        let mut q = request("q1", "r1");
+        q.p99_return_ticks = Some(8);
+        q.action_buffer_slack_ticks = Some(10);
+        q.deadline_slack_ticks = Some(12);
+        q.local_projection_dispatch_guard_ticks = 3;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn result_and_guard_exactly_at_slack_is_admissible() {
+        let mut q = request("q1", "r1");
+        q.p99_return_ticks = Some(8);
+        q.action_buffer_slack_ticks = Some(10);
+        q.deadline_slack_ticks = Some(12);
+        q.local_projection_dispatch_guard_ticks = 2;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
+    }
+
+    #[test]
+    fn excessive_poma_is_rejected() {
+        let mut q = request("q1", "r1");
+        q.poma_upper_ppm = Some(80_000);
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::MissRiskTooHigh)
+        );
+    }
+
+    #[test]
+    fn safety_work_cannot_be_displaced() {
+        let mut q = request("q1", "r1");
+        q.local_hard_safety_preserved = false;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::LocalSafetyWouldBeDisplaced)
+        );
+    }
+
+    #[test]
+    fn local_fallback_is_mandatory() {
+        let mut q = request("q1", "r1");
+        q.local_fallback_ready = false;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::NoLocalFallback)
+        );
+    }
+
+    #[test]
+    fn privacy_denial_is_mandatory() {
+        let mut q = request("q1", "r1");
+        q.privacy_policy_allows_remote_data = false;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::PrivacyPolicyDenied)
+        );
+    }
+
+    #[test]
+    fn service_floor_precedes_optional_urgency() {
+        let mut floor = request("a_floor", "r_floor");
+        floor.service_floor_due = true;
+        floor.starvation_ticks = 7;
+        let mut urgent = request("b_urgent", "r_urgent");
+        urgent.action_buffer_slack_ticks = Some(1);
+        urgent.deadline_slack_ticks = Some(1);
+        let tight = ResourceBudget {
+            gpu_micros: 10,
+            memory_bandwidth_units: 10,
+            network_bytes: 10,
+            kv_cache_growth_tokens: 10,
+        };
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            tight,
+            &[urgent, floor],
+        )
+        .unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["a_floor"]);
+        assert!(report.service_floors_met);
+    }
+
+    #[test]
+    fn already_overdue_service_is_admitted_and_breach_is_reported() {
+        let mut q = request("q_due", "r1");
+        q.service_floor_due = true;
+        q.starvation_ticks = 12;
+        q.max_starvation_ticks = 10;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q_due"]);
+        assert!(report.service_floor_violations.is_empty());
+        assert_eq!(report.preexisting_starvation_breaches, vec!["r1"]);
+        assert!(!report.service_floors_met);
+    }
+
+    #[test]
+    fn zero_starvation_limit_is_invalid_evidence() {
+        let mut q = request("q_due", "r1");
+        q.max_starvation_ticks = 0;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::StarvationEvidenceInvalid)
+        );
+    }
+
+    #[test]
+    fn service_floor_miss_is_reported_not_hidden_by_throughput() {
+        let mut floor = request("q_floor", "r1");
+        floor.service_floor_due = true;
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            ResourceBudget {
+                gpu_micros: 0,
+                memory_bandwidth_units: 0,
+                network_bytes: 0,
+                kv_cache_growth_tokens: 0,
+            },
+            &[floor],
+        )
+        .unwrap();
+        assert!(!report.service_floors_met);
+        assert_eq!(report.service_floor_violations, vec!["r1"]);
+    }
+
+    #[test]
+    fn unknown_kv_cache_growth_is_rejected() {
+        let mut q = request("q1", "r1");
+        q.kv_cache_growth_tokens = None;
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownKvCacheDemand)
+        );
+    }
+
+    #[test]
+    fn kv_cache_growth_is_an_independent_capacity_constraint() {
+        let mut q1 = request("q1", "r1");
+        let mut q2 = request("q2", "r2");
+        q1.kv_cache_growth_tokens = Some(60);
+        q2.kv_cache_growth_tokens = Some(60);
+        let tight = ResourceBudget {
+            gpu_micros: 100,
+            memory_bandwidth_units: 100,
+            network_bytes: 100,
+            kv_cache_growth_tokens: 100,
+        };
+        let report = admit_batch(SchedulerPolicy::RoundRobin, &cursor(), tight, &[q1, q2]).unwrap();
+        assert_eq!(report.admitted_request_ids.len(), 1);
+        assert_eq!(report.resource_use.kv_cache_growth_tokens, 60);
+    }
+
+    #[test]
+    fn memory_bandwidth_is_a_first_class_batch_constraint() {
+        let mut q1 = request("q1", "r1");
+        let mut q2 = request("q2", "r2");
+        q1.memory_bandwidth_units = 60;
+        q2.memory_bandwidth_units = 60;
+        let tight = ResourceBudget {
+            gpu_micros: 100,
+            memory_bandwidth_units: 100,
+            network_bytes: 100,
+            kv_cache_growth_tokens: 100,
+        };
+        let report = admit_batch(SchedulerPolicy::RoundRobin, &cursor(), tight, &[q1, q2]).unwrap();
+        assert_eq!(report.admitted_request_ids.len(), 1);
+        assert!(report.resource_use.memory_bandwidth_units <= 100);
+    }
+
+    #[test]
+    fn evsi_per_compute_refuses_unrelated_loss_scales() {
+        let a = request("q1", "r1");
+        let mut b = request("q2", "r2");
+        b.loss_scale_id = Some("other-task-v1".to_owned());
+        b.decision_sufficiency.as_mut().unwrap().loss_scale_id = "other-task-v1".into();
+        assert_eq!(
+            admit_batch(
+                SchedulerPolicy::EvsiPerCompute,
+                &cursor(),
+                budget(),
+                &[a, b],
+            ),
+            Err(ReferenceError::IncomparableLossScales)
+        );
+    }
+
+    #[test]
+    fn evsi_per_compute_orders_higher_value_density_first() {
+        let mut a = request("q1", "r1");
+        let mut b = request("q2", "r2");
+        a.evsi_units = Some(10);
+        a.gpu_micros = 20;
+        b.evsi_units = Some(9);
+        b.gpu_micros = 10;
+        let tight = ResourceBudget {
+            gpu_micros: 10,
+            memory_bandwidth_units: 20,
+            network_bytes: 20,
+            kv_cache_growth_tokens: 10,
+        };
+        let report =
+            admit_batch(SchedulerPolicy::EvsiPerCompute, &cursor(), tight, &[a, b]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q2"]);
+    }
+
+    #[test]
+    fn edf_uses_minimum_of_action_buffer_and_deadline_slack() {
+        let mut long = request("q_long", "r1");
+        long.action_buffer_slack_ticks = Some(8);
+        long.deadline_slack_ticks = Some(20);
+        let mut short = request("q_short", "r2");
+        short.action_buffer_slack_ticks = Some(12);
+        short.deadline_slack_ticks = Some(4);
+        let tight = ResourceBudget {
+            gpu_micros: 10,
+            memory_bandwidth_units: 10,
+            network_bytes: 10,
+            kv_cache_growth_tokens: 10,
+        };
+        let report = admit_batch(
+            SchedulerPolicy::EarliestDeadlineFirst,
+            &cursor(),
+            tight,
+            &[long, short],
+        )
+        .unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q_short"]);
+    }
+
+    #[test]
+    fn round_robin_cursor_rotates_robot_priority() {
+        let a = request("q_a", "a");
+        let b = request("q_b", "b");
+        let c = request("q_c", "c");
+        let tight = ResourceBudget {
+            gpu_micros: 10,
+            memory_bandwidth_units: 10,
+            network_bytes: 10,
+            kv_cache_growth_tokens: 10,
+        };
+        let report = admit_batch(
+            SchedulerPolicy::RoundRobin,
+            &SchedulerCursor {
+                last_robot_id: Some("a".to_owned()),
+            },
+            tight,
+            &[a, b, c],
+        )
+        .unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q_b"]);
+    }
+
+    #[test]
+    fn duplicate_request_ids_are_rejected() {
+        let a = request("same", "r1");
+        let b = request("same", "r2");
+        assert_eq!(
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[a, b],),
+            Err(ReferenceError::DuplicateRequestId("same".to_owned()))
+        );
+    }
+
+    #[test]
+    fn round_robin_cursor_is_preserved_when_no_request_is_admitted() {
+        let report = admit_batch(
+            SchedulerPolicy::RoundRobin,
+            &SchedulerCursor {
+                last_robot_id: Some("robot-m".to_owned()),
+            },
+            ResourceBudget {
+                gpu_micros: 0,
+                memory_bandwidth_units: 0,
+                network_bytes: 0,
+                kv_cache_growth_tokens: 0,
+            },
+            &[request("q1", "robot-a")],
+        )
+        .unwrap();
+        assert!(report.admitted_request_ids.is_empty());
+        assert_eq!(report.next_cursor_robot_id.as_deref(), Some("robot-m"));
+    }
+
+    #[test]
+    fn empty_batch_is_a_valid_noop() {
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[]).unwrap();
+        assert!(report.admitted_request_ids.is_empty());
+        assert!(report.service_floors_met);
+        assert!(!report.actuation_authorized);
+    }
+}
