@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-validity-observation-bundle-v1.schema.json",
+  "title": "Melothaea music-edit validity observation bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_output_sha256",
+    "source_lineage_sha256",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-validity-observation-bundle-v1"
+    },
+    "candidate_output_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "source_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "evidence_sha256",
+        "method_id",
+        "method_sha256"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "symbolic",
+            "acoustic",
+            "human_adjudication",
+            "renderer_bound"
+          ]
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "property",
+        "scope",
+        "envelope_sha256",
+        "candidate_output_sha256",
+        "source_lineage_sha256",
+        "sources",
+        "payload"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "property": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidate_output_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "text"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value",
+                "unit",
+                "uncertainty"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "scalar"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uncertainty": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "present"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "presence"
+                },
+                "present": {
+                  "type": "boolean"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "before",
+                "after"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "text_comparison"
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "before",
+                "after",
+                "unit",
+                "uncertainty"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "numeric_comparison"
+                },
+                "before": {
+                  "type": "number"
+                },
+                "after": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uncertainty": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "values",
+                "unit",
+                "uncertainty"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "numeric_series"
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uncertainty": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
