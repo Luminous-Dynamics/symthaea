@@ -93,6 +93,9 @@ const RULES: &[MethodRule] = &[
     MethodRule { method_id: "ASTM_D4896", edition: "D4896-01R24", evidence_kind: "interpretation_guide", material_pair_classes: &["single_lap_bonded_joint"], geometry: "single_lap", endpoint: "single_lap_result_interpretation_guidance", allowed_claims: &["interpretation_guidance_reference"], claim_ceiling: "guidance reference for interpreting single-lap adhesive-joint strength results; not a test measurement or design allowable" },
     MethodRule { method_id: "ASTM_D5656_D5656M", edition: "D5656/D5656M-26", evidence_kind: "measurement", material_pair_classes: &["aluminum_thick_adherend_joint"], geometry: "thick_adherend_lap", endpoint: "adhesive_shear_stress_strain_response", allowed_claims: &["adhesive_constitutive_response_observation"], claim_ceiling: "adhesive shear stress-strain, proportional-limit and shear-strain-at-failure characterization for the stated aluminum thick-adherend specimen; not substrate-specific adhesion strength or a design allowable" },
     MethodRule { method_id: "ASTM_D5573", edition: "D5573-99R19", evidence_kind: "classification_practice", material_pair_classes: &["frp_smc_joint"], geometry: "failure_surface_classification", endpoint: "frp_joint_failure_mode_classification", allowed_claims: &["failure_mode_classification_reference"], claim_ceiling: "descriptive classification of failure modes for the scoped SMC FRP adhesive joint; the practice does not judge acceptability, strength, product disposition or safety" },
+    MethodRule { method_id: "ASTM_D882", edition: "D882-26", evidence_kind: "measurement", material_pair_classes: &["plastic_film_lt_1mm"], geometry: "tensile_strip", endpoint: "thin_film_tensile_properties", allowed_claims: &["substrate_mechanical_integrity_observation"], claim_ceiling: "tensile properties of plastic films and thin sheeting below 1.0 mm under the declared D882-26 conditions; not a universal product-integrity or safety claim" },
+    MethodRule { method_id: "ISO_15106_5", edition: "ISO 15106-5:2015", evidence_kind: "measurement", material_pair_classes: &["plastic_film_sheet_laminate"], geometry: "wvtr_pressure_sensor", endpoint: "water_vapour_transmission_rate", allowed_claims: &["substrate_barrier_integrity_observation"], claim_ceiling: "water-vapour transmission rate of plastic film, sheeting and multilayer structures using the pressure-sensor method under the declared test conditions" },
+    MethodRule { method_id: "ISO_15105_2", edition: "ISO 15105-2:2025", evidence_kind: "measurement", material_pair_classes: &["plastic_film_sheet_laminate"], geometry: "equal_pressure_gas_transmission", endpoint: "gas_transmission_rate", allowed_claims: &["substrate_barrier_integrity_observation"], claim_ceiling: "gas-transmission rate of plastic film, sheeting, laminates, co-extruded and flexible plastic-coated materials by the equal-pressure method under the declared gas and test conditions" },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,6 +227,15 @@ pub(super) fn decide(case: &ScopeEvidence) -> Decision {
         );
     }
 
+    if case.method_id == "ASTM_D882"
+        && case.material_pair_class != "plastic_film_lt_1mm"
+    {
+        return blocked(
+            "D882-26 is scoped to plastic film and thin sheeting below 1.0 mm; thicker specimens require the applicable alternative method and scope review",
+            rule.claim_ceiling,
+        );
+    }
+
     if !rule.material_pair_classes.contains(&case.material_pair_class.as_str()) {
         return rejected(
             "material-pair class is outside the encoded scope of the exact method edition",
@@ -298,7 +310,7 @@ fn read_fixture(path: &Path) -> anyhow::Result<Fixture> {
 
 pub fn run(path: &Path) -> anyhow::Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-claim-scope-fixture-v0.3" {
+    if fixture.schema_version != "plasma-claim-scope-fixture-v0.4" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -359,12 +371,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_claim_scope_fixture_v0_3.json");
+        include_str!("../../data/research/plasma_claim_scope_fixture_v0_4.json");
 
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
-        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.3");
+        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.4");
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
