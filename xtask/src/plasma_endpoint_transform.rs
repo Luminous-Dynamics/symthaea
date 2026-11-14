@@ -729,6 +729,27 @@ mod tests {
     }
 
     #[test]
+    fn registered_d5868_frp_joint_strength_is_admissible() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-frp-d5868-direct-strength").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Pass);
+    }
+
+    #[test]
+    fn constitutive_response_method_cannot_replace_joint_strength() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "d5656-constitutive-response-not-joint-strength").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn unsupported_d5573_material_family_is_blocked() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "d5573-general-frp-scope-not-admitted").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Blocked);
+    }
+
+    #[test]
     fn missing_design_digest_blocks_a_derived_endpoint() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
         let case = fixture.cases.iter().find(|case| case.id == "missing-design-receipt-digest").expect("case exists");
