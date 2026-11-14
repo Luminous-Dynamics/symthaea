@@ -262,6 +262,7 @@ pub enum MusicRealizationBridgeIssueV1 {
     InvalidReconciliationBinding,
     ProviderRequestIdentityMismatch,
     ExpectedBindingMismatch(&'static str),
+    RealizationEvidenceNotRequiredByPolicy,
     InvalidVerifierDigest,
     UnresolvedExecutionCannotBeVerified,
     MissingIdempotencyKeyForRetry,
@@ -703,6 +704,13 @@ pub fn verify_music_realization_transaction_binding_v1(
     if !validate_music_edit_transaction_v1(transaction).is_empty() {
         issues.push(MusicRealizationBridgeIssueV1::TransactionInvalid);
     }
+    if !transaction
+        .policy
+        .required_evidence
+        .contains(&K::RealizationExecution)
+    {
+        issues.push(MusicRealizationBridgeIssueV1::RealizationEvidenceNotRequiredByPolicy);
+    }
     if receipt.payload.transaction_id != transaction.transaction_id {
         issues.push(MusicRealizationBridgeIssueV1::TransactionMismatch);
     }
@@ -1096,6 +1104,34 @@ mod tests {
         attach_realization_evidence(&mut tx, evidence);
         let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Accept);
+    }
+
+    #[test]
+    fn bridge_refuses_when_transaction_policy_omits_realization_evidence() {
+        let bytes = b"candidate";
+        let output_sha = sha256_bytes(bytes);
+        let mut tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        tx.policy
+            .required_evidence
+            .retain(|kind| *kind != MusicEditEvidenceKindV1::RealizationExecution);
+        tx.attempts[0]
+            .evidence
+            .retain(|record| record.kind != MusicEditEvidenceKindV1::RealizationExecution);
+        tx.policy_sha256 = music_edit_transaction_policy_digest_v1(&tx.policy).unwrap();
+        let receipt = completed_receipt(&tx, bytes);
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes)
+        )
+        .unwrap_err()
+        .contains(&MusicRealizationBridgeIssueV1::RealizationEvidenceNotRequiredByPolicy));
     }
 
     #[test]
