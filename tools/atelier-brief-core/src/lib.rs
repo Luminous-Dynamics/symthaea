@@ -6,6 +6,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod preset_stack;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
