@@ -546,3 +546,19 @@ Freeze the corpus and task cutoff before execution. Keep a private temporal hold
 The first PR's authored tests cover deterministic query normalization, term bounds, punctuation/Boolean-injection resistance, stopword-only prompts and relevance-versus-recency selection. They are unexecuted until a runner is available. The PR does not yet demonstrate Recall@k improvement.
 
 A broader search can make Symthaea less likely to overlook useful papers. It cannot establish that those papers are correct, independent, novel, or supportive of the current claim.
+
+
+### 11.5 Retrieval security is part of research quality
+
+The source-fetcher is part of the research threat model. The current \`WebResearcher::fetch_and_extract\` performs direct HTTP fetches from search-result URLs and buffers response text before truncating to the configured content length. Research retrieval must reuse the repository's outbound transport and redirect protections rather than become a parallel unrestricted network stack.
+
+This is tracked by [RES-SEC-RESEARCH-FETCH-001 #12181](https://github.com/Luminous-Dynamics/symthaea/issues/12181), composing:
+- #4405 — bounded HTTP/OpenAPI transport, SSRF and response limits;
+- #7435 — outbound URL/redirect authorization and actual egress enforcement;
+- #5497 — hostile OSINT corpus and source-authority non-laundering;
+- #10771 — provenance-to-effect adversarial evaluation.
+
+The required design checks the initial URL and every redirect before dispatch, protects actual DNS/connection/egress boundaries, streams with byte/time limits, never forwards provider credentials to arbitrary result URLs, and preserves source/truncation provenance. External page text remains untrusted data: it cannot change the research objective, tools, policies, credentials, persistent grammar, or execution authority.
+
+A safe crawler is not equivalent to a prompt-injection-proof researcher. The adversarial suite must separately measure outbound containment, credential leakage, source-to-policy escalation, benign false refusals and retrieval utility.
+
