@@ -1,0 +1,46 @@
+name: AIRROAD Complex FRF Impropriety Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_COMPLEX_FRF_IMPROPRIETY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-complex-frf-impropriety-v0.1.json"
+      - "tools/airroad-complex-frf-impropriety/verify_augmented_covariance.py"
+      - ".github/workflows/airroad-complex-frf-impropriety-reference.yml"
+  push:
+    branches:
+      - research/airroad-complex-frf-impropriety-v0.1
+    paths:
+      - "docs/research/AIRROAD_COMPLEX_FRF_IMPROPRIETY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-complex-frf-impropriety-v0.1.json"
+      - "tools/airroad-complex-frf-impropriety/verify_augmented_covariance.py"
+      - ".github/workflows/airroad-complex-frf-impropriety-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-complex-frf-impropriety-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-augmented-covariance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute augmented covariance oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-complex-frf-impropriety/verify_augmented_covariance.py
+          python3 \
+            tools/airroad-complex-frf-impropriety/verify_augmented_covariance.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-complex-frf-impropriety-v0.1.json \
+            > /dev/null
