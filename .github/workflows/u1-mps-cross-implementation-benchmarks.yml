@@ -1,0 +1,72 @@
+name: U1 MPS cross-implementation benchmark smoke
+
+on:
+  push:
+    branches:
+      - research/u1-mps-cross-implementation-benchmarks-20261114
+    paths:
+      - benchmarks/u1_tebd/**
+  pull_request:
+    branches:
+      - research/u1-tebd-strang-stepper-20261113
+    paths:
+      - benchmarks/u1_tebd/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: u1-mps-cross-benchmark-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quimb-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: benchmarks/u1_tebd/external/quimb/requirements.txt
+      - name: Install pinned Quimb environment
+        run: python -m pip install -r benchmarks/u1_tebd/external/quimb/requirements.txt
+      - name: Compile baseline runner
+        run: python -m py_compile benchmarks/u1_tebd/external/quimb/run_quimb_baseline.py
+      - name: Run two-site dense-oracle smoke
+        run: |
+          python benchmarks/u1_tebd/external/quimb/run_quimb_baseline.py \
+            --case u1-two-site-hopping-known-answer --track fixed_bond \
+            --warmups 0 --repeats 1 --output /tmp/quimb-u1-smoke.json
+      - name: Assert discrete and continuous known answers
+        run: |
+          python - <<'PY'
+          import json
+          p = json.load(open("/tmp/quimb-u1-smoke.json"))
+          r = p["records"][0]
+          assert r["dense_discrete_oracle"] is not None
+          assert r["continuous_time_oracle"] is not None
+          assert r["charge_metrics"]["charge_leakage_probability"] <= 1e-12
+          assert r["dense_discrete_oracle"]["state_l2_error"] <= 1e-10
+          assert r["continuous_time_oracle"]["state_l2_error"] <= 1e-8
+          PY
+
+  itensor-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.13.1"
+      - uses: julia-actions/cache@v2
+      - name: Instantiate pinned ITensorMPS environment
+        run: julia --project=benchmarks/u1_tebd/external/itensor -e 'using Pkg; Pkg.instantiate()'
+      - name: Run two-site QN and dense-oracle smoke
+        run: |
+          julia --project=benchmarks/u1_tebd/external/itensor \
+            benchmarks/u1_tebd/external/itensor/run_itensor_baseline.jl \
+            --case=u1-two-site-hopping-known-answer --track=fixed_bond \
+            --warmups=0 --repeats=1 --output=/tmp/itensor-u1-smoke.json
+      - name: Assert discrete and continuous known answers
+        run: |
+          julia -e 'using JSON3; p=JSON3.read(read("/tmp/itensor-u1-smoke.json",String)); r=only(p.records); @assert r.dense_discrete_oracle.state_l2_error <= 1e-10; @assert r.continuous_time_oracle.state_l2_error <= 1e-8; @assert r.charge_metrics.charge_leakage_probability <= 1e-12'
