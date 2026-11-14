@@ -114,6 +114,13 @@ pub struct ReceiptQualification {
     pub authenticity: GateState,
     pub scope: GateState,
     pub native_semantics: GateState,
+    /// Exact digest of the candidate-visible evidence manifest, required for
+    /// temporal-admissibility and run-context-visibility owner receipts.
+    pub evidence_manifest_sha256: Option<String>,
+    /// Independent source-inventory completeness result from the temporal owner.
+    pub source_inventory_completeness: Option<GateState>,
+    /// Execution/materialization proof, not a retrieval plan, from the run-context owner.
+    pub execution_materialization: Option<GateState>,
     /// Required on the action-policy receipt to bind the policy to the exact
     /// evaluator-frozen action/loss inputs and selected action.
     pub action_set_sha256: Option<String>,
@@ -315,6 +322,7 @@ pub fn evaluate_json(
     let outcome = required_object(&packet, "/outcome")?;
 
     validate_commitment(
+        &packet,
         committed,
         episode,
         evaluator,
@@ -472,6 +480,37 @@ pub fn evaluate_json(
     })
 }
 
+/// Compute the canonical SHA-256 commitment over the decision inputs.
+///
+/// The projection excludes its own digest and all post-decision assessment
+/// fields (outcome, evaluator record and assessment result). It includes the
+/// schema version, decision episode, remaining commitment fields, owner receipt
+/// references, axis declarations, defeater ledger and counterfactual contract.
+/// serde_json::Value uses deterministic map ordering for this canonical form.
+fn candidate_commitment_digest(
+    packet: &serde_json::Value,
+) -> Result<String, EvaluationError> {
+    let mut commitment = required_object(packet, "/candidate_commitment")?.clone();
+    commitment
+        .as_object_mut()
+        .ok_or_else(|| EvaluationError::InvalidEnvelope(
+            "candidate commitment must be an object".to_owned()
+        ))?
+        .remove("decision_packet_sha256");
+
+    let projection = serde_json::json!({
+        "schema_version": string_at(packet, "/schema_version")?,
+        "decision_episode": required_object(packet, "/decision_episode")?,
+        "candidate_commitment": commitment,
+        "owner_receipts": required_object(packet, "/owner_receipts")?,
+        "axes": required_object(packet, "/axes")?,
+        "defeater_analysis": required_object(packet, "/defeater_analysis")?,
+        "counterfactual_adjudication": required_object(packet, "/counterfactual_adjudication")?
+    });
+    let bytes = serde_json::to_vec(&projection)?;
+    Ok(sha256_hex(&bytes))
+}
+
 fn receipt_dependencies(axis: &str) -> &'static [&'static str] {
     match axis {
         "process_admissibility" => &["temporal_admissibility", "run_context_visibility"],
@@ -518,6 +557,41 @@ fn qualify_receipt(
 
     let mut states = qualification.statuses();
 
+    if key == "temporal_admissibility" || key == "run_context_visibility" {
+        let expected_manifest = string_at(commitment, "/evidence_manifest_sha256")?;
+        match qualification.evidence_manifest_sha256.as_deref() {
+            Some(actual) if actual == expected_manifest => {}
+            Some(_) => {
+                reasons.insert(format!("EVIDENCE_MANIFEST_BINDING_MISMATCH:{key}"));
+                return Ok(GateState::Fail);
+            }
+            None => {
+                reasons.insert(format!("EVIDENCE_MANIFEST_BINDING_UNQUALIFIED:{key}"));
+                states.push(GateState::Indeterminate);
+            }
+        }
+    }
+
+    if key == "temporal_admissibility" {
+        match qualification.source_inventory_completeness {
+            Some(state) => states.push(state),
+            None => {
+                reasons.insert("SOURCE_INVENTORY_COMPLETENESS_UNQUALIFIED".to_owned());
+                states.push(GateState::Indeterminate);
+            }
+        }
+    }
+
+    if key == "run_context_visibility" {
+        match qualification.execution_materialization {
+            Some(state) => states.push(state),
+            None => {
+                reasons.insert("RUN_CONTEXT_EXECUTION_UNQUALIFIED".to_owned());
+                states.push(GateState::Indeterminate);
+            }
+        }
+    }
+
     if key == "action_policy" {
         let action_set = string_at(commitment, "/action_set_sha256")?;
         let loss_model = string_at(commitment, "/loss_model_sha256")?;
@@ -550,6 +624,7 @@ fn qualify_receipt(
 }
 
 fn validate_commitment(
+    packet: &serde_json::Value,
     commitment: &serde_json::Value,
     episode: &serde_json::Value,
     evaluator: &serde_json::Value,
@@ -558,6 +633,12 @@ fn validate_commitment(
     failures: &mut BTreeSet<String>,
     indeterminate: &mut bool,
 ) -> Result<(), EvaluationError> {
+    let recorded_packet_digest = string_at(commitment, "/decision_packet_sha256")?;
+    let computed_packet_digest = candidate_commitment_digest(packet)?;
+    if recorded_packet_digest != computed_packet_digest {
+        failures.insert("CANDIDATE_COMMITMENT_DIGEST_MISMATCH".to_owned());
+    }
+
     for field in [
         "decision_packet_sha256",
         "evidence_manifest_sha256",
@@ -913,7 +994,7 @@ mod tests {
 
     fn sample_packet() -> Value {
         let receipt = |owner: &str, suffix: char| {
-            json!({
+            let mut packet = json!({
                 "owner_id": owner,
                 "artifact_ref": format!("synthetic://{owner}/receipt-001"),
                 "artifact_sha256": suffix.to_string().repeat(64),
@@ -1004,7 +1085,10 @@ mod tests {
                 "effect_authority":"none"
             },
             "claim_ceiling": CLAIM_CEILING
-        })
+        });
+        packet["candidate_commitment"]["decision_packet_sha256"] =
+            json!(candidate_commitment_digest(&packet).unwrap());
+        packet
     }
 
     fn qualifications(packet: &Value) -> BTreeMap<String, ReceiptQualification> {
@@ -1026,6 +1110,10 @@ mod tests {
                 authenticity: GateState::Pass,
                 scope: GateState::Pass,
                 native_semantics: GateState::Pass,
+                evidence_manifest_sha256: (key == "temporal_admissibility" || key == "run_context_visibility")
+                    .then(|| packet["candidate_commitment"]["evidence_manifest_sha256"].as_str().unwrap().to_owned()),
+                source_inventory_completeness: (key == "temporal_admissibility").then_some(GateState::Pass),
+                execution_materialization: (key == "run_context_visibility").then_some(GateState::Pass),
                 action_set_sha256: action.then(|| packet["candidate_commitment"]["action_set_sha256"].as_str().unwrap().to_owned()),
                 loss_model_sha256: action.then(|| packet["candidate_commitment"]["loss_model_sha256"].as_str().unwrap().to_owned()),
                 selected_action: action.then(|| packet["decision_episode"]["selected_action"].as_str().unwrap().to_owned()),
@@ -1033,6 +1121,11 @@ mod tests {
             });
         }
         result
+    }
+
+    fn reseal(packet: &mut Value) {
+        packet["candidate_commitment"]["decision_packet_sha256"] =
+            json!(candidate_commitment_digest(packet).unwrap());
     }
 
     fn run(packet: &Value, qualifications: &BTreeMap<String, ReceiptQualification>) -> AssessmentReport {
@@ -1073,6 +1166,49 @@ mod tests {
         assert_eq!(report.indeterminate_axis_count, 5);
         assert_eq!(report.critical_gate_failure_count, 0);
         assert!(report.reason_codes.iter().any(|r| r.starts_with("OWNER_QUALIFICATION_MISSING:")));
+    }
+
+    #[test]
+    fn committed_decision_packet_digest_detects_rewrite() {
+        let mut packet = sample_packet();
+        packet["decision_episode"]["selected_action"] = json!("block");
+        let report = run(&packet, &qualifications(&packet));
+        assert_eq!(report.decision_support, DecisionSupport::NotSupportedAtK);
+        assert!(report.reason_codes.contains(&"CANDIDATE_COMMITMENT_DIGEST_MISMATCH".to_owned()));
+    }
+
+    #[test]
+    fn absent_source_inventory_completeness_is_indeterminate() {
+        let mut packet = sample_packet();
+        packet["assessment_result"]["decision_support"] = json!("indeterminate");
+        packet["assessment_result"]["indeterminate_axis_count"] = json!(1);
+        let mut qualified = qualifications(&packet);
+        qualified.get_mut("temporal_admissibility").unwrap().source_inventory_completeness = None;
+        let report = run(&packet, &qualified);
+        assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
+        assert!(report.reason_codes.contains(&"SOURCE_INVENTORY_COMPLETENESS_UNQUALIFIED".to_owned()));
+    }
+
+    #[test]
+    fn run_context_requires_execution_materialization_not_plan_only() {
+        let mut packet = sample_packet();
+        packet["assessment_result"]["decision_support"] = json!("indeterminate");
+        packet["assessment_result"]["indeterminate_axis_count"] = json!(1);
+        let mut qualified = qualifications(&packet);
+        qualified.get_mut("run_context_visibility").unwrap().execution_materialization = None;
+        let report = run(&packet, &qualified);
+        assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
+        assert!(report.reason_codes.contains(&"RUN_CONTEXT_EXECUTION_UNQUALIFIED".to_owned()));
+    }
+
+    #[test]
+    fn temporal_and_run_context_receipts_bind_the_same_evidence_manifest() {
+        let packet = sample_packet();
+        let mut qualified = qualifications(&packet);
+        qualified.get_mut("run_context_visibility").unwrap().evidence_manifest_sha256 = Some("0".repeat(64));
+        let report = run(&packet, &qualified);
+        assert_eq!(report.decision_support, DecisionSupport::NotSupportedAtK);
+        assert!(report.reason_codes.contains(&"EVIDENCE_MANIFEST_BINDING_MISMATCH:run_context_visibility".to_owned()));
     }
 
     #[test]
@@ -1147,6 +1283,7 @@ mod tests {
             "observed_original_action":"revalidate",
             "observed_paired_action":"block"
         });
+        reseal(&mut packet);
         let report = run(&packet, &qualifications(&packet));
         assert_eq!(report.decision_support, DecisionSupport::SupportedAtK);
     }
@@ -1163,6 +1300,7 @@ mod tests {
             "observed_original_action":"revalidate",
             "observed_paired_action":"revalidate"
         });
+        reseal(&mut packet);
         let report = run(&packet, &qualifications(&packet));
         assert_eq!(report.decision_support, DecisionSupport::NotSupportedAtK);
         assert!(report.reason_codes.contains(&"COUNTERFACTUAL_ACTION_RELATION_MISMATCH".to_owned()));
@@ -1180,6 +1318,7 @@ mod tests {
             "observed_original_action":"revalidate",
             "observed_paired_action":"revalidate"
         });
+        reseal(&mut packet);
         let report = run(&packet, &qualifications(&packet));
         assert_eq!(report.decision_support, DecisionSupport::SupportedAtK);
     }
