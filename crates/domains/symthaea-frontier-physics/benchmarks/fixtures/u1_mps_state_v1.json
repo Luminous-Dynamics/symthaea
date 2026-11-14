@@ -348,12 +348,14 @@
         "ideal_packed_value_bytes",
         "ideal_value_payload_savings_bytes",
         "ideal_value_payload_savings_fraction",
-        "charge_blocks"
+        "charge_blocks",
+        "forbidden_non_finite_entry_count"
       ],
       "authored_tests": [
         "storage_audit_measures_product_state_structural_zero_overhead",
         "storage_audit_reports_tolerated_forbidden_nonzero_weight",
-        "storage_audit_charge_blocks_sum_to_allowed_layout_entries"
+        "storage_audit_charge_blocks_sum_to_allowed_layout_entries",
+        "storage_audit_does_not_classify_nonfinite_forbidden_entries_as_zeros"
       ],
       "claim_ceiling": "Audit only. Current U1MpsTensor data remains dense; ideal packed bytes are theoretical and omit index/metadata overhead. No measured memory/performance gain."
     }
@@ -546,7 +548,8 @@
         "forbidden-sector L2 leakage reported",
         "dense and ideal packed payload bytes reported",
         "charge-block layout shapes sum to the allowed-value count",
-        "no claim of production block sparsity or measured memory savings"
+        "no claim of production block sparsity or measured memory savings",
+        "non-finite forbidden entries are distinguished from structural zeros"
       ]
     },
     {
@@ -616,7 +619,8 @@
     "storage audit hides nonzero forbidden-sector components",
     "storage audit charge-block counts do not sum to allowed entry count",
     "ideal packed value bytes reported as measured production allocation",
-    "packed storage drops tolerated forbidden leakage without a receipt"
+    "packed storage drops tolerated forbidden leakage without a receipt",
+    "storage audit classifies non-finite forbidden entries as structural zeros"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -700,7 +704,8 @@
     "storage_forbidden_nonzero_l2_weight",
     "storage_dense_payload_bytes",
     "storage_ideal_packed_value_bytes",
-    "storage_ideal_value_payload_savings_fraction"
+    "storage_ideal_value_payload_savings_fraction",
+    "storage_forbidden_non_finite_entry_count"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
