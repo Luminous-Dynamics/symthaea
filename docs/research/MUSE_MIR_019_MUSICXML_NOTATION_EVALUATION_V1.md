@@ -1,6 +1,6 @@
 # MUSE-MIR-019 — Multidimensional MusicXML score-event evaluation (Evaluator V1, report schema V2)
 
-**Issue:** #11901  
+**Issue:** #12066  
 **Parent implementation:** MUSE-MIR-018 source-native MusicXML notation events  
 **Date:** 14 November 2026  
 **Status:** evaluator implementation and 32 focused tests authored; report schema V2; focused Rust 1.96 workflow configured; not compiled or executed in this authoring environment
@@ -101,6 +101,8 @@ Percentiles use the nearest-rank rule ceil(p * n) - 1. If both sides have no obs
 ## Report integrity
 
 The report uses schema V2 / algorithm V2 after correcting a V1 report-commitment omission. It binds every public report field except its own self-digest, including the note performance-directive metric and the unresolved-directive count.
+The report uses schema V2 / algorithm V2 for divisions-normalized performance offsets. Its commitment covers every public report field except the self-digest, including the note-performance-directive metric and unresolved count. V2 closes a V1 omission where that metric was not included in the report commitment.
+
 The report binds:
 - reference and prediction graph SHA-256;
 - part ID, score-clock ID and canonicalization version;
