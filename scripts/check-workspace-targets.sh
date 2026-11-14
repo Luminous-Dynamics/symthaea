@@ -26,6 +26,7 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 EXCLUDES=(
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
+  "crates/core/symthaea"
   "crates/domains/symthaea-spore/fuzz"
   "crates/domains/spark-engine"
   "crates/domains/symthaea-lab"
