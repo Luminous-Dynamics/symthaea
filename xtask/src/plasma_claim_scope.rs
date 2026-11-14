@@ -12,22 +12,22 @@ struct Fixture {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Case {
-    id: String,
-    method_id: String,
-    edition: String,
-    evidence_kind: String,
-    material_pair_class: String,
-    geometry: String,
-    endpoint: String,
-    requested_claim: String,
-    protocol_id: Option<String>,
-    protocol_sha256: Option<String>,
-    raw_data_sha256: Option<String>,
-    suitability_review_sha256: Option<String>,
-    specimen_ids: Vec<String>,
-    expected_disposition: String,
-    rationale: String,
+pub(super) struct Case {
+    pub(super) id: String,
+    pub(super) method_id: String,
+    pub(super) edition: String,
+    pub(super) evidence_kind: String,
+    pub(super) material_pair_class: String,
+    pub(super) geometry: String,
+    pub(super) endpoint: String,
+    pub(super) requested_claim: String,
+    pub(super) protocol_id: Option<String>,
+    pub(super) protocol_sha256: Option<String>,
+    pub(super) raw_data_sha256: Option<String>,
+    pub(super) suitability_review_sha256: Option<String>,
+    pub(super) specimen_ids: Vec<String>,
+    pub(super) expected_disposition: String,
+    pub(super) rationale: String,
 }
 
 #[derive(Clone, Copy)]
@@ -56,7 +56,7 @@ const RULES: &[MethodRule] = &[
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Disposition {
+pub(super) enum Disposition {
     Supported,
     Blocked,
     Rejected,
@@ -72,10 +72,10 @@ impl Disposition {
     }
 }
 
-struct Decision {
-    disposition: Disposition,
-    reason: &'static str,
-    claim_ceiling: &'static str,
+pub(super) struct Decision {
+    pub(super) disposition: Disposition,
+    pub(super) reason: &'static str,
+    pub(super) claim_ceiling: &'static str,
 }
 
 fn is_sha256(value: Option<&str>) -> bool {
@@ -103,7 +103,7 @@ fn is_known_overclaim(claim: &str) -> bool {
     )
 }
 
-fn decide(case: &Case) -> Decision {
+pub(super) fn decide(case: &Case) -> Decision {
     let blocked = |reason, ceiling| Decision {
         disposition: Disposition::Blocked,
         reason,
