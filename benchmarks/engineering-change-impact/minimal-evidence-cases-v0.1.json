@@ -95,7 +95,7 @@
       "target_configuration": "CFG-7",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-001",
-      "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
       "candidate_visible_evidence_ids": [
         "E-A1",
         "E-A1-COPY",
@@ -106,7 +106,7 @@
           "world_id": "BASELINE",
           "target_configuration": "CFG-7",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
           "evidence": [
             {
               "id": "E-A1",
@@ -181,7 +181,7 @@
           "world_id": "REDUNDANT_COPY_REMOVED",
           "target_configuration": "CFG-7",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
           "evidence": [
             {
               "id": "E-A1",
@@ -304,7 +304,7 @@
       "target_configuration": "BOND-4",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-001",
-      "source_inventory_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source_inventory_sha256": "75b0f4401d5cb36fc9655dfbb999595f192f9dfd664c1fc371d94498a6fd262c",
       "candidate_visible_evidence_ids": [
         "E-PRIMARY",
         "E-EXPORT"
@@ -348,7 +348,7 @@
       "target_configuration": "PACK-3",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-002",
-      "source_inventory_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "source_inventory_sha256": "f8077b939eb8f836880bbcf9c201f854e1ee5d2e3e9c5c371c9a59ef3b927721",
       "candidate_visible_evidence_ids": [
         "E-THERM-A"
       ],
@@ -357,7 +357,7 @@
           "world_id": "BASELINE",
           "target_configuration": "PACK-3",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_inventory_sha256": "42b2fc41d5702466539412148c92dcb5d58e44ba529a3715966d14f23bfc0e8a",
           "evidence": [
             {
               "id": "E-THERM-A",
@@ -401,7 +401,7 @@
           "world_id": "LAST_SUPPORT_REMOVED",
           "target_configuration": "PACK-3",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_inventory_sha256": "f8077b939eb8f836880bbcf9c201f854e1ee5d2e3e9c5c371c9a59ef3b927721",
           "evidence": [
             {
               "id": "E-THERM-A",
@@ -481,7 +481,7 @@
       "target_configuration": "JOINT-NEW",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-003",
-      "source_inventory_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_inventory_sha256": "ec5a1cbf36fdefa1a7c4b475ea012e4a51f28084063146eec51b95eae40aa38f",
       "candidate_visible_evidence_ids": [
         "E-BOLT-A",
         "E-BOLT-B"
@@ -491,7 +491,7 @@
           "world_id": "BASELINE_CONFIGURATION_MATCH",
           "target_configuration": "JOINT-NEW",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "source_inventory_sha256": "16e9b441e29f521e1ffa13f4a1783b202e054dc355f0e6cd733f1026d173271d",
           "evidence": [
             {
               "id": "E-BOLT-A",
@@ -536,7 +536,7 @@
           "world_id": "IDENTICAL_CONTENT_WRONG_CONFIGURATION",
           "target_configuration": "JOINT-NEW",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "source_inventory_sha256": "ec5a1cbf36fdefa1a7c4b475ea012e4a51f28084063146eec51b95eae40aa38f",
           "evidence": [
             {
               "id": "E-BOLT-A",
@@ -602,10 +602,410 @@
           "supports": [
             "pressure_boundary_integrity"
           ]
+        },
+        {
+          "id": "IRR-001",
+          "root_id": "IRR-ROOT-001",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-002",
+          "root_id": "IRR-ROOT-002",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-003",
+          "root_id": "IRR-ROOT-003",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-004",
+          "root_id": "IRR-ROOT-004",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-005",
+          "root_id": "IRR-ROOT-005",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-006",
+          "root_id": "IRR-ROOT-006",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-007",
+          "root_id": "IRR-ROOT-007",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-008",
+          "root_id": "IRR-ROOT-008",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-009",
+          "root_id": "IRR-ROOT-009",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-010",
+          "root_id": "IRR-ROOT-010",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-011",
+          "root_id": "IRR-ROOT-011",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-012",
+          "root_id": "IRR-ROOT-012",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-013",
+          "root_id": "IRR-ROOT-013",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-014",
+          "root_id": "IRR-ROOT-014",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-015",
+          "root_id": "IRR-ROOT-015",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-016",
+          "root_id": "IRR-ROOT-016",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-017",
+          "root_id": "IRR-ROOT-017",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-018",
+          "root_id": "IRR-ROOT-018",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-019",
+          "root_id": "IRR-ROOT-019",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-020",
+          "root_id": "IRR-ROOT-020",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-021",
+          "root_id": "IRR-ROOT-021",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-022",
+          "root_id": "IRR-ROOT-022",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-023",
+          "root_id": "IRR-ROOT-023",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-024",
+          "root_id": "IRR-ROOT-024",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-025",
+          "root_id": "IRR-ROOT-025",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-026",
+          "root_id": "IRR-ROOT-026",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-027",
+          "root_id": "IRR-ROOT-027",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-028",
+          "root_id": "IRR-ROOT-028",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-029",
+          "root_id": "IRR-ROOT-029",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-030",
+          "root_id": "IRR-ROOT-030",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-031",
+          "root_id": "IRR-ROOT-031",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-032",
+          "root_id": "IRR-ROOT-032",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-033",
+          "root_id": "IRR-ROOT-033",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-034",
+          "root_id": "IRR-ROOT-034",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-035",
+          "root_id": "IRR-ROOT-035",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-036",
+          "root_id": "IRR-ROOT-036",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-037",
+          "root_id": "IRR-ROOT-037",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-038",
+          "root_id": "IRR-ROOT-038",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-039",
+          "root_id": "IRR-ROOT-039",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
+        },
+        {
+          "id": "IRR-040",
+          "root_id": "IRR-ROOT-040",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "irrelevant_background"
+          ]
         }
       ],
       "irrelevant_evidence_injection_count": 40,
-      "irrelevant_evidence_injection_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1",
       "expected": {
         "state": "supported",
         "action": "revalidate",
@@ -628,17 +1028,57 @@
       "target_configuration": "VESSEL-2",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-002",
-      "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "source_inventory_sha256": "3a77d6ddae613f47aa561e7f82f7baaeb389e0311af5eaeac8592a0828fa7753",
       "candidate_visible_evidence_ids": [
         "E-PRESS-A",
-        "E-PRESS-B"
+        "E-PRESS-B",
+        "IRR-001",
+        "IRR-002",
+        "IRR-003",
+        "IRR-004",
+        "IRR-005",
+        "IRR-006",
+        "IRR-007",
+        "IRR-008",
+        "IRR-009",
+        "IRR-010",
+        "IRR-011",
+        "IRR-012",
+        "IRR-013",
+        "IRR-014",
+        "IRR-015",
+        "IRR-016",
+        "IRR-017",
+        "IRR-018",
+        "IRR-019",
+        "IRR-020",
+        "IRR-021",
+        "IRR-022",
+        "IRR-023",
+        "IRR-024",
+        "IRR-025",
+        "IRR-026",
+        "IRR-027",
+        "IRR-028",
+        "IRR-029",
+        "IRR-030",
+        "IRR-031",
+        "IRR-032",
+        "IRR-033",
+        "IRR-034",
+        "IRR-035",
+        "IRR-036",
+        "IRR-037",
+        "IRR-038",
+        "IRR-039",
+        "IRR-040"
       ],
       "candidate_worlds": [
         {
           "world_id": "BASELINE",
           "target_configuration": "VESSEL-2",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "source_inventory_sha256": "a7aa2b29e37de5a5513f755c55cf408be3bfc55ee9cb164c76bcce9efed5185b",
           "evidence": [
             {
               "id": "E-PRESS-A",
@@ -683,7 +1123,7 @@
           "world_id": "FORTY_IRRELEVANT_RECORDS_INJECTED",
           "target_configuration": "VESSEL-2",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "source_inventory_sha256": "3a77d6ddae613f47aa561e7f82f7baaeb389e0311af5eaeac8592a0828fa7753",
           "evidence": [
             {
               "id": "E-PRESS-A",
@@ -704,11 +1144,451 @@
               "supports": [
                 "pressure_boundary_integrity"
               ]
+            },
+            {
+              "id": "IRR-001",
+              "root_id": "IRR-ROOT-001",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-002",
+              "root_id": "IRR-ROOT-002",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-003",
+              "root_id": "IRR-ROOT-003",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-004",
+              "root_id": "IRR-ROOT-004",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-005",
+              "root_id": "IRR-ROOT-005",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-006",
+              "root_id": "IRR-ROOT-006",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-007",
+              "root_id": "IRR-ROOT-007",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-008",
+              "root_id": "IRR-ROOT-008",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-009",
+              "root_id": "IRR-ROOT-009",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-010",
+              "root_id": "IRR-ROOT-010",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-011",
+              "root_id": "IRR-ROOT-011",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-012",
+              "root_id": "IRR-ROOT-012",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-013",
+              "root_id": "IRR-ROOT-013",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-014",
+              "root_id": "IRR-ROOT-014",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-015",
+              "root_id": "IRR-ROOT-015",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-016",
+              "root_id": "IRR-ROOT-016",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-017",
+              "root_id": "IRR-ROOT-017",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-018",
+              "root_id": "IRR-ROOT-018",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-019",
+              "root_id": "IRR-ROOT-019",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-020",
+              "root_id": "IRR-ROOT-020",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-021",
+              "root_id": "IRR-ROOT-021",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-022",
+              "root_id": "IRR-ROOT-022",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-023",
+              "root_id": "IRR-ROOT-023",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-024",
+              "root_id": "IRR-ROOT-024",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-025",
+              "root_id": "IRR-ROOT-025",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-026",
+              "root_id": "IRR-ROOT-026",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-027",
+              "root_id": "IRR-ROOT-027",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-028",
+              "root_id": "IRR-ROOT-028",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-029",
+              "root_id": "IRR-ROOT-029",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-030",
+              "root_id": "IRR-ROOT-030",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-031",
+              "root_id": "IRR-ROOT-031",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-032",
+              "root_id": "IRR-ROOT-032",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-033",
+              "root_id": "IRR-ROOT-033",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-034",
+              "root_id": "IRR-ROOT-034",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-035",
+              "root_id": "IRR-ROOT-035",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-036",
+              "root_id": "IRR-ROOT-036",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-037",
+              "root_id": "IRR-ROOT-037",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-038",
+              "root_id": "IRR-ROOT-038",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-039",
+              "root_id": "IRR-ROOT-039",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
+            },
+            {
+              "id": "IRR-040",
+              "root_id": "IRR-ROOT-040",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "irrelevant_background"
+              ]
             }
           ],
           "candidate_visible_evidence_ids": [
             "E-PRESS-A",
-            "E-PRESS-B"
+            "E-PRESS-B",
+            "IRR-001",
+            "IRR-002",
+            "IRR-003",
+            "IRR-004",
+            "IRR-005",
+            "IRR-006",
+            "IRR-007",
+            "IRR-008",
+            "IRR-009",
+            "IRR-010",
+            "IRR-011",
+            "IRR-012",
+            "IRR-013",
+            "IRR-014",
+            "IRR-015",
+            "IRR-016",
+            "IRR-017",
+            "IRR-018",
+            "IRR-019",
+            "IRR-020",
+            "IRR-021",
+            "IRR-022",
+            "IRR-023",
+            "IRR-024",
+            "IRR-025",
+            "IRR-026",
+            "IRR-027",
+            "IRR-028",
+            "IRR-029",
+            "IRR-030",
+            "IRR-031",
+            "IRR-032",
+            "IRR-033",
+            "IRR-034",
+            "IRR-035",
+            "IRR-036",
+            "IRR-037",
+            "IRR-038",
+            "IRR-039",
+            "IRR-040"
           ],
           "irrelevant_evidence_injection_count": 40,
           "expected": {
@@ -722,7 +1602,8 @@
                 ]
               ]
             }
-          }
+          },
+          "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1"
         }
       ],
       "expected_intervention_relation": "invariant"
@@ -794,7 +1675,7 @@
       "target_configuration": "PIPE-6",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-003",
-      "source_inventory_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "source_inventory_sha256": "70e535eca7013d633d03929f0a9c26bcf73ad3c353b984312c1b00c4900c991a",
       "candidate_visible_evidence_ids": [
         "E-CORR-A",
         "E-CORR-A-SUMMARY",
@@ -852,7 +1733,7 @@
               ]
             }
           },
-          "source_inventory_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          "source_inventory_sha256": "3e9eaaa7c2c5a8a7cba59f6f8269d30aefc6ba1d7aaac7209ae95a60bb1742c3"
         },
         {
           "world_id": "SUBSTITUTED",
@@ -897,7 +1778,7 @@
               ]
             }
           },
-          "source_inventory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          "source_inventory_sha256": "ff108c1a087bfef90c0b9d7385da2f47c66d85985646b481e59aae7a8b31f136"
         }
       ],
       "expected": {
@@ -973,7 +1854,7 @@
       "target_configuration": "ANCHOR-5",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-UNK-001",
-      "source_inventory_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "source_inventory_sha256": "7fc55c4fdaa749258f0e0821b7a23b135d84d7b9cc91396a1e55d22e47f8cea9",
       "candidate_visible_evidence_ids": [
         "E-SEISMIC-A",
         "E-SEISMIC-UNK"
@@ -983,7 +1864,7 @@
           "world_id": "UNKNOWN_PROVENANCE",
           "target_configuration": "ANCHOR-5",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "source_inventory_sha256": "7fc55c4fdaa749258f0e0821b7a23b135d84d7b9cc91396a1e55d22e47f8cea9",
           "evidence": [
             {
               "id": "E-SEISMIC-A",
@@ -1022,7 +1903,7 @@
           "world_id": "INDEPENDENT_ROOT_QUALIFIED",
           "target_configuration": "ANCHOR-5",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "source_inventory_sha256": "96d21e476137fee63835083f2efc7018481e10f08e76aaa12ffb22d9bca9d983",
           "evidence": [
             {
               "id": "E-SEISMIC-A",
