@@ -260,7 +260,8 @@
         "mixed_canonicalization_qualifies_both_two_site_centers_and_preserves_dense_state",
         "mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries",
         "mixed_canonical_sweep_handles_left_and_right_boundary_centers",
-        "canonicalization_is_idempotent_at_a_fixed_two_site_center"
+        "canonicalization_is_idempotent_at_a_fixed_two_site_center",
+        "global_error_certificate_falsification_grid_dominates_dense_oracle_for_noncanonical_gauges"
       ],
       "state_equivalence": "Stable direct-sum MPS difference contraction, independent of dense expansion.",
       "exterior_operator_bound": "Product over measured site residuals of sqrt(1+r_site), where r_site is Frobenius norm of the local Gram-minus-identity matrix.",
@@ -273,7 +274,8 @@
         "canonicalization_is_idempotent_at_a_fixed_two_site_center",
         "mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries",
         "mixed_canonical_sweep_handles_left_and_right_boundary_centers",
-        "mixed_canonicalization_rejects_invalid_center_and_tolerance_without_mutation"
+        "mixed_canonicalization_rejects_invalid_center_and_tolerance_without_mutation",
+        "global_error_certificate_falsification_grid_dominates_dense_oracle_for_noncanonical_gauges"
       ]
     },
     "tebd_gate_quality": {
@@ -367,6 +369,30 @@
         "strang_stepper_continues_global_error_ledger_across_time_steps",
         "strang_stepper_rejects_duplicate_and_out_of_range_hamiltonian_bonds"
       ]
+    },
+    "certificate_falsification_grid": {
+      "status": "source_authored_runner_pending",
+      "test": "global_error_certificate_falsification_grid_dominates_dense_oracle_for_noncanonical_gauges",
+      "cases": 48,
+      "dimensions": {
+        "site_count": "3..8",
+        "charge": "1..N-1",
+        "active_bond": "all bonds over deterministic grid",
+        "virtual_gauge_bond": "independently selected bond"
+      },
+      "perturbation": "Non-unitary positive diagonal virtual gauge X on one bond: A -> A X and B -> X^-1 B; represented physical state must remain invariant.",
+      "gate": "Seeded U(1)-conserving Hermitian two-site Hamiltonian exponentiated independently; dense two-site action is the oracle.",
+      "compression": "Global bond cap 1..3 and relative cutoff 0 or 0.04.",
+      "acceptance": [
+        "virtual gauge rescaling changes tensor gauge but not dense state beyond 1e-9",
+        "all mixed-canonical receipts qualify",
+        "output total charge and selection rule remain valid",
+        "global L2 error upper bound exists and is finite/nonnegative",
+        "global L2 upper bound dominates dense exact post-gate state error within 2e-8 comparison slack",
+        "at least 16/48 cases exercise nonzero compression",
+        "all 48 cases exercise nontrivial virtual gauge"
+      ],
+      "claim_ceiling": "Small-N deterministic adversarial verification only; no Trotter error or large-N performance guarantee."
     }
   },
   "known_answers": [
@@ -547,6 +573,20 @@
         "global error ratio approaches 4 under dt halving in asymptotic regime",
         "Trotter/time-discretization error remains separate from global canonical/gate/model-projection/compression bound"
       ]
+    },
+    {
+      "id": "MPS-3A",
+      "name": "Composed global error certificate: dense-oracle virtual-gauge falsification",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "48 deterministic N=3..8 fixed-charge cases",
+        "non-unitary diagonal virtual-gauge rescaling leaves the represented state invariant",
+        "all active bonds and independent gauge bonds exercised",
+        "seeded U(1) Hamiltonian gate checked against independent dense gate action",
+        "global L2 receipt dominates measured dense state error in every case",
+        "at least one-third of cases have nonzero compression",
+        "Trotter error remains outside this certificate"
+      ]
     }
   ],
   "negative_controls": [
@@ -675,13 +715,10 @@
     "strang_layer_bond_indices",
     "time_discretization_error_qualified",
     "strang_step_refinement_error_ratio",
-    "canonical_gauge_state_reconstruction_l2_residual",
-    "canonical_gauge_left_exterior_norm_bound",
-    "canonical_gauge_right_exterior_norm_bound",
-    "global_state_error_bound_upper",
-    "hamiltonian_projection_operator_error_upper_bound",
-    "strang_splitting_order",
-    "time_discretization_error_qualified"
+    "certificate_falsification_case_id",
+    "canonical_gauge_rescaling_digest",
+    "dense_state_error_l2",
+    "certificate_bound_slack"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
@@ -736,5 +773,11 @@
       "Trotter/time discretization (TEBD and TDVP)",
       "local Krylov/eigensolver residual (TDVP)"
     ]
-  }
+  },
+  "negativeControls": [
+    "virtual-gauge rescaling changes the represented physical state",
+    "global L2 certificate underestimates a dense exact post-gate state error",
+    "claim qualification with incomplete exterior-site coverage",
+    "treat a dense gate oracle with wrong MSB/LSB convention as a valid comparison"
+  ]
 }
