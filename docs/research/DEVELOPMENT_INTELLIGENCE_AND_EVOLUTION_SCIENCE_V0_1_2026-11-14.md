@@ -240,7 +240,7 @@ On 2026-11-14, the standalone development-map-validator received a DTEA hardenin
 - Equality at the start/end boundary is accepted under closed-interval semantics.
 - An explicit validity_completeness declaration distinguishes a known open interval edge (complete with a null bound) from incomplete applicability (incomplete).
 - Incomplete effective-time applicability cannot justify consulted evidence; it can remain explicitly excluded.
-- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and nine cover Rust syntax extraction, bringing the standalone crate total to **78 authored tests**. The public DTEA expected-results fixture contains **21 negative controls**.
+- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and ten cover Rust syntax extraction, bringing the standalone crate total to **79 authored tests**. The public DTEA expected-results fixture contains **21 negative controls**.
 
 These are source changes and authored checks. The tests have not been compiled or executed. Exact-head CI workflows were observed as skipped, not passed. Full JSON Schema 2020-12 validation, runtime replay, independent benchmark qualification and #10064 isolation qualification remain outstanding. No real Mycelix authorization record is authenticated by the synthetic DTEA fixture.
 
