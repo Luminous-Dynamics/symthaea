@@ -4174,6 +4174,13 @@ mod tests {
         assert!(receipt.qualifies(1.0e-10));
         assert!(!receipt.qualifies(f64::NAN));
         assert!(!receipt.qualifies(0.0));
+
+        let mut missing_site = receipt.clone();
+        missing_site.right_isometry_residuals.pop();
+        assert!(!missing_site.qualifies(1.0e-10));
+        let mut misbound_site = receipt.clone();
+        misbound_site.right_isometry_residuals[0].0 = 2;
+        assert!(!misbound_site.qualifies(1.0e-10));
     }
 
     #[test]
@@ -4431,6 +4438,71 @@ mod tests {
                 .abs()
                 <= 1.0e-12
         );
+    }
+
+    #[test]
+    fn tebd_global_error_bound_propagates_through_nonunitary_gate_norms() {
+        let epsilon = 1.0e-3;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        matrix[2][2] = Complex64::new(1.0 + epsilon, 0.0);
+        let gate = U1TwoSiteGate::new(matrix, 1.0e-2).unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
+        let layer = U1TeBDLayer::new(
+            4,
+            0,
+            vec![
+                U1TeBDGate::new(0, gate.clone()),
+                U1TeBDGate::new(2, gate),
+            ],
+        )
+        .unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-2,
+                },
+            )
+            .unwrap();
+
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.truncation_ledger.gate_count, 2);
+        assert_eq!(result.gate_receipts.len(), 2);
+        let first = &result.gate_receipts[0];
+        let second = &result.gate_receipts[1];
+        assert!(first.global_l2_error_bound_after_gate.is_some());
+        assert!(second.global_l2_error_bound_after_gate.is_some());
+
+        let first_bound = first.global_l2_error_bound_after_gate.unwrap();
+        let second_bound = second.global_l2_error_bound_after_gate.unwrap();
+        let second_gate_operator_norm =
+            (1.0 + second.gate_unitarity_residual).sqrt();
+        let propagated_first = first_bound * second_gate_operator_norm;
+        let second_increment = second.global_l2_error_contribution.unwrap();
+        assert!(second_increment >= 0.0);
+        assert!(
+            (second_bound - propagated_first - second_increment).abs() <= 1.0e-12,
+            "second bound {second_bound}, propagated {propagated_first}, increment {second_increment}"
+        );
+
+        let before = input.to_dense(8).unwrap();
+        let after = result.state.to_dense(8).unwrap();
+        let actual_error = before
+            .iter()
+            .zip(after.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .unwrap();
+        assert!(bound + 1.0e-12 >= actual_error);
     }
 
     #[test]
