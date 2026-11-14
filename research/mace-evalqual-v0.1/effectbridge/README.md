@@ -50,6 +50,8 @@ The server defaults to loopback. It has no production authentication or TLS and 
 
 ## Local qualification tests
 
+The public test file currently contains 12 qualification scenarios plus three child-process helper entrypoints; the expanded local source set used for the larger verification run had 24 named effectbridge test functions. This distinction is recorded to avoid implying every expanded local test is already in this public commit.
+
 The 24 effectbridge test functions cover strict request/journal validation, hash-chain tampering and torn-tail rejection, exact duplicate idempotency, same-key intent conflict, 64 concurrent goroutine requests, one-writer process locking, eight independent client processes, remote success with lost acknowledgement across service process kill/restart, ordinary absence remaining indeterminate, fence/dispatch races, delayed-request rejection after fence, lost fence acknowledgement and idempotent fence recovery, and 10,000 seeded effect/fence operations against a separate finite-state reference model.
 
 The service runs as a real local child process over loopback TCP. The separate journal reader validates the service-authored journal after the service is closed. This is not an independent physical observation of a third-party effect boundary.
