@@ -190,12 +190,22 @@ def validate_contract(data: dict[str, Any]) -> None:
         len(training["nominal_matrices"]) == len(training["frequencies"]),
         "training matrix/frequency count mismatch",
     )
-    for encoded_matrix in training["nominal_matrices"]:
+    for index, encoded_matrix in enumerate(training["nominal_matrices"]):
         decoded = [
             [Fraction(int(cell["numerator"]), int(cell["denominator"])) for cell in row]
             for row in encoded_matrix
         ]
-        require(decoded == expected_training_matrix, "training matrix does not match frozen observations")
+        require(
+            decoded == expected_training_matrix,
+            "training matrix does not match frozen observations",
+        )
+        observed_crossport = read_complex(
+            training["crossport_observations"][index]["value"]
+        )
+        require(
+            observed_crossport == (decoded[0][1], Fraction(0)),
+            "training cross-port observation disagrees with full matrix",
+        )
     require(
         holdout["observation_id"] not in set(training_ids),
         "holdout reuses a training observation ID",
@@ -203,6 +213,10 @@ def validate_contract(data: dict[str, Any]) -> None:
     require(
         holdout["holdout_sensor_error_id"] not in set(training_error_ids),
         "holdout sensor-error ID is reused from training",
+    )
+    require(
+        holdout["holdout_sensor_error_id"] == data["measurement_error"]["holdout_error_id"],
+        "holdout sensor-error identity does not match its bound",
     )
     require(
         holdout["independent_observation_id"] is True,
