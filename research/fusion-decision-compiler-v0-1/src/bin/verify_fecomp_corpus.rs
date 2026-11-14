@@ -29,6 +29,8 @@ const REQUIRED_CASES: [&str; 20] = [
     "dangling-gate-evidence",
     "changed-material-invalidates-design",
     "dependency-cycle",
+    "solver-stale-candidate-revision",
+    "solver-stale-geometry",
 ];
 
 fn main() -> ExitCode {
@@ -94,7 +96,7 @@ fn audit() -> Result<(usize, usize, usize, usize), String> {
         }
     }
 
-    if counts != (4, 5, 7, 4) {
+    if counts != (5, 5, 6, 6) {
         return Err(format!("unexpected expected-disposition counts: {counts:?}"));
     }
 
