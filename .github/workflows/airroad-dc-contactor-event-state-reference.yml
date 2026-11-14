@@ -1,0 +1,41 @@
+name: AIRROAD DC Contactor Event State Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_DC_FAULT_EVENT_STATE_001_V0_1.md"
+      - "docs/research/fixtures/airroad-dc-contactor-event-state-v0.1.json"
+      - "tools/airroad-dc-event-state-qualifier/verify_contactor_event_state.py"
+      - ".github/workflows/airroad-dc-contactor-event-state-reference.yml"
+  push:
+    branches:
+      - research/airroad-dc-event-state-v0.1
+    paths:
+      - "docs/research/AIRROAD_DC_FAULT_EVENT_STATE_001_V0_1.md"
+      - "docs/research/fixtures/airroad-dc-contactor-event-state-v0.1.json"
+      - "tools/airroad-dc-event-state-qualifier/verify_contactor_event_state.py"
+      - ".github/workflows/airroad-dc-contactor-event-state-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-dc-contactor-event-state-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute contactor event oracle
+        run: |
+          python3 -m py_compile tools/airroad-dc-event-state-qualifier/verify_contactor_event_state.py
+          python3 tools/airroad-dc-event-state-qualifier/verify_contactor_event_state.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-dc-contactor-event-state-v0.1.json > /dev/null
