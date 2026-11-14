@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-metamorphic-pair-v1.schema.json",
+  "title": "Melothaea music-edit metamorphic pair v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pair_id",
+    "dataset_id",
+    "dataset_version",
+    "benchmark_track_id",
+    "base_sample_id",
+    "transformed_sample_id",
+    "base_source_lineage_sha256",
+    "transformed_source_lineage_sha256",
+    "base_split",
+    "transformed_split",
+    "operation",
+    "base_source_audio_sha256",
+    "transformed_source_audio_sha256",
+    "base_instruction_sha256",
+    "transformed_instruction_sha256",
+    "base_validity_envelope_sha256",
+    "transformed_validity_envelope_sha256",
+    "transform_family",
+    "transform_implementation_sha256",
+    "transform_receipt_sha256",
+    "transform_version",
+    "transform_parameters_sha256",
+    "expected_relation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-metamorphic-pair-v1"
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_track_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transformed_sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_source_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transformed_source_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "base_split": {
+      "enum": [
+        "train",
+        "development",
+        "test"
+      ]
+    },
+    "transformed_split": {
+      "enum": [
+        "train",
+        "development",
+        "test"
+      ]
+    },
+    "operation": {
+      "enum": [
+        "remove_instrument",
+        "replace_instrument",
+        "extract_instrument",
+        "double_instrument",
+        "remove_drums",
+        "replace_drums",
+        "extract_drums",
+        "staccato",
+        "legato",
+        "crescendo",
+        "decrescendo",
+        "tuning_correction_440"
+      ]
+    },
+    "base_source_audio_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transformed_source_audio_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "base_instruction_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transformed_instruction_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "base_validity_envelope_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transformed_validity_envelope_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transform_family": {
+      "enum": [
+        "metadata_only",
+        "lossless_reencode",
+        "gain_headroom",
+        "channel_permutation",
+        "benign_crop_padding",
+        "renderer_change",
+        "global_transposition",
+        "tempo_scaling",
+        "key_scale_shift",
+        "meter_preserving_rhythm_scale",
+        "spatial_permutation",
+        "target_crop",
+        "target_masking",
+        "absolute_pitch_shift",
+        "dynamic_compression",
+        "separation_topology_change",
+        "instruction_scope_change"
+      ]
+    },
+    "transform_implementation_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transform_receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "transform_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transform_parameters_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "expected_relation": {
+      "enum": [
+        "invariant",
+        "equivariant",
+        "non_invariant",
+        "abstain_expected"
+      ]
+    },
+    "property_mapping_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "admissibility_reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
