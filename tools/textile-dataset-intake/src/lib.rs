@@ -60,7 +60,8 @@ pub enum RightsStatus {
 #[serde(deny_unknown_fields)]
 pub struct RightsReview {
     pub status: RightsStatus,
-    pub license_url: String,
+    /// Dataset-level license URL, if independently verified. May be absent while rights are pending.
+    pub license_url: Option<String>,
     pub license_text_local_path: Option<String>,
     pub license_text_sha256: Option<String>,
     pub reviewed_by: Option<String>,
@@ -184,7 +185,6 @@ fn validate_manifest_shape(manifest: &DatasetManifest) -> Result<()> {
         ("source.landing_page", manifest.source.landing_page.as_str()),
         ("source.version", manifest.source.version.as_str()),
         ("source.retrieved_at_utc", manifest.source.retrieved_at_utc.as_str()),
-        ("rights.license_url", manifest.rights.license_url.as_str()),
         ("rights.attribution", manifest.rights.attribution.as_str()),
         ("claim_ceiling", manifest.claim_ceiling.as_str()),
     ] {
@@ -197,16 +197,24 @@ fn validate_manifest_shape(manifest: &DatasetManifest) -> Result<()> {
     {
         return fail("source.landing_page must be an HTTP(S) URL");
     }
-    if !(manifest.rights.license_url.starts_with("https://")
-        || manifest.rights.license_url.starts_with("http://"))
-    {
-        return fail("rights.license_url must be an HTTP(S) URL");
+    if manifest.rights.license_url.as_deref().is_some_and(|url| {
+        !nonempty(url) || !(url.starts_with("https://") || url.starts_with("http://"))
+    }) {
+        return fail("rights.license_url, when present, must be a non-empty HTTP(S) URL");
     }
     if manifest.files.is_empty() {
         return fail("manifest has no files; an empty source inventory cannot be qualified");
     }
 
     if manifest.rights.status == RightsStatus::Reviewed {
+        if manifest
+            .rights
+            .license_url
+            .as_deref()
+            .is_none_or(|value| !nonempty(value))
+        {
+            return fail("reviewed rights status requires a dataset-level license URL");
+        }
         if manifest
             .rights
             .reviewed_by
@@ -483,7 +491,7 @@ mod tests {
                 },
                 rights: RightsReview {
                     status: RightsStatus::Reviewed,
-                    license_url: "https://example.invalid/license".to_owned(),
+                    license_url: Some("https://example.invalid/license".to_owned()),
                     license_text_local_path: Some("license.txt".to_owned()),
                     license_text_sha256: Some(sha256_bytes(rights_text)),
                     reviewed_by: Some("unit-test".to_owned()),
@@ -577,6 +585,41 @@ mod tests {
         manifest.rights.license_text_local_path = Some("missing-license.txt".to_owned());
         fixture.write_manifest(&manifest);
         assert!(build_receipt(&fixture.manifest, &fixture.root, "benchmark_reproduction").is_err());
+    }
+
+    #[test]
+    fn pending_rights_can_leave_dataset_license_unknown_without_a_placeholder() {
+        let fixture = Fixture::new();
+        let mut manifest = fixture.manifest_value();
+        manifest.rights.status = RightsStatus::Pending;
+        manifest.rights.license_url = None;
+        manifest.rights.license_text_local_path = None;
+        manifest.rights.license_text_sha256 = None;
+        manifest.rights.reviewed_by = None;
+        manifest.rights.reviewed_at_utc = None;
+        fixture.write_manifest(&manifest);
+        let error = build_receipt(
+            &fixture.manifest,
+            &fixture.root,
+            "benchmark_reproduction",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("rights status is pending"));
+    }
+
+    #[test]
+    fn reviewed_rights_cannot_omit_dataset_level_license_url() {
+        let fixture = Fixture::new();
+        let mut manifest = fixture.manifest_value();
+        manifest.rights.license_url = None;
+        fixture.write_manifest(&manifest);
+        let error = build_receipt(
+            &fixture.manifest,
+            &fixture.root,
+            "benchmark_reproduction",
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("requires a dataset-level license URL"));
     }
 
     #[test]
