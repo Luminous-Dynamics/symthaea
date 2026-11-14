@@ -871,7 +871,7 @@ mod tests {
         supported(&events);
         assert_eq!(events.note_events.len(), 4);
         assert!(matches!(
-            events.note_events[0].kind,
+            &events.note_events[0].kind,
             MusicXmlNotationEventKindV1::Rest { measure: false, .. }
         ));
         assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
@@ -895,7 +895,7 @@ mod tests {
         assert_eq!(events.note_events[2].staff.as_deref(), Some("2"));
         assert_eq!(events.note_events[2].instrument_ids, vec!["P1-I2"]);
         assert!(matches!(
-            events.note_events[3].kind,
+            &events.note_events[3].kind,
             MusicXmlNotationEventKindV1::Unpitched { .. }
         ));
         assert_eq!(
@@ -910,7 +910,7 @@ mod tests {
         let measure_rest = parse(measure_rest_xml);
         supported(&measure_rest);
         assert!(matches!(
-            measure_rest.note_events[0].kind,
+            &measure_rest.note_events[0].kind,
             MusicXmlNotationEventKindV1::Rest { measure: true, .. }
         ));
     }
