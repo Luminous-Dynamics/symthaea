@@ -2,7 +2,7 @@
 //! Hash chaining detects mutation of the supplied ledger, but does not authenticate
 //! source records, actor availability claims, Git objects, signatures, or authority.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -555,6 +555,14 @@ fn validate_cursor_checkpoint(cursor: &ReplayCursor) -> Result<(), String> {
         .unwrap_or(GENESIS_HASH);
     if cursor.head_hash != expected_head {
         return Err("replay cursor head hash does not match its prior-event index".to_owned());
+    }
+    if cursor.prior_events.iter().any(|(event_id, event)| event_id != &event.event_id) {
+        return Err("replay cursor event index contains a mismatched event identity".to_owned());
+    }
+    let expected_recorded_at = cursor.prior_events.values().max_by_key(|event| event.sequence)
+        .map(|event| event.body.recorded_at.as_str());
+    if cursor.last_recorded_at.as_deref() != expected_recorded_at {
+        return Err("replay cursor last_recorded_at does not match its final event".to_owned());
     }
     Ok(())
 }
