@@ -474,7 +474,8 @@
         "effective_revision",
         "targets",
         "provenance",
-        "payload"
+        "payload",
+        "state_effect"
       ],
       "properties": {
         "id": {
@@ -571,6 +572,146 @@
               ]
             }
           }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "decision_recorded"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "$ref": "#/$defs/decision_payload"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "decision_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "available_to_actor_at",
+        "admissibility",
+        "reason"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available_to_actor_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source_observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_through": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "admissibility": {
+          "enum": [
+            "admissible",
+            "inadmissible",
+            "indeterminate"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "decision_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_at",
+        "knowledge_cutoff_at",
+        "actor_id",
+        "authority_scope",
+        "policy_version",
+        "outcome",
+        "consulted_evidence",
+        "excluded_evidence"
+      ],
+      "properties": {
+        "decision_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "knowledge_cutoff_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale_summary": {
+          "type": "string"
+        },
+        "consulted_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/decision_evidence"
+          }
+        },
+        "excluded_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/decision_evidence"
+          }
+        },
+        "later_corrections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "abstention_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }
