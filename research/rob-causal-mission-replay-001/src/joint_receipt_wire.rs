@@ -557,13 +557,8 @@ mod tests {
 /// Independently supplied clock authority; the packet cannot establish this relation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClockAuthorityBinding {
-    SameMonotonicClock {
-        clock_id: String,
-        boot_epoch: u64,
-    },
-    Unknown {
-        reason_code: String,
-    },
+    SameMonotonicClock { clock_id: String, boot_epoch: u64 },
+    Unknown { reason_code: String },
 }
 
 /// Independently supplied identities not stored as fields on MissionTrace.
@@ -826,7 +821,9 @@ pub fn verify_and_join_joint_receipt(
     }
 
     match &authority.clock_relation {
-        ClockAuthorityBinding::SameMonotonicClock { clock_id, .. } if clock_id.trim().is_empty() => {
+        ClockAuthorityBinding::SameMonotonicClock { clock_id, .. }
+            if clock_id.trim().is_empty() =>
+        {
             return Err(WireError::InvalidField("clock_relation.clock_id"));
         }
         ClockAuthorityBinding::Unknown { reason_code } if reason_code.trim().is_empty() => {
@@ -1249,20 +1246,23 @@ pub fn verify_and_join_joint_receipt(
     // v0.1 single-clock profile: require the caller's clock identity before
     // any numeric age is accepted. Unknown mapping must carry null AoI.
     match &authority.clock_relation {
-        ClockAuthorityBinding::SameMonotonicClock { clock_id, boot_epoch } => {
+        ClockAuthorityBinding::SameMonotonicClock {
+            clock_id,
+            boot_epoch,
+        } => {
             bind_text(
                 "clock_relation.kind",
-                &path_string(&root, &["clock_relation", "kind"] )?,
+                &path_string(&root, &["clock_relation", "kind"])?,
                 "same_monotonic_clock_verified",
             )?;
             bind_text(
                 "clock_relation.id",
-                &path_string(&root, &["clock_relation", "clock_id"] )?,
+                &path_string(&root, &["clock_relation", "clock_id"])?,
                 clock_id,
             )?;
             bind_u64(
                 "clock_relation.epoch",
-                path_u64_string(&root, &["clock_relation", "boot_epoch"] )?,
+                path_u64_string(&root, &["clock_relation", "boot_epoch"])?,
                 *boot_epoch,
             )?;
             if observation.stamp.clock_id != *clock_id
@@ -1288,7 +1288,7 @@ pub fn verify_and_join_joint_receipt(
                 &path_string(
                     &root,
                     &["measurements", "source_to_actuator_aoi", "disposition"],
-                ) ?,
+                )?,
                 "Qualified",
             )?;
             bind_interval(
@@ -1301,12 +1301,12 @@ pub fn verify_and_join_joint_receipt(
         ClockAuthorityBinding::Unknown { reason_code } => {
             bind_text(
                 "clock_relation.kind",
-                &path_string(&root, &["clock_relation", "kind"] )?,
+                &path_string(&root, &["clock_relation", "kind"])?,
                 "unknown",
             )?;
             bind_text(
                 "clock_relation.reason_code",
-                &path_string(&root, &["clock_relation", "reason_code"] )?,
+                &path_string(&root, &["clock_relation", "reason_code"])?,
                 reason_code,
             )?;
             bind_text(
@@ -1314,11 +1314,11 @@ pub fn verify_and_join_joint_receipt(
                 &path_string(
                     &root,
                     &["measurements", "source_to_actuator_aoi", "disposition"],
-                ) ?,
+                )?,
                 "Unknown",
             )?;
             if !matches!(
-                path_value(&root, &["measurements", "source_to_actuator_aoi", "value"]) ?,
+                path_value(&root, &["measurements", "source_to_actuator_aoi", "value"])?,
                 JsonValue::Null
             ) {
                 return Err(WireError::InvalidField("aoi.value"));
