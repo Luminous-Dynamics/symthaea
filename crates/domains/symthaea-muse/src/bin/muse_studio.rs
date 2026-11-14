@@ -6124,6 +6124,10 @@ mod notation_summary_tests {
         assert_eq!(summary.visual_tie_count, 0);
         assert_eq!(summary.voice_assignment_count, 0);
         assert_eq!(summary.staff_assignment_count, 0);
+        assert_eq!(summary.part_metadata_count, 0);
+        assert_eq!(summary.score_instrument_count, 0);
+        assert_eq!(summary.midi_instrument_count, 0);
+        assert_eq!(summary.unresolved_note_instrument_reference_count, 0);
         assert_eq!(summary.source_sha256, source_sha256);
         let sidecar = match sidecar.expect("MusicXML graph must be persisted") {
             ImportedNotationArtifact::MusicXmlGraph(bytes) => bytes,
@@ -6279,6 +6283,50 @@ mod notation_summary_tests {
             ),
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         );
+    }
+
+
+    #[test]
+    fn musicxml_summary_counts_part_list_instruments_and_unresolved_references() {
+        let xml = br#"<score-partwise>
+            <part-list>
+                <score-part id="P1">
+                    <part-name>Violin I</part-name>
+                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
+                    <score-instrument id="P1-I2"><instrument-name>Muted Violin</instrument-name></score-instrument>
+                    <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument>
+                    <midi-instrument id="P1-I2"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument>
+                </score-part>
+            </part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><instrument id="P1-I1"/></note>
+                <note><chord/><pitch><step>C</step><octave>5</octave></pitch><duration>8</duration><instrument id="P1-UNKNOWN"/></note>
+            </measure></part>
+        </score-partwise>"#;
+        let source_sha256 = symthaea_muse::evidence_digest::sha256_hex(xml);
+        let graphs = symthaea_muse::musicxml_barline_adapter::parse_musicxml_part_notation_graph(
+            xml,
+            &format!("sha256:{source_sha256}"),
+            "part-list-summary-clock",
+        )
+        .unwrap();
+        let (summary, artifact) = summarize_imported_notation_structure(
+            &source_sha256,
+            ImportedNotationStructureV1::MusicXmlPartGraphs(graphs),
+        )
+        .unwrap();
+        assert_eq!(summary.status, "supported");
+        assert_eq!(summary.part_metadata_count, 1);
+        assert_eq!(summary.score_instrument_count, 2);
+        assert_eq!(summary.midi_instrument_count, 2);
+        assert_eq!(summary.notation_event_count, 2);
+        assert_eq!(summary.chord_member_count, 1);
+        assert_eq!(summary.unresolved_note_instrument_reference_count, 1);
+        assert!(matches!(
+            artifact,
+            Some(ImportedNotationArtifact::MusicXmlGraph(_))
+        ));
     }
 
 }
