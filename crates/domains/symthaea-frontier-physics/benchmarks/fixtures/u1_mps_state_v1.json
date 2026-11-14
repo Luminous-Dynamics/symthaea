@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Source-authored: complex U1 MPS core, dense fixed-charge factorization, U1 local gates, exact charge-block split, global cutoff/bond-cap compression, mixed-canonical receipts, canonical/gate/model-projection/compression error ledger, analytic U1 Hamiltonian gates, deterministic even/odd TEBD layers and second-order even/odd/even Strang stepper. Consolidated exact-head Rust 1.96 harness pending.",
+  "execution_status": "Source-authored: U1 MPS storage/factorization/gates/exact split/fixed truncation/adaptive error-budget compression, mixed-canonical receipts, global gate/model/compression ledger, and Strang TEBD. Structural-zero storage audit is added; packed block-sparse storage remains future work. Exact-head harness pending.",
   "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -332,6 +332,30 @@
         "strang_stepper_continues_global_error_ledger_across_time_steps"
       ],
       "claim_ceiling": "Nearest-neighbour second-order splitting only. Trotter error is not folded into the canonical/gate/model-projection/compression bound and remains unqualified pending step-refinement envelope or commutator bound."
+    },
+    "storage_audit": {
+      "status": "source_authored_runner_pending",
+      "api": "U1MpsTensor::storage_audit()",
+      "fields": [
+        "dense_entry_count",
+        "symmetry_allowed_entry_count",
+        "structurally_forbidden_entry_count",
+        "structurally_forbidden_zero_count",
+        "forbidden_nonzero_entry_count",
+        "forbidden_nonzero_l2_weight",
+        "non_finite_entry_count",
+        "dense_payload_bytes",
+        "ideal_packed_value_bytes",
+        "ideal_value_payload_savings_bytes",
+        "ideal_value_payload_savings_fraction",
+        "charge_blocks"
+      ],
+      "authored_tests": [
+        "storage_audit_measures_product_state_structural_zero_overhead",
+        "storage_audit_reports_tolerated_forbidden_nonzero_weight",
+        "storage_audit_charge_blocks_sum_to_allowed_layout_entries"
+      ],
+      "claim_ceiling": "Audit only. Current U1MpsTensor data remains dense; ideal packed bytes are theoretical and omit index/metadata overhead. No measured memory/performance gain."
     }
   },
   "known_answers": [
@@ -511,6 +535,32 @@
         "global error ratio approaches 4 under dt halving in asymptotic regime",
         "Trotter/time-discretization error remains separate from global canonical/gate/model-projection/compression bound"
       ]
+    },
+    {
+      "id": "MPS-0B",
+      "name": "U1 structural-zero storage audit",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "allowed charge-block values counted exactly",
+        "forbidden entries and tolerated nonzeros distinguished",
+        "forbidden-sector L2 leakage reported",
+        "dense and ideal packed payload bytes reported",
+        "charge-block layout shapes sum to the allowed-value count",
+        "no claim of production block sparsity or measured memory savings"
+      ]
+    },
+    {
+      "id": "MPS-0C",
+      "name": "Packed charge-block tensor storage",
+      "status": "planned",
+      "acceptance": [
+        "store only charge-allowed values in per-charge contiguous blocks",
+        "preserve any tolerated forbidden nonzeros in an explicit leakage sidecar or reject packing",
+        "dense round-trip matches source tensor",
+        "all MPS contractions and local gates match dense reference",
+        "metadata and index overhead included in byte accounting",
+        "measured peak memory compared with dense layout"
+      ]
     }
   ],
   "negative_controls": [
@@ -562,7 +612,11 @@
     "Hamiltonian-to-U1 projection residual silently discarded",
     "reset global error ledger at each Strang layer or time step",
     "fold Trotter error into compression/gate-quality receipt without a separate method bound",
-    "claim second-order convergence from a single time-step result"
+    "claim second-order convergence from a single time-step result",
+    "storage audit hides nonzero forbidden-sector components",
+    "storage audit charge-block counts do not sum to allowed entry count",
+    "ideal packed value bytes reported as measured production allocation",
+    "packed storage drops tolerated forbidden leakage without a receipt"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -638,7 +692,15 @@
     "strang_layer_parities",
     "strang_layer_bond_indices",
     "time_discretization_error_qualified",
-    "strang_step_refinement_error_ratio"
+    "strang_step_refinement_error_ratio",
+    "storage_dense_entry_count",
+    "storage_symmetry_allowed_entry_count",
+    "storage_structurally_forbidden_entry_count",
+    "storage_forbidden_nonzero_entry_count",
+    "storage_forbidden_nonzero_l2_weight",
+    "storage_dense_payload_bytes",
+    "storage_ideal_packed_value_bytes",
+    "storage_ideal_value_payload_savings_fraction"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
