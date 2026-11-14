@@ -229,7 +229,8 @@ def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: in
         "renormalization": "disabled_via_renorm_0",
         "runtime_seconds": elapsed,
         "gate_throughput_per_second": gate_count / elapsed if elapsed > 0 else None,
-        "peak_rss_kib": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+        "peak_rss_platform_units": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss),
+        "peak_rss_unit": "bytes" if sys.platform == "darwin" else "kibibytes",
         "norm_squared_from_network": norm_estimate,
         "quimb_norm_based_fidelity_estimate": quimb_fidelity,
         "quimb_norm_based_error_estimate": quimb_error,
@@ -243,7 +244,7 @@ def run_once(case: dict[str, Any], cutoff: float, cutoff_mode: str, max_bond: in
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--fixture", type=Path, default=Path(__file__).parents[2] / "u1_tebd" / "fixtures" / "u1_tebd_cases_v1.json")
+    parser.add_argument("--fixture", type=Path, default=Path(__file__).parents[2] / "fixtures" / "u1_tebd_cases_v1.json")
     parser.add_argument("--case", default="u1-two-site-hopping-known-answer")
     parser.add_argument("--track", choices=("fixed_bond", "matched_error"), default="fixed_bond")
     parser.add_argument("--cutoff", type=float, default=None)
