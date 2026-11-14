@@ -21,11 +21,18 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
+pub mod reconfiguration;
 pub mod viability;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation,
     CandidateModel, ModelId, ModelPairAssessment, evaluate_assay_adequacy,
+};
+pub use reconfiguration::{
+    EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
+    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode,
+    ReconfigurationPolicy, ReconfigurationQualification, ReconfigurationReport,
+    evaluate_reconfiguration,
 };
 
 macro_rules! string_id {
