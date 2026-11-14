@@ -19,12 +19,12 @@ Unknown and machine-extracted-only terms are blocked. Explicit deny is deny. All
 - Versioned component rights bundle and use-request schemas.
 - Distinct purposes: internal research, evaluation, commercial evaluation, training, fine-tuning, redistribution and public release.
 - Explicit permission states: allowed, denied, unknown.
-- Separate review states: human reviewed, machine extracted, unreviewed.
+- Separate review states: human reviewed, machine extracted, unreviewed. Human-reviewed records require an opaque reviewer reference, role, jurisdiction, UTC review timestamp, rationale and decision-record digest. These are traceability fields, not signature/identity authentication.
 - Structured commercial-use, output redistribution and public-release gates.
 - Attribution, notice and share-alike obligations are retained per component and carried into the decision receipt.
 - Deterministic decision receipt binds the normalized component bundle, request, policy version, decision, reasons and output obligations.
 - Replay recomputes the policy decision from the same input bundle and request.
-- Nine authored tests cover explicit evaluation allow, non-commercial restriction, unknown permission, machine-extracted-only terms, inherited restrictive components, attribution/share-alike propagation, receipt tampering, canonical ordering, unknown share-alike and public-release guard.
+- Sixteen authored tests cover explicit evaluation allow, non-commercial restriction, commercial-context gating, unknown permission, machine-extracted-only terms, missing/malformed review records, UTC timestamps, inherited restrictive components, attribution/share-alike propagation, receipt tampering, canonical ordering, unknown share-alike and distribution/public-release guards.
 
 ## Known SMEBench license facts — not a legal decision
 
@@ -37,7 +37,7 @@ Primary source: https://arxiv.org/abs/2610.36715, Licensing and Ethics appendix.
 ## Explicit limits
 
 - No license parser, automated legal interpretation, legal advice, issuer authentication or compliance certification.
-- Human-review receipt digests are integrity references, not digital signatures or identity proof.
+- Reviewer references and decision-record digests are traceability/integrity fields, not digital signatures or identity proof. The reviewer is not authenticated by this policy.
 - The evaluator checks the permissions declared in the record; it cannot prove that the human review was correct.
 - The caller supplies the commercial-context declaration; the policy does not infer commerciality from an organization or transaction.
 - Attribution/share-alike output flags are caller attestations. Downstream publishing workflows must independently verify the actual notices and license choices.
