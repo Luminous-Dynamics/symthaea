@@ -354,7 +354,6 @@ fn validate_execution_events(
 fn validate_controls(
     controls: &[MusicRealizerControlBindingV1],
 ) -> Vec<MusicRealizationBridgeIssueV1> {
-    use MusicRealizerControlRequirementV1 as R;
     use MusicRealizerControlRequirementV1::Hard;
     use MusicRealizerDeclaredFidelityV1 as F;
     use MusicRealizerObservedDispositionV1 as O;
@@ -390,7 +389,6 @@ fn validate_controls(
         }
         // Advisory controls may be best-effort, ignored, or unavailable. This
         // observation is retained for audit; it never upgrades musical evidence.
-        let _ = (R::Advisory, O::BestEffort, O::Ignored, O::Unavailable);
     }
     issues
 }
@@ -520,6 +518,9 @@ pub fn verify_music_realization_transaction_binding_v1(
         if observed_length != receipt.payload.output_byte_length {
             issues.push(MusicRealizationBridgeIssueV1::OutputLengthMismatch);
         }
+        if attempt.materialized_bytes < observed_length {
+            issues.push(MusicRealizationBridgeIssueV1::ByteEvidenceMismatch);
+        }
         if receipt.payload.output_artifact_sha256.as_deref() != Some(observed_sha256.as_str())
             || attempt.candidate_artifact_sha256.as_deref() != Some(observed_sha256.as_str())
         {
@@ -549,6 +550,7 @@ pub fn verify_music_realization_transaction_binding_v1(
         if actual_output_bytes.is_some()
             || receipt.payload.output_artifact_sha256.is_some()
             || receipt.payload.output_byte_length != 0
+            || attempt.candidate_artifact_sha256.is_some()
         {
             issues.push(MusicRealizationBridgeIssueV1::UnexpectedOutputBytes);
         }
@@ -596,10 +598,10 @@ pub fn verify_music_realization_transaction_binding_v1(
 mod tests {
     use super::*;
     use crate::music_edit_transaction_decision::{
-        MusicEditAttemptKindV1, MusicEditDecisionActionV1, MusicEditEvidenceFailureClassV1,
+        MusicEditAttemptKindV1, MusicEditDecisionActionV1, MusicEditDecisionReasonV1,
         MusicEditEvidenceRecordV1, MusicEditTransactionBudgetV1,
-        MusicEditTransactionPolicyV1, MusicEditTransactionUsageV1,
-        evaluate_music_edit_transaction_v1, music_edit_transaction_policy_digest_v1,
+        MusicEditTransactionPolicyV1, evaluate_music_edit_transaction_v1,
+        music_edit_transaction_policy_digest_v1,
     };
 
     fn d(byte: u8) -> String {
@@ -685,13 +687,7 @@ mod tests {
             materialized_bytes: if completed { output_length } else { 0 },
             evidence: required()
                 .into_iter()
-                .map(|kind| {
-                    evidence_record(
-                        kind,
-                        output_sha256,
-                        completed || kind != MusicEditEvidenceKindV1::ActualByteMaterialization,
-                    )
-                })
+                .map(|kind| evidence_record(kind, output_sha256, completed))
                 .collect(),
         };
         MusicEditTransactionV1 {
@@ -1189,12 +1185,14 @@ mod tests {
             },
         ];
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
-        assert!(verify_music_realization_transaction_binding_v1(
-            &tx,
-            &receipt,
-            Some(bytes)
-        )
-        .unwrap_err()
-        .contains(&MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted));
+        let binding =
+            verify_music_realization_transaction_binding_v1(&tx, &receipt, Some(bytes)).unwrap();
+        assert_eq!(binding.submission_count, 2);
+        let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Reject);
+        assert!(decision
+            .payload
+            .reasons
+            .contains(&MusicEditDecisionReasonV1::BudgetExceeded));
     }
 }
