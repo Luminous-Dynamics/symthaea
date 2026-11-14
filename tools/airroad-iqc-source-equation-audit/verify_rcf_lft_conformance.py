@@ -333,7 +333,10 @@ def run_negative_controls(data: dict[str, Any], baseline: dict[str, Matrix]) -> 
     wrong_lft = add(
         m22,
         matmul(
-            matmul(m12 and [[m12[0][0]], [m12[0][1]]], inverse_2x2(sub(identity(2), m11))),
+            matmul(
+                [[m12[0][0], m12[1][0]]],
+                inverse_2x2(sub(identity(2), m11)),
+            ),
             [[m21[0][0]], [m21[0][1]]],
         ),
     )
