@@ -86,6 +86,27 @@ jobs:
           assert r["dense_discrete_oracle"]["state_l2_error"] <= 1e-10
           assert r["continuous_time_oracle"]["state_l2_error"] <= 1e-8
           PY
+      - name: Run lazy sub-MPO compression smoke
+        run: |
+          python benchmarks/u1_tebd/external/quimb/run_quimb_baseline.py \
+            --case u1-two-site-hopping-known-answer --track fixed_bond \
+            --engine lazy --lazy-method direct --compress-every 2 \
+            --warmups 0 --repeats 1 --output /tmp/quimb-u1-lazy-smoke.json
+      - name: Assert lazy dense oracles, norm and charge
+        run: |
+          python - <<'PY'
+          import json
+          p = json.load(open("/tmp/quimb-u1-lazy-smoke.json"))
+          r = p["records"][0]
+          assert r["implementation"] == "quimb.CircuitMPSLazy"
+          assert r["compression_policy"] == "lazy_sub_mpo_periodic_compression"
+          assert r["quimb_lazy_method"] == "direct"
+          assert r["quimb_compress_every"] == 2
+          assert r["dense_discrete_oracle"]["state_l2_error"] <= 1e-10
+          assert r["continuous_time_oracle"]["state_l2_error"] <= 1e-8
+          assert r["charge_metrics"]["charge_leakage_probability"] <= 1e-12
+          assert abs(r["norm_squared_from_network"] - 1.0) <= 1e-10
+          PY
 
   itensor-smoke:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
