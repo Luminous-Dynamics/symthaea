@@ -27,7 +27,39 @@ permissions:
   contents: read
 
 jobs:
+  classify-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      benchmark_registry: ${{ steps.changed.outputs.benchmark_registry }}
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify benchmark-registry changes
+        id: changed
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" != "pull_request" ]]; then
+            echo "benchmark_registry=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")"
+          if grep -Eq '^(crates/domains/symthaea-muse/src/benchmark_registry\.rs|tools/mel-benchmark-registry-harness/|benchmarks/mel/registry/(music-benchmark-profile-v1|music-benchmark-run-v1)\.json|benchmarks/mel/schemas/music-benchmark-(profile|run)-v1\.schema\.json)' <<< "$changed"; then
+            echo "benchmark_registry=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "benchmark_registry=false" >> "$GITHUB_OUTPUT"
+          fi
+
   benchmark-registry-contract:
+    needs: classify-changes
+    if: ${{ needs.classify-changes.outputs.benchmark_registry == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -124,8 +156,10 @@ jobs:
           cp benchmarks/mel/registry/synthetic-music-edit-comparison-scope-v1.json "$staged/fixtures/"
           cp benchmarks/mel/registry/synthetic-music-edit-artifact-map-v1.json "$staged/fixtures/"
           echo "MUSE_MUSIC_EDIT_ADAPTER_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
-      - name: Check adapter harness formatting
-        run: cargo +1.96.0 fmt --check --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST"
+      - name: Format and verify isolated adapter harness
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST"
       - name: Resolve standalone adapter dependencies
         run: cargo +1.96.0 generate-lockfile --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST"
       - name: Run music-edit adapter contract tests
@@ -137,7 +171,20 @@ jobs:
       - name: Run adapter Clippy
         run: cargo +1.96.0 clippy --locked --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST" --all-targets -- -D warnings
 
+      - name: Preserve formatted harness source for exact-head review
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-music-edit-adapter-evidence"
+          harness_dir="$(dirname "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST")"
+          mkdir -p "$evidence/formatted"
+          cp "$harness_dir/src/music_edit_benchmark_adapter.rs" "$evidence/formatted/music_edit_benchmark_adapter.rs"
+          cp "$harness_dir/examples/materialize.rs" "$evidence/formatted/materialize.rs"
+          cp "$harness_dir/examples/validate_fixtures.rs" "$evidence/formatted/validate_fixtures.rs"
+
       - name: Record exact adapter source and fixture identities
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -148,6 +195,7 @@ jobs:
           cp "$harness_dir/Cargo.lock" "$evidence/Cargo.lock"
           sha256sum "$evidence/Cargo.toml" "$evidence/Cargo.lock" > "$evidence/cargo-identities.sha256"
           sha256sum crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs > "$evidence/adapter-source.sha256"
+          sha256sum "$harness_dir/src/music_edit_benchmark_adapter.rs" > "$evidence/formatted-staged-source.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-dataset-manifest-v1.schema.json > "$evidence/dataset-schema.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-capability-matrix-v1.schema.json > "$evidence/capability-schema.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-comparison-scope-v1.schema.json > "$evidence/scope-schema.sha256"
@@ -160,6 +208,7 @@ jobs:
           printf 'exact_head=%s\n' "$MUSE_MUSIC_EDIT_ADAPTER_REVISION" > "$evidence/source-identities.txt"
 
       - name: Upload adapter evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: muse-music-edit-adapter-${{ github.event.pull_request.head.sha || github.sha }}
