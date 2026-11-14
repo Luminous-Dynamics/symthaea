@@ -417,3 +417,24 @@ The work should choose the **smallest discriminating experiment**:
 - pump loop/cavitation tunnel for pump cavitation inception and breakdown;
 - rotating machinery rig for shaft transient-load observability;
 - full-scale craft/vessel only for claims that require full-scale evidence.
+
+
+## 16. Competitor correction and stronger Damen electric-tug reference — Aqua Pollux
+
+A currently indexed Damen product sheet is for the delivered **RSD Tug 2513 Electric “Aqua Pollux”**, yard 514003, delivered October 2024. It reports:
+- classification notation: MACH Escort Tug; bollard pull 70 t; maximum steering force 73 t; maximum braking force 96 t; maximum escort speed 10 kn; unrestricted navigation;
+- performance line: 70 t bollard pull and 12.6 kn speed, specified in full-electric (battery-powered) mode;
+- 2 × Ramme TW 1400r_L electric main motors; 3,700 bkW at 500 rpm;
+- maximum battery capacity 2,782 kWh;
+- 2 × Caterpillar C32TA generator sets, 1,175 kVA each, described in the sheet as backup-generator engines;
+- Damen Triton monitoring dashboard/cloud listed in the nautical/communications equipment.
+
+Official product sheet: https://medialibrary.damen.com/m/17d9e60bcdcd2257/original/product-sheet-damen-rsd-tug-2513-electric-dms-aqua-pollux.pdf
+
+**Critical interpretation:** this is a manufacturer product sheet/classification statement, not the raw class trial report. The values 73 t steering, 96 t braking and 10 kn escort speed are useful (F,B,V)-type comparator anchors, but the sheet does not report EPN transition time (C). Do not label it a complete measured full-scale EPN ((F,B,V,C)) result. Obtain the class/sea-trial report, measurement basis and uncertainty before scoring it as a full EPN comparator.
+
+**Source-reconciliation note:** an older product-sheet version in the research history described 70 t bollard pull astern, whereas this currently indexed Aqua Pollux sheet gives a 70 t bollard-pull line and the escort notation above without a direction on that line. Keep source revision, vessel identity, pull direction and measurement basis in the incomparability ledger; do not silently overwrite one edition with another. Confirm the exact configuration and test report with Damen.
+
+Combine this with Damen's 2 February 2021 operational description (manufacturer statement, not an independently audited duty-cycle distribution): at least two average-harbour berthing/unberthing operations on battery alone, 70 t push/pull for at least 30 minutes during those operations, two-hour shore recharge, four independent battery packs and an expected battery-system life of approximately 30,000 cycles. Source: https://www.damen.com/insights-center/articles/developing-zero-emissions-harbour-towage-capabilities
+
+**Competitive implication:** the benchmark should separately evaluate static pull, escort (F/B/V), transition time (C), complete harbour jobs, high-pull duration, reserve, charge turnaround, redundancy, actual availability and battery lifecycle. The manufacturer sheet's battery capacity and headline pull do not prove that a different tug architecture can complete the same job sequence.
