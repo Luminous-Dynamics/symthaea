@@ -85,3 +85,6 @@ The public verifier now has an optional cross-implementation test that verifies 
 ## Join checkpoint to the observed destination
 
 The reference API includes `AcceptObserved`, which requires the independently observed database ID, journal sequence and journal-head digest to match the signed checkpoint before it advances `TrustedState`. This removes a common integration mistake: verifying a valid signature but forgetting to compare it with the database snapshot being audited. The observer must obtain all three observed values from one coherent transaction snapshot. `AcceptObserved` cannot upgrade the observer's trust domain or prove events outside its coverage.
+
+
+The current public reference package has 21 checkpoint tests, including the `AcceptObserved` join cases and an optional OpenSSL cross-provider signature check. The integration API checks identity, sequence and head equality before accepting an advanced checkpoint. It still relies on the caller to obtain a coherent observer snapshot and keep the monotonic trust cursor in an independent domain.
