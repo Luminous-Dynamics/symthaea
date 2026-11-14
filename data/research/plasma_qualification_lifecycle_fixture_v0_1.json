@@ -1428,10 +1428,11 @@
                 "material:PP-LOT-01",
                 "adhesive:ADH-01",
                 "aging:AGING-PROFILE-01",
-                "evidence:GEN-1-SURVIVAL"
+                "evidence:GEN-1-SURVIVAL",
+                "review:bond_life"
               ],
               "dependency_closure_ref": "DAG-CLAIM-BOND_LIFE",
-              "dependency_closure_sha256": "0000000000000000000000000000000000000000000000000000000000000323",
+              "dependency_closure_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
               "evidence_refs": [
                 "GEN-1-SURVIVAL-RECEIPT",
                 "GEN-1-AGING-RAW"
