@@ -4956,4 +4956,114 @@ mod tests {
         assert!((dense[2].im + 1.0_f64.sin()).abs() <= 1.0e-12);
         assert!(gate.unitarity_residual() <= 1.0e-12);
     }
+
+    fn one_excitation_w_state() -> ComplexU1Mps {
+        let root_two_thirds = (2.0_f64 / 3.0).sqrt();
+        let root_one_third = (1.0_f64 / 3.0).sqrt();
+        let inverse_root_two = 1.0 / 2.0_f64.sqrt();
+
+        let mut first_data = vec![complex_zero(); 4];
+        first_data[0] = Complex64::new(root_two_thirds, 0.0);
+        first_data[3] = Complex64::new(root_one_third, 0.0);
+        let first = U1MpsTensor::new(vec![0], vec![0, 1], first_data).unwrap();
+
+        let mut second_data = vec![complex_zero(); 8];
+        second_data[0] = Complex64::new(inverse_root_two, 0.0);
+        second_data[3] = Complex64::new(inverse_root_two, 0.0);
+        second_data[5] = Complex64::new(1.0, 0.0);
+        let second = U1MpsTensor::new(vec![0, 1], vec![0, 1], second_data).unwrap();
+
+        let mut third_data = vec![complex_zero(); 4];
+        third_data[1] = Complex64::new(1.0, 0.0);
+        third_data[2] = Complex64::new(1.0, 0.0);
+        let third = U1MpsTensor::new(vec![0, 1], vec![1], third_data).unwrap();
+
+        ComplexU1Mps::new(vec![first, second, third], 1, 1.0e-12).unwrap()
+    }
+
+    #[test]
+    fn local_observable_contractions_match_w_state_known_answers() {
+        let state = one_excitation_w_state();
+        let number = [
+            [complex_zero(), complex_zero()],
+            [complex_zero(), Complex64::new(1.0, 0.0)],
+        ];
+        let occupation = state.expectation_one_site(0, number, 1.0e-12).unwrap();
+        assert!((occupation.expectation.re - 1.0 / 3.0).abs() <= 1.0e-12);
+        assert!(occupation.expectation.im.abs() <= 1.0e-12);
+        assert!(occupation.identity_norm_residual <= 1.0e-12);
+        assert!((occupation.norm_squared - 1.0).abs() <= 1.0e-12);
+
+        let mut double_occupancy = [[complex_zero(); 4]; 4];
+        double_occupancy[3][3] = Complex64::new(1.0, 0.0);
+        let pair_density = state
+            .expectation_two_site(0, double_occupancy, 1.0e-12)
+            .unwrap();
+        assert!(pair_density.expectation.norm() <= 1.0e-12);
+        assert!(pair_density.identity_norm_residual <= 1.0e-12);
+
+        let mut hopping = [[complex_zero(); 4]; 4];
+        hopping[1][2] = Complex64::new(1.0, 0.0);
+        hopping[2][1] = Complex64::new(1.0, 0.0);
+        let coherence = state.expectation_two_site(0, hopping, 1.0e-12).unwrap();
+        assert!((coherence.expectation.re - 2.0 / 3.0).abs() <= 1.0e-12);
+        assert!(coherence.expectation.im.abs() <= 1.0e-12);
+        assert!(coherence.identity_norm_residual <= 1.0e-12);
+    }
+
+    #[test]
+    fn local_observable_receipts_are_invariant_under_mixed_canonicalization() {
+        let mut state = one_excitation_w_state();
+        let mut current = [[complex_zero(); 4]; 4];
+        current[1][2] = Complex64::new(0.0, 1.0);
+        current[2][1] = Complex64::new(0.0, -1.0);
+        let before = state.expectation_two_site(0, current, 1.0e-12).unwrap();
+        let gauge = state.canonicalize_for_bond(0, 1.0e-12).unwrap();
+        assert!(gauge.qualifies(1.0e-12));
+        let after = state.expectation_two_site(0, current, 1.0e-12).unwrap();
+        assert!((before.expectation - after.expectation).norm() <= 1.0e-11);
+        assert!((before.norm_squared - after.norm_squared).abs() <= 1.0e-12);
+        assert!(after.identity_norm_residual <= 1.0e-12);
+    }
+
+    #[test]
+    fn observable_error_receipt_translates_global_state_distance_to_local_error() {
+        let state = one_excitation_w_state();
+        let mut hopping = [[complex_zero(); 4]; 4];
+        hopping[1][2] = Complex64::new(1.0, 0.0);
+        hopping[2][1] = Complex64::new(1.0, 0.0);
+        let receipt = state.expectation_two_site(0, hopping, 1.0e-12).unwrap();
+        let bound = receipt
+            .state_distance_error_upper_bound(1.0e-6, 1.0)
+            .unwrap();
+        assert!((bound - 2.0 * 2.0_f64.sqrt() * 1.0e-6).abs() <= 1.0e-18);
+        assert!(matches!(
+            receipt.state_distance_error_upper_bound(f64::NAN, 1.0),
+            Err(U1MpsError::InvalidObservableErrorInput)
+        ));
+    }
+
+    #[test]
+    fn local_observable_contractors_reject_invalid_support_and_nonfinite_operator() {
+        let state = one_excitation_w_state();
+        let number = [
+            [complex_zero(), complex_zero()],
+            [complex_zero(), Complex64::new(1.0, 0.0)],
+        ];
+        assert!(matches!(
+            state.expectation_one_site(3, number, 1.0e-12),
+            Err(U1MpsError::ObservableSiteOutOfRange { .. })
+        ));
+        assert!(matches!(
+            state.expectation_two_site(2, [[complex_zero(); 4]; 4], 1.0e-12),
+            Err(U1MpsError::ObservableBondOutOfRange { .. })
+        ));
+        let mut invalid = [[complex_zero(); 2]; 2];
+        invalid[0][1] = Complex64::new(f64::NAN, 0.0);
+        assert!(matches!(
+            state.expectation_one_site(0, invalid, 1.0e-12),
+            Err(U1MpsError::InvalidObservableOperator { .. })
+        ));
+    }
+
 }
