@@ -854,13 +854,14 @@ fn foreign_namespace_core_element(
         })
 }
 
-fn parse_measure_locators_for_part(
-    part: roxmltree::Node<'_, '_>,
+fn parse_measure_locators_for_inputs(
+    measure_inputs: &[MusicXmlMeasureInputV1<'_, '_>],
 ) -> Vec<MusicXmlMeasureLocatorV1> {
-    part.children()
-        .filter(|node| node.has_tag_name("measure"))
+    measure_inputs
+        .iter()
         .enumerate()
-        .map(|(measure_index, measure)| {
+        .map(|(measure_index, input)| {
+            let measure = input.container;
             let is_yes = |name: &str| {
                 measure
                     .attribute(name)
@@ -884,8 +885,8 @@ fn parse_measure_locators_for_part(
 /// D.C./D.S./coda/fine routing) and selective time-only attributes on notes,
 /// lyrics, ties and other MusicXML descendants. The traversal engine decides
 /// which of these it can interpret; the parser never silently drops them.
-fn parse_playback_controls_for_part(
-    part: roxmltree::Node<'_, '_>,
+fn parse_playback_controls_for_inputs(
+    measure_inputs: &[MusicXmlMeasureInputV1<'_, '_>],
     _part_id: &str,
 ) -> Vec<MusicXmlPlaybackControlV1> {
     const PLAYBACK_ATTRIBUTES: [&str; 8] = [
@@ -899,14 +900,12 @@ fn parse_playback_controls_for_part(
         "time-only",
     ];
 
-    let measure_nodes: Vec<_> = part
-        .children()
-        .filter(|node| node.has_tag_name("measure"))
-        .collect();
     let mut controls = Vec::new();
     let mut source_order = 0usize;
-    for (measure_index, measure) in measure_nodes.iter().enumerate() {
-        for node in measure.descendants().filter(|node| node.is_element()) {
+    for (measure_index, input) in measure_inputs.iter().enumerate() {
+        let measure = input.container;
+        let content = input.content;
+        for node in content.descendants().filter(|node| node.is_element()) {
             let is_sound = node.has_tag_name("sound");
             let has_playback_attribute = node
                 .attributes()
@@ -957,24 +956,22 @@ fn parse_playback_controls_for_part(
     controls
 }
 
-fn parse_barline_events_for_part(
-    part: roxmltree::Node<'_, '_>,
+fn parse_barline_events_for_inputs(
+    measure_inputs: &[MusicXmlMeasureInputV1<'_, '_>],
     part_id: &str,
     parsed_measures: &[ParsedMeasure],
     spans: &[MeasureSpan],
 ) -> Result<Vec<MusicXmlPartBarlineEventV1>, MusicXmlMeasureAdapterError> {
-    let measure_nodes: Vec<_> = part
-        .children()
-        .filter(|node| node.has_tag_name("measure"))
-        .collect();
-    if measure_nodes.len() != parsed_measures.len() || spans.len() != parsed_measures.len() {
+    if measure_inputs.len() != parsed_measures.len() || spans.len() != parsed_measures.len() {
         return Err(MusicXmlMeasureAdapterError::ArithmeticOverflow);
     }
 
     let mut divisions: Option<i64> = None;
     let mut source_order = 0usize;
     let mut events = Vec::new();
-    for (measure_index, measure) in measure_nodes.iter().enumerate() {
+    for (measure_index, input) in measure_inputs.iter().enumerate() {
+        let measure_container = input.container;
+        let measure = input.content;
         let mut cursor = RationalBeat::new(0, 1)
             .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
         for element in measure.children().filter(|node| node.is_element()) {
@@ -1165,7 +1162,7 @@ fn parse_barline_events_for_part(
                         attribute.value().to_string(),
                     ))
                     .collect();
-                let measure_number = measure.attribute("number").unwrap_or("");
+                let measure_number = measure_container.attribute("number").unwrap_or("");
                 events.push(MusicXmlPartBarlineEventV1 {
                     source_order,
                     source_id: element.attribute("id").map(str::to_string),
