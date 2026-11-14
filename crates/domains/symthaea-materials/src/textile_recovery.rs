@@ -51,6 +51,8 @@ pub enum EvidenceKind {
     ComponentRecoveryTrial,
     /// Physical mechanical-opening/recycling trial.
     MechanicalRecyclingTrial,
+    /// Versioned and human-reviewed sampling protocol used for fibre-length measurement.
+    FibreLengthSamplingPlan,
     /// Measured fibre-length distribution for an actual recovered output.
     FibreLengthMeasurement,
     /// Physical test of a chemical route's material/process compatibility.
@@ -267,10 +269,8 @@ pub struct FibreLengthBin {
 pub struct FibreLengthEvidence {
     /// Method/standard and version used to measure fibre length.
     pub method_ref: String,
-    /// Versioned sampling plan for the exact output-lot sample (location, extraction and conditioning).
-    pub sampling_plan_ref: String,
-    /// SHA-256 of the exact sampling-plan bytes.
-    pub sampling_plan_sha256: String,
+    /// Human-reviewed, content-addressed sampling protocol for the exact output-lot sample.
+    pub sampling_plan_evidence: EvidenceRef,
     /// Measured sample mass in milligrams taken from the accepted output lot.
     pub sample_mass_mg: u64,
     /// Number of independently measured subsamples/replicates represented by this distribution.
@@ -688,8 +688,11 @@ fn fibre_length_binds_to_trial(
 
 fn fibre_length_protocol_valid(evidence: &FibreLengthEvidence) -> bool {
     nonempty(&evidence.method_ref)
-        && nonempty(&evidence.sampling_plan_ref)
-        && valid_sha256(&evidence.sampling_plan_sha256)
+        && valid_evidence(
+            &evidence.sampling_plan_evidence,
+            EvidenceKind::FibreLengthSamplingPlan,
+            EvidenceTier::HumanInspected,
+        )
         && evidence.sample_mass_mg > 0
         && evidence.replicate_count > 0
         && evidence.measurement_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
@@ -922,6 +925,7 @@ pub fn qualify_recovery_route(
                 None => reasons.push(RouteReason::MissingFibreLengthEvidence),
                 Some(length) => {
                     evidence_ids.push(length.evidence.evidence_id.clone());
+                    evidence_ids.push(length.sampling_plan_evidence.evidence_id.clone());
                     if !valid_evidence(
                         &length.evidence,
                         EvidenceKind::FibreLengthMeasurement,
@@ -1245,8 +1249,13 @@ mod tests {
         measurement.method_ref = method_ref.clone();
         FibreLengthEvidence {
             method_ref,
-            sampling_plan_ref: "FIBRE-SAMPLING-PLAN-V1".to_owned(),
-            sampling_plan_sha256: "b".repeat(64),
+            sampling_plan_evidence: evidence(
+                "FIBRE-SAMPLING-PLAN-01",
+                EvidenceKind::FibreLengthSamplingPlan,
+                EvidenceTier::HumanInspected,
+                "fibre-methods-lab",
+                None,
+            ),
             sample_mass_mg: 25_000,
             replicate_count: 3,
             measurement_uncertainty_ppm: 20_000,
@@ -1504,7 +1513,7 @@ mod tests {
         bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
         let mut distribution = length();
         distribution.replicate_count = 0;
-        distribution.sampling_plan_ref.clear();
+        distribution.sampling_plan_evidence.evidence_id.clear();
         bundle.fibre_length = Some(distribution);
         bundle.downstream_acceptance = Some(acceptance());
         let result =
@@ -1542,7 +1551,7 @@ mod tests {
         bundle.composition = Some(composition());
         bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
         let mut distribution = length();
-        distribution.sampling_plan_sha256 = "not-a-digest".to_owned();
+        distribution.sampling_plan_evidence.sha256 = "not-a-digest".to_owned();
         bundle.fibre_length = Some(distribution);
         bundle.downstream_acceptance = Some(acceptance());
         let result =
