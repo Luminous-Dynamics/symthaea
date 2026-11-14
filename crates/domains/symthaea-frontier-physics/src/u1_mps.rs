@@ -145,6 +145,21 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    HamiltonianChargeLeakage {
+        output_charge: u32,
+        input_charge: u32,
+        amplitude: f64,
+        tolerance: f64,
+    },
+    HamiltonianHermiticityResidual {
+        residual: f64,
+        tolerance: f64,
+    },
+    InvalidTimeStep(f64),
+    HamiltonianBondCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -302,6 +317,26 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
+            ),
+            Self::HamiltonianChargeLeakage {
+                output_charge,
+                input_charge,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "local Hamiltonian couples charge {input_charge} to {output_charge} with amplitude {amplitude}, tolerance {tolerance}"
+            ),
+            Self::HamiltonianHermiticityResidual { residual, tolerance } => write!(
+                f,
+                "local Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::InvalidTimeStep(value) => {
+                write!(f, "TEBD time step must be finite and nonzero, got {value}")
+            }
+            Self::HamiltonianBondCountMismatch { expected, actual } => write!(
+                f,
+                "nearest-neighbour Hamiltonian requires {expected} bond terms, got {actual}"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -1672,6 +1707,18 @@ pub struct U1TwoSiteState {
     selection_rule_residual: f64,
 }
 
+
+
+/// Provenance and numerical checks for one local Hamiltonian exponential.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TwoSiteHamiltonianGateReceipt {
+    pub time_step: f64,
+    pub hamiltonian_charge_leakage_residual: f64,
+    pub hamiltonian_hermiticity_residual: f64,
+    pub gate_unitarity_residual: f64,
+    pub gate_charge_conservation_residual: f64,
+}
+
 impl U1TwoSiteGate {
     /// Construct and validate a charge-conserving 4x4 unitary.
     pub fn new(matrix: [[Complex64; 4]; 4], tolerance: f64) -> Result<Self, U1MpsError> {
@@ -1742,6 +1789,108 @@ impl U1TwoSiteGate {
             charge_conservation_residual,
             unitarity_residual,
         })
+    }
+
+
+    /// Construct exp(-i * time_step * H) for a Hermitian, U(1)-conserving
+    /// two-qubit Hamiltonian. Basis order is |00>, |01>, |10>, |11|.
+    ///
+    /// The charge-0 and charge-2 blocks are exponentiated as scalars. The
+    /// charge-1 block is exponentiated analytically as a Hermitian 2x2 matrix;
+    /// no generic matrix exponential or eigensolver is required.
+    pub fn from_hermitian_u1_hamiltonian(
+        hamiltonian: [[Complex64; 4]; 4],
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<(Self, U1TwoSiteHamiltonianGateReceipt), U1MpsError> {
+        if !time_step.is_finite() || time_step == 0.0 {
+            return Err(U1MpsError::InvalidTimeStep(time_step));
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        let mut hermiticity_residual: f64 = 0.0;
+        let mut charge_residual: f64 = 0.0;
+        let mut charge_witness = (0_usize, 0_usize);
+
+        for row in 0_usize..4 {
+            for column in 0_usize..4 {
+                let value = hamiltonian[row][column];
+                if !value.re.is_finite() || !value.im.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry {
+                        site: 0,
+                        index: row * 4 + column,
+                    });
+                }
+                hermiticity_residual = hermiticity_residual
+                    .max((value - hamiltonian[column][row].conj()).norm());
+                if row.count_ones() != column.count_ones() {
+                    let amplitude = value.norm();
+                    if amplitude > charge_residual {
+                        charge_residual = amplitude;
+                        charge_witness = (row, column);
+                    }
+                }
+            }
+        }
+        if hermiticity_residual > tolerance {
+            return Err(U1MpsError::HamiltonianHermiticityResidual {
+                residual: hermiticity_residual,
+                tolerance,
+            });
+        }
+        if charge_residual > tolerance {
+            return Err(U1MpsError::HamiltonianChargeLeakage {
+                output_charge: charge_witness.0.count_ones(),
+                input_charge: charge_witness.1.count_ones(),
+                amplitude: charge_residual,
+                tolerance,
+            });
+        }
+
+        let minus_i = Complex64::new(0.0, -1.0);
+        let phase_for = |energy: f64| {
+            Complex64::from_polar(1.0, -time_step * energy)
+        };
+        let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
+        matrix[0][0] = phase_for(hamiltonian[0][0].re);
+        matrix[3][3] = phase_for(hamiltonian[3][3].re);
+
+        // Hermitian single-excitation block [[a, z], [conj(z), d]].
+        let a = hamiltonian[1][1].re;
+        let d = hamiltonian[2][2].re;
+        let z = hamiltonian[1][2];
+        let mean = 0.5 * (a + d);
+        let half_difference = 0.5 * (a - d);
+        let radius = (half_difference * half_difference + z.norm_sqr()).sqrt();
+        let angle = time_step * radius;
+        let sinc_factor = if angle.abs() <= 1.0e-8 {
+            time_step
+                * (1.0 - angle * angle / 6.0 + angle.powi(4) / 120.0)
+        } else {
+            angle.sin() / radius
+        };
+        let phase = phase_for(mean);
+        let cosine = angle.cos();
+        let diagonal_a = Complex64::new(cosine, 0.0)
+            + minus_i * (sinc_factor * half_difference);
+        let diagonal_d = Complex64::new(cosine, 0.0)
+            - minus_i * (sinc_factor * half_difference);
+        let off_diagonal = minus_i * sinc_factor * z;
+        matrix[1][1] = phase * diagonal_a;
+        matrix[1][2] = phase * off_diagonal;
+        matrix[2][1] = phase * off_diagonal.conj();
+        matrix[2][2] = phase * diagonal_d;
+
+        let gate = Self::new(matrix, tolerance)?;
+        let receipt = U1TwoSiteHamiltonianGateReceipt {
+            time_step,
+            hamiltonian_charge_leakage_residual: charge_residual,
+            hamiltonian_hermiticity_residual: hermiticity_residual,
+            gate_unitarity_residual: gate.unitarity_residual(),
+            gate_charge_conservation_residual: gate.charge_conservation_residual(),
+        };
+        Ok((gate, receipt))
     }
 
     pub fn matrix(&self) -> &[[Complex64; 4]; 4] {
