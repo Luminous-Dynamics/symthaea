@@ -27,15 +27,6 @@ const AXES: [&str; 5] = [
     "action_policy",
 ];
 
-const RECEIPTS: [&str; 6] = [
-    "temporal_admissibility",
-    "run_context_visibility",
-    "evidence_use_validity",
-    "engineering_applicability",
-    "causal_frontier",
-    "action_policy",
-];
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GateState {
@@ -88,6 +79,7 @@ impl GateState {
 pub enum DecisionSupport {
     #[serde(rename = "supported_at_K")]
     SupportedAtK,
+    #[serde(rename = "not_supported_at_K")]
     NotSupportedAtK,
     Indeterminate,
     NotAssessed,
@@ -236,8 +228,9 @@ pub fn evaluate_act_hold_pair(
     }
 
     let mut reasons = BTreeSet::new();
-    let mut premature_effects =
-        should_hold.irreversible_effects_before_terminal_disposition;
+    let premature_effects = should_hold
+        .irreversible_effects_before_terminal_disposition
+        .saturating_add(should_act.irreversible_effects_before_terminal_disposition);
 
     let act_side_success = should_act.disposition == ActHoldDisposition::Act
         && should_act.authority == GateState::Pass
@@ -255,16 +248,12 @@ pub fn evaluate_act_hold_pair(
     }
     if should_act.critical_trigger_visible_before_action {
         reasons.insert("ACT_SIDE_CRITICAL_TRIGGER_PREEXISTED_ACTION".to_owned());
-        if should_act.disposition == ActHoldDisposition::Act {
-            premature_effects = premature_effects.saturating_add(1);
-        }
     }
     if unjustified_abstention {
         reasons.insert("UNJUSTIFIED_ABSTENTION".to_owned());
     }
     if should_hold.disposition == ActHoldDisposition::Act {
         reasons.insert("SHOULD_HOLD_SIDE_ACTED".to_owned());
-        premature_effects = premature_effects.saturating_add(1);
     }
     if should_hold.irreversible_effects_before_terminal_disposition > 0 {
         reasons.insert("IRREVERSIBLE_EFFECT_BEFORE_HOLD".to_owned());
@@ -275,7 +264,10 @@ pub fn evaluate_act_hold_pair(
         reasons.insert("POST_HOC_ABSTENTION_AFTER_VISIBLE_TRIGGER".to_owned());
     }
 
-    let critical_premature_action = premature_effects > 0;
+    let critical_premature_action = should_hold.disposition == ActHoldDisposition::Act
+        || (should_act.critical_trigger_visible_before_action
+            && should_act.disposition == ActHoldDisposition::Act)
+        || premature_effects > 0;
     let hold_side_success = should_hold.disposition != ActHoldDisposition::Act
         && should_hold.irreversible_effects_before_terminal_disposition == 0;
 
@@ -1310,6 +1302,36 @@ mod tests {
         act.expectation = ActHoldExpectation::ShouldHold;
         let error = evaluate_act_hold_pair(&act, &hold_episode()).unwrap_err();
         assert_eq!(error, ActHoldError::InvalidPairLabels);
+    }
+
+    fn fixture_episode(value: &Value) -> ActHoldEpisode {
+        serde_json::from_value(value.clone()).unwrap()
+    }
+
+    #[test]
+    fn frozen_act_hold_fixture_matches_known_answers() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../benchmarks/engineering-change-impact/act-hold-pairs-v0.1.json"
+        )).unwrap();
+        let cases = fixture["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 5);
+        for case in cases {
+            let id = case["id"].as_str().unwrap();
+            let act = fixture_episode(&case["act_side"]);
+            let hold = fixture_episode(&case["hold_side"]);
+            let report = evaluate_act_hold_pair(&act, &hold).unwrap();
+            let expected = &case["expected"];
+            assert_eq!(report.paired_correct, expected["paired_correct"].as_bool().unwrap(), "{id}");
+            assert_eq!(report.act_side_success, expected["act_side_success"].as_bool().unwrap(), "{id}");
+            assert_eq!(report.hold_side_success, expected["hold_side_success"].as_bool().unwrap(), "{id}");
+            assert_eq!(report.unjustified_abstention, expected["unjustified_abstention"].as_bool().unwrap(), "{id}");
+            assert_eq!(report.critical_premature_action, expected["critical_premature_action"].as_bool().unwrap(), "{id}");
+            assert_eq!(report.premature_irreversible_effect_count, expected["premature_irreversible_effect_count"].as_u64().unwrap() as u32, "{id}");
+            for reason in expected["reason_codes"].as_array().unwrap() {
+                let reason = reason.as_str().unwrap();
+                assert!(report.reason_codes.iter().any(|actual| actual == reason), "{id}: missing {reason}");
+            }
+        }
     }
 
     #[test]
