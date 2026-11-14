@@ -4,6 +4,9 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::plasma_claim_scope::{decide, Disposition as ScopeDisposition, ScopeEvidence};
+use crate::plasma_equivalence_design::{
+    validate_bridge, Disposition as DesignDisposition, EquivalenceDesignReceipt,
+};
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +81,7 @@ struct EndpointGraph {
     classification_taxonomy_id: Option<String>,
     classification_taxonomy_sha256: Option<String>,
     target_failure_modes: Vec<String>,
+    design_receipt: EquivalenceDesignReceipt,
     analysis: AnalysisReceipt,
 }
 
@@ -570,6 +574,55 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
         Err(Disposition::Pass) => unreachable!(),
     }
 
+    let (baseline_design_observation, candidate_design_observation) =
+        match graph.transform_id.as_str() {
+            "unit_preserving_strength_projection_v1" => (
+                nodes.iter().find(|node| node.role == "baseline_strength"),
+                nodes.iter().find(|node| node.role == "candidate_strength"),
+            ),
+            "aged_strength_retention_ratio_v1" => (
+                nodes.iter().find(|node| node.role == "baseline_aged_strength"),
+                nodes.iter().find(|node| node.role == "candidate_aged_strength"),
+            ),
+            "predeclared_failure_mode_fraction_v1" => (
+                nodes.iter().find(|node| node.role == "baseline_failure_classification"),
+                nodes.iter().find(|node| node.role == "candidate_failure_classification"),
+            ),
+            _ => unreachable!("transform registry checked above"),
+        };
+    let (Some(baseline_observation), Some(candidate_observation)) =
+        (baseline_design_observation, candidate_design_observation)
+    else {
+        return blocked("design receipt cannot be linked to its baseline/candidate observation roles");
+    };
+
+    let Some(design_receipt_sha256) = graph.design_receipt.receipt_sha256.as_deref() else {
+        return blocked("full equivalence-design receipt digest is missing");
+    };
+    let Some(transform_sha256) = graph.design_receipt.endpoint_transform_sha256.as_deref() else {
+        return blocked("design receipt does not bind the endpoint transform digest");
+    };
+    if !sha256_shape(design_receipt_sha256)
+        || transform_sha256 != graph.transform_sha256
+        || graph.design_receipt.endpoint_transform_id.as_deref() != Some(graph.transform_id.as_str())
+        || graph.design_receipt.observation_endpoint_id.as_deref()
+            != Some(baseline_observation.receipt.endpoint.as_str())
+        || analysis_design_id_mismatch(&graph.analysis, &graph.design_receipt)
+    {
+        return rejected("equivalence-design receipt is not bound to this graph, output endpoint and exact transform");
+    }
+
+    match validate_bridge(
+        &graph.design_receipt,
+        &graph.output_endpoint,
+        &baseline_observation.receipt,
+        &candidate_observation.receipt,
+    ).disposition {
+        DesignDisposition::Pass => {}
+        DesignDisposition::Blocked => return blocked("equivalence-design receipt or its exact observation binding is incomplete"),
+        DesignDisposition::Rejected => return rejected("equivalence-design receipt contradicts the endpoint transformation or observations"),
+    }
+
     let analysis = &graph.analysis;
     if !nonempty(&analysis.result_id)
         || !nonempty(&analysis.graph_id)
@@ -639,6 +692,14 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
         outcome,
         reason: "source observations, specimen/cluster lineage, registered transform and analysis result are structurally linked; numerical validity is not certified",
     }
+}
+
+fn analysis_design_id_mismatch(
+    analysis: &AnalysisReceipt,
+    design: &EquivalenceDesignReceipt,
+) -> bool {
+    analysis.design_id != design.design_id
+        || analysis.design_sha256 != design.receipt_sha256.as_deref().unwrap_or("")
 }
 
 fn expected_analysis_profile(graph: &EndpointGraph) -> &'static str {
