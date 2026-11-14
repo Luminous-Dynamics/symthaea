@@ -42,6 +42,20 @@ pub enum MusicXmlSourceContentV1 {
     ElementIndex(usize),
 }
 
+/// Part-list identity and instrument declarations that sit outside the
+/// score-partwise <part> body. These identifiers link written parts to
+/// score-instruments and MIDI program/channel metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MusicXmlPartMetadataV1 {
+    pub source_part_id: String,
+    pub part_name: Option<String>,
+    pub part_abbreviation: Option<String>,
+    pub score_instrument_ids: Vec<String>,
+    /// Full score-part subtree retains names, MIDI instruments, channels,
+    /// banks, programs, device declarations and future extensions.
+    pub source_score_part: MusicXmlSourceNodeV1,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlWrittenPitchV1 {
     pub step: String,
@@ -256,6 +270,46 @@ fn unknown(part_id: &str, reason: impl Into<String>) -> MusicXmlPartNotationEven
         auxiliary_events: Vec::new(),
         cursor_moves: Vec::new(),
     }
+}
+
+/// Resolve the matching <score-part> record from the document's
+/// <part-list>. It remains optional because valid MusicXML documents may
+/// omit a part-list; absence is None, never guessed from the note body.
+/// Duplicate declarations fail closed.
+pub fn parse_musicxml_part_metadata(
+    root: roxmltree::Node<'_, '_>,
+    part_id: &str,
+) -> Result<Option<MusicXmlPartMetadataV1>, String> {
+    if !root.has_tag_name("score-partwise") || part_id.trim().is_empty() {
+        return Err("invalid MusicXML root or empty part identity".into());
+    }
+    let Some(part_list) = root.children().find(|node| node.has_tag_name("part-list")) else {
+        return Ok(None);
+    };
+    let mut matching = part_list.children().filter(|node| {
+        node.has_tag_name("score-part") && node.attribute("id") == Some(part_id)
+    });
+    let Some(score_part) = matching.next() else {
+        return Ok(None);
+    };
+    if matching.next().is_some() {
+        return Err(format!("duplicate score-part metadata for {part_id}"));
+    }
+    let mut total_nodes = 0usize;
+    let source_score_part = source_node(score_part, 0, &mut total_nodes)
+        .map_err(|error| error.reason())?;
+    let score_instrument_ids = score_part
+        .children()
+        .filter(|node| node.has_tag_name("score-instrument"))
+        .filter_map(|node| node.attribute("id").map(str::to_string))
+        .collect();
+    Ok(Some(MusicXmlPartMetadataV1 {
+        source_part_id: part_id.to_string(),
+        part_name: child_text(score_part, "part-name"),
+        part_abbreviation: child_text(score_part, "part-abbreviation"),
+        score_instrument_ids,
+        source_score_part,
+    }))
 }
 
 /// Parse note/rest and score-order attribute semantics for one part.
