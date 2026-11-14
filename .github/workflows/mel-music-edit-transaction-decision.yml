@@ -44,10 +44,8 @@ jobs:
           cp tools/mel-music-edit-transaction-harness/src/lib.rs "$staged/src/lib.rs"
           cp crates/domains/symthaea-muse/src/music_edit_transaction_decision.rs "$staged/src/music_edit_transaction_decision.rs"
           echo "MEL_TRANSACTION_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
-      - name: Format isolated transaction crate
-        run: |
-          cargo +1.96.0 fmt --manifest-path "$MEL_TRANSACTION_MANIFEST"
-          cargo +1.96.0 fmt --check --manifest-path "$MEL_TRANSACTION_MANIFEST"
+      - name: Check formatting of exact staged source
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_TRANSACTION_MANIFEST"
       - name: Resolve standalone dependencies
         run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_TRANSACTION_MANIFEST"
       - name: Run transaction decision tests
