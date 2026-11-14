@@ -1457,22 +1457,29 @@ fn validate_federation_relationship(
                 &source_path,
                 report,
             );
-            let source_repo = field(&Value::Object(source.clone()), "repository_full_name", &source_path, report)
+            let source_repo = source
+                .get("repository_full_name")
                 .and_then(|v| string(v, &format!("{source_path}.repository_full_name"), report));
             if let Some(source_repo) = source_repo {
-                if !members.values().any(|(repository, _, _)| repository == source_repo) {
+                if !members.values().any(|(repository, _, _)| repository.as_str() == source_repo) {
                     report.error("EGDDM-FEDERATION-014", format!("{source_path}.repository_full_name"), format!("source repository {source_repo:?} is not a federation member"));
                 }
+            } else if !source.contains_key("repository_full_name") {
+                report.error("EGDDM-REQUIRED-001", format!("{source_path}.repository_full_name"), "required field is missing");
             }
-            if let Some(source_file) = field(&Value::Object(source.clone()), "path", &source_path, report) {
+            if let Some(source_file) = source.get("path") {
                 string(source_file, &format!("{source_path}.path"), report);
+            } else {
+                report.error("EGDDM-REQUIRED-001", format!("{source_path}.path"), "required field is missing");
             }
-            if let Some(blob) = field(&Value::Object(source.clone()), "blob_oid", &source_path, report)
-                .and_then(|v| string(v, &format!("{source_path}.blob_oid"), report))
-            {
-                if blob.len() != 40 || !hex_string(blob) {
-                    report.error("EGDDM-FEDERATION-015", format!("{source_path}.blob_oid"), "source blob_oid must be a 40-character Git OID");
+            if let Some(blob_value) = source.get("blob_oid") {
+                if let Some(blob) = string(blob_value, &format!("{source_path}.blob_oid"), report) {
+                    if blob.len() != 40 || !hex_string(blob) {
+                        report.error("EGDDM-FEDERATION-015", format!("{source_path}.blob_oid"), "source blob_oid must be a 40-character Git OID");
+                    }
                 }
+            } else {
+                report.error("EGDDM-REQUIRED-001", format!("{source_path}.blob_oid"), "required field is missing");
             }
             let start = source.get("line_start").and_then(Value::as_u64);
             let end = source.get("line_end").and_then(Value::as_u64);
@@ -1489,21 +1496,27 @@ fn validate_federation_relationship(
             if let Some(binding) = object(binding, &format!("{path}.contract_binding"), report) {
                 check_allowed_keys(binding, &["contract_id", "version", "contract_blob_oid", "status"], &format!("{path}.contract_binding"), report);
                 for key in ["contract_id", "version"] {
-                    if let Some(item) = field(&Value::Object(binding.clone()), key, &format!("{path}.contract_binding"), report) {
+                    if let Some(item) = binding.get(key) {
                         string(item, &format!("{path}.contract_binding.{key}"), report);
+                    } else {
+                        report.error("EGDDM-REQUIRED-001", format!("{path}.contract_binding.{key}"), "required field is missing");
                     }
                 }
-                if let Some(oid) = field(&Value::Object(binding.clone()), "contract_blob_oid", &format!("{path}.contract_binding"), report)
-                    .and_then(|v| string(v, &format!("{path}.contract_binding.contract_blob_oid"), report))
-                {
-                    if oid.len() != 40 || !hex_string(oid) {
-                        report.error("EGDDM-FEDERATION-018", format!("{path}.contract_binding.contract_blob_oid"), "contract_blob_oid must be a 40-character Git OID");
+                if let Some(oid_value) = binding.get("contract_blob_oid") {
+                    if let Some(oid) = string(oid_value, &format!("{path}.contract_binding.contract_blob_oid"), report) {
+                        if oid.len() != 40 || !hex_string(oid) {
+                            report.error("EGDDM-FEDERATION-018", format!("{path}.contract_binding.contract_blob_oid"), "contract_blob_oid must be a 40-character Git OID");
+                        }
                     }
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.contract_binding.contract_blob_oid"), "required field is missing");
                 }
-                if let Some(binding_status) = field(&Value::Object(binding.clone()), "status", &format!("{path}.contract_binding"), report) {
+                if let Some(binding_status) = binding.get("status") {
                     enum_value(binding_status, &format!("{path}.contract_binding.status"), &[
                         "declared", "two_sided_match", "independently_conformance_tested",
                     ], report);
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.contract_binding.status"), "required field is missing");
                 }
             }
         }
@@ -1589,17 +1602,21 @@ pub fn validate_federation_value(value: &Value) -> ValidationReport {
                 &mut report,
             );
             for key in ["repository_full_name", "default_branch", "self_map_id", "self_map_path"] {
-                if let Some(item) = field(&Value::Object(hub.clone()), key, "$.hub", &mut report) {
+                if let Some(item) = hub.get(key) {
                     string(item, &format!("$.hub.{key}"), &mut report);
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("$.hub.{key}"), "required field is missing");
                 }
             }
             for key in ["subject_revision", "subject_tree_oid", "self_map_blob_oid"] {
-                if let Some(item) = field(&Value::Object(hub.clone()), key, "$.hub", &mut report)
-                    .and_then(|v| string(v, &format!("$.hub.{key}"), &mut report))
-                {
-                    if item.len() != 40 || !hex_string(item) {
-                        report.error("EGDDM-FEDERATION-021", format!("$.hub.{key}"), "hub identity must be a 40-character Git OID");
+                if let Some(value) = hub.get(key) {
+                    if let Some(item) = string(value, &format!("$.hub.{key}"), &mut report) {
+                        if item.len() != 40 || !hex_string(item) {
+                            report.error("EGDDM-FEDERATION-021", format!("$.hub.{key}"), "hub identity must be a 40-character Git OID");
+                        }
                     }
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("$.hub.{key}"), "required field is missing");
                 }
             }
         }
