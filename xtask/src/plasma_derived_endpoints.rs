@@ -217,7 +217,7 @@ impl Decision {
     }
 
     fn rejected(reason: &'static str) -> Self {
-        Self { disposition: Disposition::Rejected, claim: "REJECTED_BY_CLAIM_CEILING", reason }
+        Self { disposition: Disposition::Rejected, claim: "REJECTED", reason }
     }
 
     fn pass(claim: &'static str, reason: &'static str) -> Self {
@@ -884,6 +884,9 @@ pub fn run(path: &Path) -> Result<()> {
         println!("{}: {} / {} — {}", case.id, decision.disposition.as_str(), decision.claim, decision.reason);
         if decision.disposition.as_str() != case.expected_disposition {
             bail!("case {}: expected {}, got {}", case.id, case.expected_disposition, decision.disposition.as_str());
+        }
+        if decision.claim != case.expected_claim {
+            bail!("case {}: expected claim {}, got {}", case.id, case.expected_claim, decision.claim);
         }
         if !nonempty(&case.rationale) {
             bail!("case {} has an empty rationale", case.id);
