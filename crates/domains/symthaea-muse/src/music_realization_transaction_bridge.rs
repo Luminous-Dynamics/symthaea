@@ -882,6 +882,7 @@ mod tests {
             MusicEditEvidenceKindV1::Metamorphic,
             MusicEditEvidenceKindV1::RightsAdmission,
             MusicEditEvidenceKindV1::ReferenceAdjudication,
+            MusicEditEvidenceKindV1::RealizationExecution,
         ]
     }
 
@@ -951,7 +952,13 @@ mod tests {
             materialized_bytes: if completed { output_length } else { 0 },
             evidence: required()
                 .into_iter()
-                .map(|kind| evidence_record(kind, output_sha256, completed))
+                .map(|kind| {
+                    evidence_record(
+                        kind,
+                        output_sha256,
+                        completed && kind != MusicEditEvidenceKindV1::RealizationExecution,
+                    )
+                })
                 .collect(),
         };
         MusicEditTransactionV1 {
@@ -971,6 +978,48 @@ mod tests {
             },
             attempts: vec![attempt],
         }
+    }
+
+    fn expected_binding_for(
+        request_id: &str,
+        backend_id: &str,
+        output_modality: MusicRealizationOutputModalityV1,
+    ) -> MusicRealizationExpectedBindingV1 {
+        MusicRealizationExpectedBindingV1 {
+            transaction_id: "transaction-001".to_owned(),
+            attempt_id: "attempt-001".to_owned(),
+            candidate_id: "candidate-001".to_owned(),
+            source_lineage_sha256: d(1),
+            realization_request_id: request_id.to_owned(),
+            realization_request_sha256: d(21),
+            capability_manifest_sha256: d(22),
+            upstream_realization_receipt_sha256: d(23),
+            backend_id: backend_id.to_owned(),
+            backend_version: "1.0.0".to_owned(),
+            adapter_id: "mock-adapter".to_owned(),
+            adapter_version: "1.0.0".to_owned(),
+            output_modality,
+        }
+    }
+
+    fn expected_binding() -> MusicRealizationExpectedBindingV1 {
+        expected_binding_for(
+            "request-001",
+            "mock-midi-realizer",
+            MusicRealizationOutputModalityV1::Midi,
+        )
+    }
+
+    fn attach_realization_evidence(
+        tx: &mut MusicEditTransactionV1,
+        evidence: MusicEditEvidenceRecordV1,
+    ) {
+        let record = tx.attempts[0]
+            .evidence
+            .iter_mut()
+            .find(|record| record.kind == MusicEditEvidenceKindV1::RealizationExecution)
+            .expect("realization evidence gate is present in the policy");
+        *record = evidence;
     }
 
     fn completed_receipt(
@@ -1051,6 +1100,7 @@ mod tests {
         let receipt = completed_receipt(&tx, bytes);
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(altered)
         )
@@ -1073,6 +1123,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1084,6 +1135,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1114,6 +1166,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1146,6 +1199,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1167,6 +1221,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1189,6 +1244,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1219,6 +1275,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1330,6 +1387,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1419,6 +1477,7 @@ mod tests {
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1440,6 +1499,7 @@ mod tests {
         receipt.payload.backend_version = "2.0.0".to_owned();
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
@@ -1463,6 +1523,7 @@ mod tests {
         let receipt = completed_receipt(&tx, bytes);
         assert!(verify_music_realization_transaction_binding_v1(
             &tx,
+            &expected_binding(),
             &receipt,
             Some(bytes)
         )
