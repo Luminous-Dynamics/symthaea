@@ -669,9 +669,14 @@ mod tests {
         model.variables.clear();
         model.constraints.clear();
         model.variables.insert(id("x"), [id("0"), id("1")].into_iter().collect());
+        model.variables.insert(id("y"), [id("0"), id("1")].into_iter().collect());
         model.constraints = vec![
-            LocalConstraint::new("requires-zero", vec![id("x")], vec![vec![id("0")]]),
-            LocalConstraint::new("requires-one", vec![id("x")], vec![vec![id("1")]]),
+            LocalConstraint::new("requires-equal", vec![id("x"), id("y")], vec![
+                vec![id("0"), id("0")], vec![id("1"), id("1")],
+            ]),
+            LocalConstraint::new("requires-different", vec![id("x"), id("y")], vec![
+                vec![id("0"), id("1")], vec![id("1"), id("0")],
+            ]),
         ];
         model.search_budget = 1;
         let report = evaluate_finite_viability_model(&model);
