@@ -360,7 +360,7 @@ The integration has three distinct identities:
 2. **Bridge receipt:** the backend/adapter execution trace, control observations, exact source/candidate binding and receipt digest. A self-sealed receipt is only a content commitment; it cannot choose its own trusted expected identities.
 3. **Actual candidate bytes:** re-hashed at the transaction boundary and compared with both the bridge receipt and the EVAL-040 candidate artifact digest and verified byte-materialization evidence.
 
-EVAL-040 now has a task-specific evidence kind, `RealizationExecution`. A policy for a candidate produced by a qualified realizer must include this kind in its canonical `required_evidence` list. The five existing core requirements remain globally mandatory; this new gate is explicitly selected for workflows that use a realizer. The bridge can produce a Verified record only for Completed or ReconciledCompleted output with independently observed bytes. Submitted, Failed, OutcomeUnknown and unresolved states cannot be converted into verified realization evidence.
+EVAL-040 now has a task-specific evidence kind, `RealizationExecution`. A policy for a candidate produced by a qualified realizer must include this kind in its canonical `required_evidence` list. The five existing core requirements remain globally mandatory; this new gate is explicitly selected for workflows that use a realizer. The bridge itself fails closed when the transaction policy omits `RealizationExecution`, so the receipt cannot be verified out-of-band and then ignored by the terminal decision. The bridge can produce a Verified record only for Completed or ReconciledCompleted output with independently observed bytes. Submitted, Failed, OutcomeUnknown and unresolved states cannot be converted into verified realization evidence.
 
 The resulting evidence record binds:
 - source-lineage digest;
@@ -371,11 +371,12 @@ The resulting evidence record binds:
 
 The caller inserts this record into the candidate attempt before invoking EVAL-040's final `Accept | Repair | Abstain | Reject` evaluator. A transaction whose policy requires RealizationExecution must abstain while the record is pending or absent. EVAL-040 remains the sole cumulative budget/terminal-decision authority; the bridge only verifies execution identities and reports the number of submissions.
 
-The current implementation branch authors tests for the following additional controls:
+The current implementation branch authors 18 tests for the following additional controls:
 - resealed receipt cannot substitute a different expected capability manifest;
 - bounded hard controls require an explicit digest-committed fidelity bound;
 - completed/reconciled provider events retain the exact submission identity;
 - a reconciled-completed result can be accepted without issuing a second provider call;
+- the bridge refuses a transaction policy that omits the RealizationExecution evidence kind;
 - an unresolved result cannot create a Verified EVAL-040 realization record;
 - the final EVAL-040 decision abstains until that record is present.
 
