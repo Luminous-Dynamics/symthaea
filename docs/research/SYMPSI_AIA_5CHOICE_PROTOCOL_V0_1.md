@@ -22,7 +22,7 @@ For trial (i), the AI commits to one choice (Y_i \in \{1,2,3,4,5\}). A target (T
 - **Directional alternative:** (P(Y_i=T_i)>0.20).
 - **Smallest effect of scientific interest (provisional):** a hit rate of 0.22, i.e. +2 percentage points over chance. This is a design choice to be reviewed before preregistration, not an established psi effect.
 - **Primary endpoint:** exact top-1 hit rate over all valid, preregistered trials.
-- **Primary analysis:** one-sided exact binomial test against (p_0=0.20), with a 99.5% confidence interval and the prespecified alpha of 0.005. Report the effect estimate and interval; a p-value alone is not a capability claim.
+- **Primary analysis:** one-sided exact binomial test against (p_0=0.20), with a one-sided 99.5% lower confidence bound (and a two-sided 99% interval) and the prespecified alpha of 0.005. Report the effect estimate and interval; a p-value alone is not a capability claim.
 
 A small positive effect is not interchangeable with a large effect, and failure to reject the null is not proof of impossibility. The study must be powered against the declared smallest effect of interest, not the largest exploratory estimate in the literature.
 
