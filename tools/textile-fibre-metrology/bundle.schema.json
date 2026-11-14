@@ -350,7 +350,7 @@
         "local_scope_validation": {
           "oneOf": [
             {
-              "$ref": "#/$defs/evidence"
+              "$ref": "#/$defs/localScopeValidation"
             },
             {
               "type": "null"
@@ -418,6 +418,34 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000000
+        }
+      }
+    },
+    "localScopeValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_id",
+        "method_version",
+        "material_class",
+        "process_state",
+        "evidence"
+      ],
+      "properties": {
+        "method_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "method_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "material_class": {
+          "$ref": "#/$defs/material"
+        },
+        "process_state": {
+          "$ref": "#/$defs/state"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
         }
       }
     }
