@@ -15,13 +15,14 @@ mod symthaea_airroad_iqc;
 use symthaea_airroad_iqc::{Complex64, HermitianMatrix, RealSymmetricMatrix};
 
 fn settings() -> DefaultSettings<f64> {
-    let mut settings = DefaultSettings::default();
-    settings.verbose = false;
-    settings.max_iter = 200;
-    settings.tol_gap_abs = 1.0e-9;
-    settings.tol_gap_rel = 1.0e-9;
-    settings.tol_feas = 1.0e-9;
-    settings
+    DefaultSettings {
+        verbose: false,
+        max_iter: 200,
+        tol_gap_abs: 1.0e-9,
+        tol_gap_rel: 1.0e-9,
+        tol_feas: 1.0e-9,
+        ..DefaultSettings::default()
+    }
 }
 
 fn diagonal_csc(order: usize, value: f64) -> CscMatrix<f64> {
