@@ -298,11 +298,16 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         }
     }
 
-    for source in model.realization.keys() {
+    for (source, target) in &model.realization {
         if !model.production_states.contains_key(source) {
             ap1_ok = false;
             finding(&mut report, ViabilityFindingCode::UnknownRealizationSource, Some(source.0.clone()),
                 "realization map contains an unknown production-state source");
+        }
+        if !model.organization_states.contains_key(target) {
+            ap1_ok = false;
+            finding(&mut report, ViabilityFindingCode::UnknownRealizationTarget, Some(source.0.clone()),
+                "realization map contains an unknown organization-state target");
         }
     }
 
@@ -363,11 +368,16 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
                 "boundary-state map key differs from the embedded state ID");
         }
     }
-    for source in model.boundary_production.keys() {
+    for (source, target) in &model.boundary_production {
         if !model.production_states.contains_key(source) {
             ap2_ok = false;
             finding(&mut report, ViabilityFindingCode::UnknownBoundarySource, Some(source.0.clone()),
                 "boundary-production map contains an unknown production-state source");
+        }
+        if !model.boundary_states.contains_key(target) {
+            ap2_ok = false;
+            finding(&mut report, ViabilityFindingCode::UnknownBoundaryTarget, Some(source.0.clone()),
+                "boundary-production map contains an unknown boundary-state target");
         }
     }
     let mut induced_boundary = BTreeMap::new();
