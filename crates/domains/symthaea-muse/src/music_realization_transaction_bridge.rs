@@ -1071,19 +1071,46 @@ mod tests {
     fn completed_realization_binds_actual_bytes_to_exact_candidate() {
         let bytes = b"MThd\0\0\0\x06";
         let output_sha = sha256_bytes(bytes);
-        let tx = transaction(
+        let mut tx = transaction(
             MusicEditAttemptOutcomeV1::CandidateReady,
             Some(&output_sha),
             bytes.len() as u64,
             1,
         );
         let receipt = completed_receipt(&tx, bytes);
-        let binding =
-            verify_music_realization_transaction_binding_v1(&tx, &receipt, Some(bytes)).unwrap();
+        let binding = verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes),
+        )
+        .unwrap();
         assert_eq!(binding.candidate_id, "candidate-001");
         assert_eq!(binding.submission_count, 1);
         assert_eq!(binding.observed_output_sha256.as_deref(), Some(output_sha.as_str()));
         assert_eq!(binding.final_execution_state, MusicRealizerExecutionEventStateV1::Completed);
+        let evidence = binding.to_evidence_record(&d(0x77)).unwrap();
+        attach_realization_evidence(&mut tx, evidence);
+        let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Accept);
+    }
+
+    #[test]
+    fn transaction_abstains_until_realization_evidence_is_verified() {
+        let bytes = b"candidate";
+        let output_sha = sha256_bytes(bytes);
+        let tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Abstain);
+        assert!(decision
+            .payload
+            .reasons
+            .contains(&MusicEditDecisionReasonV1::EvidencePending));
     }
 
     #[test]
@@ -1295,9 +1322,9 @@ mod tests {
             transaction_id: tx.transaction_id.clone(),
             attempt_id: "attempt-001".to_owned(),
             realization_request_id: "request-unknown".to_owned(),
-            realization_request_sha256: d(31),
-            capability_manifest_sha256: d(32),
-            upstream_realization_receipt_sha256: d(33),
+            realization_request_sha256: d(21),
+            capability_manifest_sha256: d(22),
+            upstream_realization_receipt_sha256: d(23),
             backend_id: "mock-streaming-realizer".to_owned(),
             backend_version: "1.0.0".to_owned(),
             adapter_id: "mock-adapter".to_owned(),
@@ -1329,11 +1356,24 @@ mod tests {
             controls: Vec::new(),
         };
         let receipt = seal_music_realization_bridge_receipt_v1(payload).unwrap();
-        let binding =
-            verify_music_realization_transaction_binding_v1(&tx, &receipt, None).unwrap();
+        let binding = verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding_for(
+                "request-unknown",
+                "mock-streaming-realizer",
+                MusicRealizationOutputModalityV1::Audio,
+            ),
+            &receipt,
+            None,
+        )
+        .unwrap();
         assert_eq!(
             binding.final_execution_state,
             MusicRealizerExecutionEventStateV1::OutcomeUnknown
+        );
+        assert_eq!(
+            binding.to_evidence_record(&d(0x77)),
+            Err(MusicRealizationBridgeIssueV1::UnresolvedExecutionCannotBeVerified)
         );
         let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Abstain);
@@ -1399,7 +1439,7 @@ mod tests {
     fn retry_is_permitted_only_after_reconciliation_and_consumes_each_submission() {
         let bytes = b"candidate-after-reconcile";
         let output_sha = sha256_bytes(bytes);
-        let tx = transaction(
+        let mut tx = transaction(
             MusicEditAttemptOutcomeV1::CandidateReady,
             Some(&output_sha),
             bytes.len() as u64,
@@ -1450,9 +1490,18 @@ mod tests {
             },
         ];
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
-        let binding =
-            verify_music_realization_transaction_binding_v1(&tx, &receipt, Some(bytes)).unwrap();
+        let binding = verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes),
+        )
+        .unwrap();
         assert_eq!(binding.submission_count, 2);
+        let evidence = binding.to_evidence_record(&d(0x77)).unwrap();
+        attach_realization_evidence(&mut tx, evidence);
+        let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Accept);
     }
 
     #[test]
@@ -1587,8 +1636,13 @@ mod tests {
             },
         ];
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
-        let binding =
-            verify_music_realization_transaction_binding_v1(&tx, &receipt, Some(bytes)).unwrap();
+        let binding = verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes),
+        )
+        .unwrap();
         assert_eq!(binding.submission_count, 2);
         let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
         assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Reject);
