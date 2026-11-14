@@ -36,7 +36,11 @@ The evaluator refuses when either side has:
 - a mismatched part identity or score-clock identity;
 - empty, overlapping, discontinuous or noncanonical measure spans;
 - invalid event part/measure bindings, duplicate/non-contiguous source ordinals, out-of-measure positions or invalid cursor moves;
-- an exceeded event, candidate-comparison or matching-work budget.
+- an exceeded event, source-tree depth/node, candidate-comparison or matching-work budget.
+
+The part-metadata layer has a separate coverage flag. A pre-metadata legacy graph is not interpreted as proof that its source MusicXML lacked a part-list. In that case part metadata metrics abstain. For covered graphs, the evaluator separately measures part-list presence P/R/F1, part-name/abbreviation accuracy, score-instrument ID accuracy, MIDI instrument setup accuracy (including nested `midi-instrument` declarations) and exact `score-part` source-subtree preservation. These do not alter note-presence F1 or note-level instrument-reference accuracy.
+
+The evaluator validates source subtrees itself, even for deserialized graphs that did not pass through the current XML parser: maximum depth 32 and 1,000,000 retained source nodes per part across note, auxiliary, attribute, cursor and part-metadata subtrees.
 
 Measure spans must begin at score coordinate zero and be contiguous exact rational quarter-beat spans.
 
@@ -107,7 +111,7 @@ The hashes establish content consistency, not the identity of the parser, truth 
 
 ## Tests authored
 
-19 focused tests currently cover:
+27 focused tests currently cover:
 - identical graph yields perfect independent dimensions, including onset, duration, note, auxiliary, attribute and cursor outputs;
 - wrong pitch spelling does not suppress note-event presence;
 - equivalent decimal alteration lexemes compare numerically exactly, including implicit natural versus explicit zero;
@@ -123,7 +127,7 @@ The hashes establish content consistency, not the identity of the parser, truth 
 - augmenting-path matching reaches maximum cardinality where a greedy first pairing would fail;
 - grace slash/steal-time, cue flags, chord-member flags and chord-anchor relationships are independently scored.
 
-Twenty focused tests are authored, not compiled or run; the latest test independently mutates grace, cue, chord-member and chord-anchor semantics.
+All 27 focused tests are authored, not compiled or run. The final tranche independently mutates part name/abbreviation, nested MIDI setup, metadata presence/absence and legacy metadata-layer coverage, and rejects pathological source-tree depth.
 
 ## External comparison and honest SOTA strategy
 
