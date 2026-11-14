@@ -39,10 +39,7 @@ pub struct CandidateModel {
 }
 
 impl CandidateModel {
-    pub fn new(
-        id: impl Into<ModelId>,
-        target_equivalence_class: impl Into<String>,
-    ) -> Self {
+    pub fn new(id: impl Into<ModelId>, target_equivalence_class: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             target_equivalence_class: target_equivalence_class.into(),
@@ -124,19 +121,14 @@ impl AssayAdequacyReport {
         if self.non_equivalent_pair_count == 0 {
             return None;
         }
-        Some(
-            self.findings.is_empty()
-                && self.resolved_pair_count == self.non_equivalent_pair_count,
-        )
+        Some(self.findings.is_empty() && self.resolved_pair_count == self.non_equivalent_pair_count)
     }
 
     pub fn resolved_pair_fraction(&self) -> Option<f64> {
         if self.non_equivalent_pair_count == 0 {
             return None;
         }
-        Some(
-            self.resolved_pair_count as f64 / self.non_equivalent_pair_count as f64,
-        )
+        Some(self.resolved_pair_count as f64 / self.non_equivalent_pair_count as f64)
     }
 }
 
@@ -248,8 +240,7 @@ pub fn evaluate_assay_adequacy(
                 if model_id != &first.id {
                     continue;
                 }
-                if let Some(second_digest) =
-                    signatures.get(&(second.id.clone(), assay_id.clone()))
+                if let Some(second_digest) = signatures.get(&(second.id.clone(), assay_id.clone()))
                     && first_digest != second_digest
                 {
                     distinguishing_assays.insert(assay_id.clone());
@@ -306,9 +297,11 @@ mod tests {
             CandidateModel::new("model-a", "class-a"),
             CandidateModel::new("model-b", "class-b"),
         ];
-        let observations = vec![
-            AssayObservation::new("model-a", "remove-producer", digest(b"degraded")),
-        ];
+        let observations = vec![AssayObservation::new(
+            "model-a",
+            "remove-producer",
+            digest(b"degraded"),
+        )];
 
         let report = evaluate_assay_adequacy(&candidates, &observations);
         assert_eq!(report.non_equivalent_pair_count, 1);
@@ -351,12 +344,16 @@ mod tests {
         assert_eq!(report.non_equivalent_pair_count, 1);
         assert_eq!(report.resolved_pair_count, 1);
         assert_eq!(report.is_conservative_for_declared_classes(), Some(false));
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AssayFindingCode::DuplicateModelAssayObservation
-        }));
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AssayFindingCode::UnknownModelObservation
-        }));
+        assert!(
+            report.findings.iter().any(|finding| {
+                finding.code == AssayFindingCode::DuplicateModelAssayObservation
+            })
+        );
+        assert!(
+            report.findings.iter().any(|finding| {
+                finding.code == AssayFindingCode::UnknownModelObservation
+            })
+        );
     }
 
     #[test]
