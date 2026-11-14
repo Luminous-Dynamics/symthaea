@@ -150,6 +150,9 @@ pub enum U1MpsError {
     DuplicateTeBDHamiltonianBond {
         bond_index: usize,
     },
+    InvalidAdaptivePolicy(&'static str),
+    InvalidAdaptiveTimeStep(f64),
+    AdaptiveGlobalErrorUnqualified,
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -317,6 +320,16 @@ impl core::fmt::Display for U1MpsError {
             Self::DuplicateTeBDHamiltonianBond { bond_index } => write!(
                 f,
                 "Hamiltonian contains more than one local term for bond {bond_index}"
+            ),
+            Self::InvalidAdaptivePolicy(name) => {
+                write!(f, "invalid adaptive TEBD policy field {name}")
+            }
+            Self::InvalidAdaptiveTimeStep(value) => {
+                write!(f, "adaptive TEBD requires a positive finite time step, got {value}")
+            }
+            Self::AdaptiveGlobalErrorUnqualified => write!(
+                f,
+                "adaptive TEBD requires globally qualified canonical-gauge compression receipts"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -3072,13 +3085,276 @@ impl U1TeBDStrangStepper {
     }
 }
 
+
+
+/// Error budgets and step-size safeguards for an adaptive Strang controller.
+///
+/// Time-discretization error is estimated by step doubling in the asymptotic
+/// second-order regime. Compression error is accepted only when the global
+/// canonical-gauge receipts qualify.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TeBDAdaptivePolicy {
+    pub target_trotter_error: f64,
+    pub target_compression_error: f64,
+    pub minimum_time_step: f64,
+    pub maximum_time_step: f64,
+    pub safety_factor: f64,
+    pub minimum_step_scale: f64,
+    pub maximum_step_scale: f64,
+}
+
+impl U1TeBDAdaptivePolicy {
+    pub fn validate(self) -> Result<(), U1MpsError> {
+        for (name, value) in [
+            ("target_trotter_error", self.target_trotter_error),
+            ("target_compression_error", self.target_compression_error),
+            ("minimum_time_step", self.minimum_time_step),
+            ("maximum_time_step", self.maximum_time_step),
+            ("safety_factor", self.safety_factor),
+            ("minimum_step_scale", self.minimum_step_scale),
+            ("maximum_step_scale", self.maximum_step_scale),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(U1MpsError::InvalidAdaptivePolicy(name));
+            }
+        }
+        if self.minimum_time_step > self.maximum_time_step {
+            return Err(U1MpsError::InvalidAdaptivePolicy(
+                "minimum_time_step > maximum_time_step",
+            ));
+        }
+        if self.safety_factor > 1.0 {
+            return Err(U1MpsError::InvalidAdaptivePolicy(
+                "safety_factor must be <= 1",
+            ));
+        }
+        if self.minimum_step_scale > 1.0
+            || self.maximum_step_scale < 1.0
+            || self.minimum_step_scale > self.maximum_step_scale
+        {
+            return Err(U1MpsError::InvalidAdaptivePolicy(
+                "step_scale interval must contain 1",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// One step-doubling decision. The accepted state is present only if both
+/// compression and estimated time-discretization budgets pass.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDAdaptiveStepResult {
+    pub accepted: bool,
+    pub accepted_state: Option<ComplexU1Mps>,
+    pub attempted_time_step: f64,
+    pub accepted_time_advance: Option<f64>,
+    pub recommended_next_time_step: f64,
+    pub coarse_fine_state_distance: f64,
+    pub compression_uncertainty_upper_bound: f64,
+    pub coarse_path_compression_error_upper_bound: f64,
+    pub fine_path_compression_error_upper_bound: f64,
+    pub trotter_error_estimate_lower: f64,
+    pub trotter_error_estimate_upper: f64,
+    pub total_error_estimate_upper: f64,
+    pub target_trotter_error: f64,
+    pub target_compression_error: f64,
+    pub method_order: usize,
+    pub uses_asymptotic_step_doubling_assumption: bool,
+    pub all_global_compression_bounds_qualified: bool,
+}
+
+fn mps_state_distance(
+    left: &ComplexU1Mps,
+    right: &ComplexU1Mps,
+    tolerance: f64,
+) -> Result<f64, U1MpsError> {
+    let left_norm = left.norm_squared(tolerance)?;
+    let right_norm = right.norm_squared(tolerance)?;
+    let overlap = left.inner_product(right)?;
+    let scale = left_norm.abs().max(right_norm.abs()).max(1.0);
+    if overlap.im.abs() > tolerance * scale {
+        return Err(U1MpsError::ComplexNormResidual {
+            imaginary_part: overlap.im,
+            tolerance: tolerance * scale,
+        });
+    }
+    let squared = left_norm + right_norm - 2.0 * overlap.re;
+    if squared < -tolerance * scale {
+        return Err(U1MpsError::NegativeNormSquared(squared));
+    }
+    let distance = squared.max(0.0).sqrt();
+    if !distance.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "step-doubling MPS state distance",
+        ));
+    }
+    Ok(distance)
+}
+
+impl U1TeBDStrangStepper {
+    /// Bound the operator norm of one exact Strang gate product. For each
+    /// gate, ||G||_2 <= sqrt(1 + ||G*G-I||_F).
+    fn strang_gate_operator_norm_upper_bound(
+        &self,
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<f64, U1MpsError> {
+        let mut upper_bound = 1.0_f64;
+        for (parity, scale) in [(0_u8, 0.5_f64), (1_u8, 1.0_f64), (0_u8, 0.5_f64)] {
+            for term in self
+                .terms
+                .iter()
+                .filter(|term| term.bond_index % 2 == parity as usize)
+            {
+                let gate = term.hamiltonian.to_gate(time_step * scale, tolerance)?;
+                let residual = gate.unitarity_residual();
+                if !residual.is_finite() || residual < 0.0 {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "adaptive gate operator-norm receipt",
+                    ));
+                }
+                upper_bound *= (1.0 + residual).sqrt();
+                if !upper_bound.is_finite() {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "adaptive gate operator-norm product",
+                    ));
+                }
+            }
+        }
+        Ok(upper_bound)
+    }
+
+    /// Compare one full Strang step with two half steps.
+    ///
+    /// The uncertainty in the coarse/fine difference is bounded by the
+    /// compression error of both paths. Dividing the remaining interval by 3
+    /// estimates the fine path's local defect for a second-order method.
+    /// This Richardson estimate assumes the asymptotic regime and is not a
+    /// rigorous global Trotter error theorem.
+    ///
+    /// The method fails closed unless the full step and both half steps return
+    /// globally qualified canonical-gauge compression receipts.
+    pub fn attempt_adaptive_step(
+        &self,
+        input: &ComplexU1Mps,
+        time_step: f64,
+        truncation_policy: U1TwoSiteTruncationPolicy,
+        adaptive_policy: U1TeBDAdaptivePolicy,
+    ) -> Result<U1TeBDAdaptiveStepResult, U1MpsError> {
+        adaptive_policy.validate()?;
+        truncation_policy.validate()?;
+        if !time_step.is_finite()
+            || time_step < adaptive_policy.minimum_time_step
+            || time_step > adaptive_policy.maximum_time_step
+        {
+            return Err(U1MpsError::InvalidAdaptiveTimeStep(time_step));
+        }
+
+        let half_step = 0.5 * time_step;
+        let coarse = self.step(input, time_step, truncation_policy)?;
+        let first_half = self.step(input, half_step, truncation_policy)?;
+        let second_half = self.step(&first_half.state, half_step, truncation_policy)?;
+
+        let all_qualified = coarse.global_l2_bound_qualified
+            && first_half.global_l2_bound_qualified
+            && second_half.global_l2_bound_qualified
+            && coarse.total_global_l2_error_bound.is_some()
+            && first_half.total_global_l2_error_bound.is_some()
+            && second_half.total_global_l2_error_bound.is_some();
+        if !all_qualified {
+            return Err(U1MpsError::AdaptiveGlobalErrorUnqualified);
+        }
+
+        let coarse_compression = coarse
+            .total_global_l2_error_bound
+            .ok_or(U1MpsError::AdaptiveGlobalErrorUnqualified)?;
+        let first_half_compression = first_half
+            .total_global_l2_error_bound
+            .ok_or(U1MpsError::AdaptiveGlobalErrorUnqualified)?;
+        let second_half_compression = second_half
+            .total_global_l2_error_bound
+            .ok_or(U1MpsError::AdaptiveGlobalErrorUnqualified)?;
+
+        // The first half-step error is propagated through the second
+        // half-step's gate product before its own compression error is added.
+        let second_half_operator_norm =
+            self.strang_gate_operator_norm_upper_bound(half_step, truncation_policy.tolerance)?;
+        let fine_compression =
+            first_half_compression * second_half_operator_norm + second_half_compression;
+        let uncertainty = coarse_compression + fine_compression;
+        if !fine_compression.is_finite() || !uncertainty.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive compression uncertainty",
+            ));
+        }
+
+        let coarse_fine_distance = mps_state_distance(
+            &coarse.state,
+            &second_half.state,
+            truncation_policy.tolerance,
+        )?;
+        let trotter_difference_lower = (coarse_fine_distance - uncertainty).max(0.0);
+        let trotter_difference_upper = coarse_fine_distance + uncertainty;
+        let trotter_error_lower = trotter_difference_lower / 3.0;
+        let trotter_error_upper = trotter_difference_upper / 3.0;
+        let total_error_upper = fine_compression + trotter_error_upper;
+        if !trotter_error_upper.is_finite() || !total_error_upper.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive Trotter error estimate",
+            ));
+        }
+
+        let accepted = fine_compression <= adaptive_policy.target_compression_error
+            && trotter_error_upper <= adaptive_policy.target_trotter_error;
+        let raw_scale = if trotter_error_upper <= f64::MIN_POSITIVE {
+            adaptive_policy.maximum_step_scale
+        } else {
+            adaptive_policy.safety_factor
+                * (adaptive_policy.target_trotter_error / trotter_error_upper).cbrt()
+        };
+        let mut step_scale = raw_scale.clamp(
+            adaptive_policy.minimum_step_scale,
+            adaptive_policy.maximum_step_scale,
+        );
+        if fine_compression > adaptive_policy.target_compression_error {
+            step_scale = step_scale.min(1.0);
+        }
+        let recommended_next_time_step = (time_step * step_scale).clamp(
+            adaptive_policy.minimum_time_step,
+            adaptive_policy.maximum_time_step,
+        );
+
+        Ok(U1TeBDAdaptiveStepResult {
+            accepted,
+            accepted_state: accepted.then_some(second_half.state),
+            attempted_time_step: time_step,
+            accepted_time_advance: accepted.then_some(time_step),
+            recommended_next_time_step,
+            coarse_fine_state_distance: coarse_fine_distance,
+            compression_uncertainty_upper_bound: uncertainty,
+            coarse_path_compression_error_upper_bound: coarse_compression,
+            fine_path_compression_error_upper_bound: fine_compression,
+            trotter_error_estimate_lower: trotter_error_lower,
+            trotter_error_estimate_upper: trotter_error_upper,
+            total_error_estimate_upper: total_error_upper,
+            target_trotter_error: adaptive_policy.target_trotter_error,
+            target_compression_error: adaptive_policy.target_compression_error,
+            method_order: 2,
+            uses_asymptotic_step_doubling_assumption: true,
+            all_global_compression_bounds_qualified: all_qualified,
+        })
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
         U1TeBDGate, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
         U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
+        U1TwoSiteTruncationPolicy, U1TeBDAdaptivePolicy, left_isometry_residual,
+        right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -4552,4 +4828,137 @@ mod tests {
         assert!((dense[2].im + 1.0_f64.sin()).abs() <= 1.0e-12);
         assert!(gate.unitarity_residual() <= 1.0e-12);
     }
+
+    fn adaptive_policy(target_trotter_error: f64) -> U1TeBDAdaptivePolicy {
+        U1TeBDAdaptivePolicy {
+            target_trotter_error,
+            target_compression_error: 1.0e-9,
+            minimum_time_step: 1.0e-3,
+            maximum_time_step: 1.0,
+            safety_factor: 0.9,
+            minimum_step_scale: 0.5,
+            maximum_step_scale: 2.0,
+        }
+    }
+
+    #[test]
+    fn adaptive_strang_accepts_zero_hamiltonian_with_zero_estimated_error() {
+        let zero_hamiltonian =
+            U1TwoSiteHamiltonian::new(0.0, 0.0, 0.0, complex_zero()).unwrap();
+        let stepper = U1TeBDStrangStepper::new(
+            2,
+            vec![U1TeBDHamiltonianTerm {
+                bond_index: 0,
+                hamiltonian: zero_hamiltonian,
+            }],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.1,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+                adaptive_policy(1.0e-9),
+            )
+            .unwrap();
+
+        assert!(result.accepted);
+        assert!(result.accepted_state.is_some());
+        assert_eq!(result.accepted_time_advance, Some(0.1));
+        assert!(result.coarse_fine_state_distance <= 1.0e-12);
+        assert!(result.trotter_error_estimate_upper <= 1.0e-12);
+        assert!(result.all_global_compression_bounds_qualified);
+        assert_eq!(result.method_order, 2);
+    }
+
+    #[test]
+    fn adaptive_strang_rejects_step_when_trotter_budget_is_too_small() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.8,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 3,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-11,
+                },
+                adaptive_policy(1.0e-18),
+            )
+            .unwrap();
+
+        assert!(!result.accepted);
+        assert!(result.accepted_state.is_none());
+        assert!(result.accepted_time_advance.is_none());
+        assert!(result.coarse_fine_state_distance > 0.0);
+        assert!(result.trotter_error_estimate_upper > 1.0e-18);
+        assert!(result.recommended_next_time_step < result.attempted_time_step);
+        assert!(result.all_global_compression_bounds_qualified);
+    }
+
+    #[test]
+    fn adaptive_strang_reports_compression_uncertainty_separately_from_trotter_error() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.35,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-11,
+                },
+                U1TeBDAdaptivePolicy {
+                    target_trotter_error: 1.0,
+                    target_compression_error: 1.0,
+                    minimum_time_step: 1.0e-3,
+                    maximum_time_step: 1.0,
+                    safety_factor: 0.9,
+                    minimum_step_scale: 0.5,
+                    maximum_step_scale: 2.0,
+                },
+            )
+            .unwrap();
+
+        assert!(result.all_global_compression_bounds_qualified);
+        assert!(result.fine_path_compression_error_upper_bound.is_finite());
+        assert!(result.coarse_path_compression_error_upper_bound.is_finite());
+        assert!(result.compression_uncertainty_upper_bound >= 0.0);
+        assert!(result.total_error_estimate_upper >= result.trotter_error_estimate_upper);
+    }
+
+    #[test]
+    fn adaptive_strang_rejects_invalid_error_budgets_and_time_step_ranges() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let truncation = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 3,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-11,
+        };
+        let mut invalid = adaptive_policy(1.0e-6);
+        invalid.safety_factor = 1.1;
+        assert!(matches!(
+            stepper.attempt_adaptive_step(&input, 0.1, truncation, invalid),
+            Err(U1MpsError::InvalidAdaptivePolicy(_))
+        ));
+
+        assert!(matches!(
+            stepper.attempt_adaptive_step(
+                &input,
+                1.1,
+                truncation,
+                adaptive_policy(1.0e-6)
+            ),
+            Err(U1MpsError::InvalidAdaptiveTimeStep(1.1))
+        ));
+    }
+
 }
