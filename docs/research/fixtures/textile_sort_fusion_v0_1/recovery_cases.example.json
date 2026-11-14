@@ -331,6 +331,14 @@
         "disposition": "ineligible",
         "reason": "InvalidFibreLengthMeasurementProtocol"
       }
+    },
+    {
+      "case_id": "ROUTE-042-SAMPLING-PLAN-MEASUREMENT-EVIDENCE-REUSED",
+      "mutation": "The same evidence identity is reused for the sampling protocol and the fibre-length measurement.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DuplicateEvidenceIdentity"
+      }
     }
   ]
 }
