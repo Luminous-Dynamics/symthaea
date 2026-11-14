@@ -92,7 +92,84 @@
           }
         ]
       ]
-    ]
+    ],
+    "identity_binding": {
+      "campaign_id": "airroad-holdout-campaign-001",
+      "acquisition_id": "airroad-holdout-acquisition-001",
+      "topology_identity": "sha256:airroad-two-port-topology-v0.1",
+      "sample_clock_identity": "airroad-holdout-clock-001",
+      "port_order": [
+        "input-a",
+        "input-b"
+      ],
+      "calibration_nuisance_id": "calibration-common-real-crossport-001"
+    },
+    "crossport_observations": [
+      {
+        "frequency": 1,
+        "observation_id": "train-f1",
+        "measurement_error_id": "train-sensor-error-1",
+        "value": {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      },
+      {
+        "frequency": 2,
+        "observation_id": "train-f2",
+        "measurement_error_id": "train-sensor-error-2",
+        "value": {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      },
+      {
+        "frequency": 4,
+        "observation_id": "train-f4",
+        "measurement_error_id": "train-sensor-error-3",
+        "value": {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      }
+    ],
+    "measurement_error": {
+      "semantics": "deterministic_hard_componentwise_bound",
+      "real_lower": {
+        "numerator": "-1",
+        "denominator": "20"
+      },
+      "real_upper": {
+        "numerator": "1",
+        "denominator": "20"
+      },
+      "imaginary_lower": {
+        "numerator": "-1",
+        "denominator": "20"
+      },
+      "imaginary_upper": {
+        "numerator": "1",
+        "denominator": "20"
+      }
+    }
   },
   "candidates": {
     "ZA": {
@@ -107,12 +184,14 @@
           "numerator": "0",
           "denominator": "1"
         }
-      }
+      },
+      "model_pair_identity": "sha256:airroad-hidden-crossport-models-v0.1"
     },
     "ZB": {
       "candidate_id": "candidate-hidden-crossport-B",
       "transfer_definition": "Z_B(s)=[[2,Delta(s)],[0,3]]",
-      "delta_definition": "1000*(s^2+1)*(s^2+4)*(s^2+16)/(s+5)^7"
+      "delta_definition": "1000*(s^2+1)*(s^2+4)*(s^2+16)/(s+5)^7",
+      "model_pair_identity": "sha256:airroad-hidden-crossport-models-v0.1"
     }
   },
   "holdout": {
@@ -136,7 +215,26 @@
         "denominator": "410338673"
       }
     },
-    "observation_truth": "synthetic-ZB"
+    "observation_truth": "synthetic-ZB",
+    "identity_binding": {
+      "campaign_id": "airroad-holdout-campaign-001",
+      "acquisition_id": "airroad-holdout-acquisition-001",
+      "topology_identity": "sha256:airroad-two-port-topology-v0.1",
+      "sample_clock_identity": "airroad-holdout-clock-001",
+      "port_order": [
+        "input-a",
+        "input-b"
+      ],
+      "calibration_nuisance_id": "calibration-common-real-crossport-001"
+    },
+    "observed_port_order": [
+      "input-a",
+      "input-b"
+    ],
+    "preregistered_frequency": {
+      "numerator": "3",
+      "denominator": "1"
+    }
   },
   "calibration": {
     "nuisance_id": "calibration-common-real-crossport-001",
@@ -149,7 +247,8 @@
     "upper": {
       "numerator": "1",
       "denominator": "20"
-    }
+    },
+    "evidence_class": "deterministic_hard_interval"
   },
   "measurement_error": {
     "semantics": "deterministic_hard_componentwise_bound",
@@ -169,7 +268,23 @@
       "numerator": "1",
       "denominator": "20"
     },
-    "holdout_error_id": "holdout-sensor-error-001"
+    "holdout_error_id": "holdout-sensor-error-001",
+    "preregistered_real_lower": {
+      "numerator": "-1",
+      "denominator": "20"
+    },
+    "preregistered_real_upper": {
+      "numerator": "1",
+      "denominator": "20"
+    },
+    "preregistered_imaginary_lower": {
+      "numerator": "-1",
+      "denominator": "20"
+    },
+    "preregistered_imaginary_upper": {
+      "numerator": "1",
+      "denominator": "20"
+    }
   },
   "expected": {
     "delta_at_training": [
@@ -289,5 +404,20 @@
     "Exact-rational falsification of candidate A under the declared synthetic hard-set holdout.",
     "Candidate B is only not falsified by this one holdout; it is not proven true.",
     "No continuous-frequency adequacy, IQC, physical FRF or robust-stability claim is established."
-  ]
+  ],
+  "acquisition_passport": {
+    "campaign_id": "airroad-holdout-campaign-001",
+    "acquisition_id": "airroad-holdout-acquisition-001",
+    "topology_identity": "sha256:airroad-two-port-topology-v0.1",
+    "sample_clock_identity": "airroad-holdout-clock-001",
+    "port_order": [
+      "input-a",
+      "input-b"
+    ],
+    "calibration_nuisance_id": "calibration-common-real-crossport-001",
+    "holdout_frequency_pre_registered": {
+      "numerator": "3",
+      "denominator": "1"
+    }
+  }
 }
