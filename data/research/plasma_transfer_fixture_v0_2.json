@@ -11658,6 +11658,1858 @@
           }
         ]
       }
+    },
+    {
+      "id": "missing-embedded-composition-blocks",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-missing-embedded-composition-blocks",
+            "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee6",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-BR1-B-LOT-1",
+              "material-lot-bridged-BR1-B-LOT-2"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-BR1-C-LOT-1",
+              "material-lot-bridged-BR1-C-LOT-2"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ],
+            "baseline_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+              }
+            ],
+            "candidate_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic adversarial composition-bound transfer case.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-missing-embedded-composition-blocks",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "bridge-artifact-digest-substitution-rejected",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-bridge-artifact-digest-substitution-rejected",
+            "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee7",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-BR1-B-LOT-1",
+              "material-lot-bridged-BR1-B-LOT-2"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-BR1-C-LOT-1",
+              "material-lot-bridged-BR1-C-LOT-2"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ],
+            "baseline_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+              }
+            ],
+            "candidate_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+              }
+            ]
+          },
+          "composition_evidence": {
+            "transfer_bridge_artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "composition": {
+              "id": "bridge-artifact-digest-substitution-rejected-COMPOSITION",
+              "baseline_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "candidate_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "required_endpoints": [
+                "apparent_shear_strength"
+              ],
+              "endpoint_evidence": [
+                {
+                  "endpoint": "apparent_shear_strength",
+                  "baseline_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-B1",
+                    "material-lot-bridged-substrate_lot-B2"
+                  ],
+                  "candidate_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-C1",
+                    "material-lot-bridged-substrate_lot-C2"
+                  ],
+                  "baseline_receipt": {
+                    "id": "material-lot-bridged-BR1-BASE",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-B1",
+                      "material-lot-bridged-substrate_lot-B2"
+                    ]
+                  },
+                  "candidate_receipt": {
+                    "id": "material-lot-bridged-BR1-CAND",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-C1",
+                      "material-lot-bridged-substrate_lot-C2"
+                    ]
+                  },
+                  "equivalence_design": {
+                    "design_id": "bridge-artifact-digest-substitution-rejected-DESIGN",
+                    "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                    "endpoint_id": "apparent_shear_strength",
+                    "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+                    "quantity_unit": "MPa",
+                    "analysis_profile": "two_sample_tost_v1",
+                    "grouping_scheme": "independent_arms",
+                    "independent_unit": "material_lot",
+                    "margin_lower": -1,
+                    "margin_upper": 1,
+                    "alpha": 0.025000000000000022,
+                    "confidence_level": 0.95,
+                    "frozen_at": 100,
+                    "first_outcome_available_at": 200,
+                    "design_changed_after_outcome": false,
+                    "planned_min_baseline_specimens": 2,
+                    "planned_min_candidate_specimens": 2,
+                    "planned_min_baseline_clusters": 2,
+                    "planned_min_candidate_clusters": 2,
+                    "max_specimen_attrition_rate": 0.25,
+                    "max_cluster_attrition_rate": 0.25,
+                    "target_power": 0.8,
+                    "target_precision_half_width": 0.5,
+                    "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                    "effect_under_alternative": 0.25,
+                    "variance_low": 0.5,
+                    "variance_central": 1,
+                    "variance_high": 1.5,
+                    "randomization_plan_ref": "material-lot-bridged-BR1-RANDOMIZATION-PLAN",
+                    "analysis_plan_ref": "material-lot-bridged-BR1-ANALYSIS-PLAN",
+                    "exclusion_protocol_ref": "material-lot-bridged-BR1-EXCLUSION-PROTOCOL",
+                    "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+                    "power_receipt": {
+                      "receipt_id": "bridge-artifact-digest-substitution-rejected-POWER",
+                      "calculation_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "design_id": "bridge-artifact-digest-substitution-rejected-DESIGN",
+                      "endpoint_id": "apparent_shear_strength",
+                      "independent_unit": "material_lot",
+                      "grouping_scheme": "independent_arms",
+                      "planned_baseline_clusters": 2,
+                      "planned_candidate_clusters": 2,
+                      "target_power": 0.8,
+                      "target_precision_half_width": 0.5,
+                      "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                      "effect_under_alternative": 0.25,
+                      "variance_low": 0.5,
+                      "variance_central": 1,
+                      "variance_high": 1.5,
+                      "method_ref": "symthaea-statistics:power-planning-reference-v1",
+                      "claim_ceiling": "planning_only"
+                    },
+                    "baseline_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+                      }
+                    ],
+                    "candidate_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+                      }
+                    ],
+                    "excluded_samples": [],
+                    "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                    "baseline_method_receipt": {
+                      "id": "material-lot-bridged-BR1-BASE",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-B1",
+                        "material-lot-bridged-substrate_lot-B2"
+                      ]
+                    },
+                    "candidate_method_receipt": {
+                      "id": "material-lot-bridged-BR1-CAND",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-C1",
+                        "material-lot-bridged-substrate_lot-C2"
+                      ]
+                    },
+                    "analysis_result": {
+                      "result_id": "bridge-artifact-digest-substitution-rejected-RESULT",
+                      "result_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+                      "design_id": "bridge-artifact-digest-substitution-rejected-DESIGN",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "endpoint_id": "apparent_shear_strength",
+                      "analysis_profile": "two_sample_tost_v1",
+                      "margin_lower": -1,
+                      "margin_upper": 1,
+                      "alpha": 0.025000000000000022,
+                      "confidence_level": 0.95,
+                      "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                      "baseline_sample_count": 2,
+                      "candidate_sample_count": 2,
+                      "baseline_cluster_count": 2,
+                      "candidate_cluster_count": 2,
+                      "ci_lower": -0.4,
+                      "ci_upper": 0.4,
+                      "outcome": "EQUIVALENCE_ESTABLISHED"
+                    }
+                  }
+                }
+              ],
+              "expected_disposition": "PASS",
+              "rationale": "Embedded method-qualified initial lap-shear endpoint tied to the exact transfer bridge artifact and per-specimen lot mapping."
+            }
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic adversarial composition-bound transfer case.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-bridge-artifact-digest-substitution-rejected",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "composition-specimen-substitution-rejected",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-composition-specimen-substitution-rejected",
+            "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee8",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-BR1-B-LOT-1",
+              "material-lot-bridged-BR1-B-LOT-2"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-BR1-C-LOT-1",
+              "material-lot-bridged-BR1-C-LOT-2"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ],
+            "baseline_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+              }
+            ],
+            "candidate_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+              }
+            ]
+          },
+          "composition_evidence": {
+            "transfer_bridge_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "composition": {
+              "id": "composition-specimen-substitution-rejected-COMPOSITION",
+              "baseline_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "candidate_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "required_endpoints": [
+                "apparent_shear_strength"
+              ],
+              "endpoint_evidence": [
+                {
+                  "endpoint": "apparent_shear_strength",
+                  "baseline_specimen_ids": [
+                    "UNRELATED-SPECIMEN",
+                    "material-lot-bridged-substrate_lot-B2"
+                  ],
+                  "candidate_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-C1",
+                    "material-lot-bridged-substrate_lot-C2"
+                  ],
+                  "baseline_receipt": {
+                    "id": "material-lot-bridged-BR1-BASE",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-B1",
+                      "material-lot-bridged-substrate_lot-B2"
+                    ]
+                  },
+                  "candidate_receipt": {
+                    "id": "material-lot-bridged-BR1-CAND",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-C1",
+                      "material-lot-bridged-substrate_lot-C2"
+                    ]
+                  },
+                  "equivalence_design": {
+                    "design_id": "composition-specimen-substitution-rejected-DESIGN",
+                    "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                    "endpoint_id": "apparent_shear_strength",
+                    "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+                    "quantity_unit": "MPa",
+                    "analysis_profile": "two_sample_tost_v1",
+                    "grouping_scheme": "independent_arms",
+                    "independent_unit": "material_lot",
+                    "margin_lower": -1,
+                    "margin_upper": 1,
+                    "alpha": 0.025000000000000022,
+                    "confidence_level": 0.95,
+                    "frozen_at": 100,
+                    "first_outcome_available_at": 200,
+                    "design_changed_after_outcome": false,
+                    "planned_min_baseline_specimens": 2,
+                    "planned_min_candidate_specimens": 2,
+                    "planned_min_baseline_clusters": 2,
+                    "planned_min_candidate_clusters": 2,
+                    "max_specimen_attrition_rate": 0.25,
+                    "max_cluster_attrition_rate": 0.25,
+                    "target_power": 0.8,
+                    "target_precision_half_width": 0.5,
+                    "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                    "effect_under_alternative": 0.25,
+                    "variance_low": 0.5,
+                    "variance_central": 1,
+                    "variance_high": 1.5,
+                    "randomization_plan_ref": "material-lot-bridged-BR1-RANDOMIZATION-PLAN",
+                    "analysis_plan_ref": "material-lot-bridged-BR1-ANALYSIS-PLAN",
+                    "exclusion_protocol_ref": "material-lot-bridged-BR1-EXCLUSION-PROTOCOL",
+                    "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+                    "power_receipt": {
+                      "receipt_id": "composition-specimen-substitution-rejected-POWER",
+                      "calculation_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "design_id": "composition-specimen-substitution-rejected-DESIGN",
+                      "endpoint_id": "apparent_shear_strength",
+                      "independent_unit": "material_lot",
+                      "grouping_scheme": "independent_arms",
+                      "planned_baseline_clusters": 2,
+                      "planned_candidate_clusters": 2,
+                      "target_power": 0.8,
+                      "target_precision_half_width": 0.5,
+                      "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                      "effect_under_alternative": 0.25,
+                      "variance_low": 0.5,
+                      "variance_central": 1,
+                      "variance_high": 1.5,
+                      "method_ref": "symthaea-statistics:power-planning-reference-v1",
+                      "claim_ceiling": "planning_only"
+                    },
+                    "baseline_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+                      }
+                    ],
+                    "candidate_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+                      }
+                    ],
+                    "excluded_samples": [],
+                    "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                    "baseline_method_receipt": {
+                      "id": "material-lot-bridged-BR1-BASE",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-B1",
+                        "material-lot-bridged-substrate_lot-B2"
+                      ]
+                    },
+                    "candidate_method_receipt": {
+                      "id": "material-lot-bridged-BR1-CAND",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-C1",
+                        "material-lot-bridged-substrate_lot-C2"
+                      ]
+                    },
+                    "analysis_result": {
+                      "result_id": "composition-specimen-substitution-rejected-RESULT",
+                      "result_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+                      "design_id": "composition-specimen-substitution-rejected-DESIGN",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "endpoint_id": "apparent_shear_strength",
+                      "analysis_profile": "two_sample_tost_v1",
+                      "margin_lower": -1,
+                      "margin_upper": 1,
+                      "alpha": 0.025000000000000022,
+                      "confidence_level": 0.95,
+                      "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                      "baseline_sample_count": 2,
+                      "candidate_sample_count": 2,
+                      "baseline_cluster_count": 2,
+                      "candidate_cluster_count": 2,
+                      "ci_lower": -0.4,
+                      "ci_upper": 0.4,
+                      "outcome": "EQUIVALENCE_ESTABLISHED"
+                    }
+                  }
+                }
+              ],
+              "expected_disposition": "PASS",
+              "rationale": "Embedded method-qualified initial lap-shear endpoint tied to the exact transfer bridge artifact and per-specimen lot mapping."
+            }
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic adversarial composition-bound transfer case.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-composition-specimen-substitution-rejected",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "sample-cluster-map-substitution-rejected",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-sample-cluster-map-substitution-rejected",
+            "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee9",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-BR1-B-LOT-1",
+              "material-lot-bridged-BR1-B-LOT-2"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-BR1-C-LOT-1",
+              "material-lot-bridged-BR1-C-LOT-2"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ],
+            "baseline_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                "cluster_id": "UNRELATED-LOT"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+              }
+            ],
+            "candidate_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+              }
+            ]
+          },
+          "composition_evidence": {
+            "transfer_bridge_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "composition": {
+              "id": "sample-cluster-map-substitution-rejected-COMPOSITION",
+              "baseline_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "candidate_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "required_endpoints": [
+                "apparent_shear_strength"
+              ],
+              "endpoint_evidence": [
+                {
+                  "endpoint": "apparent_shear_strength",
+                  "baseline_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-B1",
+                    "material-lot-bridged-substrate_lot-B2"
+                  ],
+                  "candidate_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-C1",
+                    "material-lot-bridged-substrate_lot-C2"
+                  ],
+                  "baseline_receipt": {
+                    "id": "material-lot-bridged-BR1-BASE",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-B1",
+                      "material-lot-bridged-substrate_lot-B2"
+                    ]
+                  },
+                  "candidate_receipt": {
+                    "id": "material-lot-bridged-BR1-CAND",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-C1",
+                      "material-lot-bridged-substrate_lot-C2"
+                    ]
+                  },
+                  "equivalence_design": {
+                    "design_id": "sample-cluster-map-substitution-rejected-DESIGN",
+                    "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                    "endpoint_id": "apparent_shear_strength",
+                    "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+                    "quantity_unit": "MPa",
+                    "analysis_profile": "two_sample_tost_v1",
+                    "grouping_scheme": "independent_arms",
+                    "independent_unit": "material_lot",
+                    "margin_lower": -1,
+                    "margin_upper": 1,
+                    "alpha": 0.025000000000000022,
+                    "confidence_level": 0.95,
+                    "frozen_at": 100,
+                    "first_outcome_available_at": 200,
+                    "design_changed_after_outcome": false,
+                    "planned_min_baseline_specimens": 2,
+                    "planned_min_candidate_specimens": 2,
+                    "planned_min_baseline_clusters": 2,
+                    "planned_min_candidate_clusters": 2,
+                    "max_specimen_attrition_rate": 0.25,
+                    "max_cluster_attrition_rate": 0.25,
+                    "target_power": 0.8,
+                    "target_precision_half_width": 0.5,
+                    "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                    "effect_under_alternative": 0.25,
+                    "variance_low": 0.5,
+                    "variance_central": 1,
+                    "variance_high": 1.5,
+                    "randomization_plan_ref": "material-lot-bridged-BR1-RANDOMIZATION-PLAN",
+                    "analysis_plan_ref": "material-lot-bridged-BR1-ANALYSIS-PLAN",
+                    "exclusion_protocol_ref": "material-lot-bridged-BR1-EXCLUSION-PROTOCOL",
+                    "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+                    "power_receipt": {
+                      "receipt_id": "sample-cluster-map-substitution-rejected-POWER",
+                      "calculation_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "design_id": "sample-cluster-map-substitution-rejected-DESIGN",
+                      "endpoint_id": "apparent_shear_strength",
+                      "independent_unit": "material_lot",
+                      "grouping_scheme": "independent_arms",
+                      "planned_baseline_clusters": 2,
+                      "planned_candidate_clusters": 2,
+                      "target_power": 0.8,
+                      "target_precision_half_width": 0.5,
+                      "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                      "effect_under_alternative": 0.25,
+                      "variance_low": 0.5,
+                      "variance_central": 1,
+                      "variance_high": 1.5,
+                      "method_ref": "symthaea-statistics:power-planning-reference-v1",
+                      "claim_ceiling": "planning_only"
+                    },
+                    "baseline_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+                      }
+                    ],
+                    "candidate_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+                      }
+                    ],
+                    "excluded_samples": [],
+                    "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                    "baseline_method_receipt": {
+                      "id": "material-lot-bridged-BR1-BASE",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-B1",
+                        "material-lot-bridged-substrate_lot-B2"
+                      ]
+                    },
+                    "candidate_method_receipt": {
+                      "id": "material-lot-bridged-BR1-CAND",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-C1",
+                        "material-lot-bridged-substrate_lot-C2"
+                      ]
+                    },
+                    "analysis_result": {
+                      "result_id": "sample-cluster-map-substitution-rejected-RESULT",
+                      "result_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+                      "design_id": "sample-cluster-map-substitution-rejected-DESIGN",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "endpoint_id": "apparent_shear_strength",
+                      "analysis_profile": "two_sample_tost_v1",
+                      "margin_lower": -1,
+                      "margin_upper": 1,
+                      "alpha": 0.025000000000000022,
+                      "confidence_level": 0.95,
+                      "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                      "baseline_sample_count": 2,
+                      "candidate_sample_count": 2,
+                      "baseline_cluster_count": 2,
+                      "candidate_cluster_count": 2,
+                      "ci_lower": -0.4,
+                      "ci_upper": 0.4,
+                      "outcome": "EQUIVALENCE_ESTABLISHED"
+                    }
+                  }
+                }
+              ],
+              "expected_disposition": "PASS",
+              "rationale": "Embedded method-qualified initial lap-shear endpoint tied to the exact transfer bridge artifact and per-specimen lot mapping."
+            }
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic adversarial composition-bound transfer case.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-sample-cluster-map-substitution-rejected",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "design-result-interval-substitution-rejected",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-design-result-interval-substitution-rejected",
+            "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee0",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-BR1-B-LOT-1",
+              "material-lot-bridged-BR1-B-LOT-2"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-BR1-C-LOT-1",
+              "material-lot-bridged-BR1-C-LOT-2"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ],
+            "baseline_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+              }
+            ],
+            "candidate_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+              }
+            ]
+          },
+          "composition_evidence": {
+            "transfer_bridge_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "composition": {
+              "id": "design-result-interval-substitution-rejected-COMPOSITION",
+              "baseline_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "candidate_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "required_endpoints": [
+                "apparent_shear_strength"
+              ],
+              "endpoint_evidence": [
+                {
+                  "endpoint": "apparent_shear_strength",
+                  "baseline_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-B1",
+                    "material-lot-bridged-substrate_lot-B2"
+                  ],
+                  "candidate_specimen_ids": [
+                    "material-lot-bridged-substrate_lot-C1",
+                    "material-lot-bridged-substrate_lot-C2"
+                  ],
+                  "baseline_receipt": {
+                    "id": "material-lot-bridged-BR1-BASE",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-B1",
+                      "material-lot-bridged-substrate_lot-B2"
+                    ]
+                  },
+                  "candidate_receipt": {
+                    "id": "material-lot-bridged-BR1-CAND",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "material-lot-bridged-substrate_lot-C1",
+                      "material-lot-bridged-substrate_lot-C2"
+                    ]
+                  },
+                  "equivalence_design": {
+                    "design_id": "design-result-interval-substitution-rejected-DESIGN",
+                    "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                    "endpoint_id": "apparent_shear_strength",
+                    "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+                    "quantity_unit": "MPa",
+                    "analysis_profile": "two_sample_tost_v1",
+                    "grouping_scheme": "independent_arms",
+                    "independent_unit": "material_lot",
+                    "margin_lower": -1,
+                    "margin_upper": 1,
+                    "alpha": 0.025000000000000022,
+                    "confidence_level": 0.95,
+                    "frozen_at": 100,
+                    "first_outcome_available_at": 200,
+                    "design_changed_after_outcome": false,
+                    "planned_min_baseline_specimens": 2,
+                    "planned_min_candidate_specimens": 2,
+                    "planned_min_baseline_clusters": 2,
+                    "planned_min_candidate_clusters": 2,
+                    "max_specimen_attrition_rate": 0.25,
+                    "max_cluster_attrition_rate": 0.25,
+                    "target_power": 0.8,
+                    "target_precision_half_width": 0.5,
+                    "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                    "effect_under_alternative": 0.25,
+                    "variance_low": 0.5,
+                    "variance_central": 1,
+                    "variance_high": 1.5,
+                    "randomization_plan_ref": "material-lot-bridged-BR1-RANDOMIZATION-PLAN",
+                    "analysis_plan_ref": "material-lot-bridged-BR1-ANALYSIS-PLAN",
+                    "exclusion_protocol_ref": "material-lot-bridged-BR1-EXCLUSION-PROTOCOL",
+                    "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+                    "power_receipt": {
+                      "receipt_id": "design-result-interval-substitution-rejected-POWER",
+                      "calculation_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "design_id": "design-result-interval-substitution-rejected-DESIGN",
+                      "endpoint_id": "apparent_shear_strength",
+                      "independent_unit": "material_lot",
+                      "grouping_scheme": "independent_arms",
+                      "planned_baseline_clusters": 2,
+                      "planned_candidate_clusters": 2,
+                      "target_power": 0.8,
+                      "target_precision_half_width": 0.5,
+                      "assumptions_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+                      "effect_under_alternative": 0.25,
+                      "variance_low": 0.5,
+                      "variance_central": 1,
+                      "variance_high": 1.5,
+                      "method_ref": "symthaea-statistics:power-planning-reference-v1",
+                      "claim_ceiling": "planning_only"
+                    },
+                    "baseline_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                        "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+                      }
+                    ],
+                    "candidate_samples": [
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+                      },
+                      {
+                        "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                        "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+                      }
+                    ],
+                    "excluded_samples": [],
+                    "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                    "baseline_method_receipt": {
+                      "id": "material-lot-bridged-BR1-BASE",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-B1",
+                        "material-lot-bridged-substrate_lot-B2"
+                      ]
+                    },
+                    "candidate_method_receipt": {
+                      "id": "material-lot-bridged-BR1-CAND",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "material-lot-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "material-lot-bridged-substrate_lot-C1",
+                        "material-lot-bridged-substrate_lot-C2"
+                      ]
+                    },
+                    "analysis_result": {
+                      "result_id": "design-result-interval-substitution-rejected-RESULT",
+                      "result_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+                      "design_id": "design-result-interval-substitution-rejected-DESIGN",
+                      "plan_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+                      "endpoint_id": "apparent_shear_strength",
+                      "analysis_profile": "two_sample_tost_v1",
+                      "margin_lower": -1,
+                      "margin_upper": 1,
+                      "alpha": 0.025000000000000022,
+                      "confidence_level": 0.95,
+                      "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+                      "baseline_sample_count": 2,
+                      "candidate_sample_count": 2,
+                      "baseline_cluster_count": 2,
+                      "candidate_cluster_count": 2,
+                      "ci_lower": -0.4,
+                      "ci_upper": 0.6000000000000001,
+                      "outcome": "EQUIVALENCE_ESTABLISHED"
+                    }
+                  }
+                }
+              ],
+              "expected_disposition": "PASS",
+              "rationale": "Embedded method-qualified initial lap-shear endpoint tied to the exact transfer bridge artifact and per-specimen lot mapping."
+            }
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic adversarial composition-bound transfer case.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-design-result-interval-substitution-rejected",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "design-receipt-from-another-bridge-rejected",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-design-receipt-from-another-bridge-rejected",
+            "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-BR1-B-LOT-1",
+              "material-lot-bridged-BR1-B-LOT-2"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-BR1-C-LOT-1",
+              "material-lot-bridged-BR1-C-LOT-2"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ],
+            "baseline_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B1",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-B2",
+                "cluster_id": "material-lot-bridged-BR1-B-LOT-2"
+              }
+            ],
+            "candidate_sample_clusters": [
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C1",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-1"
+              },
+              {
+                "specimen_id": "material-lot-bridged-substrate_lot-C2",
+                "cluster_id": "material-lot-bridged-BR1-C-LOT-2"
+              }
+            ]
+          },
+          "composition_evidence": {
+            "transfer_bridge_artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee1",
+            "composition": {
+              "id": "supplier-bridged-BR1-COMPOSITION",
+              "baseline_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "candidate_profile": {
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap"
+              },
+              "required_endpoints": [
+                "apparent_shear_strength"
+              ],
+              "endpoint_evidence": [
+                {
+                  "endpoint": "apparent_shear_strength",
+                  "baseline_specimen_ids": [
+                    "supplier-bridged-substrate_supplier-B1",
+                    "supplier-bridged-substrate_supplier-B2"
+                  ],
+                  "candidate_specimen_ids": [
+                    "supplier-bridged-substrate_supplier-C1",
+                    "supplier-bridged-substrate_supplier-C2"
+                  ],
+                  "baseline_receipt": {
+                    "id": "supplier-bridged-BR1-BASE",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "supplier-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "supplier-bridged-substrate_supplier-B1",
+                      "supplier-bridged-substrate_supplier-B2"
+                    ]
+                  },
+                  "candidate_receipt": {
+                    "id": "supplier-bridged-BR1-CAND",
+                    "method_id": "ASTM_D3163",
+                    "edition": "D3163-01R23",
+                    "evidence_kind": "measurement",
+                    "material_pair_class": "rigid_plastic_pair",
+                    "geometry": "single_lap",
+                    "endpoint": "apparent_shear_strength",
+                    "requested_claim": "comparative_screening",
+                    "protocol_id": "supplier-bridged-BR1-METHOD-PROTOCOL",
+                    "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                    "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+                    "suitability_review_sha256": null,
+                    "specimen_ids": [
+                      "supplier-bridged-substrate_supplier-C1",
+                      "supplier-bridged-substrate_supplier-C2"
+                    ]
+                  },
+                  "equivalence_design": {
+                    "design_id": "supplier-bridged-BR1-DESIGN",
+                    "plan_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+                    "endpoint_id": "apparent_shear_strength",
+                    "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+                    "quantity_unit": "MPa",
+                    "analysis_profile": "two_sample_tost_v1",
+                    "grouping_scheme": "independent_arms",
+                    "independent_unit": "material_lot",
+                    "margin_lower": -1,
+                    "margin_upper": 1,
+                    "alpha": 0.025000000000000022,
+                    "confidence_level": 0.95,
+                    "frozen_at": 100,
+                    "first_outcome_available_at": 200,
+                    "design_changed_after_outcome": false,
+                    "planned_min_baseline_specimens": 2,
+                    "planned_min_candidate_specimens": 2,
+                    "planned_min_baseline_clusters": 2,
+                    "planned_min_candidate_clusters": 2,
+                    "max_specimen_attrition_rate": 0.25,
+                    "max_cluster_attrition_rate": 0.25,
+                    "target_power": 0.8,
+                    "target_precision_half_width": 0.5,
+                    "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+                    "effect_under_alternative": 0.25,
+                    "variance_low": 0.5,
+                    "variance_central": 1,
+                    "variance_high": 1.5,
+                    "randomization_plan_ref": "supplier-bridged-BR1-RANDOMIZATION-PLAN",
+                    "analysis_plan_ref": "supplier-bridged-BR1-ANALYSIS-PLAN",
+                    "exclusion_protocol_ref": "supplier-bridged-BR1-EXCLUSION-PROTOCOL",
+                    "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+                    "power_receipt": {
+                      "receipt_id": "supplier-bridged-BR1-POWER-RECEIPT",
+                      "calculation_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+                      "plan_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+                      "design_id": "supplier-bridged-BR1-DESIGN",
+                      "endpoint_id": "apparent_shear_strength",
+                      "independent_unit": "material_lot",
+                      "grouping_scheme": "independent_arms",
+                      "planned_baseline_clusters": 2,
+                      "planned_candidate_clusters": 2,
+                      "target_power": 0.8,
+                      "target_precision_half_width": 0.5,
+                      "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+                      "effect_under_alternative": 0.25,
+                      "variance_low": 0.5,
+                      "variance_central": 1,
+                      "variance_high": 1.5,
+                      "method_ref": "symthaea-statistics:power-planning-reference-v1",
+                      "claim_ceiling": "planning_only"
+                    },
+                    "baseline_samples": [
+                      {
+                        "specimen_id": "supplier-bridged-substrate_supplier-B1",
+                        "cluster_id": "supplier-bridged-BR1-B-LOT-1"
+                      },
+                      {
+                        "specimen_id": "supplier-bridged-substrate_supplier-B2",
+                        "cluster_id": "supplier-bridged-BR1-B-LOT-2"
+                      }
+                    ],
+                    "candidate_samples": [
+                      {
+                        "specimen_id": "supplier-bridged-substrate_supplier-C1",
+                        "cluster_id": "supplier-bridged-BR1-C-LOT-1"
+                      },
+                      {
+                        "specimen_id": "supplier-bridged-substrate_supplier-C2",
+                        "cluster_id": "supplier-bridged-BR1-C-LOT-2"
+                      }
+                    ],
+                    "excluded_samples": [],
+                    "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+                    "baseline_method_receipt": {
+                      "id": "supplier-bridged-BR1-BASE",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "supplier-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "supplier-bridged-substrate_supplier-B1",
+                        "supplier-bridged-substrate_supplier-B2"
+                      ]
+                    },
+                    "candidate_method_receipt": {
+                      "id": "supplier-bridged-BR1-CAND",
+                      "method_id": "ASTM_D3163",
+                      "edition": "D3163-01R23",
+                      "evidence_kind": "measurement",
+                      "material_pair_class": "rigid_plastic_pair",
+                      "geometry": "single_lap",
+                      "endpoint": "apparent_shear_strength",
+                      "requested_claim": "comparative_screening",
+                      "protocol_id": "supplier-bridged-BR1-METHOD-PROTOCOL",
+                      "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+                      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+                      "suitability_review_sha256": null,
+                      "specimen_ids": [
+                        "supplier-bridged-substrate_supplier-C1",
+                        "supplier-bridged-substrate_supplier-C2"
+                      ]
+                    },
+                    "analysis_result": {
+                      "result_id": "supplier-bridged-BR1-ANALYSIS-RESULT",
+                      "result_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+                      "design_id": "supplier-bridged-BR1-DESIGN",
+                      "plan_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+                      "endpoint_id": "apparent_shear_strength",
+                      "analysis_profile": "two_sample_tost_v1",
+                      "margin_lower": -1,
+                      "margin_upper": 1,
+                      "alpha": 0.025000000000000022,
+                      "confidence_level": 0.95,
+                      "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+                      "baseline_sample_count": 2,
+                      "candidate_sample_count": 2,
+                      "baseline_cluster_count": 2,
+                      "candidate_cluster_count": 2,
+                      "ci_lower": -0.4,
+                      "ci_upper": 0.4,
+                      "outcome": "EQUIVALENCE_ESTABLISHED"
+                    }
+                  }
+                }
+              ],
+              "expected_disposition": "PASS",
+              "rationale": "Embedded method-qualified initial lap-shear endpoint tied to the exact transfer bridge artifact and per-specimen lot mapping."
+            }
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic adversarial composition-bound transfer case.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-design-receipt-from-another-bridge-rejected",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
+        ]
+      }
     }
   ],
   "material_scope_map": {
