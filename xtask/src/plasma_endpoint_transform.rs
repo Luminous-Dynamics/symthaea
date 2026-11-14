@@ -729,6 +729,27 @@ mod tests {
     }
 
     #[test]
+    fn missing_design_digest_blocks_a_derived_endpoint() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "missing-design-receipt-digest").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn analysis_result_must_bind_every_source_receipt() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "analysis-result-input-lineage-mismatch").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn invalid_aging_method_or_protocol_cannot_support_retention() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "conditioning-receipt-protocol-mismatch").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Rejected);
+    }
+
+    #[test]
     fn valid_graph_can_fail_to_establish_equivalence() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
         let case = fixture.cases.iter().find(|case| case.id == "valid-direct-strength-outside-margin").expect("case exists");
