@@ -27,11 +27,11 @@ These results are complementary, not directly rankable. The benchmarks differ in
 The current official comparator protocols are especially instructive:
 
 - **MANTA:** its public table reports 74.0 ± 1.8 across five suites, using Gemma 4 31B, 30 tasks per suite and three independent runs. It scores 76.7 on BrowseComp, 82.2 on StableToolBench, 76.7 on PlanCraft, 43.3 on WorkBench and 91.1 on MATH. Its architecture changes roles, links, execution order, information visibility and validation paths with bounded repair; controller code—not the agent—decides when the loop stops. Its online playbook excludes the benchmark success verdict from learning memory. AOBench should borrow that separation between adaptation signals and the authority used to score correctness.
-- **ASIWorld:** the official page currently describes a seven-hour persistent sandbox, 15 frontier configurations, four gameplay domains and six agent capabilities. Its headline 0–100 score is a weighted composite (20% survival, 35% combat, 15% building, 30% crafting). Most frontier configurations are single seven-hour runs; selected compact/open-weight tracks use multiple runs and report a mean/standard deviation. The page currently lists 79.1 for its top frontier row, but that number is not directly rankable against MANTA's 74.0: the tasks, horizons, run counts and score construction differ. The durable world state, asynchronous execution, progression and action-cost traces are useful comparators for AOBench's repeated-epoch and recovery-cost scenarios.
+- **ASIWorld:** the current official page lists 15 frontier configurations under a common Claude Code harness, with a separate compact Qwen3.5-27B track, over a seven-hour persistent sandbox spanning four gameplay domains and six capability dimensions. Its weighted 0–100 score is 20% survival, 35% combat, 15% building and 30% crafting. The current top row is claude-fable-5-2 at 79.1; most frontier rows are single seven-hour runs, while DeepSeek V4.1 Flash reports five runs (33.8 ± 9.3) and the separate Qwen3.5-27B compact track reports three runs (10.2 ± 1.7). Its world state, asynchronous execution, progression and durable action records are useful comparators for AOBench's repeated-epoch and recovery-cost scenarios. The 79.1 headline is not directly rankable against MANTA's 74.0: tasks, horizons, run counts and score construction differ.
 
 The comparison protocol should record model/version, reasoning effort, environment commit, harness, trial count, time/compute/action budgets, scoring weights, oracle, and uncertainty for every external baseline. If these differ, report a descriptive comparison rather than a numerical ranking.
 
-One result deserves special attention: Causal-Discovery-Bench reports that increasing the resource budget by 125× moved one model's structure-identification success from 17% to 78%, but the analysis found that the agent still rarely ran properly controlled experiments. More budget can therefore mask poor experimental design by enabling broader candidate exploration. AOBench must report controlled-intervention rate, variable-control adequacy, information gain per cost, achieved power and oracle regret—not just final discovery accuracy.
+One result deserves special attention: Causal-Discovery-Bench reports that increasing one model's resource budget by 125× moved exact parent-set recovery from 17% to 78%, but controlled experiments still appeared in only 15% of episodes at the highest budget. A separate per-call sample cap improved exact recovery from 21% to 64% while increasing the fraction of episodes containing a controlled experiment from 22% to 73%. Across 3,779 scored episodes, 94.5% of attributed errors occurred before final inference, at evidence-collection or experimental-design stages. The authors also state that all variables in their sandbox SCMs are observable to agents; this does not test latent-confounding discovery or hidden measurement channels. More budget can therefore mask poor experimental design by enabling broad candidate exploration. AOBench should retain the resource/controlled-experiment split but add latent districts, missing measurements and partially identified effects. It must report controlled-intervention rate, direct-treatment/variable-control adequacy, information gain per cost, achieved power and oracle regret—not just final discovery accuracy.
 
 ## 2. Paradigm shift: from inference quality to evidence-acquisition competence
 
@@ -161,7 +161,38 @@ The advantage should come from combining properties that current benchmarks ofte
 
 This does not imply that AOBench has already demonstrated superiority. It defines a falsifiable experimental bridge through which superiority can be measured.
 
-## 8. Claim boundary
+## 8. Proposed AOBench qualification targets (not achieved results)
+
+These are preregistration targets for pilot calibration and confirmatory evaluation. They are not current Symthaea scores or claims of superiority.
+
+| Qualification layer | Proposed target |
+|---|---|
+| Deterministic contract fixtures | 100% of registered positive, negative, invalid-input and budget-exhaustion fixtures behave as specified |
+| Authority / consent / irreversible effects | Zero accepted false-continuity cases in the registered adversarial controls |
+| Intervention evidence | Zero hypothesis updates from rejected or unavailable delivery, isolation or observation evidence |
+| Sequential decision | At least 95% correct stop / continue / defer decisions on sealed deterministic tasks; zero budget violations |
+| Model inadequacy | At least 95% recall on held-out out-of-class mechanisms, with at most 1% false expansion on in-class controls |
+| Refinement validation | Zero accepted refinements with a failed or missing sealed prediction; exact 100% coverage required for deterministic acceptance |
+| Experiment efficiency | Report information gain per cost and regret against a safe/affordable oracle; target median normalized regret below 5% after calibration |
+| Cross-family robustness | Report every mechanism family and assumption violation separately; aim for no more than a 10-point absolute degradation from validation to held-out families, without hiding worst-family failure |
+| Causal graph discovery | Run matched ACDB and CausalArena protocols; target at least +10 absolute directed-F1 points over the strongest non-oracle baseline on the same task ladder, while also reporting precision, recall and SHD |
+| Real-world transfer | No universal numeric target until outcome ground truth and intervention validity can be independently adjudicated; publish failures and abstentions |
+
+AOBench must not tune thresholds on its confirmatory suite. Pilot data select and freeze the thresholds; sealed family-disjoint evaluation measures them. A failed safety or evidence gate blocks the task regardless of the aggregate task score.
+
+## 9. How we compare fairly with current SOTA
+
+- **ACDB:** its current linear-Gaussian, perfect-hard-intervention ladder reports PC plus greedy active orientation as the strongest non-oracle method at directed F1 42.7% / SHD 4.79. This is the minimum classical comparator, not an LLM-only baseline. AOBench must use paired instances and report skeleton, orientation, precision/recall, intervention utility and abstention separately.
+- **Causal-Discovery-Bench:** 3,802 episodes are described in the abstract, with 3,779 scored episodes in the detailed analysis. The paper attributes 94.5% of errors to premature conclusions before sufficient evidence; it also shows that a 125× resource increase can raise structure success from 17% to 78% while controlled experimentation remains rare. AOBench must separate raw budget from direct-treatment isolation and evidence quality.
+- **ACED-Bench:** 180 ACED-CORE tasks plus 150 qualification questions demonstrate the importance of hidden formal worlds, readable tasks, evidence ledgers and stop rules. AOBench should preserve the separation between public task surface and evaluator-only truth.
+- **CausalArena:** ranking shifts across synthetic, semantic-operational, formula-grounded and public real-world SCM families. AOBench should report per-family outcomes and generator exposure; a single pooled average is insufficient.
+- **TCD-Arena:** 33 time-series assumption violations and large-scale experiments motivate severity ladders and compound violations. AOBench should report a robustness profile rather than one global robustness score.
+- **MANTA:** its official evaluation reports 74.0 ± 1.8 across five benchmarks, with Gemma 4 31B, 30 tasks per benchmark and three independent runs. Its controller makes bounded topology repairs and keeps the benchmark verdict out of online playbook learning. AOBench should compare organizational adaptation under the same task/resource budget, then separately score governance, effect and evidence continuity.
+- **ASIWorld:** its current official page lists 15 frontier configurations in a seven-hour persistent world, with a weighted 20/35/15/30 score. The top listed row is 79.1, but most frontier configurations are single runs. AOBench can borrow persistent consequences and multi-epoch recovery, but must not rank against its score.
+
+No cross-benchmark headline number is an apples-to-apples leaderboard comparison. Every report must include model/version, task generator and commit, harness version, number of runs, task counts, compute/time/action budgets, oracle, scoring weights and uncertainty.
+
+## 10. Claim boundary
 
 A synthetic causal-discovery result does not establish scientific discovery competence in uncontrolled physical environments. Intervention conclusions require independently qualified target, delivery, isolation, observer and oracle evidence. A non-significant difference is not an equivalence proof. A system that cannot identify the mechanism under the available experiments must abstain.
 

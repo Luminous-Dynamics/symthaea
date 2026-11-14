@@ -21,11 +21,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
+pub mod experiment_design;
 pub mod identity;
-pub mod viability;
+pub mod model_refinement;
 pub mod reconfiguration;
 pub mod semantic_continuity;
-pub mod experiment_design;
+pub mod viability;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
@@ -42,6 +43,13 @@ pub use experiment_design::{
     ExperimentTrial, HypothesisId, MechanismHypothesis, ProbeId,
     SequentialExperimentReport, SequentialExperimentScenario, SequentialExperimentTrace,
     TrialInformationAssessment, evaluate_sequential_experiment,
+};
+pub use model_refinement::{
+    CandidateMechanismModel, ModelAdequacyDecision, ModelAdequacyScenario,
+    ModelAdequacyStatus, ModelAdequacyTrace, ModelRefinementFinding,
+    ModelRefinementFindingCode, ModelRefinementOracle, ModelRefinementProposal,
+    ModelRefinementQualification, ModelRefinementReport, RefinementProbe,
+    evaluate_model_refinement,
 };
 pub use semantic_continuity::{
     AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,

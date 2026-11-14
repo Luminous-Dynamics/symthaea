@@ -22,6 +22,8 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 16. [Typed semantic continuity](AOBENCH_SEMANTIC_CONTINUITY_2026-11-14.md) — explicit authority, consent, side-effect, provenance and substrate transition envelopes; tracked by [AOBENCH-010 #12167](https://github.com/Luminous-Dynamics/symthaea/issues/12167).
 17. [Experimental design and cross-family generalization](AOBENCH_EXPERIMENTAL_DESIGN_AND_GENERALIZATION_2026-11-14.md) — sequential probe choice, power, stopping, classical baselines and sealed mechanism-family holdouts; tracked by [AOBENCH-011 #12173](https://github.com/Luminous-Dynamics/symthaea/issues/12173).
 18. [Sequential experiment design evaluator](AOBENCH_SEQUENTIAL_EXPERIMENT_EVALUATOR_2026-11-14.md) — adaptive probe selection, information gain, delivery/isolation evidence, budgeted stopping and oracle-efficiency regret.
+19. [Model-class adequacy and held-out refinement](AOBENCH_MODEL_ADEQUACY_AND_REFINEMENT_2026-11-14.md) — detect when every current hypothesis is falsified and require new models to predict sealed probes; tracked by [AOBENCH-012 #12200](https://github.com/Luminous-Dynamics/symthaea/issues/12200).
+20. [Decision-focused partial identification and max-potency experiments](AOBENCH_PARTIAL_IDENTIFICATION_AND_MAX_POTENCY_2026-11-14.md) — select interventions that guarantee causal-effect bound contraction and authorize robust decisions without requiring full graph identification; tracked by [AOBENCH-013 #12206](https://github.com/Luminous-Dynamics/symthaea/issues/12206).
 18. [Sequential experiment design evaluator](AOBENCH_SEQUENTIAL_EXPERIMENT_EVALUATOR_2026-11-14.md) — adaptive probe selection, information gain, delivery/isolation evidence, budgeted stopping and oracle-efficiency regret; implementation in `src/experiment_design.rs`.
 
 ## Current implementation
@@ -36,6 +38,7 @@ The first executable package is a standalone nested Cargo workspace:
   - `src/identity.rs`: finite simulation/bisimulation-style operational-continuity checker over declared state, capability, invariant and action/observation models.
   - `src/semantic_continuity.rs`: typed authority, consent, effect, provenance and substrate continuity evaluator; evidence dispositions are supplied by independent adapters and are not authenticated by this module.
   - `src/experiment_design.rs`: sequential deterministic experiment evaluator with evaluator-only hidden truth, target-class information gain, intervention/cost/risk budgets and stop/abstain qualification; no stochastic power claim.
+  - `src/model_refinement.rs`: model-class adequacy and held-out hypothesis refinement evaluator. A proposed model must fit the complete qualified discovery trace and sealed validation probes against an evaluator-only oracle.
   - `src/experiment_design.rs`: sequential deterministic experiment evaluator with hidden evaluator oracle, target-class information gain, intervention/cost/risk budgets and stop/abstain qualification. It does not claim stochastic statistical power.
 
 It has exact serde / sha2 dependency pins and its own lockfile, and is explicitly excluded from the root workspace's crates/domains glob. Its focused CI builds the nested workspace independently.
