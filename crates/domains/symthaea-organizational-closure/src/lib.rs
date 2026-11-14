@@ -107,6 +107,9 @@ impl ComponentSpec {
 pub struct ProcessSpec {
     pub id: ProcessId,
     pub version: ProcessVersion,
+    /// Expected executable identity frozen in the organization declaration.
+    /// This binds identity metadata; it is not proof that this binary ran.
+    pub executable_digest: ContentDigest,
     pub required_inputs: BTreeSet<ComponentId>,
     pub optional_inputs: BTreeSet<ComponentId>,
     pub required_outputs: BTreeSet<ComponentId>,
@@ -116,10 +119,15 @@ pub struct ProcessSpec {
 }
 
 impl ProcessSpec {
-    pub fn new(id: impl Into<ProcessId>, version: impl Into<ProcessVersion>) -> Self {
+    pub fn new(
+        id: impl Into<ProcessId>,
+        version: impl Into<ProcessVersion>,
+        executable_digest: ContentDigest,
+    ) -> Self {
         Self {
             id: id.into(),
             version: version.into(),
+            executable_digest,
             required_inputs: BTreeSet::new(),
             optional_inputs: BTreeSet::new(),
             required_outputs: BTreeSet::new(),
@@ -289,6 +297,7 @@ pub enum FindingCode {
     UnknownComponent,
     UnknownProcess,
     ProcessVersionMismatch,
+    ExecutableDigestMismatch,
     NonMonotonicSequence,
     DuplicateExecution,
     MissingRequiredInput,
@@ -564,6 +573,15 @@ pub fn verify_trace(
                 event,
                 None,
                 "execution process version differs from the frozen specification",
+            );
+        }
+        if process.executable_digest != event.executable_digest {
+            event_finding(
+                &mut report,
+                FindingCode::ExecutableDigestMismatch,
+                event,
+                None,
+                "execution executable digest differs from the frozen process specification",
             );
         }
 
@@ -993,12 +1011,14 @@ mod tests {
             true,
         )));
 
-        let mut produce = ProcessSpec::new("refresh-memory", "v1");
+        let refresh_digest = ContentDigest::of(b"refresh-memory-binary");
+        let mut produce = ProcessSpec::new("refresh-memory", "v1", refresh_digest);
         produce.required_inputs.insert("seed".into());
         produce.required_outputs.insert("memory".into());
         assert!(organization.insert_process(produce));
 
-        let mut consume = ProcessSpec::new("use-memory", "v1");
+        let use_digest = ContentDigest::of(b"use-memory-binary");
+        let mut consume = ProcessSpec::new("use-memory", "v1", use_digest);
         consume.required_inputs.insert("memory".into());
         assert!(organization.insert_process(consume));
 
@@ -1019,7 +1039,7 @@ mod tests {
             sequence: 1,
             process_id: "refresh-memory".into(),
             process_version: "v1".into(),
-            executable_digest: ContentDigest::of(b"refresh-memory-binary"),
+            executable_digest: refresh_digest,
             inputs: vec![ArtifactRef {
                 id: seed_id,
                 digest: seed_digest,
@@ -1044,7 +1064,7 @@ mod tests {
             sequence: 2,
             process_id: "use-memory".into(),
             process_version: "v1".into(),
-            executable_digest: ContentDigest::of(b"use-memory-binary"),
+            executable_digest: use_digest,
             inputs: vec![ArtifactRef {
                 id: memory_id,
                 digest: memory_digest,
@@ -1100,6 +1120,21 @@ mod tests {
                 .findings
                 .iter()
                 .any(|finding| { finding.code == FindingCode::MissingRegenerativeConsumer })
+        );
+    }
+
+    #[test]
+    fn executable_digest_must_match_frozen_process_specification() {
+        let (organization, mut trace, store) = healthy_fixture();
+        trace.events[0].executable_digest = ContentDigest::of(b"substituted-binary");
+
+        let report = verify_trace(&organization, &trace, &store);
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::ExecutableDigestMismatch })
         );
     }
 
