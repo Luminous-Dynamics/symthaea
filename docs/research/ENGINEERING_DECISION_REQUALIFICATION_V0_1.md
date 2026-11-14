@@ -67,9 +67,9 @@ These are decision dispositions only. The assessment contract must carry effect_
 
 ## 6. Frozen synthetic corpus
 
-The companion corpus contains ten known-answer cases covering no change, evidence supersession, late-arriving trust revocation, irrelevant duplicate notification, a two-decision scope-control baseline, configuration drift affecting only one of two decisions, operating-envelope breach, model calibration drift, unknown scope with incomplete event inventory and uncertain ordering, and revocation already known before K0.
+The companion corpus contains eleven known-answer cases and thirteen decision outcomes covering no change, evidence supersession, late-arriving trust revocation, irrelevant duplicate notification, a two-decision scope-control baseline, configuration drift affecting only one of two decisions, operating-envelope breach, model calibration drift, unknown scope with incomplete event inventory and uncertain ordering, revocation already known before K0, and a relevant owner event missing from candidate-visible materialization.
 
-Eight paired interventions specify INVARIANT, FLIP, late-arrival, scoped-invalidation or historical-rejection relations.
+Nine paired interventions specify INVARIANT, FLIP, late-arrival, scoped-invalidation, historical-rejection and materialization-gate relations.
 
 ## 7. Metrics
 
@@ -129,13 +129,14 @@ The standalone Rust reference package is located at `benchmarks/engineering-chan
 cargo test --manifest-path benchmarks/engineering-change-impact/decision-requalification-reference/Cargo.toml
 ```
 
-The synthetic fixture contains ten cases, twelve individual decision outcomes, eight paired interventions and eighteen preregistered mutation controls. At the exact authoring branch head, a separate JavaScript reference replay matched:
+The synthetic fixture contains eleven cases, thirteen individual decision outcomes, nine paired interventions and twenty preregistered mutation controls. At the exact authoring branch head, a separate JavaScript reference replay is intended to verify:
 
-- 30/30 dependency-manifest, event-inventory and candidate-visible-event SHA-256 commitments;
-- 12/12 as-of K0 and current K1 decision dispositions/actions/reason-code sets;
-- 8/8 FLIP, INVARIANT, late-arrival, scoped-invalidation and historical-rejection relations.
+- dependency-manifest and complete owner event-inventory SHA-256 commitments;
+- distinct candidate-visible event manifests at K0 and K1;
+- as-of K0 and current K1 decision dispositions/actions/reason-code sets;
+- FLIP, INVARIANT, late-arrival, scoped-invalidation, historical-rejection and materialization-gate relations.
 
-These are reference/fixture checks, not candidate-model performance. The three Rust tests are authored but have not yet been compiled or executed. The mutation controls are frozen specifications, not executed mutation results.
+These are reference/fixture checks, not candidate-model performance. The four Rust tests are authored but have not yet been compiled or executed. The mutation controls are frozen specifications, not executed mutation results.
 
 For this synthetic corpus, timestamps are normalized to fixed-width UTC RFC3339 strings so the standalone reference can compare them deterministically. Production adapters must parse real instants, preserve offsets/clock uncertainty and owner sequence semantics; lexical timestamp comparison is not a production time-validation method.
 
