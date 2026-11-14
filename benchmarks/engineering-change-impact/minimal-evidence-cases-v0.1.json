@@ -1026,7 +1026,7 @@
         }
       ],
       "irrelevant_evidence_injection_count": 40,
-      "irrelevant_evidence_injection_digest": "1ff4cfa17a5468a18bbf83086ea7e81537bb5d7910ff1f6232be65030db69df2",
+      "irrelevant_evidence_injection_digest": "faf4b427a345311911c2897344354f149802c14a50955bc9e455dd1fad1ab6d1",
       "expected": {
         "state": "supported",
         "action": "revalidate",
@@ -2026,7 +2026,7 @@
               ]
             }
           },
-          "irrelevant_evidence_injection_digest": "43a35a6001170ee11c97e5c4a55c2afb499f203f9f5b5c6299c229e7fe8bbb9f",
+          "irrelevant_evidence_injection_digest": "fe1e7e0e809ca7b2246a98298d53e95ed382acc3dc0c6298fe350f28c4ae348b",
           "candidate_visible_manifest_sha256": "422d36f875535b8948af3069008ca00268e072126dfc38de7a6decb141ee5a12",
           "candidate_action": "revalidate",
           "injected_evidence_ids": [
