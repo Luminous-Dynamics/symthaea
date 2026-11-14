@@ -366,7 +366,7 @@ fn relevant_owner_events_missing_from_K0_or_K1_candidate_context_are_indetermina
 }
 
 #[test]
-fn eight_intervention_pairs_preserve_history_and_scope_requalification() {
+fn nine_intervention_pairs_preserve_history_and_scope_requalification() {
     let corpus: Value = serde_json::from_str(CASES).expect("valid requalification corpus");
     let pairs = array_at(&corpus, "intervention_pairs");
     assert_eq!(pairs.len(), 9);
