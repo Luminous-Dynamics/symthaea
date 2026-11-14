@@ -160,11 +160,13 @@ It checks:
 - all required regimes exist exactly once;
 - all regimes share the same SCM and estimand digests;
 - context and query unit IDs are unique, disjoint and identically ordered across views;
+- shared X/T/Y context values and shared X query values remain exactly identical across matched views;
+- feature-vector dimensions remain consistent across regimes and splits;
 - column names match the frozen per-regime allowlist;
 - query factual treatment/outcome and evaluator-only columns (tau, Y0/Y1, M0/M1, T0/T1, true effect, oracle fields) never enter the estimator view;
 - each column has the correct row count, consistent vector dimensions and finite values.
 
-Ten deterministic unit tests cover a valid four-view set, target-effect leakage, query T/Y leakage, changed query ordering, SCM/estimand digest mismatch, missing regime, duplicate regime, malformed/non-finite columns, context/query overlap and unexpected columns.
+Thirteen deterministic unit tests cover a valid four-view set, target-effect leakage, query T/Y leakage, changed query ordering, SCM/estimand digest mismatch, missing regime, duplicate regime, malformed/non-finite columns, context/query overlap, unexpected columns, shared context-value drift, shared query-value drift and cross-view feature-dimension mismatch.
 
 This validator proves only that the supplied serialized view matches its declared data contract. It does not authenticate the SCM digest, prove the observation source is truthful, or establish the back-door/front-door/IV/proximal assumptions. Those require separate oracle/evidence contracts. No Rust compiler, test or Clippy pass is claimed until exact-head qualification completes.
 
