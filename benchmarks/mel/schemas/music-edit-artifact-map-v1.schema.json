@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-artifact-map-v1.schema.json",
+  "title": "Melothaea music-edit artifact path map v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-artifact-map-v1"
+    },
+    "rights_evidence_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "access_evidence_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    }
+  },
+  "$defs": {
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "source_audio_path",
+        "instruction_path",
+        "target_audio_path",
+        "target_selector_path",
+        "metadata_path"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_audio_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instruction_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_audio_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_symbolic_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_selector_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metadata_path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

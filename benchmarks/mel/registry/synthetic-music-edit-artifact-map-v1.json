@@ -1,0 +1,24 @@
+{
+  "schema_version": "mel-music-edit-artifact-map-v1",
+  "rights_evidence_path": "rights/synthetic-permission-evidence.txt",
+  "rows": [
+    {
+      "sample_id": "synthetic-001",
+      "source_audio_path": "assets/synthetic-001-source.wav",
+      "instruction_path": "instructions/synthetic-001.txt",
+      "target_audio_path": "assets/synthetic-001-target.wav",
+      "source_symbolic_path": "symbolic/synthetic-001.mid",
+      "target_selector_path": "selectors/synthetic-001.json",
+      "metadata_path": "metadata/synthetic-001.json"
+    },
+    {
+      "sample_id": "synthetic-002",
+      "source_audio_path": "assets/synthetic-002-source.wav",
+      "instruction_path": "instructions/synthetic-002.txt",
+      "target_audio_path": "assets/synthetic-002-target.wav",
+      "source_symbolic_path": "symbolic/synthetic-002.mid",
+      "target_selector_path": "selectors/synthetic-002.json",
+      "metadata_path": "metadata/synthetic-002.json"
+    }
+  ]
+}
