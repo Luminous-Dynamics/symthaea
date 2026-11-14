@@ -24,6 +24,13 @@ Recent 2026 benchmarks make this distinction concrete:
 
 These results are complementary, not directly rankable. The benchmarks differ in task, model, budget, environment, oracle and metric. AOBench must not treat their headline scores as one common leaderboard.
 
+The current official comparator protocols are especially instructive:
+
+- **MANTA:** its public table reports 74.0 ± 1.8 across five suites, using Gemma 4 31B, 30 tasks per suite and three independent runs. It scores 76.7 on BrowseComp, 82.2 on StableToolBench, 76.7 on PlanCraft, 43.3 on WorkBench and 91.1 on MATH. Its architecture changes roles, links, execution order, information visibility and validation paths with bounded repair; controller code—not the agent—decides when the loop stops. Its online playbook excludes the benchmark success verdict from learning memory. AOBench should borrow that separation between adaptation signals and the authority used to score correctness.
+- **ASIWorld:** the official page currently describes a seven-hour persistent sandbox, 15 frontier configurations, four gameplay domains and six agent capabilities. Its headline 0–100 score is a weighted composite (20% survival, 35% combat, 15% building, 30% crafting). Most frontier configurations are single seven-hour runs; selected compact/open-weight tracks use multiple runs and report a mean/standard deviation. The page currently lists 79.1 for its top frontier row, but that number is not directly rankable against MANTA's 74.0: the tasks, horizons, run counts and score construction differ. The durable world state, asynchronous execution, progression and action-cost traces are useful comparators for AOBench's repeated-epoch and recovery-cost scenarios.
+
+The comparison protocol should record model/version, reasoning effort, environment commit, harness, trial count, time/compute/action budgets, scoring weights, oracle, and uncertainty for every external baseline. If these differ, report a descriptive comparison rather than a numerical ranking.
+
 One result deserves special attention: Causal-Discovery-Bench reports that increasing the resource budget by 125× moved one model's structure-identification success from 17% to 78%, but the analysis found that the agent still rarely ran properly controlled experiments. More budget can therefore mask poor experimental design by enabling broader candidate exploration. AOBench must report controlled-intervention rate, variable-control adequacy, information gain per cost, achieved power and oracle regret—not just final discovery accuracy.
 
 ## 2. Paradigm shift: from inference quality to evidence-acquisition competence

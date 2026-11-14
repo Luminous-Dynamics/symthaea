@@ -21,6 +21,8 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 15. [Mutation adequacy and cross-plane adversarial qualification](AOBENCH_MUTATION_ADEQUACY_2026-11-14.md) — mutation-tested assurance and paired positive twins; tracked by [AOBENCH-009 #12140](https://github.com/Luminous-Dynamics/symthaea/issues/12140).
 16. [Typed semantic continuity](AOBENCH_SEMANTIC_CONTINUITY_2026-11-14.md) — explicit authority, consent, side-effect, provenance and substrate transition envelopes; tracked by [AOBENCH-010 #12167](https://github.com/Luminous-Dynamics/symthaea/issues/12167).
 17. [Experimental design and cross-family generalization](AOBENCH_EXPERIMENTAL_DESIGN_AND_GENERALIZATION_2026-11-14.md) — sequential probe choice, power, stopping, classical baselines and sealed mechanism-family holdouts; tracked by [AOBENCH-011 #12173](https://github.com/Luminous-Dynamics/symthaea/issues/12173).
+18. [Sequential experiment design evaluator](AOBENCH_SEQUENTIAL_EXPERIMENT_EVALUATOR_2026-11-14.md) — adaptive probe selection, information gain, delivery/isolation evidence, budgeted stopping and oracle-efficiency regret.
+18. [Sequential experiment design evaluator](AOBENCH_SEQUENTIAL_EXPERIMENT_EVALUATOR_2026-11-14.md) — adaptive probe selection, information gain, delivery/isolation evidence, budgeted stopping and oracle-efficiency regret; implementation in `src/experiment_design.rs`.
 
 ## Current implementation
 
@@ -33,6 +35,8 @@ The first executable package is a standalone nested Cargo workspace:
   - `src/reconfiguration.rs`: allowlist- and budget-constrained structural diff admission with protected-root/constraint checks. This admits a proposal structurally; it does not authorize, prove viability or establish behavioral continuity.
   - `src/identity.rs`: finite simulation/bisimulation-style operational-continuity checker over declared state, capability, invariant and action/observation models.
   - `src/semantic_continuity.rs`: typed authority, consent, effect, provenance and substrate continuity evaluator; evidence dispositions are supplied by independent adapters and are not authenticated by this module.
+  - `src/experiment_design.rs`: sequential deterministic experiment evaluator with evaluator-only hidden truth, target-class information gain, intervention/cost/risk budgets and stop/abstain qualification; no stochastic power claim.
+  - `src/experiment_design.rs`: sequential deterministic experiment evaluator with hidden evaluator oracle, target-class information gain, intervention/cost/risk budgets and stop/abstain qualification. It does not claim stochastic statistical power.
 
 It has exact serde / sha2 dependency pins and its own lockfile, and is explicitly excluded from the root workspace's crates/domains glob. Its focused CI builds the nested workspace independently.
 
