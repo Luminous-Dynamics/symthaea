@@ -316,7 +316,31 @@
       "evidence_class": "public_research_dataset",
       "license": "CC0 1.0 Universal",
       "permitted_use": "External raw-data reproduction after local file checksum and header verification. Version 1.0 lists 26 public files including CV, GCD, EIS, cycling, XRD, Raman, SEM and BET files. Selected file-level records: CyclicVoltammetry_PCNS_TemperatureComparison_50mVs.csv, MD5 42631fe50e35001dfcfd474f99db37dd; GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv, MD5 88bc3dc26bd37971d7ca4a80ed79f290; ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv, MD5 4ef9d5efe0519c599a03b6527511c54c.",
-      "prohibited_inference": "Materials / electrochemical characterization dataset, not a full EDLC module, installed system, standby-reliability or sequential-reserve benchmark. Do not infer module Wh/kg, Wh/L, power, service availability, physical calibration provenance or Luminous performance. Preserve dataset version and each file's own DOI/MD5; verify downloaded bytes and actual CSV columns before analysis."
+      "prohibited_inference": "Materials / electrochemical characterization dataset, not a full EDLC module, installed system, standby-reliability or sequential-reserve benchmark. Do not infer module Wh/kg, Wh/L, power, service availability, physical calibration provenance or Luminous performance. Preserve dataset version and each file's own DOI/MD5; verify downloaded bytes and actual CSV columns before analysis. Repository MD5 values and file persistent IDs are metadata captured from the public version 1.0 page; no local file bytes or SHA-256 have yet been verified.",
+      "file_records": [
+        {
+          "file_name": "CyclicVoltammetry_PCNS_TemperatureComparison_50mVs.csv",
+          "persistent_id": "10.18710/F4NFMJ/RREE4O",
+          "size_bytes": 225689,
+          "repository_md5": "42631fe50e35001dfcfd474f99db37dd",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv",
+          "persistent_id": "10.18710/F4NFMJ/8LHNEC",
+          "size_bytes": 4089000,
+          "repository_md5": "88bc3dc26bd37971d7ca4a80ed79f290",
+          "local_sha256_verified": false
+        },
+        {
+          "file_name": "ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv",
+          "persistent_id": "10.18710/F4NFMJ/QKZMNC",
+          "size_bytes": 2969,
+          "repository_md5": "4ef9d5efe0519c599a03b6527511c54c",
+          "local_sha256_verified": false
+        }
+      ],
+      "local_download_status": "not_downloaded_in_this_work_increment"
     },
     {
       "id": "ZENODO-TIO2-AC-FLEX-SUPERCAP-2026",
