@@ -141,3 +141,12 @@ The public checkpoint verifier also exposes `AcceptObserved`, which joins the si
 ## Local checkpoint witness reference
 
 The `witness/` package is a single-writer local signed-checkpoint journal. It replays and validates a contiguous Ed25519 chain, refuses equivocation for unchanged journal progress, returns the same signed checkpoint on an identical retry, and fsyncs each appended record before acknowledgement. It is Linux-only for exclusive writer locking and receives its private key from the caller in memory. It is not a remote E3 witness, HSM integration, transparency log, gossip system or independent administrative domain. See [witness/README.md](witness/README.md).
+
+
+## Peer checkpoint consistency
+
+The `checkpoints.VerifyPeerConsistency` API compares a signed bridge between two consumers' monotonic cursors and detects a same-sequence fork, missing/broken bridge, identity mismatch or peer cursor not reached by the chain. It detects split views only after consumers exchange proofs or report to a common monitor; it does not provide gossip or transparency-log consistency itself.
+
+## Local checkpoint witness reference
+
+The `witness/` package is a single-writer local signed-checkpoint journal. It replays and validates a contiguous Ed25519 chain, refuses equivocation for unchanged journal progress, returns the same signed checkpoint on an identical retry, and fsyncs each appended record before acknowledgement. It is Linux-only for exclusive writer locking and receives its private key from the caller in memory. It is not a remote E3 witness, HSM integration, transparency log, gossip system or independent administrative domain. See [witness/README.md](witness/README.md).
