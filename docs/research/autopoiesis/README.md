@@ -10,6 +10,7 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 4. [Assay adequacy and model-relative identifiability](EXPERIMENTAL_ASSAY_ADEQUACY_2026-11-14.md) — how to know whether our test suite can distinguish competing organizational models.
 5. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
 6. [MEL-AUTO-001 runtime regeneration qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10098).
+5. [AOBENCH-004 synthetic-organism adapter](https://github.com/Luminous-Dynamics/symthaea/issues/12023) — project the existing synthetic-organism viability environment into AOBench without duplicating its simulator.
 
 ## Current implementation
 
@@ -26,9 +27,9 @@ The package is a bounded functional self-maintenance verifier. It is not a detec
 ## Evidence status
 
 - The Rust source and deterministic unit fixtures are committed on the AOBench runtime-verifier branch.
-- The package has not been compiled or run locally in this environment because no Rust toolchain is installed.
+- Exact-head focused CI passed formatting, locked compile, 10 deterministic tests and strict Clippy on commit `59c4c6c5fa4a2777bf9be75cc9e6fe1535ce17ca`.
 - Exact-head GitHub checks are the next source of build/test evidence; skipped, absent, queued or wrong-head checks are not passes.
-- The trace producer is not yet an authenticated trusted logger; the policy digest is an identity reference, not an authorization decision.
+- The process specification freezes an expected executable digest; event mismatch fails closed, but the event source itself is not yet authenticated.
 - Benchmark targets remain proposals until pilot calibration and confirmatory measurement.
 
 ## Contribution rule
