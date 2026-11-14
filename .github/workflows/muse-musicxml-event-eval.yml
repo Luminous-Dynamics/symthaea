@@ -1,0 +1,78 @@
+name: MUSE MusicXML Event Evaluation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/muse-musicxml-event-eval.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
+  push:
+    branches:
+      - "research/melothaea-musicxml-event-evaluator-v1"
+    paths:
+      - ".github/workflows/muse-musicxml-event-eval.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-musicxml-event-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  notation-eval:
+    name: MusicXML notation-event evaluator qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-muse-musicxml-eval-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-muse-musicxml-eval-
+
+      - name: Format evaluator and dependencies
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-muse/src/musicxml_notation_eval.rs \
+            crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
+            crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
+            crates/domains/symthaea-muse/src/lib.rs
+
+      - name: Test source-native notation evaluator
+        run: "cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::"
+
+      - name: Test source-native MusicXML event parser
+        run: "cargo test --locked -p symthaea-muse --features theory musicxml_notation_events::tests::"
+
+      - name: Test measure map and graph replay
+        run: "cargo test --locked -p symthaea-muse --features theory musicxml_barline_adapter::tests::"
