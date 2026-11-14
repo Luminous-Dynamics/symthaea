@@ -49,7 +49,7 @@ The v0.1.1 manifest currently contains 11 directional relationship statements. T
 
 The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, federation manifests v0.1.0/v0.1.1, DYNRETR fixed-budget retrieval/exploration cases, a pure Cargo manifest projection library, and a syntax-only Rust source projection library with parser-derived source spans.
 
-**The Rust source and its 79 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
+**The Rust source and its 95 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
 
 ## Retrieval benchmark fixture
 
@@ -73,3 +73,10 @@ The federation is a directory of independent maps, not a merged graph or common 
 ## Read-only Cargo projection
 
 The validator crate now contains a library-only Cargo manifest projector at `src/cargo_manifest.rs`. It emits exact-anchor, `manifest_declared` facts for workspace patterns, package declarations, dependencies, target-specific dependencies, features, explicit targets and build-script declarations. It does not call Cargo, expand globs/features, resolve compiler semantics or execute build scripts. Ten test definitions cover virtual workspaces, packages, dependency kinds, target conditions, inherited declarations, build scripts and anchor failures; they are authored but not executed.
+
+
+## Source-tree composition increment
+
+The Symthaea research branch now includes a deterministic, read-only composition API that joins a caller-supplied recursive Git tree inventory to its Cargo manifest and Rust syntax projections by exact repository/revision/tree/path/blob identity. It reports partial projection coverage or rejects caller-labelled complete inventories with unprojected regular Cargo.toml / .rs files. Symlinks and gitlinks are not followed. This is still a source-anchor composition, not a compiler-resolved or executable repository twin. The tree inventory's completeness and Git object authenticity remain caller responsibilities.
+
+The branch currently authors 95 Rust unit-test cases across the validator, Cargo projection, Rust syntax projection and tree composition. None has been compiled or executed in this environment; do not treat the test definitions as passing.

@@ -6,6 +6,7 @@
 
 pub mod cargo_manifest;
 pub mod rust_syntax;
+pub mod tree_projection;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 

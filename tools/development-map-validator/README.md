@@ -21,9 +21,16 @@ The CLI supports:
 - **Retrieval/exploration cases and oracles**: per-case source revision/tree pins, fixed token/line budgets, candidate-region identity, availability, configuration-world and temporal-scope checks, distinct natural vs wrong-repository no-gold dispositions, and oracle relevant/forbidden-span consistency.
 - **Cargo.toml** via the explicit `cargo-manifest` subcommand: workspace/package declarations, dependency kinds and target predicates, feature declarations, explicit targets and build-script declarations are preserved as manifest-declared facts.
 - **Rust source** via the explicit `rust-file` subcommand: modules, declarations, functions, traits, methods, imports, visibility, attributes, opaque item-position macro syntax and parser-derived start/end line-column spans are preserved as syntax-extracted facts.
+- **Repository tree composition** via `tree_projection::compose_repository_tree(...)`: exact recursive tree entries are joined to Cargo and Rust projections by repository, commit, tree, path and blob OID. Partial inventories report coverage gaps; caller-asserted complete inventories fail closed when any regular Cargo.toml or .rs file is unprojected.
 - **Federation manifests v0.1.0 and v0.1.1**: unique project/repository/map identities, exact map-blob and artifact-commit pins, source-repository references, relationship endpoints, shared-contract bindings, hub self-map identity and claim/authority consistency. V0.1.1 additionally requires a two-sided compatibility receipt before an edge may be independently qualified.
 
 For federation manifests, a successful structural check does **not** fetch member repositories or prove that the pinned Git objects exist. It checks the manifest's internal references and identity formats only. Fetch each map by its exact artifact commit and compare the resulting blob OID independently when constructing or refreshing a federation.
+
+## Deterministic repository-tree composition
+
+The crate exposes `tree_projection::compose_repository_tree(...)`, which composes a caller-supplied recursive Git tree inventory with already-created `CargoManifestProjection` and `RustFileProjection` values. The join is exact on repository, revision, tree OID, repository-relative path and blob OID. It rejects duplicate paths/projections, mismatched object modes, noncanonical paths and projections from a different snapshot. Symlinks and submodule gitlinks are never followed.
+
+The caller chooses `InventoryCompleteness::Partial` or `InventoryCompleteness::Complete`. Partial mode emits sorted unprojected Cargo/Rust paths and coverage counts. Complete mode requires a projection for every regular Cargo.toml and .rs entry in the supplied inventory. Completeness is only caller-asserted: the function cannot prove that the inventory itself is exhaustive or authenticate the Git objects. The output authority is `composed_source_anchors`, not compiler-resolved or runtime evidence.
 
 ## Cargo manifest projection library
 
@@ -68,4 +75,4 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Seventy-nine Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases and 10 Rust-syntax cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Ninety-five Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases, 10 Rust-syntax cases and 16 tree-composition cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
