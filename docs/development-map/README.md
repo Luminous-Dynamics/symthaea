@@ -47,9 +47,13 @@ The v0.1.1 manifest currently contains 11 directional relationship statements. T
 
 ## Validation tool
 
-The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, and federation manifests v0.1.0/v0.1.1.
+The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, federation manifests v0.1.0/v0.1.1, and DYNRETR fixed-budget retrieval/exploration cases.
 
-**The Rust source and its 41 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
+**The Rust source and its 50 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
+
+## Retrieval benchmark fixture
+
+[DYNRETR-001](https://github.com/Luminous-Dynamics/symthaea/issues/12078) adds a public synthetic seven-case retrieval/exploration corpus and expected oracle under `fixtures/retrieval-exploration-v0.1.*.json`. It separates natural no-gold from wrong-repository counterfactual no-gold and includes feature/world, stale-revision, non-local impact and lexical-decoy controls. Each case pins its own repository revision/tree and fixed token/line budgets. This is authored synthetic data, not a measured retrieval score or an external benchmark reproduction.
 
 ## Refresh procedure
 
