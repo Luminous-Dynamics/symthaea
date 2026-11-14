@@ -23,7 +23,15 @@ Relevant references:
 - Goulet and Smith (2013), Error-Domain Model Falsification: https://doi.org/10.1016/j.compstruc.2013.07.009
 - MATLAB frequency-domain identification/validation guidance: https://www.mathworks.com/help/ident/gs/estimate-models-using-frequency-domain-data.html
 
-## 2. Exact model pair
+## 2. Adaptive-design and falsification-budget benchmark
+
+A new preprint directly relevant to AIRROAD's adaptive excitation work is Choudhary (2026-11-05), [Adaptive Experimentation Can Hide Model Error: Detection Limits and Falsification Budget](https://arxiv.org/abs/2611.07529). It formalizes an important distinction: an adaptive experiment can estimate parameters efficiently inside a working model while repeatedly selecting settings where a wrong model still fits. Its own-design power analysis shows that a valid adequacy detector cannot recover information that was never sampled. The paper's empirical results are mixed and include a frozen-policy failure, a fresh-panel failure, and a revised rule whose advantage was not resolved at a longer horizon. We use it as a falsification-budget comparator and warning, not as evidence that any fixed reserve is universally optimal.
+
+A second recent comparator is Niu, Shen and Yong (2026), [Active model discrimination: A multi-stage approach with adaptive partitions](https://doi.org/10.1016/j.automatica.2026.113067), Automatica 190, article 113067. It optimizes separating inputs for affine model families under bounded uncertainties and run-time-revealed information. AIRROAD's next benchmark should compare multi-stage set-based model discrimination against one-step EIG, D-optimal parameter design, fixed sweeps, random exploration and a preregistered falsification reserve.
+
+The required outcome is not simply "which frequency has the largest disagreement?" It is whether the complete sequence of observations makes the intersection of every candidate model with the same shared calibration and measurement-error variables empty, and whether a statistical detector has calibrated power under its actual adaptive sampling law. Parameter learning, acquisition-side detection power, detector validity and final engineering decision value remain separate metrics. See [#12008](https://github.com/Luminous-Dynamics/symthaea/issues/12008).
+
+## 3. Exact model pair
 
 Use the AIRROAD hidden cross-port model pair:
 \[
@@ -46,7 +54,7 @@ Training data cannot distinguish them. The holdout frequency is preregistered at
 +i\frac{299932500}{410338673}.
 \]
 
-## 3. Hard uncertainty semantics
+## 4. Hard uncertainty semantics
 
 The cross-port observation is affected by one **campaign-shared** real calibration offset:
 \[
@@ -82,7 +90,7 @@ The minimum sensor-error half-width needed to rescue candidate A, after using th
 \]
 This is a diagnostic only. It must not silently replace the declared 1/20 error bound.
 
-## 4. Exact verifier
+## 5. Exact verifier
 
 The Fraction/Gaussian-rational oracle:
 - evaluates \(\Delta(j\omega)\) exactly from the rational transfer expression;
@@ -101,7 +109,7 @@ The falsifier's terminal state is deliberately asymmetric:
 
 There is no VERIFIED_TRUE state.
 
-## 5. Benchmark extensions
+## 6. Benchmark extensions
 
 Compare under identical energy, duration and bounded measurement error:
 1. fixed log-spaced holdout;
@@ -111,6 +119,6 @@ Compare under identical energy, duration and bounded measurement error:
 
 Report model rejection rate, false-rejection rate under known truth, missed-falsification rate, measurement budget, calibration-dependency preservation and minimum error inflation. Do not optimize fit RMS alone.
 
-## 6. Claim ceiling
+## 7. Claim ceiling
 
 V0.1 demonstrates exact falsification of one synthetic candidate under a stipulated hard-set experiment. It does not prove the surviving model true, establish continuous-frequency adequacy, estimate a physical FRF, solve an IQC, or establish robust stability/airworthiness.
