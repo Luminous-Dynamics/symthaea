@@ -178,6 +178,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
     jobs = parse_jobs(text)
     runner_jobs = 0
     draft_guarded = 0
+    pull_request_runner_jobs = 0
     for job, block in jobs.items():
         if not has_runner_allocation(block):
             continue
@@ -191,8 +192,9 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
                 "pull_request draft == false guard or explicit non-PR event guard"
             )
         draft_guarded += 1
+        pull_request_runner_jobs += 1
 
-    if runner_jobs:
+    if pull_request_runner_jobs:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
