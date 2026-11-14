@@ -3,7 +3,7 @@ use mel_music_rights_policy_harness::{
     RightsDecisionStatusV1,
 };
 
-const RIGHTS: &str = include_str!("../fixtures/synthetic-sm ebench-rights-structure-v1.json");
+const RIGHTS: &str = include_str!("../fixtures/synthetic-smebench-rights-structure-v1.json");
 const REQUEST: &str = include_str!("../fixtures/synthetic-commercial-evaluation-request-v1.json");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
