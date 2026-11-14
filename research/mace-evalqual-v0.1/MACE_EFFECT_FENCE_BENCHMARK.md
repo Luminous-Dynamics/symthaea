@@ -126,3 +126,10 @@ This is a finite abstraction, not a proof of the implementation or the unbounded
 ## Generated history corpus
 
 The implementation test suite adds 256 fixed-seed concurrent histories of six operations each, spanning two keys and two intent values. Append, fence and lookup results must admit a sequential ordering that respects real-time precedence. This tests key isolation and changed-intent conflict behavior in addition to the four-operation single-key race. These generated histories are a deterministic test corpus, not IID population sampling and not exhaustive over all possible schedules.
+
+
+## Formal specification tier
+
+The public branch now includes a finite TLA+ effect/fence model under formal/. It models two keys/two intents, delayed requests, a single serialized destination transaction, receipt/business staging, atomic commit, rollback/process crash and derived reconciliation results. Registered invariants cover terminal visibility, transaction well-formedness, committed-intent binding, reconciliation soundness and fence non-execution.
+
+The existing Go breadth-first test has executed 68 states / 200 transitions. The TLA+ specification/config and pinned runner are newly authored but TLC has **not yet been executed** in the current environment. No TLC pass or TLA+ verification claim is made. A reproducible TLC run must record tool version, generated/distinct states, transitions, runtime, workers, invariant result and trace artifact digest before its result can qualify this tier.
