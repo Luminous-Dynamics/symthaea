@@ -10440,6 +10440,2454 @@
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
       "rationale": "Ten coupons per arm are drawn from one lot each; coupon count does not satisfy the preregistered minimum of three independent material lots."
+    },
+    {
+      "id": "aged-retention-design-missing-unaged-binding",
+      "graph": {
+        "graph_id": "AGED-RETENTION-DESIGN-MISSING-UNAGED-BINDING",
+        "output_endpoint": "aged_strength_retention",
+        "transform_id": "aged_strength_retention_ratio_v1",
+        "transform_version": "v1",
+        "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_unaged_strength",
+            "receipt": {
+              "id": "baseline_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BU-S1",
+                "GRAPH-AGED-01-BU-S2",
+                "GRAPH-AGED-01-BU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "baseline_aged_strength",
+            "receipt": {
+              "id": "baseline_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BA-S1",
+                "GRAPH-AGED-01-BA-S2",
+                "GRAPH-AGED-01-BA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          },
+          {
+            "role": "candidate_unaged_strength",
+            "receipt": {
+              "id": "candidate_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CU-S1",
+                "GRAPH-AGED-01-CU-S2",
+                "GRAPH-AGED-01-CU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_aged_strength",
+            "receipt": {
+              "id": "candidate_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CA-S1",
+                "GRAPH-AGED-01-CA-S2",
+                "GRAPH-AGED-01-CA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "AGED-RETENTION-DESIGN-MISSING-UNAGED-BINDING-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+          "graph_id": "AGED-RETENTION-DESIGN-MISSING-UNAGED-BINDING",
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-missing-unaged-binding",
+          "design_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "graph_sha256": "000000000000000000000000000000000000000000000000000000000000200f",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "ratio",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_unaged_strength-RECEIPT",
+            "baseline_aged_strength-RECEIPT",
+            "baseline_aged_strength-CONDITIONING-METHOD",
+            "baseline_aged_strength-EXPOSURE-RECEIPT",
+            "candidate_unaged_strength-RECEIPT",
+            "candidate_aged_strength-RECEIPT",
+            "candidate_aged_strength-CONDITIONING-METHOD",
+            "candidate_aged_strength-EXPOSURE-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002007",
+            "0000000000000000000000000000000000000000000000000000000000002009",
+            "0000000000000000000000000000000000000000000000000000000000009000",
+            "0000000000000000000000000000000000000000000000000000000000002008",
+            "000000000000000000000000000000000000000000000000000000000000200a",
+            "000000000000000000000000000000000000000000000000000000000000200c",
+            "0000000000000000000000000000000000000000000000000000000000009001",
+            "000000000000000000000000000000000000000000000000000000000000200b"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "aged_strength_retention_observation_only"
+        },
+        "formula_id": "mean_aged_strength_over_mean_unaged_strength_v1",
+        "design_receipt": {
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-missing-unaged-binding",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "endpoint_id": "aged_strength_retention",
+          "estimand": "aged_strength_retention_candidate_minus_baseline",
+          "quantity_unit": "ratio",
+          "analysis_profile": "two_sample_tost_v1",
+          "grouping_scheme": "independent_arms",
+          "independent_unit": "material_lot",
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "design_changed_after_outcome": false,
+          "planned_min_baseline_specimens": 3,
+          "planned_min_candidate_specimens": 3,
+          "planned_min_baseline_clusters": 3,
+          "planned_min_candidate_clusters": 3,
+          "max_specimen_attrition_rate": 0.25,
+          "max_cluster_attrition_rate": 0.25,
+          "target_power": 0.8,
+          "target_precision_half_width": 0.05,
+          "power_receipt": {
+            "receipt_id": "GRAPH-AGED-01-DESIGN-POWER",
+            "calculation_sha256": "000000000000000000000000000000000000000000000000000000000000a009",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-missing-unaged-binding",
+            "endpoint_id": "aged_strength_retention",
+            "independent_unit": "material_lot",
+            "grouping_scheme": "independent_arms",
+            "planned_baseline_clusters": 3,
+            "planned_candidate_clusters": 3,
+            "target_power": 0.8,
+            "target_precision_half_width": 0.05,
+            "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+            "effect_under_alternative": 0.02,
+            "variance_low": 0.01,
+            "variance_central": 0.02,
+            "variance_high": 0.04,
+            "method_ref": "symthaea-statistics:planning-receipt-v1",
+            "claim_ceiling": "planning_only"
+          },
+          "baseline_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S1",
+              "cluster_id": "LOT-B1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S2",
+              "cluster_id": "LOT-B2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S3",
+              "cluster_id": "LOT-B3"
+            }
+          ],
+          "candidate_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S1",
+              "cluster_id": "LOT-C1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S2",
+              "cluster_id": "LOT-C2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S3",
+              "cluster_id": "LOT-C3"
+            }
+          ],
+          "excluded_samples": [],
+          "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+          "baseline_method_receipt": {
+            "id": "baseline_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-BA-S1",
+              "GRAPH-AGED-01-BA-S2",
+              "GRAPH-AGED-01-BA-S3"
+            ]
+          },
+          "candidate_method_receipt": {
+            "id": "candidate_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-CA-S1",
+              "GRAPH-AGED-01-CA-S2",
+              "GRAPH-AGED-01-CA-S3"
+            ]
+          },
+          "analysis_result": {
+            "result_id": "GRAPH-AGED-01-RESULT",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-missing-unaged-binding",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "endpoint_id": "aged_strength_retention",
+            "analysis_profile": "two_sample_tost_v1",
+            "margin_lower": -0.1,
+            "margin_upper": 0.1,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+            "baseline_sample_count": 3,
+            "candidate_sample_count": 3,
+            "baseline_cluster_count": 3,
+            "candidate_cluster_count": 3,
+            "ci_lower": -0.03,
+            "ci_upper": 0.04,
+            "outcome": "EQUIVALENCE_ESTABLISHED"
+          },
+          "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+          "effect_under_alternative": 0.02,
+          "variance_low": 0.01,
+          "variance_central": 0.02,
+          "variance_high": 0.04,
+          "randomization_plan_ref": "GRAPH-AGED-01-DESIGN-RANDOMIZATION",
+          "analysis_plan_ref": "GRAPH-AGED-01-DESIGN-ANALYSIS",
+          "exclusion_protocol_ref": "GRAPH-AGED-01-DESIGN-EXCLUSION",
+          "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+          "endpoint_transform_id": "aged_strength_retention_ratio_v1",
+          "observation_endpoint_id": "apparent_shear_strength",
+          "endpoint_transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "receipt_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "additional_source_bindings": [
+            {
+              "role": "baseline_aged_strength::conditioning",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "baseline_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+              "method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::exposure",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_unaged_strength",
+              "cohort_role": "candidate_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "candidate_unaged_strength-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "method_receipt": {
+                "id": "candidate_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CU-S1",
+                  "GRAPH-AGED-01-CU-S2",
+                  "GRAPH-AGED-01-CU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::conditioning",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "candidate_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+              "method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::exposure",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "All four cohorts exist in the graph, but the frozen equivalence design omits the baseline unaged source binding."
+    },
+    {
+      "id": "aged-retention-design-source-manifest-substitution",
+      "graph": {
+        "graph_id": "AGED-RETENTION-DESIGN-SOURCE-MANIFEST-SUBSTITUTION",
+        "output_endpoint": "aged_strength_retention",
+        "transform_id": "aged_strength_retention_ratio_v1",
+        "transform_version": "v1",
+        "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_unaged_strength",
+            "receipt": {
+              "id": "baseline_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BU-S1",
+                "GRAPH-AGED-01-BU-S2",
+                "GRAPH-AGED-01-BU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "baseline_aged_strength",
+            "receipt": {
+              "id": "baseline_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BA-S1",
+                "GRAPH-AGED-01-BA-S2",
+                "GRAPH-AGED-01-BA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          },
+          {
+            "role": "candidate_unaged_strength",
+            "receipt": {
+              "id": "candidate_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CU-S1",
+                "GRAPH-AGED-01-CU-S2",
+                "GRAPH-AGED-01-CU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_aged_strength",
+            "receipt": {
+              "id": "candidate_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CA-S1",
+                "GRAPH-AGED-01-CA-S2",
+                "GRAPH-AGED-01-CA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "AGED-RETENTION-DESIGN-SOURCE-MANIFEST-SUBSTITUTION-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+          "graph_id": "AGED-RETENTION-DESIGN-SOURCE-MANIFEST-SUBSTITUTION",
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-source-manifest-substitution",
+          "design_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "graph_sha256": "000000000000000000000000000000000000000000000000000000000000200f",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "ratio",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_unaged_strength-RECEIPT",
+            "baseline_aged_strength-RECEIPT",
+            "baseline_aged_strength-CONDITIONING-METHOD",
+            "baseline_aged_strength-EXPOSURE-RECEIPT",
+            "candidate_unaged_strength-RECEIPT",
+            "candidate_aged_strength-RECEIPT",
+            "candidate_aged_strength-CONDITIONING-METHOD",
+            "candidate_aged_strength-EXPOSURE-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002007",
+            "0000000000000000000000000000000000000000000000000000000000002009",
+            "0000000000000000000000000000000000000000000000000000000000009000",
+            "0000000000000000000000000000000000000000000000000000000000002008",
+            "000000000000000000000000000000000000000000000000000000000000200a",
+            "000000000000000000000000000000000000000000000000000000000000200c",
+            "0000000000000000000000000000000000000000000000000000000000009001",
+            "000000000000000000000000000000000000000000000000000000000000200b"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "aged_strength_retention_observation_only"
+        },
+        "formula_id": "mean_aged_strength_over_mean_unaged_strength_v1",
+        "design_receipt": {
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-source-manifest-substitution",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "endpoint_id": "aged_strength_retention",
+          "estimand": "aged_strength_retention_candidate_minus_baseline",
+          "quantity_unit": "ratio",
+          "analysis_profile": "two_sample_tost_v1",
+          "grouping_scheme": "independent_arms",
+          "independent_unit": "material_lot",
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "design_changed_after_outcome": false,
+          "planned_min_baseline_specimens": 3,
+          "planned_min_candidate_specimens": 3,
+          "planned_min_baseline_clusters": 3,
+          "planned_min_candidate_clusters": 3,
+          "max_specimen_attrition_rate": 0.25,
+          "max_cluster_attrition_rate": 0.25,
+          "target_power": 0.8,
+          "target_precision_half_width": 0.05,
+          "power_receipt": {
+            "receipt_id": "GRAPH-AGED-01-DESIGN-POWER",
+            "calculation_sha256": "000000000000000000000000000000000000000000000000000000000000a009",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-source-manifest-substitution",
+            "endpoint_id": "aged_strength_retention",
+            "independent_unit": "material_lot",
+            "grouping_scheme": "independent_arms",
+            "planned_baseline_clusters": 3,
+            "planned_candidate_clusters": 3,
+            "target_power": 0.8,
+            "target_precision_half_width": 0.05,
+            "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+            "effect_under_alternative": 0.02,
+            "variance_low": 0.01,
+            "variance_central": 0.02,
+            "variance_high": 0.04,
+            "method_ref": "symthaea-statistics:planning-receipt-v1",
+            "claim_ceiling": "planning_only"
+          },
+          "baseline_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S1",
+              "cluster_id": "LOT-B1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S2",
+              "cluster_id": "LOT-B2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S3",
+              "cluster_id": "LOT-B3"
+            }
+          ],
+          "candidate_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S1",
+              "cluster_id": "LOT-C1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S2",
+              "cluster_id": "LOT-C2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S3",
+              "cluster_id": "LOT-C3"
+            }
+          ],
+          "excluded_samples": [],
+          "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+          "baseline_method_receipt": {
+            "id": "baseline_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-BA-S1",
+              "GRAPH-AGED-01-BA-S2",
+              "GRAPH-AGED-01-BA-S3"
+            ]
+          },
+          "candidate_method_receipt": {
+            "id": "candidate_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-CA-S1",
+              "GRAPH-AGED-01-CA-S2",
+              "GRAPH-AGED-01-CA-S3"
+            ]
+          },
+          "analysis_result": {
+            "result_id": "GRAPH-AGED-01-RESULT",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-source-manifest-substitution",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "endpoint_id": "aged_strength_retention",
+            "analysis_profile": "two_sample_tost_v1",
+            "margin_lower": -0.1,
+            "margin_upper": 0.1,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+            "baseline_sample_count": 3,
+            "candidate_sample_count": 3,
+            "baseline_cluster_count": 3,
+            "candidate_cluster_count": 3,
+            "ci_lower": -0.03,
+            "ci_upper": 0.04,
+            "outcome": "EQUIVALENCE_ESTABLISHED"
+          },
+          "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+          "effect_under_alternative": 0.02,
+          "variance_low": 0.01,
+          "variance_central": 0.02,
+          "variance_high": 0.04,
+          "randomization_plan_ref": "GRAPH-AGED-01-DESIGN-RANDOMIZATION",
+          "analysis_plan_ref": "GRAPH-AGED-01-DESIGN-ANALYSIS",
+          "exclusion_protocol_ref": "GRAPH-AGED-01-DESIGN-EXCLUSION",
+          "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+          "endpoint_transform_id": "aged_strength_retention_ratio_v1",
+          "observation_endpoint_id": "apparent_shear_strength",
+          "endpoint_transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "receipt_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "additional_source_bindings": [
+            {
+              "role": "baseline_unaged_strength",
+              "cohort_role": "baseline_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "baseline_unaged_strength-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "method_receipt": {
+                "id": "baseline_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BU-S1",
+                  "GRAPH-AGED-01-BU-S2",
+                  "GRAPH-AGED-01-BU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "SUBSTITUTED-SPECIMEN",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::conditioning",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "baseline_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+              "method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::exposure",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_unaged_strength",
+              "cohort_role": "candidate_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "candidate_unaged_strength-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "method_receipt": {
+                "id": "candidate_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CU-S1",
+                  "GRAPH-AGED-01-CU-S2",
+                  "GRAPH-AGED-01-CU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::conditioning",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "candidate_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+              "method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::exposure",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The unaged source binding's specimen manifest differs from the exact method-qualified source observation."
+    },
+    {
+      "id": "aged-retention-design-lot-lineage-substitution",
+      "graph": {
+        "graph_id": "AGED-RETENTION-DESIGN-LOT-LINEAGE-SUBSTITUTION",
+        "output_endpoint": "aged_strength_retention",
+        "transform_id": "aged_strength_retention_ratio_v1",
+        "transform_version": "v1",
+        "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_unaged_strength",
+            "receipt": {
+              "id": "baseline_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BU-S1",
+                "GRAPH-AGED-01-BU-S2",
+                "GRAPH-AGED-01-BU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "baseline_aged_strength",
+            "receipt": {
+              "id": "baseline_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BA-S1",
+                "GRAPH-AGED-01-BA-S2",
+                "GRAPH-AGED-01-BA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          },
+          {
+            "role": "candidate_unaged_strength",
+            "receipt": {
+              "id": "candidate_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CU-S1",
+                "GRAPH-AGED-01-CU-S2",
+                "GRAPH-AGED-01-CU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_aged_strength",
+            "receipt": {
+              "id": "candidate_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CA-S1",
+                "GRAPH-AGED-01-CA-S2",
+                "GRAPH-AGED-01-CA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "AGED-RETENTION-DESIGN-LOT-LINEAGE-SUBSTITUTION-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+          "graph_id": "AGED-RETENTION-DESIGN-LOT-LINEAGE-SUBSTITUTION",
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-lot-lineage-substitution",
+          "design_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "graph_sha256": "000000000000000000000000000000000000000000000000000000000000200f",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "ratio",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_unaged_strength-RECEIPT",
+            "baseline_aged_strength-RECEIPT",
+            "baseline_aged_strength-CONDITIONING-METHOD",
+            "baseline_aged_strength-EXPOSURE-RECEIPT",
+            "candidate_unaged_strength-RECEIPT",
+            "candidate_aged_strength-RECEIPT",
+            "candidate_aged_strength-CONDITIONING-METHOD",
+            "candidate_aged_strength-EXPOSURE-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002007",
+            "0000000000000000000000000000000000000000000000000000000000002009",
+            "0000000000000000000000000000000000000000000000000000000000009000",
+            "0000000000000000000000000000000000000000000000000000000000002008",
+            "000000000000000000000000000000000000000000000000000000000000200a",
+            "000000000000000000000000000000000000000000000000000000000000200c",
+            "0000000000000000000000000000000000000000000000000000000000009001",
+            "000000000000000000000000000000000000000000000000000000000000200b"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "aged_strength_retention_observation_only"
+        },
+        "formula_id": "mean_aged_strength_over_mean_unaged_strength_v1",
+        "design_receipt": {
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-lot-lineage-substitution",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "endpoint_id": "aged_strength_retention",
+          "estimand": "aged_strength_retention_candidate_minus_baseline",
+          "quantity_unit": "ratio",
+          "analysis_profile": "two_sample_tost_v1",
+          "grouping_scheme": "independent_arms",
+          "independent_unit": "material_lot",
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "design_changed_after_outcome": false,
+          "planned_min_baseline_specimens": 3,
+          "planned_min_candidate_specimens": 3,
+          "planned_min_baseline_clusters": 3,
+          "planned_min_candidate_clusters": 3,
+          "max_specimen_attrition_rate": 0.25,
+          "max_cluster_attrition_rate": 0.25,
+          "target_power": 0.8,
+          "target_precision_half_width": 0.05,
+          "power_receipt": {
+            "receipt_id": "GRAPH-AGED-01-DESIGN-POWER",
+            "calculation_sha256": "000000000000000000000000000000000000000000000000000000000000a009",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-lot-lineage-substitution",
+            "endpoint_id": "aged_strength_retention",
+            "independent_unit": "material_lot",
+            "grouping_scheme": "independent_arms",
+            "planned_baseline_clusters": 3,
+            "planned_candidate_clusters": 3,
+            "target_power": 0.8,
+            "target_precision_half_width": 0.05,
+            "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+            "effect_under_alternative": 0.02,
+            "variance_low": 0.01,
+            "variance_central": 0.02,
+            "variance_high": 0.04,
+            "method_ref": "symthaea-statistics:planning-receipt-v1",
+            "claim_ceiling": "planning_only"
+          },
+          "baseline_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S1",
+              "cluster_id": "LOT-B1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S2",
+              "cluster_id": "LOT-B2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S3",
+              "cluster_id": "LOT-B3"
+            }
+          ],
+          "candidate_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S1",
+              "cluster_id": "LOT-C1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S2",
+              "cluster_id": "LOT-C2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S3",
+              "cluster_id": "LOT-C3"
+            }
+          ],
+          "excluded_samples": [],
+          "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+          "baseline_method_receipt": {
+            "id": "baseline_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-BA-S1",
+              "GRAPH-AGED-01-BA-S2",
+              "GRAPH-AGED-01-BA-S3"
+            ]
+          },
+          "candidate_method_receipt": {
+            "id": "candidate_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-CA-S1",
+              "GRAPH-AGED-01-CA-S2",
+              "GRAPH-AGED-01-CA-S3"
+            ]
+          },
+          "analysis_result": {
+            "result_id": "GRAPH-AGED-01-RESULT",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-lot-lineage-substitution",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "endpoint_id": "aged_strength_retention",
+            "analysis_profile": "two_sample_tost_v1",
+            "margin_lower": -0.1,
+            "margin_upper": 0.1,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+            "baseline_sample_count": 3,
+            "candidate_sample_count": 3,
+            "baseline_cluster_count": 3,
+            "candidate_cluster_count": 3,
+            "ci_lower": -0.03,
+            "ci_upper": 0.04,
+            "outcome": "EQUIVALENCE_ESTABLISHED"
+          },
+          "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+          "effect_under_alternative": 0.02,
+          "variance_low": 0.01,
+          "variance_central": 0.02,
+          "variance_high": 0.04,
+          "randomization_plan_ref": "GRAPH-AGED-01-DESIGN-RANDOMIZATION",
+          "analysis_plan_ref": "GRAPH-AGED-01-DESIGN-ANALYSIS",
+          "exclusion_protocol_ref": "GRAPH-AGED-01-DESIGN-EXCLUSION",
+          "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+          "endpoint_transform_id": "aged_strength_retention_ratio_v1",
+          "observation_endpoint_id": "apparent_shear_strength",
+          "endpoint_transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "receipt_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "additional_source_bindings": [
+            {
+              "role": "baseline_unaged_strength",
+              "cohort_role": "baseline_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "baseline_unaged_strength-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "method_receipt": {
+                "id": "baseline_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BU-S1",
+                  "GRAPH-AGED-01-BU-S2",
+                  "GRAPH-AGED-01-BU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S1",
+                  "cluster_id": "UNRELATED-LOT"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::conditioning",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "baseline_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+              "method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::exposure",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_unaged_strength",
+              "cohort_role": "candidate_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "candidate_unaged_strength-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "method_receipt": {
+                "id": "candidate_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CU-S1",
+                  "GRAPH-AGED-01-CU-S2",
+                  "GRAPH-AGED-01-CU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::conditioning",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "candidate_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+              "method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::exposure",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The unaged design source no longer maps to the baseline aged cohort's independent material lots."
+    },
+    {
+      "id": "aged-retention-design-artifact-substitution",
+      "graph": {
+        "graph_id": "AGED-RETENTION-DESIGN-ARTIFACT-SUBSTITUTION",
+        "output_endpoint": "aged_strength_retention",
+        "transform_id": "aged_strength_retention_ratio_v1",
+        "transform_version": "v1",
+        "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_unaged_strength",
+            "receipt": {
+              "id": "baseline_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BU-S1",
+                "GRAPH-AGED-01-BU-S2",
+                "GRAPH-AGED-01-BU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BU-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "baseline_aged_strength",
+            "receipt": {
+              "id": "baseline_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-BA-S1",
+                "GRAPH-AGED-01-BA-S2",
+                "GRAPH-AGED-01-BA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-BA-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          },
+          {
+            "role": "candidate_unaged_strength",
+            "receipt": {
+              "id": "candidate_unaged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CU-S1",
+                "GRAPH-AGED-01-CU-S2",
+                "GRAPH-AGED-01-CU-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CU-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_aged_strength",
+            "receipt": {
+              "id": "candidate_aged_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-AGED-01-CA-S1",
+                "GRAPH-AGED-01-CA-S2",
+                "GRAPH-AGED-01-CA-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-AGED-01-CA-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": {
+              "profile_id": "AGING-85C-85RH-1000H",
+              "protocol_id": "AGING-PROTOCOL-01",
+              "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+              "exposure_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "conditions_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+              "temperature_c": 85,
+              "relative_humidity_pct": 85,
+              "duration_hours": 1000,
+              "exposure_receipt_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "conditioning_method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "conditioning_mode": "continuous"
+            }
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "AGED-RETENTION-DESIGN-ARTIFACT-SUBSTITUTION-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+          "graph_id": "AGED-RETENTION-DESIGN-ARTIFACT-SUBSTITUTION",
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-artifact-substitution",
+          "design_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "graph_sha256": "000000000000000000000000000000000000000000000000000000000000200f",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "ratio",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_unaged_strength-RECEIPT",
+            "baseline_aged_strength-RECEIPT",
+            "baseline_aged_strength-CONDITIONING-METHOD",
+            "baseline_aged_strength-EXPOSURE-RECEIPT",
+            "candidate_unaged_strength-RECEIPT",
+            "candidate_aged_strength-RECEIPT",
+            "candidate_aged_strength-CONDITIONING-METHOD",
+            "candidate_aged_strength-EXPOSURE-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002007",
+            "0000000000000000000000000000000000000000000000000000000000002009",
+            "0000000000000000000000000000000000000000000000000000000000009000",
+            "0000000000000000000000000000000000000000000000000000000000002008",
+            "000000000000000000000000000000000000000000000000000000000000200a",
+            "000000000000000000000000000000000000000000000000000000000000200c",
+            "0000000000000000000000000000000000000000000000000000000000009001",
+            "000000000000000000000000000000000000000000000000000000000000200b"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "aged_strength_retention_observation_only"
+        },
+        "formula_id": "mean_aged_strength_over_mean_unaged_strength_v1",
+        "design_receipt": {
+          "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-artifact-substitution",
+          "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+          "endpoint_id": "aged_strength_retention",
+          "estimand": "aged_strength_retention_candidate_minus_baseline",
+          "quantity_unit": "ratio",
+          "analysis_profile": "two_sample_tost_v1",
+          "grouping_scheme": "independent_arms",
+          "independent_unit": "material_lot",
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "design_changed_after_outcome": false,
+          "planned_min_baseline_specimens": 3,
+          "planned_min_candidate_specimens": 3,
+          "planned_min_baseline_clusters": 3,
+          "planned_min_candidate_clusters": 3,
+          "max_specimen_attrition_rate": 0.25,
+          "max_cluster_attrition_rate": 0.25,
+          "target_power": 0.8,
+          "target_precision_half_width": 0.05,
+          "power_receipt": {
+            "receipt_id": "GRAPH-AGED-01-DESIGN-POWER",
+            "calculation_sha256": "000000000000000000000000000000000000000000000000000000000000a009",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-artifact-substitution",
+            "endpoint_id": "aged_strength_retention",
+            "independent_unit": "material_lot",
+            "grouping_scheme": "independent_arms",
+            "planned_baseline_clusters": 3,
+            "planned_candidate_clusters": 3,
+            "target_power": 0.8,
+            "target_precision_half_width": 0.05,
+            "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+            "effect_under_alternative": 0.02,
+            "variance_low": 0.01,
+            "variance_central": 0.02,
+            "variance_high": 0.04,
+            "method_ref": "symthaea-statistics:planning-receipt-v1",
+            "claim_ceiling": "planning_only"
+          },
+          "baseline_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S1",
+              "cluster_id": "LOT-B1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S2",
+              "cluster_id": "LOT-B2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-BA-S3",
+              "cluster_id": "LOT-B3"
+            }
+          ],
+          "candidate_samples": [
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S1",
+              "cluster_id": "LOT-C1"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S2",
+              "cluster_id": "LOT-C2"
+            },
+            {
+              "specimen_id": "GRAPH-AGED-01-CA-S3",
+              "cluster_id": "LOT-C3"
+            }
+          ],
+          "excluded_samples": [],
+          "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+          "baseline_method_receipt": {
+            "id": "baseline_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002009",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-BA-S1",
+              "GRAPH-AGED-01-BA-S2",
+              "GRAPH-AGED-01-BA-S3"
+            ]
+          },
+          "candidate_method_receipt": {
+            "id": "candidate_aged_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000200c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "GRAPH-AGED-01-CA-S1",
+              "GRAPH-AGED-01-CA-S2",
+              "GRAPH-AGED-01-CA-S3"
+            ]
+          },
+          "analysis_result": {
+            "result_id": "GRAPH-AGED-01-RESULT",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000002011",
+            "design_id": "GRAPH-AGED-01-DESIGN-aged-retention-design-artifact-substitution",
+            "plan_sha256": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+            "endpoint_id": "aged_strength_retention",
+            "analysis_profile": "two_sample_tost_v1",
+            "margin_lower": -0.1,
+            "margin_upper": 0.1,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "sample_manifest_sha256": "000000000000000000000000000000000000000000000000000000000000a006",
+            "baseline_sample_count": 3,
+            "candidate_sample_count": 3,
+            "baseline_cluster_count": 3,
+            "candidate_cluster_count": 3,
+            "ci_lower": -0.03,
+            "ci_upper": 0.04,
+            "outcome": "EQUIVALENCE_ESTABLISHED"
+          },
+          "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a008",
+          "effect_under_alternative": 0.02,
+          "variance_low": 0.01,
+          "variance_central": 0.02,
+          "variance_high": 0.04,
+          "randomization_plan_ref": "GRAPH-AGED-01-DESIGN-RANDOMIZATION",
+          "analysis_plan_ref": "GRAPH-AGED-01-DESIGN-ANALYSIS",
+          "exclusion_protocol_ref": "GRAPH-AGED-01-DESIGN-EXCLUSION",
+          "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+          "endpoint_transform_id": "aged_strength_retention_ratio_v1",
+          "observation_endpoint_id": "apparent_shear_strength",
+          "endpoint_transform_sha256": "000000000000000000000000000000000000000000000000000000000000200d",
+          "receipt_sha256": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+          "additional_source_bindings": [
+            {
+              "role": "baseline_unaged_strength",
+              "cohort_role": "baseline_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "baseline_unaged_strength-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+              "method_receipt": {
+                "id": "baseline_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002007",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BU-S1",
+                  "GRAPH-AGED-01-BU-S2",
+                  "GRAPH-AGED-01-BU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BU-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::conditioning",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "baseline_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+              "method_receipt": {
+                "id": "baseline_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009000",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-BA-S1",
+                  "GRAPH-AGED-01-BA-S2",
+                  "GRAPH-AGED-01-BA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "baseline_aged_strength::exposure",
+              "cohort_role": "baseline_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "baseline_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000002008",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S1",
+                  "cluster_id": "LOT-B1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S2",
+                  "cluster_id": "LOT-B2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-BA-S3",
+                  "cluster_id": "LOT-B3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_unaged_strength",
+              "cohort_role": "candidate_unaged_strength",
+              "source_kind": "observation",
+              "source_id": "candidate_unaged_strength-RECEIPT",
+              "artifact_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "method_receipt": {
+                "id": "candidate_unaged_strength-RECEIPT",
+                "method_id": "ASTM_D3163",
+                "edition": "D3163-01R23",
+                "evidence_kind": "measurement",
+                "material_pair_class": "rigid_plastic_pair",
+                "geometry": "single_lap",
+                "endpoint": "apparent_shear_strength",
+                "requested_claim": "comparative_screening",
+                "protocol_id": "PLASMA-PROTOCOL-01",
+                "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "raw_data_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CU-S1",
+                  "GRAPH-AGED-01-CU-S2",
+                  "GRAPH-AGED-01-CU-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CU-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::conditioning",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "conditioning_method",
+              "source_id": "candidate_aged_strength-CONDITIONING-METHOD",
+              "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+              "method_receipt": {
+                "id": "candidate_aged_strength-CONDITIONING-METHOD",
+                "method_id": "ASTM_D1151",
+                "edition": "D1151-00R22",
+                "evidence_kind": "conditioning_practice",
+                "material_pair_class": "adhesive_bonded_specimens",
+                "geometry": "continuous_environmental_conditioning",
+                "endpoint": "moisture_temperature_exposure_protocol",
+                "requested_claim": "conditioning_protocol_reference",
+                "protocol_id": "AGING-PROTOCOL-01",
+                "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009001",
+                "suitability_review_sha256": null,
+                "specimen_ids": [
+                  "GRAPH-AGED-01-CA-S1",
+                  "GRAPH-AGED-01-CA-S2",
+                  "GRAPH-AGED-01-CA-S3"
+                ]
+              },
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            },
+            {
+              "role": "candidate_aged_strength::exposure",
+              "cohort_role": "candidate_aged_strength",
+              "source_kind": "exposure_record",
+              "source_id": "candidate_aged_strength-EXPOSURE-RECEIPT",
+              "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000200b",
+              "method_receipt": null,
+              "samples": [
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S1",
+                  "cluster_id": "LOT-C1"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S2",
+                  "cluster_id": "LOT-C2"
+                },
+                {
+                  "specimen_id": "GRAPH-AGED-01-CA-S3",
+                  "cluster_id": "LOT-C3"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The design binds a different raw-data digest from the exact candidate unaged observation used by the endpoint graph."
     }
   ]
 }
