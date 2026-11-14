@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "federation_id": "luminous-dynamics:egddm-federation:2026-11-14",
-  "observed_at": "2026-11-14T09:45:00.000Z",
+  "observed_at": "2026-11-14T11:32:00.000Z",
   "hub": {
     "repository_full_name": "Luminous-Dynamics/symthaea",
     "default_branch": "main",
@@ -34,9 +34,9 @@
         "path": "docs/development-map/readme-and-workstreams-v0.1.json",
         "blob_oid": "28eaf7bfd352d21c12fd073d81208c36646f5793",
         "artifact_branch": "research/dynamic-development-maps-v0-1-2026-11-14",
-        "artifact_commit_sha": "f3e43b67eb2acca57cb93625d1d019bcdbd1491e",
-        "artifact_tree_oid": "f7c55501e0dbc81cc56d5373bcba5c1b0269e776",
-        "artifact_url": "https://github.com/Luminous-Dynamics/symthaea/blob/f3e43b67eb2acca57cb93625d1d019bcdbd1491e/docs/development-map/readme-and-workstreams-v0.1.json",
+        "artifact_commit_sha": "861e3573154263dbe3714393b2b109582115a1ea",
+        "artifact_tree_oid": "373eb5123c271851ebc9bfa56124f21d7882943f",
+        "artifact_url": "https://github.com/Luminous-Dynamics/symthaea/blob/861e3573154263dbe3714393b2b109582115a1ea/docs/development-map/readme-and-workstreams-v0.1.json",
         "subject_snapshot": {
           "revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
           "tree_digest": "74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
@@ -308,7 +308,7 @@
       "contract_binding": {
         "contract_id": "EGDDM-SNAPSHOT",
         "version": "0.1.0",
-        "contract_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
         "status": "declared"
       },
       "claim_limitations": [
@@ -333,7 +333,7 @@
       "contract_binding": {
         "contract_id": "EGDDM-SNAPSHOT",
         "version": "0.1.0",
-        "contract_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
         "status": "declared"
       },
       "claim_limitations": [
@@ -358,11 +358,51 @@
       "contract_binding": {
         "contract_id": "EGDDM-SNAPSHOT",
         "version": "0.1.0",
-        "contract_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
         "status": "declared"
       },
       "claim_limitations": [
         "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "source_declared_integration",
+      "to_project_id": "symtropy",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "DEMO.md",
+          "blob_oid": "ae87d09a4c47992df40b707a74f9fef419c39c93",
+          "line_start": 61,
+          "line_end": 70
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "DEMO.md describes a Bevy renderer embedded in Symtropy; exact crate/version compatibility, build receipt and runtime integration are not pinned."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "source_declared_integration",
+      "to_project_id": "mycelix",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "DEMO.md",
+          "blob_oid": "ae87d09a4c47992df40b707a74f9fef419c39c93",
+          "line_start": 57,
+          "line_end": 70
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "DEMO.md describes a Mycelix Holochain DHT bridge and simulated P2P trading; no DNA/zome/schema version, conductor run or runtime transaction receipt is pinned."
       ]
     }
   ],
