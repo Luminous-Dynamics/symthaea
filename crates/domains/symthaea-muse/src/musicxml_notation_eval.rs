@@ -102,6 +102,12 @@ pub struct MusicXmlNotationEvaluationReportV1 {
     pub duration_presence: MusicXmlNotationAccuracyV1,
     pub duration_error: MusicXmlNotationErrorDistributionV1,
     pub written_type_and_dots: MusicXmlNotationAccuracyV1,
+    pub grace_semantics: MusicXmlNotationAccuracyV1,
+    pub cue_semantics: MusicXmlNotationAccuracyV1,
+    pub chord_member_semantics: MusicXmlNotationAccuracyV1,
+    /// Chord members must reference the matched prediction of their original
+    /// base note, not merely carry the same boolean chord flag.
+    pub chord_anchor_semantics: MusicXmlNotationAccuracyV1,
     pub voice_assignment: MusicXmlNotationAccuracyV1,
     pub voice_reference_unassigned_count: usize,
     pub voice_unexpected_assignment_count: usize,
@@ -661,6 +667,10 @@ struct NotePairDimensionsV1 {
     duration_presence: MusicXmlNotationAccuracyV1,
     duration_error: MusicXmlNotationErrorDistributionV1,
     written_type_and_dots: MusicXmlNotationAccuracyV1,
+    grace_semantics: MusicXmlNotationAccuracyV1,
+    cue_semantics: MusicXmlNotationAccuracyV1,
+    chord_member_semantics: MusicXmlNotationAccuracyV1,
+    chord_anchor_semantics: MusicXmlNotationAccuracyV1,
     voice_assignment: MusicXmlNotationAccuracyV1,
     voice_reference_unassigned_count: usize,
     voice_unexpected_assignment_count: usize,
@@ -695,6 +705,14 @@ fn note_pair_dimensions(
     let mut duration_within = 0;
     let mut written_samples = 0;
     let mut written_correct = 0;
+    let mut grace_samples = 0;
+    let mut grace_correct = 0;
+    let mut cue_samples = 0;
+    let mut cue_correct = 0;
+    let mut chord_member_samples = 0;
+    let mut chord_member_correct = 0;
+    let mut chord_anchor_samples = 0;
+    let mut chord_anchor_correct = 0;
     let mut voice_samples = 0;
     let mut voice_correct = 0;
     let mut voice_reference_unassigned_count = 0;
@@ -781,6 +799,43 @@ fn note_pair_dimensions(
             written_correct += 1;
         }
 
+        grace_samples += 1;
+        let grace_equal = match (&gold.grace, &predicted.grace) {
+            (None, None) => true,
+            (Some(left), Some(right)) => {
+                left.slash == right.slash
+                    && left.steal_time_previous == right.steal_time_previous
+                    && left.steal_time_following == right.steal_time_following
+                    && left.make_time == right.make_time
+            }
+            _ => false,
+        };
+        if gold.is_grace == predicted.is_grace && grace_equal {
+            grace_correct += 1;
+        }
+
+        cue_samples += 1;
+        if gold.is_cue == predicted.is_cue {
+            cue_correct += 1;
+        }
+
+        chord_member_samples += 1;
+        if gold.is_chord_member == predicted.is_chord_member {
+            chord_member_correct += 1;
+        }
+        if gold.is_chord_member || predicted.is_chord_member {
+            chord_anchor_samples += 1;
+            if chord_anchor_relationship_matches(
+                reference,
+                prediction,
+                pairs,
+                reference_index,
+                prediction_index,
+            ) {
+                chord_anchor_correct += 1;
+            }
+        }
+
         match &gold.voice {
             Some(_) => {
                 voice_samples += 1;
@@ -850,6 +905,10 @@ fn note_pair_dimensions(
         duration_presence: accuracy(duration_presence_samples, duration_presence_correct),
         duration_error: error_distribution(&mut duration_errors, duration_within),
         written_type_and_dots: accuracy(written_samples, written_correct),
+        grace_semantics: accuracy(grace_samples, grace_correct),
+        cue_semantics: accuracy(cue_samples, cue_correct),
+        chord_member_semantics: accuracy(chord_member_samples, chord_member_correct),
+        chord_anchor_semantics: accuracy(chord_anchor_samples, chord_anchor_correct),
         voice_assignment: accuracy(voice_samples, voice_correct),
         voice_reference_unassigned_count,
         voice_unexpected_assignment_count,
@@ -865,6 +924,41 @@ fn note_pair_dimensions(
         tuplet_notation: accuracy(tuplet_samples, tuplet_correct),
         full_note_source_subtree: accuracy(source_samples, source_correct),
     })
+}
+
+fn chord_anchor_relationship_matches(
+    reference: &MusicXmlPartNotationEventsV1,
+    prediction: &MusicXmlPartNotationEventsV1,
+    pairs: &[(usize, usize)],
+    reference_index: usize,
+    prediction_index: usize,
+) -> bool {
+    let gold = &reference.note_events[reference_index];
+    let predicted = &prediction.note_events[prediction_index];
+    match (gold.is_chord_member, predicted.is_chord_member) {
+        (false, false) => true,
+        (true, true) => {
+            let Some(anchor_order) = gold.chord_anchor_source_order else {
+                return false;
+            };
+            let Some(anchor_reference_index) = reference
+                .note_events
+                .iter()
+                .position(|event| event.source_order == anchor_order)
+            else {
+                return false;
+            };
+            let Some((_, anchor_prediction_index)) = pairs
+                .iter()
+                .find(|(left, _)| *left == anchor_reference_index)
+            else {
+                return false;
+            };
+            predicted.chord_anchor_source_order
+                == Some(prediction.note_events[*anchor_prediction_index].source_order)
+        }
+        _ => false,
+    }
 }
 
 fn note_onset_error(
@@ -924,6 +1018,10 @@ struct ReportBodyV1<'a> {
     duration_presence: &'a MusicXmlNotationAccuracyV1,
     duration_error: &'a MusicXmlNotationErrorDistributionV1,
     written_type_and_dots: &'a MusicXmlNotationAccuracyV1,
+    grace_semantics: &'a MusicXmlNotationAccuracyV1,
+    cue_semantics: &'a MusicXmlNotationAccuracyV1,
+    chord_member_semantics: &'a MusicXmlNotationAccuracyV1,
+    chord_anchor_semantics: &'a MusicXmlNotationAccuracyV1,
     voice_assignment: &'a MusicXmlNotationAccuracyV1,
     voice_reference_unassigned_count: usize,
     voice_unexpected_assignment_count: usize,
@@ -974,6 +1072,10 @@ fn report_commitment(
         duration_presence: &report.duration_presence,
         duration_error: &report.duration_error,
         written_type_and_dots: &report.written_type_and_dots,
+        grace_semantics: &report.grace_semantics,
+        cue_semantics: &report.cue_semantics,
+        chord_member_semantics: &report.chord_member_semantics,
+        chord_anchor_semantics: &report.chord_anchor_semantics,
         voice_assignment: &report.voice_assignment,
         voice_reference_unassigned_count: report.voice_reference_unassigned_count,
         voice_unexpected_assignment_count: report.voice_unexpected_assignment_count,
@@ -1172,6 +1274,10 @@ pub fn evaluate_musicxml_notation_graphs(
         duration_presence: note_dimensions.duration_presence,
         duration_error: note_dimensions.duration_error,
         written_type_and_dots: note_dimensions.written_type_and_dots,
+        grace_semantics: note_dimensions.grace_semantics,
+        cue_semantics: note_dimensions.cue_semantics,
+        chord_member_semantics: note_dimensions.chord_member_semantics,
+        chord_anchor_semantics: note_dimensions.chord_anchor_semantics,
         voice_assignment: note_dimensions.voice_assignment,
         voice_reference_unassigned_count: note_dimensions.voice_reference_unassigned_count,
         voice_unexpected_assignment_count: note_dimensions.voice_unexpected_assignment_count,
@@ -1640,4 +1746,38 @@ mod tests {
         assert_eq!(pairs.len(), 2);
         assert_eq!(pairs, vec![(0, 1), (1, 0)]);
     }
+    #[test]
+    fn grace_cue_chord_flags_and_chord_anchor_are_independent_metrics() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><grace slash="yes" steal-time-following="25"/><pitch><step>C</step><octave>5</octave></pitch><voice>1</voice></note>
+            <note><grace/><chord/><pitch><step>E</step><octave>5</octave></pitch><voice>1</voice></note>
+            <note><cue/><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><voice>2</voice></note>
+            <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><voice>2</voice></note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(xml);
+        let identical = evaluate_musicxml_notation_graphs(
+            &reference, &reference, default_config()
+        ).unwrap();
+        assert_eq!(identical.grace_semantics.accuracy, Some(1.0));
+        assert_eq!(identical.cue_semantics.accuracy, Some(1.0));
+        assert_eq!(identical.chord_member_semantics.accuracy, Some(1.0));
+        assert_eq!(identical.chord_anchor_semantics.accuracy, Some(1.0));
+
+        let mut prediction = reference.clone();
+        prediction.notation_events.note_events[0].grace.as_mut().unwrap().slash =
+            Some("no".into());
+        prediction.notation_events.note_events[2].is_cue = false;
+        prediction.notation_events.note_events[1].is_chord_member = false;
+        prediction.notation_events.note_events[1].chord_anchor_source_order = None;
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.grace_semantics.accuracy, Some(0.5));
+        assert_eq!(report.cue_semantics.accuracy, Some(0.5));
+        assert_eq!(report.chord_member_semantics.accuracy, Some(0.5));
+        assert_eq!(report.chord_anchor_semantics.accuracy, Some(0.0));
+    }
+
 }
