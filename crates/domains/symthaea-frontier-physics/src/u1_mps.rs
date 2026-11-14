@@ -478,6 +478,18 @@ pub struct U1CanonicalGaugeReceipt {
 }
 
 impl U1CanonicalGaugeReceipt {
+    fn required_left_exterior_bound(&self) -> f64 {
+        self.left_isometry_residuals
+            .iter()
+            .fold(1.0, |bound, (_, residual)| bound * (1.0 + residual).sqrt())
+    }
+
+    fn required_right_exterior_bound(&self) -> f64 {
+        self.right_isometry_residuals
+            .iter()
+            .fold(1.0, |bound, (_, residual)| bound * (1.0 + residual).sqrt())
+    }
+
     pub fn bond(&self) -> usize { self.bond }
     fn state_fingerprint(&self) -> u128 {
         // FNV-1a 128-bit fingerprint over dimensions, charge labels and exact
@@ -561,9 +573,13 @@ impl U1CanonicalGaugeReceipt {
             && self.selection_rule_residual >= 0.0
             && self.selection_rule_residual <= tolerance
             && self.left_exterior_operator_norm_upper_bound.is_finite()
-            && self.left_exterior_operator_norm_upper_bound >= 1.0
+            && self.left_exterior_operator_norm_upper_bound
+                + 8.0 * f64::EPSILON * self.required_left_exterior_bound().max(1.0)
+                >= self.required_left_exterior_bound()
             && self.right_exterior_operator_norm_upper_bound.is_finite()
-            && self.right_exterior_operator_norm_upper_bound >= 1.0
+            && self.right_exterior_operator_norm_upper_bound
+                + 8.0 * f64::EPSILON * self.required_right_exterior_bound().max(1.0)
+                >= self.required_right_exterior_bound()
             && self.exterior_operator_norm_product_upper_bound().is_finite()
             && self.left_isometry_residuals.len() == self.bond
             && self
@@ -5460,6 +5476,64 @@ mod tests {
         assert_eq!(
             second.truncation_ledger.canonical_gauge_receipt_count,
             6
+        );
+    }
+
+    #[test]
+    fn canonical_gauge_receipt_rejects_understated_operator_norm_bound() {
+        let mut state = canonical_w_state();
+        let mut receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(receipt.qualifies(1.0e-10));
+        receipt.left_exterior_operator_norm_upper_bound = 1.0;
+        assert!(!receipt.qualifies(1.0e-10));
+    }
+
+    #[test]
+    fn canonical_gauge_receipt_rejects_negative_residuals_even_if_qualified_flag_is_set() {
+        let mut state = canonical_w_state();
+        let mut receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        receipt.maximum_left_isometry_residual = -1.0;
+        assert!(!receipt.qualifies(1.0e-10));
+    }
+
+    #[test]
+    fn truncation_ledger_cannot_be_reused_with_a_different_mps_state() {
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(0.4)),
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(0.4)),
+            ],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 2,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let first = stepper.apply(&input, 0.1, policy).unwrap();
+        let unrelated = ComplexU1Mps::product_state(&[false, true, false]).unwrap();
+        assert!(matches!(
+            stepper.apply_with_ledger(
+                &unrelated,
+                0.1,
+                policy,
+                first.truncation_ledger.clone()
+            ),
+            Err(U1MpsError::TruncationLedgerStateMismatch)
+        ));
+        // The continuation is accepted when paired with the exact output state
+        // to which the ledger was bound.
+        assert!(
+            stepper
+                .apply_with_ledger(
+                    &first.state,
+                    0.1,
+                    policy,
+                    first.truncation_ledger.clone()
+                )
+                .is_ok()
         );
     }
 
