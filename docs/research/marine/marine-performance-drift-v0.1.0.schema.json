@@ -1,0 +1,432 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-performance-drift:0.1.0",
+  "title": "Luminous Marine Performance Drift Synthetic Challenge Corpus v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "corpus_status",
+    "generated_at_utc",
+    "cases",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "corpus_status": {
+      "const": "synthetic"
+    },
+    "generated_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "configuration_sha256",
+        "propulsion_family",
+        "coating_revision"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "propulsion_family": {
+          "enum": [
+            "waterjet_pwc",
+            "fixed_propeller",
+            "azimuth_tug",
+            "vsp_tug"
+          ]
+        },
+        "coating_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "reference_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_version",
+        "model_sha256",
+        "trained_through_utc"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "trained_through_utc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wind_speed_mps",
+        "significant_wave_height_m",
+        "current_speed_mps",
+        "water_density_kg_m3",
+        "draft_m",
+        "trim_deg"
+      ],
+      "properties": {
+        "wind_speed_mps": {
+          "type": "number",
+          "minimum": 0
+        },
+        "significant_wave_height_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "current_speed_mps": {
+          "type": "number",
+          "minimum": 0
+        },
+        "water_density_kg_m3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "trim_deg": {
+          "type": "number"
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "speed_through_water_mps",
+        "shaft_power_kw",
+        "shaft_rpm"
+      ],
+      "properties": {
+        "speed_through_water_mps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shaft_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shaft_rpm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fuel_flow_kg_per_h": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "battery_dc_power_kw": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "kind",
+        "status",
+        "available_at_utc",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "hull_inspection",
+            "propulsor_inspection",
+            "cleaning_record",
+            "calibration_record",
+            "weather_observation",
+            "configuration_change"
+          ]
+        },
+        "status": {
+          "enum": [
+            "confirmed",
+            "negative",
+            "incomplete",
+            "unknown",
+            "revoked"
+          ]
+        },
+        "available_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "feature_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_at_utc",
+        "available_at_utc",
+        "mission_fingerprint_sha256",
+        "condition_fingerprint_sha256",
+        "environment",
+        "measurements",
+        "calibration_status",
+        "evidence"
+      ],
+      "properties": {
+        "observed_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "mission_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "condition_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment": {
+          "$ref": "#/$defs/environment"
+        },
+        "measurements": {
+          "$ref": "#/$defs/measurement"
+        },
+        "calibration_status": {
+          "enum": [
+            "valid",
+            "stale",
+            "invalid",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predicted_shaft_power_kw",
+        "lower_bound_kw",
+        "upper_bound_kw"
+      ],
+      "properties": {
+        "predicted_shaft_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lower_bound_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upper_bound_kw": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "decision_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_time_utc",
+        "feature_snapshot",
+        "reference_prediction"
+      ],
+      "properties": {
+        "decision_time_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "feature_snapshot": {
+          "$ref": "#/$defs/feature_snapshot"
+        },
+        "reference_prediction": {
+          "$ref": "#/$defs/prediction"
+        }
+      }
+    },
+    "challenge_truth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_disposition",
+        "primary_cause",
+        "attribution_supported",
+        "label_available_at_utc"
+      ],
+      "properties": {
+        "expected_disposition": {
+          "enum": [
+            "NO_DRIFT_DETECTED",
+            "DRIFT_DETECTED",
+            "INDETERMINATE",
+            "OUT_OF_DOMAIN"
+          ]
+        },
+        "primary_cause": {
+          "enum": [
+            "none",
+            "biofouling",
+            "biofouling_cleaned",
+            "weather_or_environment",
+            "loading_or_mission",
+            "propulsor_damage_or_blockage",
+            "drivetrain_or_powertrain",
+            "sensor_or_calibration",
+            "mixed",
+            "unknown"
+          ]
+        },
+        "attribution_supported": {
+          "type": "boolean"
+        },
+        "label_available_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "scenario_class",
+        "vessel",
+        "reference_model",
+        "decision_points",
+        "challenge_truth",
+        "limitations"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_class": {
+          "enum": [
+            "stable_reference",
+            "weather_shift",
+            "fouling_drift",
+            "post_cleaning_recovery",
+            "propulsor_damage",
+            "sensor_drift",
+            "mixed_or_unidentified"
+          ]
+        },
+        "vessel": {
+          "$ref": "#/$defs/vessel"
+        },
+        "reference_model": {
+          "$ref": "#/$defs/reference_model"
+        },
+        "decision_points": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/decision_point"
+          }
+        },
+        "challenge_truth": {
+          "$ref": "#/$defs/challenge_truth"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
