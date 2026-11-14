@@ -19,6 +19,9 @@ impl Disposition {
 pub fn run(fixture_path: &Path, composition_fixture_path: &Path) -> Result<()> {
     let bytes = fs::read(fixture_path).with_context(|| format!("reading {}", fixture_path.display()))?;
     let fixture: Value = serde_json::from_slice(&bytes).context("parsing plasma-transfer fixture")?;
+    if fixture.get("schema_version").and_then(Value::as_str) != Some("plasma-transfer-fixture-v0.2") {
+        bail!("unsupported plasma-transfer fixture schema");
+    }
     let cases = fixture.get("cases").and_then(Value::as_array).context("fixture must contain cases[]")?;
     let (mut pass, mut blocked, mut rejected) = (0usize, 0usize, 0usize);
     for case in cases {
@@ -29,7 +32,8 @@ pub fn run(fixture_path: &Path, composition_fixture_path: &Path) -> Result<()> {
         match actual { Disposition::Pass => pass += 1, Disposition::Blocked => blocked += 1, Disposition::Rejected => rejected += 1 }
     }
     println!("plasma-transfer-audit: {} composed cases; PASS={pass}, BLOCKED={blocked}, REJECTED={rejected}", cases.len());
-    println!("Transfer PASS requires the legacy factor/interval gates AND exact method-qualified, preregistered endpoint/design evidence.");
+    println!("Transfer PASS requires the legacy factor/interval gates and per-bridge method-qualified apparent-shear/design evidence.");
+    println!("Age-retention and failure-mode interval gates remain legacy records; they are not yet fully typed endpoint compositions.");
     println!("S0 structural evidence audit only; no physical qualification is implied.");
     Ok(())
 }
