@@ -39,7 +39,7 @@ This crate is a first implementation tranche. See docs/research/autopoiesis/RUNT
 
 ## Organizational reconfiguration gate
 
-The `reconfiguration` module compares a frozen `OrganizationSpec` with a candidate and reports the exact component/process/edge diff. It enforces explicit addition/removal/contract-change allowlists, a structural-edit budget, referential integrity, required-versus-optional edge consistency, and hard protection for provisioned roots, constraints, viability-critical components and operator-designated processes.
+The `reconfiguration` module compares a frozen `OrganizationSpec` with a candidate and reports the exact component/process/edge diff. It enforces explicit addition/removal/contract-change allowlists, a structural-edit budget, referential integrity, required-versus-optional edge consistency, and hard protection for provisioned roots, constraints, viability-critical components and operator-designated processes. Existing process input edges to provisioned roots and constraints cannot be severed or weakened, and candidate processes cannot produce provisioned roots or externally governed constraints.
 
 This is only a **structural admission** result. A passing candidate is not thereby authorized, viable, causally beneficial, or proven to have executed. Promotion still requires external authority and durable receipts; viability, runtime recurrence, intervention isolation and capability preservation remain separate evidence planes.
 
