@@ -24,8 +24,12 @@ pub fn run(fixture_path: &Path, composition_fixture_path: &Path) -> Result<()> {
     }
     let cases = fixture.get("cases").and_then(Value::as_array).context("fixture must contain cases[]")?;
     let (mut pass, mut blocked, mut rejected) = (0usize, 0usize, 0usize);
+    let mut seen_case_ids = HashSet::new();
     for case in cases {
         let id = case.get("id").and_then(Value::as_str).context("case id missing")?;
+        if !seen_case_ids.insert(id.to_owned()) {
+            bail!("duplicate transfer case identity: {id}");
+        }
         let expected = case.get("expected_disposition").and_then(Value::as_str).context("expected disposition missing")?;
         let actual = audit_case_composed(case, &fixture, composition_fixture_path)?;
         if actual.as_str() != expected { bail!("case {id}: expected {expected}, got {}", actual.as_str()); }
@@ -428,5 +432,10 @@ mod tests {
     #[test] fn unchanged_profile_requires_current_baseline_composition() {
         let data = fixture();
         assert_eq!(composed(&data, "unchanged-profile-without-baseline-composition"), Disposition::Blocked);
+    }
+
+    #[test] fn structurally_valid_but_non_equivalent_design_blocks_transfer() {
+        let data = fixture();
+        assert_eq!(composed(&data, "transfer-design-no-equivalence"), Disposition::Blocked);
     }
 }
