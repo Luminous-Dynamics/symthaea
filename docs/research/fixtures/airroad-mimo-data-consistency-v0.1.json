@@ -1,0 +1,381 @@
+{
+  "schema": "luminous.airroad.mimo_data_consistent_additive_uncertainty.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_single_frequency_data_consistency",
+  "model_identity": "sha256:identity-nominal-two-port-v0.1",
+  "topology_identity": "sha256:two-port-bus-a-b-reference-v0.1",
+  "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+  "frequency": {
+    "numerator": "3",
+    "denominator": "1"
+  },
+  "frequency_unit": "rad_per_second",
+  "port_order": [
+    "bus-a",
+    "bus-b"
+  ],
+  "nominal_transfer_matrix": [
+    [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    ],
+    [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    ]
+  ],
+  "uncertainty_semantics": "deterministic_hard_euclidean_ball",
+  "experiments": [
+    {
+      "experiment_id": "excite-bus-a",
+      "input_vector": [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      "observed_output_vector": [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "10"
+        }
+      ],
+      "output_error_radius": {
+        "numerator": "1",
+        "denominator": "100"
+      },
+      "worst_case_residual_vector": [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "11",
+          "denominator": "100"
+        }
+      ],
+      "squared_input_norm": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "gamma": {
+        "numerator": "121",
+        "denominator": "10000"
+      },
+      "lmi": [
+        [
+          {
+            "numerator": "121",
+            "denominator": "10000"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "121",
+            "denominator": "10000"
+          },
+          {
+            "numerator": "11",
+            "denominator": "100"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "11",
+            "denominator": "100"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ]
+    },
+    {
+      "experiment_id": "excite-bus-b",
+      "input_vector": [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ],
+      "observed_output_vector": [
+        {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ],
+      "output_error_radius": {
+        "numerator": "1",
+        "denominator": "100"
+      },
+      "worst_case_residual_vector": [
+        {
+          "numerator": "11",
+          "denominator": "100"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      "squared_input_norm": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "gamma": {
+        "numerator": "121",
+        "denominator": "10000"
+      },
+      "lmi": [
+        [
+          {
+            "numerator": "121",
+            "denominator": "10000"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "11",
+            "denominator": "100"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "121",
+            "denominator": "10000"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "11",
+            "denominator": "100"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ]
+    }
+  ],
+  "input_ensemble": {
+    "matrix_columns": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "determinant": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "rank": 2,
+    "input_dimension": 2
+  },
+  "expected": {
+    "nominal_residual_matrix": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "10"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "per_experiment_gamma": {
+      "numerator": "121",
+      "denominator": "10000"
+    },
+    "frobenius_norm_squared_upper_bound": {
+      "numerator": "121",
+      "denominator": "5000"
+    },
+    "spectral_norm_squared_upper_bound": {
+      "numerator": "121",
+      "denominator": "5000"
+    },
+    "nominal_residual_spectral_norm_squared": {
+      "numerator": "1",
+      "denominator": "100"
+    },
+    "result_scope": "single_frequency_knot_only"
+  },
+  "counterfactuals": {
+    "gamma_too_small": {
+      "numerator": "120",
+      "denominator": "10000"
+    },
+    "rank_one_input_matrix": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "zero_input_with_nonzero_residual": {
+      "input_vector": [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      "residual_vector": [
+        {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    },
+    "statistical_semantics": "uncalibrated_statistical_confidence_interval"
+  },
+  "negative_controls": [
+    {
+      "id": "gamma-below-required-bound",
+      "expected": "lmi-not-psd"
+    },
+    {
+      "id": "zero-input-nonzero-residual",
+      "expected": "reject"
+    },
+    {
+      "id": "rank-deficient-inputs",
+      "expected": "no-full-matrix-bound"
+    },
+    {
+      "id": "noise-bound-omitted",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "statistical-only-noise",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "wrong-model-topology-or-operating-point",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "pointwise-result-promoted-to-continuous",
+      "expected": "reject"
+    },
+    {
+      "id": "frobenius-bound-labelled-exact-spectral-bound",
+      "expected": "reject-claim-class"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact-rational pointwise data-consistency bound at one frequency knot.",
+    "Full-matrix norm bound requires full-rank input excitation and uses a conservative Frobenius outer bound.",
+    "No continuous-frequency, physical calibration, real aircraft plant or robust stability result is established."
+  ]
+}
