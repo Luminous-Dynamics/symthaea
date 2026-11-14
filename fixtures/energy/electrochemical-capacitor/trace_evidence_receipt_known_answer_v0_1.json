@@ -1,0 +1,164 @@
+{
+  "schema_version": "0.1.0",
+  "receipt_id": "EDLC-TRACE-RECEIPT-KNOWN-ANSWER-001",
+  "evidence_class": "synthetic_artifact_integrity",
+  "claim_ceiling": "ARTIFACT_HASH_PATH_AND_STRUCTURAL_METADATA_INTEGRITY_ONLY_NOT_PHYSICAL_ORIGIN_AUTHENTICITY_OR_RELIABILITY",
+  "integrity_scope": "sha256_byte_integrity_and_structural_metadata_only",
+  "provenance_limit": "SHA256_MATCH_DOES_NOT_AUTHENTICATE_CREATOR_INSTRUMENT_CALIBRATION_OR_PHYSICAL_DEVICE",
+  "acquisition": {
+    "start_unix_ms": 1794200000000,
+    "end_unix_ms": 1794200000500,
+    "sample_clock_reference": "SYNTHETIC-CLOCK"
+  },
+  "device": {
+    "manufacturer": "SYNTHETIC ONLY",
+    "model": "SYNTH-EDLC-MODULE-001",
+    "physical_device_serial": "SYNTH-TRACE-001",
+    "lot_id": "SYNTH-LOT-001",
+    "device_boundary": "complete_device",
+    "identity_artifact_id": "device-identity"
+  },
+  "instrument": {
+    "instrument_id": "SYNTH-INSTRUMENT-001",
+    "model": "SYNTH-DIGITIZER",
+    "serial": "SYNTH-DIGITIZER-001",
+    "sample_rate_hz": 10,
+    "timebase_reference": "SYNTHETIC-CLOCK",
+    "configuration_artifact_id": "instrument-config",
+    "calibration_artifact_id": "calibration-record",
+    "calibration_id": "SYNTH-CAL-001"
+  },
+  "protocol": {
+    "protocol_id": "SYNTH-EDLC-SEQ-PROTOCOL-001",
+    "sequence_profile_id": "SYNTH-EDLC-SEQ-PROFILE-001",
+    "standby_mode": "open_circuit",
+    "device_boundary": "complete_device",
+    "artifact_id": "test-protocol"
+  },
+  "environment": {
+    "ambient_temperature_c": 23,
+    "relative_humidity_percent": 45,
+    "artifact_id": "environment-record"
+  },
+  "trace": {
+    "artifact_id": "raw-terminal-trace",
+    "expected_row_count": 4,
+    "required_columns": [
+      "event_id",
+      "elapsed_s",
+      "terminal_voltage_v",
+      "terminal_current_a",
+      "source_voltage_v",
+      "source_current_a",
+      "temperature_c"
+    ]
+  },
+  "events": [
+    {
+      "event_index": 1,
+      "event_id": "CALL-01",
+      "load_profile_id": "SYNTH-LOAD-PROFILE-01",
+      "load_profile_artifact_id": "load-call-01",
+      "readiness_probe_profile_id": null,
+      "readiness_probe_artifact_id": null
+    },
+    {
+      "event_index": 2,
+      "event_id": "CALL-02",
+      "load_profile_id": "SYNTH-LOAD-PROFILE-02",
+      "load_profile_artifact_id": "load-call-02",
+      "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-02",
+      "readiness_probe_artifact_id": "probe-call-02"
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "raw-terminal-trace",
+      "role": "raw_terminal_trace",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/raw_terminal_trace.csv",
+      "sha256": "d31724baee002097bed353f0db9e5ee09b8376148c07b8620af046c8e76e3e3d",
+      "byte_length": 241,
+      "media_type": "text/csv"
+    },
+    {
+      "artifact_id": "device-identity",
+      "role": "device_identity_record",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/device_identity.json",
+      "sha256": "6b15f27835f6bb3e92548683717474b9e921221e3de3f8c590a11a919dd2403a",
+      "byte_length": 191,
+      "media_type": "application/json"
+    },
+    {
+      "artifact_id": "instrument-config",
+      "role": "instrument_configuration",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/instrument_configuration.json",
+      "sha256": "146536a9be99bdc8cb027677131859149fe9671a46b98471d149fce146a09c6a",
+      "byte_length": 178,
+      "media_type": "application/json"
+    },
+    {
+      "artifact_id": "calibration-record",
+      "role": "calibration_certificate",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/calibration_certificate.json",
+      "sha256": "ad8459fba835bc76f1322577243d3574ae05f407d2159ff3ba2dced8a5e854d3",
+      "byte_length": 215,
+      "media_type": "application/json"
+    },
+    {
+      "artifact_id": "test-protocol",
+      "role": "test_protocol",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/protocol.json",
+      "sha256": "f342947d5384456a27c21010d2e23c8a3b1a484dc3f6272a85e4cb844a1dcf8f",
+      "byte_length": 193,
+      "media_type": "application/json"
+    },
+    {
+      "artifact_id": "environment-record",
+      "role": "environment_log",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/environment_log.json",
+      "sha256": "3e4c22128278ba262cf03551cd6124343b4b591f6c8e79f022da52e27a4ae6d1",
+      "byte_length": 113,
+      "media_type": "application/json"
+    },
+    {
+      "artifact_id": "load-call-01",
+      "role": "load_profile",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/load_call_01.csv",
+      "sha256": "1fed7de31913b0435daede39dcc0f277d2dea40aae8016b341a29ed4e377b53d",
+      "byte_length": 41,
+      "media_type": "text/csv"
+    },
+    {
+      "artifact_id": "load-call-02",
+      "role": "load_profile",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/load_call_02.csv",
+      "sha256": "d8a8decfb07afd0f61dd813b25a4d09206f4095f541e7096ea6ca028458cba12",
+      "byte_length": 41,
+      "media_type": "text/csv"
+    },
+    {
+      "artifact_id": "probe-call-02",
+      "role": "readiness_probe_profile",
+      "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/probe_call_02.csv",
+      "sha256": "b3afa4239cee628a3b6d97801aa08766c2e9360d5744ce3ef527ead872613e42",
+      "byte_length": 43,
+      "media_type": "text/csv"
+    }
+  ],
+  "expected": {
+    "artifact_count": 9,
+    "raw_trace_rows": 4
+  },
+  "negative_controls": [
+    "SHA-256 mismatch must reject the artifact package.",
+    "Manifest byte length mismatch must reject the artifact package.",
+    "Absolute paths and parent-directory traversal must be rejected.",
+    "CSV headers and units must match the receipt's declared channel contract.",
+    "Raw trace event IDs must exactly match the frozen sequence profile.",
+    "Sample elapsed time must be monotonic within every event.",
+    "Open-circuit mode must not contain external source current.",
+    "Calibration must cover the full acquisition interval and match the instrument serial.",
+    "Device identity, instrument configuration and protocol artifacts must agree with the manifest.",
+    "A hash match proves byte integrity only and does not authenticate origin or calibration."
+  ]
+}
