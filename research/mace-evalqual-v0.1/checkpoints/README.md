@@ -40,3 +40,10 @@ When the OpenSSL CLI is available, `openssl_interop_test.go` verifies the publis
 `AcceptObserved` is the safer integration entry point when a caller has a separately observed destination snapshot. It requires the observed database identity, journal sequence and head digest to match the signed checkpoint before advancing the monotonic cursor. The observer must obtain those values from one coherent snapshot; the helper cannot make an incomplete or self-reported observer independent.
 
 The verifier also rejects a checkpoint that increments its witness and journal sequence numbers while repeating the previous journal-head digest. Sequence movement without a new head is not accepted as destination progress.
+
+
+## Peer consistency and split-view detection
+
+`VerifyPeerConsistency` checks whether one consumer's trusted checkpoint cursor is a valid ancestor of another's. The peer supplies every intervening signed checkpoint; each signature, predecessor link, sequence, database/key identity and final cursor must match. It rejects rollback, same-sequence forks, gaps, broken bridges, identity mismatches and peer targets not reached by the signed bridge.
+
+This detects a witness split view **only when consumers exchange checkpoint proofs or a monitor compares them**. A hidden fork remains invisible to isolated clients. This package is not a gossip network, transparency log, quorum witness or availability service.
