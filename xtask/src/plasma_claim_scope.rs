@@ -91,6 +91,8 @@ const RULES: &[MethodRule] = &[
     MethodRule { method_id: "ASTM_D1151", edition: "D1151-00R22", evidence_kind: "conditioning_practice", material_pair_classes: &["adhesive_bonded_specimens"], geometry: "continuous_environmental_conditioning", endpoint: "moisture_temperature_exposure_protocol", allowed_claims: &["conditioning_protocol_reference"], claim_ceiling: "continuous moisture/temperature conditioning protocol reference only; retained-strength outcome requires its own qualified test evidence" },
     MethodRule { method_id: "ASTM_D1183", edition: "D1183-03R19", evidence_kind: "conditioning_practice", material_pair_classes: &["adhesive_bonded_specimens"], geometry: "cyclic_environmental_conditioning", endpoint: "cyclic_temperature_humidity_exposure_protocol", allowed_claims: &["conditioning_protocol_reference"], claim_ceiling: "cyclic temperature/humidity conditioning protocol reference only; it does not by itself establish service-life equivalence" },
     MethodRule { method_id: "ASTM_D4896", edition: "D4896-01R24", evidence_kind: "interpretation_guide", material_pair_classes: &["single_lap_bonded_joint"], geometry: "single_lap", endpoint: "single_lap_result_interpretation_guidance", allowed_claims: &["interpretation_guidance_reference"], claim_ceiling: "guidance reference for interpreting single-lap adhesive-joint strength results; not a test measurement or design allowable" },
+    MethodRule { method_id: "ASTM_D5656_D5656M", edition: "D5656/D5656M-26", evidence_kind: "measurement", material_pair_classes: &["aluminum_thick_adherend_joint"], geometry: "thick_adherend_lap", endpoint: "adhesive_shear_stress_strain_response", allowed_claims: &["adhesive_constitutive_response_observation"], claim_ceiling: "adhesive shear stress-strain, proportional-limit and shear-strain-at-failure characterization for the stated aluminum thick-adherend specimen; not substrate-specific adhesion strength or a design allowable" },
+    MethodRule { method_id: "ASTM_D5573", edition: "D5573-99R19", evidence_kind: "classification_practice", material_pair_classes: &["frp_smc_joint"], geometry: "failure_surface_classification", endpoint: "frp_joint_failure_mode_classification", allowed_claims: &["failure_mode_classification_reference"], claim_ceiling: "descriptive classification of failure modes for the scoped SMC FRP adhesive joint; the practice does not judge acceptability, strength, product disposition or safety" },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,6 +140,14 @@ fn is_known_overclaim(claim: &str) -> bool {
             | "bond_strength_from_contact_angle"
             | "fatigue_life"
             | "equivalence_from_nonsignificance"
+            | "substrate_adhesion_strength"
+            | "interfacial_adhesion_strength"
+            | "bond_strength_from_adhesive_constitutive_response"
+            | "failure_mode_acceptability"
+            | "acceptable_failure_mode"
+            | "failure_mode_design_allowable"
+            | "acceptability_from_classification"
+            | "product_disposition"
     )
 }
 
@@ -192,6 +202,24 @@ pub(super) fn decide(case: &ScopeEvidence) -> Decision {
         let _documented_review_digest = case.suitability_review_sha256.as_deref();
         return blocked(
             "D3762-24 defaults to aluminium-to-aluminium; use on other materials requires a separate thickness/rigidity suitability review that S0 does not authenticate or approve",
+            rule.claim_ceiling,
+        );
+    }
+
+    if case.method_id == "ASTM_D5656_D5656M"
+        && case.material_pair_class != "aluminum_thick_adherend_joint"
+    {
+        return blocked(
+            "D5656/D5656M-26 was developed using bonded aluminum adherends; non-aluminum applicability is not assumed and requires a separately qualified scope bridge",
+            rule.claim_ceiling,
+        );
+    }
+
+    if case.method_id == "ASTM_D5573"
+        && case.material_pair_class != "frp_smc_joint"
+    {
+        return blocked(
+            "D5573-99R19 was developed for the stated SMC FRP joint family; generalized CFRP or other FRP applicability requires a separately reviewed scope bridge",
             rule.claim_ceiling,
         );
     }
