@@ -230,3 +230,86 @@ The first bounded demonstrator is the existing non-PPE woven overshirt. Separate
 The new issue records proposed targets only: zero accepted hard-constraint violations; zero unsupported comfort/durability/weather/composition claims; 20% reduction in selected rework/failure events; 20% improvement in a preregistered durability-retention endpoint without degrading wearer acceptance; and at least 15% improvement in a declared comfort or mobility profile without material lower-tail harm. These are not measured results, standards or industry benchmarks.
 
 Issue and full protocol: https://github.com/Luminous-Dynamics/symthaea/issues/12157
+
+
+## 10. Clothing-native exosuits and global terrestrial wear (14 November 2026)
+
+New workstream: [EXOSUIT-GARMENT-001 #12162](https://github.com/Luminous-Dynamics/symthaea/issues/12162). This is an apparel/interface product owner, not a duplicate exosuit controller, dynamics engine, human-device safety authority or cloth solver. It composes MOBILITY-ASSIST-001 #7766, MOBILITY-ASSIST-006 #7850, MOBILITY-ASSIST-008 #7880, MOBILITY-ASSIST-009 #7890, benchmark harness #7784, Everyday Wear #12157, and the existing garment/compiler and Symtropy/Sol-Atlas/Mycelix interfaces.
+
+### Research frontier
+
+**Texoskeletons (first published 6 May 2026).** The *Advanced Functional Materials* paper explores textile-integrated one-dimensional pneumatic actuators and triboelectric movement sensors. In its reported setup, three actuators grouped in a textile lifted more than 300 g, and a wrist sleeve with 14 actuators and four sensors demonstrated wearable integration; wrist-motion classification was 85.71%. This is a research prototype and a useful textile-robotics comparator—not evidence of full-body load-bearing, all-weather, clinically effective or production-ready clothing.
+
+Paper: https://doi.org/10.1002/adfm.75714
+
+**System-level lightweight design review (7 July 2026).** A *Frontiers in Mechanical Engineering* review compares rigid, textile and hybrid lower-limb systems. It highlights that system mass alone is insufficient: distal mass, stiffness, load paths, human-device coupled dynamics and assistance mechanism placement matter. Its comparison table lists a 3.8–4.1 kg portable textile exosuit and much heavier rigid systems, but these are secondary-source representative values across different products and must not be treated as a controlled leaderboard.
+
+Paper: https://doi.org/10.3389/fmech.2026.1835857
+
+**Soft exosuit feasibility (2026).** A *Nature Communications* study of ten older adults reports a 2.86 kg textile-based hip exosuit, a mean 1.8 additional one-minute sit-to-stand repetitions and 13.6% lower walking metabolic cost in the powered-on versus powered-off comparison. The sample is small and task/population-specific; it is not directly comparable to consumer hiking products or proof of general benefit.
+
+Paper: https://doi.org/10.1038/s41467-026-75528-1
+
+**Consumer outdoor comparator (Hypershell X Ultra S).** The manufacturer lists 2,538 g total wearing weight including battery, IP54 and a -20 °C to 60 °C operating-temperature range. These are manufacturer-published specifications; the product page is not an independent environmental or biomechanical test. IP54 applies to the stated product configuration, not automatically every garment seam, connector, cable exit or wearer interface.
+
+Manufacturer page: https://hypershell.tech/en-us/blogs/news/inside-the-new-hypershell-x-series-upgrades-real-world-impact-and-faq
+
+**Skin shear and interface.** An October 2026 article proposes a shear-isolating actuation path using layered webbing and a movable pulley; its motivation is that tendon-driven systems can cause chafing even when additional padding adds bulk. Treat this as a design hypothesis requiring independent reproduction, not as an established safety threshold.
+
+Paper: https://doi.org/10.1002/adrr.70177
+
+### Competitive interpretation and design hypothesis
+
+Do not claim novelty for textile exosuits, garment-integrated sensors/actuators, lightweight outdoor exoskeletons or IP-rated consumer exoskeletons. The differentiator to test is an evidence-qualified **clothing-native platform** with separately replaceable:
+1. skin-interface / comfort liner;
+2. load-path garment chassis and mechanical anchors;
+3. removable actuation, transmission, sensing, controller and battery modules;
+4. climate / weather / abrasion shell modules.
+
+Keep load-bearing seams distinct from decorative seams. Do not assume the outer weather shell is structurally qualified. Removable electronics and washable textile parts are preferred. Textile sensors and actuators stay optional until wash, sweat, UV, fatigue, drift, thermal and connector behaviour is qualified.
+
+Keep passive support, powered soft assist, all-weather garment kit and specialist protective/EVA systems as different product profiles. A terrestrial outdoor garment is not an EVA pressure suit, survival garment or PPE product.
+
+### Lightweight and environmental benchmarks
+
+The new issue records a conditional research hypothesis of ≤2.0 kg total worn mass including battery for one future powered terrestrial hip-assist profile, but only if frozen matched testing demonstrates non-inferior assistance, task effectiveness, runtime, fit, reliability and safety against a named 2.5–3 kg comparison class. This is not an achieved result, not a release requirement, and not a reason to sacrifice function. Report proximal/distal mass, moment/inertia impact, volume, pressure/shear, thermal burden and don/doff burden—not mass alone.
+
+Build explicit environmental profiles: hot/dry plus dust and solar load; hot/humid plus sweat and heavy rain; cool/wet plus wind; cold start and cold-weather operation; salt/coastal exposure; mud/grit/cleaning; and indoor/outdoor thermal transitions. For each, freeze exposure duration, temperature, humidity, rain/dust/UV condition, movement and recovery profile. "Global" means a tested family of terrestrial use envelopes, not a universal claim across every hazard.
+
+Separate device-enclosure ingress tests from textile rain/water tests, garment seam/closure performance, battery safety/temperature, connector contamination and complete worn-system function. Exclude fire, chemical/biological hazard, immersion, severe storm, avalanche, toxic atmosphere, vacuum and radiation unless a separate specialist product programme exists.
+
+### Standards and risk context
+
+- ASTM F3474-25 is an active practice for selecting functional ergonomic parameters and metrics for exoskeleton evaluation; it is not a complete safety case: https://store.astm.org/f3474-25.html
+- ASTM F3392-20 covers user information for wearing, care and maintenance: https://store.astm.org/standards/f3392
+- ASTM F3527-24 is a task-specific environmental risk-assessment guide for exoskeleton deployment: https://shop.standards.ie/en-ie/standards/astm-f-3527-2024-1276363_saig_astm_astm_3509866/
+- ISO 13482:2014 is listed by ISO as current but under revision; it addresses earthbound personal-care robots and excludes medical-device and industrial-robot categories. Product classification and applicability must be reviewed for the specific intended use: https://www.iso.org/standard/53820.html
+
+Consult licensed standards text and qualified domain reviewers before freezing a conformity or test claim.
+
+## 11. Post-futurist travel robe
+
+New workstream: [TRAVEL-ROBE-001 #12163](https://github.com/Luminous-Dynamics/symthaea/issues/12163). It composes the Personal Garment Studio #12093, Everyday Wear #12157, Wardrobe-First Optimization #12094, apparel digital thread #11731, pattern interoperability #11750, sewing-plan compiler #12134 and textile qualification #5984.
+
+The concept is an elegant, comfortable, non-PPE travel robe or wrap-coat family: home/accommodation, terminal waiting, seated aircraft/train/bus travel, walking and variable indoor/outdoor conditions. The design language should be restrained and architectural rather than costume-like or gadget-heavy. Cultural and ceremonial references require user intent, respect and provenance; no single robe silhouette is treated as a universal aesthetic.
+
+Key engineering questions:
+- Can the robe remain comfortable sitting/reclining as well as standing and walking?
+- Are closures stable but easy to operate, including one-handed variants when requested?
+- Are passport/phone/ticket pockets reachable while seated, without distorting drape or creating pressure?
+- Do hem, sleeve and belt elements avoid snagging on seats, luggage, wheels and steps?
+- Can the garment layer across temperature changes without one heavy "all-season" material?
+- Does it pack compactly, recover from creasing, dry under realistic conditions, survive laundering and remain repairable?
+- Does the user control silhouette, fit, length, coverage, pocket map, material hand and aesthetic direction?
+
+**TravelRobeBench v0.1** separates seated comfort, mobility, closure/pocket function, tactile/thermal comfort, pack volume, care, durability, style acceptance and rights/provenance. Compare with named garments of matched coverage, warmth and price class. A hidden pocket is not an anti-theft guarantee; a render is not a sewable pattern; a quick-dry label is not measured drying.
+
+The first execution tranche is a rights-aware design brief, three silhouette hypotheses, a seated-use task map, editable pattern and typed sewing-plan fixture, synthetic negative controls, then physical sample and wearer evaluation.
+
+Issue: https://github.com/Luminous-Dynamics/symthaea/issues/12163
+
+## 12. Overall strategic conclusion
+
+Atelier should not become a styling interface attached to a collection of disconnected devices. It can become the human-authored clothing and wearable-product compiler that connects garment intent, spatial fit, textile structure, mechanical interfaces, environmental modules, manufacturing plans, physical qualification, care, repair and product history.
+
+The meaningful competitive question is not "Can we render a futuristic suit or robe?" It is whether a wearer can use the resulting garment in real tasks, in declared environments, with acceptable comfort and burden, while the design and evidence remain inspectable and repairable.
