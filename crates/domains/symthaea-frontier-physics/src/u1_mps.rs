@@ -625,6 +625,302 @@ pub struct U1MpoOperator {
     tolerance: f64,
 }
 
+
+
+impl U1MpoOperator {
+    pub fn new(
+        tensors: Vec<U1MpoTensor>,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if tensors.is_empty() {
+            return Err(U1MpsError::EmptyChain);
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let first = &tensors[0];
+        if first.left_dimension() != 1 || first.left_fluxes[0] != 0 {
+            return Err(U1MpsError::MpoLeftBoundary {
+                dimension: first.left_dimension(),
+                flux: first.left_fluxes.first().copied(),
+            });
+        }
+        let last = tensors.last().expect("nonempty MPO");
+        if last.right_dimension() != 1 || last.right_fluxes[0] != 0 {
+            return Err(U1MpsError::MpoRightBoundary {
+                dimension: last.right_dimension(),
+                flux: last.right_fluxes.first().copied(),
+            });
+        }
+
+        for bond in 0..tensors.len() - 1 {
+            if tensors[bond].right_fluxes != tensors[bond + 1].left_fluxes {
+                return Err(U1MpsError::MpoBondFluxMismatch { bond });
+            }
+        }
+
+        let mut selection_rule_residual = 0.0_f64;
+        for (site, tensor) in tensors.iter().enumerate() {
+            let (amplitude, left, output_physical, input_physical, right) =
+                tensor.maximum_forbidden_amplitude();
+            selection_rule_residual = selection_rule_residual.max(amplitude);
+            if amplitude > tolerance {
+                return Err(U1MpsError::MpoChargeSelectionRule {
+                    site,
+                    left_flux: tensor.left_fluxes[left],
+                    output_physical,
+                    input_physical,
+                    right_flux: tensor.right_fluxes[right],
+                    amplitude,
+                    tolerance,
+                });
+            }
+        }
+
+        Ok(Self {
+            tensors,
+            selection_rule_residual,
+            tolerance,
+        })
+    }
+
+    pub fn site_count(&self) -> usize {
+        self.tensors.len()
+    }
+
+    pub fn tensors(&self) -> &[U1MpoTensor] {
+        &self.tensors
+    }
+
+    pub fn selection_rule_residual(&self) -> f64 {
+        self.selection_rule_residual
+    }
+
+    /// Apply the MPO exactly, fusing MPS state-charge and MPO flux bonds.
+    ///
+    /// The result is not truncated or renormalized. Its bond dimensions are
+    /// products of the input MPS and MPO bond dimensions.
+    pub fn apply(&self, state: &ComplexU1Mps) -> Result<ComplexU1Mps, U1MpsError> {
+        if state.site_count() != self.site_count() {
+            return Err(U1MpsError::MpoSiteCountMismatch {
+                mpo_sites: self.site_count(),
+                mps_sites: state.site_count(),
+            });
+        }
+
+        let mut output_tensors = Vec::with_capacity(self.site_count());
+        for (mps_tensor, mpo_tensor) in state.tensors.iter().zip(self.tensors.iter()) {
+            let left_dimension = mps_tensor
+                .left_dimension()
+                .checked_mul(mpo_tensor.left_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let right_dimension = mps_tensor
+                .right_dimension()
+                .checked_mul(mpo_tensor.right_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let entries = left_dimension
+                .checked_mul(2)
+                .and_then(|value| value.checked_mul(right_dimension))
+                .ok_or(U1MpsError::DimensionOverflow)?;
+
+            let mut left_charges = Vec::with_capacity(left_dimension);
+            for state_charge in mps_tensor.left_charges() {
+                for flux in mpo_tensor.left_fluxes() {
+                    left_charges.push(*state_charge + *flux);
+                }
+            }
+            let mut right_charges = Vec::with_capacity(right_dimension);
+            for state_charge in mps_tensor.right_charges() {
+                for flux in mpo_tensor.right_fluxes() {
+                    right_charges.push(*state_charge + *flux);
+                }
+            }
+
+            let mut data = vec![Complex64::new(0.0, 0.0); entries];
+            for state_left in 0..mps_tensor.left_dimension() {
+                for mpo_left in 0..mpo_tensor.left_dimension() {
+                    let fused_left = state_left * mpo_tensor.left_dimension() + mpo_left;
+                    for output_physical in 0..2 {
+                        for state_right in 0..mps_tensor.right_dimension() {
+                            for mpo_right in 0..mpo_tensor.right_dimension() {
+                                let fused_right =
+                                    state_right * mpo_tensor.right_dimension() + mpo_right;
+                                let mut amplitude = Complex64::new(0.0, 0.0);
+                                for input_physical in 0..2 {
+                                    amplitude += mps_tensor.get(
+                                        state_left,
+                                        input_physical,
+                                        state_right,
+                                    ) * mpo_tensor.get(
+                                        mpo_left,
+                                        output_physical,
+                                        input_physical,
+                                        mpo_right,
+                                    );
+                                }
+                                let index =
+                                    (fused_left * 2 + output_physical) * right_dimension
+                                        + fused_right;
+                                data[index] = amplitude;
+                            }
+                        }
+                    }
+                }
+            }
+
+            output_tensors.push(U1MpsTensor::new(
+                left_charges,
+                right_charges,
+                data,
+            )?);
+        }
+
+        ComplexU1Mps::new(
+            output_tensors,
+            state.total_charge(),
+            self.tolerance,
+        )
+    }
+
+    /// Contract <state|MPO|state> without materializing a dense state vector.
+    ///
+    /// The result is complex because the MPO is not required to be Hermitian.
+    /// Hermitian-energy callers should separately bound its imaginary part.
+    pub fn expectation_value(
+        &self,
+        state: &ComplexU1Mps,
+    ) -> Result<Complex64, U1MpsError> {
+        if state.site_count() != self.site_count() {
+            return Err(U1MpsError::MpoSiteCountMismatch {
+                mpo_sites: self.site_count(),
+                mps_sites: state.site_count(),
+            });
+        }
+
+        let mut environment = vec![Complex64::new(1.0, 0.0)];
+        let mut bra_dimension = 1_usize;
+        let mut mpo_dimension = 1_usize;
+        let mut ket_dimension = 1_usize;
+
+        for (mps_tensor, mpo_tensor) in state.tensors.iter().zip(self.tensors.iter()) {
+            if bra_dimension != mps_tensor.left_dimension()
+                || ket_dimension != mps_tensor.left_dimension()
+                || mpo_dimension != mpo_tensor.left_dimension()
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "MPO expectation environment shape",
+                ));
+            }
+            let next_bra = mps_tensor.right_dimension();
+            let next_mpo = mpo_tensor.right_dimension();
+            let next_ket = mps_tensor.right_dimension();
+            let next_entries = next_bra
+                .checked_mul(next_mpo)
+                .and_then(|value| value.checked_mul(next_ket))
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut next = vec![Complex64::new(0.0, 0.0); next_entries];
+
+            for bra_left in 0..bra_dimension {
+                for mpo_left in 0..mpo_dimension {
+                    for ket_left in 0..ket_dimension {
+                        let environment_index =
+                            (bra_left * mpo_dimension + mpo_left) * ket_dimension + ket_left;
+                        let environment_value = environment[environment_index];
+                        for output_physical in 0..2 {
+                            for input_physical in 0..2 {
+                                for bra_right in 0..next_bra {
+                                    let bra_value =
+                                        mps_tensor.get(bra_left, output_physical, bra_right).conj();
+                                    for mpo_right in 0..next_mpo {
+                                        let mpo_value = mpo_tensor.get(
+                                            mpo_left,
+                                            output_physical,
+                                            input_physical,
+                                            mpo_right,
+                                        );
+                                        for ket_right in 0..next_ket {
+                                            let ket_value = mps_tensor.get(
+                                                ket_left,
+                                                input_physical,
+                                                ket_right,
+                                            );
+                                            let next_index = (bra_right * next_mpo + mpo_right)
+                                                * next_ket
+                                                + ket_right;
+                                            next[next_index] += environment_value
+                                                * bra_value
+                                                * mpo_value
+                                                * ket_value;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "MPO expectation environment",
+                ));
+            }
+            environment = next;
+            bra_dimension = next_bra;
+            mpo_dimension = next_mpo;
+            ket_dimension = next_ket;
+        }
+
+        if bra_dimension != 1 || mpo_dimension != 1 || ket_dimension != 1 {
+            return Err(U1MpsError::NonFiniteContraction(
+                "MPO expectation open-boundary contraction",
+            ));
+        }
+        Ok(environment[0])
+    }
+
+    /// Expand the operator to a dense matrix for small-system qualification.
+    ///
+    /// Computational basis ordering is MSB-first. This routine enumerates basis
+    /// columns and is bounded by maximum_sites; it is not a scalable execution
+    /// method.
+    pub fn to_dense(&self, maximum_sites: usize) -> Result<Vec<Complex64>, U1MpsError> {
+        if self.site_count() > maximum_sites {
+            return Err(U1MpsError::DenseExpansionTooLarge {
+                sites: self.site_count(),
+                maximum_sites,
+            });
+        }
+        let shift = u32::try_from(self.site_count())
+            .map_err(|_| U1MpsError::DimensionOverflow)?;
+        let dimension = 1_usize
+            .checked_shl(shift)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let entries = dimension
+            .checked_mul(dimension)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut dense = vec![Complex64::new(0.0, 0.0); entries];
+
+        for input_index in 0..dimension {
+            let bits = (0..self.site_count())
+                .map(|site| ((input_index >> (self.site_count() - 1 - site)) & 1) != 0)
+                .collect::<Vec<_>>();
+            let basis_state = ComplexU1Mps::product_state(&bits)?;
+            let output_state = self.apply(&basis_state)?;
+            let column = output_state.to_dense(maximum_sites)?;
+            for output_index in 0..dimension {
+                dense[output_index * dimension + input_index] = column[output_index];
+            }
+        }
+        Ok(dense)
+    }
+}
+
+
 /// Measured mixed-canonical gauge receipt for a two-site center at a bond.
 ///
 /// Sites [0,bond) are left-isometric and sites (bond+1,N) are right-isometric.
