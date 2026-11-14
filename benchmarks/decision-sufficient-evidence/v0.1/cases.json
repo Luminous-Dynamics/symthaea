@@ -1,0 +1,601 @@
+{
+  "corpus_version": "0.1",
+  "synthetic": true,
+  "status": "development",
+  "as_of": "2026-11-14T08:00:00Z",
+  "cases": [
+    {
+      "scenario_id": "VOI-001",
+      "case_family": "single_critical_blocker",
+      "description": "Custody and identity are supported; only title is unresolved for a proposed disposal.",
+      "decision": {
+        "action": "approve_property_disposal",
+        "purpose": "disposal_due_diligence",
+        "asset_ref": "PROPERTY-001",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 100,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "title",
+          "consequence": "hard_blocker",
+          "disposition": "indeterminate",
+          "rationale": "Title must be established before disposal approval."
+        },
+        {
+          "dimension": "condition",
+          "consequence": "noncritical",
+          "disposition": "stale",
+          "rationale": "A current inspection would be useful but is not the disposal authority blocker."
+        }
+      ],
+      "existing_evidence": [
+        {
+          "source_ref": "SRC-CUSTODY-001",
+          "claim_dimension": "custody",
+          "disposition": "supported",
+          "competence": "competent",
+          "freshness": "fresh",
+          "upstream_provider_ref": "CUSTODY-REGISTRY-A"
+        }
+      ],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-001-A",
+          "source_ref": "SRC-REGISTRY-DIRECT",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.98,
+          "acquisition_cost_units": 3,
+          "latency_minutes": 45,
+          "disclosure_fields": [
+            "asset_ref",
+            "legal_entity_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref",
+            "legal_entity_ref"
+          ],
+          "upstream_provider_ref": "LAND-REGISTRY-A"
+        },
+        {
+          "request_ref": "REQ-001-B",
+          "source_ref": "SRC-INSPECTION-PHOTO",
+          "resolves_dimensions": [
+            "condition"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.2,
+          "acquisition_cost_units": 0.3,
+          "latency_minutes": 5,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "INSPECTOR-A"
+        },
+        {
+          "request_ref": "REQ-001-C",
+          "source_ref": "SRC-PORTFOLIO-AGG",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "unknown",
+          "freshness": "stale",
+          "availability": "available",
+          "expected_information_gain": 0.3,
+          "acquisition_cost_units": 0.2,
+          "latency_minutes": 2,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "CUSTODY-REGISTRY-A"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-002",
+      "case_family": "freshness_dominates_low_cost",
+      "description": "The only encumbrance record is stale; a cached copy is cheap but cannot answer the current-state question.",
+      "decision": {
+        "action": "assess_current_encumbrances",
+        "purpose": "disposal_due_diligence",
+        "asset_ref": "PROPERTY-002",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 80,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "encumbrance",
+          "consequence": "hard_blocker",
+          "disposition": "stale",
+          "rationale": "Disposal requires current encumbrance status."
+        }
+      ],
+      "existing_evidence": [
+        {
+          "source_ref": "SRC-OLD-REGISTER-002",
+          "claim_dimension": "encumbrance",
+          "disposition": "stale",
+          "competence": "competent",
+          "freshness": "stale",
+          "upstream_provider_ref": "REGISTRY-B"
+        }
+      ],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-002-A",
+          "source_ref": "SRC-CURRENT-REGISTRY-B",
+          "resolves_dimensions": [
+            "encumbrance"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.97,
+          "acquisition_cost_units": 2,
+          "latency_minutes": 90,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-B"
+        },
+        {
+          "request_ref": "REQ-002-B",
+          "source_ref": "SRC-CACHED-REPEAT",
+          "resolves_dimensions": [
+            "encumbrance"
+          ],
+          "competence": "competent",
+          "freshness": "stale",
+          "availability": "available",
+          "expected_information_gain": 0.1,
+          "acquisition_cost_units": 0.1,
+          "latency_minutes": 1,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-B"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-003",
+      "case_family": "common_cause_independence",
+      "description": "A portfolio dashboard and a mirrored registry feed share one upstream aggregator; a direct registrar source is slower but independent.",
+      "decision": {
+        "action": "evaluate_independent_title_support",
+        "purpose": "disposal_due_diligence",
+        "asset_ref": "PROPERTY-003",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 90,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "title",
+          "consequence": "hard_blocker",
+          "disposition": "contested",
+          "rationale": "Two independent competent sources are required by the approved review protocol."
+        }
+      ],
+      "existing_evidence": [
+        {
+          "source_ref": "SRC-MIRROR-003",
+          "claim_dimension": "title",
+          "disposition": "supported",
+          "competence": "competent",
+          "freshness": "fresh",
+          "upstream_provider_ref": "AGGREGATOR-X"
+        }
+      ],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-003-A",
+          "source_ref": "SRC-PORTFOLIO-SUMMARY",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.4,
+          "acquisition_cost_units": 0.3,
+          "latency_minutes": 2,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "AGGREGATOR-X"
+        },
+        {
+          "request_ref": "REQ-003-B",
+          "source_ref": "SRC-DIRECT-REGISTRAR",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.95,
+          "acquisition_cost_units": 4,
+          "latency_minutes": 120,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "REGISTRAR-DIRECT"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-004",
+      "case_family": "minimum_disclosure",
+      "description": "A title verification request can be satisfied by a limited extract; a full owner file contains unnecessary personal and financial fields.",
+      "decision": {
+        "action": "verify_registered_interest",
+        "purpose": "due_diligence",
+        "asset_ref": "PROPERTY-004",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 70,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "title",
+          "consequence": "hard_blocker",
+          "disposition": "indeterminate",
+          "rationale": "The institution needs the registered entity and parcel linkage, not private contact or banking details."
+        }
+      ],
+      "existing_evidence": [],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-004-A",
+          "source_ref": "SRC-FULL-OWNER-FILE",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.99,
+          "acquisition_cost_units": 1,
+          "latency_minutes": 10,
+          "disclosure_fields": [
+            "asset_ref",
+            "legal_entity_ref",
+            "home_address",
+            "bank_account",
+            "personal_phone"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref",
+            "legal_entity_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-C"
+        },
+        {
+          "request_ref": "REQ-004-B",
+          "source_ref": "SRC-REDACTED-TITLE-EXTRACT",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.96,
+          "acquisition_cost_units": 1.2,
+          "latency_minutes": 15,
+          "disclosure_fields": [
+            "asset_ref",
+            "legal_entity_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref",
+            "legal_entity_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-C"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-005",
+      "case_family": "no_competent_authority_evidence",
+      "description": "Collection transfer authority is unresolved; an inventory record and a custodian letter cannot establish institutional delegation.",
+      "decision": {
+        "action": "authorize_collection_transfer",
+        "purpose": "approved_collection_transfer",
+        "asset_ref": "COLLECTION-005",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 120,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "operational_authority",
+          "consequence": "hard_blocker",
+          "disposition": "indeterminate",
+          "rationale": "A valid appointment/delegation instrument from the competent governance body is required."
+        }
+      ],
+      "existing_evidence": [
+        {
+          "source_ref": "SRC-INVENTORY-005",
+          "claim_dimension": "custody",
+          "disposition": "supported",
+          "competence": "competent",
+          "freshness": "fresh",
+          "upstream_provider_ref": "CUSTODIAN-A"
+        }
+      ],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-005-A",
+          "source_ref": "SRC-CUSTODIAN-LETTER",
+          "resolves_dimensions": [
+            "operational_authority"
+          ],
+          "competence": "incompetent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.2,
+          "acquisition_cost_units": 0.2,
+          "latency_minutes": 5,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "CUSTODIAN-A"
+        },
+        {
+          "request_ref": "REQ-005-B",
+          "source_ref": "SRC-GOVERNANCE-REGISTER-UNAVAILABLE",
+          "resolves_dimensions": [
+            "operational_authority"
+          ],
+          "competence": "unknown",
+          "freshness": "fresh",
+          "availability": "unavailable",
+          "expected_information_gain": 0.4,
+          "acquisition_cost_units": 0,
+          "latency_minutes": 0,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "GOVERNANCE-SECRETARIAT"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-006",
+      "case_family": "acquisition_cost_exceeds_benefit",
+      "description": "A low-value maintenance request would require an expensive specialist report; the action benefit does not justify acquisition or disclosure cost.",
+      "decision": {
+        "action": "approve_minor_repair",
+        "purpose": "routine_maintenance",
+        "asset_ref": "SITE-006",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 2,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "condition",
+          "consequence": "material",
+          "disposition": "indeterminate",
+          "rationale": "A specialist inspection could reduce uncertainty but exceeds the value of this low-impact repair."
+        }
+      ],
+      "existing_evidence": [],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-006-A",
+          "source_ref": "SRC-SPECIALIST-REPORT",
+          "resolves_dimensions": [
+            "condition"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.98,
+          "acquisition_cost_units": 10,
+          "latency_minutes": 240,
+          "disclosure_fields": [
+            "asset_ref",
+            "site_access_details"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref",
+            "site_access_details"
+          ],
+          "upstream_provider_ref": "SPECIALIST-FIRM"
+        },
+        {
+          "request_ref": "REQ-006-B",
+          "source_ref": "SRC-REMOTE-THERMAL-SCAN",
+          "resolves_dimensions": [
+            "condition"
+          ],
+          "competence": "unknown",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.4,
+          "acquisition_cost_units": 4,
+          "latency_minutes": 60,
+          "disclosure_fields": [
+            "asset_ref",
+            "site_access_details"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref",
+            "site_access_details"
+          ],
+          "upstream_provider_ref": "REMOTE-VENDOR"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-007",
+      "case_family": "safe_partial_work",
+      "description": "Title is unresolved, but the approved work order permits a routine visual condition inspection without transfer, occupancy or title action.",
+      "decision": {
+        "action": "schedule_routine_inspection",
+        "purpose": "maintenance_planning",
+        "asset_ref": "PROPERTY-007",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 20,
+        "authorized_to_proceed_with_partial_evidence": true
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "title",
+          "consequence": "noncritical",
+          "disposition": "indeterminate",
+          "rationale": "Title is not a precondition for this limited inspection under the approved work order."
+        },
+        {
+          "dimension": "condition",
+          "consequence": "material",
+          "disposition": "unavailable",
+          "rationale": "A current condition observation is needed to schedule the maintenance window."
+        }
+      ],
+      "existing_evidence": [],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-007-A",
+          "source_ref": "SRC-CURRENT-CONDITION-INSPECTION",
+          "resolves_dimensions": [
+            "condition"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.92,
+          "acquisition_cost_units": 1,
+          "latency_minutes": 30,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "INSPECTOR-B"
+        },
+        {
+          "request_ref": "REQ-007-B",
+          "source_ref": "SRC-TITLE-REGISTRY",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "available",
+          "expected_information_gain": 0.98,
+          "acquisition_cost_units": 5,
+          "latency_minutes": 120,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-D"
+        }
+      ]
+    },
+    {
+      "scenario_id": "VOI-008",
+      "case_family": "outage_is_not_negative_evidence",
+      "description": "The primary registry endpoint is unavailable; a second competent registry adapter can return the authoritative record after a short delay.",
+      "decision": {
+        "action": "assess_title_status",
+        "purpose": "transaction_due_diligence",
+        "asset_ref": "PROPERTY-008",
+        "deadline_at": "2026-11-15T12:00:00Z",
+        "expected_benefit_units": 60,
+        "authorized_to_proceed_with_partial_evidence": false
+      },
+      "evidence_gaps": [
+        {
+          "dimension": "title",
+          "consequence": "hard_blocker",
+          "disposition": "unavailable",
+          "rationale": "No title disposition is supportable while all competent current sources are unavailable."
+        }
+      ],
+      "existing_evidence": [],
+      "candidate_requests": [
+        {
+          "request_ref": "REQ-008-A",
+          "source_ref": "SRC-PRIMARY-REGISTRY",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "unavailable",
+          "expected_information_gain": 0,
+          "acquisition_cost_units": 0,
+          "latency_minutes": 0,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-E"
+        },
+        {
+          "request_ref": "REQ-008-B",
+          "source_ref": "SRC-SECONDARY-REGISTRY-ADAPTER",
+          "resolves_dimensions": [
+            "title"
+          ],
+          "competence": "competent",
+          "freshness": "fresh",
+          "availability": "delayed",
+          "expected_information_gain": 0.94,
+          "acquisition_cost_units": 1.5,
+          "latency_minutes": 45,
+          "disclosure_fields": [
+            "asset_ref"
+          ],
+          "permitted_disclosure_fields": [
+            "asset_ref"
+          ],
+          "upstream_provider_ref": "REGISTRY-E"
+        }
+      ]
+    }
+  ]
+}
