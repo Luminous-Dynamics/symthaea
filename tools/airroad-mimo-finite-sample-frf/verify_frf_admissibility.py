@@ -77,11 +77,12 @@ def check_aliases(normalized_frequencies: list[Fraction]) -> dict[str, Any]:
 def decode_design(
     design: dict[str, Any],
     expected_frequency_ids: list[str],
+    experiments: int,
     n_inputs: int,
 ) -> tuple[list[list[Fraction]], list[list[list[Fraction]]], list[list[Fraction]]]:
     a0 = decode_matrix(design["dc_offset_matrix_a0"])
-    if len(a0) != n_inputs or len(a0[0]) != n_inputs:
-        raise ValueError("A0 dimensions do not match n_inputs")
+    if len(a0) != experiments or len(a0[0]) != n_inputs:
+        raise ValueError("A0 dimensions do not match experiments x n_inputs")
 
     line_records = design["frequency_matrices"]
     if [item["frequency_id"] for item in line_records] != expected_frequency_ids:
@@ -93,12 +94,12 @@ def decode_design(
         amplitudes = decode_matrix(record["amplitudes"])
         a_l = decode_matrix(record["a_l"])
         signs = record["phase_signs"]
-        if len(amplitudes) != n_inputs or len(amplitudes[0]) != n_inputs:
-            raise ValueError("amplitude matrix dimensions do not match n_inputs")
-        if len(a_l) != n_inputs or len(a_l[0]) != n_inputs:
-            raise ValueError("A_l dimensions do not match n_inputs")
-        if len(signs) != n_inputs or any(len(row) != n_inputs for row in signs):
-            raise ValueError("phase sign matrix dimensions do not match n_inputs")
+        if len(amplitudes) != experiments or len(amplitudes[0]) != n_inputs:
+            raise ValueError("amplitude matrix dimensions do not match experiments x n_inputs")
+        if len(a_l) != experiments or len(a_l[0]) != n_inputs:
+            raise ValueError("A_l dimensions do not match experiments x n_inputs")
+        if len(signs) != experiments or any(len(row) != n_inputs for row in signs):
+            raise ValueError("phase sign matrix dimensions do not match experiments x n_inputs")
         if any(sign not in (-1, 1) for row in signs for sign in row):
             raise ValueError("V0.1 phase signs must be +1 or -1")
         if any(value <= 0 for row in amplitudes for value in row):
@@ -131,7 +132,7 @@ def exact_design_gate(data: dict[str, Any]) -> dict[str, Any]:
 
     alias = check_aliases(q_values)
     a0, line_matrices, amplitudes = decode_design(
-        data["input_design"], frequency_ids, n_inputs
+        data["input_design"], frequency_ids, experiments, n_inputs
     )
     determinants = {
         "a0": determinant_2x2(a0),
@@ -283,6 +284,10 @@ def run_negative_controls(data: dict[str, Any]) -> None:
 
     # A_l rank failure is independent of A0 rank.
     rank_deficient_line = json.loads(json.dumps(data))
+    rank_deficient_line["input_design"]["frequency_matrices"][0]["phase_signs"] = [
+        [1, 1],
+        [1, 1],
+    ]
     rank_deficient_line["input_design"]["frequency_matrices"][0]["a_l"] = [
         [{"numerator": "1", "denominator": "2"},
          {"numerator": "1", "denominator": "2"}],
@@ -304,7 +309,12 @@ def run_negative_controls(data: dict[str, Any]) -> None:
 
     insufficient_experiments = json.loads(json.dumps(data))
     insufficient_experiments["dimensions"]["experiments"] = 1
-    assert exact_design_gate(insufficient_experiments)["ls_unbiasedness_eligible"] is False
+    try:
+        exact_design_gate(insufficient_experiments)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("experiment/design matrix row mismatch was accepted")
 
     insufficient_samples = json.loads(json.dumps(data))
     insufficient_samples["dimensions"]["samples_per_experiment"] = 4
