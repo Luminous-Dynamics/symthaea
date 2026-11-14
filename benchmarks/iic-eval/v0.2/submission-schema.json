@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/iic-eval/v0.2/submission-schema.json",
+  "title": "IIC-Eval v0.2 system submission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "system_id",
+    "build_sha",
+    "configuration_sha256",
+    "results"
+  ],
+  "properties": {
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "build_sha": {
+      "type": "string",
+      "minLength": 1
+    },
+    "configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "review_time_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "candidates",
+          "unresolved_questions"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^IIC-[0-9]{3}$"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_document_id",
+                "source_version",
+                "span_start_byte",
+                "span_end_byte",
+                "quoted_text",
+                "modality",
+                "conditions",
+                "adjudication_state"
+              ],
+              "properties": {
+                "source_document_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "span_start_byte": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "span_end_byte": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "quoted_text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "modality": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "adjudication_state": {
+                  "enum": [
+                    "candidate",
+                    "in_conflict",
+                    "unresolved"
+                  ]
+                }
+              }
+            }
+          },
+          "unresolved_questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
