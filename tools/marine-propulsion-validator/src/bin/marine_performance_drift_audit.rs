@@ -47,12 +47,12 @@ impl Findings {
     fn disposition(&self) -> &'static str {
         if self.invalid {
             "INVALID"
+        } else if self.incomplete {
+            "INCOMPLETE"
         } else if self.blocked {
             "BLOCKED"
         } else if self.incomparable {
             "INCOMPARABLE"
-        } else if self.incomplete {
-            "INCOMPLETE"
         } else {
             "PERFORMANCE_DRIFT_CORPUS_VALID"
         }
@@ -181,7 +181,7 @@ fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
         );
     }
 
-    let mut prior_decision: Option<DateTime<Utc>> = None;
+    let mut prior_decision_nanos: Option<i64> = None;
 
     for (point_index, point) in decision_points.iter().enumerate() {
         let point_path = format!("{case_path}/decision_points/{point_index}");
@@ -217,8 +217,9 @@ fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
             );
         }
 
-        if let (Some(decision), Some(previous)) = (decision.as_ref(), prior_decision.as_ref()) {
-            if decision <= previous {
+        let decision_nanos = decision.as_ref().and_then(|value| value.timestamp_nanos_opt());
+        if let (Some(current), Some(previous)) = (decision_nanos, prior_decision_nanos) {
+            if current <= previous {
                 findings.push(
                     format!("{point_path}/decision_time_utc"),
                     "INVALID",
@@ -226,9 +227,7 @@ fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
                 );
             }
         }
-        if let Some(decision) = decision.as_ref() {
-            prior_decision = Some(decision.clone());
-        }
+        prior_decision_nanos = decision_nanos;
 
         if !time_is_not_after(observed.as_ref(), decision.as_ref()) {
             findings.push(
@@ -556,6 +555,11 @@ mod tests {
         let mut findings = Findings::default();
         findings.push("/calibration_status", "BLOCKED", "invalid calibration");
         assert_eq!(findings.disposition(), "BLOCKED");
+
+        let mut synthetic_with_blocked_case = Findings::default();
+        synthetic_with_blocked_case.push("/calibration_status", "BLOCKED", "invalid calibration");
+        synthetic_with_blocked_case.push("/corpus_status", "INCOMPLETE", "synthetic corpus");
+        assert_eq!(synthetic_with_blocked_case.disposition(), "INCOMPLETE");
 
         let mut unknown = Findings::default();
         unknown.push("/calibration_status", "INCOMPLETE", "unknown calibration");
