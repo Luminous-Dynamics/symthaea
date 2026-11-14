@@ -56,6 +56,18 @@ Use this as a **replication target and adversarial case**, not as a general perf
 
 Reference: Silva et al., Journal of Cleaner Production (2026), DOI 10.1016/j.jclepro.2026.149662; https://www.sciencedirect.com/science/article/pii/S0959652626022043
 
+## 3. Design-time fabric architecture contract
+
+The design dossier now has an explicit `OpeningCharacterized` intent. For every textile-bearing shell, lining, trim and padding component, it requires a type-appropriate construction descriptor with its source reference and basis weight.
+
+- **Woven:** weave pattern, yarn system/count, warp density, weft density and interlacement density.
+- **Knitted:** knit structure, yarn system/count, wales per centimetre and courses per centimetre. Woven interlacement is not fabricated for knitted goods.
+- **Nonwoven:** declared bonding process.
+- **Laminated:** lamination method and a reference to its substrate architecture.
+- **Unknown/other:** remains incomplete until the construction is resolved; the system does not infer a process route from a generic label.
+
+These are as-designed/specification fields used to stratify trials, not physical measurements or guarantees of opening behaviour. A mill/pattern source reference is required; the physical pilot must independently verify the sample's actual construction before opening. The 7 November cotton study's interlacement result is woven-specific and must not be transferred to knitted or nonwoven constructions.
+
 ## 3. Benchmark arms
 
 All arms must use the same frozen incoming specimens/lots, acceptance methods and declared end points.
