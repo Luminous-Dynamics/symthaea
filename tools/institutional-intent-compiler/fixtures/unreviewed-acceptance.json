@@ -1,0 +1,14 @@
+{
+  "schema_version":"0.1","brief_id":"synthetic-brief-004","baseline_version":1,
+  "sources":[{"id":"brief","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","byte_length":80,"classification":"public"}],
+  "derivations":[],
+  "requirements":[{
+    "id":"REQ-004","statement":"The system shall record a review decision.","class":"functional",
+    "declared_modality":"mandatory","proposed_modality":"mandatory","lifecycle":"accepted",
+    "traceability":{"source_spans":[{"source_id":"brief","start_byte":0,"end_byte":20,"quote_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}],"derivation_ref":null},
+    "verification":{"method":"test","acceptance_condition":"The synthetic decision is present.","limitation":null},
+    "owner":{"system":"mycelix","reference":"decision-owner"},
+    "links":[],"review_decision_ref":null,"modality_change_decision_ref":null,"unverifiable_exception_decision_ref":null
+  }],
+  "decisions":[]
+}
