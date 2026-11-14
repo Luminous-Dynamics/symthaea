@@ -178,6 +178,7 @@ fn validate_generation_set<'a>(
 ) -> std::result::Result<HashMap<&'a str, &'a QualificationGeneration>, AuditDisposition> {
     let mut generations = HashMap::new();
     let mut passport_indices = HashSet::new();
+    let mut successor_predecessors = HashSet::new();
 
     if case.generations.is_empty() {
         return Err(AuditDisposition::Blocked);
@@ -227,6 +228,7 @@ fn validate_generation_set<'a>(
             return Err(AuditDisposition::Blocked);
         }
         let mut claim_ids = HashSet::new();
+        let mut generation_receipt_ids = HashSet::new();
         for claim in &generation.claims {
             if !nonempty(&claim.claim_id)
                 || !nonempty(&claim.claim_type)
@@ -264,10 +266,9 @@ fn validate_generation_set<'a>(
                 return Err(AuditDisposition::Blocked);
             }
 
-            let mut receipt_ids = HashSet::new();
             let mut raw_artifacts = HashSet::new();
             for receipt in &claim.method_receipts {
-                if !receipt_ids.insert(receipt.id.as_str()) {
+                if !generation_receipt_ids.insert(receipt.id.as_str()) {
                     return Err(AuditDisposition::Rejected);
                 }
                 let Some(raw_digest) = receipt.raw_data_sha256.as_deref() else {
@@ -298,6 +299,9 @@ fn validate_generation_set<'a>(
                     || predecessor.generation_index + 1 != generation.generation_index
                     || predecessor.generation_id == generation.generation_id
                 {
+                    return Err(AuditDisposition::Rejected);
+                }
+                if !successor_predecessors.insert(predecessor_id) {
                     return Err(AuditDisposition::Rejected);
                 }
             }
