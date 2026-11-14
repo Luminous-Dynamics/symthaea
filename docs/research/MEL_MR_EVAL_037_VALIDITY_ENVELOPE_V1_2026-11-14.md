@@ -35,9 +35,9 @@ A candidate edit should ultimately pass hard obligations and protected invariant
 - Valid alternatives require a review record commitment, reviewer-set commitment, at least two reviewers and an independence attestation. These commitments/attestations are provenance fields; they do not cryptographically authenticate reviewers or prove legal/ethical approval.
 - Reference lineage must equal the sample's source lineage.
 - Constraint-only policy allows evaluation without any paired target; the alternative-required policy fails closed without a reviewed valid alternative.
-- Operation-specific contract checks require part identity/lineage for instrument replacement, kit identity/lineage for drum replacement, target/non-target acoustic presence obligations for extraction, score-duration plus acoustic articulation obligations for staccato/legato, explicitly scoped acoustic contour evidence for crescendo/decrescendo, and both an A4=440 Hz anchor and cent-based acoustic tolerance for tuning correction.
+- Operation-specific contract checks require part identity/lineage for instrument replacement, kit identity/lineage for drum replacement, target/non-target acoustic presence obligations for extraction, positive integer score-tick duration plus acoustic articulation obligations for staccato/legato, explicitly scoped acoustic contour evidence for crescendo/decrescendo, and both an A4=440 Hz anchor and a zero-cent-spanning acoustic tolerance for tuning correction.
 - Domain-separated SHA-256 envelope commitment.
-- Seventeen authored Rust tests cover multiple alternatives, constraint-only operation, missing alternatives, unreviewed alternatives, lineage substitution, negative-control promotion, duplicate obligations, invalid ranges, digest sensitivity, mutable versions, canonical ordering, no-op obligations, instrument/drum replacement, articulation, dynamic contour and cent-level tuning contracts.
+- Eighteen authored Rust tests cover multiple alternatives, constraint-only operation, missing alternatives, unreviewed alternatives, lineage substitution, negative-control promotion, duplicate obligations, invalid ranges, digest sensitivity, mutable versions, canonical ordering, no-op obligations, instrument/drum replacement, articulation, dynamic contour and cent-level tuning contracts.
 
 ## What this is not
 
