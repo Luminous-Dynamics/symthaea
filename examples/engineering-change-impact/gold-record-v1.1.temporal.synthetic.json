@@ -170,7 +170,8 @@
       },
       "upper": {
         "state": "unbounded"
-      }
+      },
+      "interval_evidence_ref": "synthetic://evidence/validity-interval-001"
     },
     "availability": {
       "source_publication": {
