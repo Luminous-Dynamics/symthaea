@@ -165,6 +165,24 @@ The accompanying \`U1MpsErrorBudgetPlan\` compiles an end-to-end L2 target into 
 
 **Error-domain boundary:** \`maximum_local_l2_error\` is a two-site tensor Frobenius target. It becomes a global state-vector target only after multiplying by qualified canonical-gauge exterior operator-norm bounds and accounting for all other error channels in the global ledger. The API does not silently reinterpret local residuals as global fidelity guarantees.
 
+
+## Observable-specific accuracy envelopes
+
+The next layer converts a state-vector guarantee into an error interval for a bounded observable. Given an operator-norm upper bound \(a\), an approximate-state norm upper bound \(n_a\), an exact-reference norm upper bound \(n_e\), and a qualified global state L2 bound \(\delta\), the receipt uses
+\[
+\left|\langle A\rangle_a-\langle A\rangle_e\right|
+\le a\,\delta\,(n_a+n_e).
+\]
+
+The API supports two directions:
+
+- \`U1MpsObservableErrorTarget::compile_state_l2_error_budget\` converts a requested absolute expectation error into a sufficient global state-L2 budget.
+- \`U1MpsObservableErrorTarget::certify\` uses the qualified global ledger to return an expectation-error upper bound and whether the requested observable tolerance is met.
+
+The exact-state norm upper bound is caller-supplied and must be justified from the reference dynamics; for an exactly unitary reference trajectory, the initial state norm is sufficient. The approximate norm is measured from the actual MPS, without assuming it is normalized.
+
+**Important boundary:** this is an error-envelope/certification helper, not yet an observable evaluator. It does not implement arbitrary MPO expectation contraction or infer the observable operator norm. Applications must supply a valid norm upper bound (for a Pauli string, 1 is exact; for a weighted sum, the sum of absolute coefficient bounds is a simple conservative choice). An unqualified local truncation ledger is rejected; a zero operator is the trivial exact exception.
+
 ## Explicit limitations
 
 This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
@@ -173,7 +191,7 @@ This increment includes charge-block mixed-canonical sweeps, measured exterior-i
 - Independent Hamiltonian-to-MPO and local-effective-Hamiltonian qualification.
 - N=16–64 scale-out or accuracy-matched Quimb/ITensor/SeeMPS/cuQuantum performance evidence.
 
-The next stages are sensitivity-weighted error-budget allocation, one-pass adaptive SVD selection, Trotter-envelope qualification, canonical-gauge TDVP/MPO exploration, lazy/nonlocal MPO support, and controlled accuracy-matched comparisons.
+The next stages are observable evaluation and MPO norm bounds, sensitivity-weighted error-budget allocation, Trotter-envelope qualification, canonical-gauge TDVP/MPO exploration, lazy/nonlocal MPO support, and controlled accuracy-matched comparisons.
 
 ## Competitive benchmark policy
 
