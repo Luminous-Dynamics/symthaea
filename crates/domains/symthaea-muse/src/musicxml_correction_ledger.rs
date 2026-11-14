@@ -1070,15 +1070,20 @@ mod tests {
         let ledger = build_musicxml_correction_ledger(
             &reference, &prediction, config(), MusicXmlCorrectionLedgerConfigV1::default()
         ).unwrap();
-        assert_eq!(ledger.action_count, 1);
-        let action = &ledger.actions[0];
+        assert_eq!(ledger.by_field.get("written_pitch_spelling"), Some(&1));
+        let action = ledger.actions.iter()
+            .find(|action| action.field_path == "written_pitch_spelling")
+            .unwrap();
         assert_eq!(action.operation, MusicXmlCorrectionOperationV1::ReplaceField);
-        assert_eq!(action.field_path, "written_pitch_spelling");
         assert_eq!(action.family, MusicXmlCorrectionFamilyV1::NoteEvent);
         assert_eq!(action.reference_measure_number.as_deref(), Some("1"));
         assert_eq!(action.reference_source_order, Some(1));
         assert!(action.before_sha256.is_some());
         assert!(action.after_sha256.is_some());
+        let aggregate = crate::musicxml_notation_eval::evaluate_musicxml_notation_graphs(
+            &reference, &prediction, config()
+        ).unwrap();
+        assert_eq!(aggregate.note_event_presence.f1, Some(1.0));
     }
 
     #[test]
