@@ -23,9 +23,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 macro_rules! string_id {
     ($name:ident) => {
-        #[derive(
-            Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-        )]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
         pub struct $name(pub String);
 
         impl From<&str> for $name {
@@ -45,9 +43,7 @@ string_id!(ProvisionId);
 
 /// SHA-256 content identity. The verifier always recomputes this from stored
 /// bytes; a digest supplied by an agent is never accepted on assertion alone.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ContentDigest([u8; 32]);
 
 impl ContentDigest {
@@ -436,14 +432,19 @@ pub fn verify_trace(
                 );
             } else {
                 *declared_consumers.entry(component_id.clone()).or_default() += 1;
-                if organization.components.get(component_id).is_some_and(|component| {
-                    component.class == ComponentClass::ExternalResource
-                }) {
+                if organization
+                    .components
+                    .get(component_id)
+                    .is_some_and(|component| component.class == ComponentClass::ExternalResource)
+                {
                     report.push(
                         FindingCode::DeclaredInvalidInputClass,
                         None,
                         Some(component_id.clone()),
-                        format!("process {} models an external resource as an internal artifact input", process.id.0),
+                        format!(
+                            "process {} models an external resource as an internal artifact input",
+                            process.id.0
+                        ),
                     );
                 }
             }
@@ -462,17 +463,24 @@ pub fn verify_trace(
                 );
             } else {
                 *declared_producers.entry(component_id.clone()).or_default() += 1;
-                if organization.components.get(component_id).is_some_and(|component| {
-                    !matches!(
-                        component.class,
-                        ComponentClass::RegenerativeInternal | ComponentClass::EvidenceArtifact
-                    )
-                }) {
+                if organization
+                    .components
+                    .get(component_id)
+                    .is_some_and(|component| {
+                        !matches!(
+                            component.class,
+                            ComponentClass::RegenerativeInternal | ComponentClass::EvidenceArtifact
+                        )
+                    })
+                {
                     report.push(
                         FindingCode::DeclaredInvalidOutputClass,
                         None,
                         Some(component_id.clone()),
-                        format!("process {} declares output of a non-regenerable component", process.id.0),
+                        format!(
+                            "process {} declares output of a non-regenerable component",
+                            process.id.0
+                        ),
                     );
                 }
             }
@@ -613,8 +621,11 @@ pub fn verify_trace(
                 );
             }
 
-            let supplied_inputs: BTreeSet<ComponentId> =
-                event.inputs.iter().map(|input| input.id.component_id.clone()).collect();
+            let supplied_inputs: BTreeSet<ComponentId> = event
+                .inputs
+                .iter()
+                .map(|input| input.id.component_id.clone())
+                .collect();
 
             for required in &process.required_inputs {
                 if !supplied_inputs.contains(required) {
@@ -684,8 +695,7 @@ pub fn verify_trace(
                         if provision_id.0.trim().is_empty()
                             || !matches!(
                                 component.class,
-                                ComponentClass::ProvisionedImmutable
-                                    | ComponentClass::Constraint
+                                ComponentClass::ProvisionedImmutable | ComponentClass::Constraint
                             )
                         {
                             event_finding(
@@ -700,8 +710,7 @@ pub fn verify_trace(
                     ArtifactOrigin::Produced { execution_id } => {
                         if !matches!(
                             component.class,
-                            ComponentClass::RegenerativeInternal
-                                | ComponentClass::EvidenceArtifact
+                            ComponentClass::RegenerativeInternal | ComponentClass::EvidenceArtifact
                         ) {
                             event_finding(
                                 &mut report,
@@ -753,8 +762,11 @@ pub fn verify_trace(
                 }
             }
 
-            let supplied_outputs: BTreeSet<ComponentId> =
-                event.outputs.iter().map(|output| output.id.component_id.clone()).collect();
+            let supplied_outputs: BTreeSet<ComponentId> = event
+                .outputs
+                .iter()
+                .map(|output| output.id.component_id.clone())
+                .collect();
 
             for required in &process.required_outputs {
                 if !supplied_outputs.contains(required) {
@@ -966,10 +978,14 @@ mod tests {
 
         let mut store = ArtifactStore::default();
         let seed_id = artifact_id("seed", 0);
-        let seed_digest = store.insert(seed_id.clone(), b"provisioned-seed".to_vec()).unwrap();
+        let seed_digest = store
+            .insert(seed_id.clone(), b"provisioned-seed".to_vec())
+            .unwrap();
 
         let memory_id = artifact_id("memory", 1);
-        let memory_digest = store.insert(memory_id.clone(), b"regenerated-memory".to_vec()).unwrap();
+        let memory_digest = store
+            .insert(memory_id.clone(), b"regenerated-memory".to_vec())
+            .unwrap();
 
         let producer_id: ExecutionId = "exec-1".into();
         let producer = ExecutionEvent {
@@ -1030,7 +1046,11 @@ mod tests {
         let (organization, trace, store) = healthy_fixture();
         let report = verify_trace(&organization, &trace, &store);
 
-        assert!(report.qualifies_functional_self_maintenance(), "{:?}", report.findings);
+        assert!(
+            report.qualifies_functional_self_maintenance(),
+            "{:?}",
+            report.findings
+        );
         assert_eq!(report.successful_execution_count, 2);
         assert_eq!(report.verified_output_count, 1);
         assert_eq!(report.required_regenerative_component_count, 1);
@@ -1042,13 +1062,19 @@ mod tests {
         let (organization, _, store) = healthy_fixture();
         let report = verify_trace(&organization, &ExecutionTrace::default(), &store);
 
-        assert!(!report.is_qualified());
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::MissingRegenerativeProducer
-        }));
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::MissingRegenerativeConsumer
-        }));
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::MissingRegenerativeProducer })
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::MissingRegenerativeConsumer })
+        );
     }
 
     #[test]
@@ -1057,10 +1083,13 @@ mod tests {
         trace.events[0].outputs[0].digest = ContentDigest::of(b"forged-content");
 
         let report = verify_trace(&organization, &trace, &store);
-        assert!(!report.is_qualified());
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::DigestMismatch
-        }));
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::DigestMismatch })
+        );
         assert_eq!(report.verified_output_count, 0);
     }
 
@@ -1070,51 +1099,70 @@ mod tests {
         trace.events[0].result = ExecutionResult::Interrupted;
 
         let report = verify_trace(&organization, &trace, &store);
-        assert!(!report.is_qualified());
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::NonSuccessCommittedOutput
-        }));
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::NonSuccessCommittedOutput })
+        );
     }
 
     #[test]
     fn undeclared_external_dependency_is_rejected() {
         let (mut organization, mut trace, store) = healthy_fixture();
-        trace.events[0].external_dependencies.push(ExternalDependencyObservation {
-            dependency_id: "unlisted-network".into(),
-            status: ExternalDependencyStatus::Available,
-            receipt_digest: Some(ContentDigest::of(b"network-receipt")),
-        });
+        trace.events[0]
+            .external_dependencies
+            .push(ExternalDependencyObservation {
+                dependency_id: "unlisted-network".into(),
+                status: ExternalDependencyStatus::Available,
+                receipt_digest: Some(ContentDigest::of(b"network-receipt")),
+            });
 
         let report = verify_trace(&organization, &trace, &store);
-        assert!(!report.is_qualified());
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::UndeclaredExternalDependency
-        }));
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::UndeclaredExternalDependency })
+        );
 
         // Keep the fixture mutable in this test to make it explicit that an
         // allow-list change is a new frozen organization declaration.
-        organization.processes.get_mut(&ProcessId::from("refresh-memory"))
+        organization
+            .processes
+            .get_mut(&ProcessId::from("refresh-memory"))
             .unwrap()
-            .external_dependencies.insert("unlisted-network".into());
+            .external_dependencies
+            .insert("unlisted-network".into());
     }
 
     #[test]
     fn missing_external_receipt_digest_is_rejected() {
         let (mut organization, mut trace, store) = healthy_fixture();
-        organization.processes.get_mut(&ProcessId::from("refresh-memory"))
+        organization
+            .processes
+            .get_mut(&ProcessId::from("refresh-memory"))
             .unwrap()
-            .external_dependencies.insert("object-store".into());
-        trace.events[0].external_dependencies.push(ExternalDependencyObservation {
-            dependency_id: "object-store".into(),
-            status: ExternalDependencyStatus::Available,
-            receipt_digest: None,
-        });
+            .external_dependencies
+            .insert("object-store".into());
+        trace.events[0]
+            .external_dependencies
+            .push(ExternalDependencyObservation {
+                dependency_id: "object-store".into(),
+                status: ExternalDependencyStatus::Available,
+                receipt_digest: None,
+            });
 
         let report = verify_trace(&organization, &trace, &store);
-        assert!(!report.is_qualified());
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == FindingCode::AvailableReceiptMissingDigest
-        }));
+        assert!(!report.qualifies_functional_self_maintenance());
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == FindingCode::AvailableReceiptMissingDigest })
+        );
     }
 
     #[test]
@@ -1136,9 +1184,13 @@ mod tests {
             ComponentClass::ProvisionedImmutable,
             false,
         ));
-        let report = verify_trace(&organization, &ExecutionTrace::default(), &ArtifactStore::default());
+        let report = verify_trace(
+            &organization,
+            &ExecutionTrace::default(),
+            &ArtifactStore::default(),
+        );
 
-        assert!(!report.is_qualified());
+        assert!(!report.qualifies_functional_self_maintenance());
         assert!(report.findings.iter().any(|finding| {
             finding.code == FindingCode::EmptyRequiredRegenerativeSet
         }));
