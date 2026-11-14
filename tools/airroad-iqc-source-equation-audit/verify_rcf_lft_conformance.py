@@ -414,7 +414,8 @@ def verify_schur_complement_case(
     require(shape(m_matrix) == (2, 2), "M must be 2x2 in V0.1")
     require(pi11[0][1] == pi11[1][0], "Pi11 must be symmetric")
     require(pi22[0][1] == pi22[1][0], "Pi22 must be symmetric")
-    require(pi12[0][1] == pi12[1][0], "Pi12 must be symmetric in this real fixture")
+    # Pi12 is a cross block: it need not be symmetric. The full multiplier
+    # remains symmetric because the opposite block is Pi12^T in this real fixture.
     require(is_positive_definite(pi11), "Pi11 must be strictly positive definite")
 
     pi11_inverse = inverse_2x2(pi11)
