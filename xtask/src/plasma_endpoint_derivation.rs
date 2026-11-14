@@ -452,8 +452,13 @@ fn audit_retention(
         candidate.aged.scope_evidence.raw_data_sha256.as_deref(),
     ];
     let mut artifact_set = HashSet::new();
-    if all_artifacts.iter().any(|digest| digest.is_none_or(|value| !artifact_set.insert(value))) {
-        return rejected("initial/aged or baseline/candidate raw-data artifacts are reused or missing");
+    for digest in all_artifacts {
+        let Some(value) = digest else {
+            return rejected("initial/aged or baseline/candidate raw-data artifact digest is missing");
+        };
+        if !artifact_set.insert(value) {
+            return rejected("initial/aged or baseline/candidate raw-data artifacts are reused");
+        }
     }
 
     if baseline.initial.scope_evidence.method_id != baseline.aged.scope_evidence.method_id
