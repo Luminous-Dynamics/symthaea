@@ -113,7 +113,7 @@ Only delivered frames are passed through this bridge. Missing/dropped/stale obse
 
 A fused HDC vector has the same dimensionality as the existing proprioceptive encoder, but equal dimension does not mean equal input semantics. A legacy state-only controller checkpoint must not be presumed compatible with camera-conditioned input.
 
-The bridge now provides a separate CameraDrivingPolicyManifest and a strict compatibility gate. The manifest binds the exact checkpoint-byte SHA-256, architecture identity, canonical fused-input schema, steering/throttle/brake output schema, VisionConfig, vehicle-encoder seed, camera calibration, renderer revision, visual fusion weight, HDC dimension, frame/delivery envelope, training corpus and split manifests, privilege disclosure, and qualified scope.
+The bridge now provides a separate CameraDrivingPolicyManifest and a strict compatibility gate. The manifest binds the exact checkpoint-byte SHA-256, architecture identity, canonical fused-input schema, steering/throttle/brake output schema, VisionConfig, vehicle-encoder seed, camera identity and calibration, simulator/renderer revisions, visual fusion weight, HDC dimension, frame/delivery envelope, training corpus and split manifests, privilege disclosure, and qualified scope.
 
 Before a separately trained controller is allowed to consume a fused input, the caller must validate the artifact and exact bridge receipt:
 
@@ -128,7 +128,7 @@ let compatibility = manifest.validate_for(
 assert_eq!(compatibility.compatibility, "INPUT_AND_ARTIFACT_COMPATIBLE_ONLY");
 ```
 
-The gate also verifies the bridge receipt commitment, fused HDC vector digest, camera/renderer identity, calibration, fusion weight, HDC dimension, capture-to-delivery timing and frozen VisionManifold learning. A mismatch requires a new manifest/retraining or a separately reviewed exact compatibility proof; it is not silently accepted.
+The gate also verifies the bridge receipt commitment, fused HDC vector digest, camera and simulator/renderer identity, calibration, fusion weight, HDC dimension, capture-to-delivery timing and frozen VisionManifold learning. A mismatch requires a new manifest/retraining or a separately reviewed exact compatibility proof; it is not silently accepted.
 
 The manifest reports training-data privilege explicitly (no privileged inputs, privileged expert, ground-truth perception, mixed declared, or unknown). Unknown privilege is rejected by this compatibility gate. A disclosed privileged profile is still not comparable to a non-privileged benchmark row without a separate matched-access analysis.
 
