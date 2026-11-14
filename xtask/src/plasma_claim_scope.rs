@@ -151,6 +151,11 @@ fn is_known_overclaim(claim: &str) -> bool {
             | "failure_mode_design_allowable"
             | "acceptability_from_classification"
             | "product_disposition"
+            | "product_safety"
+            | "food_contact_safety"
+            | "shelf_life"
+            | "packaging_shelf_life"
+            | "barrier_safety_guarantee"
     )
 }
 
