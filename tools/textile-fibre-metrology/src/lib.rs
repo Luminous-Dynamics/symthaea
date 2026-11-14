@@ -248,22 +248,6 @@ fn validate_method_definition(method: &MethodDefinition) -> bool {
         && method.resolution_um > 0
 }
 
-fn evaluate_fraction(
-    fraction_ppm: u32,
-    uncertainty_ppm: u32,
-    qualifies: bool,
-) -> (u64, u64, u64) {
-    if qualifies {
-        (
-            u64::from(fraction_ppm.saturating_sub(uncertainty_ppm)),
-            0,
-            u64::from(uncertainty_ppm),
-        )
-    } else {
-        (0, 0, u64::from(uncertainty_ppm))
-    }
-}
-
 pub fn assess_distribution(
     distribution: &FibreLengthDistribution,
     method: &MethodDefinition,
@@ -390,6 +374,7 @@ pub fn assess_distribution(
         + u64::from(distribution.unclassified_fraction_ppm);
     calculated_uncertainty += u64::from(distribution.underflow.expanded_uncertainty_ppm)
         + u64::from(distribution.overflow.expanded_uncertainty_ppm);
+    ambiguous += u64::from(distribution.unclassified_fraction_ppm);
 
     let first_lower = distribution.bins.first().map(|bin| bin.lower_bound_um);
     let last_upper = distribution.bins.last().map(|bin| bin.upper_bound_um);
@@ -423,12 +408,10 @@ pub fn assess_distribution(
         total_fraction += u64::from(bin.fraction_ppm);
         calculated_uncertainty += u64::from(bin.expanded_uncertainty_ppm);
         if bin.lower_bound_um >= threshold {
-            let (contribution, _, _) = evaluate_fraction(
-                bin.fraction_ppm,
-                bin.expanded_uncertainty_ppm,
-                true,
+            lower += u64::from(
+                bin.fraction_ppm
+                    .saturating_sub(bin.expanded_uncertainty_ppm),
             );
-            lower += contribution;
         } else if bin.upper_bound_um > threshold {
             ambiguous += u64::from(bin.fraction_ppm);
         }
@@ -437,26 +420,16 @@ pub fn assess_distribution(
     if distribution.overflow.boundary_um < threshold {
         ambiguous += u64::from(distribution.overflow.fraction_ppm);
     } else {
-        let (contribution, _, _) = evaluate_fraction(
-            distribution.overflow.fraction_ppm,
-            distribution.overflow.expanded_uncertainty_ppm,
-            true,
+        lower += u64::from(
+            distribution
+                .overflow
+                .fraction_ppm
+                .saturating_sub(distribution.overflow.expanded_uncertainty_ppm),
         );
-        lower += contribution;
     }
 
-    total_fraction += distribution
-        .bins
-        .iter()
-        .map(|bin| u64::from(bin.fraction_ppm))
-        .sum::<u64>();
-    // The first bin pass above already accumulated fractions; remove the
-    // duplicated bin sum before checking closure.
-    total_fraction -= distribution
-        .bins
-        .iter()
-        .map(|bin| u64::from(bin.fraction_ppm))
-        .sum::<u64>();
+    calculated_uncertainty = calculated_uncertainty
+        .max(u64::from(distribution.total_expanded_uncertainty_ppm));
 
     if total_fraction != u64::from(FRACTION_SCALE_PPM) {
         push_unique(&mut findings, Finding::FractionTotalNotClosed);
@@ -945,12 +918,14 @@ mod tests {
     fn straddling_threshold_bin_receives_no_conservative_qualification_credit() {
         let method = method();
         let mut specimen = distribution(&method, "incoming-001", ProcessState::PreProcessReferenceFibre);
-        specimen.bins[0].upper_bound_um = 15_000;
-        specimen.bins[1].lower_bound_um = 15_000;
+        specimen.bins[0].upper_bound_um = 10_000;
+        specimen.bins[1].lower_bound_um = 10_000;
+        specimen.bins[1].upper_bound_um = 15_000;
+        specimen.bins[2].lower_bound_um = 15_000;
         let result = assess_distribution(&specimen, &method, &criterion());
         assert_eq!(result.decision, Decision::InsufficientEvidence);
         assert_eq!(result.qualifying_fraction_lower_ppm, 199_000);
-        assert_eq!(result.threshold_ambiguous_fraction_ppm, 300_000);
+        assert_eq!(result.threshold_ambiguous_fraction_ppm, 500_000);
     }
 
     fn bridge(method_a: &MethodDefinition, method_b: &MethodDefinition) -> MethodBridge {
