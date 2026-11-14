@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/development-map/fixtures/retrieval-exploration-v0.1.schema.json",
+  "title": "DYNRETR-001 public retrieval/exploration benchmark case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "document_type",
+    "schema_version",
+    "benchmark_id",
+    "task_id",
+    "status",
+    "observed_at",
+    "evaluation_contract",
+    "repository_snapshot",
+    "cases",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "document_type": {
+      "const": "retrieval_exploration_benchmark_case"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "benchmark_id": {
+      "const": "DYNRETR-001"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "public_synthetic_known_answer",
+        "design_only",
+        "sealed_holdout"
+      ]
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evaluation_contract": {
+      "$ref": "#/$defs/evaluation_contract"
+    },
+    "repository_snapshot": {
+      "$ref": "#/$defs/repository_snapshot"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "evaluation_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokenizer_id",
+        "token_budget",
+        "line_budget",
+        "region_unit",
+        "ranking_direction",
+        "no_gold_policy"
+      ],
+      "properties": {
+        "tokenizer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "token_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "region_unit": {
+          "enum": [
+            "file",
+            "symbol",
+            "line_span",
+            "mixed"
+          ]
+        },
+        "ranking_direction": {
+          "const": "lower_rank_is_better"
+        },
+        "no_gold_policy": {
+          "enum": [
+            "explicit_abstain",
+            "abstain_or_indeterminate"
+          ]
+        }
+      }
+    },
+    "repository_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "revision",
+        "tree_oid",
+        "configuration_world"
+      ],
+      "properties": {
+        "repository_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "tree_oid": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "configuration_world": {
+          "type": "object"
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "path",
+        "line_start",
+        "line_end",
+        "token_estimate",
+        "authority",
+        "source_revision",
+        "availability"
+      ],
+      "properties": {
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "token_estimate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "authority": {
+          "enum": [
+            "source_declared",
+            "syntax_extracted",
+            "manifest_resolved",
+            "compiler_resolved",
+            "runtime_observed",
+            "benchmark_observed",
+            "independently_adjudicated",
+            "inferred",
+            "proposed"
+          ]
+        },
+        "source_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "availability": {
+          "enum": [
+            "available",
+            "inactive_configuration",
+            "stale_revision",
+            "missing",
+            "unauthorized",
+            "unknown"
+          ]
+        },
+        "configuration_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lexical_terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "case_kind",
+        "repository_id",
+        "query",
+        "configuration_world",
+        "token_budget",
+        "line_budget",
+        "changed_entities",
+        "candidate_regions",
+        "expected_disposition"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_kind": {
+          "enum": [
+            "positive_context_retrieval",
+            "natural_no_gold",
+            "wrong_repository_counterfactual",
+            "configuration_world_mismatch",
+            "temporal_revision_mismatch",
+            "nonlocal_change_impact",
+            "lexical_decoy"
+          ]
+        },
+        "repository_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "counterfactual_pair_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_world": {
+          "type": "object"
+        },
+        "token_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "changed_entities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidate_regions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/region"
+          }
+        },
+        "expected_disposition": {
+          "enum": [
+            "retrieve",
+            "abstain",
+            "indeterminate"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
