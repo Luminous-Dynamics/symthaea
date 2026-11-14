@@ -159,3 +159,30 @@ This method evaluates whether a chosen experimental panel discriminates a declar
 ---
 
 **Status statement:** This is a proposed model-relative experimental protocol. No assay adequacy result or proof of organizational closure is claimed.
+
+
+## 9. Initial executable deterministic evaluator
+
+A deterministic pilot implementation now exists in:
+
+- \`crates/domains/symthaea-organizational-closure/src/assay.rs\`
+
+It defines:
+- candidate models with a frozen target-equivalence-class label;
+- assay IDs and response digests;
+- pairwise assessment of candidate models in different target classes;
+- resolved-pair coverage and model-class-relative conservativity;
+- fail-closed findings for empty/duplicate model identities, empty equivalence classes, unknown model observations, empty assay IDs and duplicate model/assay observations.
+
+The core API is \`evaluate_assay_adequacy(candidates, observations)\`. If the panel lacks observations for both sides of a non-equivalent pair, that pair remains unresolved. The evaluator never treats missing data as equivalence. If there are no non-equivalent candidate pairs, conservativity is reported as not applicable.
+
+Five deterministic tests cover:
+1. a complete panel that separates a frozen non-equivalent pair;
+2. an incomplete panel that leaves the pair unresolved;
+3. target-equivalent models that need not be distinguished;
+4. duplicate/unknown observations that block qualification;
+5. an empty candidate class.
+
+**Limitations:** this is not a stochastic statistical test. It does not yet model response distributions, confidence intervals, test power, multiplicity correction, model-form uncertainty or adaptive assay-selection policies. A response digest is an exact signature, not proof of experiment authenticity. Those capabilities remain in #12015 and must be added before using this evaluator for noisy or physical systems.
+
+**Verification state:** source and fixtures have been committed on the AOBench research branch. The focused exact-package qualification run for the new assay module is pending; do not infer a pass from the earlier runtime-verifier-only 10-test run.
