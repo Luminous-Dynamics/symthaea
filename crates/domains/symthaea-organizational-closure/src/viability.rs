@@ -112,6 +112,7 @@ pub enum ViabilityFindingCode {
     EmptyViableOrganizationStates,
     StateMapKeyMismatch,
     MissingRealization,
+    UnknownRealizationSource,
     UnknownRealizationTarget,
     NonViableRealizationTarget,
     RealizationNotWellDefined,
@@ -119,6 +120,7 @@ pub enum ViabilityFindingCode {
     RealizationNotSurjective,
     EmptyRequiredBoundaryClasses,
     MissingBoundaryProduction,
+    UnknownBoundarySource,
     UnknownBoundaryTarget,
     NonViableBoundaryTarget,
     BoundaryClassNotWellDefined,
@@ -296,6 +298,14 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         }
     }
 
+    for source in model.realization.keys() {
+        if !model.production_states.contains_key(source) {
+            ap1_ok = false;
+            finding(&mut report, ViabilityFindingCode::UnknownRealizationSource, Some(source.0.clone()),
+                "realization map contains an unknown production-state source");
+        }
+    }
+
     for (production_id, production_state) in &viable_production {
         let Some(organization_id) = model.realization.get(*production_id) else {
             ap1_ok = false;
@@ -351,6 +361,13 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             ap2_ok = false;
             finding(&mut report, ViabilityFindingCode::StateMapKeyMismatch, Some(key.0.clone()),
                 "boundary-state map key differs from the embedded state ID");
+        }
+    }
+    for source in model.boundary_production.keys() {
+        if !model.production_states.contains_key(source) {
+            ap2_ok = false;
+            finding(&mut report, ViabilityFindingCode::UnknownBoundarySource, Some(source.0.clone()),
+                "boundary-production map contains an unknown production-state source");
         }
     }
     let mut induced_boundary = BTreeMap::new();
@@ -413,14 +430,23 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         }
     }
     for production_id in viable_production.iter().map(|(id, _)| *id) {
-        if let Some(boundary_id) = model.boundary_production.get(production_id) {
-            if model.boundary_states.contains_key(boundary_id)
-                && !model.admissible_boundaries.contains(boundary_id)
-            {
+        match model.boundary_production.get(production_id) {
+            None => {
+                ap3_ok = false;
+                finding(&mut report, ViabilityFindingCode::MissingBoundaryProduction, Some(production_id.0.clone()),
+                    "admissibility cannot be established without a boundary-production witness");
+            }
+            Some(boundary_id) if !model.boundary_states.contains_key(boundary_id) => {
+                ap3_ok = false;
+                finding(&mut report, ViabilityFindingCode::UnknownBoundaryTarget, Some(production_id.0.clone()),
+                    "produced boundary target is not declared in the finite model");
+            }
+            Some(boundary_id) if !model.admissible_boundaries.contains(boundary_id) => {
                 ap3_ok = false;
                 finding(&mut report, ViabilityFindingCode::InadmissibleProducedBoundary, Some(production_id.0.clone()),
                     "viable production produces a boundary outside the frozen admissibility predicate");
             }
+            Some(_) => {}
         }
     }
     report.ap3_admissibility = Some(if ap3_ok { WitnessStatus::Pass } else { WitnessStatus::Fail });
@@ -445,7 +471,9 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             finding(&mut report, ViabilityFindingCode::DuplicateConstraintId, Some(constraint.id.clone()),
                 "local constraint ID is duplicated");
         }
+        let mut relation_valid = true;
         if constraint.scope.is_empty() {
+            relation_valid = false;
             ap4_valid = false;
             finding(&mut report, ViabilityFindingCode::EmptyConstraintScope, Some(constraint.id.clone()),
                 "local constraint scope is empty");
@@ -453,11 +481,13 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         let mut seen_variables = BTreeSet::new();
         for variable in &constraint.scope {
             if !seen_variables.insert(variable.clone()) {
+                relation_valid = false;
                 ap4_valid = false;
                 finding(&mut report, ViabilityFindingCode::DuplicateVariableInScope, Some(constraint.id.clone()),
                     "local constraint repeats a variable in its scope");
             }
             if !model.variables.contains_key(variable) {
+                relation_valid = false;
                 ap4_valid = false;
                 finding(&mut report, ViabilityFindingCode::UnknownConstraintVariable, Some(constraint.id.clone()),
                     "local constraint references an unknown variable");
@@ -470,7 +500,11 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             continue;
         }
 
-        let mut relation_valid = true;
+        for variable in &constraint.scope {
+            if model.variables.get(variable).is_some_and(BTreeSet::is_empty) {
+                relation_valid = false;
+            }
+        }
         for tuple in &constraint.allowed_assignments {
             if tuple.len() != constraint.scope.len() {
                 relation_valid = false;
