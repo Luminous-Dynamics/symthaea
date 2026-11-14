@@ -16,7 +16,7 @@ impl Disposition {
     }
 }
 
-pub fn run(fixture_path: &Path) -> Result<()> {
+pub fn run(fixture_path: &Path, composition_fixture_path: &Path) -> Result<()> {
     let bytes = fs::read(fixture_path).with_context(|| format!("reading {}", fixture_path.display()))?;
     let fixture: Value = serde_json::from_slice(&bytes).context("parsing plasma-transfer fixture")?;
     let cases = fixture.get("cases").and_then(Value::as_array).context("fixture must contain cases[]")?;
@@ -24,13 +24,133 @@ pub fn run(fixture_path: &Path) -> Result<()> {
     for case in cases {
         let id = case.get("id").and_then(Value::as_str).context("case id missing")?;
         let expected = case.get("expected_disposition").and_then(Value::as_str).context("expected disposition missing")?;
-        let actual = audit_case(case, &fixture);
+        let actual = audit_case_composed(case, &fixture, composition_fixture_path)?;
         if actual.as_str() != expected { bail!("case {id}: expected {expected}, got {}", actual.as_str()); }
         match actual { Disposition::Pass => pass += 1, Disposition::Blocked => blocked += 1, Disposition::Rejected => rejected += 1 }
     }
-    println!("plasma-transfer-audit: {} cases; PASS={pass}, BLOCKED={blocked}, REJECTED={rejected}", cases.len());
+    println!("plasma-transfer-audit: {} composed cases; PASS={pass}, BLOCKED={blocked}, REJECTED={rejected}", cases.len());
+    println!("Transfer PASS requires the legacy factor/interval gates AND exact method-qualified, preregistered endpoint/design evidence.");
     println!("S0 structural evidence audit only; no physical qualification is implied.");
     Ok(())
+}
+
+fn audit_case_composed(
+    case: &Value,
+    fixture: &Value,
+    composition_fixture_path: &Path,
+) -> Result<Disposition> {
+    let legacy = audit_case(case, fixture);
+    if legacy != Disposition::Pass {
+        return Ok(legacy);
+    }
+
+    let Some(baseline) = case.get("baseline_profile").and_then(Value::as_object) else {
+        return Ok(Disposition::Blocked);
+    };
+    let Some(case_id) = case.get("id").and_then(Value::as_str) else {
+        return Ok(Disposition::Blocked);
+    };
+    let Some(scope_registry) = fixture.get("material_scope_registry").and_then(Value::as_object) else {
+        return Ok(Disposition::Blocked);
+    };
+    let Some(substrate_grade) = baseline.get("substrate_grade").and_then(Value::as_str) else {
+        return Ok(Disposition::Blocked);
+    };
+    let Some(scope) = scope_registry.get(substrate_grade).and_then(Value::as_object) else {
+        return Ok(Disposition::Blocked);
+    };
+    let Some(material_pair_class) = scope.get("material_pair_class").and_then(Value::as_str) else {
+        return Ok(Disposition::Blocked);
+    };
+    let Some(geometry) = scope.get("geometry").and_then(Value::as_str) else {
+        return Ok(Disposition::Blocked);
+    };
+    let baseline_profile_sha256 = profile_digest(baseline)?;
+    let required_factors = string_list(fixture.get("required_factors")).ok_or_else(|| anyhow::anyhow!("required_factors missing"))?;
+    let candidate = case.get("candidate_profile").and_then(Value::as_object).ok_or_else(|| anyhow::anyhow!("candidate_profile missing after legacy pass"))?;
+    let changed: Vec<String> = required_factors.iter().filter(|factor| baseline.get(*factor) != candidate.get(*factor)).cloned().collect();
+
+    let mut seen_composition_ids = HashSet::new();
+    if changed.is_empty() {
+        let Some(composition_id) = case.get("baseline_composition_case_id").and_then(Value::as_str) else {
+            return Ok(Disposition::Blocked);
+        };
+        if !seen_composition_ids.insert(composition_id.to_owned()) {
+            return Ok(Disposition::Rejected);
+        }
+        let decision = crate::plasma_evidence_composition::validate_transfer_case(
+            composition_fixture_path,
+            composition_id,
+            case_id,
+            &format!("{case_id}::UNCHANGED_PROFILE"),
+            &baseline_profile_sha256,
+            &baseline_profile_sha256,
+            material_pair_class,
+            geometry,
+            &[],
+        )?;
+        return Ok(map_composition_disposition(decision.disposition));
+    }
+
+    let bridges = case.get("bridges").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
+    for bridge in bridges {
+        let Some(dimensions) = bridge.get("dimensions").and_then(Value::as_object) else {
+            return Ok(Disposition::Blocked);
+        };
+        let mut keys: Vec<String> = dimensions.keys().cloned().collect();
+        keys.sort();
+        let bridge_id = format!("{case_id}::{}", keys.join("+"));
+        let Some(composition_id) = bridge.get("composition_case_id").and_then(Value::as_str) else {
+            return Ok(Disposition::Blocked);
+        };
+        if !seen_composition_ids.insert(composition_id.to_owned()) {
+            return Ok(Disposition::Rejected);
+        }
+
+        // A one-factor bridge is bound to a profile in which only that factor changed.
+        // Multi-factor bridges are bound to the exact joint vector they purport to qualify.
+        let mut bridge_profile = baseline.clone();
+        for key in &keys {
+            let Some(to) = dimensions.get(key).and_then(Value::as_object).and_then(|mapping| mapping.get("to")) else {
+                return Ok(Disposition::Blocked);
+            };
+            bridge_profile.insert(key.clone(), to.clone());
+        }
+        let candidate_profile_sha256 = profile_digest(&bridge_profile)?;
+        let decision = crate::plasma_evidence_composition::validate_transfer_case(
+            composition_fixture_path,
+            composition_id,
+            case_id,
+            &bridge_id,
+            &baseline_profile_sha256,
+            &candidate_profile_sha256,
+            material_pair_class,
+            geometry,
+            &keys,
+        )?;
+        let mapped = map_composition_disposition(decision.disposition);
+        if mapped != Disposition::Pass {
+            return Ok(mapped);
+        }
+    }
+
+    Ok(Disposition::Pass)
+}
+
+fn profile_digest(profile: &serde_json::Map<String, Value>) -> Result<String> {
+    let bytes = serde_json::to_vec(&Value::Object(profile.clone()))
+        .context("serializing exact transfer profile for digest")?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn map_composition_disposition(
+    disposition: crate::plasma_evidence_composition::Disposition,
+) -> Disposition {
+    match disposition {
+        crate::plasma_evidence_composition::Disposition::Pass => Disposition::Pass,
+        crate::plasma_evidence_composition::Disposition::Blocked => Disposition::Blocked,
+        crate::plasma_evidence_composition::Disposition::Rejected => Disposition::Rejected,
+    }
 }
 
 fn audit_case(case: &Value, fixture: &Value) -> Disposition {
