@@ -364,7 +364,7 @@ The formal motivation is Segura (2026), *Experimental probes of autopoietic self
 
 ## 14. Runtime evidence implementation tranche (2026-11-14)
 
-A first Rust package has been added at \`crates/domains/symthaea-organizational-closure\`.
+A first Rust package has been added at \`crates/domains/symthaea-organizational-closure\` as an independently locked nested Cargo workspace. It is excluded from the root monorepo glob workspace so benchmark qualification does not require unrelated workspace dev-dependencies.
 
 The current source provides:
 - typed component/process/identity declarations;
