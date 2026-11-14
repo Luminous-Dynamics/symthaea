@@ -1,0 +1,5 @@
+event_id,elapsed_s,terminal_voltage_v,terminal_current_a,source_voltage_v,source_current_a,temperature_c
+CALL-01,0.0,2.70,0.0,0.0,0.0,23.0
+CALL-01,0.1,2.68,1.2,0.0,0.0,23.1
+CALL-02,0.0,2.35,0.0,0.0,0.0,23.5
+CALL-02,0.1,2.31,1.1,0.0,0.0,23.6
