@@ -292,3 +292,101 @@ The following are prospective targets to preregister for a single selected trigg
 | Reuse count | Test repeated cycles; report degradation and uncertainty, not only first release/rebond |
 
 The right product-level objective is cost and impact per accepted service-and-recovery outcome, not minimum debond temperature or maximum initial lap-shear strength alone.
+
+
+## 14 November 2026 — v0.2 material-family and evidence-kind expansion
+
+The initial v0.1 registry was intentionally narrow. Review of the current ASTM catalogue exposed an important scope gap: rigid plastics and fibre-reinforced plastics have their own active lap-shear methods, and several adjacent ASTM documents are *practices or guides*, not strength-test methods. The S0 registry has therefore been expanded rather than treating every cited document as an interchangeable test.
+
+### Newly registered measurement methods
+
+| Exact active designation | Material scope | Geometry / endpoint | Claim ceiling |
+|---|---|---|---|
+| ASTM D3163-01R23 | Rigid plastic adherends | Single-lap apparent shear | Comparative apparent-shear observation for rigid-plastic joints |
+| ASTM D5868-01R23 | FRP-to-FRP or FRP-to-metal | Single-lap apparent shear | Comparative apparent-shear observation for the stated FRP pair |
+
+ASTM D3163-01R23 explicitly complements D1002 by extending single-lap comparison to rigid plastic adherends, including comparing plastic surface treatments. It cautions that a single-lap result is not a design allowable for structurally different joints without thorough analysis.
+
+ASTM D5868-01R23 is the FRP-specific method. Its scope covers fibre-reinforced plastics bonded to themselves and to metals, including random and fibre-oriented FRP; it is intended for comparative apparent shear testing and comparison of FRP surface treatments.
+
+Official sources:
+- https://store.astm.org/d3163-01r23.html
+- https://store.astm.org/d5868-01r23.html
+
+This is important for the near-term polymer profile and the later composite/metallization programme. D5868 must not be represented as a metal-to-metal standard or as an aerospace design-allowable test.
+
+### Evidence-kind typing: methods are not all measurements
+
+The v0.2 registry adds an explicit `evidence_kind` field. The purpose is to stop a preparation practice, conditioning practice, or interpretation guide being mistaken for a destructive outcome measurement.
+
+| Exact active designation | Evidence kind | What may be referenced | What it cannot establish by itself |
+|---|---|---|---|
+| ASTM D2093-03R25 | `preparation_practice` | Plastic-adherend surface-preparation procedure | Specimen test result or bond strength |
+| ASTM D1151-00R22 | `conditioning_practice` | Continuous moisture/temperature exposure conditions | Retained-strength outcome without a separate strength test; calendar service life |
+| ASTM D1183-03R19 | `conditioning_practice` | Cyclic temperature/humidity accelerated-aging regime | A universal field-life correlation or service-life equivalence |
+| ASTM D4896-01R24 | `interpretation_guide` | Interpretation guidance for single-lap joint results | A new strength measurement or structural design allowable |
+
+Official sources:
+- D2093-03R25: https://store.astm.org/standards/d2093
+- D1151-00R22: https://store.astm.org/standards/d1151
+- D1183-03R19: https://store.astm.org/d1183-03r19.html
+- D4896-01R24: https://store.astm.org/d4896-01r24.html
+
+D2093 explicitly says it covers plastic surface pretreatment, not test-specimen preparation, testing conditions or evaluation. D1151 defines continuous moisture/temperature exposure and describes retained strength relative to original strength, but the strength test remains a distinct operation. D1183 explicitly cautions that no single or small group of accelerated conditions simulates all service conditions. D4896 explicitly warns that misuse of several single-lap strength results as allowable design stress can cause product failure, property damage and human injury.
+
+Consequently the audit now distinguishes four evidence kinds:
+- `measurement`: an observation under a method that measures a declared endpoint;
+- `preparation_practice`: a referenced process used to prepare adherends;
+- `conditioning_practice`: a referenced environmental exposure/aging regime;
+- `interpretation_guide`: guidance for interpreting another test's result.
+
+A SUPPORTED outcome for a practice or guide means only that the evidence references the matching document family, material class, procedure/geometry and narrow reference claim. It does not claim that the procedure was actually executed correctly, nor does it produce a bond-strength result. For D1151/D1183 the resulting retained-strength measurement must still be bound to the relevant measurement method and specimen cohort.
+
+### Exact edition identity
+
+The v0.2 fixture uses the exact active ASTM designations rather than year-only aliases:
+- D1002-26
+- D3163-01R23
+- D5868-01R23
+- D3762-24
+- D2093-03R25
+- D1151-00R22
+- D1183-03R19
+- D4896-01R24
+
+ISO 4587:2003 and the versioned protocol-defined water-contact-angle protocol remain separate entries.
+
+An older reaffirmation, unknown edition, or method family with the wrong evidence kind returns BLOCKED or REJECTED according to whether the issue is unknown or a known contradiction. The registry is a versioned research contract, not a replacement for obtaining the controlled current standard text.
+
+### v0.2 synthetic fixture
+
+The active command now defaults to:
+
+```bash
+cargo run -p xtask -- plasma-claim-scope-audit
+```
+
+Fixture: `data/research/plasma_claim_scope_fixture_v0_2.json`
+
+It contains 35 synthetic known-answer cases:
+- 11 SUPPORTED;
+- 8 BLOCKED;
+- 16 REJECTED.
+
+Additional adversarial cases cover rigid-plastic D3163, FRP-to-FRP and FRP-to-metal D5868, metal-only mismatch, design-allowable escalation, stale editions, D2093 misuse as a bond test, conditioning practices promoted to service lifetime, and D4896 guidance misused as a design allowable.
+
+These are source/contract fixtures only. The audit does not verify actual procedure execution, sample conditioning, laboratory competence, instrument calibration, raw-data authenticity, retained strength, fatigue, service life, or design allowables. It validates SHA-256 field shape only. Rust formatting, compilation, Clippy, unit-test execution and exact-head CI remain pending.
+
+### Why this changes the product architecture
+
+The Passport should not have one generic `test_method` string. It should carry a typed evidence graph in which preparation, process, conditioning, measurement, interpretation and engineering inference are distinct node types.
+
+A valid evidence chain for an aged FRP joint could therefore require:
+1. D2093 or another applicable surface-preparation procedure reference, where appropriate to the adherend;
+2. a plasma exposure record and surface-state observation;
+3. an adhesive bond specimen with D5868 method identity and exact FRP pair/geometry;
+4. a D1151 or D1183 conditioning record with exact environment and duration/cycle state;
+5. a post-conditioning D5868 measurement record, bound to the same traceable specimen cohort;
+6. a separate durability/transfer claim whose statistics, censoring and uncertainty are assessed by the owners in #11971 and #12002.
+
+No single document or endpoint can stand in for this complete chain.
