@@ -5,9 +5,9 @@
   "created": "2026-11-13",
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
-  "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
+  "status": "u1_mps_goal_driven_error_budget_source_authored_runner_pending",
   "execution_status": "Source-authored: complex U1 MPS core, dense fixed-charge factorization, U1 local gates, exact charge-block split, global cutoff/bond-cap compression, mixed-canonical receipts, canonical/gate/model-projection/compression error ledger, analytic U1 Hamiltonian gates, deterministic even/odd TEBD layers and second-order even/odd/even Strang stepper. Consolidated exact-head Rust 1.96 harness pending.",
-  "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim.",
+  "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim. Goal-driven adaptive compression is local two-site error budgeting only; no globally optimal resource allocation or one-pass SVD performance claim.",
   "conventions": {
     "physical_dimension": 2,
     "physical_charges": [
@@ -332,6 +332,59 @@
         "strang_stepper_continues_global_error_ledger_across_time_steps"
       ],
       "claim_ceiling": "Nearest-neighbour second-order splitting only. Trotter error is not folded into the canonical/gate/model-projection/compression bound and remains unqualified pending step-refinement envelope or commutator bound."
+    },
+    "adaptive_error_budget": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TwoSiteState::split_with_error_budget(U1TwoSiteErrorBudgetPolicy)",
+      "policy": {
+        "max_bond_dimension": "Global cap across all charge sectors.",
+        "maximum_local_l2_error": "Absolute measured Frobenius residual of the two-site center, not relative Schmidt cutoff.",
+        "tolerance": "SVD and structural validation tolerance."
+      },
+      "algorithm": [
+        "Compute exact charge-block Schmidt spectrum.",
+        "Find the smallest theoretical retained rank whose discarded Schmidt tail fits the local L2 target.",
+        "Fail closed immediately when the global bond cap cannot meet the ideal target.",
+        "Run the standard split and measure the actual reconstruction residual.",
+        "Increase rank if finite-precision reconstruction residual exceeds budget.",
+        "Return the smallest rank that meets the measured local residual, or a TruncationBudgetInfeasible error."
+      ],
+      "receipts": [
+        "requested_local_l2_error",
+        "achieved_local_l2_error",
+        "minimum_required_bond_dimension",
+        "selected_bond_dimension",
+        "cap_headroom",
+        "svd_factorization_passes",
+        "budget_satisfied",
+        "nested_truncation_diagnostics"
+      ],
+      "claim_boundary": "Local two-site Frobenius target only. Global state-vector interpretation still requires canonical-gauge exterior operator norm bounds and complete error-ledger propagation.",
+      "authored_tests": [
+        "adaptive_error_budget_selects_minimum_rank_that_meets_local_l2_target",
+        "adaptive_error_budget_increases_rank_when_target_requires_it",
+        "adaptive_error_budget_fails_closed_when_bond_cap_cannot_meet_target",
+        "adaptive_error_budget_rejects_invalid_fields",
+        "simulation_error_budget_compiles_named_channels_and_reserves_unallocated_fraction",
+        "simulation_error_budget_rejects_overallocation_and_nonfinite_fractions"
+      ],
+      "known_optimization_debt": "Current v1 performs an exact Schmidt-spectrum pass and one or more validation truncation passes. svd_factorization_passes is exposed; refactor to reuse one factorization before large-N performance claims."
+    },
+    "error_budget_compiler": {
+      "type": "U1MpsErrorBudgetPlan",
+      "api": "U1MpsErrorBudgetPlan::compile(total_l2_error, fractions)",
+      "channels": [
+        "canonicalization_l2_error",
+        "gate_quality_l2_error",
+        "hamiltonian_projection_l2_error",
+        "compression_l2_error",
+        "time_discretization_l2_error",
+        "reserved_l2_error"
+      ],
+      "fractions_must_be_finite_nonnegative": true,
+      "total_fraction_must_not_exceed": 1,
+      "per_gate_compression_allocation": "equal compression allowance / planned gate count",
+      "claim_boundary": "Equal-gate allocation baseline only. A globally optimal/sensitivity-weighted allocation is not claimed."
     }
   },
   "known_answers": [
@@ -511,6 +564,32 @@
         "global error ratio approaches 4 under dt halving in asymptotic regime",
         "Trotter/time-discretization error remains separate from global canonical/gate/model-projection/compression bound"
       ]
+    },
+    {
+      "id": "MPS-8",
+      "name": "Goal-driven local error-budget compression",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "caller requests an absolute local two-site Frobenius error target",
+        "selects smallest retained bond rank meeting the measured residual",
+        "global bond cap spans all charge sectors",
+        "infeasible target returns achieved-best residual and fails closed",
+        "no hidden state renormalization",
+        "SVD factorization pass count is recorded",
+        "matched fixed-cutoff versus goal-driven bond/error Pareto comparison on the same states"
+      ]
+    },
+    {
+      "id": "MPS-9",
+      "name": "End-to-end numerical error-budget compiler",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "named canonicalization/gate/model/compression/Trotter allowances",
+        "fraction validation and explicit reserve",
+        "gate-count allocation reproducible",
+        "no local-to-global interpretation without canonical exterior operator bounds",
+        "step-refinement evidence for the separate Trotter component"
+      ]
     }
   ],
   "negative_controls": [
@@ -562,7 +641,12 @@
     "Hamiltonian-to-U1 projection residual silently discarded",
     "reset global error ledger at each Strang layer or time step",
     "fold Trotter error into compression/gate-quality receipt without a separate method bound",
-    "claim second-order convergence from a single time-step result"
+    "claim second-order convergence from a single time-step result",
+    "adaptive truncator returns a state whose measured local L2 residual exceeds requested budget",
+    "adaptive truncator silently exceeds the global bond cap",
+    "adaptive truncator silently renormalizes the compressed state",
+    "error-budget fractions overallocate more than the requested total",
+    "local two-site residual is reported as global state-vector error without canonical exterior receipts"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -638,7 +722,21 @@
     "strang_layer_parities",
     "strang_layer_bond_indices",
     "time_discretization_error_qualified",
-    "strang_step_refinement_error_ratio"
+    "strang_step_refinement_error_ratio",
+    "requested_local_l2_error",
+    "achieved_local_l2_error",
+    "minimum_required_bond_dimension",
+    "selected_bond_dimension",
+    "cap_headroom",
+    "svd_factorization_passes",
+    "budget_satisfied",
+    "error_budget_total_l2",
+    "error_budget_canonicalization_allowance",
+    "error_budget_gate_quality_allowance",
+    "error_budget_hamiltonian_projection_allowance",
+    "error_budget_compression_allowance",
+    "error_budget_time_discretization_allowance",
+    "error_budget_reserved_allowance"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
