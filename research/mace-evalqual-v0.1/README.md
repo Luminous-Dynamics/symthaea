@@ -129,3 +129,8 @@ A bounded TLA+ model and pinned TLC runner are available in [formal/](formal/REA
 ## Detached checkpoint chain
 
 The proposed Ed25519 checkpoint wire contract, monotonic consumer-state rules and cross-language test vector are documented in [CHECKPOINT_CHAIN.md](CHECKPOINT_CHAIN.md). The public branch publishes the JSON test vector and schema. A local companion Go verifier passes its signature/rollback/fork tests, but the signer, independently administered witness and external trust-state store are not deployed; the Go implementation itself is not part of this public PR's source diff.
+
+
+## Detached checkpoint chain
+
+The proposed Ed25519 checkpoint wire contract, monotonic consumer-state rules and cross-language test vector are documented in [CHECKPOINT_CHAIN.md](CHECKPOINT_CHAIN.md). The public branch now includes the executable standard-library Go verifier under `checkpoints/`, 16 focused tests and the public test vector. The signer, independently administered witness service, protected external trust-state store and key custody are not deployed. The verifier does not turn this into an E3/E4 witness or certification.
