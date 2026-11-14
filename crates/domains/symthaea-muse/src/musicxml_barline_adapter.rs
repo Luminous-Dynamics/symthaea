@@ -1341,22 +1341,34 @@ fn unknown_map(source_id: &str, score_clock_id: &str, reason: &str) -> MeasureMa
 fn parse_part(
     part: roxmltree::Node<'_, '_>,
 ) -> Result<Option<Vec<ParsedMeasure>>, MusicXmlMeasureAdapterError> {
-    let mut divisions: Option<i64> = None;
-    let mut expected_measure_length: Option<RationalBeat> = None;
-    let measure_nodes: Vec<_> = part
+    let measure_inputs: Vec<_> = part
         .children()
         .filter(|node| node.has_tag_name("measure"))
+        .map(|measure| MusicXmlMeasureInputV1 {
+            container: measure,
+            content: measure,
+        })
         .collect();
-    if measure_nodes.is_empty() {
+    parse_part_measure_inputs(&measure_inputs)
+}
+
+fn parse_part_measure_inputs(
+    measure_inputs: &[MusicXmlMeasureInputV1<'_, '_>],
+) -> Result<Option<Vec<ParsedMeasure>>, MusicXmlMeasureAdapterError> {
+    let mut divisions: Option<i64> = None;
+    let mut expected_measure_length: Option<RationalBeat> = None;
+    if measure_inputs.is_empty() {
         return Ok(Some(Vec::new()));
     }
 
-    let mut measures = Vec::with_capacity(measure_nodes.len());
-    for (measure_index, measure) in measure_nodes.iter().enumerate() {
-        let implicit = measure
+    let mut measures = Vec::with_capacity(measure_inputs.len());
+    for (measure_index, measure_input) in measure_inputs.iter().enumerate() {
+        let measure = measure_input.content;
+        let measure_container = measure_input.container;
+        let implicit = measure_container
             .attribute("implicit")
             .is_some_and(|value| matches!(value, "yes" | "true" | "1"));
-        let non_controlling = measure
+        let non_controlling = measure_container
             .attribute("non-controlling")
             .is_some_and(|value| matches!(value, "yes" | "true" | "1"));
         let mut cursor = RationalBeat::new(0, 1)
