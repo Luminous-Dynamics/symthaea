@@ -635,7 +635,7 @@
       "candidate_visible_event_manifest_sha256": "f23adbea8a632721babfdd9483ca2be50bb17c8bc7e29f8b6839c5332644ece8"
     }
   ],
-  "pairs": [
+  "intervention_pairs": [
     {
       "id": "RQ-PAIR-001",
       "before_case_id": "RQ-POS-001",
@@ -644,7 +644,9 @@
       "decision_id": "D-PUMP-01",
       "expected_as_of_state": "supported",
       "expected_current_state": "supported",
-      "expected_current_action": "no_requalification"
+      "expected_current_action": "no_requalification",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-PUMP-09"
     },
     {
       "id": "RQ-PAIR-002",
@@ -654,7 +656,9 @@
       "decision_id": "D-BEARING-02",
       "expected_before_current_state": "supported",
       "expected_after_current_state": "requalification_required",
-      "expected_after_action": "hold_and_requalify"
+      "expected_after_action": "hold_and_requalify",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-BEARING-02"
     },
     {
       "id": "RQ-PAIR-003",
@@ -664,7 +668,9 @@
       "decision_id": "D-BOND-03",
       "expected_as_of_state": "supported",
       "expected_current_state": "withdrawn",
-      "expected_current_action": "withdraw_claim_and_hold"
+      "expected_current_action": "withdraw_claim_and_hold",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-BOND-03"
     },
     {
       "id": "RQ-PAIR-004",
@@ -674,7 +680,9 @@
       "affected_decision_id": "D-ROBOT-04",
       "unaffected_decision_id": "D-POWER-04",
       "expected_affected_state": "requalification_required",
-      "expected_unaffected_state": "supported"
+      "expected_unaffected_state": "supported",
+      "before_decision_id": "D-ROBOT-04",
+      "after_decision_id": "D-ROBOT-04"
     },
     {
       "id": "RQ-PAIR-005",
@@ -683,7 +691,9 @@
       "expected_relation": "flip_to_indeterminate",
       "decision_id": "D-SEISMIC-08",
       "expected_current_state": "indeterminate",
-      "expected_current_action": "hold_pending_evidence"
+      "expected_current_action": "hold_pending_evidence",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-SEISMIC-08"
     },
     {
       "id": "RQ-PAIR-006",
@@ -692,7 +702,9 @@
       "expected_relation": "flip_to_withdrawn",
       "decision_id": "D-MARINE-06",
       "expected_current_state": "withdrawn",
-      "expected_current_action": "withdraw_claim_and_hold"
+      "expected_current_action": "withdraw_claim_and_hold",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-MARINE-06"
     },
     {
       "id": "RQ-PAIR-007",
@@ -701,7 +713,9 @@
       "expected_relation": "flip_to_requalification",
       "decision_id": "D-SOLVER-07",
       "expected_current_state": "requalification_required",
-      "expected_current_action": "hold_and_requalify"
+      "expected_current_action": "hold_and_requalify",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-SOLVER-07"
     },
     {
       "id": "RQ-PAIR-008",
@@ -710,7 +724,9 @@
       "expected_relation": "historical_rejection",
       "decision_id": "D-VALVE-10",
       "expected_as_of_state": "withdrawn",
-      "expected_current_state": "withdrawn"
+      "expected_current_state": "withdrawn",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-VALVE-10"
     }
   ]
 }
