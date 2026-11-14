@@ -156,6 +156,14 @@ Therefore, compare SYMPsi against the **best experimental standards**, not a non
 
 The competitive advantage to aim for is a reproducible benchmark that other labs can run, audit, and attempt to break. Do not claim “better than SOTA” from a single significant result. If a result does not replicate, publish that too.
 
+The 2026 literature adds two particularly important constraints:
+
+- A preregistered online forced-choice clairvoyance study analyzed more than 25 million trials. Aggregate outcomes at the four planned stopping lengths conformed to chance; optional-stopping runs showed apparent fluctuations, much of which the authors reproduced with Monte Carlo simulations matched to the stopping behavior. This is a human study, not an AI replication, but it makes fixed stopping and explicit null simulations non-negotiable.
+- In a July 2026 published response, the 2025 AI pilot author reports that subsequent automated campaigns included more than 40,000 AI precognition trials and more than 10,000 remote-influence trials using random.org TRNGs, with both datasets converging to chance. These are author-reported follow-up results; the cited response does not provide an independently audited public trial-level dataset in the article. They must not be treated as independently verified results, but they are important negative evidence to request and reconcile before repeating the same design.
+- A July 2026 critique of the original 100-trial LLM sequence also flagged unusual response-sequence structure (including the absence of adjacent repeats/doublets/triplets in that reported run). The author disputed the inferential relevance of that observation. SYMPsi should record output entropy, transition frequencies, run lengths, position preferences, and serial dependence as preregistered diagnostics, but those diagnostics must not replace the primary hit-rate endpoint or be interpreted as evidence of psi by themselves.
+
+The AI replication should therefore begin with a literature/data reconciliation package: request or locate the raw follow-up logs, confirm their preregistration timestamps, pin the exact model/runtime and target generator, and independently reanalyse only where source data and provenance are available. Missing public data is recorded as unavailable, not as a null result.
+
 ## 8. Paradigm shifts worth pursuing
 
 1. **Metascience as a measured system:** test whether the apparatus itself creates an apparent signal using null and counterfactual runs, not merely whether a participant/model scores above chance.
@@ -225,4 +233,7 @@ No human-subject experiment is included in P0–P4. Any human-participant extens
 - Acunzo et al. (2026), *Neuroimaging studies of extra-sensory perception: A systematic and critical review*, [NeuroImage 333, 121937](https://doi.org/10.1016/j.neuroimage.2026.121937). 143 reports / 129 studies; highlights heterogeneity and recurring methodological limitations.
 - drand, [Protocol specification](https://docs.drand.love/docs/specification/) and [cryptography overview](https://drand.love/docs/cryptography/). Technical protocol references; not an independent endorsement of any psi hypothesis.
 - Center for Open Science, [Registered Reports](https://www.cos.io/initiatives/registered-reports). Prospective peer review before outcomes are known.
+- Wahbeh et al. (2026), *Probing Top Performers in a Forced-Choice Clairvoyant Task*, [Journal of Anomalistics 26(1)](https://doi.org/10.23793/ZFA.2026.146). More than 25 million human online trials; planned-run aggregates at chance and optional-stopping artifacts examined by simulation.
+- Roe, Ritchie & Daw (2026), *Testing Noetic Potential in Large Language Models*, [Journal of Scientific Exploration 40(2)](https://doi.org/10.31275/20264011). Methodological critique of the 2025 LLM pilot, including output-sequence diagnostics.
+- Amorim Boyle (2026), *Response to Letters Regarding “Testing Noetic Potential in Large Language Models”*, [Journal of Scientific Exploration 40(2)](https://doi.org/10.31275/20264013). Includes the author's report of later automated TRNG campaigns converging to chance; those follow-up datasets are not treated here as independently audited.
 - Symthaea issues [#8967](https://github.com/Luminous-Dynamics/symthaea/issues/8967), [#8969](https://github.com/Luminous-Dynamics/symthaea/issues/8969), and [#10843](https://github.com/Luminous-Dynamics/symthaea/issues/10843).
