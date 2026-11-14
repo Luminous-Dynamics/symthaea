@@ -21,12 +21,18 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
+pub mod identity;
 pub mod viability;
 pub mod reconfiguration;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
     ModelId, ModelPairAssessment, evaluate_assay_adequacy,
+};
+pub use identity::{
+    ContinuityFinding, ContinuityFindingCode, ContinuityPolicy, ContinuityQualification,
+    ContinuityReport, RelationMode, StateId, StateProfile, Transition, TransitionSystem,
+    evaluate_operational_continuity,
 };
 pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
