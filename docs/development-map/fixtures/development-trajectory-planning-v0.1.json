@@ -352,5 +352,6 @@
       "claim_state": "proposed"
     }
   ],
-  "claim_ceiling": "Synthetic planning case only. Costs are abstract fixture values, not real engineering estimates. No actual owner agreement, consumer implementation, build/test run or integration is asserted."
+  "claim_ceiling": "Synthetic planning case only. Costs are abstract fixture values, not real engineering estimates. No actual owner agreement, consumer implementation, build/test run or integration is asserted.",
+  "document_type": "development_trajectory_planning_case"
 }
