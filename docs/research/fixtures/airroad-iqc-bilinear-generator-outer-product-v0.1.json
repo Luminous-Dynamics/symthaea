@@ -677,6 +677,24 @@
           "numerator": "9",
           "denominator": "1"
         }
+      ],
+      "A_lower_generators": [
+        {
+          "id": "A-k0-plus",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ],
+      "B_lower_generators": [
+        {
+          "id": "B-k0-plus",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        }
       ]
     },
     "right_interval": {
