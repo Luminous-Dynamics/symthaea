@@ -1714,7 +1714,7 @@ impl U1MpsTruncationLedger {
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound = self.cumulative_l2_error_upper_bound + diagnostics.discarded_weight.sqrt();
+        let next_bound = self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
