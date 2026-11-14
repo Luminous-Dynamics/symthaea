@@ -7,7 +7,7 @@ This is a small, standalone Rust research tool. It validates the **structure** o
 From this directory:
 
 ```sh
-cargo test --locked
+cargo test
 cargo run -- fixtures/valid.json
 ```
 
