@@ -192,6 +192,17 @@ impl CognitiveLoopService {
                 .collect()
         };
 
+        // Refresh through FepModule so the exported view has one integration owner.
+        self.fep.viability_fabric.refresh_viability(
+            self.fep.viability_fabric.state().cycle,
+            self.thermodynamic_load as f64,
+            self.stats.avg_prediction_error as f64,
+            self.prediction_confidence,
+        );
+        metadata.viability = self.fep.viability_telemetry();
+        metadata.viability.viability_planning_horizon_scale =
+            self.fep.viability_planning_horizon_scale();
+
         metadata.cycle_duration_us = cycle_start.elapsed().as_micros() as u64;
 
         tracing::debug!(

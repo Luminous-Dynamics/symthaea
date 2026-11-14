@@ -107,6 +107,9 @@ pub use memory_bridge::*;
 pub mod goal_world;
 pub use goal_world::*;
 
+pub mod viability_qualification;
+pub use viability_qualification::*;
+
 pub mod types;
 pub(crate) use types::CycleState;
 pub use types::*;
@@ -318,6 +321,31 @@ pub mod threat_memory;
 
 pub mod life_support;
 pub mod power_budget;
+
+/// Typed causal state contracts for persistence, prediction, homeostasis, and recovery.
+pub mod viability_fabric;
+pub use viability_fabric::{
+    ActionOutcome, ActionPrediction, CognitiveResourceMode, LifecyclePhase,
+    PredictionCancellation, PredictionErrorLedger, RegulationDecision, RegulationThresholds,
+    ViabilityTraceReceipt,
+    ViabilityBand, ViabilityDelta, ViabilityFabric, ViabilitySignal, ViabilityState,
+    ViabilityTelemetry, ViabilityVariable,
+};
+pub mod viability_micro_world;
+pub use viability_micro_world::{
+    benchmark_scenarios, evaluate_predictor, evaluate_predictor_generalization,
+    evaluate_predictor_suite, evaluate_predictor_suite_fresh, run_homeostatic_agent,
+    run_homeostatic_agent_horizon, run_homeostatic_agent_horizon_scenario,
+    run_homeostatic_agent_scenario, CounterfactualRollout, HomeostaticHorizonRunReport,
+    HomeostaticPolicy, HomeostaticRunReport, MicroAction, MicroExecutionFailure,
+    MicroPerturbation,
+    MicroWorldObservation,
+    MicroWorldFactorization, MicroWorldGeneralizationReport, MicroWorldPredictor, MicroWorldReport,
+    MicroWorldScenario,
+    MicroWorldSuiteReport,
+    PersistencePredictor, WorldModelBridgePredictor,
+    DEFAULT_HORIZON_CONFIDENCE_DECAY,
+};
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 // AffectiveBridge now owned by ConsciousnessStateManager
