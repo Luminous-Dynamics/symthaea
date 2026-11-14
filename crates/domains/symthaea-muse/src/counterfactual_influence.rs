@@ -109,7 +109,6 @@ pub struct RepeatabilityCalibration {
     /// Parser-reconstructed receipt digest from the baseline MIDI bytes.
     pub performed_event_map_receipt_sha256: String,
     pub expected_primary_pitches_sha256: String,
-    pub counterfactual_expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
@@ -422,6 +421,7 @@ pub struct CounterfactualInfluenceReport {
     pub counterfactual_event_map_sha256: String,
     pub counterfactual_event_map_receipt_sha256: String,
     pub expected_primary_pitches_sha256: String,
+    pub counterfactual_expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub counterfactual_schedule_sha256: String,
     pub renderer_identity_sha256: String,
@@ -1421,6 +1421,8 @@ pub fn measure_counterfactual_influence(
         expected_primary_pitches_sha256: calibration
             .expected_primary_pitches_sha256
             .clone(),
+        counterfactual_expected_primary_pitches_sha256:
+            sha256_hex(input.counterfactual_expected_primary_midi_by_score_index),
         baseline_schedule_sha256: sha256_hex(input.baseline_schedule_bytes),
         counterfactual_schedule_sha256: sha256_hex(input.counterfactual_schedule_bytes),
         renderer_identity_sha256: input.baseline_renderer_evidence.renderer_identity_sha256.clone(),
