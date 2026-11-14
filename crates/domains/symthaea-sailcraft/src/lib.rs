@@ -527,6 +527,7 @@ mod tests {
     fn polar() -> PolarDiagram {
         PolarDiagram {
             configuration_digest: CONFIG,
+            source_artifact_digest: [0xb6; 32],
             true_wind_speeds_mps: vec![4.0, 8.0, 12.0],
             true_wind_angles_deg: vec![0.0, 30.0, 45.0, 60.0, 90.0, 120.0, 150.0, 180.0],
             boat_speed_mps: vec![
