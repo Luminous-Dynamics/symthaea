@@ -321,23 +321,23 @@
         {
           "file_name": "CyclicVoltammetry_PCNS_TemperatureComparison_50mVs.csv",
           "persistent_id": "10.18710/F4NFMJ/RREE4O",
-          "size_bytes": 225689,
           "repository_md5": "42631fe50e35001dfcfd474f99db37dd",
-          "local_sha256_verified": false
+          "local_sha256_verified": false,
+          "size_display": "220.4 KB"
         },
         {
           "file_name": "GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv",
           "persistent_id": "10.18710/F4NFMJ/8LHNEC",
-          "size_bytes": 4089000,
           "repository_md5": "88bc3dc26bd37971d7ca4a80ed79f290",
-          "local_sha256_verified": false
+          "local_sha256_verified": false,
+          "size_display": "3.9 MB"
         },
         {
           "file_name": "ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv",
           "persistent_id": "10.18710/F4NFMJ/QKZMNC",
-          "size_bytes": 2969,
           "repository_md5": "4ef9d5efe0519c599a03b6527511c54c",
-          "local_sha256_verified": false
+          "local_sha256_verified": false,
+          "size_display": "2.9 KB"
         }
       ],
       "local_download_status": "not_downloaded_in_this_work_increment"
