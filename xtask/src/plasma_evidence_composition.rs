@@ -103,6 +103,7 @@ struct FailurePatternShare {
 #[serde(deny_unknown_fields)]
 struct FailureClassificationRecord {
     specimen_id: String,
+    cluster_id: String,
     status: String,
     patterns: Vec<FailurePatternShare>,
     oscillating: bool,
@@ -156,15 +157,16 @@ const ISO_10365_PATTERNS: &[&str] = &[
 
 fn classification_share(
     records: &[FailureClassificationRecord],
-    expected_ids: &[String],
+    expected_samples: &[SampleIdentity],
     target_pattern: &str,
     rounding_tolerance: f64,
 ) -> std::result::Result<(f64, f64), Disposition> {
-    if records.is_empty() || !unique_nonempty(expected_ids) {
+    if records.is_empty() || expected_samples.is_empty() {
         return Err(Disposition::Blocked);
     }
+    let expected_ids: Vec<String> = expected_samples.iter().map(|sample| sample.specimen_id.clone()).collect();
     let actual_ids: Vec<String> = records.iter().map(|record| record.specimen_id.clone()).collect();
-    if !same_members(expected_ids, &actual_ids) {
+    if !same_members(&expected_ids, &actual_ids) {
         return Err(Disposition::Rejected);
     }
 
@@ -172,7 +174,14 @@ fn classification_share(
     let mut classified_count = 0usize;
     let mut target_total = 0.0f64;
     for record in records {
+        let Some(expected) = expected_samples.iter().find(|sample| sample.specimen_id == record.specimen_id) else {
+            return Err(Disposition::Rejected);
+        };
+        if expected.cluster_id != record.cluster_id {
+            return Err(Disposition::Rejected);
+        }
         if !nonempty(&record.specimen_id)
+            || !nonempty(&record.cluster_id)
             || !unique_nonempty(&record.reviewer_refs)
             || !nonempty(&record.adjudication_ref)
         {
@@ -235,6 +244,8 @@ fn validate_failure_mode_distribution(
     evidence: &Value,
     baseline_ids: &[String],
     candidate_ids: &[String],
+    baseline_samples: &[SampleIdentity],
+    candidate_samples: &[SampleIdentity],
     baseline_groups: &[String],
     candidate_groups: &[String],
 ) -> Disposition {
@@ -293,7 +304,7 @@ fn validate_failure_mode_distribution(
     }
     let baseline = match classification_share(
         &envelope.baseline_failure_classifications,
-        baseline_ids,
+        baseline_samples,
         &analysis.target_pattern,
         rounding,
     ) {
@@ -302,7 +313,7 @@ fn validate_failure_mode_distribution(
     };
     let candidate = match classification_share(
         &envelope.candidate_failure_classifications,
-        candidate_ids,
+        candidate_samples,
         &analysis.target_pattern,
         rounding,
     ) {
@@ -475,6 +486,8 @@ pub(super) fn audit_transfer_bridge(
         evidence,
         &baseline_ids,
         &candidate_ids,
+        &baseline_samples,
+        &candidate_samples,
         &baseline_groups,
         &candidate_groups,
     )
