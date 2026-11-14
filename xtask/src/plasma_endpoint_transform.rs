@@ -700,6 +700,12 @@ fn analysis_design_id_mismatch(
 ) -> bool {
     analysis.design_id != design.design_id
         || analysis.design_sha256 != design.receipt_sha256.as_deref().unwrap_or("")
+        || analysis.plan_sha256 != design.plan_sha256
+        || analysis.result_id != design.analysis_result.result_id
+        || analysis.result_sha256 != design.analysis_result.result_sha256
+        || analysis.analysis_profile != design.analysis_profile
+        || analysis.design_id != design.analysis_result.design_id
+        || analysis.plan_sha256 != design.analysis_result.plan_sha256
 }
 
 fn expected_analysis_profile(graph: &EndpointGraph) -> &'static str {
