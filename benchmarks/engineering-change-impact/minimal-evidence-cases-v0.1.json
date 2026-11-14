@@ -1,0 +1,560 @@
+{
+  "schema_version": "engineering-decision-minimal-evidence-v0.1",
+  "status": "synthetic_known_answers_not_adjudicated_engineering_data",
+  "semantics": {
+    "provenance_rule": "Copies and derivatives inherit the qualified provenance root of their source. A new record identifier or representation does not create an independent root.",
+    "sufficient_set_rule": "For each mandatory predicate, a sufficient root set contains at least the evaluator-frozen number of distinct, admissible provenance roots that support that predicate.",
+    "unknown_rule": "Unknown provenance cannot be counted as independent support; if it could change sufficiency, the result is indeterminate.",
+    "output_states": [
+      "supported",
+      "unsupported",
+      "indeterminate"
+    ]
+  },
+  "cases": [
+    {
+      "id": "ME-POS-001",
+      "family": "redundant_sources_multiple_sufficient_sets",
+      "mandatory_predicates": [
+        "bearing_fatigue_margin"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-A1",
+          "root_id": "ROOT-A",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "CFG-7",
+          "supports": [
+            "bearing_fatigue_margin"
+          ]
+        },
+        {
+          "id": "E-A1-COPY",
+          "root_id": "ROOT-A",
+          "derived_from": [
+            "E-A1"
+          ],
+          "admissibility": "admissible",
+          "configuration": "CFG-7",
+          "supports": [
+            "bearing_fatigue_margin"
+          ]
+        },
+        {
+          "id": "E-B",
+          "root_id": "ROOT-B",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "CFG-7",
+          "supports": [
+            "bearing_fatigue_margin"
+          ]
+        },
+        {
+          "id": "E-C",
+          "root_id": "ROOT-C",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "CFG-7",
+          "supports": [
+            "bearing_fatigue_margin"
+          ]
+        }
+      ],
+      "candidate_selected_evidence": [
+        "E-A1",
+        "E-A1-COPY",
+        "E-B"
+      ],
+      "expected": {
+        "state": "supported",
+        "action": "revalidate",
+        "independent_roots_by_predicate": {
+          "bearing_fatigue_margin": [
+            "ROOT-A",
+            "ROOT-B"
+          ]
+        },
+        "sufficient_root_sets_by_predicate": {
+          "bearing_fatigue_margin": [
+            [
+              "ROOT-A",
+              "ROOT-B"
+            ],
+            [
+              "ROOT-A",
+              "ROOT-C"
+            ],
+            [
+              "ROOT-B",
+              "ROOT-C"
+            ]
+          ]
+        },
+        "reason_codes": []
+      }
+    },
+    {
+      "id": "ME-NEG-001",
+      "family": "two_records_one_common_origin",
+      "mandatory_predicates": [
+        "bond_strength_limit"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-PRIMARY",
+          "root_id": "ROOT-X",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "BOND-4",
+          "supports": [
+            "bond_strength_limit"
+          ]
+        },
+        {
+          "id": "E-EXPORT",
+          "root_id": "ROOT-X",
+          "derived_from": [
+            "E-PRIMARY"
+          ],
+          "admissibility": "admissible",
+          "configuration": "BOND-4",
+          "supports": [
+            "bond_strength_limit"
+          ]
+        }
+      ],
+      "candidate_selected_evidence": [
+        "E-PRIMARY",
+        "E-EXPORT"
+      ],
+      "expected": {
+        "state": "unsupported",
+        "action": "request_evidence",
+        "independent_roots_by_predicate": {
+          "bond_strength_limit": [
+            "ROOT-X"
+          ]
+        },
+        "sufficient_root_sets_by_predicate": {
+          "bond_strength_limit": []
+        },
+        "reason_codes": [
+          "COMMON_CAUSE_ROOT_COLLAPSE",
+          "INSUFFICIENT_INDEPENDENT_ROOTS:bond_strength_limit"
+        ]
+      }
+    },
+    {
+      "id": "ME-NEG-002",
+      "family": "last_independent_support_removed",
+      "mandatory_predicates": [
+        "thermal_runaway_limit"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-THERM-A",
+          "root_id": "THERM-A",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "PACK-3",
+          "supports": [
+            "thermal_runaway_limit"
+          ]
+        },
+        {
+          "id": "E-THERM-B",
+          "root_id": "THERM-B",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "PACK-3",
+          "supports": [
+            "thermal_runaway_limit"
+          ]
+        }
+      ],
+      "candidate_selected_evidence": [
+        "E-THERM-A"
+      ],
+      "expected": {
+        "state": "unsupported",
+        "action": "hold",
+        "independent_roots_by_predicate": {
+          "thermal_runaway_limit": [
+            "THERM-A"
+          ]
+        },
+        "sufficient_root_sets_by_predicate": {
+          "thermal_runaway_limit": []
+        },
+        "reason_codes": [
+          "LAST_SUFFICIENT_ROOT_REMOVED",
+          "INSUFFICIENT_INDEPENDENT_ROOTS:thermal_runaway_limit"
+        ]
+      }
+    },
+    {
+      "id": "ME-NEG-003",
+      "family": "content_identical_wrong_configuration",
+      "mandatory_predicates": [
+        "bolt_preload_limit"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-BOLT-A",
+          "root_id": "BOLT-A",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "JOINT-NEW",
+          "supports": [
+            "bolt_preload_limit"
+          ]
+        },
+        {
+          "id": "E-BOLT-B",
+          "root_id": "BOLT-B",
+          "derived_from": [],
+          "admissibility": "inadmissible_scope",
+          "configuration": "JOINT-OLD",
+          "content_digest": "same-content-digest",
+          "supports": [
+            "bolt_preload_limit"
+          ]
+        }
+      ],
+      "candidate_selected_evidence": [
+        "E-BOLT-A",
+        "E-BOLT-B"
+      ],
+      "expected": {
+        "state": "unsupported",
+        "action": "revalidate",
+        "independent_roots_by_predicate": {
+          "bolt_preload_limit": [
+            "BOLT-A"
+          ]
+        },
+        "sufficient_root_sets_by_predicate": {
+          "bolt_preload_limit": []
+        },
+        "reason_codes": [
+          "INADMISSIBLE_LOOKALIKE_REJECTED:E-BOLT-B",
+          "INSUFFICIENT_INDEPENDENT_ROOTS:bolt_preload_limit"
+        ]
+      }
+    },
+    {
+      "id": "ME-POS-002",
+      "family": "irrelevant_evidence_injection",
+      "mandatory_predicates": [
+        "pressure_boundary_integrity"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-PRESS-A",
+          "root_id": "PRESS-A",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "pressure_boundary_integrity"
+          ]
+        },
+        {
+          "id": "E-PRESS-B",
+          "root_id": "PRESS-B",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "VESSEL-2",
+          "supports": [
+            "pressure_boundary_integrity"
+          ]
+        }
+      ],
+      "irrelevant_evidence_injection_count": 40,
+      "irrelevant_evidence_injection_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidate_selected_evidence": [
+        "E-PRESS-A",
+        "E-PRESS-B"
+      ],
+      "expected": {
+        "state": "supported",
+        "action": "revalidate",
+        "independent_roots_by_predicate": {
+          "pressure_boundary_integrity": [
+            "PRESS-A",
+            "PRESS-B"
+          ]
+        },
+        "sufficient_root_sets_by_predicate": {
+          "pressure_boundary_integrity": [
+            [
+              "PRESS-A",
+              "PRESS-B"
+            ]
+          ]
+        },
+        "reason_codes": []
+      }
+    },
+    {
+      "id": "ME-POS-003",
+      "family": "derivative_lineage_does_not_inflate_support",
+      "mandatory_predicates": [
+        "corrosion_allowance"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-CORR-A",
+          "root_id": "CORR-A",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "PIPE-6",
+          "supports": [
+            "corrosion_allowance"
+          ]
+        },
+        {
+          "id": "E-CORR-A-SUMMARY",
+          "root_id": "CORR-A",
+          "derived_from": [
+            "E-CORR-A"
+          ],
+          "admissibility": "admissible",
+          "configuration": "PIPE-6",
+          "supports": [
+            "corrosion_allowance"
+          ]
+        },
+        {
+          "id": "E-CORR-B",
+          "root_id": "CORR-B",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "PIPE-6",
+          "supports": [
+            "corrosion_allowance"
+          ]
+        }
+      ],
+      "candidate_selected_evidence": [
+        "E-CORR-A",
+        "E-CORR-A-SUMMARY",
+        "E-CORR-B"
+      ],
+      "expected": {
+        "state": "supported",
+        "action": "revalidate",
+        "raw_record_count": 3,
+        "effective_independent_root_count": 2,
+        "independent_roots_by_predicate": {
+          "corrosion_allowance": [
+            "CORR-A",
+            "CORR-B"
+          ]
+        },
+        "sufficient_root_sets_by_predicate": {
+          "corrosion_allowance": [
+            [
+              "CORR-A",
+              "CORR-B"
+            ]
+          ]
+        },
+        "reason_codes": [
+          "DERIVATIVE_NOT_COUNTED_AS_INDEPENDENT:E-CORR-A-SUMMARY"
+        ]
+      }
+    },
+    {
+      "id": "ME-POS-004",
+      "family": "admissible_independent_substitution",
+      "mandatory_predicates": [
+        "actuator_torque_envelope"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "candidate_worlds": [
+        {
+          "world_id": "BASE",
+          "evidence": [
+            {
+              "id": "E-TORQUE-A",
+              "root_id": "TORQUE-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ACT-9",
+              "supports": [
+                "actuator_torque_envelope"
+              ]
+            },
+            {
+              "id": "E-TORQUE-B",
+              "root_id": "TORQUE-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ACT-9",
+              "supports": [
+                "actuator_torque_envelope"
+              ]
+            }
+          ],
+          "selected": [
+            "E-TORQUE-A",
+            "E-TORQUE-B"
+          ],
+          "expected_action": "revalidate"
+        },
+        {
+          "world_id": "SUBSTITUTED",
+          "evidence": [
+            {
+              "id": "E-TORQUE-A",
+              "root_id": "TORQUE-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ACT-9",
+              "supports": [
+                "actuator_torque_envelope"
+              ]
+            },
+            {
+              "id": "E-TORQUE-C",
+              "root_id": "TORQUE-C",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ACT-9",
+              "supports": [
+                "actuator_torque_envelope"
+              ]
+            }
+          ],
+          "selected": [
+            "E-TORQUE-A",
+            "E-TORQUE-C"
+          ],
+          "expected_action": "revalidate"
+        }
+      ],
+      "expected": {
+        "state": "supported",
+        "relation": "invariant",
+        "sufficient_root_sets_by_predicate": {
+          "actuator_torque_envelope": [
+            [
+              "TORQUE-A",
+              "TORQUE-B"
+            ],
+            [
+              "TORQUE-A",
+              "TORQUE-C"
+            ]
+          ]
+        },
+        "reason_codes": []
+      }
+    },
+    {
+      "id": "ME-UNK-001",
+      "family": "unknown_provenance_cannot_establish_independence",
+      "mandatory_predicates": [
+        "seismic_anchor_capacity"
+      ],
+      "minimum_independent_roots_per_predicate": 2,
+      "evidence": [
+        {
+          "id": "E-SEISMIC-A",
+          "root_id": "SEISMIC-A",
+          "derived_from": [],
+          "admissibility": "admissible",
+          "configuration": "ANCHOR-5",
+          "supports": [
+            "seismic_anchor_capacity"
+          ]
+        },
+        {
+          "id": "E-SEISMIC-UNK",
+          "root_id": null,
+          "derived_from": [],
+          "admissibility": "unknown_provenance",
+          "configuration": "ANCHOR-5",
+          "supports": [
+            "seismic_anchor_capacity"
+          ]
+        }
+      ],
+      "candidate_selected_evidence": [
+        "E-SEISMIC-A",
+        "E-SEISMIC-UNK"
+      ],
+      "expected": {
+        "state": "indeterminate",
+        "action": "request_evidence",
+        "independent_roots_by_predicate": {
+          "seismic_anchor_capacity": [
+            "SEISMIC-A"
+          ]
+        },
+        "unknown_origin_records": [
+          "E-SEISMIC-UNK"
+        ],
+        "sufficient_root_sets_by_predicate": {
+          "seismic_anchor_capacity": []
+        },
+        "reason_codes": [
+          "PROVENANCE_INDEPENDENCE_UNKNOWN:E-SEISMIC-UNK"
+        ]
+      }
+    }
+  ],
+  "intervention_pairs": [
+    {
+      "id": "ME-PAIR-001",
+      "case_id": "ME-POS-001",
+      "intervention": "remove E-A1-COPY while E-A1 and E-B remain",
+      "expected_relation": "invariant",
+      "expected_action": "revalidate"
+    },
+    {
+      "id": "ME-PAIR-002",
+      "case_id": "ME-NEG-002",
+      "intervention": "remove E-THERM-B from the selected evidence",
+      "expected_relation": "flip",
+      "expected_action": "hold"
+    },
+    {
+      "id": "ME-PAIR-003",
+      "case_id": "ME-POS-002",
+      "intervention": "inject the frozen irrelevant evidence batch",
+      "expected_relation": "invariant",
+      "expected_action": "revalidate"
+    },
+    {
+      "id": "ME-PAIR-004",
+      "case_id": "ME-NEG-003",
+      "intervention": "apply the wrong-configuration gate to E-BOLT-B",
+      "expected_relation": "flip",
+      "expected_action": "revalidate"
+    },
+    {
+      "id": "ME-PAIR-005",
+      "case_id": "ME-UNK-001",
+      "intervention": "replace unknown provenance with independently qualified root SEISMIC-B",
+      "expected_relation": "flip",
+      "expected_action": "revalidate"
+    },
+    {
+      "id": "ME-PAIR-006",
+      "case_id": "ME-POS-004",
+      "intervention": "replace independent root TORQUE-B with independent root TORQUE-C",
+      "expected_relation": "invariant",
+      "expected_action": "revalidate"
+    }
+  ]
+}
