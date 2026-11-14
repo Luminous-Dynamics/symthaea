@@ -1,12 +1,20 @@
 # MACE benchmark-audit landscape: where to integrate and where to differentiate
 
-**Research snapshot:** 2026-11-13  
+**Research snapshot:** 2026-11-14  
 **Status:** research synthesis; design recommendations, not achieved capabilities.
 
 ## The field is not empty
 
 MACE should not claim to have invented benchmark auditing. Several 2026 efforts now audit benchmark components, evaluator oracles and agent trajectories. The competitive opportunity is to compose with them and address the missing connection between audited specifications, actual effect boundaries and reproducible evidence.
 
+
+### Public/private saturation and training-time exposure — runtime locking cannot remove contamination
+
+Scale's SWE-Bench Pro V2 update reports Claude Opus 5 resolving 638/642 public tasks versus 222/272 private tasks, a 17.8 percentage-point gap. Scale says network-locked evaluation prevented evaluation-time retrieval from code hosts and module proxies, but cannot remove training-time exposure to public repositories, fixing commits and task artifacts. The public and private sets differ, so this gap is not a causal estimate of contamination; it is evidence that a locked runtime alone does not establish generalization.
+
+**MACE response:** preregister temporal holdouts, private task families, secret reference states and artifact-preserving regrades. Publish public/private scores separately and keep task authoring, private test labels and verifier code outside the evaluated agent's accessible trust domain. A near-ceiling public score remains a result on that public split—not proof of generalization.
+
+Source: https://labs.scale.com/blog/swe-bench-pro-v2
 
 ### Terminal-Bench 4.1 — verifier isolation is now a baseline, not a novelty claim
 
