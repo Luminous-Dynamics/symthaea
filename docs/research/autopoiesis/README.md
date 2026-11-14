@@ -18,6 +18,9 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 12. [AOBENCH-007 organizational reconfiguration](https://github.com/Luminous-Dynamics/symthaea/issues/12113) — structural evolution and capability preservation.
 13. [Operational continuity specification](AOBENCH_OPERATIONAL_CONTINUITY_2026-11-14.md) — simulation/bisimulation and separate capability, governance and evidence continuity.
 14. [AOBENCH-008 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/12121) — operational identity and behavioral continuity across reconfiguration.
+15. [Mutation adequacy and cross-plane adversarial qualification](AOBENCH_MUTATION_ADEQUACY_2026-11-14.md) — mutation-tested assurance and paired positive twins; tracked by [AOBENCH-009 #12140](https://github.com/Luminous-Dynamics/symthaea/issues/12140).
+16. [Typed semantic continuity](AOBENCH_SEMANTIC_CONTINUITY_2026-11-14.md) — explicit authority, consent, side-effect, provenance and substrate transition envelopes; tracked by [AOBENCH-010 #12167](https://github.com/Luminous-Dynamics/symthaea/issues/12167).
+17. [Experimental design and cross-family generalization](AOBENCH_EXPERIMENTAL_DESIGN_AND_GENERALIZATION_2026-11-14.md) — sequential probe choice, power, stopping, classical baselines and sealed mechanism-family holdouts; tracked by [AOBENCH-011 #12173](https://github.com/Luminous-Dynamics/symthaea/issues/12173).
 
 ## Current implementation
 
@@ -28,6 +31,8 @@ The first executable package is a standalone nested Cargo workspace:
   - `src/assay.rs`: deterministic finite-model assay adequacy evaluator.
   - `src/viability.rs`: bounded finite viability, boundary-production, admissibility and global-constraint witnesses.
   - `src/reconfiguration.rs`: allowlist- and budget-constrained structural diff admission with protected-root/constraint checks. This admits a proposal structurally; it does not authorize, prove viability or establish behavioral continuity.
+  - `src/identity.rs`: finite simulation/bisimulation-style operational-continuity checker over declared state, capability, invariant and action/observation models.
+  - `src/semantic_continuity.rs`: typed authority, consent, effect, provenance and substrate continuity evaluator; evidence dispositions are supplied by independent adapters and are not authenticated by this module.
 
 It has exact serde / sha2 dependency pins and its own lockfile, and is explicitly excluded from the root workspace's crates/domains glob. Its focused CI builds the nested workspace independently.
 
