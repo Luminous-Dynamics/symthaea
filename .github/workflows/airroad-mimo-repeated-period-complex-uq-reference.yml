@@ -1,0 +1,46 @@
+name: AIRROAD MIMO Repeated-Period Complex UQ Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_REPEATED_PERIOD_COMPLEX_UQ_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-repeated-period-complex-uq-v0.1.json"
+      - "tools/airroad-mimo-repeated-period-complex-uq/verify_mimo_period_statistics.py"
+      - ".github/workflows/airroad-mimo-repeated-period-complex-uq-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-repeated-period-complex-uq-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_REPEATED_PERIOD_COMPLEX_UQ_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-repeated-period-complex-uq-v0.1.json"
+      - "tools/airroad-mimo-repeated-period-complex-uq/verify_mimo_period_statistics.py"
+      - ".github/workflows/airroad-mimo-repeated-period-complex-uq-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-repeated-period-complex-uq-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-mimo-period-statistics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute MIMO C/P estimator oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-mimo-repeated-period-complex-uq/verify_mimo_period_statistics.py
+          python3 \
+            tools/airroad-mimo-repeated-period-complex-uq/verify_mimo_period_statistics.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-mimo-repeated-period-complex-uq-v0.1.json \
+            > /dev/null
