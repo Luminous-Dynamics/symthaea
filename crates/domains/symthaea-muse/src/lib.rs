@@ -108,6 +108,8 @@ pub mod critic;
 #[cfg(feature = "theory")]
 pub mod evidence_digest;
 #[cfg(feature = "theory")]
+pub mod humdrum_kern;
+#[cfg(feature = "theory")]
 pub mod experiment_manifest;
 pub mod export;
 pub mod expressive;
