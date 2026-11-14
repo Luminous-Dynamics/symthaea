@@ -135,6 +135,11 @@ pub enum U1MpsError {
         relative_cutoff: f64,
         tolerance: f64,
     },
+    TruncationBudgetInfeasible {
+        requested_l2_error: f64,
+        achievable_l2_error: f64,
+        max_bond_dimension: usize,
+    },
     InvalidTeBDParity(u8),
     TeBDGateOutOfRange {
         bond_index: usize,
@@ -295,6 +300,14 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "invalid truncation policy: max_bond={max_bond_dimension}, relative_cutoff={relative_cutoff}, tolerance={tolerance}"
+            ),
+            Self::TruncationBudgetInfeasible {
+                requested_l2_error,
+                achievable_l2_error,
+                max_bond_dimension,
+            } => write!(
+                f,
+                "local L2 truncation budget {requested_l2_error} is infeasible with max bond {max_bond_dimension}; best achievable residual is {achievable_l2_error}"
             ),
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
