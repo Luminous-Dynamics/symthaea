@@ -695,6 +695,48 @@ mod tests {
     }
 
     #[test]
+    fn explicitly_rejected_receipt_is_not_preserved() {
+        let baseline = transition();
+        let mut candidate = transition();
+        candidate.authority.evidence.status = EvidenceStatus::Rejected;
+        let report = evaluate_semantic_continuity(
+            &[baseline],
+            &[candidate],
+            &SemanticContinuityPolicy::default(),
+        );
+        assert_eq!(report.qualification, ContinuityQualification::NotPreserved);
+        assert!(report.findings.iter().any(|f| f.code == SemanticFindingCode::EvidenceRejected));
+    }
+
+    #[test]
+    fn incomplete_effect_inventory_is_inconclusive() {
+        let baseline = transition();
+        let mut candidate = transition();
+        candidate.effect_inventory_complete = false;
+        let report = evaluate_semantic_continuity(
+            &[baseline],
+            &[candidate],
+            &SemanticContinuityPolicy::default(),
+        );
+        assert_eq!(report.plane_qualifications[&SemanticPlane::Effects], ContinuityQualification::Inconclusive);
+        assert_eq!(report.qualification, ContinuityQualification::Inconclusive);
+    }
+
+    #[test]
+    fn required_provenance_cannot_be_omitted() {
+        let mut baseline = transition();
+        baseline.lineage.clear();
+        let mut candidate = baseline.clone();
+        let policy = SemanticContinuityPolicy {
+            provenance_required_for_actions: ["refresh".into()].into(),
+            ..SemanticContinuityPolicy::default()
+        };
+        let report = evaluate_semantic_continuity(&[baseline], &[candidate], &policy);
+        assert_eq!(report.plane_qualifications[&SemanticPlane::Provenance], ContinuityQualification::NotPreserved);
+        assert!(report.findings.iter().any(|f| f.code == SemanticFindingCode::MissingRequiredLineage));
+    }
+
+    #[test]
     fn substrate_dependency_change_fails_only_the_substrate_plane() {
         let mut baseline = transition();
         let mut candidate = transition();
