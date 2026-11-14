@@ -21,12 +21,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
+pub mod experiment_design;
 pub mod identity;
-pub mod viability;
+pub mod model_refinement;
 pub mod reconfiguration;
 pub mod semantic_continuity;
-pub mod experiment_design;
-pub mod model_refinement;
+pub mod viability;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
