@@ -383,6 +383,51 @@ pub fn validate_ledger(ledger: &EventLedger) -> LedgerValidationReport {
     }
 }
 
+/// Append one event atomically. Existing history is validated first; an invalid
+/// candidate is rolled back and never left in the in-memory ledger.
+pub fn append_event(
+    ledger: &mut EventLedger,
+    event_id: String,
+    body: LedgerEventBody,
+) -> Result<String, String> {
+    let before = validate_ledger(ledger);
+    if !before.valid {
+        return Err(format!("cannot append to an invalid ledger: {}", before.diagnostics.iter()
+            .map(|item| format!("{} {}: {}", item.code, item.path, item.message))
+            .collect::<Vec<_>>().join("; ")));
+    }
+    if event_id.trim().is_empty() || ledger.events.iter().any(|event| event.event_id == event_id) {
+        return Err("event_id must be non-empty and unique within the ledger".to_owned());
+    }
+    let sequence = ledger.events.len() as u64 + 1;
+    let previous_hash = ledger.events.last()
+        .map(|event| event.event_hash.clone())
+        .unwrap_or_else(|| GENESIS_HASH.to_owned());
+    let mut event = LedgerEvent {
+        event_id,
+        sequence,
+        previous_hash,
+        event_hash: String::new(),
+        body,
+    };
+    event.event_hash = calculate_event_hash(
+        &ledger.schema_version,
+        &ledger.ledger_id,
+        &ledger.repository_full_name,
+        &event,
+    )?;
+    let event_hash = event.event_hash.clone();
+    ledger.events.push(event);
+    let after = validate_ledger(ledger);
+    if !after.valid {
+        ledger.events.pop();
+        return Err(format!("candidate event rejected: {}", after.diagnostics.iter()
+            .map(|item| format!("{} {}: {}", item.code, item.path, item.message))
+            .collect::<Vec<_>>().join("; ")));
+    }
+    Ok(event_hash)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ReplayAccumulator {
     facts: BTreeMap<String, FactProjection>,
@@ -782,6 +827,25 @@ mod tests {
     }
 
     #[test] fn valid_hash_chain_is_accepted() { assert!(validate_ledger(&sample_ledger()).valid); }
+    #[test] fn append_event_assigns_identity_sequence_and_hash_atomically() {
+        let mut ledger = sample_ledger();
+        let proposal = body(EventOperation::Propose, "next-change", "2026-11-14T12:00:00Z", "2026-11-14T12:01:00Z", "2026-11-14T12:02:00Z");
+        let hash = append_event(&mut ledger, "event-005".to_owned(), proposal).expect("append");
+        assert_eq!(ledger.events.len(), 5);
+        assert_eq!(ledger.events[4].sequence, 5);
+        assert_eq!(ledger.events[4].event_hash, hash);
+        assert!(validate_ledger(&ledger).valid);
+    }
+    #[test] fn invalid_append_is_rolled_back() {
+        let mut ledger = sample_ledger();
+        let mut bad = body(EventOperation::Invalidate, "unknown-fact", "2026-11-14T12:00:00Z", "2026-11-14T12:01:00Z", "2026-11-14T12:02:00Z");
+        bad.effective_at = Some("2026-11-14T11:00:00Z".to_owned());
+        bad.target_event_id = Some("missing-target".to_owned());
+        let before = ledger.events.len();
+        assert!(append_event(&mut ledger, "event-invalid".to_owned(), bad).is_err());
+        assert_eq!(ledger.events.len(), before);
+        assert!(validate_ledger(&ledger).valid);
+    }
     #[test] fn tampered_event_payload_is_rejected() {
         let mut ledger = sample_ledger();
         ledger.events[0].body.payload = serde_json::json!({"result":"fail"});
