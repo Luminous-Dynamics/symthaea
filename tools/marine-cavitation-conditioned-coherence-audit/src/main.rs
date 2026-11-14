@@ -366,6 +366,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     let mut cavitation_digests = BTreeSet::new();
     let mut coherence_case_ids = BTreeSet::new();
     let mut coherence_report_digests = BTreeSet::new();
+    let mut vibration_trace_digests = BTreeSet::new();
 
     for window in &case.windows {
         let identity = format!("{}::{}", window.run_id, window.window_id);
@@ -421,6 +422,12 @@ fn validate_case(case: &Case) -> Vec<String> {
         if !is_sha256(&coh.report_sha256) || !coherence_report_digests.insert(coh.report_sha256.clone()) {
             errors.push(format!("{identity}: malformed or reused coherence report digest"));
         }
+        if !vibration_trace_digests.insert(coh.vibration_raw_trace_sha256.clone()) {
+            errors.push(format!("{identity}: vibration raw-trace digest is reused across joined windows"));
+        }
+        if coh.vibration_raw_trace_sha256 == coh.pressure_raw_trace_sha256 {
+            errors.push(format!("{identity}: pressure and vibration raw-trace digests must be distinct"));
+        }
         for (label, digest) in [
             ("coherence source data", &coh.source_data_sha256),
             ("coherence operating point", &coh.operating_point_receipt_sha256),
@@ -471,7 +478,7 @@ fn validate_case(case: &Case) -> Vec<String> {
             }
             let recomposed = band.vibration_reference_coherent_pressure_psd_pa2_per_hz
                 + band.non_coherent_residual_pressure_psd_pa2_per_hz;
-            let allowed = PSD_REL_TOLERANCE * band.pressure_psd_pa2_per_hz.max(1.0);
+            let allowed = PSD_REL_TOLERANCE * band.pressure_psd_pa2_per_hz.max(f64::MIN_POSITIVE) + 1.0e-24;
             if (recomposed - band.pressure_psd_pa2_per_hz).abs() > allowed {
                 errors.push(format!("{identity} / {}: coherent plus residual PSD does not recover measured pressure PSD", band.band_id));
             }
@@ -481,7 +488,7 @@ fn validate_case(case: &Case) -> Vec<String> {
                 (band.non_coherent_residual_pressure_psd_lower_bound, band.non_coherent_residual_pressure_psd_upper_bound, band.non_coherent_residual_pressure_psd_pa2_per_hz, "residual PSD"),
             ] {
                 match (lower, upper) {
-                    (Some(lo), Some(hi)) if lo.is_finite() && hi.is_finite() && lo >= 0.0 && lo <= value && value <= hi => {}
+                    (Some(lo), Some(hi)) if lo.is_finite() && hi.is_finite() && lo >= 0.0 && lo <= value && value <= hi && (label != "coherence" || hi <= 1.0 + 1.0e-9) => {}
                     _ => errors.push(format!("{identity} / {}: {label} must have an ordered conservative marginal interval", band.band_id)),
                 }
             }
@@ -499,6 +506,11 @@ fn validate_case(case: &Case) -> Vec<String> {
 fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
     let mut incomparable = false;
     let mut reasons = Vec::new();
+    let reference_sample_rate = case.windows.first().map(|w| w.coherence.sample_rate_hz).unwrap_or_default();
+    let reference_sample_count = case.windows.first().map(|w| w.coherence.sample_count).unwrap_or_default();
+    let reference_band_coverage: BTreeMap<String, f64> = case.windows.first()
+        .map(|window| window.coherence.bands.iter().map(|band| (band.band_id.clone(), band.marginal_uncertainty_coverage_level)).collect())
+        .unwrap_or_default();
     let reference_band_ids: BTreeSet<String> = case.windows.first()
         .map(|window| window.coherence.bands.iter().map(|band| band.band_id.clone()).collect())
         .unwrap_or_default();
@@ -513,7 +525,15 @@ fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
             incomparable = true;
             reasons.push(format!("{}: coherence band ID set differs across windows", window.window_id));
         }
+        if (coh.sample_rate_hz - reference_sample_rate).abs() > 1.0e-9 || coh.sample_count != reference_sample_count {
+            incomparable = true;
+            reasons.push(format!("{}: coherence sample rate/count differs across windows", window.window_id));
+        }
         for band in &coh.bands {
+            if reference_band_coverage.get(&band.band_id).is_some_and(|coverage| (coverage - band.marginal_uncertainty_coverage_level).abs() > 1.0e-9) {
+                incomparable = true;
+                reasons.push(format!("{}: marginal uncertainty coverage differs for band {}", window.window_id, band.band_id));
+            }
             if let Some(reference_frequency) = reference_frequencies.get(&band.band_id) {
                 let relative = (reference_frequency - band.frequency_hz).abs() / reference_frequency.max(1.0);
                 if relative > case.frequency_match_tolerance_fraction {
@@ -546,8 +566,13 @@ fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
                 reasons.push(format!("{}: {reason}", window.window_id));
             }
         }
+        let phase_unresolved_in_bands = coh.bands.iter().any(|band| band.phase_status == "phase_unresolved");
         match coh.disposition.as_str() {
-            "COHERENCE_ESTIMATE_ONLY" | "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" => {}
+            "COHERENCE_ESTIMATE_ONLY" if !phase_unresolved_in_bands => {}
+            "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" if phase_unresolved_in_bands => {}
+            "COHERENCE_ESTIMATE_ONLY" | "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" => {
+                reasons.push(format!("{}: coherence report disposition conflicts with per-band phase status", window.window_id));
+            }
             "UNCERTAINTY_UNRESOLVED" => reasons.push(format!("{}: coherence uncertainty is unresolved", window.window_id)),
             "INVALID" => reasons.push(format!("{}: parent coherence report is invalid", window.window_id)),
             _ => reasons.push(format!("{}: parent coherence report is incomplete or unsupported", window.window_id)),
@@ -685,7 +710,9 @@ fn audit(case: &Case) -> AuditReport {
                 present_minus_absent_mean_coherent_pressure_psd_pa2_per_hz: delta_coherent,
                 present_minus_absent_mean_residual_pressure_psd_pa2_per_hz: delta_residual,
             };
-            per_band_run_reports.entry(band_id.clone()).or_default().push(report.clone());
+            if has_both {
+                per_band_run_reports.entry(band_id.clone()).or_default().push(report.clone());
+            }
             band_reports.push(report);
         }
         run_reports.push(RunReport {
@@ -736,9 +763,11 @@ fn audit(case: &Case) -> AuditReport {
     }
 
     let mut disposition = "CONDITIONED_SUMMARY_ONLY";
-    if invalid_input {
+    if invalid_input || reasons.iter().any(|reason| reason.contains("parent coherence report is invalid") || reason.contains("disposition conflicts with per-band phase status")) {
         disposition = "INVALID";
-        reasons.push("one or more joined input records are malformed".to_string());
+        if invalid_input {
+            reasons.push("one or more joined input records are malformed".to_string());
+        }
     } else if has_incomparable_identity {
         disposition = "INCOMPARABLE";
     } else if reasons.iter().any(|reason| reason.contains("frequency for band")) {
