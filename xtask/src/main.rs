@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod plasma_transfer;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -62,6 +63,11 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Audit evidence-backed transfer of a qualified plasma-bonding profile.
+    PlasmaTransferAudit {
+        #[arg(long, default_value = "data/research/plasma_transfer_fixture_v0_1.json")]
+        fixture: PathBuf,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +111,18 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::PlasmaTransferAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() {
+                fixture
+            } else {
+                root.join(fixture)
+            };
+            plasma_transfer::run(&fixture_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
