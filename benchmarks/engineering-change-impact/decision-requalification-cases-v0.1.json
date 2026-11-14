@@ -53,7 +53,13 @@
         }
       ],
       "events": [],
-      "candidate_visible_event_ids": []
+      "candidate_visible_event_ids": [],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "721f37810e9104dcd5df56200589188df7e0d6c0512e1dbc68038eae947fa20a",
+      "event_inventory_sha256": "eb690975c8f0c6b19c499a4533a037eca74c0a6b2e96d5d2c676c3e388b7d306",
+      "candidate_visible_event_manifest_sha256": "9d437ed433df624b23a71856adff994464cc000cc401be2bb831ce1a4dad5ba0"
     },
     {
       "id": "RQ-NEG-001",
@@ -107,7 +113,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-BRG-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "d2a023edc5e8792b8eed4fafb4b4cfb4ce7a2f2fb94350f80139e0909708fe09",
+      "event_inventory_sha256": "5ce994c800d731b8196218e31dc4e325e1c68018b30e04d7eefc1a65cd5f7959",
+      "candidate_visible_event_manifest_sha256": "1362c75cee9434208b5b206c3478bf8f4b1817f4a6a546ce96c4859edc770264"
     },
     {
       "id": "RQ-NEG-002",
@@ -162,7 +174,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-BOND-REVOKE-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "7d33f03c411765824dcff55075d4ea948a96eaaa56354766f0444e165d1eb950",
+      "event_inventory_sha256": "ec31dd4419ec43eea5019ca09af347bde339c0eaa10e6b8656f6b88e59c446b3",
+      "candidate_visible_event_manifest_sha256": "7fd2aafef870adb57cdd61b899b114cc7690ec2125d8257a5d7b050c7f24a14a"
     },
     {
       "id": "RQ-POS-002",
@@ -216,7 +234,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-PUMP-NOTICE-009"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "f192601e45ae4b27e365fcae6224b57a63bf9b253da8af17d0f00a691873eba5",
+      "event_inventory_sha256": "b5cc682531e73b5286c9b8f2709fba9e32f27bf3c2d3e827abdd48a29d9f9600",
+      "candidate_visible_event_manifest_sha256": "c5bd466136c6d701a9d2b43b72c78adb23d8ebbf7ab3ddd018d6e9892436a2c3"
     },
     {
       "id": "RQ-POS-003",
@@ -276,7 +300,13 @@
         }
       ],
       "events": [],
-      "candidate_visible_event_ids": []
+      "candidate_visible_event_ids": [],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "583cb44f87e329e13de273df5ed3cba325c0ac1a30bf89d9a8ce600435cc9bca",
+      "event_inventory_sha256": "eb690975c8f0c6b19c499a4533a037eca74c0a6b2e96d5d2c676c3e388b7d306",
+      "candidate_visible_event_manifest_sha256": "9d437ed433df624b23a71856adff994464cc000cc401be2bb831ce1a4dad5ba0"
     },
     {
       "id": "RQ-NEG-003",
@@ -355,7 +385,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-ROBOT-CFG-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "583cb44f87e329e13de273df5ed3cba325c0ac1a30bf89d9a8ce600435cc9bca",
+      "event_inventory_sha256": "00847741838938a2e325da8697c6931e04747a255a09a9fa3ac053ae819840a8",
+      "candidate_visible_event_manifest_sha256": "674b697a13152e9863b96f78bb161bbe5768233db45d93ec729c46224bc4648e"
     },
     {
       "id": "RQ-NEG-004",
@@ -409,7 +445,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-HULL-ENV-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "ed244cfdd949674c9e8da4a84ba007b3b4186d33a81553a1da827813321c6f30",
+      "event_inventory_sha256": "e9dd47905ceff9b4425b9f82093ea1080a35829a1a216beac0c252a2d1d2a722",
+      "candidate_visible_event_manifest_sha256": "9a420e41e22f1d873330503178c7e2890e0c4738f77fefb22043ff36b33f2d0f"
     },
     {
       "id": "RQ-NEG-005",
@@ -463,7 +505,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-CFD-CAL-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "3c183e70e3854693a39ff3c487722f3f5bc1de1f01d8d7de7bc954ad19cf53f7",
+      "event_inventory_sha256": "4de08103b5eb3268b48e2f7b3b3e3e552b617a5907b186d9418883f99f1f63cc",
+      "candidate_visible_event_manifest_sha256": "e45d9f4038b16d8c01722f2ac87d1d92faf604c4027311bd246940d78d1f06a3"
     },
     {
       "id": "RQ-UNK-001",
@@ -518,7 +566,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-SEISMIC-UNKNOWN-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "6878f4a57c24b920618d557fd0f52950bee35d1e211d35f72bd04e38f955d4b1",
+      "event_inventory_sha256": "41861b7ba68746db58b9c9683b58a6a53638445d5cd5035ab0b72e4abdd2cedb",
+      "candidate_visible_event_manifest_sha256": "1060ac0d8dfb7157d18fb638c79780aad11bf3438087a443d05a294b52e9c697"
     },
     {
       "id": "RQ-NEG-006",
@@ -572,7 +626,13 @@
       ],
       "candidate_visible_event_ids": [
         "EV-VALVE-REVOKE-001"
-      ]
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "ce8e5868f32b4045954cff8b132565bb9e3a13cf3858a6165ba1a22c96f4e6b2",
+      "event_inventory_sha256": "05fca2163998b709321ae0d524427623eaf63db87b0c46fd5829c70ffef71dbe",
+      "candidate_visible_event_manifest_sha256": "f23adbea8a632721babfdd9483ca2be50bb17c8bc7e29f8b6839c5332644ece8"
     }
   ],
   "pairs": [
