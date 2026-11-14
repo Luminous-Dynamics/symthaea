@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-materialization-receipt-v1.schema.json",
+  "title": "Melothaea music-edit byte materialization receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_version",
+    "benchmark_track_id",
+    "dataset_manifest_sha256",
+    "artifact_map_sha256",
+    "sample_count",
+    "artifact_count",
+    "total_bytes",
+    "artifacts",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-materialization-receipt-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_track_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifact_map_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "artifact_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "total_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "source_lineage_sha256",
+        "split",
+        "role",
+        "relative_path",
+        "sha256",
+        "byte_len"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_lineage_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "split": {
+          "oneOf": [
+            {
+              "enum": [
+                "train",
+                "development",
+                "test"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "enum": [
+            "rights_evidence",
+            "access_evidence",
+            "source_audio",
+            "instruction",
+            "target_audio",
+            "source_symbolic",
+            "target_selector",
+            "metadata"
+          ]
+        },
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byte_len": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
