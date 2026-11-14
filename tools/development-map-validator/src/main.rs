@@ -4,6 +4,7 @@ use development_map_validator::{
     cargo_manifest::{project_cargo_manifest, ManifestAnchor},
     rust_syntax::{project_rust_file, RustFileAnchor},
     tree_projection::{collect_github_tree_inventory_json, compose_repository_tree_json, RepositoryTreeAnchor},
+    dynamapbench::validate_dynamapbench_manifest_json,
     validate_document_json,
 };
 
@@ -14,6 +15,7 @@ fn usage() {
     eprintln!("  development-map-validator rust-file <source.rs> <repository> <revision> <tree-oid> <source-path> <blob-oid>");
     eprintln!("  development-map-validator tree-inventory <github-tree.json> <repository> <revision> <tree-oid>");
     eprintln!("  development-map-validator tree-compose <request.json>");
+    eprintln!("  development-map-validator dynamapbench-manifest <manifest.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects a Cargo manifest or Rust source file, or composes exact source projections into a Git tree snapshot.");
@@ -197,6 +199,37 @@ fn compose_repository_tree_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn validate_dynamapbench_manifest_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "DMB-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match validate_dynamapbench_manifest_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR DMB-JSON-001 {path}: {error}");
+            2
+        }
+        Ok(report) if report.is_valid() => {
+            println!("VALID DYNAMAPBENCH_MANIFEST path={path}");
+            println!("NOTE no Git object, corpus artifact, evaluator binary, signature, benchmark run or source content was independently verified");
+            0
+        }
+        Ok(report) => {
+            for diagnostic in &report.diagnostics {
+                eprintln!("ERROR {} {} {}", diagnostic.code, diagnostic.path, diagnostic.message);
+            }
+            eprintln!("INVALID diagnostics={}", report.diagnostics.len());
+            1
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -212,6 +245,7 @@ fn main() {
         "rust-file" => project_rust_source_file(&args),
         "tree-inventory" => collect_github_tree_inventory_file(&args),
         "tree-compose" => compose_repository_tree_file(&args),
+        "dynamapbench-manifest" => validate_dynamapbench_manifest_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();

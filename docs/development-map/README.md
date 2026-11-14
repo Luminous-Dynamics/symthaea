@@ -80,3 +80,8 @@ The validator crate now contains a library-only Cargo manifest projector at `src
 The Symthaea research branch now includes a deterministic, read-only composition API that joins a caller-supplied recursive Git tree inventory to its Cargo manifest and Rust syntax projections by exact repository/revision/tree/path/blob identity. The same operation is available through the read-only `tree-compose <request.json>` CLI, with precomputed projections supplied as JSON. It reports partial projection coverage or rejects caller-labelled complete inventories with unprojected regular Cargo.toml / .rs files. Symlinks and gitlinks are not followed. This is still a source-anchor composition, not a compiler-resolved or executable repository twin. The tree inventory's completeness and Git object authenticity remain caller responsibilities.
 
 The branch currently authors 103 Rust unit-test cases across the validator, Cargo projection, Rust syntax projection and tree composition. None has been compiled or executed in this environment; do not treat the test definitions as passing.
+
+
+## DynaMapBench manifest artifacts
+
+The initial benchmark manifest contract is [DynaMapBench v0.1 JSON Schema](../research/dynamapbench-manifest-v0.1.schema.json), with an illustrative valid fixture at [dynamapbench-manifest-v0.1.json](fixtures/dynamapbench-manifest-v0.1.json). The standalone Rust validator checks the data-only split, pin, temporal, no-gold, gold-span and budget invariants; a pass is not authentication of Git objects or execution evidence.

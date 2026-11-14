@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "DynaMapBench",
+  "release": "v0.1-example",
+  "corpus_artifact": {
+    "uri": "https://example.invalid/dynamapbench-v0.1.tar",
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "evaluator": {
+    "name": "dynamapbench-evaluator",
+    "version": "0.1.0",
+    "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "cases": [
+    {
+      "case_id": "example-trace2code-001",
+      "lane": "D3",
+      "task_family": "trace2code",
+      "split": "test",
+      "repository": {
+        "full_name": "example/project",
+        "family_id": "example/project-family",
+        "commit_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "source_objects": [
+        {
+          "path": "src/lib.rs",
+          "blob_oid": "cccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "decision_cutoff": "2026-01-02T00:00:00Z",
+      "available_inputs": [
+        {
+          "source_id": "issue-observed",
+          "available_at": "2026-01-01T00:00:00Z",
+          "object_oid": "dddddddddddddddddddddddddddddddddddddddd"
+        }
+      ],
+      "forbidden_inputs": [
+        {
+          "source_id": "fix-after-cutoff",
+          "reason": "future",
+          "available_at": "2026-01-03T00:00:00Z",
+          "object_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      ],
+      "budget": {
+        "tokenizer_id": "example-tokenizer@1",
+        "token_limit": 8192,
+        "line_limit": 500,
+        "tool_call_limit": 20,
+        "time_limit_ms": 60000
+      },
+      "harness": {
+        "agent": "example-agent",
+        "model": "example-model",
+        "harness": "example-harness@1",
+        "prompt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "evaluator_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "gold": {
+        "disposition": "positive",
+        "authority": "independently_adjudicated",
+        "review_count": 2,
+        "adjudicated": true,
+        "relevant_spans": [
+          {
+            "path": "src/lib.rs",
+            "start_line": 1,
+            "end_line": 12
+          }
+        ],
+        "forbidden_spans": []
+      }
+    }
+  ]
+}

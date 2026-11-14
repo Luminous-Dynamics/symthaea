@@ -7,6 +7,7 @@
 pub mod cargo_manifest;
 pub mod rust_syntax;
 pub mod tree_projection;
+pub mod dynamapbench;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
