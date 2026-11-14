@@ -6,7 +6,7 @@ From the repository root:
 
     cargo test --manifest-path benchmarks/engineering-change-impact/decision-requalification-reference/Cargo.toml
 
-The package independently checks:
+The corpus currently contains eleven synthetic cases, thirteen decision outcomes, nine paired interventions and twenty preregistered mutation controls. The package independently checks:
 - decision dependency-manifest and complete owner event-inventory SHA-256 bindings;
 - separate K0 and K1 candidate-visible event manifest bindings;
 - as-of K0 versus current K1 evaluation;
