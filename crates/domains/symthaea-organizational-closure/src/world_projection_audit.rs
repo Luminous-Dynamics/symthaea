@@ -70,6 +70,7 @@ pub enum WorldProjectionAuditFindingCode {
     EstimandDigestMismatch,
     ContextUnitIdMismatch,
     QueryUnitIdMismatch,
+    EmptyMasterQuerySet,
     MissingMasterContextColumn,
     MissingMasterQueryColumn,
     ContextProjectionMismatch,
@@ -203,8 +204,6 @@ pub fn audit_matched_world_projection(
     oracle: &MatchedWorldOracle,
     policy: &WorldProjectionAuditPolicy,
 ) -> WorldProjectionAuditReport {
-    use super::observational_views::IdentificationRegime;
-
     let mut findings = Vec::new();
     let mut context_checks = 0_usize;
     let mut query_checks = 0_usize;
@@ -416,7 +415,17 @@ pub fn audit_matched_world_projection(
         }
     }
 
-    // A dataset with no views is never a qualified construction.
+    // A dataset with no query units or views is never a qualified construction.
+    if expected_query_ids.is_empty() {
+        push_finding(
+            &mut findings,
+            WorldProjectionAuditFindingCode::EmptyMasterQuerySet,
+            None,
+            None,
+            None,
+            "master-world query set is empty",
+        );
+    }
     if matched.views.is_empty() {
         push_finding(
             &mut findings,
@@ -433,8 +442,6 @@ pub fn audit_matched_world_projection(
     } else {
         WorldProjectionAuditQualification::NotQualified
     };
-
-    let _ = IdentificationRegime::BackDoor; // Keep the enum linked in the public audit API.
 
     WorldProjectionAuditReport {
         qualification,
@@ -456,7 +463,6 @@ mod tests {
         IdentificationRegime, MatchedObservationalViews, ObservationTable,
         RegimeObservationalView,
     };
-    use std::collections::BTreeMap;
 
     fn table(unit_ids: Vec<u64>, variables: &[&str]) -> ObservationTable {
         let columns = variables.iter().map(|name| {
