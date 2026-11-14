@@ -1,0 +1,396 @@
+{
+  "schema_version": "luminous.verified-capability-cost-crosswalk.v0.1",
+  "snapshot_date": "2026-11-13",
+  "parent": "https://github.com/Luminous-Dynamics/symthaea/issues/11774",
+  "claim_status": "design_only_no_empirical_cost_comparison",
+  "purpose": "Define a consistent, auditable cost boundary for matched comparisons of complete engineering and agent workflows. This is a research crosswalk over existing receipts and evidence sources, not a new run receipt, billing ledger, score service, or product subsystem.",
+  "primary_unit": "One independently adjudicated accepted task or workflow outcome, using the task owner's declared unit and the canonical benchmark receipt denominator.",
+  "accounting_lenses": [
+    {
+      "id": "benchmark_campaign",
+      "includes": [
+        "arm execution",
+        "benchmark-specific setup",
+        "independent judging and gold adjudication",
+        "study-only instrumentation"
+      ],
+      "reporting_rule": "Report separately from deployed workflow cost. Include in deployment TCO only where the same activity is a recurring operational requirement."
+    },
+    {
+      "id": "workflow_delivery",
+      "includes": [
+        "model/provider usage",
+        "agent orchestration",
+        "tools and external services",
+        "compute and storage",
+        "isolation and verification",
+        "human operation and review",
+        "retry, recovery and rework"
+      ],
+      "reporting_rule": "Attribute all costs incurred across the complete eligible cohort, including failed, refused, unsupported, timed-out, ungraded and unattempted cases where cohort-level setup or commitment costs were incurred."
+    },
+    {
+      "id": "deployed_lifecycle",
+      "includes": [
+        "workflow delivery",
+        "integration and migration",
+        "licenses and support",
+        "ongoing operations and maintenance",
+        "allocated fixed infrastructure and capital"
+      ],
+      "reporting_rule": "Declare the amortization horizon, workload volume, utilization and allocation method. Show actual-volume and sensitivity scenarios separately."
+    }
+  ],
+  "cost_dimensions": [
+    {
+      "id": "model_provider_usage",
+      "label": "Model and provider inference",
+      "examples": [
+        "input and output tokens",
+        "reasoning or cached tokens where billed",
+        "image/audio/video or other modality charges",
+        "embedding and reranking calls",
+        "provider-side retries"
+      ],
+      "source_evidence": [
+        "provider invoice",
+        "usage export",
+        "dated official rate card",
+        "request-level usage record"
+      ],
+      "monetary_treatment": "Use actual net billed amount and report list-price equivalent separately when discounts, credits or negotiated terms apply. For local models, allocate compute under compute_infrastructure rather than inventing an API charge.",
+      "double_count_rule": "Do not add estimated GPU cost for provider-hosted inference to the provider invoice unless it is a separately incurred cost outside that invoice."
+    },
+    {
+      "id": "agent_runtime_orchestration",
+      "label": "Agent runtime and orchestration",
+      "examples": [
+        "workflow runtime",
+        "queues and schedulers",
+        "agent gateways",
+        "state stores",
+        "trace and audit services",
+        "managed orchestration charges"
+      ],
+      "source_evidence": [
+        "service invoice",
+        "runtime usage export",
+        "metered resource report"
+      ],
+      "monetary_treatment": "Assign each billed line item once to this or another primary cost dimension.",
+      "double_count_rule": "Do not add per-call estimates on top of a bundled runtime invoice for the same service."
+    },
+    {
+      "id": "tools_and_external_services",
+      "label": "Tools and external services",
+      "examples": [
+        "code hosting",
+        "search",
+        "CAD/CAE/PLM",
+        "databases",
+        "data acquisition",
+        "external APIs",
+        "specialist validation services"
+      ],
+      "source_evidence": [
+        "tool invoice",
+        "API usage export",
+        "license statement",
+        "request log"
+      ],
+      "monetary_treatment": "Include paid calls, consumption, licenses and per-seat charges attributable to the declared workload.",
+      "double_count_rule": "Tool charges already bundled into a platform invoice are not counted again."
+    },
+    {
+      "id": "compute_storage_network",
+      "label": "Compute, storage and network",
+      "examples": [
+        "CPU/GPU/accelerator time",
+        "memory and storage",
+        "network transfer and egress",
+        "local server utilization",
+        "dedicated runner capacity"
+      ],
+      "source_evidence": [
+        "cloud bill",
+        "resource meter",
+        "hardware utilization sample",
+        "facility meter"
+      ],
+      "monetary_treatment": "Use billed cost where available. For shared owned assets, disclose utilization and a reproducible depreciation or capacity-allocation method; report idle/committed capacity rather than allocating only peak productive time.",
+      "double_count_rule": "Choose either an invoice allocation or an owned-asset allocation for the same resource interval, never both."
+    },
+    {
+      "id": "isolation_and_verification",
+      "label": "Isolation, observation and independent verification",
+      "examples": [
+        "sandbox or VM isolation",
+        "independent effect observer",
+        "artifact reconstruction",
+        "signature/proof verification",
+        "evidence archive and retention"
+      ],
+      "source_evidence": [
+        "service invoice",
+        "metered runner record",
+        "verification service record",
+        "storage usage report"
+      ],
+      "monetary_treatment": "Include incremental resources required to make the outcome independently verifiable. Separate verification capability from the benchmark judge's study-only cost.",
+      "double_count_rule": "If the verifier uses the same compute already allocated to compute_storage_network, assign the monetary amount once and retain verifier CPU/GPU time as a non-monetary diagnostic."
+    },
+    {
+      "id": "human_operations_governance",
+      "label": "Human operation, review and governance",
+      "examples": [
+        "operator intervention",
+        "exception handling",
+        "engineering review",
+        "approval",
+        "security/privacy review",
+        "on-call support",
+        "manual evidence reconciliation"
+      ],
+      "source_evidence": [
+        "measured time log",
+        "work item record",
+        "declared fully loaded labor-rate source"
+      ],
+      "monetary_treatment": "Report minutes by role first. Convert to money only with a disclosed rate basis, geography, tax/benefit inclusion and observation date.",
+      "double_count_rule": "Do not count the same person's time in both a generic overhead allocation and a task-level work log."
+    },
+    {
+      "id": "failure_recovery_rework",
+      "label": "Failures, recovery and rework",
+      "examples": [
+        "failed attempts",
+        "timeouts and retries",
+        "rollback",
+        "duplicate-effect cleanup",
+        "manual correction",
+        "revalidation",
+        "lost-work recovery"
+      ],
+      "source_evidence": [
+        "canonical task disposition",
+        "retry/recovery record",
+        "incident record",
+        "time log",
+        "service invoice"
+      ],
+      "monetary_treatment": "Include costs actually incurred across all attempts in the cohort. Report critical safety, security and authority failures separately as hard-gate outcomes; do not monetize them into a score that can be offset.",
+      "double_count_rule": "Where a retry's provider or compute spend is already included in usage totals, add only additional labor or remediation not already counted."
+    },
+    {
+      "id": "integration_maintenance_migration",
+      "label": "Integration, maintenance and migration",
+      "examples": [
+        "connector implementation",
+        "workflow integration",
+        "schema mapping",
+        "security assessment",
+        "model/provider migration",
+        "upgrade and compatibility work",
+        "operator training"
+      ],
+      "source_evidence": [
+        "project time records",
+        "contract or invoice",
+        "maintenance work items",
+        "release/change records"
+      ],
+      "monetary_treatment": "Report one-time and recurring amounts separately. Amortize only with an explicit horizon, expected and observed volume, and sensitivity range.",
+      "double_count_rule": "Do not bury integration effort in both per-task labor and an annual overhead allocation."
+    },
+    {
+      "id": "licenses_support_commitments",
+      "label": "Licenses, support and commitments",
+      "examples": [
+        "enterprise seats",
+        "platform minimums",
+        "reserved capacity",
+        "support tiers",
+        "committed-use spend",
+        "data residency add-ons"
+      ],
+      "source_evidence": [
+        "contract",
+        "invoice",
+        "official dated pricing schedule",
+        "commitment utilization report"
+      ],
+      "monetary_treatment": "Show gross list price, net cash outlay, unused commitment and utilization separately. Allocate minimum commitments using declared usage and horizon.",
+      "double_count_rule": "Do not count a bundled license again as a separate per-seat or service charge."
+    },
+    {
+      "id": "physical_resource_vector",
+      "label": "Physical resource consumption and externalities",
+      "examples": [
+        "electricity",
+        "cooling energy",
+        "water",
+        "materials",
+        "embodied or operational carbon where measured"
+      ],
+      "source_evidence": [
+        "metered kWh",
+        "metered water volume",
+        "provider-reported resource report",
+        "declared lifecycle assessment source"
+      ],
+      "monetary_treatment": "Report physical quantities per eligible and accepted outcome. Monetize only with an explicit tariff or externality method and keep the physical vector visible beside money.",
+      "double_count_rule": "If electricity or cooling is already included in a cloud/facility invoice, do not add a second monetary charge for the same energy. Physical kWh remains a separate measurement."
+    },
+    {
+      "id": "independent_evaluation",
+      "label": "Independent benchmark evaluation",
+      "examples": [
+        "gold annotation",
+        "blind expert adjudication",
+        "external evaluator fees",
+        "judge calibration",
+        "study-only instrumentation"
+      ],
+      "source_evidence": [
+        "adjudicator time log",
+        "evaluator invoice",
+        "calibration report",
+        "benchmark campaign record"
+      ],
+      "monetary_treatment": "Report as benchmark_campaign cost. Include in workflow_delivery or deployed_lifecycle only when independent evaluation is a recurring production requirement.",
+      "double_count_rule": "Do not attribute one-time research gold-labeling cost to every production task unless that activity is genuinely repeated in service."
+    }
+  ],
+  "evidence_quality": [
+    {
+      "status": "invoiced_or_contractual",
+      "meaning": "Observed financial amount from invoice or contract with date, region, currency and billing boundary."
+    },
+    {
+      "status": "metered",
+      "meaning": "Directly observed resource quantity from a named meter or system meter with sampling window and calibration/source metadata."
+    },
+    {
+      "status": "provider_usage_reported",
+      "meaning": "Provider-reported units or spend without independent meter access; retain provider and export identity."
+    },
+    {
+      "status": "measured_human_time",
+      "meaning": "Observed role-specific minutes with a declared time-capture method."
+    },
+    {
+      "status": "estimated_allocation",
+      "meaning": "Allocated or inferred value with an explicit formula, input provenance, horizon and uncertainty range."
+    },
+    {
+      "status": "unknown",
+      "meaning": "Not measured or not available. Never coerce to zero; material unknown cost blocks a fully burdened cost-superiority claim."
+    }
+  ],
+  "required_provenance_fields": [
+    "canonical_run_receipt_identity",
+    "arm_and_task_manifest_identity",
+    "cost_category_and_allocation_rule",
+    "source_record_or_artifact_digest",
+    "observation_or_invoice_period",
+    "currency_and_tax_basis_when_monetized",
+    "region_and_provider_when_applicable",
+    "measurement_quality_status",
+    "uncertainty_or_allocation_range",
+    "duplicate_counting_exclusion_reason"
+  ],
+  "derived_metrics": [
+    {
+      "id": "fully_burdened_cost_per_eligible_task",
+      "formula": "total cohort workflow_delivery cost / eligible task count",
+      "interpretation": "Charges the arm for failures, refusals, unsupported cases, timeouts and non-attempts within the eligible cohort."
+    },
+    {
+      "id": "fully_burdened_cost_per_verified_success",
+      "formula": "total cohort workflow_delivery cost / independently accepted outcome count",
+      "interpretation": "Primary economic outcome after every hard gate passes. Undefined when no independently accepted outcomes exist."
+    },
+    {
+      "id": "deployed_lifecycle_cost_per_verified_success",
+      "formula": "deployed_lifecycle cost over declared horizon / independently accepted outcomes over the same horizon",
+      "interpretation": "Requires observed or scenario-declared volume, utilization, fixed-cost allocation and sensitivity reporting."
+    },
+    {
+      "id": "human_minutes_per_verified_success",
+      "formula": "all role-specific operational and review minutes / independently accepted outcome count",
+      "interpretation": "Report operator, reviewer, approver and exception-handling minutes separately as well as total."
+    },
+    {
+      "id": "resource_per_verified_success",
+      "formula": "metered energy, water and other declared resources / independently accepted outcome count",
+      "interpretation": "Report each physical quantity separately; do not collapse it into a monetary score without a declared method."
+    },
+    {
+      "id": "matched_cost_delta",
+      "formula": "candidate cohort cost minus control cohort cost on the same frozen eligible task set",
+      "interpretation": "Use paired task-level costs and cluster-aware uncertainty; publish mean, median and tail behavior."
+    }
+  ],
+  "eligibility_and_claim_rules": {
+    "denominator_owner": "Canonical benchmark receipt and benchmark owner; no local denominator rewrite.",
+    "accepted_outcome_owner": "Independent task judge qualified under #11772, using the task owner's gold rubric.",
+    "comparison_modes": [
+      "same-model matched-harness ablation",
+      "best-available-product comparison"
+    ],
+    "hard_gates": [
+      "task correctness is non-inferior under preregistered criteria",
+      "critical unauthorized effects are absent in the frozen control suite",
+      "critical stale-evidence false-current dispositions are absent in frozen critical controls",
+      "evidence provenance and result reconstruction meet the declared requirement",
+      "no safety, security, authority, physical feasibility or service constraint is violated"
+    ],
+    "missing_cost_rule": "Unknown material costs are not zero. Report lower/upper bounds where defensible; otherwise withhold full-cost superiority claims.",
+    "zero_success_rule": "If an arm has zero independently accepted outcomes, cost per verified success is undefined; retain all costs and show the zero-success count.",
+    "no_compensation_rule": "Cost, speed, energy or human-time improvements cannot compensate for a failed hard gate."
+  },
+  "existing_owners": [
+    {
+      "id": "benchmark-run-receipt",
+      "owner": "Symthaea #10314 / #10370",
+      "role": "canonical task universe, run identity, budgets and actual resource-usage reconciliation; no new receipt is introduced"
+    },
+    {
+      "id": "independent-judge",
+      "owner": "Symthaea #11772",
+      "role": "judge qualification and independent accepted-outcome labels"
+    },
+    {
+      "id": "comparative-statistics",
+      "owner": "Symthaea #10619 / #10624",
+      "role": "claim classes, paired inference, cluster-aware uncertainty and Pareto reporting"
+    },
+    {
+      "id": "engineering-change",
+      "owner": "Symthaea #10543 / #10546 / #10547 / #10581",
+      "role": "engineering-change task universe, blueprint and independent gold-adjudication protocol"
+    },
+    {
+      "id": "cross-stack-security",
+      "owner": "Symthaea #10771",
+      "role": "synthetic unauthorized-effect and recovery control outcomes"
+    },
+    {
+      "id": "datacentre-resources",
+      "owner": "Symtropy #3435 / #3776",
+      "role": "facility energy, useful work, QoS, water and grid-service resource accounting"
+    },
+    {
+      "id": "supply-chain-interoperability",
+      "owner": "Mycelix #6105 / #6107",
+      "role": "manufacturing data/provenance interoperability use case; this crosswalk does not create a Mycelix ledger"
+    }
+  ],
+  "non_claims": [
+    "No Luminous cost, capability, energy, productivity or ROI result is measured by this crosswalk.",
+    "No provider price comparison is asserted; every price must be source-pinned to its region, date, contract and usage tier.",
+    "No cost result can establish correctness, safety, authorization, evidence validity or physical feasibility.",
+    "No universal currency-normalized or cross-domain capability score is defined.",
+    "This file is not a billing ledger, canonical run receipt, cost engine, score service or independent judge."
+  ]
+}
