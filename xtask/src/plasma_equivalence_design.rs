@@ -434,18 +434,21 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         receipt.observation_endpoint_id.as_deref(),
     ) {
         (None, None) => receipt.endpoint_id.as_str(),
-        (Some("unit_preserving_strength_projection_v1"), Some("apparent_shear_strength"))
-            if receipt.endpoint_id == "initial_lap_shear_mpa" =>
+        (Some("unit_preserving_strength_projection_v1"), Some(observation))
+            if observation == "apparent_shear_strength"
+                && receipt.endpoint_id == "initial_lap_shear_mpa" =>
         {
             observation
         }
-        (Some("aged_strength_retention_ratio_v1"), Some("apparent_shear_strength"))
-            if receipt.endpoint_id == "aged_strength_retention" =>
+        (Some("aged_strength_retention_ratio_v1"), Some(observation))
+            if observation == "apparent_shear_strength"
+                && receipt.endpoint_id == "aged_strength_retention" =>
         {
             observation
         }
-        (Some("predeclared_failure_mode_fraction_v1"), Some("frp_joint_failure_mode_classification"))
-            if receipt.endpoint_id == "failure_mode_fraction" =>
+        (Some("predeclared_failure_mode_fraction_v1"), Some(observation))
+            if observation == "frp_joint_failure_mode_classification"
+                && receipt.endpoint_id == "failure_mode_fraction" =>
         {
             return blocked("cluster-aware proportion-equivalence analysis is not yet qualified; failure-mode fraction remains blocked");
         }
