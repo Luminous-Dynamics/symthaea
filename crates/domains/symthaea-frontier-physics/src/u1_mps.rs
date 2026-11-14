@@ -240,7 +240,10 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "two-site gate unitarity residual {residual} exceeds tolerance {tolerance}"
             ),
-            Self::GateChargeConservationResidual { residual, tolerance } => write!(
+            Self::GateChargeConservationResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "two-site gate charge-conservation residual {residual} exceeds tolerance {tolerance}"
             ),
@@ -293,7 +296,10 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "TEBD layer was built for {layer_sites} sites, state has {state_sites}"
             ),
-            Self::CanonicalGaugeNotQualified { residual, tolerance } => write!(
+            Self::CanonicalGaugeNotQualified {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
             ),
@@ -418,8 +424,6 @@ pub struct ComplexU1Mps {
     dense_svd_rank_by_charge_and_cut: Option<Vec<Vec<(i32, usize)>>>,
 }
 
-
-
 /// Measured mixed-canonical gauge receipt for a two-site center at a bond.
 ///
 /// Sites [0,bond) are left-isometric and sites (bond+1,N) are right-isometric.
@@ -466,16 +470,21 @@ impl U1CanonicalGaugeReceipt {
             && self.left_exterior_operator_norm_upper_bound >= 1.0
             && self.right_exterior_operator_norm_upper_bound.is_finite()
             && self.right_exterior_operator_norm_upper_bound >= 1.0
-            && self.exterior_operator_norm_product_upper_bound().is_finite()
+            && self
+                .exterior_operator_norm_product_upper_bound()
+                .is_finite()
             && self.left_isometry_residuals.iter().all(|(site, residual)| {
                 *site < self.bond && residual.is_finite() && *residual <= tolerance
             })
-            && self.right_isometry_residuals.iter().all(|(site, residual)| {
-                *site > self.bond + 1
-                    && *site < self.site_count
-                    && residual.is_finite()
-                    && *residual <= tolerance
-            })
+            && self
+                .right_isometry_residuals
+                .iter()
+                .all(|(site, residual)| {
+                    *site > self.bond + 1
+                        && *site < self.site_count
+                        && residual.is_finite()
+                        && *residual <= tolerance
+                })
             && self.left_isometry_residuals.len() == self.bond
             && self.right_isometry_residuals.len() == self.site_count.saturating_sub(self.bond + 2)
             && self.input_norm_squared.is_finite()
@@ -485,8 +494,7 @@ impl U1CanonicalGaugeReceipt {
     }
 
     pub fn exterior_operator_norm_product_upper_bound(&self) -> f64 {
-        self.left_exterior_operator_norm_upper_bound
-            * self.right_exterior_operator_norm_upper_bound
+        self.left_exterior_operator_norm_upper_bound * self.right_exterior_operator_norm_upper_bound
     }
 }
 
@@ -497,7 +505,6 @@ struct CanonicalizationStats {
     exact_zero_singular_values_omitted: usize,
 }
 
-
 fn left_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
     let dimension = tensor.right_dimension();
     let mut squared = 0.0;
@@ -506,8 +513,8 @@ fn left_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
             let mut gram = Complex64::new(0.0, 0.0);
             for left in 0..tensor.left_dimension() {
                 for physical in 0..2 {
-                    gram += tensor.get(left, physical, row).conj()
-                        * tensor.get(left, physical, column);
+                    gram +=
+                        tensor.get(left, physical, row).conj() * tensor.get(left, physical, column);
                 }
             }
             let expected = if row == column {
@@ -520,7 +527,9 @@ fn left_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
     }
     let residual = squared.sqrt();
     if !residual.is_finite() {
-        return Err(U1MpsError::NonFiniteContraction("left-canonical isometry residual"));
+        return Err(U1MpsError::NonFiniteContraction(
+            "left-canonical isometry residual",
+        ));
     }
     Ok(residual)
 }
@@ -547,13 +556,12 @@ fn right_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
     }
     let residual = squared.sqrt();
     if !residual.is_finite() {
-        return Err(U1MpsError::NonFiniteContraction("right-canonical isometry residual"));
+        return Err(U1MpsError::NonFiniteContraction(
+            "right-canonical isometry residual",
+        ));
     }
     Ok(residual)
 }
-
-
-
 
 fn left_canonicalize_site(
     tensors: &mut [U1MpsTensor],
@@ -745,18 +753,11 @@ fn left_canonicalize_site(
         next_charges.clone(),
         current_data,
     )?;
-    let new_next = U1MpsTensor::new(
-        next_charges,
-        next.right_charges.clone(),
-        next_data,
-    )?;
+    let new_next = U1MpsTensor::new(next_charges, next.right_charges.clone(), next_data)?;
     tensors[site] = new_current;
     tensors[site + 1] = new_next;
     Ok(stats)
 }
-
-
-
 
 fn right_canonicalize_site(
     tensors: &mut [U1MpsTensor],
@@ -947,7 +948,6 @@ fn right_canonicalize_site(
     Ok(stats)
 }
 
-
 impl ComplexU1Mps {
     /// Validate a complete open-boundary MPS and its charge-selection rules.
     pub fn new(
@@ -1043,7 +1043,6 @@ impl ComplexU1Mps {
         Self::new(tensors, prefix_charge, 0.0_f64.max(1.0e-14))
     }
 
-
     /// Move the MPS into mixed-canonical form around a two-site center.
     ///
     /// Sites before the bond are left-isometric; sites after the bond plus one
@@ -1101,8 +1100,7 @@ impl ComplexU1Mps {
             return Err(U1MpsError::NegativeNormSquared(difference_squared));
         }
         let state_reconstruction_l2_residual = difference_squared.max(0.0).sqrt();
-        let relative_norm_drift =
-            (output_norm_squared - input_norm_squared).abs() / scale;
+        let relative_norm_drift = (output_norm_squared - input_norm_squared).abs() / scale;
 
         let mut left_isometry_residuals = Vec::with_capacity(bond);
         let mut right_isometry_residuals =
@@ -1161,10 +1159,6 @@ impl ComplexU1Mps {
         *self = candidate;
         Ok(receipt)
     }
-
-
-
-
 
     /// Mixed-canonicalize the MPS around a two-site center at (bond, bond+1).
     ///
@@ -1527,7 +1521,6 @@ impl ComplexU1Mps {
         Ok(state)
     }
 
-
     /// Contract the overlap <self|other> without dense expansion.
     pub fn inner_product(&self, other: &Self) -> Result<Complex64, U1MpsError> {
         if self.site_count() != other.site_count() {
@@ -1570,7 +1563,9 @@ impl ComplexU1Mps {
                 .iter()
                 .any(|value| !value.re.is_finite() || !value.im.is_finite())
             {
-                return Err(U1MpsError::NonFiniteContraction("overlap transfer environment"));
+                return Err(U1MpsError::NonFiniteContraction(
+                    "overlap transfer environment",
+                ));
             }
             environment = next;
             bra_dimension = next_bra_dimension;
@@ -2492,8 +2487,7 @@ impl U1MpsTruncationLedger {
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound =
-            self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
+        let next_bound = self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
@@ -2623,18 +2617,16 @@ impl U1MpsTruncationLedger {
         // max(sqrt(1+delta)-1, 1-sqrt(1-delta)). The supplied Frobenius
         // residual upper-bounds the spectral norm residual.
         let delta = gate_unitarity_residual;
-        let unitary_distance_upper =
-            ((1.0 + delta).sqrt() - 1.0).max(1.0 - (1.0 - delta).sqrt());
+        let unitary_distance_upper = ((1.0 + delta).sqrt() - 1.0).max(1.0 - (1.0 - delta).sqrt());
         // Ten charge-off-diagonal entries exist in a 4x4 two-qubit gate.
         // sqrt(10) times their maximum magnitude bounds their Frobenius norm.
         let charge_distance_upper = 10.0_f64.sqrt() * gate_charge_residual;
-        let gate_quality_error = (unitary_distance_upper + charge_distance_upper)
-            * pre_gate_norm_squared.sqrt();
+        let gate_quality_error =
+            (unitary_distance_upper + charge_distance_upper) * pre_gate_norm_squared.sqrt();
         let projection_error = diagnostics.discarded_weight.sqrt()
             * receipt.exterior_operator_norm_product_upper_bound();
         let canonicalization_error = receipt.state_reconstruction_l2_residual;
-        let contribution =
-            canonicalization_error + gate_quality_error + projection_error;
+        let contribution = canonicalization_error + gate_quality_error + projection_error;
         if !contribution.is_finite()
             || !unitary_distance_upper.is_finite()
             || !charge_distance_upper.is_finite()
@@ -2840,18 +2832,14 @@ impl U1TeBDLayer {
                 _ => None,
             };
             let delta = entry.gate.unitarity_residual();
-            let gate_quality_error_upper_bound =
-                (((1.0 + delta).sqrt() - 1.0).max(1.0 - (1.0 - delta).sqrt())
-                    + 10.0_f64.sqrt() * entry.gate.charge_conservation_residual())
-                    * gauge_receipt.input_norm_squared.sqrt();
+            let gate_quality_error_upper_bound = (((1.0 + delta).sqrt() - 1.0)
+                .max(1.0 - (1.0 - delta).sqrt())
+                + 10.0_f64.sqrt() * entry.gate.charge_conservation_residual())
+                * gauge_receipt.input_norm_squared.sqrt();
             let local_projection_error_upper_bound = truncation.discarded_weight.sqrt();
             state.tensors[bond] = truncation.left_tensor.clone();
             state.tensors[bond + 1] = truncation.right_tensor.clone();
-            state = ComplexU1Mps::new(
-                state.tensors.clone(),
-                input_total_charge,
-                policy.tolerance,
-            )?;
+            state = ComplexU1Mps::new(state.tensors.clone(), input_total_charge, policy.tolerance)?;
             canonical_gauge_receipts.push(gauge_receipt.clone());
             gate_receipts.push(U1TeBDGateReceipt {
                 bond_index: bond,
@@ -2883,14 +2871,14 @@ impl U1TeBDLayer {
             input_total_charge,
             global_l2_bound_qualified,
         })
-    }}
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor,
-        U1MpsTruncationLedger, U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate,
-        U1TwoSiteState,
+        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
         U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
@@ -3802,7 +3790,12 @@ mod tests {
         assert_eq!(result.gate_truncations.len(), 2);
         assert_eq!(result.canonical_gauge_receipts.len(), 2);
         assert!(result.global_l2_bound_qualified);
-        assert!(result.truncation_ledger.global_state_error_bound_upper.is_some());
+        assert!(
+            result
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .is_some()
+        );
 
         let dense = result.state.to_dense(8).unwrap();
         assert!((dense[5] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
@@ -3835,7 +3828,12 @@ mod tests {
         assert!(result.gate_truncations[0].discarded_weight <= 1.0e-12);
         assert_eq!(result.canonical_gauge_receipts.len(), 1);
         assert!(result.global_l2_bound_qualified);
-        assert!(result.truncation_ledger.global_state_error_bound_upper.is_some());
+        assert!(
+            result
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .is_some()
+        );
         let dense = result.state.to_dense(4).unwrap();
         assert!((dense[1] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
     }
@@ -3896,7 +3894,11 @@ mod tests {
         dense[9] = Complex64::new(0.1, 0.2);
         dense[10] = Complex64::new(-0.3, -0.2);
         dense[12] = Complex64::new(0.4, 0.3);
-        let norm = dense.iter().map(|value| value.norm_sqr()).sum::<f64>().sqrt();
+        let norm = dense
+            .iter()
+            .map(|value| value.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
         for value in &mut dense {
             *value /= norm;
         }
@@ -3906,14 +3908,16 @@ mod tests {
     #[test]
     fn canonicalization_preserves_dense_state_and_qualifies_all_two_site_centers() {
         let dense = four_site_two_excitation_dense_fixture();
-        let original =
-            ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let original = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
         let original_norm = original.norm_squared(1.0e-12).unwrap();
 
         for bond in 0..3 {
             let mut canonical = original.clone();
             let receipt = canonical.canonicalize_for_bond(bond, 1.0e-10).unwrap();
-            assert!(receipt.qualifies(1.0e-10), "bond={bond}, receipt={receipt:?}");
+            assert!(
+                receipt.qualifies(1.0e-10),
+                "bond={bond}, receipt={receipt:?}"
+            );
             assert_eq!(receipt.bond, bond);
             assert_eq!(receipt.site_count, 4);
             assert_eq!(receipt.total_charge, 2);
@@ -3925,20 +3929,20 @@ mod tests {
             assert!(receipt.state_reconstruction_l2_residual <= 1.0e-9);
             assert!(receipt.relative_norm_drift <= 1.0e-10);
             assert!(receipt.exterior_operator_norm_product_upper_bound() >= 1.0);
-            assert!(receipt.exterior_operator_norm_product_upper_bound().is_finite());
+            assert!(
+                receipt
+                    .exterior_operator_norm_product_upper_bound()
+                    .is_finite()
+            );
 
             let reconstructed = canonical.to_dense(8).unwrap();
-            for (index, (actual, expected)) in
-                reconstructed.iter().zip(dense.iter()).enumerate()
-            {
+            for (index, (actual, expected)) in reconstructed.iter().zip(dense.iter()).enumerate() {
                 assert!(
                     (*actual - *expected).norm() <= 1.0e-9,
                     "bond={bond}, basis={index}, actual={actual:?}, expected={expected:?}"
                 );
             }
-            assert!(
-                (canonical.norm_squared(1.0e-12).unwrap() - original_norm).abs() <= 1.0e-10
-            );
+            assert!((canonical.norm_squared(1.0e-12).unwrap() - original_norm).abs() <= 1.0e-10);
             assert_eq!(canonical.total_charge(), original.total_charge());
             assert!(canonical.selection_rule_residual() <= 1.0e-12);
         }
@@ -3948,8 +3952,7 @@ mod tests {
     fn canonicalization_receipt_is_bound_to_measured_external_isometries() {
         let dense = four_site_two_excitation_dense_fixture();
         let mut state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
-        let receipt: U1CanonicalGaugeReceipt =
-            state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+        let receipt: U1CanonicalGaugeReceipt = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
 
         for &(site, residual) in &receipt.left_isometry_residuals {
             assert_eq!(site, 0);
@@ -4007,7 +4010,6 @@ mod tests {
         }
     }
 
-
     fn canonical_w_state() -> ComplexU1Mps {
         let amplitude = 1.0 / 3.0_f64.sqrt();
         let mut dense = vec![Complex64::new(0.0, 0.0); 8];
@@ -4033,11 +4035,19 @@ mod tests {
             assert_eq!(receipt.total_charge, 1);
             assert!(receipt.qualifies(1.0e-10), "receipt={receipt:?}");
             assert_eq!(
-                receipt.left_isometry_residuals.iter().map(|(site, _)| *site).collect::<Vec<_>>(),
+                receipt
+                    .left_isometry_residuals
+                    .iter()
+                    .map(|(site, _)| *site)
+                    .collect::<Vec<_>>(),
                 (0..bond).collect::<Vec<_>>()
             );
             assert_eq!(
-                receipt.right_isometry_residuals.iter().map(|(site, _)| *site).collect::<Vec<_>>(),
+                receipt
+                    .right_isometry_residuals
+                    .iter()
+                    .map(|(site, _)| *site)
+                    .collect::<Vec<_>>(),
                 ((bond + 2)..3).collect::<Vec<_>>()
             );
             assert!(receipt.left_exterior_operator_norm_upper_bound >= 1.0);
@@ -4102,19 +4112,14 @@ mod tests {
         }
     }
 
-
     #[test]
     fn tebd_global_error_bound_matches_dense_two_site_discarded_component() {
         let mut dense = vec![complex_zero(); 4];
         dense[1] = Complex64::new(0.8, 0.0);
         dense[2] = Complex64::new(0.6, 0.0);
         let input = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
-        let layer = U1TeBDLayer::new(
-            2,
-            0,
-            vec![U1TeBDGate::new(0, U1TwoSiteGate::identity())],
-        )
-        .unwrap();
+        let layer =
+            U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, U1TwoSiteGate::identity())]).unwrap();
         let result = layer
             .apply(
                 &input,
@@ -4148,7 +4153,6 @@ mod tests {
         assert!(certified_bound + 1.0e-10 >= actual_error);
         assert!((result.output_norm_squared - 0.64).abs() <= 1.0e-10);
     }
-
 
     #[test]
     fn tebd_rejects_a_gate_constructed_with_a_looser_unitarity_tolerance() {
@@ -4217,7 +4221,9 @@ mod tests {
             .unwrap();
         assert!(bound + 1.0e-12 >= actual_error);
         assert!(
-            (result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+            (result
+                .truncation_ledger
+                .cumulative_gate_quality_l2_error_bound
                 - receipt.gate_quality_error_upper_bound)
                 .abs()
                 <= 1.0e-12
@@ -4245,7 +4251,6 @@ mod tests {
         assert!(ledger.global_state_error_bound_upper.is_none());
     }
 
-
     #[test]
     fn mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries() {
         let mut dense = vec![Complex64::new(0.0, 0.0); 16];
@@ -4255,7 +4260,11 @@ mod tests {
         dense[9] = Complex64::new(0.1, 0.3);
         dense[10] = Complex64::new(-0.35, 0.2);
         dense[12] = Complex64::new(0.2, -0.15);
-        let norm = dense.iter().map(|value| value.norm_sqr()).sum::<f64>().sqrt();
+        let norm = dense
+            .iter()
+            .map(|value| value.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
         for value in &mut dense {
             *value /= norm;
         }
@@ -4303,7 +4312,8 @@ mod tests {
         assert_eq!(left_receipt.right_isometry_residuals.len(), 0);
         assert!(left_receipt.qualifies(1.0e-10));
 
-        let mut right_center = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let mut right_center =
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
         let right_receipt = right_center.canonicalize_for_bond(0, 1.0e-10).unwrap();
         assert!(right_receipt.qualifies(1.0e-10));
         assert!(right_center.selection_rule_residual() <= 1.0e-10);
@@ -4323,5 +4333,4 @@ mod tests {
         ));
         assert_eq!(state.to_dense(8).unwrap(), before);
     }
-
 }
