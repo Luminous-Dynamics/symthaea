@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_goal_driven_error_budget_source_authored_runner_pending",
-  "execution_status": "Source-authored: complex U1 MPS core, dense fixed-charge factorization, U1 local gates, exact charge-block split, global cutoff/bond-cap compression, mixed-canonical receipts, canonical/gate/model-projection/compression error ledger, analytic U1 Hamiltonian gates, deterministic even/odd TEBD layers and second-order even/odd/even Strang stepper. Consolidated exact-head Rust 1.96 harness pending.",
+  "execution_status": "U1 MPS exact/cutoff truncation plus goal-driven local error-budget selection and typed error-budget allocation are source-authored; exact-head Rust 1.96 validation pending.",
   "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim. Goal-driven adaptive compression is local two-site error budgeting only; no globally optimal resource allocation or one-pass SVD performance claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -342,12 +342,11 @@
         "tolerance": "SVD and structural validation tolerance."
       },
       "algorithm": [
-        "Compute exact charge-block Schmidt spectrum.",
+        "Compute exact charge-block SVD once and retain its U/S/V factors.",
         "Find the smallest theoretical retained rank whose discarded Schmidt tail fits the local L2 target.",
-        "Fail closed immediately when the global bond cap cannot meet the ideal target.",
-        "Run the standard split and measure the actual reconstruction residual.",
-        "Increase rank if finite-precision reconstruction residual exceeds budget.",
-        "Return the smallest rank that meets the measured local residual, or a TruncationBudgetInfeasible error."
+        "Reuse the same factorization to assemble candidate ranks and measure actual reconstruction residual.",
+        "If finite-precision residual exceeds the target, increase retained rank using the same factorization.",
+        "Fail closed with TruncationBudgetInfeasible when the global bond cap cannot satisfy the measured target."
       ],
       "receipts": [
         "requested_local_l2_error",
@@ -368,7 +367,7 @@
         "simulation_error_budget_compiles_named_channels_and_reserves_unallocated_fraction",
         "simulation_error_budget_rejects_overallocation_and_nonfinite_fractions"
       ],
-      "known_optimization_debt": "Current v1 performs an exact Schmidt-spectrum pass and one or more validation truncation passes. svd_factorization_passes is exposed; refactor to reuse one factorization before large-N performance claims."
+      "known_optimization_debt": "Resolved in this increment: exact charge-block SVD factors are reused for all candidate ranks, so svd_factorization_passes=1. The residual is recomputed for each candidate rank without repeating the factorization."
     },
     "error_budget_compiler": {
       "type": "U1MpsErrorBudgetPlan",
@@ -575,7 +574,7 @@
         "global bond cap spans all charge sectors",
         "infeasible target returns achieved-best residual and fails closed",
         "no hidden state renormalization",
-        "SVD factorization pass count is recorded",
+        "exact charge-block SVD factorization pass count equals one",
         "matched fixed-cutoff versus goal-driven bond/error Pareto comparison on the same states"
       ]
     },
