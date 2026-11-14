@@ -201,3 +201,8 @@ The public verifier is a building block, not a deployed witness. It does not pro
 ## 14 November 2026 — independent Ed25519 implementation cross-check
 
 Added `checkpoints/openssl_interop_test.go`. Where OpenSSL CLI is installed, the test reconstructs the public test vector's exact domain-separated signing bytes, packages the public Ed25519 key as RFC 8410 SubjectPublicKeyInfo DER and asks OpenSSL `pkeyutl` to verify the detached signature. Local test passed with OpenSSL 3.5.5. If OpenSSL is absent, the test skips with an explicit reason; the Go standard-library vector verification remains required. This checks the signing bytes/signature across two crypto providers, not the full monotonic checkpoint state machine in an independent implementation.
+
+
+## 14 November 2026 — checkpoint-to-observed-head join
+
+Added `ObservedHead` and `AcceptObserved` to the public checkpoint verifier. It checks that the observed database identity, journal sequence and journal-head digest match the detached signed checkpoint before applying monotonic sequence/predecessor rules. Four tests cover the valid join and rejection of a mismatched database, journal sequence and digest. The observer must produce the three values from one coherent snapshot; this API prevents an omitted comparison but cannot establish observer independence or downstream effect coverage.
