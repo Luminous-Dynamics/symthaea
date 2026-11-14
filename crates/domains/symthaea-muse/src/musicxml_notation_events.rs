@@ -1444,4 +1444,42 @@ mod tests {
             Some("urn:example:extension")
         );
     }
+
+    #[test]
+    fn foreign_namespace_extensions_inside_attributes_are_retained_as_auxiliary() {
+        let xml = r#"<score-partwise xmlns:ext="urn:example:attribute-extension"><part id="P1"><measure number="1">
+            <attributes>
+                <divisions>4</divisions>
+                <time><beats>4</beats><beat-type>4</beat-type></time>
+                <ext:divisions>99</ext:divisions>
+                <ext:future-clef mode="experimental"/>
+            </attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.attribute_events.len(), 2);
+        assert_eq!(events.auxiliary_events.len(), 2);
+        assert_eq!(
+            events.auxiliary_events[0].source.element,
+            "divisions"
+        );
+        assert_eq!(
+            events.auxiliary_events[0].source.namespace_uri.as_deref(),
+            Some("urn:example:attribute-extension")
+        );
+        assert_eq!(
+            events.auxiliary_events[1].source.element,
+            "future-clef"
+        );
+        assert_eq!(
+            events.auxiliary_events[1].source.namespace_uri.as_deref(),
+            Some("urn:example:attribute-extension")
+        );
+        assert_eq!(
+            events.note_events[0].performed_duration,
+            Some(RationalBeat::new(4, 1).unwrap())
+        );
+    }
+
 }
