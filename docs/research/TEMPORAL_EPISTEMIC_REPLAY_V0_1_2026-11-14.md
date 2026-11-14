@@ -38,10 +38,10 @@ A historical decision audit should normally retain both the original decision-ti
 
 The v0.1 Rust model supports four append-only operations:
 
-- \`assert\`: introduces a fact with explicit validity completeness and optional effective bounds.
-- \`invalidate\`: marks one earlier assertion stale from an explicit effective time.
-- \`supersede\`: marks one earlier assertion superseded from an explicit effective time.
-- \`propose\`: records a proposal without mutating observed facts.
+- `assert`: introduces a fact with explicit validity completeness and optional effective bounds.
+- `invalidate`: marks one earlier assertion stale from an explicit effective time.
+- `supersede`: marks one earlier assertion superseded from an explicit effective time.
+- `propose`: records a proposal without mutating observed facts.
 
 Each event carries a stable event ID, contiguous sequence, previous hash, event hash, source observation time, ledger recording time, per-actor availability records, exact repository revision/tree pins, configuration-world digest, optional validity/effective bounds, optional target event, and a JSON payload.
 
@@ -53,18 +53,18 @@ The event SHA-256 chain binds the schema version, ledger identity, repository id
 
 These digests detect accidental or unsophisticated content mutation when the digest itself is retained. They do **not** authenticate who supplied an event, whether an actor actually received it, whether a Git commit/tree/blob exists, whether a timestamp is trustworthy, or whether the ledger is complete. An attacker who can rewrite the entire unsigned ledger or checkpoint can recompute its hashes. Production use requires independently verified source receipts, signed or externally witnessed checkpoints, clock/availability provenance, exact Git-object authentication and an independently administered append-only custody boundary.
 
-The v0.1 replay projection reports *temporal eligibility*, not proof of decision authority or source truth. It must not promote evidence to \`ci_passed\` or \`independently_qualified\`.
+The v0.1 replay projection reports *temporal eligibility*, not proof of decision authority or source truth. It must not promote evidence to `ci_passed` or `independently_qualified`.
 
 ## 5. Deterministic replay and checkpoints
 
 The crate exposes:
 
-- \`validate_ledger(&EventLedger)\`;
-- \`start_replay_cursor(prefix, query)\`;
-- \`resume_replay_cursor(cursor, suffix)\`;
-- \`serialize_replay_cursor(cursor)\` and \`deserialize_replay_cursor(bytes)\`;
-- \`replay_ledger(ledger, query)\` as a clean-from-genesis reference; and
-- \`replay_incremental(prefix, suffix, query)\` for a validated prefix followed by an append-only suffix.
+- `validate_ledger(&EventLedger)`;
+- `start_replay_cursor(prefix, query)`;
+- `resume_replay_cursor(cursor, suffix)`;
+- `serialize_replay_cursor(cursor)` and `deserialize_replay_cursor(bytes)`;
+- `replay_ledger(ledger, query)` as a clean-from-genesis reference; and
+- `replay_incremental(prefix, suffix, query)` for a validated prefix followed by an append-only suffix.
 
 A cursor fixes its query at creation. Resuming with a changed actor, world or cutoff requires a new cursor. The cursor validates sequence continuity, chain linkage, event identity, append timestamps and correction target rules before applying a suffix. The intended equivalence property is byte-identical canonical projection output between a resumed cursor and clean replay for the same frozen ledger and query.
 
@@ -85,12 +85,12 @@ The JSON contracts are:
 - [Temporal event-ledger schema](temporal-event-ledger-v0.1.schema.json)
 - [Temporal replay-query schema](temporal-replay-query-v0.1.schema.json)
 
-Synthetic known-answer inputs live in \`docs/development-map/fixtures/\`:
+Synthetic known-answer inputs live in `docs/development-map/fixtures/`:
 
-- \`temporal-event-ledger-v0.1.json\`
-- \`temporal-replay-actor-knowledge-v0.1.json\`
-- \`temporal-replay-ledger-as-of-v0.1.json\`
-- \`temporal-replay-restated-v0.1.json\`
+- `temporal-event-ledger-v0.1.json`
+- `temporal-replay-actor-knowledge-v0.1.json`
+- `temporal-replay-ledger-as-of-v0.1.json`
+- `temporal-replay-restated-v0.1.json`
 
 The fixture intentionally includes: a decision-relevant assertion, a retroactive invalidation observed and made available after the original knowledge cutoff, a late-ingested event with an earlier actor-availability claim, and an unexecuted proposal. It is synthetic and does not represent a real repository, Mycelix authorization, CI event or test outcome.
 
