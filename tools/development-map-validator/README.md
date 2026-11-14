@@ -23,6 +23,18 @@ The CLI autodetects:
 
 For federation manifests, a successful structural check does **not** fetch member repositories or prove that the pinned Git objects exist. It checks the manifest's internal references and identity formats only. Fetch each map by its exact artifact commit and compare the resulting blob OID independently when constructing or refreshing a federation.
 
+## Cargo manifest projection library
+
+The crate also exposes a pure read-only Rust API:
+
+- `cargo_manifest::project_cargo_manifest(raw_toml, ManifestAnchor)`
+- Output type: `CargoManifestProjection`, serializable through Serde.
+- Authority is labelled `manifest_declared`; this is not compiler-resolved dependency, API or build evidence.
+- The caller must provide the exact repository, revision, tree OID, manifest path and blob OID. The parser validates identity syntax but does not authenticate the Git objects.
+- It preserves literal workspace member patterns, workspace dependency aliases, package inheritance declarations, normal/dev/build and target-specific dependencies, optional/default-feature declarations, feature expressions, explicit targets and build-script declarations.
+- It does not expand workspace globs or feature expressions, resolve inherited workspace values, infer implicit targets without a separate source-tree view, run Cargo, inspect or execute build scripts, expand procedural macros, or invoke repository code.
+- This is a library API only; the current CLI does not yet expose a Cargo manifest subcommand.
+
 ## What it checks
 
 - v0.1 top-level, node, edge, provenance, lifecycle and event field shape;
@@ -54,4 +66,4 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Fifty-nine Rust unit-test cases are authored at the current branch head; compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Sixty-nine Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases plus 10 Cargo-projection cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
