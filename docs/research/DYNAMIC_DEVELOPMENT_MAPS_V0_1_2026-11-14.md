@@ -460,7 +460,7 @@ The corpus has seven cases and eight negative controls:
 
 Each case now pins its own repository revision and tree; candidate regions bind exact source revisions, line spans, token estimates, authority and availability. The validator checks that available/inactive evidence belongs to that exact case revision, stale evidence differs from it, and feature requirements agree with the case's configuration world. Natural no-gold must abstain; lexical resemblance is not evidence.
 
-The synthetic fixture and expected oracle were parsed and inspected statically. This does not measure a retrieval system, validate actual tokenizer costs, reproduce Agent Retrieval Bench or SWE-Explore, or establish downstream repair gains. The Rust validator adds five authored retrieval tests for local shape, oracle shape, no-gold separation, config/temporal decoys, per-case revision/world isolation and oracle overlap.
+The synthetic fixture and expected oracle were parsed and inspected statically. This does not measure a retrieval system, validate actual tokenizer costs, reproduce Agent Retrieval Bench or SWE-Explore, or establish downstream repair gains. The Rust validator adds eight authored retrieval tests for local shape, oracle shape, no-gold separation, config/temporal decoys, per-case revision/world isolation and oracle overlap.
 
 ### Four-repository adoption and federated directory — 2026-11-14
 
