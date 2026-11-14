@@ -479,4 +479,34 @@ AOBench's proposed distinction is **organizational-model discrimination**: selec
 - Ramírez-Tagle, R. (2026). [Formalizing autopoiesis: Toward a Categorical-Thermodynamic Calculus of Closure](https://doi.org/10.1016/j.biosystems.2026.105918), *BioSystems* 268, 105918.
 
 
-**Status statement:** This document specifies a research programme. No AOBench implementation, leaderboard, measured result, or claim of biological autopoiesis is implied by its existence.
+## 20. Reuse the existing synthetic-organism viability environment
+
+AOBench should not create a second toy-organism simulator. Symthaea already has a substantial synthetic-organism viability qualification programme in [PR #6970](https://github.com/Luminous-Dynamics/symthaea/pull/6970). Its described capabilities include a deterministic six-action micro-world, explicit energy/integrity/knowledge/threat/progress state, perturbations and execution failures, action-conditioned world-model validation against a deterministic transition oracle, held-out transfer, horizon-aware confidence calibration, action-ranking/exploitation-gap negative controls, leave-one-scenario-out transfer, procedural scenarios, counterfactual probes, and prediction-error adaptation/forgetting measurements.
+
+These are environment and world-model qualification metrics. They do not establish that a process organization regenerates its own required components. AOBench should consume #6970 as an environment adapter and preserve its metric definitions.
+
+### AOBench synthetic-organism adapter
+
+The adapter should map synthetic-organism steps into AOBench's frozen component/process contracts:
+
+1. Perception/observation consumes explicitly external environment/sensor input and produces a versioned internal percept.
+2. Prediction consumes the exact percept and world-model version and produces a prediction artifact.
+3. Action selection consumes prediction, viability/goal state and policy version and produces a typed action proposal.
+4. Execution bridge consumes an authorized action proposal and uses an external actuator/environment dependency; it records the deterministic transition receipt.
+5. Learning/update consumes predicted and observed outcomes plus prediction-error evidence and produces a new world-model/policy version.
+6. Checkpoint/continuity consumes verified internal state and produces an exact versioned checkpoint artifact.
+
+The environment state, actuator and exogenous resource signals remain external dependencies. Only explicitly designated internal model/policy/checkpoint artifacts count as regenerative components.
+
+Publish two independent result planes:
+
+- **Environment capability:** viability, survival, oracle regret, action ranking, predictive calibration, multi-horizon error, counterfactual error, held-out transfer, adaptation and forgetting.
+- **Organizational evidence:** verified producer/consumer coverage, exact digest/version lineage, external dependency completeness, runtime recurrence across maintenance epochs, perturbation recovery and correct abstention.
+
+Do not collapse the two planes into one “autopoiesis score”. The adapter must not modify #6970's transition law, policy, seed schedule or existing qualification gates.
+
+The implementation is tracked in [AOBENCH-004 #12023](https://github.com/Luminous-Dynamics/symthaea/issues/12023). Its first increment should be a read-only adapter with exact scenario/seed/model digests and deterministic replay.
+
+**Current status:** The AOBench verifier is implemented and has passed its focused package checks as described in the runtime evidence note. The synthetic-organism adapter is specified and tracked but is not yet implemented. No cross-benchmark result or biological autopoiesis claim is implied.
+
+**Status statement:** This document specifies a research programme. The first AOBench runtime verifier is implemented, but no public leaderboard or cross-benchmark measured result is claimed. No claim of biological autopoiesis, life, sentience or consciousness is implied.
