@@ -34,6 +34,7 @@ const REQUIRED_CASES: [&str; 20] = [
     "unsupported-observable",
     "boundary-evidence-missing",
     "boundary-evidence-wrong-scope",
+    "unsupported-model-use",
 ];
 
 fn main() -> ExitCode {
@@ -99,7 +100,7 @@ fn audit() -> Result<(usize, usize, usize, usize), String> {
         }
     }
 
-    if counts != (5, 6, 6, 8) {
+    if counts != (5, 7, 6, 8) {
         return Err(format!("unexpected expected-disposition counts: {counts:?}"));
     }
 
