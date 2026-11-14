@@ -168,11 +168,18 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
     let mut nodes = BTreeMap::new();
     for node in &mission.subgoals {
         require_nonempty("subgoal_id", &node.subgoal_id)?;
-        if nodes.insert(node.subgoal_id.clone(), node.mandatory).is_some() {
+        if nodes
+            .insert(node.subgoal_id.clone(), node.mandatory)
+            .is_some()
+        {
             return Err(ProgressError::DuplicateSubgoal(node.subgoal_id.clone()));
         }
     }
-    let ordered = mission.mission_order.iter().cloned().collect::<BTreeSet<_>>();
+    let ordered = mission
+        .mission_order
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
     if ordered.len() != mission.mission_order.len()
         || ordered.len() != nodes.len()
         || ordered.iter().any(|id| !nodes.contains_key(id))
@@ -187,7 +194,10 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
         .map(|(index, id)| (id.as_str(), index))
         .collect::<BTreeMap<_, _>>();
     let mut seen_edges = BTreeSet::new();
-    let mut indegree = nodes.keys().map(|id| (id.clone(), 0_usize)).collect::<BTreeMap<_, _>>();
+    let mut indegree = nodes
+        .keys()
+        .map(|id| (id.clone(), 0_usize))
+        .collect::<BTreeMap<_, _>>();
     let mut successors: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for edge in &mission.edges {
         if edge.from == edge.to
@@ -197,8 +207,13 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
         {
             return Err(ProgressError::InvalidEdge);
         }
-        *indegree.get_mut(&edge.to).ok_or(ProgressError::InvalidEdge)? += 1;
-        successors.entry(edge.from.clone()).or_default().push(edge.to.clone());
+        *indegree
+            .get_mut(&edge.to)
+            .ok_or(ProgressError::InvalidEdge)? += 1;
+        successors
+            .entry(edge.from.clone())
+            .or_default()
+            .push(edge.to.clone());
     }
 
     let mut ready = indegree
@@ -210,7 +225,9 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
     while let Some(node) = ready.pop_first() {
         visited += 1;
         for successor in successors.get(&node).into_iter().flatten() {
-            let degree = indegree.get_mut(successor).ok_or(ProgressError::InvalidEdge)?;
+            let degree = indegree
+                .get_mut(successor)
+                .ok_or(ProgressError::InvalidEdge)?;
             *degree = degree.checked_sub(1).ok_or(ProgressError::InvalidEdge)?;
             if *degree == 0 {
                 ready.insert(successor.clone());
@@ -265,9 +282,9 @@ fn validate_receipt_uniqueness(evaluations: &[SubgoalEvaluation]) -> Result<(), 
             let output = evaluation
                 .accepted_output_digest
                 .as_deref()
-                .ok_or_else(|| ProgressError::IncompleteAcceptedOutcome(
-                    evaluation.subgoal_id.clone(),
-                ))?;
+                .ok_or_else(|| {
+                    ProgressError::IncompleteAcceptedOutcome(evaluation.subgoal_id.clone())
+                })?;
             if !accepted_outputs.insert(output.to_owned()) {
                 return Err(ProgressError::DuplicateAcceptedOutput(output.to_owned()));
             }
@@ -298,15 +315,28 @@ fn validate_transition(evaluation: &SubgoalEvaluation) -> Result<bool, ProgressE
         evaluation.outcome,
         SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe
     );
-    match (evaluation.rework_attempt_count, evaluation.rework_receipt_digest.as_deref()) {
+    match (
+        evaluation.rework_attempt_count,
+        evaluation.rework_receipt_digest.as_deref(),
+    ) {
         (0, None) => {}
-        (0, Some(_)) => return Err(ProgressError::InvalidReworkEvidence(evaluation.subgoal_id.clone())),
+        (0, Some(_)) => {
+            return Err(ProgressError::InvalidReworkEvidence(
+                evaluation.subgoal_id.clone(),
+            ));
+        }
         (_, Some(receipt)) if !receipt.trim().is_empty() => {}
-        _ => return Err(ProgressError::InvalidReworkEvidence(evaluation.subgoal_id.clone())),
+        _ => {
+            return Err(ProgressError::InvalidReworkEvidence(
+                evaluation.subgoal_id.clone(),
+            ));
+        }
     }
     if !accepted {
         if evaluation.continuation.is_some() {
-            return Err(ProgressError::IncompleteAcceptedOutcome(evaluation.subgoal_id.clone()));
+            return Err(ProgressError::IncompleteAcceptedOutcome(
+                evaluation.subgoal_id.clone(),
+            ));
         }
         return Ok(false);
     }
@@ -325,12 +355,16 @@ fn validate_transition(evaluation: &SubgoalEvaluation) -> Result<bool, ProgressE
         .into_iter()
         .any(|value| value.is_none_or(|value| value.trim().is_empty()))
     {
-        return Err(ProgressError::IncompleteAcceptedOutcome(evaluation.subgoal_id.clone()));
+        return Err(ProgressError::IncompleteAcceptedOutcome(
+            evaluation.subgoal_id.clone(),
+        ));
     }
     if evaluation.predecessor_state_digest != evaluation.option_predecessor_state_digest
         || evaluation.result_state_digest != evaluation.option_result_state_digest
     {
-        return Err(ProgressError::PhysicalOptionStateMismatch(evaluation.subgoal_id.clone()));
+        return Err(ProgressError::PhysicalOptionStateMismatch(
+            evaluation.subgoal_id.clone(),
+        ));
     }
     Ok(true)
 }
@@ -344,33 +378,53 @@ fn validate_continuation(
     };
     require_nonempty("continuation_receipt_digest", &receipt.receipt_digest)?;
     require_nonempty("terminal_state_digest", &receipt.terminal_state_digest)?;
-    require_nonempty("continuation_witness_digest", &receipt.continuation_witness_digest)?;
+    require_nonempty(
+        "continuation_witness_digest",
+        &receipt.continuation_witness_digest,
+    )?;
     if evaluation.result_state_digest.as_deref() != Some(receipt.terminal_state_digest.as_str()) {
-        return Err(ProgressError::ContinuationStateMismatch(evaluation.subgoal_id.clone()));
+        return Err(ProgressError::ContinuationStateMismatch(
+            evaluation.subgoal_id.clone(),
+        ));
     }
-    let required = receipt.required_mandatory_successor_ids.iter().cloned().collect::<BTreeSet<_>>();
-    let feasible = receipt.feasible_mandatory_successor_ids.iter().cloned().collect::<BTreeSet<_>>();
+    let required = receipt
+        .required_mandatory_successor_ids
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let feasible = receipt
+        .feasible_mandatory_successor_ids
+        .iter()
+        .cloned()
+        .collect::<BTreeSet<_>>();
     if required.len() != receipt.required_mandatory_successor_ids.len()
         || feasible.len() != receipt.feasible_mandatory_successor_ids.len()
         || required != *required_mandatory
         || !feasible.is_subset(&required)
     {
-        return Err(ProgressError::InvalidContinuationCoverage(evaluation.subgoal_id.clone()));
+        return Err(ProgressError::InvalidContinuationCoverage(
+            evaluation.subgoal_id.clone(),
+        ));
     }
-    let feasible_count = u16::try_from(feasible.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
+    let feasible_count =
+        u16::try_from(feasible.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
     match receipt.disposition {
-        ContinuationDisposition::Qualified if feasible == required => Ok((true, false, feasible_count)),
-        ContinuationDisposition::Qualified => {
-            Err(ProgressError::InvalidContinuationCoverage(evaluation.subgoal_id.clone()))
+        ContinuationDisposition::Qualified if feasible == required => {
+            Ok((true, false, feasible_count))
         }
-        ContinuationDisposition::Insufficient if feasible != required => Ok((false, false, feasible_count)),
-        ContinuationDisposition::Insufficient => {
-            Err(ProgressError::InvalidContinuationCoverage(evaluation.subgoal_id.clone()))
+        ContinuationDisposition::Qualified => Err(ProgressError::InvalidContinuationCoverage(
+            evaluation.subgoal_id.clone(),
+        )),
+        ContinuationDisposition::Insufficient if feasible != required => {
+            Ok((false, false, feasible_count))
         }
+        ContinuationDisposition::Insufficient => Err(ProgressError::InvalidContinuationCoverage(
+            evaluation.subgoal_id.clone(),
+        )),
         ContinuationDisposition::Unknown => Ok((false, true, feasible_count)),
-        ContinuationDisposition::Rejected => {
-            Err(ProgressError::RejectedContinuation(evaluation.subgoal_id.clone()))
-        }
+        ContinuationDisposition::Rejected => Err(ProgressError::RejectedContinuation(
+            evaluation.subgoal_id.clone(),
+        )),
     }
 }
 
@@ -381,10 +435,22 @@ pub fn evaluate_mission_progress(
         ("arm_id", input.arm.arm_id.as_str()),
         ("policy_digest", input.arm.policy_digest.as_str()),
         ("harness_digest", input.arm.harness_digest.as_str()),
-        ("task_manifest_digest", input.arm.task_manifest_digest.as_str()),
-        ("robot_configuration_digest", input.arm.robot_configuration_digest.as_str()),
-        ("environment_manifest_digest", input.arm.environment_manifest_digest.as_str()),
-        ("resource_budget_digest", input.arm.resource_budget_digest.as_str()),
+        (
+            "task_manifest_digest",
+            input.arm.task_manifest_digest.as_str(),
+        ),
+        (
+            "robot_configuration_digest",
+            input.arm.robot_configuration_digest.as_str(),
+        ),
+        (
+            "environment_manifest_digest",
+            input.arm.environment_manifest_digest.as_str(),
+        ),
+        (
+            "resource_budget_digest",
+            input.arm.resource_budget_digest.as_str(),
+        ),
     ] {
         require_nonempty(name, value)?;
     }
@@ -392,10 +458,17 @@ pub fn evaluate_mission_progress(
     let mut evaluations = BTreeMap::new();
     for evaluation in &input.evaluations {
         if !mandatory.contains_key(&evaluation.subgoal_id) {
-            return Err(ProgressError::DuplicateEvaluation(evaluation.subgoal_id.clone()));
+            return Err(ProgressError::DuplicateEvaluation(
+                evaluation.subgoal_id.clone(),
+            ));
         }
-        if evaluations.insert(evaluation.subgoal_id.clone(), evaluation).is_some() {
-            return Err(ProgressError::DuplicateEvaluation(evaluation.subgoal_id.clone()));
+        if evaluations
+            .insert(evaluation.subgoal_id.clone(), evaluation)
+            .is_some()
+        {
+            return Err(ProgressError::DuplicateEvaluation(
+                evaluation.subgoal_id.clone(),
+            ));
         }
     }
     for id in &input.mission.mission_order {
@@ -426,7 +499,10 @@ pub fn evaluate_mission_progress(
                 unsafe_count += 1;
             }
             SubgoalOutcome::Unknown => unknown_count += 1,
-            SubgoalOutcome::Rejected | SubgoalOutcome::Aborted | SubgoalOutcome::Held | SubgoalOutcome::NotAttempted => {}
+            SubgoalOutcome::Rejected
+            | SubgoalOutcome::Aborted
+            | SubgoalOutcome::Held
+            | SubgoalOutcome::NotAttempted => {}
         }
     }
 
@@ -443,8 +519,7 @@ pub fn evaluate_mission_progress(
     for id in &input.mission.mission_order {
         let evaluation = evaluations[id];
         let safe = evaluation.outcome == SubgoalOutcome::SafeAccepted;
-        let required =
-            mandatory_descendants(&input.mission, id, &mandatory, &completed_before);
+        let required = mandatory_descendants(&input.mission, id, &mandatory, &completed_before);
         total_rework_attempts = total_rework_attempts
             .checked_add(u64::from(evaluation.rework_attempt_count))
             .ok_or(ProgressError::ArithmeticOverflow)?;
@@ -475,13 +550,20 @@ pub fn evaluate_mission_progress(
         reports.push(SubgoalProgressReport {
             subgoal_id: id.clone(),
             outcome: evaluation.outcome,
-            independently_accepted: matches!(evaluation.outcome, SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe),
+            independently_accepted: matches!(
+                evaluation.outcome,
+                SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe
+            ),
             safe_accepted: safe,
             rework_attempt_count: evaluation.rework_attempt_count,
-            physical_option_join_valid: matches!(evaluation.outcome, SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe),
+            physical_option_join_valid: matches!(
+                evaluation.outcome,
+                SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe
+            ),
             continuation_qualified: qualified,
             continuation_unknown,
-            mandatory_successor_count: u16::try_from(required.len()).map_err(|_| ProgressError::ArithmeticOverflow)?,
+            mandatory_successor_count: u16::try_from(required.len())
+                .map_err(|_| ProgressError::ArithmeticOverflow)?,
             feasible_mandatory_successor_count: feasible_count,
         });
         if safe {
@@ -489,12 +571,20 @@ pub fn evaluate_mission_progress(
         }
     }
 
-    let mandatory_ids = mandatory.iter().filter(|(_, required)| **required).map(|(id, _)| id).collect::<Vec<_>>();
+    let mandatory_ids = mandatory
+        .iter()
+        .filter(|(_, required)| **required)
+        .map(|(id, _)| id)
+        .collect::<Vec<_>>();
     let mandatory_safe_completion = mandatory_ids.iter().all(|id| safe_accepted.contains(*id));
     let mandatory_continuation_completion = mandatory_ids.iter().all(|id| {
-        reports.iter().find(|report| &report.subgoal_id == *id).is_some_and(|report| report.continuation_qualified)
+        reports
+            .iter()
+            .find(|report| &report.subgoal_id == *id)
+            .is_some_and(|report| report.continuation_qualified)
     });
-    let scheduled = u16::try_from(input.mission.subgoals.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
+    let scheduled = u16::try_from(input.mission.subgoals.len())
+        .map_err(|_| ProgressError::ArithmeticOverflow)?;
 
     Ok(MissionProgressReport {
         mission_id: input.mission.mission_id.clone(),
@@ -526,13 +616,28 @@ mod tests {
             graph_digest: "graph-sha256".into(),
             mission_order: vec!["a".into(), "b".into(), "c".into()],
             subgoals: vec![
-                SubgoalDefinition { subgoal_id: "a".into(), mandatory: true },
-                SubgoalDefinition { subgoal_id: "b".into(), mandatory: true },
-                SubgoalDefinition { subgoal_id: "c".into(), mandatory: false },
+                SubgoalDefinition {
+                    subgoal_id: "a".into(),
+                    mandatory: true,
+                },
+                SubgoalDefinition {
+                    subgoal_id: "b".into(),
+                    mandatory: true,
+                },
+                SubgoalDefinition {
+                    subgoal_id: "c".into(),
+                    mandatory: false,
+                },
             ],
             edges: vec![
-                SubgoalEdge { from: "a".into(), to: "b".into() },
-                SubgoalEdge { from: "a".into(), to: "c".into() },
+                SubgoalEdge {
+                    from: "a".into(),
+                    to: "b".into(),
+                },
+                SubgoalEdge {
+                    from: "a".into(),
+                    to: "c".into(),
+                },
             ],
         }
     }
@@ -549,7 +654,13 @@ mod tests {
         }
     }
 
-    fn continuation(state: &str, required: &[&str], feasible: &[&str], disposition: ContinuationDisposition, tag: &str) -> ContinuationReceipt {
+    fn continuation(
+        state: &str,
+        required: &[&str],
+        feasible: &[&str],
+        disposition: ContinuationDisposition,
+        tag: &str,
+    ) -> ContinuationReceipt {
         ContinuationReceipt {
             receipt_digest: format!("receipt-{tag}"),
             terminal_state_digest: state.into(),
@@ -561,7 +672,10 @@ mod tests {
     }
 
     fn evaluation(id: &str, outcome: SubgoalOutcome) -> SubgoalEvaluation {
-        let success = matches!(outcome, SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe);
+        let success = matches!(
+            outcome,
+            SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe
+        );
         SubgoalEvaluation {
             subgoal_id: id.into(),
             outcome,
@@ -582,11 +696,27 @@ mod tests {
 
     fn input() -> MissionEvaluationInput {
         let mut a = evaluation("a", SubgoalOutcome::SafeAccepted);
-        a.continuation = Some(continuation("state-a-after", &["b"], &["b"], ContinuationDisposition::Qualified, "a"));
+        a.continuation = Some(continuation(
+            "state-a-after",
+            &["b"],
+            &["b"],
+            ContinuationDisposition::Qualified,
+            "a",
+        ));
         let mut b = evaluation("b", SubgoalOutcome::SafeAccepted);
-        b.continuation = Some(continuation("state-b-after", &[], &[], ContinuationDisposition::Qualified, "b"));
+        b.continuation = Some(continuation(
+            "state-b-after",
+            &[],
+            &[],
+            ContinuationDisposition::Qualified,
+            "b",
+        ));
         let c = evaluation("c", SubgoalOutcome::NotAttempted);
-        MissionEvaluationInput { mission: mission(), arm: arm(), evaluations: vec![a, b, c] }
+        MissionEvaluationInput {
+            mission: mission(),
+            arm: arm(),
+            evaluations: vec![a, b, c],
+        }
     }
 
     #[test]
@@ -606,7 +736,13 @@ mod tests {
     #[test]
     fn local_success_without_future_mandatory_continuation_is_not_qualified() {
         let mut audit = input();
-        audit.evaluations[0].continuation = Some(continuation("state-a-after", &["b"], &[], ContinuationDisposition::Insufficient, "blocked"));
+        audit.evaluations[0].continuation = Some(continuation(
+            "state-a-after",
+            &["b"],
+            &[],
+            ContinuationDisposition::Insufficient,
+            "blocked",
+        ));
         let report = evaluate_mission_progress(&audit).unwrap();
         assert_eq!(report.native_completed_subgoals, 2);
         assert_eq!(report.continuation_qualified_subgoals, 1);
@@ -632,27 +768,51 @@ mod tests {
     fn causal_transition_and_option_ledger_must_share_the_same_state_pair() {
         let mut audit = input();
         audit.evaluations[0].option_result_state_digest = Some("other-state".into());
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::PhysicalOptionStateMismatch("a".into())));
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::PhysicalOptionStateMismatch("a".into()))
+        );
     }
 
     #[test]
     fn continuation_receipt_must_bind_to_the_exact_terminal_physical_state() {
         let mut audit = input();
-        audit.evaluations[0].continuation.as_mut().unwrap().terminal_state_digest = "earlier-state".into();
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::ContinuationStateMismatch("a".into())));
+        audit.evaluations[0]
+            .continuation
+            .as_mut()
+            .unwrap()
+            .terminal_state_digest = "earlier-state".into();
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::ContinuationStateMismatch("a".into()))
+        );
     }
 
     #[test]
     fn continuation_must_cover_the_exact_mandatory_successor_set() {
         let mut audit = input();
-        audit.evaluations[0].continuation.as_mut().unwrap().required_mandatory_successor_ids.clear();
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::InvalidContinuationCoverage("a".into())));
+        audit.evaluations[0]
+            .continuation
+            .as_mut()
+            .unwrap()
+            .required_mandatory_successor_ids
+            .clear();
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::InvalidContinuationCoverage("a".into()))
+        );
     }
 
     #[test]
     fn optional_successor_does_not_block_mandatory_continuation() {
         let mut audit = input();
-        audit.evaluations[0].continuation = Some(continuation("state-a-after", &["b"], &["b"], ContinuationDisposition::Qualified, "optional"));
+        audit.evaluations[0].continuation = Some(continuation(
+            "state-a-after",
+            &["b"],
+            &["b"],
+            ContinuationDisposition::Qualified,
+            "optional",
+        ));
         let report = evaluate_mission_progress(&audit).unwrap();
         assert!(report.subgoals[0].continuation_qualified);
         assert_eq!(report.subgoals[0].mandatory_successor_count, 1);
@@ -661,7 +821,13 @@ mod tests {
     #[test]
     fn unknown_continuation_is_inconclusive_not_qualified() {
         let mut audit = input();
-        audit.evaluations[0].continuation = Some(continuation("state-a-after", &["b"], &[], ContinuationDisposition::Unknown, "unknown"));
+        audit.evaluations[0].continuation = Some(continuation(
+            "state-a-after",
+            &["b"],
+            &[],
+            ContinuationDisposition::Unknown,
+            "unknown",
+        ));
         let report = evaluate_mission_progress(&audit).unwrap();
         assert!(!report.subgoals[0].continuation_qualified);
         assert!(report.subgoals[0].continuation_unknown);
@@ -680,30 +846,49 @@ mod tests {
     #[test]
     fn dependency_cycles_are_rejected() {
         let mut audit = input();
-        audit.mission.edges.push(SubgoalEdge { from: "b".into(), to: "a".into() });
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::DependencyCycle));
+        audit.mission.edges.push(SubgoalEdge {
+            from: "b".into(),
+            to: "a".into(),
+        });
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::DependencyCycle)
+        );
     }
 
     #[test]
     fn duplicate_subgoal_definition_is_rejected() {
         let mut audit = input();
-        audit.mission.subgoals.push(audit.mission.subgoals[0].clone());
+        audit
+            .mission
+            .subgoals
+            .push(audit.mission.subgoals[0].clone());
         audit.mission.mission_order.push("a".into());
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::DuplicateSubgoal("a".into())));
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::DuplicateSubgoal("a".into()))
+        );
     }
 
     #[test]
     fn duplicate_evaluation_is_rejected() {
         let mut audit = input();
         audit.evaluations[2] = audit.evaluations[0].clone();
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::DuplicateEvaluation("a".into())));
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::DuplicateEvaluation("a".into()))
+        );
     }
 
     #[test]
     fn one_receipt_cannot_be_reused_to_mint_progress_for_another_subgoal() {
         let mut audit = input();
-        audit.evaluations[1].acceptance_receipt_digest = audit.evaluations[0].acceptance_receipt_digest.clone();
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::ReceiptReused("accept-a".into())));
+        audit.evaluations[1].acceptance_receipt_digest =
+            audit.evaluations[0].acceptance_receipt_digest.clone();
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::ReceiptReused("accept-a".into()))
+        );
     }
 
     #[test]
@@ -753,14 +938,24 @@ mod tests {
     fn missing_scheduled_subgoal_outcome_is_rejected() {
         let mut audit = input();
         audit.evaluations.pop();
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::MissingEvaluation("c".into())));
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::MissingEvaluation("c".into()))
+        );
     }
 
     #[test]
     fn rejected_continuation_witness_is_not_accepted() {
         let mut audit = input();
-        audit.evaluations[0].continuation.as_mut().unwrap().disposition = ContinuationDisposition::Rejected;
-        assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::RejectedContinuation("a".into())));
+        audit.evaluations[0]
+            .continuation
+            .as_mut()
+            .unwrap()
+            .disposition = ContinuationDisposition::Rejected;
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::RejectedContinuation("a".into()))
+        );
     }
 
     #[test]
