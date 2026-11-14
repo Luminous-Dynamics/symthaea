@@ -20,6 +20,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+
+  symthaea-rust-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust 1.96
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check benchmark runner formatting
+        run: cargo fmt --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml -- --check
+      - name: Compile and lint the production-source harness
+        run: cargo clippy --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml --all-targets -- -D warnings
+      - name: Run Strang TEBD two-site smoke
+        run: |
+          cargo run --release --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml -- \
+            --case u1-two-site-hopping-known-answer --track fixed_bond \
+            --warmups 0 --repeats 1 --output /tmp/symthaea-u1-smoke.json
+      - name: Assert dense oracles and charge conservation
+        run: |
+          python - <<'PY'
+          import json
+          p = json.load(open("/tmp/symthaea-u1-smoke.json"))
+          r = p["records"][0]
+          assert r["dense_discrete_oracle"]["state_l2_error"] <= 1e-10
+          assert r["continuous_time_oracle"]["state_l2_error"] <= 1e-8
+          assert r["charge_metrics"]["charge_leakage_probability"] <= 1e-12
+          assert r["norm_drift"] <= 1e-10
+          assert r["gate_unitarity_max_residual"] <= 1e-12
+          assert r["gate_charge_conservation_max_residual"] <= 1e-12
+          PY
+
   quimb-smoke:
     runs-on: ubuntu-latest
     steps:
