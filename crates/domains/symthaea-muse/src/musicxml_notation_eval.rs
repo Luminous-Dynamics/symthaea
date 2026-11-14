@@ -2266,4 +2266,35 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn note_performance_directives_are_independent_from_written_note_values() {
+        let reference_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="1" attack="-2" release="3">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>
+                <type>quarter</type><dot/>
+            </note>
+        </measure></part></score-partwise>"#;
+        let prediction_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="2" attack="0" release="4">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>
+                <type>quarter</type><dot/>
+            </note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(reference_xml);
+        let prediction = graph(prediction_xml);
+        let report = evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
+        assert_eq!(report.written_type_and_dots.accuracy, Some(1.0));
+        assert_eq!(report.note_performance_directives.accuracy, Some(0.0));
+    }
+
 }
