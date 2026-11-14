@@ -71,6 +71,155 @@ pub enum JointReversibility {
     Unknown,
 }
 
+/// Textile substrate architecture recorded in the product-design revision.
+///
+/// These are design/specification descriptors, not measured opening results.
+/// Physical opening and recovered-fibre quality are qualified separately by
+/// the route/process evidence contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FabricStructureKind {
+    /// Interlaced warp/weft construction.
+    Woven,
+    /// Loop-based weft- or warp-knitted construction.
+    Knitted,
+    /// Fibre web bonded without conventional spun yarns.
+    Nonwoven,
+    /// Two or more layers bonded into a laminate.
+    Laminated,
+    /// A construction outside the current typed vocabulary.
+    Other,
+    /// Structure has not been established.
+    Unknown,
+}
+
+/// Declared woven pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WeavePattern {
+    /// Plain weave.
+    Plain,
+    /// Twill weave.
+    Twill,
+    /// Satin or sateen weave.
+    Satin,
+    /// Dobby weave.
+    Dobby,
+    /// Jacquard weave.
+    Jacquard,
+    /// Other documented weave.
+    Other,
+    /// Weave pattern is unresolved.
+    Unknown,
+}
+
+/// Declared knitted construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KnitStructure {
+    /// Single jersey.
+    SingleJersey,
+    /// Rib knit.
+    Rib,
+    /// Interlock knit.
+    Interlock,
+    /// Purl knit.
+    Purl,
+    /// Warp knit.
+    WarpKnit,
+    /// Other documented knit structure.
+    Other,
+    /// Knit structure is unresolved.
+    Unknown,
+}
+
+/// Yarn system used in a woven/knitted fabric.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum YarnSystem {
+    /// Ring-spun staple yarn.
+    RingSpun,
+    /// Rotor/open-end spun staple yarn.
+    RotorSpun,
+    /// Air-jet spun yarn.
+    AirJetSpun,
+    /// Vortex-spun yarn.
+    VortexSpun,
+    /// Continuous-filament yarn.
+    Filament,
+    /// Yarn system is unresolved.
+    Unknown,
+}
+
+/// Bonding process for a nonwoven fibre web.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NonwovenBonding {
+    /// Needle-punched/mechanically entangled.
+    NeedlePunched,
+    /// Hydroentangled/spunlaced.
+    Hydroentangled,
+    /// Thermally bonded.
+    Thermal,
+    /// Chemically bonded.
+    Chemical,
+    /// Spunbond process.
+    Spunbond,
+    /// Meltblown process.
+    Meltblown,
+    /// Other documented method.
+    Other,
+    /// Bonding process is unresolved.
+    Unknown,
+}
+
+/// Bonding method for a laminate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LaminationMethod {
+    /// Adhesive lamination.
+    Adhesive,
+    /// Thermal/fusion lamination.
+    Thermal,
+    /// Flame lamination.
+    Flame,
+    /// Mechanical lamination.
+    Mechanical,
+    /// Other documented method.
+    Other,
+    /// Lamination method is unresolved.
+    Unknown,
+}
+
+/// Type-specific, as-designed construction descriptors for one textile component.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FabricStructure {
+    /// Construction family.
+    pub kind: FabricStructureKind,
+    /// Exact pattern, mill specification or construction record reference.
+    pub source_ref: Option<String>,
+    /// Declared basis weight in grams per square metre.
+    pub basis_weight_gsm: Option<u32>,
+    /// Spinning system for woven/knitted constructions.
+    pub yarn_system: Option<YarnSystem>,
+    /// Nominal yarn linear density in tex.
+    pub yarn_count_tex: Option<u32>,
+    /// Woven pattern; required only for woven construction.
+    pub weave_pattern: Option<WeavePattern>,
+    /// Warp thread density per centimetre; required only for woven construction.
+    pub warp_density_per_cm: Option<u32>,
+    /// Weft thread density per centimetre; required only for woven construction.
+    pub weft_density_per_cm: Option<u32>,
+    /// Declared weave intersections per square centimetre, from a named construction method.
+    pub interlacement_per_cm2: Option<u32>,
+    /// Knit construction; required only for knitted construction.
+    pub knit_structure: Option<KnitStructure>,
+    /// Wale density per centimetre; required only for knitted construction.
+    pub wales_per_cm: Option<u32>,
+    /// Course density per centimetre; required only for knitted construction.
+    pub courses_per_cm: Option<u32>,
+    /// Nonwoven bonding process; required only for nonwovens.
+    pub nonwoven_bonding: Option<NonwovenBonding>,
+    /// Lamination process; required only for laminated structures.
+    pub lamination_method: Option<LaminationMethod>,
+    /// Reference to the declared substrate architecture beneath the laminate.
+    pub substrate_structure_ref: Option<String>,
+}
+
 /// A component declared in one exact product-design revision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DesignComponent {
@@ -86,6 +235,9 @@ pub struct DesignComponent {
     pub replaceable: bool,
     /// Repair or replacement instruction reference, if replaceable.
     pub replacement_instructions_ref: Option<String>,
+    /// Optional as-designed fabric architecture for textile-bearing components.
+    /// Required for textile components when OpeningCharacterized intent is declared.
+    pub fabric_structure: Option<FabricStructure>,
 }
 
 /// A declared joint between components, with removal dependencies.
@@ -127,6 +279,9 @@ pub enum DesignIntent {
     ComponentRecovery,
     /// Every component has an explicit material identity reference.
     MaterialTraceable,
+    /// Textile-bearing components include type-appropriate construction descriptors
+    /// needed to stratify opening trials; this is not a physical recyclability claim.
+    OpeningCharacterized,
 }
 
 /// Versioned component/joint topology dossier for one product design.
@@ -208,6 +363,22 @@ pub enum DesignAuditReason {
     JointReversibilityUnknown,
     /// Joining method remains unknown.
     JoiningMethodUnknown,
+    /// A textile-bearing component has no fabric-structure descriptor under opening intent.
+    FabricStructureMissing,
+    /// Fabric structure is unknown or outside the current qualified vocabulary.
+    FabricStructureUnknown,
+    /// Fabric structure lacks a source specification/pattern reference.
+    FabricStructureMissingSource,
+    /// Fabric structure lacks a positive basis weight.
+    FabricStructureMissingBasisWeight,
+    /// Woven structure lacks pattern, yarn or density/interlacement descriptors.
+    FabricStructureMissingWovenMetrics,
+    /// Knitted structure lacks knit, yarn, wale or course descriptors.
+    FabricStructureMissingKnittedMetrics,
+    /// Nonwoven structure lacks a declared bonding process.
+    FabricStructureMissingNonwovenBonding,
+    /// Laminated structure lacks a declared bonding method or substrate reference.
+    FabricStructureMissingLaminationDetails,
 }
 
 /// Result of a static design topology audit.
@@ -227,6 +398,8 @@ pub struct DesignAudit {
     pub conditional_joint_count: usize,
     /// Number of permanent joints.
     pub permanent_joint_count: usize,
+    /// Number of textile components with declared fabric architecture.
+    pub fabric_structure_count: usize,
 }
 
 /// Checks whether an identifier is non-empty after trimming.
