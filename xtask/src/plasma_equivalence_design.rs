@@ -291,10 +291,10 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     }
     if receipt.planned_min_baseline_specimens == 0
         || receipt.planned_min_candidate_specimens == 0
-        || receipt.planned_min_baseline_clusters == 0
-        || receipt.planned_min_candidate_clusters == 0
+        || receipt.planned_min_baseline_clusters < 2
+        || receipt.planned_min_candidate_clusters < 2
     {
-        return rejected("planned specimen and independent-cluster minimums must be positive");
+        return rejected("planned specimen minimums must be positive and each arm must include at least two independent clusters");
     }
 
     let power = &receipt.power_receipt;
