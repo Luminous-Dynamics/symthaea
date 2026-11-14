@@ -62,6 +62,7 @@ pub struct U1MpsStorageAudit {
     pub structurally_forbidden_entry_count: usize,
     pub structurally_forbidden_zero_count: usize,
     pub forbidden_nonzero_entry_count: usize,
+    pub forbidden_non_finite_entry_count: usize,
     pub forbidden_nonzero_l2_weight: f64,
     pub non_finite_entry_count: usize,
     pub dense_payload_bytes: usize,
@@ -488,6 +489,7 @@ impl U1MpsTensor {
         let structurally_forbidden_entry_count =
             dense_entry_count - symmetry_allowed_entry_count;
         let mut forbidden_nonzero_entry_count = 0_usize;
+        let mut forbidden_non_finite_entry_count = 0_usize;
         let mut forbidden_nonzero_l2_weight = 0.0;
         let mut non_finite_entry_count = 0_usize;
         for left in 0..self.left_dimension() {
@@ -496,6 +498,11 @@ impl U1MpsTensor {
                     let value = self.get(left, physical, right);
                     if !value.re.is_finite() || !value.im.is_finite() {
                         non_finite_entry_count += 1;
+                        if self.right_charges[right]
+                            != self.left_charges[left] + physical as i32
+                        {
+                            forbidden_non_finite_entry_count += 1;
+                        }
                         continue;
                     }
                     if self.right_charges[right] != self.left_charges[left] + physical as i32
@@ -512,8 +519,9 @@ impl U1MpsTensor {
                 "forbidden-sector storage audit weight",
             ));
         }
-        let structurally_forbidden_zero_count =
-            structurally_forbidden_entry_count.saturating_sub(forbidden_nonzero_entry_count);
+        let structurally_forbidden_zero_count = structurally_forbidden_entry_count
+            .saturating_sub(forbidden_nonzero_entry_count)
+            .saturating_sub(forbidden_non_finite_entry_count);
         let dense_payload_bytes = dense_entry_count
             .checked_mul(core::mem::size_of::<Complex64>())
             .ok_or(U1MpsError::DimensionOverflow)?;
@@ -537,6 +545,7 @@ impl U1MpsTensor {
             structurally_forbidden_entry_count,
             structurally_forbidden_zero_count,
             forbidden_nonzero_entry_count,
+            forbidden_non_finite_entry_count,
             forbidden_nonzero_l2_weight,
             non_finite_entry_count,
             dense_payload_bytes,
@@ -5918,6 +5927,25 @@ mod tests {
             assert!(audit.ideal_value_payload_savings_fraction >= 0.0);
             assert!(audit.ideal_value_payload_savings_fraction <= 1.0);
         }
+    }
+
+
+    #[test]
+    fn storage_audit_does_not_classify_nonfinite_forbidden_entries_as_zeros() {
+        let tensor = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(f64::NAN, 0.0),
+            ],
+        )
+        .unwrap();
+        let audit = tensor.storage_audit().unwrap();
+        assert_eq!(audit.non_finite_entry_count, 1);
+        assert_eq!(audit.forbidden_non_finite_entry_count, 1);
+        assert_eq!(audit.structurally_forbidden_zero_count, 0);
+        assert_eq!(audit.forbidden_nonzero_entry_count, 0);
     }
 
 }
