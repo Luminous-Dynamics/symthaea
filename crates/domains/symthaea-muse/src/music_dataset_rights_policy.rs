@@ -203,6 +203,7 @@ pub enum RightsPolicyIssueV1 {
     InvalidComponentDigest { component_id: String },
     EmptyLicenseField { component_id: String, field: &'static str },
     InvalidLicenseDigest { component_id: String },
+    InvalidUtcTimestamp { component_id: String, field: &'static str },
     InvalidHumanReviewRecord { component_id: String },
     ReviewRecordStatusMismatch { component_id: String },
     MissingAttributionStatement { component_id: String },
@@ -239,6 +240,20 @@ fn valid_rights_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_utc_timestamp_v1(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 20
+        && [0..4, 5..7, 8..10, 11..13, 14..16, 17..19]
+            .iter()
+            .all(|range| bytes[range.clone()].iter().all(u8::is_ascii_digit))
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[10] == b'T'
+        && bytes[13] == b':'
+        && bytes[16] == b':'
+        && bytes[19] == b'Z'
 }
 
 pub fn validate_music_component_rights_bundle_v1(
@@ -295,6 +310,28 @@ pub fn validate_music_component_rights_bundle_v1(
                 component_id: component.component_id.clone(),
             });
         }
+        for (field, value) in [
+            ("rights_holder_ref", component.license.rights_holder_ref.as_deref()),
+            ("source_revision", component.license.source_revision.as_deref()),
+        ] {
+            if value.is_some_and(|item| item.trim().is_empty()) {
+                issues.push(RightsPolicyIssueV1::EmptyLicenseField {
+                    component_id: component.component_id.clone(),
+                    field,
+                });
+            }
+        }
+        if component
+            .license
+            .retrieved_at_utc
+            .as_deref()
+            .is_some_and(|value| !valid_utc_timestamp_v1(value))
+        {
+            issues.push(RightsPolicyIssueV1::InvalidUtcTimestamp {
+                component_id: component.component_id.clone(),
+                field: "retrieved_at_utc",
+            });
+        }
         if let Some(review) = component.human_review.as_ref() {
             let review_fields = [
                 review.reviewer_ref.as_str(),
@@ -308,6 +345,12 @@ pub fn validate_music_component_rights_bundle_v1(
             {
                 issues.push(RightsPolicyIssueV1::InvalidHumanReviewRecord {
                     component_id: component.component_id.clone(),
+                });
+            }
+            if !valid_utc_timestamp_v1(&review.reviewed_at_utc) {
+                issues.push(RightsPolicyIssueV1::InvalidUtcTimestamp {
+                    component_id: component.component_id.clone(),
+                    field: "reviewed_at_utc",
                 });
             }
             if component.review_status != RightsReviewStatusV1::HumanReviewed {
