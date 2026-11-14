@@ -1,0 +1,11 @@
+[package]
+name = "audio-edit-session-assurance"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Append-only, content-addressed assurance for multi-turn audio editing sessions"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
