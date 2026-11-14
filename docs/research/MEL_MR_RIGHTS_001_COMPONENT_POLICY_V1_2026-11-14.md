@@ -45,4 +45,4 @@ Primary source: https://arxiv.org/abs/2610.36715, Licensing and Ethics appendix.
 
 ## Validation state
 
-Nine Rust test functions are authored. They have not yet been compiled or run. The exact-head Rust 1.96 workflow must pass formatting, tests and Clippy before any implementation qualification claim.
+Sixteen Rust test functions are authored. They have not yet been compiled or run. The exact-head Rust 1.96 workflow must pass formatting, tests and Clippy before any implementation qualification claim.
