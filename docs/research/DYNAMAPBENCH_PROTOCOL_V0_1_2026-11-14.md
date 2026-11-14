@@ -223,3 +223,8 @@ No leaderboard claim is valid if the evaluated commit is not pinned, cases leake
 6. **D6 safety:** add paired act/defer controls under the existing authority boundary.
 
 The first credible result is not a top leaderboard score. It is a reproducible baseline table with an immutable corpus, leakage audit, adversarial controls, honest unknowns and independently checked scoring.
+
+
+## Source tree inventory collector
+
+The validator now includes a non-networking parser for saved GitHub recursive-tree API responses. `tree-inventory <github-tree.json> <repository> <revision> <tree-oid>` checks that the response root SHA equals the exact tree OID supplied from the pinned commit object, validates each returned path/mode/type/object ID, rejects duplicate paths, and maps the API `truncated` flag to `partial` or `complete`. It does not make requests, authenticate the downloaded JSON or commit signature, prove the caller's commit-to-tree binding, or hash file contents. A non-truncated response is only as trustworthy as the API response and pinning procedure that supplied it.

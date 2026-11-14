@@ -3,7 +3,7 @@ use std::{env, fs, process};
 use development_map_validator::{
     cargo_manifest::{project_cargo_manifest, ManifestAnchor},
     rust_syntax::{project_rust_file, RustFileAnchor},
-    tree_projection::compose_repository_tree_json,
+    tree_projection::{collect_github_tree_inventory_json, compose_repository_tree_json, RepositoryTreeAnchor},
     validate_document_json,
 };
 
@@ -12,6 +12,7 @@ fn usage() {
     eprintln!("  development-map-validator <snapshot.json>");
     eprintln!("  development-map-validator cargo-manifest <Cargo.toml> <repository> <revision> <tree-oid> <manifest-path> <blob-oid>");
     eprintln!("  development-map-validator rust-file <source.rs> <repository> <revision> <tree-oid> <source-path> <blob-oid>");
+    eprintln!("  development-map-validator tree-inventory <github-tree.json> <repository> <revision> <tree-oid>");
     eprintln!("  development-map-validator tree-compose <request.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
@@ -134,6 +135,40 @@ fn project_rust_source_file(args: &[String]) -> i32 {
 }
 
 
+
+fn collect_github_tree_inventory_file(args: &[String]) -> i32 {
+    if args.len() != 5 {
+        usage();
+        return 2;
+    }
+    let request_file = &args[1];
+    let input = match read_input(request_file, "EGDDM-TREE-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    let source = RepositoryTreeAnchor {
+        repository_full_name: args[2].clone(),
+        revision: args[3].clone(),
+        tree_oid: args[4].clone(),
+    };
+    match collect_github_tree_inventory_json(&input, source) {
+        Err(error) => {
+            eprintln!("ERROR EGDDM-TREE-COLLECT-001 {request_file}: {error}");
+            1
+        }
+        Ok(inventory) => match serde_json::to_string_pretty(&inventory) {
+            Ok(output) => {
+                println!("{output}");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR EGDDM-TREE-COLLECT-JSON-001 {request_file}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn compose_repository_tree_file(args: &[String]) -> i32 {
     if args.len() != 2 {
         usage();
@@ -175,6 +210,7 @@ fn main() {
     let code = match args[0].as_str() {
         "cargo-manifest" => project_cargo_manifest_file(&args),
         "rust-file" => project_rust_source_file(&args),
+        "tree-inventory" => collect_github_tree_inventory_file(&args),
         "tree-compose" => compose_repository_tree_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {

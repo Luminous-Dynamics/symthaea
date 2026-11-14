@@ -240,7 +240,7 @@ On 2026-11-14, the standalone development-map-validator received a DTEA hardenin
 - Equality at the start/end boundary is accepted under closed-interval semantics.
 - An explicit validity_completeness declaration distinguishes a known open interval edge (complete with a null bound) from incomplete applicability (incomplete).
 - Incomplete effective-time applicability cannot justify consulted evidence; it can remain explicitly excluded.
-- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and ten cover Rust syntax extraction, bringing the standalone crate total to **96 authored tests** after 17 tree-composition tests (including serialized-request round-trip coverage). The public DTEA expected-results fixture contains **21 negative controls**.
+- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and ten cover Rust syntax extraction, bringing the standalone crate total to **102 authored tests** after 17 tree-composition tests (including serialized-request round-trip coverage). The public DTEA expected-results fixture contains **21 negative controls**.
 
 These are source changes and authored checks. The tests have not been compiled or executed. Exact-head CI workflows were observed as skipped, not passed. Full JSON Schema 2020-12 validation, runtime replay, independent benchmark qualification and #10064 isolation qualification remain outstanding. No real Mycelix authorization record is authenticated by the synthetic DTEA fixture.
 
@@ -276,3 +276,6 @@ The source-tree composition API is also exposed as a JSON request and CLI mode s
 ## DynaMapBench protocol
 
 The detailed versioned benchmark design is maintained in [DynaMapBench Protocol V0.1](DYNAMAPBENCH_PROTOCOL_V0_1_2026-11-14.md). It keeps structural fidelity, temporal admissibility, fixed-budget retrieval, impact/planning, causal attribution, paired act/defer competence and federation conformance as separate lanes. All targets remain prospective; the protocol requires exact benchmark artifact identities, frozen repositories, leakage-resistant splits, matched budgets, per-task reporting, paired ablations, uncertainty intervals and independent adjudication. No overall aggregate score may conceal a critical safety or authority error.
+
+
+D1 now has a saved-response tree inventory parser as well as the pure composer. The parser validates the exact recursive-tree root and the API truncation flag before emitting a pinned inventory. The commit-to-tree relation, response authenticity and any source content hash verification remain collector/transport responsibilities; the parser does not perform network access.

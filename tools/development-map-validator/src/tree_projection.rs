@@ -87,6 +87,86 @@ pub fn compose_repository_tree_json(raw_json: &str) -> Result<RepositoryTreeComp
     )
 }
 
+
+/// The relevant subset of GitHub's recursive tree API response.
+/// Unknown response fields are ignored; all fields used here are mandatory.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GitHubTreeApiEntry {
+    pub path: String,
+    pub mode: String,
+    #[serde(rename = "type")]
+    pub object_type: String,
+    pub sha: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GitHubTreeApiResponse {
+    pub sha: String,
+    pub truncated: bool,
+    pub tree: Vec<GitHubTreeApiEntry>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RepositoryTreeInventory {
+    pub source: RepositoryTreeAnchor,
+    /// Complete only when the API response explicitly reports truncated=false.
+    /// This does not independently authenticate the API response or commit object.
+    pub inventory_completeness: InventoryCompleteness,
+    pub api_truncated: bool,
+    pub tree_entries: Vec<RepositoryTreeEntry>,
+}
+
+/// Convert a saved GitHub recursive-tree JSON response into a pinned inventory.
+///
+/// source.tree_oid must be taken from the exact commit object for source.revision.
+/// This function verifies that the recursive-tree response names that same root
+/// tree OID, checks the API truncation flag, validates every path/mode/type/OID
+/// tuple and rejects duplicate paths. It performs no network access and cannot
+/// authenticate the downloaded response, commit signature, object contents or
+/// the caller's commit-to-tree binding.
+pub fn collect_github_tree_inventory_json(
+    raw_json: &str,
+    source: RepositoryTreeAnchor,
+) -> Result<RepositoryTreeInventory, String> {
+    validate_repository_anchor(&source)?;
+    let response: GitHubTreeApiResponse = serde_json::from_str(raw_json)
+        .map_err(|error| format!("GitHub tree API JSON parse error: {error}"))?;
+    if response.sha != source.tree_oid {
+        return Err(format!(
+            "recursive tree root mismatch: expected {}, response returned {}",
+            source.tree_oid, response.sha
+        ));
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut tree_entries = Vec::with_capacity(response.tree.len());
+    for item in response.tree {
+        let entry = RepositoryTreeEntry {
+            path: item.path,
+            mode: item.mode,
+            object_type: item.object_type,
+            oid: item.sha,
+        };
+        validate_tree_entry(&entry)?;
+        if !seen.insert(entry.path.clone()) {
+            return Err(format!("duplicate GitHub tree path: {}", entry.path));
+        }
+        tree_entries.push(entry);
+    }
+    tree_entries.sort_by(|left, right| left.path.cmp(&right.path));
+
+    Ok(RepositoryTreeInventory {
+        source,
+        inventory_completeness: if response.truncated {
+            InventoryCompleteness::Partial
+        } else {
+            InventoryCompleteness::Complete
+        },
+        api_truncated: response.truncated,
+        tree_entries,
+    })
+}
+
 fn valid_git_oid(value: &str) -> bool {
     (value.len() == 40 || value.len() == 64)
         && value.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -375,6 +455,80 @@ mod tests {
         ]
     }
 
+
+
+    fn api_tree_json(root: &str, truncated: bool, entries: serde_json::Value) -> String {
+        serde_json::json!({
+            "sha": root,
+            "truncated": truncated,
+            "tree": entries
+        }).to_string()
+    }
+
+    #[test]
+    fn collects_exact_nontruncated_github_tree_as_complete() {
+        let root = "b".repeat(40);
+        let input = api_tree_json(&root, false, serde_json::json!([
+            {"path":"src/lib.rs","mode":"100644","type":"blob","sha":"d".repeat(40)},
+            {"path":"src","mode":"040000","type":"tree","sha":"e".repeat(40)}
+        ]));
+        let result = collect_github_tree_inventory_json(&input, source_anchor()).expect("inventory");
+        assert_eq!(result.inventory_completeness, InventoryCompleteness::Complete);
+        assert!(!result.api_truncated);
+        assert_eq!(result.tree_entries[0].path, "src");
+        assert_eq!(result.tree_entries[1].path, "src/lib.rs");
+    }
+
+    #[test]
+    fn marks_truncated_github_tree_as_partial_not_complete() {
+        let root = "b".repeat(40);
+        let input = api_tree_json(&root, true, serde_json::json!([
+            {"path":"Cargo.toml","mode":"100644","type":"blob","sha":"c".repeat(40)}
+        ]));
+        let result = collect_github_tree_inventory_json(&input, source_anchor()).expect("partial inventory");
+        assert_eq!(result.inventory_completeness, InventoryCompleteness::Partial);
+        assert!(result.api_truncated);
+    }
+
+    #[test]
+    fn rejects_recursive_tree_root_mismatch() {
+        let input = api_tree_json(&"9".repeat(40), false, serde_json::json!([]));
+        let error = collect_github_tree_inventory_json(&input, source_anchor()).expect_err("root mismatch");
+        assert!(error.contains("recursive tree root mismatch"));
+    }
+
+    #[test]
+    fn rejects_duplicate_github_tree_paths() {
+        let root = "b".repeat(40);
+        let input = api_tree_json(&root, false, serde_json::json!([
+            {"path":"src/lib.rs","mode":"100644","type":"blob","sha":"d".repeat(40)},
+            {"path":"src/lib.rs","mode":"100644","type":"blob","sha":"d".repeat(40)}
+        ]));
+        let error = collect_github_tree_inventory_json(&input, source_anchor()).expect_err("duplicate path");
+        assert!(error.contains("duplicate GitHub tree path"));
+    }
+
+    #[test]
+    fn rejects_malformed_tree_entry_mode_type_and_object_id() {
+        let root = "b".repeat(40);
+        let cases = [
+            serde_json::json!([{"path":"src/lib.rs","mode":"100644","type":"tree","sha":"d".repeat(40)}]),
+            serde_json::json!([{"path":"src/lib.rs","mode":"100644","type":"blob","sha":"not-a-sha"}]),
+            serde_json::json!([{"path":"../lib.rs","mode":"100644","type":"blob","sha":"d".repeat(40)}])
+        ];
+        for entries in cases {
+            let input = api_tree_json(&root, false, entries);
+            assert!(collect_github_tree_inventory_json(&input, source_anchor()).is_err());
+        }
+    }
+
+    #[test]
+    fn rejects_missing_or_nonboolean_truncation_flag() {
+        let missing = serde_json::json!({"sha":"b".repeat(40),"tree":[]}).to_string();
+        assert!(collect_github_tree_inventory_json(&missing, source_anchor()).is_err());
+        let invalid = serde_json::json!({"sha":"b".repeat(40),"truncated":"false","tree":[]}).to_string();
+        assert!(collect_github_tree_inventory_json(&invalid, source_anchor()).is_err());
+    }
 
     #[test]
     fn accepts_a_serialized_json_composition_request() {
