@@ -22,6 +22,8 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Stale/dangling path matched by crates/core/* in CI; no Cargo.toml exists.
+    "crates/core/symthaea",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
