@@ -196,15 +196,44 @@ def exact_design_gate(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def evaluate_clock_and_units(data: dict[str, Any]) -> str:
+    clock = data["sample_clock"]
+    passport = data["acquisition_passport"]
+    if clock.get("relation_status") != "exact_rational":
+        return "NOT_EVALUABLE"
+    if clock.get("clock_identity") != passport.get("sample_clock_identity"):
+        return "NOT_EVALUABLE"
+    if clock.get("sample_period_identity") != passport.get("sample_period_identity"):
+        return "NOT_EVALUABLE"
+    if data.get("frequency_unit") != "cycles_per_sample":
+        return "NOT_EVALUABLE"
+    for line in data["frequency_lines"]:
+        if line.get("sample_clock_identity") != clock.get("clock_identity"):
+            return "NOT_EVALUABLE"
+        if line.get("frequency_unit") != data["frequency_unit"]:
+            return "NOT_EVALUABLE"
+    return "ADMITTED"
+
+
 def validate_metadata(data: dict[str, Any]) -> None:
     assert data["schema"] == "luminous.airroad.mimo_finite_sample_frf_admissibility.v0_1"
     assert data["schema_version"] == "0.1.0"
     assert data["evidence_class"] == "synthetic_exact_rational_experiment_design"
     assert data["claim_class"] == "statistical_estimator_admissibility"
-    assert data["frequency_unit"] == "cycles_per_sample"
-    assert data["sample_clock"]["clock_identity"] == "sample-clock-001"
-    assert data["sample_clock"]["sample_period_identity"] == "sample-period-001"
-    assert data["sample_clock"]["relation_status"] == "exact_rational"
+    if evaluate_clock_and_units(data) != "ADMITTED":
+        raise ValueError("sample-clock/frequency-unit identity is not evaluable")
+
+
+def validate_claim_class(
+    source_semantics: str,
+    requested_claim: str,
+) -> str:
+    if source_semantics == "statistical_estimator_admissibility" and requested_claim in {
+        "deterministic_hard_set",
+        "continuous_frequency_adequacy",
+    }:
+        return "REJECT_CLAIM_CLASS"
+    return "ADMITTED"
 
 
 def run_negative_controls(data: dict[str, Any]) -> None:
@@ -287,11 +316,30 @@ def run_negative_controls(data: dict[str, Any]) -> None:
 
     bad_clock = json.loads(json.dumps(data))
     bad_clock["sample_clock"]["relation_status"] = "unknown_interval"
-    assert bad_clock["sample_clock"]["relation_status"] != "exact_rational"
+    assert evaluate_clock_and_units(bad_clock) == "NOT_EVALUABLE"
 
     stale_clock = json.loads(json.dumps(data))
     stale_clock["sample_clock"]["clock_identity"] = "different-clock"
-    assert stale_clock["sample_clock"]["clock_identity"] != "sample-clock-001"
+    assert evaluate_clock_and_units(stale_clock) == "NOT_EVALUABLE"
+
+    bad_unit = json.loads(json.dumps(data))
+    bad_unit["frequency_unit"] = "radians_per_second"
+    assert evaluate_clock_and_units(bad_unit) == "NOT_EVALUABLE"
+
+    stale_line = json.loads(json.dumps(data))
+    stale_line["frequency_lines"][1]["sample_clock_identity"] = "different-clock"
+    assert evaluate_clock_and_units(stale_line) == "NOT_EVALUABLE"
+
+    assert (
+        validate_claim_class("statistical_estimator_admissibility",
+                             "deterministic_hard_set")
+        == "REJECT_CLAIM_CLASS"
+    )
+    assert (
+        validate_claim_class("statistical_estimator_admissibility",
+                             "continuous_frequency_adequacy")
+        == "REJECT_CLAIM_CLASS"
+    )
 
 
 def main() -> None:
