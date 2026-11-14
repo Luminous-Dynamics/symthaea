@@ -108,8 +108,8 @@
       "artifact_id": "test-protocol",
       "role": "test_protocol",
       "relative_path": "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/protocol.json",
-      "sha256": "f342947d5384456a27c21010d2e23c8a3b1a484dc3f6272a85e4cb844a1dcf8f",
-      "byte_length": 193,
+      "sha256": "1c34176011b307abc9f08baf7d5675cedd20b67f43eee658a15ba953dea1831f",
+      "byte_length": 233,
       "media_type": "application/json"
     },
     {
