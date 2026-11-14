@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod plasma_measurement_capability;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -62,6 +63,11 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Audit whether a measurement-system receipt can resolve its declared engineering decision.
+    PlasmaMeasurementCapabilityAudit {
+        #[arg(long, default_value = "data/research/plasma_measurement_capability_fixture_v0_1.json")]
+        fixture: PathBuf,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +111,14 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::PlasmaMeasurementCapabilityAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() { fixture } else { root.join(fixture) };
+            plasma_measurement_capability::run(&fixture_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
