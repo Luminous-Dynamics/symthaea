@@ -412,9 +412,7 @@ fn validate_continuation(
         ));
     }
     match receipt.disposition {
-        ContinuationDisposition::Qualified if feasible == required => {
-            Ok((true, false, feasible))
-        }
+        ContinuationDisposition::Qualified if feasible == required => Ok((true, false, feasible)),
         ContinuationDisposition::Qualified => Err(ProgressError::InvalidContinuationCoverage(
             evaluation.subgoal_id.clone(),
         )),
@@ -461,8 +459,8 @@ pub fn evaluate_mission_progress(
     }
     let mandatory = validate_mission(&input.mission)?;
     // Validate the report's fixed-width counters before any increment can wrap.
-    let scheduled =
-        u16::try_from(input.mission.subgoals.len()).map_err(|_| ProgressError::ArithmeticOverflow)?;
+    let scheduled = u16::try_from(input.mission.subgoals.len())
+        .map_err(|_| ProgressError::ArithmeticOverflow)?;
     let mut evaluations = BTreeMap::new();
     for evaluation in &input.evaluations {
         if !mandatory.contains_key(&evaluation.subgoal_id) {
@@ -866,7 +864,9 @@ mod tests {
             from: "a".into(),
             to: "d".into(),
         });
-        audit.evaluations.push(evaluation("d", SubgoalOutcome::NotAttempted));
+        audit
+            .evaluations
+            .push(evaluation("d", SubgoalOutcome::NotAttempted));
         audit.evaluations[0].continuation = Some(continuation(
             "state-a-after",
             &["b", "d"],
@@ -900,13 +900,19 @@ mod tests {
         ));
         let report = evaluate_mission_progress(&audit).unwrap();
         assert!(report.subgoals[0].continuation_unknown);
-        assert!(report.subgoals[0].feasible_mandatory_successor_ids.is_empty());
+        assert!(
+            report.subgoals[0]
+                .feasible_mandatory_successor_ids
+                .is_empty()
+        );
     }
 
     #[test]
     fn mission_size_outside_report_counter_range_is_rejected_before_evaluation() {
         let count = usize::from(u16::MAX) + 1;
-        let ids = (0..count).map(|index| format!("g-{index}")).collect::<Vec<_>>();
+        let ids = (0..count)
+            .map(|index| format!("g-{index}"))
+            .collect::<Vec<_>>();
         let audit = MissionEvaluationInput {
             mission: MissionManifest {
                 mission_id: "oversized-mission".into(),
