@@ -398,7 +398,7 @@ pub fn parse_humdrum_kern(
                 });
             }
             let mut parsed_atoms = Vec::with_capacity(subtokens.len());
-            for subtoken in subtokens {
+            for subtoken in subtokens.iter().copied() {
                 parsed_atoms.push(parse_kern_atom(subtoken, line_number)?);
             }
             let duration = parsed_atoms[0].duration;
