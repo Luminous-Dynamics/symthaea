@@ -200,3 +200,15 @@ The 25% test-reduction figure is a programme target, not an achieved result or i
 - No numerical transform, TOST, power calculation, survival estimator or clustered proportion analysis is executed here.
 - The data is synthetic; there is no physical plasma, bond, aging, failure classification, calibration, laboratory or production evidence in this increment.
 - No design allowable, failure acceptability, product qualification, safety or release authority is claimed.
+
+
+## Existing adjacent owners (no duplication)
+
+The endpoint graph composes with other active plasma workstreams rather than creating a second version of their models:
+- #12099 owns pre-bond surface-state trajectory, hydrophobic recovery, storage/handling and treatment-to-bond open-time. The aged-strength graph here is post-bond durability evidence; it does not substitute for pre-bond recovery evidence.
+- #12086 owns substrate integrity and over-treatment constraints, including barrier-property or bulk-property degradation.
+- #11907 owns decision-value-driven multifidelity experiment selection.
+- #11795 owns the application-specific physical bondability-window benchmark.
+- #12117 owns the still-unqualified cluster-aware failure-mode proportion inference.
+
+The graph is the typed claim/provenance layer that composes these outputs. It does not introduce a parallel surface-recovery model, substrate-damage simulator, contact-angle-to-strength predictor or optimizer.
