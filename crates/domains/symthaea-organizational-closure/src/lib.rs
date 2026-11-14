@@ -944,8 +944,7 @@ pub fn verify_trace(
                 .keys()
                 .any(|version_id| &version_id.component_id == component_id);
             let has_consumer = verified_outputs.keys().any(|version_id| {
-                &version_id.component_id == component_id
-                    && consumed_versions.contains(version_id)
+                &version_id.component_id == component_id && consumed_versions.contains(version_id)
             });
 
             if !has_producer {
