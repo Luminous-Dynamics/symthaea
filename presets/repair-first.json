@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "preset_id": "repair-first",
+  "name": "Repair-First",
+  "revision": 1,
+  "compatible_families": ["top", "bottom", "outerwear", "dress", "one_piece", "workwear", "accessory"],
+  "intent_defaults": {
+    "description": "A garment architecture that makes likely wear points inspectable and replacement or repair practical.",
+    "style_tags": ["repairable", "modular", "durable-design", "user-directed"],
+    "silhouette": "User-selectable, with reinforcement and replacement access considered early",
+    "component_defaults": {"fasteners": "Prefer standardized replaceable fasteners", "pockets": "Consider separately replaceable pocket bags", "panels": "Use replaceable panels only where the interface is robust and visually intentional", "seams": "Prefer accessible repair paths"},
+    "fit_intent": "regular"
+  },
+  "objective_defaults": [
+    {"metric": "repairability", "direction": "maximize", "weight": 100},
+    {"metric": "durability", "direction": "maximize", "weight": 95},
+    {"metric": "modularity", "direction": "maximize", "weight": 85},
+    {"metric": "affordability", "direction": "minimize", "weight": 65},
+    {"metric": "material_efficiency", "direction": "maximize", "weight": 75}
+  ],
+  "hard_constraints": [],
+  "accessibility_defaults": ["Repair steps and replacement parts should be understandable to the intended wearer or maker."],
+  "circularity_defaults": ["Document replaceable components, tools, repair methods and compatible replacement materials."],
+  "manufacturing_defaults": {"preferred_route": "local_maker", "allowed_operations": []},
+  "caveats": ["Repairability is design intent until repair tasks are physically tried and timed.", "Durability and service life require testing under a declared wear, care and repair profile."]
+}

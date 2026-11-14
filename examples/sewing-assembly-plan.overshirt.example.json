@@ -1,0 +1,107 @@
+{
+  "schema_version": "0.1.0",
+  "plan_id": "SEWPLAN-OVERSHIRT-SYNTH-001",
+  "revision": 1,
+  "plan_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_brief_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_pattern_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "claim_ceiling": "proposed_plan_only_no_actuation_authority",
+  "parts": [
+    {
+      "part_id": "front",
+      "pattern_piece_id": "overshirt-front",
+      "revision": 1,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "edge_ids": ["shoulder", "side"],
+      "grain_direction": "warp"
+    },
+    {
+      "part_id": "back",
+      "pattern_piece_id": "overshirt-back",
+      "revision": 1,
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "edge_ids": ["shoulder", "side"],
+      "grain_direction": "warp"
+    }
+  ],
+  "interfaces": [
+    {
+      "interface_id": "shoulder-seam",
+      "interface_kind": "seam",
+      "edge_refs": [
+        {"part_id": "front", "edge_id": "shoulder", "orientation": "forward"},
+        {"part_id": "back", "edge_id": "shoulder", "orientation": "reversed"}
+      ],
+      "seam_allowance_mm": 10,
+      "tolerance_mm": 1.5,
+      "notch_sequence": ["shoulder-notch"],
+      "construction_note": "Synthetic fixture only; verify seam geometry and handling on physical sample."
+    },
+    {
+      "interface_id": "side-seam",
+      "interface_kind": "seam",
+      "edge_refs": [
+        {"part_id": "front", "edge_id": "side", "orientation": "forward"},
+        {"part_id": "back", "edge_id": "side", "orientation": "reversed"}
+      ],
+      "seam_allowance_mm": 10,
+      "tolerance_mm": 1.5,
+      "notch_sequence": [],
+      "construction_note": "Synthetic side seam for graph-validation tests."
+    }
+  ],
+  "machine_profiles": [
+    {
+      "profile_id": "industrial-lockstitch-synthetic",
+      "revision": 1,
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "machine_class": "single-needle lockstitch",
+      "supported_operations": ["join", "topstitch", "edge_finish"],
+      "supported_stitches": ["301"],
+      "profile_basis": "synthetic_fixture"
+    }
+  ],
+  "operations": [
+    {
+      "operation_id": "join-shoulders",
+      "kind": "join",
+      "predecessor_ids": [],
+      "part_refs": ["front", "back"],
+      "interface_refs": ["shoulder-seam"],
+      "machine_profile_ref": "industrial-lockstitch-synthetic",
+      "manual": false,
+      "requires_human_review": true,
+      "irreversible": true,
+      "skill_tags": ["sewing-technologist-review"],
+      "evidence_requirements": ["machine-profile-match", "seam-sample-inspection"],
+      "ambiguity_notes": ["Confirm seam construction and pressing sequence before production handoff."]
+    },
+    {
+      "operation_id": "join-sides",
+      "kind": "join",
+      "predecessor_ids": ["join-shoulders"],
+      "part_refs": ["front", "back"],
+      "interface_refs": ["side-seam"],
+      "machine_profile_ref": "industrial-lockstitch-synthetic",
+      "manual": false,
+      "requires_human_review": true,
+      "irreversible": true,
+      "skill_tags": ["sewing-technologist-review"],
+      "evidence_requirements": ["seam-sample-inspection"],
+      "ambiguity_notes": []
+    },
+    {
+      "operation_id": "inspect-body-seams",
+      "kind": "inspect",
+      "predecessor_ids": ["join-sides"],
+      "part_refs": ["front", "back"],
+      "interface_refs": ["shoulder-seam", "side-seam"],
+      "manual": true,
+      "requires_human_review": true,
+      "irreversible": false,
+      "skill_tags": ["quality-inspection"],
+      "evidence_requirements": ["visual-seam-inspection", "dimensional-check"],
+      "ambiguity_notes": []
+    }
+  ]
+}
