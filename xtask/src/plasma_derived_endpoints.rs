@@ -33,6 +33,7 @@ struct StudyDesign {
     design_id: String,
     design_sha256: String,
     analysis_plan_sha256: String,
+    sample_manifest_sha256: String,
     analysis_profile: String,
     estimand: String,
     quantity_unit: String,
@@ -170,6 +171,8 @@ struct FailureModeDistributionEvidence {
     category_ids: Vec<String>,
     mandatory_nonterminal_categories: Vec<String>,
     denominator_specimen_ids: Vec<String>,
+    sample_manifest_sha256: String,
+    minimum_assignment_confidence: f64,
     assignments: Vec<ClassificationAssignment>,
     category_counts: Vec<CategoryCount>,
     design: StudyDesign,
@@ -248,7 +251,10 @@ fn validate_design(design: &StudyDesign, required_profile: &str) -> std::result:
     if design.analysis_profile != required_profile {
         return Err(Decision::rejected("analysis profile is not registered for the declared derived endpoint"));
     }
-    if !matches!(design.grouping_scheme.as_str(), "independent_arms" | "paired_by_cluster") {
+    if design.grouping_scheme == "single_arm_clustered" && design.independent_unit == "paired_cluster" {
+        return Err(Decision::rejected("single-cohort classification cannot declare paired clusters"));
+    }
+    if !matches!(design.grouping_scheme.as_str(), "independent_arms" | "paired_by_cluster" | "single_arm_clustered") {
         return Err(Decision::rejected("unsupported grouping scheme"));
     }
     if !matches!(
@@ -496,7 +502,7 @@ fn audit_aged_retention(evidence: &AgedRetentionEvidence) -> Decision {
         return Decision::blocked("derived-retention result, code, definition or input-manifest receipt is incomplete");
     }
     if result.analysis_profile != evidence.design.analysis_profile
-        || result.input_manifest_sha256 != evidence.design.analysis_plan_sha256
+        || result.input_manifest_sha256 != evidence.design.sample_manifest_sha256
     {
         return Decision::rejected("retention derivation is not bound to the preregistered design and input manifest");
     }
@@ -514,7 +520,7 @@ fn audit_aged_retention(evidence: &AgedRetentionEvidence) -> Decision {
     {
         return Decision::rejected("retention estimate or interval is non-finite, negative, reversed or inconsistent");
     }
-    if result.lower_bound > result.minimum_acceptable_ratio {
+    if result.lower_bound >= result.minimum_acceptable_ratio {
         return Decision::pass(
             "AGED_STRENGTH_RETENTION_ESTABLISHED",
             "D3163 baseline/conditioned observations and D1151/D1183 conditioning are linked to a preregistered matched-cluster retention derivation",
@@ -587,11 +593,25 @@ fn audit_failure_mode_distribution(evidence: &FailureModeDistributionEvidence) -
     if !denominator.iter().all(|id| evidence.classification_receipt.specimen_ids.contains(id)) {
         return Decision::rejected("D5573 classification receipt does not cover the complete declared denominator");
     }
-    if !unique_nonempty(&evidence.design.design_id.clone().into_iter().collect::<Vec<_>>()) {
-        return Decision::blocked("failure-mode study design identity is incomplete");
+    if !sha256_shape(&evidence.sample_manifest_sha256)
+        || !evidence.minimum_assignment_confidence.is_finite()
+        || !(0.0..=1.0).contains(&evidence.minimum_assignment_confidence)
+    {
+        return Decision::blocked("failure-mode sample manifest or minimum classification-confidence threshold is incomplete");
+    }
+    if evidence.classification_receipt.raw_data_sha256.as_deref()
+        != Some(evidence.image_manifest_sha256.as_str())
+    {
+        return Decision::rejected("D5573 classification receipt does not bind the exact image/inspection manifest");
     }
     if let Err(decision) = validate_design(&evidence.design, "clustered_failure_mode_distribution_v1") {
         return decision;
+    }
+    if evidence.design.grouping_scheme != "single_arm_clustered" {
+        return Decision::rejected("failure-mode distribution requires a single-cohort clustered design, not a two-arm contrast");
+    }
+    if evidence.design.sample_manifest_sha256 != evidence.sample_manifest_sha256 {
+        return Decision::rejected("failure-mode study design and classification evidence do not bind the same denominator manifest");
     }
 
     let mut assignments = HashMap::<&str, &str>::new();
@@ -611,6 +631,12 @@ fn audit_failure_mode_distribution(evidence: &FailureModeDistributionEvidence) -
             || !evidence.category_ids.iter().any(|id| id == &assignment.category_id)
         {
             return Decision::rejected("classification assignment refers to a specimen outside the denominator or an unknown category");
+        }
+        if assignment.confidence < evidence.minimum_assignment_confidence
+            && assignment.category_id != "unclear"
+            && assignment.category_id != "invalid"
+        {
+            return Decision::rejected("low-confidence classification must remain in the explicit unclear or invalid denominator category");
         }
         if assignments.insert(&assignment.specimen_id, &assignment.category_id).is_some() {
             return Decision::rejected("a specimen has multiple top-level failure-mode assignments; mixed cases must be explicitly represented in their category");
@@ -791,6 +817,20 @@ mod tests {
     fn retention_requires_exact_baseline_and_conditioned_cohorts() {
         let fixture = fixture();
         let case = fixture.cases.iter().find(|case| case.id == "aged-retention-cohort-mismatch").expect("case exists");
+        assert_eq!(audit_case(case).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn conditioning_protocol_must_bind_exact_aged_cohort() {
+        let fixture = fixture();
+        let case = fixture.cases.iter().find(|case| case.id == "conditioning-cohort-mismatch").expect("case exists");
+        assert_eq!(audit_case(case).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn failure_mode_distribution_counts_low_confidence_as_unclear() {
+        let fixture = fixture();
+        let case = fixture.cases.iter().find(|case| case.id == "low-confidence-classification-not-unclear").expect("case exists");
         assert_eq!(audit_case(case).disposition, Disposition::Rejected);
     }
 
