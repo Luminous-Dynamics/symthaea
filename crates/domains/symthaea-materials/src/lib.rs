@@ -20,6 +20,7 @@ pub mod mining;
 pub mod properties;
 pub mod strategic;
 pub mod textile_design;
+pub mod textile_material_flow;
 pub mod textile_recovery;
 pub mod textile_sensing;
 
