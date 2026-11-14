@@ -1759,6 +1759,11 @@ mod tests {
                 upper_bound_um: 25_400,
                 mass_fraction_ppm: 300_000,
             },
+            FibreLengthBin {
+                lower_bound_um: 25_400,
+                upper_bound_um: u32::MAX,
+                mass_fraction_ppm: 0,
+            },
         ];
         bundle.fibre_length = Some(distribution);
         bundle.downstream_acceptance = Some(acceptance());
@@ -1769,6 +1774,124 @@ mod tests {
             result
                 .reasons
                 .contains(&RouteReason::FibreLengthBelowPolicy)
+        );
+    }
+
+    #[test]
+    fn fibre_histogram_must_cover_the_full_length_domain_without_gaps_or_truncation() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.bins[1].lower_bound_um += 1;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::InvalidFibreLengthDistribution)
+        );
+
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.bins[2].upper_bound_um = 50_000;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::InvalidFibreLengthDistribution)
+        );
+    }
+
+    #[test]
+    fn length_measurement_uncertainty_raises_the_conservative_acceptance_floor() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.bins = vec![
+            FibreLengthBin {
+                lower_bound_um: 0,
+                upper_bound_um: 12_900,
+                mass_fraction_ppm: 400_000,
+            },
+            FibreLengthBin {
+                lower_bound_um: 12_900,
+                upper_bound_um: 25_400,
+                mass_fraction_ppm: 400_000,
+            },
+            FibreLengthBin {
+                lower_bound_um: 25_400,
+                upper_bound_um: u32::MAX,
+                mass_fraction_ppm: 200_000,
+            },
+        ];
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::FibreLengthBelowPolicy));
+    }
+
+    #[test]
+    fn fibre_length_sampling_must_meet_receiver_mass_and_replicate_minima() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.sample_mass_mg = 19_999;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::FibreLengthSamplingBelowPolicy)
+        );
+
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.replicate_count = 2;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::FibreLengthSamplingBelowPolicy)
+        );
+    }
+
+    #[test]
+    fn fibre_length_coverage_probability_must_meet_receiver_policy() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.measurement_coverage_probability_ppm = 900_000;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::FibreLengthCoverageBelowPolicy)
         );
     }
 
@@ -2207,6 +2330,22 @@ mod tests {
                 fibre_sampling_plan_and_measurement_cannot_reuse_evidence_identity();
                 ("ineligible", Some("DuplicateEvidenceIdentity"))
             }
+            "ROUTE-043-FIBRE-HISTOGRAM-GAP-OR-TAIL-OMISSION" => {
+                fibre_histogram_must_cover_the_full_length_domain_without_gaps_or_truncation();
+                ("ineligible", Some("InvalidFibreLengthDistribution"))
+            }
+            "ROUTE-044-LENGTH-UNCERTAINTY-OVERLAPS-RECEIVER-FLOOR" => {
+                length_measurement_uncertainty_raises_the_conservative_acceptance_floor();
+                ("ineligible", Some("FibreLengthBelowPolicy"))
+            }
+            "ROUTE-045-SAMPLE-MASS-BELOW-RECEIVER-PROTOCOL" => {
+                fibre_length_sampling_must_meet_receiver_mass_and_replicate_minima();
+                ("insufficient_evidence", Some("FibreLengthSamplingBelowPolicy"))
+            }
+            "ROUTE-046-COVERAGE-BELOW-RECEIVER-PROTOCOL" => {
+                fibre_length_coverage_probability_must_meet_receiver_policy();
+                ("insufficient_evidence", Some("FibreLengthCoverageBelowPolicy"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -2228,12 +2367,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(42));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(46));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 42, "review route corpus case count changes");
+        assert_eq!(cases.len(), 46, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"].as_str().expect("case_id must be a string");
@@ -2256,7 +2395,7 @@ mod tests {
             );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 42);
+        assert_eq!(seen.len(), 46);
     }
 
     #[test]
