@@ -218,15 +218,15 @@ fn qualification(findings: &[ExperimentFinding], invalid_scenario: bool) -> Expe
     if invalid_scenario {
         return ExperimentQualification::Inconclusive;
     }
-    if findings.iter().any(|f| matches!(
-        f.code,
+    let only_inconclusive_findings = findings.iter().all(|finding| matches!(
+        finding.code,
         ExperimentFindingCode::EvidenceUnavailable
             | ExperimentFindingCode::ObservationContradictsFrozenModel
             | ExperimentFindingCode::NoConsistentHypothesis
-    )) {
-        return ExperimentQualification::Inconclusive;
-    }
-    if !findings.is_empty() {
+    ));
+    if !findings.is_empty() && only_inconclusive_findings {
+        ExperimentQualification::Inconclusive
+    } else if !findings.is_empty() {
         ExperimentQualification::NotQualified
     } else {
         ExperimentQualification::Qualified
@@ -548,9 +548,15 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
                 let remaining_cost = scenario.budget.max_cost_units.saturating_sub(total_cost);
                 let remaining_risk = scenario.budget.max_risk_units.saturating_sub(total_risk);
                 let remaining_trials = scenario.budget.max_trials.saturating_sub(trace.trials.len());
-                let informative_available = eligible_probe_utilities(
-                    &active, &hypotheses, &probes, remaining_cost, remaining_risk, remaining_trials,
-                ).iter().any(|(_, gain, _)| *gain > f64::EPSILON);
+                let model_class_discrepancy = findings.iter().any(|finding| matches!(
+                    finding.code,
+                    ExperimentFindingCode::ObservationContradictsFrozenModel
+                        | ExperimentFindingCode::NoConsistentHypothesis
+                ));
+                let informative_available = !model_class_discrepancy
+                    && eligible_probe_utilities(
+                        &active, &hypotheses, &probes, remaining_cost, remaining_risk, remaining_trials,
+                    ).iter().any(|(_, gain, _)| *gain > f64::EPSILON);
                 if informative_available {
                     push_finding(&mut findings, ExperimentFindingCode::AbstainedWhileInformativeProbeAvailable,
                         None, None, "agent abstained while an informative probe remained within all frozen budgets");
@@ -645,6 +651,8 @@ mod tests {
     #[test]
     fn unavailable_evidence_never_updates_hypotheses() {
         let scenario = scenario();
+        let mut scenario = scenario();
+        scenario.budget.max_trials = 1;
         let oracle = ExperimentOracle::new("memory-fault");
         let mut trial = ExperimentTrial::qualified("inspect-model", "healthy");
         trial.delivery = ExperimentEvidenceStatus::Unavailable;
