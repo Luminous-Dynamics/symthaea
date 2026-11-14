@@ -104,6 +104,16 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    TwoSiteHamiltonianHermiticityResidual {
+        residual: f64,
+        tolerance: f64,
+    },
+    TwoSiteHamiltonianChargeLeakage {
+        output_charge: u32,
+        input_charge: u32,
+        amplitude: f64,
+        tolerance: f64,
+    },
     TwoSiteBondMismatch,
     TwoSiteShapeMismatch,
     TwoSiteDenseExpansionRequiresOpenBoundaries,
@@ -246,6 +256,19 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "two-site gate charge-conservation residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::TwoSiteHamiltonianHermiticityResidual { residual, tolerance } => write!(
+                f,
+                "two-site Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::TwoSiteHamiltonianChargeLeakage {
+                output_charge,
+                input_charge,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "two-site Hamiltonian couples excitation sector {input_charge} to {output_charge} with amplitude {amplitude}, tolerance {tolerance}"
             ),
             Self::TwoSiteBondMismatch => write!(
                 f,
@@ -1810,6 +1833,143 @@ pub struct U1TwoSiteGate {
     unitarity_residual: f64,
 }
 
+
+
+/// Hermitian nearest-neighbour two-qubit Hamiltonian restricted to U(1) sectors.
+///
+/// Basis order is |00>, |01>, |10>, |11>. The only coupled block is the
+/// single-excitation sector {|01>,|10>}; zero- and two-excitation sectors
+/// contribute independent real energies.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteHamiltonian {
+    matrix: [[Complex64; 4]; 4],
+    hermiticity_residual: f64,
+    charge_conservation_residual: f64,
+}
+
+impl U1TwoSiteHamiltonian {
+    /// Construct a finite Hermitian two-site Hamiltonian with zero U(1) flux.
+    pub fn new(
+        matrix: [[Complex64; 4]; 4],
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        for row in 0..4 {
+            for column in 0..4 {
+                let value = matrix[row][column];
+                if !value.re.is_finite() || !value.im.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry {
+                        site: 0,
+                        index: row * 4 + column,
+                    });
+                }
+            }
+        }
+
+        let mut hermiticity_residual: f64 = 0.0;
+        let mut charge_conservation_residual: f64 = 0.0;
+        let mut charge_witness = (0_usize, 0_usize);
+        for row in 0_usize..4 {
+            for column in 0_usize..4 {
+                hermiticity_residual = hermiticity_residual
+                    .max((matrix[row][column] - matrix[column][row].conj()).norm());
+                if row.count_ones() != column.count_ones() {
+                    let amplitude = matrix[row][column].norm();
+                    if amplitude > charge_conservation_residual {
+                        charge_conservation_residual = amplitude;
+                        charge_witness = (row, column);
+                    }
+                }
+            }
+        }
+        if hermiticity_residual > tolerance {
+            return Err(U1MpsError::TwoSiteHamiltonianHermiticityResidual {
+                residual: hermiticity_residual,
+                tolerance,
+            });
+        }
+        if charge_conservation_residual > tolerance {
+            return Err(U1MpsError::TwoSiteHamiltonianChargeLeakage {
+                output_charge: charge_witness.0.count_ones(),
+                input_charge: charge_witness.1.count_ones(),
+                amplitude: charge_conservation_residual,
+                tolerance,
+            });
+        }
+
+        Ok(Self {
+            matrix,
+            hermiticity_residual,
+            charge_conservation_residual,
+        })
+    }
+
+    pub fn matrix(&self) -> &[[Complex64; 4]; 4] {
+        &self.matrix
+    }
+
+    pub fn hermiticity_residual(&self) -> f64 {
+        self.hermiticity_residual
+    }
+
+    pub fn charge_conservation_residual(&self) -> f64 {
+        self.charge_conservation_residual
+    }
+
+    /// Compute exp(-i dt H) analytically, block-by-block in the U(1) sectors.
+    ///
+    /// The single-excitation block is a closed-form 2x2 Hermitian exponential;
+    /// this avoids a generic 4x4 matrix exponential and preserves block
+    /// structure by construction.
+    pub fn evolution_gate(
+        &self,
+        dt: f64,
+        gate_tolerance: f64,
+    ) -> Result<U1TwoSiteGate, U1MpsError> {
+        if !dt.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site Hamiltonian time step",
+            ));
+        }
+        if !gate_tolerance.is_finite() || gate_tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(gate_tolerance));
+        }
+
+        let h00 = self.matrix[0][0].re;
+        let h11 = self.matrix[1][1].re;
+        let h22 = self.matrix[2][2].re;
+        let h33 = self.matrix[3][3].re;
+        let mean = 0.5 * (h11 + h22);
+        let difference = 0.5 * (h11 - h22);
+        let coupling = self.matrix[1][2];
+        let radius = (difference * difference + coupling.norm_sqr()).sqrt();
+        let angle = dt * radius;
+        let cosine = angle.cos();
+        let sine_over_radius = if radius <= f64::EPSILON * (1.0 + mean.abs()) {
+            dt
+        } else {
+            angle.sin() / radius
+        };
+        let phase_single = Complex64::from_polar(1.0, -dt * mean);
+        let imaginary_factor = Complex64::new(0.0, -sine_over_radius);
+
+        let mut gate = [[Complex64::new(0.0, 0.0); 4]; 4];
+        gate[0][0] = Complex64::from_polar(1.0, -dt * h00);
+        gate[3][3] = Complex64::from_polar(1.0, -dt * h33);
+        gate[1][1] =
+            phase_single * (Complex64::new(cosine, 0.0) + imaginary_factor * difference);
+        gate[1][2] = phase_single * imaginary_factor * coupling;
+        gate[2][1] = phase_single * imaginary_factor * coupling.conj();
+        gate[2][2] =
+            phase_single * (Complex64::new(cosine, 0.0) - imaginary_factor * difference);
+
+        U1TwoSiteGate::new(gate, gate_tolerance)
+    }
+}
+
+
 /// The exact two-site tensor obtained after contracting an MPS bond and
 /// applying one U(1)-conserving two-qubit gate.
 ///
@@ -3088,8 +3248,9 @@ impl U1TeBDLayer {
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate,
+        U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -4513,6 +4674,87 @@ mod tests {
             + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
             + result.truncation_ledger.cumulative_projection_l2_error_bound;
         assert!((component_sum - bound).abs() <= 1.0e-12);
+    }
+
+
+
+    #[test]
+    fn two_site_hamiltonian_exponential_matches_analytic_single_excitation_rabi_gate() {
+        let coupling = 0.7;
+        let dt = 0.31;
+        let mut hamiltonian = [[complex_zero(); 4]; 4];
+        hamiltonian[0][0] = Complex64::new(0.2, 0.0);
+        hamiltonian[3][3] = Complex64::new(-0.3, 0.0);
+        hamiltonian[1][1] = Complex64::new(0.1, 0.0);
+        hamiltonian[2][2] = Complex64::new(-0.1, 0.0);
+        hamiltonian[1][2] = Complex64::new(coupling, 0.0);
+        hamiltonian[2][1] = Complex64::new(coupling, 0.0);
+        let model = U1TwoSiteHamiltonian::new(hamiltonian, 1.0e-12).unwrap();
+        let gate = model.evolution_gate(dt, 1.0e-12).unwrap();
+        let matrix = gate.matrix();
+        let difference: f64 = 0.1;
+        let radius = (difference * difference + coupling * coupling).sqrt();
+        let cosine = (dt * radius).cos();
+        let sine_over_radius = (dt * radius).sin() / radius;
+        assert!((matrix[0][0] - Complex64::from_polar(1.0, -dt * 0.2)).norm() <= 1.0e-12);
+        assert!((matrix[3][3] - Complex64::from_polar(1.0, dt * 0.3)).norm() <= 1.0e-12);
+        assert!(
+            (matrix[1][2] - Complex64::new(0.0, -sine_over_radius * coupling)).norm()
+                <= 1.0e-12
+        );
+        assert!(
+            (matrix[2][1] - Complex64::new(0.0, -sine_over_radius * coupling)).norm()
+                <= 1.0e-12
+        );
+        assert!(
+            (matrix[1][1]
+                - Complex64::new(cosine, 0.0)
+                - Complex64::new(0.0, -sine_over_radius * difference))
+                .norm()
+                <= 1.0e-12
+        );
+        assert!(
+            (matrix[2][2]
+                - Complex64::new(cosine, 0.0)
+                + Complex64::new(0.0, -sine_over_radius * difference))
+                .norm()
+                <= 1.0e-12
+        );
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+        assert_eq!(gate.charge_conservation_residual(), 0.0);
+    }
+
+    #[test]
+    fn two_site_hamiltonian_rejects_nonhermitian_charge_leaking_and_nonfinite_inputs() {
+        let mut nonhermitian = [[complex_zero(); 4]; 4];
+        nonhermitian[1][2] = Complex64::new(0.5, 0.2);
+        nonhermitian[2][1] = Complex64::new(0.5, 0.2);
+        assert!(matches!(
+            U1TwoSiteHamiltonian::new(nonhermitian, 1.0e-12),
+            Err(U1MpsError::TwoSiteHamiltonianHermiticityResidual { .. })
+        ));
+
+        let mut charge_leaking = [[complex_zero(); 4]; 4];
+        charge_leaking[0][1] = Complex64::new(0.1, 0.0);
+        charge_leaking[1][0] = Complex64::new(0.1, 0.0);
+        assert!(matches!(
+            U1TwoSiteHamiltonian::new(charge_leaking, 1.0e-12),
+            Err(U1MpsError::TwoSiteHamiltonianChargeLeakage { .. })
+        ));
+
+        let mut nonfinite = [[complex_zero(); 4]; 4];
+        nonfinite[2][2] = Complex64::new(f64::NAN, 0.0);
+        assert!(matches!(
+            U1TwoSiteHamiltonian::new(nonfinite, 1.0e-12),
+            Err(U1MpsError::NonFiniteTensorEntry { .. })
+        ));
+    }
+
+    #[test]
+    fn two_site_hamiltonian_exponential_rejects_nonfinite_time_step() {
+        let model = U1TwoSiteHamiltonian::new([[complex_zero(); 4]; 4], 1.0e-12).unwrap();
+        assert!(model.evolution_gate(f64::INFINITY, 1.0e-12).is_err());
+        assert!(model.evolution_gate(0.1, f64::NAN).is_err());
     }
 
     #[test]
