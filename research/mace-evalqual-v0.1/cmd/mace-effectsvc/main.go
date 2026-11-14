@@ -13,10 +13,21 @@ import (
 
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8087", "HTTP listen address")
-	journal := flag.String("journal", "./mace-effect-service.jsonl", "durable service journal path")
+	backend := flag.String("backend", "journal", "destination backend: journal or sqlite")
+	journal := flag.String("journal", "./mace-effect-service.jsonl", "append-only journal path when backend=journal")
+	database := flag.String("database", "./mace-effect-service.sqlite3", "SQLite database path when backend=sqlite (Linux+cgo)")
 	allowFaults := flag.Bool("allow-test-fault-injection", false, "allow deterministic post-commit acknowledgement-drop test header; never enable in production")
 	flag.Parse()
-	server, err := effectbridge.NewServer(*journal, *allowFaults)
+	var server *effectbridge.Server
+	var err error
+	switch *backend {
+	case "journal":
+		server, err = effectbridge.NewServer(*journal, *allowFaults)
+	case "sqlite":
+		server, err = effectbridge.NewSQLiteServer(*database, *allowFaults)
+	default:
+		fail(fmt.Errorf("unsupported backend %q (choose journal or sqlite)", *backend))
+	}
 	if err != nil {
 		fail(err)
 	}
