@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/u1_tebd_benchmark_result_v1.json",
+  "title": "Luminous U1 TEBD benchmark result",
+  "type": "object",
+  "required": [
+    "schema",
+    "fixture_schema",
+    "track",
+    "case_id",
+    "repeats",
+    "warmups",
+    "runtime_median_seconds",
+    "runtime_p95_seconds",
+    "records",
+    "host"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.u1_tebd_benchmark_result.v1"
+    },
+    "fixture_schema": {
+      "const": "luminous.u1_tebd_benchmark.v1"
+    },
+    "track": {
+      "enum": [
+        "fixed_bond",
+        "matched_error"
+      ]
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repeats": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "warmups": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "runtime_median_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "runtime_p95_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "implementation",
+          "case_id",
+          "site_count",
+          "total_charge",
+          "time_step",
+          "steps",
+          "gate_count",
+          "runtime_seconds",
+          "renormalization"
+        ],
+        "properties": {
+          "implementation": {
+            "enum": [
+              "quimb.CircuitMPS",
+              "ITensorMPS",
+              "symthaea-frontier-physics::U1TeBDStrangStepper"
+            ]
+          },
+          "case_id": {
+            "type": "string"
+          },
+          "site_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "total_charge": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "time_step": {
+            "type": "number"
+          },
+          "steps": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "gate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "runtime_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "gate_throughput_per_second": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cutoff": {
+            "type": "number",
+            "minimum": 0
+          },
+          "cutoff_mode": {
+            "type": "string"
+          },
+          "max_bond": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxdim": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observed_max_bond": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "input_norm_squared": {
+            "type": "number",
+            "minimum": 0
+          },
+          "output_norm_squared": {
+            "type": "number",
+            "minimum": 0
+          },
+          "norm_drift": {
+            "type": "number",
+            "minimum": 0
+          },
+          "dense_discrete_oracle": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "continuous_time_oracle": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "charge_metrics": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "canonical_gauge_max_residual": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "selection_rule_residual": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "global_state_error_bound_qualified": {
+            "type": "boolean"
+          },
+          "cumulative_local_l2_error_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cumulative_global_l2_error_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "host": {
+      "type": "object"
+    },
+    "additionalProperties": true
+  },
+  "additionalProperties": true
+}

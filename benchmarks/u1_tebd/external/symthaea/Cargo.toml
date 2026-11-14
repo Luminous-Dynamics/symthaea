@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-u1-tebd-benchmark"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+nalgebra = "=0.34.2"
+num-complex = "=0.4.6"
+serde_json = "=1.0.145"

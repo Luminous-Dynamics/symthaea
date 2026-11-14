@@ -1,0 +1,1509 @@
+{
+  "schema": "luminous.u1_tebd_benchmark.v1",
+  "fixture_version": 1,
+  "conventions": {
+    "basis_order": [
+      "00",
+      "01",
+      "10",
+      "11"
+    ],
+    "site_bit_order": "most_significant_site_first",
+    "bit_charge": {
+      "0": 0,
+      "1": 1
+    },
+    "Hamiltonian": "H_j = mu_left*n_j + mu_right*n_(j+1) + V*n_j*n_(j+1) + h*|01><10| + conj(h)*|10><01|",
+    "gate": "G_j(tau) = exp(-i*tau*H_j)",
+    "strang_order": [
+      "even_dt_over_2",
+      "odd_dt",
+      "even_dt_over_2"
+    ],
+    "renormalization": "disabled"
+  },
+  "comparison_tracks": {
+    "fixed_bond": {
+      "max_bond_dimension": 16,
+      "relative_singular_value_cutoff": 0,
+      "quimb": {
+        "cutoff": 0,
+        "cutoff_mode": "rel",
+        "renorm": 0
+      },
+      "itensor": {
+        "cutoff": 0,
+        "maxdim": 16
+      }
+    },
+    "matched_error": {
+      "target_state_l2": [
+        0.0001,
+        0.000001,
+        1e-8
+      ],
+      "max_bond_dimension": 256,
+      "mode": "tune_native_cutoff_until_measured_dense_oracle_error_is_at_or_below_target"
+    }
+  },
+  "cases": [
+    {
+      "id": "u1-two-site-hopping-known-answer",
+      "family": "known_answer",
+      "site_count": 2,
+      "initial_bits": [
+        1,
+        0
+      ],
+      "total_charge": 1,
+      "bonds": [
+        {
+          "bond_index": 0,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0,
+          "hopping": {
+            "re": 1,
+            "im": 0
+          }
+        }
+      ],
+      "time_step": 0.125,
+      "steps": 4,
+      "max_bond_dimension": 2,
+      "relative_singular_value_cutoff": 0,
+      "oracle": {
+        "discrete_dense": true,
+        "continuous_dense": true,
+        "analytic_solution": "|10> -> cos(J*t)|10> - i*sin(J*t)|01> for H=J(|01><10|+|10><01|)"
+      },
+      "acceptance": {
+        "discrete_l2_max": 1e-12,
+        "charge_leakage_probability_max": 1e-12,
+        "norm_drift_max": 1e-12
+      }
+    },
+    {
+      "id": "u1-three-site-analytic-strang",
+      "family": "trotter_order",
+      "site_count": 3,
+      "initial_bits": [
+        1,
+        0,
+        0
+      ],
+      "total_charge": 1,
+      "bonds": [
+        {
+          "bond_index": 0,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0,
+          "hopping": {
+            "re": 1,
+            "im": 0
+          }
+        },
+        {
+          "bond_index": 1,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0,
+          "hopping": {
+            "re": 1,
+            "im": 0
+          }
+        }
+      ],
+      "time_step": 0.05,
+      "steps": 10,
+      "max_bond_dimension": 4,
+      "relative_singular_value_cutoff": 0,
+      "refinement_steps": [
+        10,
+        20,
+        40
+      ],
+      "oracle": {
+        "discrete_dense": true,
+        "continuous_dense": true
+      },
+      "acceptance": {
+        "strang_refinement_ratio_min": 3.5,
+        "strang_refinement_ratio_max": 4.5,
+        "dense_discrete_l2_max": 1e-10
+      }
+    },
+    {
+      "id": "u1-eight-site-domain-wall",
+      "family": "mid_scale_dense_oracle",
+      "site_count": 8,
+      "initial_bits": [
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_charge": 4,
+      "bonds": [
+        {
+          "bond_index": 0,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        },
+        {
+          "bond_index": 1,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        },
+        {
+          "bond_index": 2,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        },
+        {
+          "bond_index": 3,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        },
+        {
+          "bond_index": 4,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        },
+        {
+          "bond_index": 5,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        },
+        {
+          "bond_index": 6,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.3,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.15
+          }
+        }
+      ],
+      "time_step": 0.02,
+      "steps": 25,
+      "max_bond_dimension": 32,
+      "relative_singular_value_cutoff": 1e-8,
+      "oracle": {
+        "discrete_dense": true,
+        "continuous_dense": true
+      },
+      "acceptance": {
+        "dense_discrete_l2_max": 0.000001,
+        "charge_leakage_probability_max": 1e-10
+      }
+    },
+    {
+      "id": "u1-sixteen-site-domain-wall",
+      "family": "scaling",
+      "site_count": 16,
+      "initial_bits": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_charge": 8,
+      "bonds": [
+        {
+          "bond_index": 0,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 1,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 2,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 3,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 4,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 5,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 6,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 7,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 8,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 9,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 10,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 11,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 12,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 13,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 14,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        }
+      ],
+      "time_step": 0.02,
+      "steps": 20,
+      "max_bond_dimension": 64,
+      "relative_singular_value_cutoff": 1e-8,
+      "oracle": {
+        "discrete_dense": false,
+        "continuous_dense": false
+      },
+      "acceptance": {
+        "max_bond_dimension": 64,
+        "norm_drift_max": 1e-8,
+        "charge_leakage_probability_max": 1e-10
+      }
+    },
+    {
+      "id": "u1-thirty-two-site-domain-wall",
+      "family": "scaling",
+      "site_count": 32,
+      "initial_bits": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_charge": 16,
+      "bonds": [
+        {
+          "bond_index": 0,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 1,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 2,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 3,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 4,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 5,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 6,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 7,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 8,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 9,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 10,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 11,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 12,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 13,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 14,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 15,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 16,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 17,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 18,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 19,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 20,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 21,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 22,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 23,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 24,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 25,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 26,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 27,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 28,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 29,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 30,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        }
+      ],
+      "time_step": 0.01,
+      "steps": 20,
+      "max_bond_dimension": 128,
+      "relative_singular_value_cutoff": 1e-8,
+      "oracle": {
+        "discrete_dense": false,
+        "continuous_dense": false
+      },
+      "acceptance": {
+        "max_bond_dimension": 128,
+        "norm_drift_max": 1e-7,
+        "charge_leakage_probability_max": 1e-9
+      }
+    },
+    {
+      "id": "u1-sixty-four-site-domain-wall",
+      "family": "scaling",
+      "site_count": 64,
+      "initial_bits": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_charge": 32,
+      "bonds": [
+        {
+          "bond_index": 0,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 1,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 2,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 3,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 4,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 5,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 6,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 7,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 8,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 9,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 10,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 11,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 12,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 13,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 14,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 15,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 16,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 17,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 18,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 19,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 20,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 21,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 22,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 23,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 24,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 25,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 26,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 27,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 28,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 29,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 30,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 31,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 32,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 33,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 34,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 35,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 36,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 37,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 38,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 39,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 40,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 41,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 42,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 43,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 44,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 45,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 46,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 47,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 48,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 49,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 50,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 51,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 52,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 53,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 54,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 55,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 56,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 57,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 58,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 59,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 60,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 61,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        },
+        {
+          "bond_index": 62,
+          "mu_left": 0,
+          "mu_right": 0,
+          "density_interaction": 0.2,
+          "hopping": {
+            "re": 0.7,
+            "im": 0.1
+          }
+        }
+      ],
+      "time_step": 0.005,
+      "steps": 20,
+      "max_bond_dimension": 256,
+      "relative_singular_value_cutoff": 1e-8,
+      "oracle": {
+        "discrete_dense": false,
+        "continuous_dense": false
+      },
+      "acceptance": {
+        "max_bond_dimension": 256,
+        "norm_drift_max": 0.000001,
+        "charge_leakage_probability_max": 1e-8
+      }
+    }
+  ]
+}
