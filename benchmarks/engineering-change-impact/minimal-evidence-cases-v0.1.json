@@ -100,7 +100,159 @@
         "E-A1",
         "E-A1-COPY",
         "E-B"
-      ]
+      ],
+      "candidate_worlds": [
+        {
+          "world_id": "BASELINE",
+          "target_configuration": "CFG-7",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "evidence": [
+            {
+              "id": "E-A1",
+              "root_id": "ROOT-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            },
+            {
+              "id": "E-A1-COPY",
+              "root_id": "ROOT-A",
+              "derived_from": [
+                "E-A1"
+              ],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            },
+            {
+              "id": "E-B",
+              "root_id": "ROOT-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            },
+            {
+              "id": "E-C",
+              "root_id": "ROOT-C",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-A1",
+            "E-A1-COPY",
+            "E-B"
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "bearing_fatigue_margin": [
+                [
+                  "ROOT-A",
+                  "ROOT-B"
+                ],
+                [
+                  "ROOT-A",
+                  "ROOT-C"
+                ],
+                [
+                  "ROOT-B",
+                  "ROOT-C"
+                ]
+              ]
+            }
+          }
+        },
+        {
+          "world_id": "REDUNDANT_COPY_REMOVED",
+          "target_configuration": "CFG-7",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "evidence": [
+            {
+              "id": "E-A1",
+              "root_id": "ROOT-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            },
+            {
+              "id": "E-A1-COPY",
+              "root_id": "ROOT-A",
+              "derived_from": [
+                "E-A1"
+              ],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            },
+            {
+              "id": "E-B",
+              "root_id": "ROOT-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            },
+            {
+              "id": "E-C",
+              "root_id": "ROOT-C",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "CFG-7",
+              "supports": [
+                "bearing_fatigue_margin"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-A1",
+            "E-B"
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "bearing_fatigue_margin": [
+                [
+                  "ROOT-A",
+                  "ROOT-B"
+                ],
+                [
+                  "ROOT-A",
+                  "ROOT-C"
+                ],
+                [
+                  "ROOT-B",
+                  "ROOT-C"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "expected_intervention_relation": "invariant"
     },
     {
       "id": "ME-NEG-001",
@@ -333,7 +485,95 @@
       "candidate_visible_evidence_ids": [
         "E-BOLT-A",
         "E-BOLT-B"
-      ]
+      ],
+      "candidate_worlds": [
+        {
+          "world_id": "BASELINE_CONFIGURATION_MATCH",
+          "target_configuration": "JOINT-NEW",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "evidence": [
+            {
+              "id": "E-BOLT-A",
+              "root_id": "BOLT-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "JOINT-NEW",
+              "supports": [
+                "bolt_preload_limit"
+              ]
+            },
+            {
+              "id": "E-BOLT-B",
+              "root_id": "BOLT-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "JOINT-NEW",
+              "content_digest": "same-content-digest",
+              "supports": [
+                "bolt_preload_limit"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-BOLT-A",
+            "E-BOLT-B"
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "preserve",
+            "sufficient_root_sets_by_predicate": {
+              "bolt_preload_limit": [
+                [
+                  "BOLT-A",
+                  "BOLT-B"
+                ]
+              ]
+            }
+          }
+        },
+        {
+          "world_id": "IDENTICAL_CONTENT_WRONG_CONFIGURATION",
+          "target_configuration": "JOINT-NEW",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "evidence": [
+            {
+              "id": "E-BOLT-A",
+              "root_id": "BOLT-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "JOINT-NEW",
+              "supports": [
+                "bolt_preload_limit"
+              ]
+            },
+            {
+              "id": "E-BOLT-B",
+              "root_id": "BOLT-B",
+              "derived_from": [],
+              "admissibility": "inadmissible_scope",
+              "configuration": "JOINT-OLD",
+              "content_digest": "same-content-digest",
+              "supports": [
+                "bolt_preload_limit"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-BOLT-A",
+            "E-BOLT-B"
+          ],
+          "expected": {
+            "state": "unsupported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "bolt_preload_limit": []
+            }
+          }
+        }
+      ],
+      "expected_intervention_relation": "flip"
     },
     {
       "id": "ME-POS-002",
@@ -392,7 +632,100 @@
       "candidate_visible_evidence_ids": [
         "E-PRESS-A",
         "E-PRESS-B"
-      ]
+      ],
+      "candidate_worlds": [
+        {
+          "world_id": "BASELINE",
+          "target_configuration": "VESSEL-2",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "evidence": [
+            {
+              "id": "E-PRESS-A",
+              "root_id": "PRESS-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "pressure_boundary_integrity"
+              ]
+            },
+            {
+              "id": "E-PRESS-B",
+              "root_id": "PRESS-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "pressure_boundary_integrity"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-PRESS-A",
+            "E-PRESS-B"
+          ],
+          "irrelevant_evidence_injection_count": 0,
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "pressure_boundary_integrity": [
+                [
+                  "PRESS-A",
+                  "PRESS-B"
+                ]
+              ]
+            }
+          }
+        },
+        {
+          "world_id": "FORTY_IRRELEVANT_RECORDS_INJECTED",
+          "target_configuration": "VESSEL-2",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+          "evidence": [
+            {
+              "id": "E-PRESS-A",
+              "root_id": "PRESS-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "pressure_boundary_integrity"
+              ]
+            },
+            {
+              "id": "E-PRESS-B",
+              "root_id": "PRESS-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "pressure_boundary_integrity"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-PRESS-A",
+            "E-PRESS-B"
+          ],
+          "irrelevant_evidence_injection_count": 40,
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "pressure_boundary_integrity": [
+                [
+                  "PRESS-A",
+                  "PRESS-B"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "expected_intervention_relation": "invariant"
     },
     {
       "id": "ME-POS-003",
@@ -506,7 +839,19 @@
           "candidate_visible_evidence_ids": [
             "E-TORQUE-A",
             "E-TORQUE-B"
-          ]
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "actuator_torque_envelope": [
+                [
+                  "TORQUE-A",
+                  "TORQUE-B"
+                ]
+              ]
+            }
+          }
         },
         {
           "world_id": "SUBSTITUTED",
@@ -538,7 +883,19 @@
           "candidate_visible_evidence_ids": [
             "E-TORQUE-A",
             "E-TORQUE-C"
-          ]
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "actuator_torque_envelope": [
+                [
+                  "TORQUE-A",
+                  "TORQUE-C"
+                ]
+              ]
+            }
+          }
         }
       ],
       "expected": {
@@ -618,50 +975,163 @@
       "candidate_visible_evidence_ids": [
         "E-SEISMIC-A",
         "E-SEISMIC-UNK"
-      ]
+      ],
+      "candidate_worlds": [
+        {
+          "world_id": "UNKNOWN_PROVENANCE",
+          "target_configuration": "ANCHOR-5",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "evidence": [
+            {
+              "id": "E-SEISMIC-A",
+              "root_id": "SEISMIC-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ANCHOR-5",
+              "supports": [
+                "seismic_anchor_capacity"
+              ]
+            },
+            {
+              "id": "E-SEISMIC-UNK",
+              "root_id": null,
+              "derived_from": [],
+              "admissibility": "unknown_provenance",
+              "configuration": "ANCHOR-5",
+              "supports": [
+                "seismic_anchor_capacity"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-SEISMIC-A",
+            "E-SEISMIC-UNK"
+          ],
+          "expected": {
+            "state": "indeterminate",
+            "action": "request_evidence",
+            "sufficient_root_sets_by_predicate": {
+              "seismic_anchor_capacity": []
+            }
+          }
+        },
+        {
+          "world_id": "INDEPENDENT_ROOT_QUALIFIED",
+          "target_configuration": "ANCHOR-5",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "evidence": [
+            {
+              "id": "E-SEISMIC-A",
+              "root_id": "SEISMIC-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ANCHOR-5",
+              "supports": [
+                "seismic_anchor_capacity"
+              ]
+            },
+            {
+              "id": "E-SEISMIC-B",
+              "root_id": "SEISMIC-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "ANCHOR-5",
+              "supports": [
+                "seismic_anchor_capacity"
+              ]
+            }
+          ],
+          "candidate_visible_evidence_ids": [
+            "E-SEISMIC-A",
+            "E-SEISMIC-B"
+          ],
+          "expected": {
+            "state": "supported",
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "seismic_anchor_capacity": [
+                [
+                  "SEISMIC-A",
+                  "SEISMIC-B"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "expected_intervention_relation": "flip"
     }
   ],
   "intervention_pairs": [
     {
       "id": "ME-PAIR-001",
       "case_id": "ME-POS-001",
+      "baseline_world_id": "BASELINE",
+      "intervention_world_id": "REDUNDANT_COPY_REMOVED",
       "intervention": "remove E-A1-COPY while E-A1 and E-B remain",
       "expected_relation": "invariant",
+      "expected_baseline_state": "supported",
+      "expected_intervention_state": "supported",
       "expected_action": "revalidate"
     },
     {
       "id": "ME-PAIR-002",
       "case_id": "ME-NEG-002",
-      "intervention": "remove E-THERM-B from the frozen candidate-visible evidence inventory and source manifest",
+      "baseline_world_id": "BASELINE",
+      "intervention_world_id": "LAST_SUPPORT_REMOVED",
+      "intervention": "remove the final independent root E-THERM-B from the frozen source inventory",
       "expected_relation": "flip",
+      "expected_baseline_state": "supported",
+      "expected_intervention_state": "unsupported",
+      "expected_baseline_action": "revalidate",
       "expected_action": "hold"
     },
     {
       "id": "ME-PAIR-003",
       "case_id": "ME-POS-002",
-      "intervention": "inject the frozen irrelevant evidence batch",
+      "baseline_world_id": "BASELINE",
+      "intervention_world_id": "FORTY_IRRELEVANT_RECORDS_INJECTED",
+      "intervention": "inject forty irrelevant records without changing the source inventory or support roots",
       "expected_relation": "invariant",
+      "expected_baseline_state": "supported",
+      "expected_intervention_state": "supported",
       "expected_action": "revalidate"
     },
     {
       "id": "ME-PAIR-004",
       "case_id": "ME-NEG-003",
-      "intervention": "apply the wrong-configuration gate to E-BOLT-B",
+      "baseline_world_id": "BASELINE_CONFIGURATION_MATCH",
+      "intervention_world_id": "IDENTICAL_CONTENT_WRONG_CONFIGURATION",
+      "intervention": "change E-BOLT-B to the old configuration while keeping identical content bytes",
       "expected_relation": "flip",
+      "expected_baseline_state": "supported",
+      "expected_intervention_state": "unsupported",
+      "expected_baseline_action": "preserve",
       "expected_action": "revalidate"
     },
     {
       "id": "ME-PAIR-005",
       "case_id": "ME-UNK-001",
-      "intervention": "replace unknown provenance with independently qualified root SEISMIC-B",
+      "baseline_world_id": "UNKNOWN_PROVENANCE",
+      "intervention_world_id": "INDEPENDENT_ROOT_QUALIFIED",
+      "intervention": "replace unknown provenance with a separately qualified independent root SEISMIC-B",
       "expected_relation": "flip",
+      "expected_baseline_state": "indeterminate",
+      "expected_intervention_state": "supported",
+      "expected_baseline_action": "request_evidence",
       "expected_action": "revalidate"
     },
     {
       "id": "ME-PAIR-006",
       "case_id": "ME-POS-004",
+      "baseline_world_id": "BASE",
+      "intervention_world_id": "SUBSTITUTED",
       "intervention": "replace independent root TORQUE-B with independent root TORQUE-C",
       "expected_relation": "invariant",
+      "expected_baseline_state": "supported",
+      "expected_intervention_state": "supported",
       "expected_action": "revalidate"
     }
   ],
