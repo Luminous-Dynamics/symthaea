@@ -770,7 +770,7 @@ mod tests {
 // -----------------------------------------------------------------------------
 
 use sha2::{Digest as ShaDigest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
@@ -2084,6 +2084,70 @@ mod materialization_tests {
                 MusicEditMaterializationIssueV1::CrossLineageExactAudioDuplicate { .. }
             ))
         ));
+    }
+
+
+    #[test]
+    fn each_declared_sample_artifact_role_checks_actual_bytes() {
+        let cases = [
+            (
+                "samples/one/instruction.txt",
+                MusicEditMaterializedArtifactRoleV1::Instruction,
+            ),
+            (
+                "samples/one/target.wav",
+                MusicEditMaterializedArtifactRoleV1::TargetAudio,
+            ),
+            (
+                "samples/one/source.mid",
+                MusicEditMaterializedArtifactRoleV1::SourceSymbolic,
+            ),
+            (
+                "samples/one/selector.json",
+                MusicEditMaterializedArtifactRoleV1::TargetSelector,
+            ),
+            (
+                "samples/one/metadata.json",
+                MusicEditMaterializedArtifactRoleV1::Metadata,
+            ),
+        ];
+        for (relative_path, expected_role) in cases {
+            let root = TestRoot::new();
+            let (manifest, artifact_map) = manifest_and_map(&root);
+            fs::write(root.0.join(relative_path), b"mutated artifact bytes").unwrap();
+            let result = materialize_music_edit_dataset_v1(
+                &root.0,
+                &manifest,
+                &artifact_map,
+                MusicEditMaterializationLimitsV1::default(),
+            );
+            assert!(matches!(
+                result,
+                Err(issues) if issues.iter().any(|issue| matches!(
+                    issue,
+                    MusicEditMaterializationIssueV1::DigestMismatch { role, .. }
+                        if role == &expected_role
+                ))
+            ), "mutation was not rejected for {expected_role:?}");
+        }
+    }
+
+    #[test]
+    fn duplicate_and_unexpected_artifact_map_rows_reject() {
+        let root = TestRoot::new();
+        let (manifest, mut artifact_map) = manifest_and_map(&root);
+        artifact_map.rows.push(artifact_map.rows[0].clone());
+        assert!(validate_music_edit_artifact_map_v1(&manifest, &artifact_map)
+            .contains(&MusicEditMaterializationIssueV1::DuplicateArtifactMapSample {
+                sample_id: "sample-one".to_owned()
+            }));
+
+        artifact_map.rows.pop();
+        artifact_map.rows[0].sample_id = "unlisted-sample".to_owned();
+        assert!(validate_music_edit_artifact_map_v1(&manifest, &artifact_map)
+            .contains(&MusicEditMaterializationIssueV1::UnexpectedArtifactMapSample {
+                sample_id: "unlisted-sample".to_owned()
+            }));
     }
 
     #[test]
