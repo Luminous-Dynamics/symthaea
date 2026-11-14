@@ -1,0 +1,248 @@
+{
+  "schema": "luminous.airroad.adaptive_falsification_budget.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_finite_action_power_ceiling_and_hard_set_sequence_reference",
+  "claim_class": "statistical_power_ceiling_plus_deterministic_set_separation",
+  "statistical": {
+    "action_ids": [
+      "A",
+      "B"
+    ],
+    "outcome_space": [
+      0,
+      1
+    ],
+    "truth": {
+      "A": {
+        "success_probability": {
+          "numerator": "1",
+          "denominator": "5"
+        }
+      },
+      "B": {
+        "success_probability": {
+          "numerator": "1",
+          "denominator": "5"
+        }
+      }
+    },
+    "null_parameters": {
+      "theta_1": {
+        "A": {
+          "success_probability": {
+            "numerator": "1",
+            "denominator": "5"
+          }
+        },
+        "B": {
+          "success_probability": {
+            "numerator": "4",
+            "denominator": "5"
+          }
+        }
+      },
+      "theta_2": {
+        "A": {
+          "success_probability": {
+            "numerator": "4",
+            "denominator": "5"
+          }
+        },
+        "B": {
+          "success_probability": {
+            "numerator": "1",
+            "denominator": "5"
+          }
+        }
+      }
+    },
+    "designs": [
+      {
+        "id": "A_only",
+        "proportions": {
+          "A": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "B": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      },
+      {
+        "id": "B_only",
+        "proportions": {
+          "A": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "B": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      },
+      {
+        "id": "balanced",
+        "proportions": {
+          "A": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "B": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        }
+      }
+    ],
+    "test_target": {
+      "alpha": {
+        "numerator": "1",
+        "denominator": "20"
+      },
+      "power": {
+        "numerator": "4",
+        "denominator": "5"
+      },
+      "beta": {
+        "numerator": "1",
+        "denominator": "5"
+      }
+    },
+    "expected": {
+      "D_A_only": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "D_B_only": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "D_balanced_symbolic": "3/10 * ln(4)",
+      "D_balanced_decimal": "0.4158883083359671856503392728749059408453000806161531525",
+      "binary_kl_power_vs_alpha_decimal": "1.9064420541825150219002301508718649376243246314370931511",
+      "T4_times_D_decimal": "1.6635532333438687426013570914996237633812003224646126099",
+      "T5_times_D_decimal": "2.0794415416798359282516963643745297042265004030807657624",
+      "necessary_horizon_lower_bound_decimal": "4.5840241621854715020688268590310551924354974767794886618",
+      "first_integer_horizon_not_ruled_out": 5,
+      "T4_fails_necessary_condition": true,
+      "T5_meets_necessary_condition_not_guarantee": true,
+      "zero_information_design_power_ceiling": "alpha"
+    }
+  },
+  "deterministic_sequence": {
+    "action_ids": [
+      "A",
+      "B"
+    ],
+    "observation_values": {
+      "A": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "B": {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    },
+    "measurement_error": {
+      "semantics": "deterministic_hard_exact",
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    },
+    "calibration": {
+      "nuisance_id": "campaign-shared-calibration-001",
+      "scope": "same_single_coordinate_across_A_and_B",
+      "lower": {
+        "numerator": "-1",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    },
+    "candidate_models": {
+      "H1": {
+        "predictions": {
+          "A": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "B": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      },
+      "H2": {
+        "predictions": {
+          "A": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "B": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      }
+    },
+    "expected": {
+      "action_A_candidates": [
+        "H1",
+        "H2"
+      ],
+      "action_B_candidates": [
+        "H1",
+        "H2"
+      ],
+      "joint_shared_calibration_candidates": [],
+      "joint_action_local_calibration_counterfactual_candidates": [
+        "H1",
+        "H2"
+      ],
+      "each_single_action_leaves_both_candidates": true,
+      "joint_shared_sequence_falsifies_all_candidates": true
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "A-only-policy-zero-own-design-divergence",
+      "expected": "power-at-most-alpha"
+    },
+    {
+      "id": "B-only-policy-zero-own-design-divergence",
+      "expected": "power-at-most-alpha"
+    },
+    {
+      "id": "positive-power-ceiling-promoted-to-guaranteed-power",
+      "expected": "reject-claim"
+    },
+    {
+      "id": "balanced-design-ceiling-claimed-as-achieved-power",
+      "expected": "reject-claim"
+    },
+    {
+      "id": "shared-calibration-reset-per-action",
+      "expected": "reject-dependency-model"
+    },
+    {
+      "id": "single-action-claimed-to-falsify-composite-model-family",
+      "expected": "reject-claim"
+    }
+  ],
+  "claim_ceiling": [
+    "The finite-action D(nu) quantity is a necessary power ceiling under the declared statistical model, not an achievable-power guarantee.",
+    "The deterministic sequence reference uses one exact shared calibration coordinate and zero measurement error.",
+    "No statistical detector, adaptive control law, physical experiment or controller stability result is implemented."
+  ]
+}
