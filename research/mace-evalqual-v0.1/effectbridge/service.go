@@ -243,7 +243,7 @@ func VerifyReceiptForRequest(receipt Receipt, req Request) error {
 }
 
 func validateReceipt(receipt Receipt, expectedSequence uint64, expectedPrevious string) error {
-	if receipt.SchemaVersion != SchemaVersion || (receipt.DurabilityMode != DurabilityMode && receipt.DurabilityMode != SQLiteDurabilityMode) || receipt.Sequence == 0 || receipt.Sequence != expectedSequence {
+	if receipt.SchemaVersion != SchemaVersion || receipt.DurabilityMode != DurabilityMode || receipt.Sequence == 0 || receipt.Sequence != expectedSequence {
 		return errors.New("schema or contiguous sequence mismatch")
 	}
 	if receipt.IdempotencyKey == "" || receipt.Principal == "" || receipt.Target == "" {
@@ -447,25 +447,10 @@ func (j *Journal) Close() error {
 	return errors.Join(unlockErr, closeErr)
 }
 
-type terminalStore interface {
-	Append(Request) (Receipt, bool, error)
-	Fence(Request) (Receipt, bool, error)
-	Lookup(string) Reconciliation
-	Close() error
-}
-
 type Server struct {
 	journal             *Journal
-	store               terminalStore
 	allowFaultInjection bool
 	http                *http.Server
-}
-
-func (s *Server) terminalStore() terminalStore {
-	if s.store != nil {
-		return s.store
-	}
-	return s.journal
 }
 
 func NewServer(journalPath string, allowFaultInjection bool) (*Server, error) {
@@ -473,29 +458,14 @@ func NewServer(journalPath string, allowFaultInjection bool) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	server := &Server{journal: journal, store: journal, allowFaultInjection: allowFaultInjection}
-	return newHTTPServer(server), nil
-}
-
-// NewSQLiteServer uses one native SQLite transaction for the modeled business
-// effect row and its idempotency/fence terminal record. It is Linux+cgo only.
-func NewSQLiteServer(databasePath string, allowFaultInjection bool) (*Server, error) {
-	store, err := OpenSQLiteStore(databasePath)
-	if err != nil {
-		return nil, err
-	}
-	server := &Server{store: store, allowFaultInjection: allowFaultInjection}
-	return newHTTPServer(server), nil
-}
-
-func newHTTPServer(server *Server) *Server {
+	server := &Server{journal: journal, allowFaultInjection: allowFaultInjection}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", server.handleHealth)
 	mux.HandleFunc("/v1/effects", server.handleEffect)
 	mux.HandleFunc("/v1/reconcile/", server.handleReconcile)
 	mux.HandleFunc("/v1/fence/", server.handleFence)
 	server.http = &http.Server{Handler: mux, ReadHeaderTimeout: 2 * time.Second, MaxHeaderBytes: 16 * 1024}
-	return server
+	return server, nil
 }
 
 func (s *Server) Serve(listener net.Listener) error {
@@ -503,14 +473,8 @@ func (s *Server) Serve(listener net.Listener) error {
 }
 
 func (s *Server) Close() error {
-	if s.http != nil {
-		_ = s.http.Close()
-	}
-	store := s.terminalStore()
-	if store == nil {
-		return nil
-	}
-	return store.Close()
+	_ = s.http.Close()
+	return s.journal.Close()
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -550,7 +514,7 @@ func (s *Server) handleEffect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fault injection not permitted", http.StatusForbidden)
 		return
 	}
-	receipt, duplicate, err := s.terminalStore().Append(req)
+	receipt, duplicate, err := s.journal.Append(req)
 	if errors.Is(err, ErrIntentConflict) || errors.Is(err, ErrFenced) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -588,7 +552,7 @@ func (s *Server) handleReconcile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid idempotency key", http.StatusBadRequest)
 		return
 	}
-	result := s.terminalStore().Lookup(key)
+	result := s.journal.Lookup(key)
 	if result.Status == "indeterminate" {
 		writeJSON(w, http.StatusServiceUnavailable, result)
 		return
@@ -630,7 +594,7 @@ func (s *Server) handleFence(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "fault injection not permitted", http.StatusForbidden)
 		return
 	}
-	_, duplicate, err := s.terminalStore().Fence(req)
+	_, duplicate, err := s.journal.Fence(req)
 	if errors.Is(err, ErrIntentConflict) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -654,7 +618,7 @@ func (s *Server) handleFence(w http.ResponseWriter, r *http.Request) {
 	if duplicate {
 		status = http.StatusOK
 	}
-	writeJSON(w, status, s.terminalStore().Lookup(key))
+	writeJSON(w, status, s.journal.Lookup(key))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
