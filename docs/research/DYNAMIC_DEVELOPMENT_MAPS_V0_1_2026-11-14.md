@@ -350,7 +350,7 @@ Report confidence intervals, per-relation/task-family breakdowns, cost, latency,
 
 A standalone Rust crate has been authored at `tools/development-map-validator/`. It is deliberately outside the root workspace, has its own Cargo workspace, reads one JSON file, and never follows source URLs or executes repository commands. Its current contract checks include graph references, provenance/lifecycle shape, evidence invalidation/supersession, authority promotion, event targets, containment cycles, and decision-time evidence availability. It uses RFC 3339 timestamp parsing for decision-time comparisons.
 
-The crate includes 14 authored unit-test cases for the public temporal fixtures and adversarial mutations. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
+The crate now contains 30 authored unit-test cases across map-snapshot, decision-time authority and federation-manifest checks. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
 
 A second public known-answer fixture now exists:
 
@@ -360,11 +360,11 @@ A second public known-answer fixture now exists:
 
 It models a decision made at 10:00Z. Evidence E1 was available by the cutoff and is cited. Evidence E2 describes a test that completed at 09:10Z but was not observed until 11:30Z and available to the actor until 11:45Z, so it cannot support the 10:00Z decision. A correction at 11:50Z later makes E1 stale in the current map, while the historical decision record remains intact and continues to state that E1 was admissible at decision time.
 
-The fixture has five graph nodes, five edges, six events and eight authored negative controls. Runner-independent checks re-fetched the artifacts and checked unique node/event IDs, graph/event references, provenance field presence, schema-local reference resolution, the late-arrival timing relationships, the decision event's timestamp/cutoff, and the later invalidation linkage. These are structural and arithmetic checks over the authored JSON, not Rust test execution, a full JSON Schema validator or independent benchmark qualification.
+The fixture now has six graph nodes, six edges and seven events, including an explicit synthetic owner-authority evidence node and a preceding `authority_evidence_recorded` event. It retains the 10:00Z decision, E1 available before the decision, backdated-but-late E2 (test occurred 09:10Z but actor availability 11:45Z), and the 11:50Z correction that later invalidates E1. Its expected-results file contains 16 authored negative controls, including actor/scope/policy mismatch, late or expired authority evidence, missing owner-authority event and owner-record projection mismatch. The authority record URI is deliberately synthetic and source-declared; it is not a real Mycelix grant, signature or authenticated permission. Runner-independent checks re-fetched the artifacts and checked unique node/event IDs, graph/event references, provenance field presence, schema-local reference resolution, the late-arrival and authority timing relationships, the decision event's timestamp/cutoff, the owner-authority evidence reference/event/node binding, and the later invalidation linkage. These are structural and arithmetic checks over the authored JSON, not Rust test execution, a full JSON Schema validator or independent benchmark qualification.
 
 ### Runner-independent temporal fixture increment — 2026-11-14
 
-A first public known-answer fixture was added at:
+A first public known-answer temporal invalidation fixture was added at:
 
 - `docs/development-map/fixtures/temporal-evidence-invalidation-v0.1.map.json`
 - `docs/development-map/fixtures/temporal-evidence-invalidation-v0.1.expected.json`
@@ -383,18 +383,18 @@ The provisional snapshot schema now accepts an optional event slice with separat
 
 The fixture is public and deliberately not a sealed benchmark. Its identifiers are synthetic placeholders, not real Git object hashes or cryptographic attestations.
 
-A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection, temporal invalidation fixture and decision-time admissibility fixture were checked against the v0.1 contract's required fields, enumerations, provenance/lifecycle structure, event targets, edge endpoints, decision-time cutoffs and local references. The selected structural checks reported **zero findings across all four maps**. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
+A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection, Symtropy architecture projection, Sol Atlas source projection, temporal invalidation fixture, decision-time admissibility fixture and four-project federation manifest were checked against the provisional v0.1 contracts' selected required fields, enumerations, provenance/lifecycle structure, event/graph references, decision-time cutoffs, exact artifact pins and local schema references. Selected structural checks reported **zero findings**. These checks are not a full JSON Schema 2020-12 implementation, Rust execution, authenticated Git verification or independent qualification. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
 
-### Four-repository adoption and federated index — 2026-11-14
+### Four-repository adoption and federated directory — 2026-11-14
 
 Four bounded, repository-local source projections now exist on separate draft branches:
 
-| Project | Local map | Pinned source revision | Initial graph |
+| Project | Local map | Pinned source revision | Graph |
 |---|---|---|---:|
 | Symthaea | `docs/development-map/readme-and-workstreams-v0.1.json` | `dcffe1060ece4815cf42548a8f646cec4f075535` | 13 nodes / 18 edges |
 | Mycelix | `docs/development-map/source-declared-maturity-v0.1.json` | `6089a68430a501c51934c2c4107061c2a2cb5565` | 17 nodes / 14 edges |
 | Symtropy | `docs/development-map/source-declared-architecture-v0.1.json` | `aea5d824b31dd949c7b24680d27c9041d025db85` | 20 nodes / 29 edges |
-| Sol Atlas | `docs/development-map/source-declared-demo-architecture-v0.1.json` | `1af10d891410cce31c1d4037e7c7129c16db5834` | 24 nodes / 32 edges |
+| Sol Atlas | `docs/development-map/source-declared-demo-architecture-v0.1.json` | `1af10d891410cce31c1d4037e7c7129c16db5834` | 41 nodes / 51 edges |
 
 Project review tracks:
 - Symthaea: [#12024](https://github.com/Luminous-Dynamics/symthaea/pull/12024)
@@ -402,11 +402,16 @@ Project review tracks:
 - Symtropy: [#5134](https://github.com/Luminous-Dynamics/symtropy/pull/5134), tracked by [#5132](https://github.com/Luminous-Dynamics/symtropy/issues/5132)
 - Sol Atlas: [#792](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/792), tracked by [#791](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/791)
 
-A federated pointer index is added at `docs/development-map/luminous-ecosystem-index-v0.1.json` (5 nodes / 9 edges). It pins the four local map file digests and their mapped repository revisions, but does not copy their graph internals. Its five cross-project compatibility edges are explicitly `source_declared_only`; exact API/schema versions and integration receipts are not established by those declarations. The index is a public four-project view, not a global map of private repositories.
+The federation directory is `docs/development-map/federation-v0.1.json`, governed by `docs/development-map/federation-v0.1.schema.json`. It contains four pinned project members and nine source-declared / unqualified cross-project relationships. It pins, separately:
+1. each mapped project source revision and root tree;
+2. each map artifact path and blob OID;
+3. the branch commit and tree containing each exact map artifact;
+4. the exact provisional shared map-schema blob and the commit containing that schema.
 
-The index's host snapshot identifies the Symthaea branch revision immediately before the index artifact was added; the index does not attempt to hash itself into its own source snapshot. Refresh the index whenever a project map branch head, mapped source revision, or map blob changes.
+A runner-independent Git-tree check fetched each member's **exact artifact commit** and confirmed that the map path exists and its observed blob OID matches the manifest. All four exact map path/blob comparisons matched. The federation Rust validator adds local checks for unique member/repository/map identities, graph-independent relationship endpoints, source refs, exact artifact URLs, hub self-map identity, schema bindings and authority non-transfer. Its authored test cases remain uncompiled/unexecuted.
 
-The initial projections include no code execution, builds, tests, dataset downloads, physics simulations, WebGL, Holochain operations or deployment actions. Reported test counts, performance figures, research results, maturity claims and integration narratives remain source-declared. Each local map owns its evidence and authority; the index is navigation/federation metadata only.
+This is a **directory of independent maps, not a merged graph**. The nine current relationships are source-declared integration/role statements or contract-versioned-but-unqualified shared-schema candidates. No API compatibility, end-to-end runtime, data exchange or cross-project authority is inferred. Member maps keep their own owner-native authority and evidence; federation edges cannot grant governance, identity, financial, deployment, sensor or physical-actuation authority.
+
 
 ## 8. Runner-independent work and safety boundary
 
