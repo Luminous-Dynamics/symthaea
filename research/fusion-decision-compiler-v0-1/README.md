@@ -10,7 +10,8 @@ It is an integration contract, not another fusion system code. It does not repla
 - Exact solver-run binding to candidate revision and geometry digest.
 - Explicit energy-service boundary admission, resolved to the exact evidence record consumed by the energy hard gate.
 - Required hard-gate evaluation for energy, material, manufacturing, inspection, assembly and replacement.
-- Solver capability, regime, observable, applicability, execution and convergence checks.
+- Solver capability, regime, observable, intended model use, applicability, execution and convergence checks.
+- Intended-use classes distinguish engineering screening, single-step prediction, open-loop rollout, optimization inside a surrogate, and reference-solver evaluation.
 - Explicit distinction between blocked and indeterminate candidates.
 - Evidence-to-claim class and revision/scope binding.
 - Pairwise solver dependence classification across declared dataset, code and assumption groups; empty or missing dependency identities remain unknown.
@@ -48,7 +49,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 25 rows: 5 expected review-eligible, 6 blocked, 6 indeterminate and 8 schema-rejected. The crate has 29 authored Rust unit tests, including one that applies all 25 corpus mutations to the actual compiler and checks each disposition. These are authored test cases, not executed test results.
+The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The crate has 30 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. These are authored test cases, not executed test results.
 
 ## Claim ceiling
 
