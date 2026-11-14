@@ -60,6 +60,7 @@ fn clarabel_solves_analytic_realified_hermitian_psd_problem() {
         ],
     )
     .expect("Hermitian input");
+    assert_eq!(h.as_slice().len(), 4);
     let realified = h.realify().expect("realification");
     let order = realified.order();
     assert_eq!(order, 4);
