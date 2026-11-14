@@ -1,0 +1,305 @@
+{
+  "schema_version": "luminous.eng-change-experiment-preregistration.v0.1",
+  "snapshot_date": "2026-11-13",
+  "status": "design_only_no_gold_no_candidate_runs",
+  "benchmark_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
+  "corpus": {
+    "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10547",
+    "branch": "research/eng-design-change-qual-manifest-v0-1",
+    "commit": "3f658a9f74b750667cfe9642a2e881afa993fca1",
+    "file_git_blob_sha": "db0f6195283190ae319df3bf03dec58927bc9327",
+    "cases": 24,
+    "status": "blueprint_only_unadjudicated_unscored"
+  },
+  "gold_protocol": {
+    "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
+    "pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10581",
+    "branch": "research/eng-design-change-qual-gold-protocol-v0-1",
+    "commit": "afa2af1c3ebeb35bc6d776de97f1f9766d941490",
+    "schema_git_blob_sha": "4b7f6c46bc7895d57cbc6ee8b5b110dfc710eed7"
+  },
+  "evaluation_unit": "claim_evidence_applicability_pair",
+  "trial_stages": [
+    "pin_corpus_contracts_and_evaluator_partition",
+    "independent_dual_assessor_gold_adjudication",
+    "24_case_public_development_pilot_for_variance_and_cost_estimation_only",
+    "design_family_and_change_lineage_held_out_set",
+    "powered_confirmatory_matched_comparison"
+  ],
+  "arms": [
+    {
+      "id": "B0",
+      "name": "full_requalification",
+      "kind": "reference_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B1",
+      "name": "byte_field_diff",
+      "kind": "weak_automation_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B2",
+      "name": "static_dependency_closure",
+      "kind": "conventional_graph_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B3",
+      "name": "qualified_semantic_delta_projection",
+      "kind": "ablation",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B4",
+      "name": "full_luminous_composition",
+      "kind": "candidate",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "B5",
+      "name": "qualified_human_workflow",
+      "kind": "human_baseline",
+      "eligibility": "candidate"
+    },
+    {
+      "id": "V1",
+      "name": "siemens_teamcenter_2606_teamcenter_x",
+      "kind": "vendor_native",
+      "eligibility": "conditional_access_and_version_pin_required"
+    },
+    {
+      "id": "V2",
+      "name": "aras_innovator_ucm_impact_analysis_ai_1_0_1",
+      "kind": "vendor_native",
+      "eligibility": "conditional_access_and_version_pin_required"
+    },
+    {
+      "id": "V3",
+      "name": "ptc_windchill_13_1_2",
+      "kind": "vendor_native",
+      "eligibility": "conditional_access_and_version_pin_required"
+    },
+    {
+      "id": "V4",
+      "name": "ibm_doors_next_7_2_paired_plm",
+      "kind": "requirements_adjunct",
+      "eligibility": "conditional_named_plm_pair_required"
+    }
+  ],
+  "hard_gates": [
+    "critical_impact_miss_count_zero_in_frozen_critical_suite",
+    "stale_evidence_false_current_count_zero",
+    "no_invalid_scope_or_generation_preservation_witness_accepted",
+    "no_evidence_state_or_authority_amplification",
+    "no_etk_authority_currentness_approval_release_or_actuation_mutation",
+    "complete_task_and_claim_evidence_pair_accounting",
+    "zero_future_knowledge_leakage_at_decision_frontier",
+    "zero_retroactive_historical_state_rewrite",
+    "zero_substitution_between_event_valid_publication_receipt_ingestion_index_and_context_times",
+    "unknown_temporal_availability_or_validity_never_forced_to_pass",
+    "zero_cross_conductor_total_order_inference_from_wall_clock_or_foreign_local_indices",
+    "no_system_available_or_run_context_included_when_required_causal_cut_is_incomplete"
+  ],
+  "metrics": {
+    "accuracy": [
+      "per_disposition_confusion_matrix",
+      "impact_precision_recall_by_family_and_criticality",
+      "critical_under_impact_count",
+      "over_requalification_count",
+      "valid_preservation_witness_rate",
+      "unknown_unsupported_detection",
+      "unsupported_relation_invention_rate",
+      "provenance_completeness"
+    ],
+    "operations": [
+      "human_minutes_by_role",
+      "time_to_independently_accepted_assessment",
+      "correctly_avoided_reverification_obligations",
+      "integration_and_configuration_effort",
+      "p50_p95_latency_when_sample_size_supports"
+    ],
+    "economics": [
+      "fully_burdened_cost_per_independently_accepted_assessment",
+      "cash_outlay",
+      "human_time",
+      "verification_and_rework_cost",
+      "material_unknown_cost_categories"
+    ],
+    "temporal_admissibility": [
+      "future_knowledge_leakage_count",
+      "retroactive_rewrite_count",
+      "false_admissibility_and_false_inadmissibility_by_evidence_class",
+      "source_available_vs_system_visible_vs_run_context_classification_accuracy",
+      "indeterminate_detection_and_forced_resolution_rate",
+      "historical_replay_equality_under_late_arrival_and_correction_permutations",
+      "clock_order_error_rate",
+      "required_causal_frontier_completeness_and_source_set_coverage",
+      "false_cross_conductor_total_order_rate",
+      "incomplete_causal_join_indeterminate_detection_rate"
+    ]
+  },
+  "analysis": {
+    "pilot_claim_ceiling": "exploratory_variance_and_workflow_cost_estimation_only",
+    "primary_endpoint": "select_after_pilot_variance_and_assessor_disagreement; freeze before holdout unblinding",
+    "paired_outcomes": true,
+    "cluster_keys": [
+      "design_family",
+      "change_lineage"
+    ],
+    "repeated_seeds_are_independent_tasks": false,
+    "confirmatory_power_analysis_required": true,
+    "statistical_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10619",
+    "claim_validator": "https://github.com/Luminous-Dynamics/symthaea/issues/10624",
+    "zero_event_precision_planning": {
+      "status": "prospective_guidance_not_result",
+      "method": "exact_one_sided_binomial_upper_confidence_bound_for_zero_observed_events",
+      "formula": "p_upper = 1 - alpha^(1/n)",
+      "confidence_level": 0.95,
+      "alpha": 0.05,
+      "assumptions": [
+        "independent Bernoulli critical cases",
+        "fixed sampling/evaluation protocol",
+        "zero observed critical misses"
+      ],
+      "table": [
+        {
+          "independent_critical_cases": 24,
+          "observed_misses": 0,
+          "upper_bound_percent": 11.7346
+        },
+        {
+          "independent_critical_cases": 60,
+          "observed_misses": 0,
+          "upper_bound_percent": 4.8703
+        },
+        {
+          "independent_critical_cases": 100,
+          "observed_misses": 0,
+          "upper_bound_percent": 2.9513
+        },
+        {
+          "independent_critical_cases": 299,
+          "observed_misses": 0,
+          "upper_bound_percent": 0.9969
+        },
+        {
+          "independent_critical_cases": 300,
+          "observed_misses": 0,
+          "upper_bound_percent": 0.9936
+        },
+        {
+          "independent_critical_cases": 600,
+          "observed_misses": 0,
+          "upper_bound_percent": 0.498
+        }
+      ],
+      "cases_needed_for_upper_bound_below_1_percent": 299,
+      "caveats": [
+        "The current 24-case blueprint corpus is unadjudicated and unscored; the 11.7346% figure is a hypothetical bound only if 24 independent critical cases produce zero misses.",
+        "Mutations sharing design families, source artifacts, base configurations or change lineages are not automatically independent.",
+        "Confirmatory analysis must report nominal counts, cluster structure, and cluster-aware uncertainty and sensitivity.",
+        "If one or more misses occur, use an exact interval for the observed numerator/denominator; the zero-event table does not apply.",
+        "This planning calculation is not an industry standard, certification threshold, or empirical Luminous result."
+      ]
+    }
+  },
+  "owners": {
+    "gold": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
+    "judge_qualification": "https://github.com/Luminous-Dynamics/symthaea/issues/11772",
+    "cost_accounting": "https://github.com/Luminous-Dynamics/symthaea/pull/11859",
+    "run_receipt": "https://github.com/Luminous-Dynamics/symthaea/issues/10314",
+    "evidence_composition": "https://github.com/Luminous-Dynamics/symthaea/issues/10370",
+    "isolation": "https://github.com/Luminous-Dynamics/symthaea/issues/10064",
+    "runner_trust": "https://github.com/Luminous-Dynamics/symthaea/issues/10369"
+  },
+  "nonclaims": [
+    "No independent gold labels or human adjudications were created by this preregistration.",
+    "No vendor product was accessed, licensed, configured, executed or scored.",
+    "No superiority, non-inferiority, ROI, safety, manufacturability, compliance, qualification or release claim is made.",
+    "This preregistration is not a run receipt, gold label, score service, authority or release record."
+  ],
+  "vendor_arm_configuration_contracts": {
+    "V2": {
+      "product": "Aras Innovator UCM + Impact Analysis AI Agent v1.0.1",
+      "status": "conditional_until_actual_licensed_environment_is_pinned_and_probed",
+      "prerequisites": [
+        "pinned Aras Innovator/UCM/InnovatorEdge AI environment and actual supported agent release",
+        "Draft-state Change Request",
+        "substantive title, Reason of Change and Description",
+        "complete and correctly linked product structure",
+        "stable unique item_number values for custom item types",
+        "effective principal has read/update Change Request and read Affected Items (Parts, CADs, Documents) permissions"
+      ],
+      "instruction_channel": {
+        "field": "optional session-level Analysis Instructions",
+        "semantics": "free text to focus or constrain one analysis session",
+        "benchmark_treatment": "candidate-visible input, standardized in scope across arms, not a grant of permission, approval, declassification or release authority",
+        "required_tests": [
+          "legitimate narrowing of the authorized analysis scope remains possible",
+          "hostile instruction cannot widen resource scope or authorize restricted export, apply, approval or lifecycle advancement"
+        ]
+      },
+      "effect_boundary": {
+        "application": "user explicitly selects recommendations and applies the selected affected-item relationships",
+        "record_resulting_lifecycle_state": true,
+        "documented_expected_state": "Draft",
+        "record_effective_permissions_at_analysis_and_apply": true,
+        "do_not_assume_atomicity_or_permission_semantics_without_observation": true
+      }
+    }
+  },
+  "temporal_admissibility_overlay": {
+    "markdown": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md",
+    "machine_readable": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_OVERLAY_V0_1.json",
+    "lifecycle_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
+    "cases": 10,
+    "status": "blueprint_only_unadjudicated_unscored",
+    "gold_record_compatibility": {
+      "status": "blocking_prerequisite_before_temporal_gold_adjudication",
+      "current_gold_schema": "strict_additionalProperties_false_without_structured_temporal_fields",
+      "notes_are_sufficient": false,
+      "required_change": "versioned optional nested temporal-evidence extension or independently validated content-addressed companion record bound to existing gold record",
+      "existing_dispositions_unchanged": true,
+      "schema_version": "change-impact-gold-record-v1.1-with-causal-frontier-binding"
+    },
+    "causal_frontier": {
+      "status": "reference_existing_owner_outputs_no_new_causal_history_contract",
+      "evidence_frontier_owner": "https://github.com/Luminous-Dynamics/mycelix/issues/2631",
+      "multiconductor_causal_history_owner": "https://github.com/Luminous-Dynamics/mycelix/issues/5843",
+      "dependency_completeness_owner": "https://github.com/Luminous-Dynamics/mycelix/issues/5923",
+      "rule": "multi-source decision frontiers require a content-bound EvidenceFrontierV1 source set and complete independently verified causal-history receipt; timestamps and local indices cannot mint cross-conductor causal order"
+    }
+  },
+  "temporal_owner_composition": {
+    "lifecycle_as_of_reasoning": "Symthaea #10600",
+    "finance_scoped_bitemporal_reference_only": "Symthaea #11241",
+    "artifact_identity_and_import_receipts": "Mycelix #3022 / #5451",
+    "unknown_vs_unbounded": "Mycelix #3046",
+    "relation_materialization": "Mycelix #4778",
+    "source_chronology": "Mycelix #5687",
+    "desci_receipt_time_projection_with_claim_ceiling": "Mycelix #5860"
+  },
+  "vendor_security_overlays": [
+    {
+      "vendor": "Aras",
+      "product_platform_version": "InnovatorEdge AI 2.4",
+      "release_date": "2026-11-10",
+      "impact_analysis_agent_version": "v1.0.1",
+      "role": "security_and_authority_subprotocol_not_an_additional_accuracy_arm",
+      "controls": [
+        "pin_each_MCP_profile_endpoint_access_point_tool_set_and_enabled_state",
+        "test_stale_cached_tool_inventory_after_server_side_disable_or_tool_removal",
+        "test_cross_profile_endpoint_or_tool_substitution",
+        "recheck_End_User_identity_and_current_Innovator_permissions_at_effect_entry",
+        "require_per_call_user_confirmation_for_beta_Invoke_Innovator_Method_Tool"
+      ],
+      "source_urls": [
+        "https://docs.aras.com/aras-innovatoredge-ai-book/edge-ai-release-notes",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/innovatoredge-ai-administrator-guide"
+      ],
+      "status": "documentation_only_no_tenant_or_endpoint_accessed"
+    }
+  ]
+}

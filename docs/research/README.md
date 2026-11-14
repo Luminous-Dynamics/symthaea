@@ -330,3 +330,15 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+## Engineering lifecycle / decision assurance research — 2026-11-14
+
+- [Industry stack comparison](INDUSTRY_STACK_COMPARISON_2026-11-12.md) — capability map and proposed matched comparisons.
+- [Industry capability register](INDUSTRY_CAPABILITY_REGISTER_2026-11-12.json) — machine-readable capability/applicability snapshot.
+- [Industry benchmark validity register](INDUSTRY_BENCHMARK_VALIDITY_REGISTER_2026-11-13.json) — validity risks and benchmark eligibility.
+- [Engineering lifecycle / PLM competitor register](ENGINEERING_LIFECYCLE_COMPETITOR_REGISTER_2026-11-13.md) — Siemens, Aras, PTC and IBM documented capabilities and limits.
+- [Engineering change experiment preregistration](ENG_CHANGE_EXPERIMENT_PREREGISTRATION_V0_1_2026-11-13.md) — ten comparison arms, gold adjudication and statistical planning.
+- [Engineering lifecycle applicability matrix](INDUSTRY_STACK_APPLICABILITY_MATRIX_2026-11-12.json) — conditional applicability by workload and system boundary.
+- [Decision-time evidence admissibility overlay](ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md) — valid-at-T versus available-by-K evidence controls, including TDA-010 causal frontier.
+- [Engineering-change benchmark frontier](ENGINEERING_CHANGE_BENCHMARK_FRONTIER_2026-11-13.md) — temporal SOTA, matched diagnostics, vendor comparisons and active evidence acquisition.

@@ -1,0 +1,459 @@
+{
+  "schema_version": "luminous.industry-stack-applicability.v0.1",
+  "snapshot_date": "2026-11-12",
+  "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11774",
+  "comparison_modes": {
+    "matched_model_ablation": "Hold foundation model, task, tools, budgets, runtime environment and grader fixed; isolate one architecture or assurance component.",
+    "best_available_product": "Compare each eligible product in its strongest documented supported configuration; record model, tools, permissions, infrastructure, budget and all configuration differences."
+  },
+  "eligibility": {
+    "candidate": "The product/workflow can plausibly perform this profile after an adapter and exact capability verification.",
+    "conditional": "A product or partner environment may qualify, but access, deployment, feature maturity or task capability must be confirmed before inclusion.",
+    "reference_only": "Useful industry/physical reference case, but not a directly comparable agent workflow.",
+    "not_eligible": "Not a valid comparison arm for this profile under the current evidence snapshot."
+  },
+  "workload_profiles": [
+    {
+      "id": "software_engineering",
+      "title": "Software engineering and repository operations",
+      "owner_contracts": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10419",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10637",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11772"
+      ],
+      "task_scope": [
+        "repository comprehension",
+        "bug discovery",
+        "patch repair",
+        "secure correctness",
+        "review",
+        "human handoff"
+      ],
+      "arms": [
+        {
+          "system": "Human expert workflow",
+          "type": "human_baseline",
+          "eligibility": "candidate",
+          "rationale": "Qualified maintainer workflow can execute the same source-view tasks; record role/experience and human minutes."
+        },
+        {
+          "system": "Microsoft Foundry agent workflow",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Foundry is an agent development/evaluation platform, not itself a complete code-repair agent; pin the actual coding agent, model, tools and Foundry configuration."
+        },
+        {
+          "system": "AWS Bedrock AgentCore",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "AgentCore can host/govern/evaluate an agent; pair it with a pinned coding model, repository tools and equivalent permissions."
+        },
+        {
+          "system": "NVIDIA NeMo Relay / Helix / Fabric",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Successor portfolio may provide middleware, evaluation and harness execution; confirm release access, supported tools and exact maturity; exclude deprecated NeMo Agent Toolkit."
+        },
+        {
+          "system": "Google model/API agent workflow",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "A model endpoint is not a complete coding workflow; specify the agent harness, repository tools, policy and evidence export."
+        },
+        {
+          "system": "Best-of-breed open coding-agent workflow",
+          "type": "open_baseline",
+          "eligibility": "candidate",
+          "rationale": "Pin model, harness, tool versions, sandbox, system prompts, context and cost."
+        },
+        {
+          "system": "Luminous / Symthaea",
+          "type": "luminous",
+          "eligibility": "candidate",
+          "rationale": "Use CEB's existing tasks and independent graders; run component ablations plus full composition."
+        },
+        {
+          "system": "Broadcom",
+          "type": "industrial_reference",
+          "eligibility": "reference_only",
+          "rationale": "Company-level semiconductor/private-cloud portfolio is not a directly comparable repository coding agent."
+        },
+        {
+          "system": "SpaceX",
+          "type": "industrial_reference",
+          "eligibility": "reference_only",
+          "rationale": "Industrial engineering reference only; no public, reproducible agent workflow identified for matched software engineering tasks."
+        }
+      ],
+      "primary_metrics": [
+        "official task score",
+        "eligible coverage and refusal/timeout accounting",
+        "defect-level recall and actionable precision",
+        "secure correctness",
+        "process compliance",
+        "human review time",
+        "cost per accepted verified patch",
+        "critical false negatives"
+      ]
+    },
+    {
+      "id": "engineering_change",
+      "title": "Engineering change impact and lifecycle evidence applicability",
+      "owner_contracts": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10546",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10581"
+      ],
+      "task_scope": [
+        "semantic design change",
+        "affected dependency/claim discovery",
+        "evidence applicability",
+        "revalidation obligation",
+        "uncertainty/abstention"
+      ],
+      "arms": [
+        {
+          "system": "Qualified systems-engineering reviewer",
+          "type": "human_baseline",
+          "eligibility": "candidate",
+          "rationale": "Use blinded multi-reviewer adjudication and retain disagreement."
+        },
+        {
+          "system": "Conventional rules/traceability workflow",
+          "type": "conventional_baseline",
+          "eligibility": "candidate",
+          "rationale": "Use an auditable dependency or MBSE/PLM workflow with identical source package; record manual configuration and analyst effort."
+        },
+        {
+          "system": "Microsoft Foundry agent plus named engineering system",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Foundry is an agent platform, not a PLM/MBSE evidence authority; name the actual engineering product, connector coverage and export semantics."
+        },
+        {
+          "system": "AWS AgentCore agent plus named engineering system",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "AgentCore supplies agent runtime/evaluation/policy capabilities; the engineering source-of-truth and evidence semantics must be separately named."
+        },
+        {
+          "system": "NVIDIA NeMo workflow plus named engineering system",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Evaluate only if a supported agent workflow can consume the exact design/evidence artifacts; do not conflate simulation with lifecycle authority."
+        },
+        {
+          "system": "Google model/API agent plus named engineering system",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Model endpoint alone is ineligible; pin toolchain, source system and evaluator."
+        },
+        {
+          "system": "Luminous / Symthaea / Sol-Atlas / Symtropy / Mycelix",
+          "type": "luminous",
+          "eligibility": "candidate",
+          "rationale": "Consume #10543 gold corpus and existing subsystem contracts; benchmark proposal/assessment only, no release authority."
+        },
+        {
+          "system": "Broadcom",
+          "type": "industrial_reference",
+          "eligibility": "reference_only",
+          "rationale": "Broadcom's infrastructure software and semiconductor portfolio is not itself a publicly documented general design-change applicability workflow."
+        },
+        {
+          "system": "SpaceX engineering lifecycle",
+          "type": "industrial_reference",
+          "eligibility": "reference_only",
+          "rationale": "Relevant industrial reference, but internal design-change datasets and processes are not publicly available for matched evaluation."
+        },
+        {
+          "system": "Siemens Teamcenter 2606 / Teamcenter X AI BOM + MBSE workflow",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Direct PLM/MBSE comparator. Requires exact Teamcenter edition, enabled AI BOM/MBSE features, deployment, model/agent and license pin; vendor documentation only, no measured output."
+        },
+        {
+          "system": "Aras Innovator UCM + Impact Analysis AI Agent v1.0.1",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Priority direct AI change-impact comparator. Requires provisioned UCM tenant, v1.0.1 agent, product structure and historical change order fixture; AI specialists are not independent human adjudicators."
+        },
+        {
+          "system": "PTC Windchill 13.1.2 change impact + configured external trace links",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Direct PLM/change-impact comparator for local and upstream/downstream external objects. Pin modules, remote object types, requirements integration and exact configuration."
+        },
+        {
+          "system": "IBM DOORS Next 7.2 paired with named PLM",
+          "type": "requirements_adjunct",
+          "eligibility": "conditional",
+          "rationale": "Requirements-to-requirements/development/test traceability adjunct only; not a stand-alone complete PLM or physical-evidence applicability arm."
+        }
+      ],
+      "primary_metrics": [
+        "critical-impact recall",
+        "affected-path precision",
+        "stale-evidence false-current count",
+        "preservation-witness validity",
+        "unknown-impact calibration",
+        "unnecessary revalidation count",
+        "human review time",
+        "cost per independently accepted assessment"
+      ]
+    },
+    {
+      "id": "agent_security_authority",
+      "title": "Cross-stack agent security, authority and actual effect",
+      "owner_contracts": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10771",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11540",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/11772"
+      ],
+      "task_scope": [
+        "indirect prompt injection",
+        "identity/delegation",
+        "revocation",
+        "information-flow control",
+        "effect-gateway admission",
+        "unknown outcome recovery"
+      ],
+      "arms": [
+        {
+          "system": "Human security engineering baseline",
+          "type": "human_baseline",
+          "eligibility": "candidate",
+          "rationale": "Human policy and red-team reviewers assess identical synthetic controls."
+        },
+        {
+          "system": "Microsoft Foundry supported agent stack",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Pin the agent framework, identity/policy enforcement components, model, tool access and telemetry; Foundry observability alone is not an effect oracle."
+        },
+        {
+          "system": "AWS Bedrock AgentCore",
+          "type": "vendor_native",
+          "eligibility": "candidate",
+          "rationale": "AgentCore has identity, gateway, evaluation and policy/guardrail capabilities; confirm target-region availability and configure identical task permissions."
+        },
+        {
+          "system": "NVIDIA NeMo Relay / Helix / Fabric",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Confirm available successor components, policy semantics and exact effect enforcement; deprecated toolkit is not a valid new baseline."
+        },
+        {
+          "system": "Google model/API with explicit agent gateway",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Model/API is not an authority system; the gateway, identity, effect enforcement and evidence export must be pinned."
+        },
+        {
+          "system": "Open agent security stack",
+          "type": "open_baseline",
+          "eligibility": "candidate",
+          "rationale": "Use a pinned policy gateway/runtime with the same attack/effect fixtures and tool permissions."
+        },
+        {
+          "system": "Luminous full XSTACK composition",
+          "type": "luminous",
+          "eligibility": "candidate",
+          "rationale": "Consume #10771 fixtures; measure actual synthetic effects and independent reconstruction, not agent self-report."
+        },
+        {
+          "system": "Broadcom",
+          "type": "industrial_reference",
+          "eligibility": "not_eligible",
+          "rationale": "No directly comparable agent-security product identified in this scoped comparison."
+        },
+        {
+          "system": "SpaceX",
+          "type": "industrial_reference",
+          "eligibility": "not_eligible",
+          "rationale": "Internal security operations are not publicly accessible for a matched product comparison."
+        }
+      ],
+      "primary_metrics": [
+        "unauthorized semantic effect rate",
+        "restricted disclosure rate",
+        "delegation/revocation correctness",
+        "stale authority acceptance",
+        "positive-control reachability",
+        "effect receipt completeness",
+        "recovery correctness",
+        "false refusal",
+        "human escalation",
+        "cost per protected task"
+      ]
+    },
+    {
+      "id": "datacentre_operations",
+      "title": "AI compute, datacentre and grid-interactive operations",
+      "owner_contracts": [
+        "https://github.com/Luminous-Dynamics/symtropy/issues/3435",
+        "https://github.com/Luminous-Dynamics/symtropy/issues/3776",
+        "https://github.com/Luminous-Dynamics/symtropy/issues/3575"
+      ],
+      "task_scope": [
+        "workload scheduling",
+        "accelerator utilization",
+        "power prediction",
+        "cooling",
+        "storage/UPS reserve",
+        "PCC response",
+        "grid value",
+        "cost and energy accounting"
+      ],
+      "arms": [
+        {
+          "system": "Conventional datacentre operations baseline",
+          "type": "conventional_baseline",
+          "eligibility": "candidate",
+          "rationale": "Freeze scheduling, power-cap, cooling and storage policies; retain the actual facility boundary."
+        },
+        {
+          "system": "NVIDIA accelerator/cluster stack",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Relevant to GPU scheduling/telemetry and accelerator power; require equivalent measured traces and facility instrumentation."
+        },
+        {
+          "system": "Google Cloud infrastructure workload stack",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Eligible only where a documented customer-accessible workload/power control is available for the specific task; avoid assuming access to internal fleet control."
+        },
+        {
+          "system": "Microsoft Azure infrastructure workload stack",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Eligible only where a customer-accessible product exposes comparable control and telemetry; name the exact product and permissions."
+        },
+        {
+          "system": "AWS compute/workload and facility controls",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "AWS customer-facing compute APIs are not equivalent to internal facility control; compare only the same controllable boundary."
+        },
+        {
+          "system": "Broadcom VMware/private-cloud workload stack",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Potentially comparable for private-cloud resource scheduling/operations, not automatically for facility power, cooling or grid response."
+        },
+        {
+          "system": "SpaceX compute infrastructure",
+          "type": "industrial_reference",
+          "eligibility": "reference_only",
+          "rationale": "1.7 GW nameplate compute is a company-reported fleet figure; internal control interface, workload data and site telemetry are not publicly available."
+        },
+        {
+          "system": "Luminous / Symtropy orchestration",
+          "type": "luminous",
+          "eligibility": "candidate",
+          "rationale": "Consume #3776's matched benchmark; compare candidate planners through independent schedule/physical-state verifiers."
+        }
+      ],
+      "primary_metrics": [
+        "completed useful work",
+        "QoS and tail latency",
+        "PCC response and ramp",
+        "whole-facility energy per completed work",
+        "rebound",
+        "UPS/BESS reserve",
+        "thermal/water constraints",
+        "grid deliverability",
+        "opportunity cost",
+        "cost per verified flexibility event"
+      ]
+    },
+    {
+      "id": "physical_spatial_operations",
+      "title": "Robotics, spatial and physical operations",
+      "owner_contracts": [
+        "https://github.com/Luminous-Dynamics/symthaea/issues/6256",
+        "https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/734",
+        "https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/742"
+      ],
+      "task_scope": [
+        "spatial reasoning",
+        "manipulation/navigation",
+        "trajectory timing",
+        "fault detection",
+        "recovery",
+        "sim-to-real discrepancy",
+        "evidence of physical outcome"
+      ],
+      "arms": [
+        {
+          "system": "Qualified human operator",
+          "type": "human_baseline",
+          "eligibility": "candidate",
+          "rationale": "Use matched task environment and expert-defined constraints; retain intervention time and safety stops."
+        },
+        {
+          "system": "NVIDIA robotics/simulation stack",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Pin exact Isaac/Omniverse/robotics stack, robot, simulator and policies; separate simulation results from physical trials."
+        },
+        {
+          "system": "Google DeepMind Gemini Robotics 2.5",
+          "type": "vendor_native",
+          "eligibility": "conditional",
+          "rationale": "Partner rollout and supported hardware/access must be confirmed; the reported Apollo kitting result is a company-reported proof of concept, not a general public test arm."
+        },
+        {
+          "system": "Other open robotics baseline",
+          "type": "open_baseline",
+          "eligibility": "candidate",
+          "rationale": "Pin robot, sensors, calibration, firmware, policy and simulator; use held-out task families."
+        },
+        {
+          "system": "Luminous / Sol-Atlas / Symtropy / Symthaea",
+          "type": "luminous",
+          "eligibility": "candidate",
+          "rationale": "Use existing spatial and trajectory contracts; physical execution remains a separate approved test stage."
+        },
+        {
+          "system": "Microsoft / AWS agent platform",
+          "type": "vendor_native",
+          "eligibility": "not_eligible",
+          "rationale": "General agent runtimes are not robot controllers absent a named, qualified robotics integration."
+        },
+        {
+          "system": "Broadcom",
+          "type": "industrial_reference",
+          "eligibility": "not_eligible",
+          "rationale": "No directly comparable general robotics policy/control product identified in this profile."
+        },
+        {
+          "system": "SpaceX",
+          "type": "industrial_reference",
+          "eligibility": "reference_only",
+          "rationale": "Manufacturing and aerospace operations are relevant industrial targets, but internal task data and robot control are not publicly accessible."
+        }
+      ],
+      "primary_metrics": [
+        "task success",
+        "critical safety events",
+        "constraint violations",
+        "spatial/pose error",
+        "recovery success/time",
+        "sim-to-real discrepancy",
+        "energy per useful task",
+        "human intervention",
+        "evidence completeness"
+      ]
+    }
+  ],
+  "rules": [
+    "Do not compare systems that do not have equivalent task access or control authority.",
+    "Vendor-reported product claims are context, not matched benchmark scores.",
+    "Unavailable product adapters remain explicit; do not silently omit them from eligibility accounting.",
+    "Keep company-level and industrial reference cases separate from directly comparable products.",
+    "No cross-domain scalar leaderboard.",
+    "No live physical actuation or production credentials are authorized by this matrix."
+  ]
+}
