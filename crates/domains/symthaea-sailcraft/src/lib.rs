@@ -11,7 +11,7 @@
 //! direction the wind comes FROM. Current direction is the direction the
 //! current flows TOWARD. Polar angles are absolute true-wind angles (TWA).
 
-#forbid(unsafe_code)
+#![forbid(unsafe_code)]
 
 pub mod robust;
 
