@@ -1,0 +1,133 @@
+{
+  "schema_version": "engineering-decision-requalification-mutations-v0.1",
+  "status": "preregistered_controls_not_results",
+  "control_count": 18,
+  "controls": [
+    {
+      "id": "RQ-CTRL-NEG-001",
+      "case_id": "RQ-NEG-002",
+      "mutation": "use effective_at but ignore observed_at and rewrite K0 as withdrawn",
+      "expected_result": "fail",
+      "reason": "late-arriving evidence must not rewrite K0"
+    },
+    {
+      "id": "RQ-CTRL-NEG-002",
+      "case_id": "RQ-NEG-006",
+      "mutation": "ignore a revocation already observed before K0",
+      "expected_result": "fail",
+      "reason": "known revocation must block as-of support"
+    },
+    {
+      "id": "RQ-CTRL-NEG-003",
+      "case_id": "RQ-NEG-002",
+      "mutation": "retain currently_supported after trust revocation is observable",
+      "expected_result": "fail",
+      "reason": "stale decision reuse"
+    },
+    {
+      "id": "RQ-CTRL-NEG-004",
+      "case_id": "RQ-NEG-003",
+      "mutation": "propagate robot configuration event to unrelated power decision",
+      "expected_result": "fail",
+      "reason": "dependency-scoped invalidation"
+    },
+    {
+      "id": "RQ-CTRL-NEG-005",
+      "case_id": "RQ-UNK-001",
+      "mutation": "treat null affected_dependency_ids as empty set",
+      "expected_result": "fail",
+      "reason": "unknown event scope cannot become no effect"
+    },
+    {
+      "id": "RQ-CTRL-NEG-006",
+      "case_id": "RQ-UNK-001",
+      "mutation": "treat incomplete event inventory as complete",
+      "expected_result": "fail",
+      "reason": "unknown source universe cannot support"
+    },
+    {
+      "id": "RQ-CTRL-NEG-007",
+      "case_id": "RQ-UNK-001",
+      "mutation": "assume total order when owner event ordering is unknown",
+      "expected_result": "fail",
+      "reason": "unresolved event order is indeterminate"
+    },
+    {
+      "id": "RQ-CTRL-NEG-008",
+      "case_id": "RQ-NEG-004",
+      "mutation": "treat operating-envelope breach as informational",
+      "expected_result": "fail",
+      "reason": "critical runtime stop trigger must withdraw claim"
+    },
+    {
+      "id": "RQ-CTRL-NEG-009",
+      "case_id": "RQ-NEG-005",
+      "mutation": "keep model-backed decision supported after calibration drift",
+      "expected_result": "fail",
+      "reason": "model validity is dependency-scoped and time-varying"
+    },
+    {
+      "id": "RQ-CTRL-POS-001",
+      "case_id": "RQ-POS-001",
+      "mutation": "replay the same complete event inventory at K0 and K1",
+      "expected_result": "pass",
+      "reason": "no event means unchanged support"
+    },
+    {
+      "id": "RQ-CTRL-POS-002",
+      "case_id": "RQ-POS-002",
+      "mutation": "add a duplicate notification outside decision dependencies",
+      "expected_result": "pass",
+      "reason": "unrelated event must not invalidate decision"
+    },
+    {
+      "id": "RQ-CTRL-NEG-010",
+      "case_id": "RQ-POS-002",
+      "mutation": "treat every event row as a blocking trigger regardless of event type or scope",
+      "expected_result": "fail",
+      "reason": "duplicate/noise is not a qualified claim defeater"
+    },
+    {
+      "id": "RQ-CTRL-NEG-011",
+      "case_id": "RQ-NEG-003",
+      "mutation": "match dependency scopes by prefix or broad product family rather than exact typed IDs",
+      "expected_result": "fail",
+      "reason": "coarse propagation creates false invalidation"
+    },
+    {
+      "id": "RQ-CTRL-NEG-012",
+      "case_id": "RQ-NEG-002",
+      "mutation": "sort events only by observed_at and discard effective_at",
+      "expected_result": "fail",
+      "reason": "bitemporal event order matters"
+    },
+    {
+      "id": "RQ-CTRL-NEG-013",
+      "case_id": "RQ-NEG-002",
+      "mutation": "sort events only by effective_at and discard observed_at",
+      "expected_result": "fail",
+      "reason": "knowledge-frontier integrity matters"
+    },
+    {
+      "id": "RQ-CTRL-NEG-014",
+      "case_id": "RQ-NEG-006",
+      "mutation": "replace pre-K0 revocation with a later observation timestamp",
+      "expected_result": "fail",
+      "reason": "temporal mutation changes the as-of answer"
+    },
+    {
+      "id": "RQ-CTRL-NEG-015",
+      "case_id": "RQ-NEG-004",
+      "mutation": "allow a candidate to override event severity to informational",
+      "expected_result": "fail",
+      "reason": "severity and qualification are owner/evaluator governed"
+    },
+    {
+      "id": "RQ-CTRL-UNK-002",
+      "case_id": "RQ-UNK-001",
+      "mutation": "promote unknown owner qualification to qualified",
+      "expected_result": "indeterminate",
+      "reason": "candidate cannot self-certify event authenticity or scope"
+    }
+  ]
+}
