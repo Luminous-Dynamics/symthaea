@@ -8,6 +8,7 @@ mod plasma_evidence_composition;
 mod plasma_claim_scope;
 mod plasma_equivalence_design;
 mod plasma_failure_composition;
+mod plasma_profile_contract;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -84,6 +85,11 @@ enum Commands {
     /// Audit complete specimen-level failure-mode compositions without inferring acceptability.
     PlasmaFailureCompositionAudit {
         #[arg(long, default_value = "data/research/plasma_failure_composition_fixture_v0_2.json")]
+        fixture: PathBuf,
+    },
+    /// Audit profile-specific required claims and their exact method/evidence roles.
+    PlasmaProfileContractAudit {
+        #[arg(long, default_value = "data/research/plasma_profile_contract_fixture_v0_1.json")]
         fixture: PathBuf,
     },
     GenerateManifest {
@@ -177,6 +183,18 @@ fn main() -> anyhow::Result<()> {
                 root.join(fixture)
             };
             plasma_failure_composition::run(&fixture_path)?;
+        }
+        Commands::PlasmaProfileContractAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() {
+                fixture
+            } else {
+                root.join(fixture)
+            };
+            plasma_profile_contract::run(&fixture_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
