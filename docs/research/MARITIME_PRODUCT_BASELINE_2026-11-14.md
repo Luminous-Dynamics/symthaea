@@ -388,3 +388,32 @@ Separate the controller contribution from the storage-architecture contribution.
 Additional metrics: battery peak/RMS current and power, high-frequency energy share, supercapacitor throughput/thermal state, DC bus ripple/sag and recovery where qualified, engine starts/ramp/low-load hours, trigger count and false/missed triggers, CPU time and worst-case execution time, job completion, reserve, final SOC, degradation uncertainty and lifecycle cost.
 
 The paradigm opportunity is **control update policy co-designed with energy-storage physics**: a controller may obtain better response and lower compute burden by separating slow energy scheduling from fast transient buffering. This is a hypothesis to test, not an assumed winner.
+
+
+## 14. South African propulsion-shaft observability opportunity
+
+Stellenbosch University's published facilities include a rotating machinery test rig that applies repeatable, directly measured impacts to a simplified propeller disk while collecting indirect shaft-line signals, and the S.A. Agulhas II full-scale laboratory with shaft shear/thrust, shaft RPM, temperature, accelerometer and strain-gauge instrumentation. Sources:
+- https://www.su.ac.za/en/faculties/engineering/departments/mechanical-mechatronic-engineering/research/naval-architecture-design/facilities
+- https://www.su.ac.za/en/faculties/engineering/departments/mechanical-mechatronic-engineering/research/naval-architecture-design
+
+This suggests a separate benchmark for reconstructing propulsion-shaft transient loads from indirect measurements, with a directly measured laboratory excitation reference and a full-scale context dataset where access/rights permit. It is not a PWC waterjet test, does not establish tug-transfer validity, and does not assume facility access.
+
+New research owner: [MARINE-SHAFT-OBSERVABILITY-001 #12187](https://github.com/Luminous-Dynamics/symthaea/issues/12187). It composes the existing marine trial-campaign binding (#11064), shipboard power-transient (#11028), marine structural-health (#11089), tug product (#12096), tug EMS (#12136), reference-data admission (#8146) and Symtropy tug trial-evidence (#5179) owners. The new issue owns only the indirect shaft-load/virtual-sensor benchmark and its observability/abstention contract.
+
+Candidate value for the tug programme: measured/estimated shaft torque and transient load may improve propulsion-load accounting, reserve assessment and fault-context interpretation. The estimate is advisory only; it cannot authorize physical actuation or replace direct protection/instrumentation. Model transfer among the Stellenbosch rig, S.A. Agulhas II, tug shafting and waterjet drives requires separate configuration and domain evidence.
+
+## 15. South African test-facility collaboration: capability before commitment
+
+Current public capability evidence supports two distinct leads:
+
+- Stellenbosch University: a 90 m × 4.2 m × 2 m towing tank, with drag, trim and trolley-speed measurement; a rotating machinery rig; and a sensor-rich full-scale research vessel. These assets have different test purposes and should not be treated as one universal marine lab. Facility details: https://www.su.ac.za/en/faculties/engineering/departments/mechanical-mechatronic-engineering/research/naval-architecture-design/facilities
+- CSIR Coastal Engineering and Port Infrastructure: physical modelling of ship motions/navigation, stability, force measurement and wave conditions; metocean data collection and port studies. Public capabilities: https://www.csir.co.za/what-we-do/mobility-and-logistics/infrastructure-engineering/coastal-engineering-and-port
+
+No public source reviewed here confirms a dedicated waterjet cavitation tunnel at either facility. The immediate action is a capability inquiry, not booking or partner announcement. Request pump fit, cavitation pressure range, optical access, inlet boundary-layer conditioning, torque/pressure/flow metrology, data rights, uncertainty procedures, cost and available dates before selecting a facility.
+
+The work should choose the **smallest discriminating experiment**:
+- towing tank for installed hull resistance, trim and force interaction where a suitable waterjet model can be instrumented;
+- dedicated waterjet-system rig for inlet distortion and IVR sweeps;
+- pump loop/cavitation tunnel for pump cavitation inception and breakdown;
+- rotating machinery rig for shaft transient-load observability;
+- full-scale craft/vessel only for claims that require full-scale evidence.
