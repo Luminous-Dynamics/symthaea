@@ -35,6 +35,11 @@ pub(super) struct PowerReceipt {
     planned_candidate_clusters: usize,
     target_power: f64,
     target_precision_half_width: f64,
+    assumptions_sha256: String,
+    effect_under_alternative: f64,
+    variance_low: f64,
+    variance_central: f64,
+    variance_high: f64,
     method_ref: String,
     claim_ceiling: String,
 }
@@ -88,6 +93,15 @@ pub(super) struct EquivalenceDesignReceipt {
     max_cluster_attrition_rate: f64,
     target_power: f64,
     target_precision_half_width: f64,
+    assumptions_sha256: String,
+    effect_under_alternative: f64,
+    variance_low: f64,
+    variance_central: f64,
+    variance_high: f64,
+    randomization_plan_ref: String,
+    analysis_plan_ref: String,
+    exclusion_protocol_ref: String,
+    time_source_ref: String,
     power_receipt: PowerReceipt,
     baseline_samples: Vec<SampleIdentity>,
     candidate_samples: Vec<SampleIdentity>,
@@ -192,6 +206,10 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         receipt.independent_unit.as_str(),
         receipt.power_receipt.receipt_id.as_str(),
         receipt.power_receipt.method_ref.as_str(),
+        receipt.randomization_plan_ref.as_str(),
+        receipt.analysis_plan_ref.as_str(),
+        receipt.exclusion_protocol_ref.as_str(),
+        receipt.time_source_ref.as_str(),
         receipt.analysis_result.result_id.as_str(),
     ] {
         if !nonempty(value) {
@@ -222,7 +240,9 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
 
     if !sha256_shape(&receipt.plan_sha256)
         || !sha256_shape(&receipt.sample_manifest_sha256)
+        || !sha256_shape(&receipt.assumptions_sha256)
         || !sha256_shape(&receipt.power_receipt.calculation_sha256)
+        || !sha256_shape(&receipt.power_receipt.assumptions_sha256)
         || !sha256_shape(&receipt.analysis_result.result_sha256)
     {
         return blocked("plan, manifest, power or analysis receipt digest is missing or malformed");
@@ -254,6 +274,14 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         || receipt.target_power >= 1.0
         || !receipt.target_precision_half_width.is_finite()
         || receipt.target_precision_half_width <= 0.0
+        || !receipt.effect_under_alternative.is_finite()
+        || receipt.effect_under_alternative == 0.0
+        || !receipt.variance_low.is_finite()
+        || !receipt.variance_central.is_finite()
+        || !receipt.variance_high.is_finite()
+        || receipt.variance_low <= 0.0
+        || receipt.variance_central < receipt.variance_low
+        || receipt.variance_high < receipt.variance_central
     {
         return rejected("attrition, power or precision planning limits are invalid");
     }
@@ -275,6 +303,11 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         || power.planned_candidate_clusters != receipt.planned_min_candidate_clusters
         || (power.target_power - receipt.target_power).abs() > 1e-9
         || (power.target_precision_half_width - receipt.target_precision_half_width).abs() > 1e-9
+        || power.assumptions_sha256 != receipt.assumptions_sha256
+        || !close(power.effect_under_alternative, receipt.effect_under_alternative)
+        || !close(power.variance_low, receipt.variance_low)
+        || !close(power.variance_central, receipt.variance_central)
+        || !close(power.variance_high, receipt.variance_high)
     {
         return rejected("power/precision planning receipt does not match the frozen design contract");
     }
@@ -400,6 +433,8 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         || baseline_receipt.raw_data_sha256 == candidate_receipt.raw_data_sha256
         || baseline_receipt.method_id != candidate_receipt.method_id
         || baseline_receipt.edition != candidate_receipt.edition
+        || baseline_receipt.evidence_kind != candidate_receipt.evidence_kind
+        || baseline_receipt.requested_claim != candidate_receipt.requested_claim
         || baseline_receipt.protocol_id != candidate_receipt.protocol_id
         || baseline_receipt.protocol_sha256 != candidate_receipt.protocol_sha256
         || baseline_receipt.material_pair_class != candidate_receipt.material_pair_class
