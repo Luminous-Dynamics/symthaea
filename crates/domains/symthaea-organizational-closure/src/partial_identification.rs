@@ -69,7 +69,10 @@ pub struct CausalEffectQuery {
 #[serde(deny_unknown_fields)]
 pub struct PartialIdentificationExperiment {
     pub id: ProbeId,
-    pub intervened_variable: String,
+    pub intervened_variables: BTreeSet<String>,
+    /// Variables measured by this experiment (the W set in the max-potency
+    /// formalism). It must be non-empty and disjoint from interventions.
+    pub measured_variables: BTreeSet<String>,
     pub cost_units: u64,
     pub risk_units: u64,
 }
@@ -83,10 +86,27 @@ impl PartialIdentificationExperiment {
     ) -> Self {
         Self {
             id: id.into(),
-            intervened_variable: intervened_variable.into(),
+            intervened_variables: [intervened_variable.into()].into(),
+            measured_variables: BTreeSet::new(),
             cost_units,
             risk_units,
         }
+    }
+
+    pub fn with_interventions(
+        mut self,
+        variables: impl IntoIterator<Item = String>,
+    ) -> Self {
+        self.intervened_variables = variables.into_iter().collect();
+        self
+    }
+
+    pub fn measuring(
+        mut self,
+        variables: impl IntoIterator<Item = String>,
+    ) -> Self {
+        self.measured_variables = variables.into_iter().collect();
+        self
     }
 }
 
@@ -170,6 +190,10 @@ pub enum PartialIdentificationFindingCode {
     EmptyExperimentId,
     DuplicateExperimentId,
     UnknownIntervenedVariable,
+    EmptyExperimentInterventions,
+    EmptyMeasuredVariableSet,
+    UnknownMeasuredVariable,
+    ExperimentIntervenesOnMeasuredVariable,
     EmptyWorldSet,
     DuplicateWorldId,
     UnknownActualWorld,
@@ -194,6 +218,7 @@ pub enum PartialIdentificationFindingCode {
     UnsafeActDecision,
     UnsafeDoNotActDecision,
     EnumerationBudgetExceeded,
+    GraphPruningCertificateDisagreement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -238,6 +263,14 @@ pub struct PartialIdentificationReport {
     pub oracle_optimal_experiment_ids: Vec<ProbeId>,
     pub zero_potency_experiment_count: usize,
     pub selected_zero_potency_count: usize,
+    /// Number of candidates certified by the published AllPathsBlocked
+    /// graph condition before finite-world consistency checking.
+    pub path_interception_candidate_count: usize,
+    /// Candidates whose graph certificate agrees with exact finite-world
+    /// zero singleton potency. They are not yet removed from subset search.
+    pub path_interception_confirmed_count: usize,
+    /// Graph certificates contradicted by the finite outcome oracle.
+    pub path_interception_disagreement_count: usize,
     pub findings: Vec<PartialIdentificationFinding>,
 }
 
@@ -357,6 +390,151 @@ fn validate_graph(scenario: &PartialIdentificationScenario,
         push_finding(findings, PartialIdentificationFindingCode::EmptyTargetPopulation,
             None, None, "target population must be declared");
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum PathNode {
+    Observed(String),
+    Latent(usize),
+}
+
+fn path_adjacency(graph: &CausalGraphDescriptor) -> BTreeMap<PathNode, BTreeSet<PathNode>> {
+    let mut adjacency: BTreeMap<PathNode, BTreeSet<PathNode>> = graph.variables.iter()
+        .map(|variable| (PathNode::Observed(variable.clone()), BTreeSet::new()))
+        .collect();
+
+    for edge in &graph.directed_edges {
+        adjacency.entry(PathNode::Observed(edge.cause.clone())).or_default()
+            .insert(PathNode::Observed(edge.effect.clone()));
+    }
+    for (index, edge) in graph.bidirected_edges.iter().enumerate() {
+        let latent = PathNode::Latent(index);
+        adjacency.entry(latent.clone()).or_default()
+            .insert(PathNode::Observed(edge.left.clone()));
+        adjacency.entry(latent).or_default()
+            .insert(PathNode::Observed(edge.right.clone()));
+    }
+    adjacency
+}
+
+fn reaches_any_target(
+    adjacency: &BTreeMap<PathNode, BTreeSet<PathNode>>,
+    start: PathNode,
+    targets: &BTreeSet<PathNode>,
+    removed: &BTreeSet<PathNode>,
+) -> bool {
+    if removed.contains(&start) || !adjacency.contains_key(&start) {
+        return false;
+    }
+    let mut visited = BTreeSet::new();
+    let mut queue = std::collections::VecDeque::new();
+    visited.insert(start.clone());
+    queue.push_back(start);
+
+    while let Some(current) = queue.pop_front() {
+        if targets.contains(&current) {
+            return true;
+        }
+        if let Some(children) = adjacency.get(&current) {
+            for child in children {
+                if !removed.contains(child) && visited.insert(child.clone()) {
+                    queue.push_back(child.clone());
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Compute R*_theta: hidden response types in every bidirected district that
+/// contains a response type with a path to the target outcome after removing
+/// the query treatment. This is the district-hull step in the published
+/// AllPathsBlocked criterion.
+fn relevant_latent_district_hull(
+    graph: &CausalGraphDescriptor,
+    query: &CausalEffectQuery,
+) -> BTreeSet<usize> {
+    let adjacency = path_adjacency(graph);
+    let removed = [PathNode::Observed(query.treatment_variable.clone())].into();
+    let target = [PathNode::Observed(query.outcome_variable.clone())].into();
+    let mut relevant_latents = BTreeSet::new();
+
+    for (index, _) in graph.bidirected_edges.iter().enumerate() {
+        if reaches_any_target(&adjacency, PathNode::Latent(index), &target, &removed) {
+            relevant_latents.insert(index);
+        }
+    }
+    if relevant_latents.is_empty() {
+        return BTreeSet::new();
+    }
+
+    let mut district_adjacency: BTreeMap<String, BTreeSet<String>> =
+        graph.variables.iter().map(|v| (v.clone(), BTreeSet::new())).collect();
+    for edge in &graph.bidirected_edges {
+        district_adjacency.entry(edge.left.clone()).or_default().insert(edge.right.clone());
+        district_adjacency.entry(edge.right.clone()).or_default().insert(edge.left.clone());
+    }
+
+    let mut component_of = BTreeMap::new();
+    let mut component = 0usize;
+    for variable in &graph.variables {
+        if component_of.contains_key(variable) {
+            continue;
+        }
+        let mut queue = std::collections::VecDeque::from([variable.clone()]);
+        component_of.insert(variable.clone(), component);
+        while let Some(current) = queue.pop_front() {
+            if let Some(neighbours) = district_adjacency.get(&current) {
+                for neighbour in neighbours {
+                    if !component_of.contains_key(neighbour) {
+                        component_of.insert(neighbour.clone(), component);
+                        queue.push_back(neighbour.clone());
+                    }
+                }
+            }
+        }
+        component += 1;
+    }
+
+    let mut relevant_components = BTreeSet::new();
+    for index in &relevant_latents {
+        if let Some(edge) = graph.bidirected_edges.iter().nth(*index) {
+            if let Some(component_id) = component_of.get(&edge.left) {
+                relevant_components.insert(*component_id);
+            }
+        }
+    }
+
+    graph.bidirected_edges.iter().enumerate()
+        .filter_map(|(index, edge)| {
+            component_of.get(&edge.left)
+                .filter(|component_id| relevant_components.contains(component_id))
+                .map(|_| index)
+        })
+        .collect()
+}
+
+/// Published AllPathsBlocked test: remove the experiment's intervention
+/// variables and search from every latent in R*_theta to its measured W set.
+/// A reachable measured variable means the experiment is not graph-pruned.
+fn all_paths_blocked_for_experiment(
+    graph: &CausalGraphDescriptor,
+    query: &CausalEffectQuery,
+    experiment: &PartialIdentificationExperiment,
+) -> bool {
+    let relevant_latents = relevant_latent_district_hull(graph, query);
+    if relevant_latents.is_empty() {
+        return true;
+    }
+    let adjacency = path_adjacency(graph);
+    let removed: BTreeSet<PathNode> = experiment.intervened_variables.iter()
+        .cloned().map(PathNode::Observed).collect();
+    let targets: BTreeSet<PathNode> = experiment.measured_variables.iter()
+        .cloned().map(PathNode::Observed).collect();
+
+    relevant_latents.into_iter().all(|latent| {
+        !reaches_any_target(&adjacency, PathNode::Latent(latent), &targets, &removed)
+    })
 }
 
 fn width_for_worlds(worlds: &[&AdmissibleCausalWorld]) -> i128 {
