@@ -910,7 +910,7 @@ fn child_text(
 /// Match a MusicXML core element by both local name and the document's
 /// namespace. Foreign extension elements may reuse core local names; they are
 /// retained as opaque source nodes and must not alter score semantics.
-fn is_musicxml_element(
+pub(crate) fn is_musicxml_element(
     node: roxmltree::Node<'_, '_>,
     name: &str,
     namespace: Option<&str>,
