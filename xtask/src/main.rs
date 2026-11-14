@@ -72,7 +72,7 @@ enum Commands {
     },
     /// Audit method-qualified endpoint evidence used by qualification transfer.
     PlasmaEvidenceCompositionAudit {
-        #[arg(long, default_value = "data/research/plasma_evidence_composition_fixture_v0_1.json")]
+        #[arg(long, default_value = "data/research/plasma_evidence_composition_fixture_v0_2.json")]
         fixture: PathBuf,
     },
     /// Audit preregistered cluster-aware equivalence designs and their linked results.
