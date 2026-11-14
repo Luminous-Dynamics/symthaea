@@ -20,6 +20,7 @@ These dimensions are not collapsed into a weighted score. A payment can satisfy 
 
 - model.go: versioned inputs/reports and exact-byte SHA-256 helpers.
 - RESEARCH_PROGRAMME.md: benchmark comparison, accountability crosswalk, proposed targets and execution roadmap.
+- MACE_EFFECT_FENCE_BENCHMARK.md: destination-side effect-or-fence semantics, fault matrix, metrics and qualification targets.
 - BENCHMARK_AUDIT_LANDSCAPE.md: 2026 evaluator/oracle/trajectory-auditing research and MACE differentiation plan.
 - qualify.go: fail-closed corpus, run-manifest, observation and metamorphic-relation checks.
 - cmd/mace-evalqual: offline CLI.
