@@ -68,7 +68,8 @@
           "implementation": {
             "enum": [
               "quimb.CircuitMPS",
-              "ITensorMPS"
+              "ITensorMPS",
+              "symthaea-frontier-physics::U1TeBDStrangStepper"
             ]
           },
           "case_id": {
@@ -155,6 +156,37 @@
               "object",
               "null"
             ]
+          },
+          "canonical_gauge_max_residual": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "selection_rule_residual": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "global_state_error_bound_qualified": {
+            "type": "boolean"
+          },
+          "cumulative_local_l2_error_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cumulative_global_l2_error_bound": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
           }
         },
         "additionalProperties": true
