@@ -98,3 +98,10 @@ A checkpoint is not considered progress merely because its integer sequence adva
 The checkpoint verifier includes `VerifyPeerConsistency(older, newer, bridge, publicKey)`. It validates that the newer trusted cursor is a descendant of the older cursor under the same witness key/database, using every intervening signed checkpoint. It detects a same-sequence fork, a missing/broken bridge, identity substitution, rollback, or a peer cursor not reached by the signed chain.
 
 This is a **proof comparison primitive**, not split-view prevention. A witness may present two signed histories to isolated clients; the clients detect the fork only after exchanging cursors/bridges or submitting them to a common monitor. Without gossip, transparency-log consistency proofs or an independent witness quorum, an undisclosed fork can remain hidden. Peer consistency therefore complements but does not replace independent checkpoint issuance, durable external cursor storage and key custody.
+
+
+## Single-writer witness reference
+
+The public branch includes `witness/`, a Linux single-writer reference that receives an observed database ID/journal sequence/head, issues the next detached Ed25519 checkpoint, and appends it to a strict replayable JSONL chain. Identical observations return the same signed checkpoint for lost-ack recovery; conflicting heads at the same journal sequence, sequence-only changes without a new digest, regressions and backward issue time are rejected. A record is fsynced before success; an uncertain write/sync poisons the process until restart/reconciliation.
+
+This is a local single-host reference, not an independent E3 witness: its journal shares the host/kernel/storage/admin domain, and the key is injected by its caller. It does not deploy a remote signer, HSM/key custody, quorum, transparency log or gossip. A duplicated private key can still sign a fork outside this journal, so peer proof exchange remains necessary for split-view detection.
