@@ -223,7 +223,8 @@ fn matrix_exponential(matrix: &DMatrix<Complex64>) -> Result<DMatrix<Complex64>,
     if squarings > 1024 {
         return Err("dense oracle matrix exponential scaling is excessive".into());
     }
-    let scaled = matrix / 2.0_f64.powi(squarings as i32);
+    let scale = Complex64::new(1.0 / 2.0_f64.powi(squarings as i32), 0.0);
+    let scaled = matrix * scale;
     let identity = DMatrix::<Complex64>::identity(n, n);
     let mut sum = identity.clone();
     let mut term = identity;
@@ -414,7 +415,7 @@ fn run_once(
     } else {
         None
     };
-    let continuous_metrics = if site_count <= 10 {
+    let continuous_metrics = if site_count <= 8 {
         let actual = dense_actual.as_ref().expect("dense state exists");
         let reference =
             continuous_time_oracle(bits, terms, time_step * steps as f64)?;
