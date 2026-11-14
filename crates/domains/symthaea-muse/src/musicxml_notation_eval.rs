@@ -1255,7 +1255,7 @@ fn optional_metadata_accuracy<T: PartialEq>(
     match reference {
         Some(reference) => accuracy(
             1,
-            usize::from(prediction.is_some_and(|prediction| prediction == reference)),
+            if prediction.is_some_and(|prediction| prediction == reference) { 1 } else { 0 },
         ),
         None => accuracy(0, 0),
     }
@@ -1284,9 +1284,9 @@ fn part_metadata_dimensions(
 
     let gold = reference.part_metadata.as_ref();
     let predicted = prediction.part_metadata.as_ref();
-    let reference_count = usize::from(gold.is_some());
-    let prediction_count = usize::from(predicted.is_some());
-    let true_positives = usize::from(gold.is_some() && predicted.is_some());
+    let reference_count = gold.is_some() as usize;
+    let prediction_count = predicted.is_some() as usize;
+    let true_positives = (gold.is_some() && predicted.is_some()) as usize;
     let (name_abbreviation, score_instrument_ids, midi_instrument_setup, source_subtree) =
         match (gold, predicted) {
             (Some(gold), Some(predicted)) => (
@@ -1331,8 +1331,8 @@ fn part_metadata_dimensions(
         score_instrument_ids,
         midi_instrument_setup,
         source_subtree,
-        reference_absent_count: usize::from(gold.is_none()),
-        unexpected_count: usize::from(gold.is_none() && predicted.is_some()),
+        reference_absent_count: gold.is_none() as usize,
+        unexpected_count: (gold.is_none() && predicted.is_some()) as usize,
     }
 }
 
