@@ -217,6 +217,7 @@ fn metric_from_counts(counts: MusicXmlNotationCountsV1) -> MusicXmlNotationMetri
         .then_some(counts.true_positives as f64 / recall_denominator as f64);
     let f1 = match (precision, recall) {
         (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
+        (Some(_), Some(_)) => Some(0.0),
         _ => None,
     };
     MusicXmlNotationMetricV1 {
@@ -1590,6 +1591,76 @@ mod tests {
             report(outcome).event_alignment.counts.true_positives,
             1
         );
+    }
+
+
+    #[test]
+    fn zero_true_positives_with_nonempty_denominators_has_zero_f1() {
+        let metric = metric_from_counts(MusicXmlNotationCountsV1 {
+            true_positives: 0,
+            false_positives: 2,
+            false_negatives: 3,
+        });
+        assert_eq!(metric.precision, Some(0.0));
+        assert_eq!(metric.recall, Some(0.0));
+        assert_eq!(metric.f1, Some(0.0));
+    }
+
+    #[test]
+    fn sound_ties_visual_ties_tuplets_and_performance_directives_are_separate() {
+        let gold_xml = r#"<score-partwise><part-list>
+            <score-part id="P1"><part-name>Violin</part-name>
+                <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
+                <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument>
+            </score-part>
+        </part-list><part id="P1"><measure number="1">
+            <attributes><divisions>12</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="1" attack="-2" release="3">
+                <pitch><step>C</step><octave>5</octave></pitch><duration>4</duration>
+                <instrument id="P1-I1"/><voice>1</voice><type>eighth</type>
+                <time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>
+                <tie type="start"/><notations><tied type="start"/><tuplet type="start" number="1"/></notations>
+            </note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(gold_xml, "gold", "clock");
+        let prediction = graph(gold_xml, "pred", "clock");
+        let evaluated = report(evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            &[binding("P1", "P1")],
+            MusicXmlNotationEvaluationConfigV1::default(),
+        ).unwrap());
+        assert_eq!(evaluated.sound_tie_annotations.f1, Some(1.0));
+        assert_eq!(evaluated.visual_tie_annotations.f1, Some(1.0));
+        assert_eq!(evaluated.tuplet_notations.f1, Some(1.0));
+        assert_eq!(evaluated.instrument_references.f1, Some(1.0));
+        assert_eq!(evaluated.instrument_reference_resolution.f1, Some(1.0));
+        assert_eq!(evaluated.performance_directives.f1, Some(1.0));
+    }
+
+    #[test]
+    fn unresolved_part_instrument_id_is_not_counted_as_resolved() {
+        let xml = r#"<score-partwise><part-list>
+            <score-part id="P1"><part-name>Violin</part-name>
+                <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
+            </score-part>
+        </part-list><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration>
+                <instrument id="P1-UNKNOWN"/>
+            </note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(xml, "gold", "clock");
+        let prediction = graph(xml, "pred", "clock");
+        let evaluated = report(evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            &[binding("P1", "P1")],
+            MusicXmlNotationEvaluationConfigV1::default(),
+        ).unwrap());
+        assert_eq!(evaluated.instrument_references.f1, Some(1.0));
+        assert_eq!(evaluated.instrument_reference_resolution.counts.true_positives, 0);
+        assert_eq!(evaluated.instrument_reference_resolution.f1, Some(0.0));
     }
 
 }
