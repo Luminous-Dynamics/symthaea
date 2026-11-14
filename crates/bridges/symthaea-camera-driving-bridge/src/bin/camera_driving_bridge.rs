@@ -394,6 +394,7 @@ mod tests {
             max_frame_bytes: 16 * 16 * 3,
             initial_dt_us: 10_000,
             maximum_frame_gap_us: 20_000,
+            maximum_observation_delivery_age_us: 5_000,
             maximum_sensor_clock_skew_us: 0,
             visual_weight_ppm: 500_000,
             vehicle_encoder_seed_phrase: "public-atomic-output-test-seed".to_string(),
