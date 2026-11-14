@@ -72,7 +72,7 @@ fn canonical_inventory_sha256(case: &Value, world: &Value) -> String {
 fn irrelevant_injection_sha256(evidence: &[Value]) -> String {
     let mut irrelevant: Vec<Value> = evidence
         .iter()
-        .filter(|record| strings_at(record, "supports").iter().any(|p| p == "irrelevant_background"))
+        .filter(|record| strings_at(record, "supports").iter().any(|p| p == "unrelated_document_classification"))
         .cloned()
         .collect();
     irrelevant.sort_by(|left, right| string_at(left, "id").cmp(string_at(right, "id")));
@@ -172,10 +172,7 @@ fn world_inventory_state<'a>(case: &'a Value, world: &'a Value) -> &'a str {
 }
 
 fn world_action(world: &Value) -> Option<&str> {
-    world
-        .pointer("/expected/action")
-        .and_then(Value::as_str)
-        .or_else(|| world.get("expected_action").and_then(Value::as_str))
+    world.get("candidate_action").and_then(Value::as_str)
 }
 
 fn admissibility_is_invalid(value: &str) -> bool {
@@ -404,14 +401,28 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                     for id in visible {
                         assert!(evidence_ids.contains(&id), "{case_id}: candidate-visible ID absent from inventory: {id}");
                     }
-                    if world.get("irrelevant_evidence_injection_count").and_then(Value::as_u64).unwrap_or(0) > 0 {
-                        let expected_batch = string_at(world, "irrelevant_evidence_injection_digest");
+                    if let Some(count) = world.get("irrelevant_evidence_injection_count").and_then(Value::as_u64) {
+                        let injected_ids = strings_at(world, "injected_evidence_ids");
+                        assert_eq!(injected_ids.len(), count as usize, "{case_id}: injected record count");
                         assert_eq!(
-                            expected_batch,
                             irrelevant_injection_sha256(evidence),
+                            string_at(world, "irrelevant_evidence_injection_digest"),
                             "{case_id} / {}: irrelevant injection digest",
                             string_at(world, "world_id")
                         );
+                        let visible_set: BTreeSet<String> = visible_ids(case, world).into_iter().collect();
+                        let mandatory: BTreeSet<String> = strings_at(case, "mandatory_predicates").into_iter().collect();
+                        for id in &injected_ids {
+                            assert!(visible_set.contains(id), "{case_id}: injected clutter must be candidate-visible");
+                            let record = evidence
+                                .iter()
+                                .find(|record| string_at(record, "id") == id)
+                                .unwrap_or_else(|| panic!("{case_id}: injected record {id} missing from inventory"));
+                            assert!(
+                                strings_at(record, "supports").iter().all(|predicate| !mandatory.contains(predicate)),
+                                "{case_id}: injected record {id} unexpectedly supports a mandatory predicate"
+                            );
+                        }
                     }
                     let report = evaluate_world(case, world);
                     assert_expected_world(case, world, &report);
@@ -432,12 +443,20 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                     candidate_visible_manifest_sha256(case, case),
                     "{case_id}: top-level candidate-visible evidence digest"
                 );
-                if case.get("irrelevant_evidence_injection_count").and_then(Value::as_u64).unwrap_or(0) > 0 {
-                    assert_eq!(
-                        string_at(case, "irrelevant_evidence_injection_digest"),
-                        irrelevant_injection_sha256(world_evidence(case, case)),
-                        "{case_id}: top-level irrelevant injection digest"
-                    );
+                if let Some(count) = case.get("irrelevant_evidence_injection_count").and_then(Value::as_u64) {
+                    let evidence = world_evidence(case, case);
+                    assert_eq!(irrelevant_injection_sha256(evidence), string_at(case, "irrelevant_evidence_injection_digest"), "{case_id}: top-level irrelevant batch digest");
+                    let injected: Vec<&Value> = evidence.iter().filter(|record| {
+                        strings_at(record, "supports").iter().any(|p| p == "unrelated_document_classification")
+                    }).collect();
+                    assert_eq!(injected.len(), count as usize, "{case_id}: top-level irrelevant record count");
+                    let visible: BTreeSet<String> = visible_ids(case, case).into_iter().collect();
+                    let mandatory: BTreeSet<String> = strings_at(case, "mandatory_predicates").into_iter().collect();
+                    for record in injected {
+                        let id = string_at(record, "id");
+                        assert!(visible.contains(id), "{case_id}: irrelevant record {id} must be candidate-visible");
+                        assert!(strings_at(record, "supports").iter().all(|p| !mandatory.contains(p)), "{case_id}: irrelevant record supports a mandatory predicate");
+                    }
                 }
                 let mut top_level = evaluate_world(case, case);
                 if case_id == "ME-NEG-002" {
