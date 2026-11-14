@@ -1,0 +1,46 @@
+name: AIRROAD MIMO Holdout Falsification Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_HOLDOUT_FALSIFICATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-holdout-falsification-v0.1.json"
+      - "tools/airroad-mimo-holdout-falsification/verify_holdout_falsification.py"
+      - ".github/workflows/airroad-mimo-holdout-falsification-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-holdout-falsification-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_HOLDOUT_FALSIFICATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-holdout-falsification-v0.1.json"
+      - "tools/airroad-mimo-holdout-falsification/verify_holdout_falsification.py"
+      - ".github/workflows/airroad-mimo-holdout-falsification-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-holdout-falsification-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-holdout-falsification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute holdout falsification oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-mimo-holdout-falsification/verify_holdout_falsification.py
+          python3 \
+            tools/airroad-mimo-holdout-falsification/verify_holdout_falsification.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-mimo-holdout-falsification-v0.1.json \
+            > /dev/null
