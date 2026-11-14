@@ -1,0 +1,1513 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "MICROPLASMA-ARRAY-RESILIENCE-001",
+  "generated_date": "2026-11-14",
+  "claim_ceiling": "SYNTHETIC_CONTRACT_AUDIT_ONLY_NO_PHYSICAL_ARRAY_QUALIFICATION_OR_ACTUATION_AUTHORITY",
+  "maximum_cell_output_cv_percent": 5,
+  "aggregate_output_absolute_tolerance": 0.000001,
+  "counts_expected": {
+    "PASS": 6,
+    "BLOCKED": 7,
+    "REJECTED": 15
+  },
+  "cases": [
+    {
+      "id": "NOMINAL_ALL_CELLS_HEALTHY",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "PASS",
+      "rationale": "All five cells are known, active and inside the synthetic service contract."
+    },
+    {
+      "id": "N_MINUS_1_ISOLATED_AND_SERVICE_RETAINED",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.6,
+      "observed_useful_output": 3.8,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "PASS",
+      "rationale": "One isolated cell contributes zero; four known cells retain the declared synthetic output floor."
+    },
+    {
+      "id": "N_MINUS_2_ISOLATED_AND_SERVICE_RETAINED",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 2.8,
+      "observed_useful_output": 2.8499999999999996,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C4",
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "PASS",
+      "rationale": "Two isolated cells are explicitly accounted for and the remaining cells meet this scenario's predeclared floor."
+    },
+    {
+      "id": "SHARED_POWER_FAILOVER_RETAINED",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 4.5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "SHARED_POWER_FAILURE",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "PASS",
+      "rationale": "A synthetic shared-power fault is declared, and the post-failover power state plus containment are recorded in range."
+    },
+    {
+      "id": "SHARED_GAS_FAILOVER_RETAINED",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 0.9
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 4.5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "SHARED_GAS_FAILURE",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "PASS",
+      "rationale": "A synthetic shared-gas fault is declared, with an in-range post-failover gas state and verified containment."
+    },
+    {
+      "id": "CV_REPORTED_BUT_NOT_A_CLAIMED_GATE",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.6
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1.4
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": false,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "PASS",
+      "rationale": "High synthetic cell-output variation is not silently called uniform; this case does not request a uniformity claim and separately declares its product-quality endpoint."
+    },
+    {
+      "id": "N_MINUS_1_BELOW_SERVICE_FLOOR",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.8
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.8
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.8
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.8
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.6,
+      "observed_useful_output": 3.2,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Known output after isolation is below the application-specific minimum."
+    },
+    {
+      "id": "FAILED_CELL_STILL_COUNTED_ACTIVE",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "The faulted cell remains labelled ACTIVE rather than being isolated."
+    },
+    {
+      "id": "SHARED_POWER_OUT_OF_ENVELOPE",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "OUT_OF_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "SHARED_POWER_FAILURE",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "The shared power boundary is known to be outside the declared envelope."
+    },
+    {
+      "id": "SHARED_GAS_OUT_OF_ENVELOPE",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "OUT_OF_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "SHARED_GAS_FAILURE",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "The shared gas boundary is known to be outside the declared envelope."
+    },
+    {
+      "id": "SHARED_COOLING_OUT_OF_ENVELOPE",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "OUT_OF_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "SHARED_COOLING_FAILURE",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "The shared cooling boundary is known to be outside the declared envelope."
+    },
+    {
+      "id": "THERMAL_CROSS_TALK_OUTSIDE_ENVELOPE",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "OUTSIDE_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "THERMAL_CROSS_TALK",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Observed neighbouring-cell response is outside its declared envelope."
+    },
+    {
+      "id": "DIAGNOSTIC_COVERAGE_LOST",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": false,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "Incomplete diagnostics prevent the audit from treating unobserved cells as healthy."
+    },
+    {
+      "id": "CELL_STATE_UNKNOWN",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "UNKNOWN",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.5,
+      "observed_useful_output": 4,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "An unknown cell state cannot be credited as active or as a known isolated cell."
+    },
+    {
+      "id": "NEIGHBOR_RESPONSE_UNKNOWN",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "UNKNOWN",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "Neighbour response was not observed, so cross-talk containment is unqualified."
+    },
+    {
+      "id": "SHARED_UTILITY_STATE_UNKNOWN",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "UNKNOWN",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "Unknown gas status cannot be treated as zero risk or in-range."
+    },
+    {
+      "id": "FAULT_INJECTION_UNCONFIRMED",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.6,
+      "observed_useful_output": 3.8,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": false,
+        "containment_verified": true
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "The claimed fault event has no confirmation receipt."
+    },
+    {
+      "id": "CONTAINMENT_RECEIPT_MISSING",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.6,
+      "observed_useful_output": 3.8,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": false
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "The fault is observed but containment/isolation evidence is absent."
+    },
+    {
+      "id": "AGGREGATE_OUTPUT_DOES_NOT_RECONCILE",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 4.8,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Declared aggregate useful output differs from the sum of per-cell observations."
+    },
+    {
+      "id": "CELL_OUTPUT_CV_ABOVE_REQUIRED_CEILING",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.6
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1.4
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Recomputed cell-output coefficient of variation exceeds the fixture's 5% target."
+    },
+    {
+      "id": "DUPLICATE_CELL_IDENTITY",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Cell IDs must be unique within an array topology."
+    },
+    {
+      "id": "CELL_MANIFEST_INCOMPLETE",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.5,
+      "observed_useful_output": 4,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "The observed manifest does not contain the declared number of cells."
+    },
+    {
+      "id": "FAULT_REFERENCES_FOREIGN_CELL",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.6,
+      "observed_useful_output": 3.8,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C99"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Fault receipt names a cell outside the declared array manifest."
+    },
+    {
+      "id": "ISOLATED_CELL_HAS_NONZERO_OUTPUT",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0.2
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4,
+      "observed_useful_output": 4.2,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "An isolated cell must contribute zero to the declared useful-output sum."
+    },
+    {
+      "id": "NORMAL_SERVICE_CLAIM_WITH_CELL_FAULT",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 3.6,
+      "observed_useful_output": 3.8,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "A degraded state cannot be labelled as all-cells-normal service."
+    },
+    {
+      "id": "DEGRADED_CLAIM_WITHOUT_A_FAULT",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "Degraded service requires an explicit non-nominal fault class."
+    },
+    {
+      "id": "PRODUCT_QUALITY_ENDPOINT_FAILS",
+      "claim": "NORMAL_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": false,
+      "fault": {
+        "kind": "NONE",
+        "affected_cell_ids": [],
+        "injection_confirmed": false,
+        "containment_verified": false
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "A useful-output quantity alone cannot override a failed product-quality endpoint."
+    },
+    {
+      "id": "UNKNOWN_FAULT_KIND",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C4",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        },
+        {
+          "cell_id": "C5",
+          "state": "ACTIVE",
+          "normalized_output": 1
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 4.5,
+      "observed_useful_output": 5,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "UNREGISTERED_FAULT",
+        "affected_cell_ids": [],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "BLOCKED",
+      "rationale": "An unregistered fault class has no qualified containment semantics."
+    }
+  ]
+}
