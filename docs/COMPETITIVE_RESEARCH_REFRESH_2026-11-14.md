@@ -250,7 +250,7 @@ Paper: https://doi.org/10.3389/fmech.2026.1835857
 
 Paper: https://doi.org/10.1038/s41467-026-75528-1
 
-**Consumer outdoor comparator (Hypershell X Ultra S).** The manufacturer lists 2,538 g total wearing weight including battery, IP54 and a -20 °C to 60 °C operating-temperature range. These are manufacturer-published specifications; the product page is not an independent environmental or biomechanical test. IP54 applies to the stated product configuration, not automatically every garment seam, connector, cable exit or wearer interface.
+**Consumer outdoor comparator (Hypershell X Ultra S).** The manufacturer lists 2,538 g total wearing weight including battery, IP54 and a -20 °C to 60 °C operating-temperature range. These are manufacturer-published specifications; the product page is not an independent environmental or biomechanical test. IP54 applies to the stated product configuration, not automatically every garment seam, connector, cable exit or wearer interface. Under IEC 60529, IP54 denotes dust-protected (not dust-tight) and splash-protected (not water-jet or immersion) enclosure performance for the exact tested configuration; it is not garment-wide or all-climate qualification.
 
 Manufacturer page: https://hypershell.tech/en-us/blogs/news/inside-the-new-hypershell-x-series-upgrades-real-world-impact-and-faq
 
@@ -283,7 +283,7 @@ Separate device-enclosure ingress tests from textile rain/water tests, garment s
 - ASTM F3474-25 is an active practice for selecting functional ergonomic parameters and metrics for exoskeleton evaluation; it is not a complete safety case: https://store.astm.org/f3474-25.html
 - ASTM F3392-20 covers user information for wearing, care and maintenance: https://store.astm.org/standards/f3392
 - ASTM F3527-24 is a task-specific environmental risk-assessment guide for exoskeleton deployment: https://shop.standards.ie/en-ie/standards/astm-f-3527-2024-1276363_saig_astm_astm_3509866/
-- ISO 13482:2014 is listed by ISO as current but under revision; it addresses earthbound personal-care robots and excludes medical-device and industrial-robot categories. Product classification and applicability must be reviewed for the specific intended use: https://www.iso.org/standard/53820.html
+- ISO 13482 Edition 2 is listed by ISO as under publication (stage 60.60, 11 November 2026) and will replace ISO 13482:2014. It covers service robots used in personal and professional/commercial applications, while excluding industrial and medical applications. At the research cut-off the ISO page says final production steps remain; verify formal publication and exact product-category applicability before making a conformity claim: https://www.iso.org/standard/83498.html
 
 Consult licensed standards text and qualified domain reviewers before freezing a conformity or test claim.
 
@@ -292,6 +292,11 @@ Consult licensed standards text and qualified domain reviewers before freezing a
 New workstream: [TRAVEL-ROBE-001 #12163](https://github.com/Luminous-Dynamics/symthaea/issues/12163). It composes the Personal Garment Studio #12093, Everyday Wear #12157, Wardrobe-First Optimization #12094, apparel digital thread #11731, pattern interoperability #11750, sewing-plan compiler #12134 and textile qualification #5984.
 
 The concept is an elegant, comfortable, non-PPE travel robe or wrap-coat family: home/accommodation, terminal waiting, seated aircraft/train/bus travel, walking and variable indoor/outdoor conditions. The design language should be restrained and architectural rather than costume-like or gadget-heavy. Cultural and ceremonial references require user intent, respect and provenance; no single robe silhouette is treated as a universal aesthetic.
+
+Commercial analogues already exist, so Atelier should not claim to invent the travel wrap or changing robe. MERSEA's Modern Travel Wrap advertises a securing loop and matching travel bag; Dryrobe's Tech-Lite changing robe advertises 1 kg with bag, weatherproof construction and packability. They occupy different product niches and are candidate comparators, not direct evidence of performance parity. Compare named garments under matched coverage, warmth, price, mass, pack volume, seated comfort, access, laundering and durability protocols.
+
+- MERSEA Modern Travel Wrap: https://mersea.com/products/modern-travel-wrap
+- Dryrobe Tech-Lite: https://dryrobe.com/products/dryrobe-lite
 
 Key engineering questions:
 - Can the robe remain comfortable sitting/reclining as well as standing and walking?
