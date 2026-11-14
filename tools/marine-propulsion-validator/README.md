@@ -350,3 +350,26 @@ The join's `timebase_binding_valid` field reports structural/timebase linkage on
 Even with `binding_valid=true`, synthetic source records or unknown calibration and
 synchronization uncertainty keep the result INCOMPLETE. This is not sensor authentication,
 ISO conformity, cavitation validation, causal attribution, or an energy/noise improvement claim.
+
+
+## Time-causal marine performance-drift corpus
+
+Audit the synthetic reference-condition monitoring challenge:
+
+~~~sh
+cargo run --bin marine-performance-drift-audit -- \
+  ../../docs/research/marine/marine-performance-drift-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-performance-drift-v0.1.0.json
+~~~
+
+The auditor checks Draft 2020-12 meta-schema and instance validity, unique case identities,
+strictly ordered decision points, observation and feature availability at decision time,
+evidence availability, reference-model training cutoff before each scored observation,
+candidate-feature isolation from evaluator-only labels, prediction interval ordering and
+calibration status. Invalid/future evidence is rejected; stale or revoked calibration blocks
+measurement-based claims; unknown calibration remains INCOMPLETE.
+
+The v0.1.0 corpus is intentionally synthetic. Its expected audit disposition is
+INCOMPLETE even when all structural and temporal checks are satisfied. This does not
+train a performance model, identify biofouling, validate hydrodynamics, or establish
+cleaning efficacy or vessel performance.
