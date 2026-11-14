@@ -841,6 +841,32 @@ mod tests {
     }
 
     #[test]
+    fn service_boundary_reference_must_resolve_to_evidence() {
+        let mut source = candidate();
+        source.service_boundary_ref = Some("missing-boundary-record".to_string());
+        let errors = compile_candidate(&source).unwrap_err();
+        assert!(has_error(
+            &errors,
+            ValidationError::MissingServiceBoundaryEvidence(
+                "missing-boundary-record".to_string()
+            )
+        ));
+    }
+
+    #[test]
+    fn service_boundary_evidence_must_have_energy_scope() {
+        let mut source = candidate();
+        source.evidence[0].scope_ref = "component-geometry".to_string();
+        let errors = compile_candidate(&source).unwrap_err();
+        assert!(has_error(
+            &errors,
+            ValidationError::ServiceBoundaryScopeMismatch(
+                "grid-export-boundary-v1".to_string()
+            )
+        ));
+    }
+
+    #[test]
     fn missing_required_gate_is_indeterminate() {
         let mut source = candidate();
         source.hard_gates.retain(|gate| gate.kind != HardGateKind::EnergyBoundary);
@@ -880,6 +906,14 @@ mod tests {
     fn unsupported_regime_blocks_candidate() {
         let mut source = candidate();
         source.solver_runs[0].supported_regimes = vec!["thermal-arc".to_string()];
+        let build = compile_candidate(&source).unwrap();
+        assert_eq!(build.disposition, CandidateDisposition::Blocked);
+    }
+
+    #[test]
+    fn unsupported_required_observable_blocks_candidate() {
+        let mut source = candidate();
+        source.solver_runs[0].supported_observables = vec!["psi".to_string()];
         let build = compile_candidate(&source).unwrap();
         assert_eq!(build.disposition, CandidateDisposition::Blocked);
     }
@@ -979,7 +1013,7 @@ mod tests {
             claim_id: "claim-synthetic-1".to_string(),
             subject_ref: source.candidate_id.clone(),
             subject_revision: "stale-design-r6".to_string(),
-            evidence_id: "evidence-0".to_string(),
+            evidence_id: "evidence-1".to_string(),
             requested_class: ClaimClass::Synthetic,
         });
         let errors = compile_candidate(&source).unwrap_err();
@@ -1059,6 +1093,19 @@ mod tests {
         assert_eq!(
             build.dependence_findings[0].disposition,
             PairwiseDependence::IndependentUnderDeclaredFactors
+        );
+    }
+
+    #[test]
+    fn empty_dependency_group_is_unknown_not_independent() {
+        let mut source = candidate();
+        let mut second = solver_run("run-b", 'e', 'f');
+        second.dependencies.dataset_group = Some(String::new());
+        source.solver_runs.push(second);
+        let build = compile_candidate(&source).unwrap();
+        assert_eq!(
+            build.dependence_findings[0].disposition,
+            PairwiseDependence::UnknownDependencyIdentity
         );
     }
 
