@@ -9,6 +9,8 @@
 //! phenomenal consciousness. A report is relative to the supplied system
 //! boundary, organization specification, trace, and artifact store.
 //!
+#![forbid(unsafe_code)]
+
 //! Trust boundary: this verifier recomputes artifact digests and validates
 //! trace consistency. It does not authenticate the trace producer, establish
 //! that a process truly ran on physical hardware, or authorize the process.
@@ -147,20 +149,26 @@ pub struct OrganizationSpec {
 impl OrganizationSpec {
     /// Returns false rather than silently replacing an existing declaration.
     pub fn insert_component(&mut self, component: ComponentSpec) -> bool {
-        if self.components.contains_key(&component.id) {
-            return false;
+        use std::collections::btree_map::Entry;
+        match self.components.entry(component.id.clone()) {
+            Entry::Vacant(entry) => {
+                entry.insert(component);
+                true
+            }
+            Entry::Occupied(_) => false,
         }
-        self.components.insert(component.id.clone(), component);
-        true
     }
 
     /// Returns false rather than silently replacing an existing declaration.
     pub fn insert_process(&mut self, process: ProcessSpec) -> bool {
-        if self.processes.contains_key(&process.id) {
-            return false;
+        use std::collections::btree_map::Entry;
+        match self.processes.entry(process.id.clone()) {
+            Entry::Vacant(entry) => {
+                entry.insert(process);
+                true
+            }
+            Entry::Occupied(_) => false,
         }
-        self.processes.insert(process.id.clone(), process);
-        true
     }
 }
 
@@ -203,12 +211,15 @@ impl ArtifactStore {
         id: ArtifactVersionId,
         bytes: Vec<u8>,
     ) -> Result<ContentDigest, StoreError> {
-        if self.bytes_by_version.contains_key(&id) {
-            return Err(StoreError::DuplicateVersion(id));
-        }
+        use std::collections::btree_map::Entry;
         let digest = ContentDigest::of(&bytes);
-        self.bytes_by_version.insert(id, bytes);
-        Ok(digest)
+        match self.bytes_by_version.entry(id) {
+            Entry::Vacant(entry) => {
+                entry.insert(bytes);
+                Ok(digest)
+            }
+            Entry::Occupied(entry) => Err(StoreError::DuplicateVersion(entry.key().clone())),
+        }
     }
 
     pub fn get(&self, id: &ArtifactVersionId) -> Option<&[u8]> {
@@ -320,9 +331,11 @@ pub struct VerificationReport {
 }
 
 impl VerificationReport {
+    /// Qualifies only the bounded functional self-maintenance contract. This
+    /// is not a claim of runtime organizational closure or biological life.
     /// Qualification is non-compensatory: any finding blocks a pass, and an
     /// empty regenerative scope is not reported as successful.
-    pub fn is_qualified(&self) -> bool {
+    pub fn qualifies_functional_self_maintenance(&self) -> bool {
         self.required_regenerative_component_count > 0
             && self.verified_regenerative_component_count
                 == self.required_regenerative_component_count
@@ -992,7 +1005,7 @@ mod tests {
         let (organization, trace, store) = healthy_fixture();
         let report = verify_trace(&organization, &trace, &store);
 
-        assert!(report.is_qualified(), "{:?}", report.findings);
+        assert!(report.qualifies_functional_self_maintenance(), "{:?}", report.findings);
         assert_eq!(report.successful_execution_count, 2);
         assert_eq!(report.verified_output_count, 1);
         assert_eq!(report.required_regenerative_component_count, 1);
