@@ -20,7 +20,7 @@ pub enum MusicEditValidityPropertyV1 {
     InstrumentIdentity, DrumKitIdentity, EventPresence, EventLineage, MelodyPitch,
     Harmony, OnsetTicks, DurationTicks, Rhythm, Meter, Form, Tempo, VelocityContour,
     DynamicContour, TuningCents, TimbreFamily, StereoImage, GlobalLoudness,
-    AudioArtifact, PhraseCoherence,
+    AudioArtifact, PhraseCoherence, Articulation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -146,6 +146,8 @@ pub enum MusicEditValidityEnvelopeIssueV1 {
     ReferenceLineageMismatch(String), ValidAlternativeNotValidated(String),
     ValidatedReferenceMissingReview(String), InvalidReviewRecord(String),
     NegativeControlNotInvalid(String), RequiredAlternativeMissing,
+    OperationScopeMismatch(MusicEditOperationV1),
+    MissingOperationRequirement { operation: MusicEditOperationV1, property: MusicEditValidityPropertyV1 },
     InvalidEnvelope, SerializationError,
 }
 
@@ -279,6 +281,201 @@ fn validate_section(
     issues
 }
 
+
+fn has_requested(
+    envelope: &MusicEditValidityEnvelopeV1,
+    property: MusicEditValidityPropertyV1,
+    scope: MusicEditValidityScopeV1,
+    relation: MusicEditValidityRelationV1,
+) -> bool {
+    envelope.requested_change.iter().any(|constraint| {
+        constraint.property == property
+            && constraint.scope == scope
+            && constraint.relation == relation
+    })
+}
+
+fn has_protected(
+    envelope: &MusicEditValidityEnvelopeV1,
+    property: MusicEditValidityPropertyV1,
+    scope: MusicEditValidityScopeV1,
+    relation: MusicEditValidityRelationV1,
+) -> bool {
+    envelope.protected_invariants.iter().any(|constraint| {
+        constraint.property == property
+            && constraint.scope == scope
+            && constraint.relation == relation
+    })
+}
+
+fn operation_scope_valid(envelope: &MusicEditValidityEnvelopeV1) -> bool {
+    use MusicEditOperationV1 as O;
+    use MusicEditTargetScopeV1 as T;
+    match envelope.operation {
+        O::RemoveInstrument | O::ReplaceInstrument | O::ExtractInstrument | O::DoubleInstrument
+        | O::Staccato | O::Legato => envelope.target_scope == T::Instrument,
+        O::RemoveDrums | O::ReplaceDrums | O::ExtractDrums => envelope.target_scope == T::DrumKit,
+        O::Crescendo | O::Decrescendo | O::TuningCorrection440 => {
+            matches!(envelope.target_scope, T::Instrument | T::Mixture)
+        }
+    }
+}
+
+/// Enforces a minimal semantic contract per declared operation. These checks
+/// validate the envelope only; actual symbolic/audio observations need separate
+/// operation-specific verifiers and renderer-bound evidence.
+fn validate_operation_contract(
+    envelope: &MusicEditValidityEnvelopeV1,
+) -> Vec<MusicEditValidityEnvelopeIssueV1> {
+    use MusicEditOperationV1 as O;
+    use MusicEditValidityEvidenceV1 as E;
+    use MusicEditValidityPropertyV1 as P;
+    use MusicEditValidityRelationV1 as R;
+    use MusicEditValidityScopeV1 as S;
+    use MusicEditTargetScopeV1 as T;
+
+    let mut issues = Vec::new();
+    if !operation_scope_valid(envelope) {
+        issues.push(MusicEditValidityEnvelopeIssueV1::OperationScopeMismatch(
+            envelope.operation,
+        ));
+        return issues;
+    }
+
+    let missing = |property| MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+        operation: envelope.operation,
+        property,
+    };
+
+    match envelope.operation {
+        O::RemoveInstrument => {
+            if !(has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::Absent)
+                || has_requested(envelope, P::EventPresence, S::TargetPart, R::Absent))
+            {
+                issues.push(missing(P::InstrumentIdentity));
+            }
+        }
+        O::ReplaceInstrument => {
+            if !has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::MemberOfSet) {
+                issues.push(missing(P::InstrumentIdentity));
+            }
+            if !envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::InstrumentIdentity
+                    && constraint.scope == S::TargetPart
+                    && constraint.relation == R::DifferentFrom
+                    && constraint.expected_value.as_ref().is_some_and(|value| !value.trim().is_empty())
+            }) {
+                issues.push(missing(P::InstrumentIdentity));
+            }
+            if !has_protected(envelope, P::EventLineage, S::TargetPart, R::NoChange) {
+                issues.push(missing(P::EventLineage));
+            }
+        }
+        O::ExtractInstrument => {
+            if !(has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::EqualTo)
+                || has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::MemberOfSet))
+                || !has_requested(envelope, P::EventPresence, S::TargetPart, R::Present)
+            {
+                issues.push(missing(P::InstrumentIdentity));
+            }
+        }
+        O::DoubleInstrument => {
+            if !has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::MemberOfSet)
+                || !has_requested(envelope, P::EventLineage, S::EditedSupport, R::Present)
+            {
+                issues.push(missing(P::InstrumentIdentity));
+            }
+        }
+        O::RemoveDrums => {
+            if !(has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::Absent)
+                || has_requested(envelope, P::EventPresence, S::TargetPart, R::Absent))
+            {
+                issues.push(missing(P::DrumKitIdentity));
+            }
+        }
+        O::ReplaceDrums => {
+            if !has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::MemberOfSet)
+                || !envelope.requested_change.iter().any(|constraint| {
+                    constraint.property == P::DrumKitIdentity
+                        && constraint.scope == S::TargetPart
+                        && constraint.relation == R::DifferentFrom
+                        && constraint.expected_value.as_ref().is_some_and(|value| !value.trim().is_empty())
+                })
+            {
+                issues.push(missing(P::DrumKitIdentity));
+            }
+            if !has_protected(envelope, P::EventLineage, S::TargetPart, R::NoChange) {
+                issues.push(missing(P::EventLineage));
+            }
+        }
+        O::ExtractDrums => {
+            if !(has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::EqualTo)
+                || has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::MemberOfSet))
+                || !has_requested(envelope, P::EventPresence, S::TargetPart, R::Present)
+            {
+                issues.push(missing(P::DrumKitIdentity));
+            }
+        }
+        O::Staccato | O::Legato => {
+            let articulation = if envelope.operation == O::Staccato { "staccato" } else { "legato" };
+            let has_articulation = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::Articulation
+                    && constraint.scope == S::TargetPart
+                    && constraint.relation == R::EqualTo
+                    && constraint.expected_value.as_deref() == Some(articulation)
+                    && matches!(constraint.evidence, E::Acoustic | E::Combined)
+            });
+            let has_duration = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::DurationTicks
+                    && constraint.scope == S::TargetPart
+                    && constraint.relation == R::WithinRange
+                    && constraint.unit.as_deref() == Some("ticks")
+                    && matches!(constraint.evidence, E::Symbolic | E::Combined)
+            });
+            if !has_articulation {
+                issues.push(missing(P::Articulation));
+            }
+            if !has_duration {
+                issues.push(missing(P::DurationTicks));
+            }
+        }
+        O::Crescendo | O::Decrescendo => {
+            let scope = if envelope.target_scope == T::Instrument { S::TargetPart } else { S::WholeMixture };
+            let relation = if envelope.operation == O::Crescendo {
+                R::MonotonicIncrease
+            } else {
+                R::MonotonicDecrease
+            };
+            let has_contour = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::DynamicContour
+                    && constraint.scope == scope
+                    && constraint.relation == relation
+                    && matches!(constraint.evidence, E::Acoustic | E::Combined)
+            });
+            if !has_contour {
+                issues.push(missing(P::DynamicContour));
+            }
+        }
+        O::TuningCorrection440 => {
+            let scope = if envelope.target_scope == T::Instrument { S::TargetPart } else { S::WholeMixture };
+            let has_cent_tolerance = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::TuningCents
+                    && constraint.scope == scope
+                    && constraint.relation == R::WithinRange
+                    && constraint.unit.as_deref() == Some("cents")
+                    && matches!(constraint.evidence, E::Acoustic | E::Combined)
+            });
+            if !has_cent_tolerance {
+                issues.push(missing(P::TuningCents));
+            }
+            if !has_protected(envelope, P::MelodyPitch, scope, R::NoChange) {
+                issues.push(missing(P::MelodyPitch));
+            }
+        }
+    }
+    issues
+}
+
 /// Checks the contract structure; it does not score audio or infer listener preference.
 pub fn validate_music_edit_validity_envelope_v1(
     envelope: &MusicEditValidityEnvelopeV1,
@@ -400,6 +597,7 @@ pub fn validate_music_edit_validity_envelope_v1(
     {
         issues.push(MusicEditValidityEnvelopeIssueV1::RequiredAlternativeMissing);
     }
+    issues.extend(validate_operation_contract(envelope));
     issues
 }
 
@@ -517,6 +715,111 @@ mod tests {
         let envelope = valid_envelope();
         assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
         assert!(music_edit_validity_envelope_digest_v1(&envelope).is_ok());
+    }
+
+
+    #[test]
+    fn operation_contract_requires_target_specific_instrument_change_and_event_lineage() {
+        let mut envelope = valid_envelope();
+        assert!(validate_music_edit_validity_envelope_v1(&envelope)
+            .contains(&MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::ReplaceInstrument,
+                property: MusicEditValidityPropertyV1::EventLineage,
+            }));
+        envelope.protected_invariants.push(constraint(
+            "protect.part-lineage",
+            MusicEditValidityPropertyV1::EventLineage,
+            MusicEditValidityScopeV1::TargetPart,
+            MusicEditValidityRelationV1::NoChange,
+        ));
+        envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.requested_change.push(MusicEditValidityConstraintV1 {
+            constraint_id: "change.from-original".to_owned(),
+            property: MusicEditValidityPropertyV1::InstrumentIdentity,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::DifferentFrom,
+            expected_value: Some("clarinet".to_owned()),
+            allowed_values: Vec::new(),
+            minimum: None,
+            maximum: None,
+            unit: None,
+            evidence: MusicEditValidityEvidenceV1::Symbolic,
+            rationale: "replace the prior instrument identity".to_owned(),
+        });
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+    }
+
+    #[test]
+    fn staccato_requires_symbolic_duration_and_acoustic_articulation_obligations() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::Staccato;
+        envelope.requested_change.clear();
+        envelope.requested_change.push(MusicEditValidityConstraintV1 {
+            constraint_id: "change.articulation".to_owned(),
+            property: MusicEditValidityPropertyV1::Articulation,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::EqualTo,
+            expected_value: Some("staccato".to_owned()),
+            allowed_values: Vec::new(),
+            minimum: None,
+            maximum: None,
+            unit: None,
+            evidence: MusicEditValidityEvidenceV1::Acoustic,
+            rationale: "the rendered articulation should be audibly staccato".to_owned(),
+        });
+        envelope.requested_change.push(MusicEditValidityConstraintV1 {
+            constraint_id: "change.duration".to_owned(),
+            property: MusicEditValidityPropertyV1::DurationTicks,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::WithinRange,
+            expected_value: None,
+            allowed_values: Vec::new(),
+            minimum: Some(1.0),
+            maximum: Some(120.0),
+            unit: Some("ticks".to_owned()),
+            evidence: MusicEditValidityEvidenceV1::Symbolic,
+            rationale: "note durations are constrained in exact score ticks".to_owned(),
+        });
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+        envelope.requested_change[0].evidence = MusicEditValidityEvidenceV1::Symbolic;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::Staccato,
+                property: MusicEditValidityPropertyV1::Articulation,
+            }
+        ));
+    }
+
+    #[test]
+    fn crescendo_scope_must_be_explicit_and_acoustically_evidenced() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::Crescendo;
+        envelope.requested_change.clear();
+        envelope.requested_change.push(MusicEditValidityConstraintV1 {
+            constraint_id: "change.dynamic-contour".to_owned(),
+            property: MusicEditValidityPropertyV1::DynamicContour,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::MonotonicIncrease,
+            expected_value: None,
+            allowed_values: Vec::new(),
+            minimum: None,
+            maximum: None,
+            unit: None,
+            evidence: MusicEditValidityEvidenceV1::Acoustic,
+            rationale: "the selected part must have an increasing rendered dynamic contour".to_owned(),
+        });
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+        envelope.target_scope = MusicEditTargetScopeV1::Mixture;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::OperationScopeMismatch(MusicEditOperationV1::Crescendo)
+        ));
     }
 
     #[test]
