@@ -1,0 +1,61 @@
+name: Marine Robust Operating Policy Audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/marine-robust-operating-policy-audit/**"
+      - "docs/research/marine/marine-robust-operating-policy-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-robust-operating-policy-v0.1.0.json"
+      - ".github/workflows/marine-robust-operating-policy.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/marine-robust-operating-policy-audit/**"
+      - "docs/research/marine/marine-robust-operating-policy-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-robust-operating-policy-v0.1.0.json"
+      - ".github/workflows/marine-robust-operating-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Format, lint and Pareto known-answer tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format Rust source
+        run: rustfmt --edition 2024 tools/marine-robust-operating-policy-audit/src/main.rs
+      - name: Preserve formatted source
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-robust-operating-policy-rustfmt
+          path: tools/marine-robust-operating-policy-audit/src/main.rs
+          if-no-files-found: error
+      - name: Verify formatting
+        run: rustfmt --edition 2024 --check tools/marine-robust-operating-policy-audit/src/main.rs
+      - name: Generate isolated Cargo lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-robust-operating-policy-audit/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path tools/marine-robust-operating-policy-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Run tests
+        run: cargo test --locked --manifest-path tools/marine-robust-operating-policy-audit/Cargo.toml
+      - name: Validate schema and fixture JSON
+        run: |
+          python3 -c "import json; json.load(open('docs/research/marine/marine-robust-operating-policy-v0.1.0.schema.json')); json.load(open('docs/research/marine/fixtures/synthetic-marine-robust-operating-policy-v0.1.0.json'))"
+      - name: Assert synthetic fixture cannot select a policy
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-robust-operating-policy-audit/Cargo.toml -- docs/research/marine/fixtures/synthetic-marine-robust-operating-policy-v0.1.0.json > /tmp/marine-policy-report.json
+          code=$?
+          set -e
+          test "$code" -eq 3
+          python3 -c "import json; r=json.load(open('/tmp/marine-policy-report.json')); assert r['disposition'] == 'NO_ROBUST_FEASIBLE_CANDIDATE'; assert r['feasible_pareto_frontier_candidate_ids'] == []; assert all(c['disposition'] == 'INCOMPLETE' for c in r['candidate_reports'])"

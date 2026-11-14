@@ -1,0 +1,181 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-robust-operating-policy-0001",
+  "source": {
+    "dataset_id": "synthetic-policy-dataset",
+    "citation": "Synthetic known-answer fixture only; not measured vessel data",
+    "raw_data_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "rights_decision_reference": "synthetic-only-no-license-claim"
+  },
+  "evidence_kind": "synthetic",
+  "rights_status": "public_or_permitted",
+  "independently_reviewed": true,
+  "scenario": {
+    "vessel_id": "synthetic-vessel-001",
+    "vessel_configuration_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "scenario_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "propeller_design_id": "synthetic-propeller-001",
+    "propeller_revision": "revision-7",
+    "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "environment_fingerprint_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "hull_state_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "route_id": "synthetic-route-001",
+    "draft_m": 11,
+    "cargo_mass_tonnes": 80000,
+    "delivered_service_tonne_nm": 100000,
+    "maximum_delivery_window_hours": 120
+  },
+  "limits": {
+    "minimum_delivered_service_tonne_nm": 99000,
+    "maximum_voyage_duration_hours": 120,
+    "maximum_primary_energy_kwh_per_tonne_nm": 0.2,
+    "maximum_well_to_wake_ghg_gco2e_per_tonne_nm": 0.08,
+    "maximum_lifecycle_cost_usd_per_tonne_nm": 0.05,
+    "source_level_limits": [
+      {
+        "band_id": "one-third-octave-1000hz",
+        "quantity_id": "source_level_db_re_1upa_at_1m",
+        "maximum_source_level_db": 130
+      },
+      {
+        "band_id": "one-third-octave-2000hz",
+        "quantity_id": "source_level_db_re_1upa_at_1m",
+        "maximum_source_level_db": 130
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "candidate_id": "A",
+      "policy_label": "A-policy",
+      "operating_point_id": "op-A",
+      "scenario_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_kind": "synthetic",
+      "independently_reviewed": true,
+      "evidence_review_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "raw_measurement_or_validation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "method_id": "synthetic-known-answer-method",
+      "propeller_rpm": 80,
+      "vessel_speed_knots": 12,
+      "metrics": {
+        "delivered_service_tonne_nm": 100000,
+        "delivered_service_u95_tonne_nm": 100,
+        "voyage_duration_hours": 100,
+        "voyage_duration_u95_hours": 0.2,
+        "primary_energy_kwh_per_tonne_nm": 0.14,
+        "primary_energy_u95_kwh_per_tonne_nm": 0.001,
+        "well_to_wake_ghg_gco2e_per_tonne_nm": 0.06,
+        "well_to_wake_ghg_u95_gco2e_per_tonne_nm": 0.001,
+        "lifecycle_cost_usd_per_tonne_nm": 0.04,
+        "lifecycle_cost_u95_usd_per_tonne_nm": 0.001,
+        "source_levels": [
+          {
+            "band_id": "one-third-octave-1000hz",
+            "quantity_id": "source_level_db_re_1upa_at_1m",
+            "source_level_db": 120,
+            "expanded_uncertainty_db": 0.2,
+            "method_id": "synthetic-source-level-method",
+            "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "band_id": "one-third-octave-2000hz",
+            "quantity_id": "source_level_db_re_1upa_at_1m",
+            "source_level_db": 118,
+            "expanded_uncertainty_db": 0.2,
+            "method_id": "synthetic-source-level-method",
+            "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          }
+        ]
+      }
+    },
+    {
+      "candidate_id": "B",
+      "policy_label": "B-policy",
+      "operating_point_id": "op-B",
+      "scenario_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_kind": "synthetic",
+      "independently_reviewed": true,
+      "evidence_review_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "raw_measurement_or_validation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "method_id": "synthetic-known-answer-method",
+      "propeller_rpm": 80,
+      "vessel_speed_knots": 12,
+      "metrics": {
+        "delivered_service_tonne_nm": 100000,
+        "delivered_service_u95_tonne_nm": 100,
+        "voyage_duration_hours": 105,
+        "voyage_duration_u95_hours": 0.2,
+        "primary_energy_kwh_per_tonne_nm": 0.16,
+        "primary_energy_u95_kwh_per_tonne_nm": 0.001,
+        "well_to_wake_ghg_gco2e_per_tonne_nm": 0.05,
+        "well_to_wake_ghg_u95_gco2e_per_tonne_nm": 0.001,
+        "lifecycle_cost_usd_per_tonne_nm": 0.045,
+        "lifecycle_cost_u95_usd_per_tonne_nm": 0.001,
+        "source_levels": [
+          {
+            "band_id": "one-third-octave-1000hz",
+            "quantity_id": "source_level_db_re_1upa_at_1m",
+            "source_level_db": 118,
+            "expanded_uncertainty_db": 0.2,
+            "method_id": "synthetic-source-level-method",
+            "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "band_id": "one-third-octave-2000hz",
+            "quantity_id": "source_level_db_re_1upa_at_1m",
+            "source_level_db": 116,
+            "expanded_uncertainty_db": 0.2,
+            "method_id": "synthetic-source-level-method",
+            "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          }
+        ]
+      }
+    },
+    {
+      "candidate_id": "C",
+      "policy_label": "C-policy",
+      "operating_point_id": "op-C",
+      "scenario_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_kind": "synthetic",
+      "independently_reviewed": true,
+      "evidence_review_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "raw_measurement_or_validation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "method_id": "synthetic-known-answer-method",
+      "propeller_rpm": 80,
+      "vessel_speed_knots": 12,
+      "metrics": {
+        "delivered_service_tonne_nm": 100000,
+        "delivered_service_u95_tonne_nm": 100,
+        "voyage_duration_hours": 110,
+        "voyage_duration_u95_hours": 0.2,
+        "primary_energy_kwh_per_tonne_nm": 0.18,
+        "primary_energy_u95_kwh_per_tonne_nm": 0.001,
+        "well_to_wake_ghg_gco2e_per_tonne_nm": 0.07,
+        "well_to_wake_ghg_u95_gco2e_per_tonne_nm": 0.001,
+        "lifecycle_cost_usd_per_tonne_nm": 0.048,
+        "lifecycle_cost_u95_usd_per_tonne_nm": 0.001,
+        "source_levels": [
+          {
+            "band_id": "one-third-octave-1000hz",
+            "quantity_id": "source_level_db_re_1upa_at_1m",
+            "source_level_db": 125,
+            "expanded_uncertainty_db": 0.2,
+            "method_id": "synthetic-source-level-method",
+            "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "band_id": "one-third-octave-2000hz",
+            "quantity_id": "source_level_db_re_1upa_at_1m",
+            "source_level_db": 123,
+            "expanded_uncertainty_db": 0.2,
+            "method_id": "synthetic-source-level-method",
+            "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+          }
+        ]
+      }
+    }
+  ]
+}
