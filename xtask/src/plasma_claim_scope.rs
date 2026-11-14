@@ -30,6 +30,44 @@ pub(super) struct Case {
     pub(super) rationale: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ScopeEvidence {
+    pub(super) id: String,
+    pub(super) method_id: String,
+    pub(super) edition: String,
+    pub(super) evidence_kind: String,
+    pub(super) material_pair_class: String,
+    pub(super) geometry: String,
+    pub(super) endpoint: String,
+    pub(super) requested_claim: String,
+    pub(super) protocol_id: Option<String>,
+    pub(super) protocol_sha256: Option<String>,
+    pub(super) raw_data_sha256: Option<String>,
+    pub(super) suitability_review_sha256: Option<String>,
+    pub(super) specimen_ids: Vec<String>,
+}
+
+impl From<&Case> for ScopeEvidence {
+    fn from(case: &Case) -> Self {
+        Self {
+            id: case.id.clone(),
+            method_id: case.method_id.clone(),
+            edition: case.edition.clone(),
+            evidence_kind: case.evidence_kind.clone(),
+            material_pair_class: case.material_pair_class.clone(),
+            geometry: case.geometry.clone(),
+            endpoint: case.endpoint.clone(),
+            requested_claim: case.requested_claim.clone(),
+            protocol_id: case.protocol_id.clone(),
+            protocol_sha256: case.protocol_sha256.clone(),
+            raw_data_sha256: case.raw_data_sha256.clone(),
+            suitability_review_sha256: case.suitability_review_sha256.clone(),
+            specimen_ids: case.specimen_ids.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 struct MethodRule {
     method_id: &'static str,
@@ -103,7 +141,7 @@ fn is_known_overclaim(claim: &str) -> bool {
     )
 }
 
-pub(super) fn decide(case: &Case) -> Decision {
+pub(super) pub(super) fn decide(case: &ScopeEvidence) -> Decision {
     let blocked = |reason, ceiling| Decision {
         disposition: Disposition::Blocked,
         reason,
@@ -241,7 +279,8 @@ pub fn run(path: &Path) -> anyhow::Result<()> {
     println!("Claim ceiling: method-scoped measurement only; no product qualification, design allowable, service-life, or standards-compliance claim.");
 
     for case in &fixture.cases {
-        let decision = decide(case);
+        let evidence = ScopeEvidence::from(case);
+        let decision = decide(&evidence);
         let index = match decision.disposition {
             Disposition::Supported => 0,
             Disposition::Blocked => 1,
@@ -301,7 +340,7 @@ mod tests {
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
-            let actual = decide(case).disposition.as_str();
+            let actual = decide(&ScopeEvidence::from(case)).disposition.as_str();
             assert_eq!(
                 actual, case.expected_disposition,
                 "disposition mismatch for {}",
