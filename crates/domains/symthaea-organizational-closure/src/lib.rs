@@ -518,16 +518,16 @@ pub fn verify_trace(
     let mut last_sequence: Option<u64> = None;
 
     for event in &trace.events {
-        if let Some(previous) = last_sequence {
-            if event.sequence <= previous {
-                event_finding(
-                    &mut report,
-                    FindingCode::NonMonotonicSequence,
-                    event,
-                    None,
-                    "event sequence must be strictly increasing",
-                );
-            }
+        if let Some(previous) = last_sequence
+            && event.sequence <= previous
+        {
+            event_finding(
+                &mut report,
+                FindingCode::NonMonotonicSequence,
+                event,
+                None,
+                "event sequence must be strictly increasing",
+            );
         }
         last_sequence = Some(event.sequence);
 
@@ -881,17 +881,17 @@ pub fn verify_trace(
                     continue;
                 }
 
-                if let Some(previous_version) = last_component_version.get(component_id) {
-                    if output.id.version <= *previous_version {
-                        event_finding(
-                            &mut report,
-                            FindingCode::NonMonotonicComponentVersion,
-                            event,
-                            Some(component_id.clone()),
-                            "component output version did not increase monotonically",
-                        );
-                        continue;
-                    }
+                if let Some(previous_version) = last_component_version.get(component_id)
+                    && output.id.version <= *previous_version
+                {
+                    event_finding(
+                        &mut report,
+                        FindingCode::NonMonotonicComponentVersion,
+                        event,
+                        Some(component_id.clone()),
+                        "component output version did not increase monotonically",
+                    );
+                    continue;
                 }
 
                 if verified_outputs.contains_key(&output.id) {
