@@ -136,3 +136,8 @@ The proposed Ed25519 checkpoint wire contract, monotonic consumer-state rules an
 The proposed Ed25519 checkpoint wire contract, monotonic consumer-state rules and cross-language test vector are documented in [CHECKPOINT_CHAIN.md](CHECKPOINT_CHAIN.md). The public branch now includes the executable standard-library Go verifier under `checkpoints/`, 16 focused tests and the public test vector. The signer, independently administered witness service, protected external trust-state store and key custody are not deployed. The verifier does not turn this into an E3/E4 witness or certification.
 
 The public checkpoint verifier also exposes `AcceptObserved`, which joins the signature to an observer-supplied database ID, journal sequence and head digest from one coherent snapshot before advancing the external trusted cursor.
+
+
+## Local checkpoint witness reference
+
+The `witness/` package is a single-writer local signed-checkpoint journal. It replays and validates a contiguous Ed25519 chain, refuses equivocation for unchanged journal progress, returns the same signed checkpoint on an identical retry, and fsyncs each appended record before acknowledgement. It is Linux-only for exclusive writer locking and receives its private key from the caller in memory. It is not a remote E3 witness, HSM integration, transparency log, gossip system or independent administrative domain. See [witness/README.md](witness/README.md).
