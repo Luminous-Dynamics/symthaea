@@ -121,6 +121,24 @@ The value proposition is independently reconstructable answers to which decision
 
 Product documentation from PTC, Dassault Systèmes, IBM and Ansys establishes substantial native PLM/ALM/change/safety-analysis capabilities; it is not independent comparative performance evidence. A superiority claim requires matched, blinded operational trials.
 
-## 11. Explicit nonclaims
+## 11. Reference package and authoring-time replay
+
+The standalone Rust reference package is located at `benchmarks/engineering-change-impact/decision-requalification-reference`. From the repository root:
+
+```sh
+cargo test --manifest-path benchmarks/engineering-change-impact/decision-requalification-reference/Cargo.toml
+```
+
+The synthetic fixture contains ten cases, twelve individual decision outcomes, eight paired interventions and eighteen preregistered mutation controls. At the exact authoring branch head, a separate JavaScript reference replay matched:
+
+- 30/30 dependency-manifest, event-inventory and candidate-visible-event SHA-256 commitments;
+- 12/12 as-of K0 and current K1 decision dispositions/actions/reason-code sets;
+- 8/8 FLIP, INVARIANT, late-arrival, scoped-invalidation and historical-rejection relations.
+
+These are reference/fixture checks, not candidate-model performance. The three Rust tests are authored but have not yet been compiled or executed. The mutation controls are frozen specifications, not executed mutation results.
+
+For this synthetic corpus, timestamps are normalized to fixed-width UTC RFC3339 strings so the standalone reference can compare them deterministically. Production adapters must parse real instants, preserve offsets/clock uncertainty and owner sequence semantics; lexical timestamp comparison is not a production time-validation method.
+
+## 12. Explicit nonclaims
 
 This benchmark does not establish continuous event-monitoring completeness, sensor coverage, universal event ordering, legal validity of revocation, physical safety, real-time actuation guarantees, external certification or vendor superiority. Those require owner-native validation and prospective engineering trials.
