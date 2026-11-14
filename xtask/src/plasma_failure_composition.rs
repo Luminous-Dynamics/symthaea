@@ -224,6 +224,12 @@ fn audit_cohort(
         return Err(Disposition::Blocked);
     }
 
+    let method_observation_mode = match cohort.classification_receipt.method_id.as_str() {
+        "ASTM_D5573" => "direct_unaided_visual",
+        "ISO_10365" => "method_declared_visual",
+        _ => return Err(Disposition::Blocked),
+    };
+
     let mut specimen_set = HashSet::new();
     let mut cluster_set = HashSet::new();
     for sample in &cohort.specimens {
@@ -237,7 +243,7 @@ fn audit_cohort(
         if !sha256_shape(&sample.image_sha256) {
             return Err(Disposition::Blocked);
         }
-        if sample.observation_mode != "direct_unaided_visual" {
+        if sample.observation_mode != method_observation_mode {
             return Err(Disposition::Rejected);
         }
         if sample.observer_refs.len() < 2 || !unique_strings(&sample.observer_refs) {
@@ -362,6 +368,41 @@ fn audit_receipt(receipt: &FailureCompositionReceipt) -> Decision {
         || receipt.baseline.fraction_protocol_sha256 != receipt.candidate.fraction_protocol_sha256
     {
         return rejected("baseline and candidate cohorts use different fraction bases or measurement protocols");
+    }
+
+    let baseline_method = &receipt.baseline.classification_receipt;
+    let candidate_method = &receipt.candidate.classification_receipt;
+    if baseline_method.method_id != candidate_method.method_id
+        || baseline_method.edition != candidate_method.edition
+        || baseline_method.evidence_kind != candidate_method.evidence_kind
+        || baseline_method.material_pair_class != candidate_method.material_pair_class
+        || baseline_method.geometry != candidate_method.geometry
+        || baseline_method.endpoint != candidate_method.endpoint
+        || baseline_method.requested_claim != candidate_method.requested_claim
+    {
+        return rejected("baseline and candidate failure classifications use different methods or claim scopes");
+    }
+
+    let expected_category_ids: &[&str] = match (
+        receipt.category_ontology_id.as_str(),
+        baseline_method.method_id.as_str(),
+    ) {
+        ("D5573-SMC-FAILURE-V1", "ASTM_D5573") => &[
+            "adhesive_failure",
+            "cohesive_failure",
+            "thin_layer_cohesive",
+            "fiber_tear",
+            "light_fiber_tear",
+            "stock_break",
+        ],
+        ("ISO-10365-GENERAL-FAILURE-V1", "ISO_10365") => &[
+            "SF", "CSF", "DF", "CF", "SCF", "SWCF", "AF", "ACFP", "COR",
+        ],
+        _ => return rejected("failure category ontology does not match its exact classification method"),
+    };
+    let actual_category_ids: Vec<&str> = receipt.categories.iter().map(|category| category.id.as_str()).collect();
+    if actual_category_ids != expected_category_ids {
+        return rejected("failure category IDs do not match the frozen method-specific ontology");
     }
     if receipt.baseline.independent_unit != receipt.candidate.independent_unit
         || receipt.baseline.grouping_scheme != receipt.candidate.grouping_scheme
@@ -534,7 +575,7 @@ fn read_fixture(path: &Path) -> Result<Fixture> {
 
 pub fn run(path: &Path) -> Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-failure-composition-fixture-v0.1" {
+    if fixture.schema_version != "plasma-failure-composition-fixture-v0.2" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -569,12 +610,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_failure_composition_fixture_v0_1.json");
+        include_str!("../../data/research/plasma_failure_composition_fixture_v0_2.json");
 
     #[test]
     fn frozen_fixture_replays_all_expected_outcomes() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid failure-composition fixture");
-        assert_eq!(fixture.schema_version, "plasma-failure-composition-fixture-v0.1");
+        assert_eq!(fixture.schema_version, "plasma-failure-composition-fixture-v0.2");
         for case in &fixture.cases {
             let result = audit_receipt(&case.receipt);
             assert_eq!(result.disposition.as_str(), case.expected_disposition, "{}", case.id);
@@ -610,6 +651,32 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
         let case = fixture.cases.iter().find(|case| case.id == "many-specimens-one-lot").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn frozen_iso_v02_fixture_replays_all_expected_outcomes() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid failure-composition fixture");
+        assert_eq!(fixture.schema_version, "plasma-failure-composition-fixture-v0.2");
+        for case in &fixture.cases {
+            let result = audit_receipt(&case.receipt);
+            assert_eq!(result.disposition.as_str(), case.expected_disposition, "{}", case.id);
+            assert_eq!(result.outcome, case.expected_outcome, "{}", case.id);
+        }
+    }
+
+    #[test]
+    fn iso_10365_uses_its_own_general_bonded_assembly_ontology() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "iso-10365-general-bonded-assembly-pattern").expect("case exists");
+        assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Pass);
+    }
+
+    #[test]
+    fn iso_10365_and_d5573_ontologies_cannot_be_mixed() {
+        let mut fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let case = fixture.cases.iter_mut().find(|case| case.id == "valid-independent-arm-failure-composition").expect("case exists");
+        case.receipt.candidate.classification_receipt.method_id = "ISO_10365".to_owned();
+        assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Rejected);
     }
 
     #[test]

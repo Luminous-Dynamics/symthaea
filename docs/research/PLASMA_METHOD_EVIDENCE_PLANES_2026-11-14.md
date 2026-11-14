@@ -158,3 +158,16 @@ A scalar `failure_mode_fraction` can conceal shifts among failure categories. Th
 The current fixture has 40 known-answer cases and independently replays 40/40 (4 PASS, 15 BLOCKED, 21 REJECTED). A valid study may still return `COMPOSITIONAL_EQUIVALENCE_NOT_ESTABLISHED`. The audit does not decide whether a failure mode is acceptable.
 
 D5573-99R19 is the SMC FRP-specific route and must remain unaided visual classification. Image hashes are traceability artifacts, not a license to substitute magnified image analysis for the standard's observation scope. ISO 10365:2022 is a broader bonded-assembly failure-pattern designation and is being treated as a separate follow-on ontology rather than blended into D5573.
+
+
+## 2026-11-14 — ISO 10365 is a separate general failure-pattern ontology
+
+The method registry now supports ISO 10365:2022 for bonded assemblies regardless of adherend/adhesive, with its own ontology identifiers: SF, CSF, DF, CF, SCF, SWCF, AF, ACFP and COR. Mixed patterns retain their declared percentage vector.
+
+The failure-composition S0 auditor now accepts either:
+- D5573-99R19 with the D5573 SMC-FRP ontology and direct unaided visual observation; or
+- ISO 10365:2022 with the ISO 10365 general bonded-assembly ontology and a declared method observation protocol.
+
+The baseline and candidate classifications must use the same exact method, edition, evidence kind, material class, geometry, endpoint, claim and ontology. Cross-ontology comparison is REJECTED until a separately reviewed mapping receipt is implemented. No silent category mapping is allowed.
+
+Updated frozen fixtures: claim scope v0.4 (59 cases), failure composition v0.2 (47 cases). Independent exact-branch replay: 59/59 and 47/47.

@@ -68,7 +68,7 @@ enum Commands {
     },
     /// Audit that engineering claims do not exceed the scope of their test method and evidence.
     PlasmaClaimScopeAudit {
-        #[arg(long, default_value = "data/research/plasma_claim_scope_fixture_v0_3.json")]
+        #[arg(long, default_value = "data/research/plasma_claim_scope_fixture_v0_4.json")]
         fixture: PathBuf,
     },
     /// Audit method-qualified endpoint evidence used by qualification transfer.
@@ -83,7 +83,7 @@ enum Commands {
     },
     /// Audit complete specimen-level failure-mode compositions without inferring acceptability.
     PlasmaFailureCompositionAudit {
-        #[arg(long, default_value = "data/research/plasma_failure_composition_fixture_v0_1.json")]
+        #[arg(long, default_value = "data/research/plasma_failure_composition_fixture_v0_2.json")]
         fixture: PathBuf,
     },
     GenerateManifest {
