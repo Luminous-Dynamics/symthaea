@@ -247,16 +247,6 @@ fn difference<T: Ord + Clone>(left: &BTreeSet<T>, right: &BTreeSet<T>) -> Vec<T>
     left.difference(right).cloned().collect()
 }
 
-fn set_for_inputs(
-    organization: &OrganizationSpec,
-    required: bool,
-) -> BTreeSet<ProcessInputEdge> {
-    input_edges(organization)
-        .into_iter()
-        .filter(|edge| (edge.requirement == EdgeRequirement::Required) == required)
-        .collect()
-}
-
 /// Compare a frozen baseline with a proposed organization and fail closed on
 /// every unapproved or structurally invalid mutation.
 pub fn evaluate_reconfiguration(
@@ -296,10 +286,12 @@ pub fn evaluate_reconfiguration(
 
     for component_id in &diff.added_components {
         let component = &candidate.components[component_id];
-        if matches!(
-            component.class,
-            ComponentClass::ProvisionedImmutable | ComponentClass::Constraint
-        ) {
+        if policy.protected_components.contains(component_id)
+            || matches!(
+                component.class,
+                ComponentClass::ProvisionedImmutable | ComponentClass::Constraint
+            )
+        {
             finding(
                 &mut findings,
                 ReconfigurationFindingCode::ProtectedComponentAdded,
