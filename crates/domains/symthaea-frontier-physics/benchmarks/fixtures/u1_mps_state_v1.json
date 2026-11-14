@@ -701,7 +701,19 @@
         "error_estimate",
         "singular-value cutoff and max-bond controls; comparison target for accuracy-budget policy"
       ],
-      "fairness": "Same initial vector, gate sequence, qubit order, dtype, cutoff policy, bond cap, hardware and measurement checkpoints."
+      "fairness": "Same initial vector, gate sequence, qubit order, dtype, cutoff policy, bond cap, hardware and measurement checkpoints.",
+      "fidelity_and_error_semantics": "CircuitMPS fidelity_estimate and error_estimate are norm-based estimates tied to truncation. They are internal controls, not the independent oracle; use dense-state L2 and infidelity for N<=12.",
+      "modes": [
+        "CircuitMPS",
+        "CircuitMPSLazy",
+        "CircuitPermMPS"
+      ],
+      "special_cases": [
+        "auto-mps swaps and splits two-qubit gates",
+        "lazy/permutation MPS ordering must be included as separate baselines",
+        "CircuitMPSLazy supports delayed compression schedules; record compress_every and compression method separately.",
+        "CircuitPermMPS lazily tracks qubit/site ordering; record the logical-to-physical permutation and include the ordering-management cost."
+      ]
     },
     "itensor": {
       "reference": "https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html",
@@ -710,7 +722,9 @@
         "block-sparse tensor storage",
         "symmetry constraints propagated by QN-aware indices"
       ],
-      "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error."
+      "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error.",
+      "gpu_caveat": "ITensor QN support is Abelian, which matches U(1). Its current GPU documentation cautions that QN block-sparse GPU operations are less mature than dense GPU operations and may not work or may be slower; report CPU and GPU comparisons separately.",
+      "gpu_docs": "https://docs.itensor.org/ITensors/stable/RunningOnGPUs.html"
     },
     "differentiator": "Per-operation charge-sector receipts, separation of truncation sources and cumulative error accounting with explicit assumptions.",
     "quimb_lazy": {
@@ -751,7 +765,8 @@
         "discarded squared Schmidt-weight truncation threshold",
         "optional MPS log data exposing bond dimensions and discarded values"
       ],
-      "fairness": "Translate the absolute L2 budget into measured dense-reference residual; do not equate Aer discarded-weight threshold directly with normalized-state L2 without matching input norm and normalization semantics."
+      "fairness": "Translate the absolute L2 budget into measured dense-reference residual; do not equate Aer discarded-weight threshold directly with normalized-state L2 without matching input norm and normalization semantics.",
+      "truncation_semantics": "matrix_product_state_truncation_threshold discards the smallest Schmidt coefficients whose summed squares fall below the configured threshold. mps_log_data reports bond dimensions and discarded values. This is not a global state-L2 certificate."
     },
     "cutensornet": {
       "reference": "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
@@ -764,7 +779,32 @@
         "The 26.11 MPS factorization API describes the MPS feature as preview.",
         "The documentation states distributed SVD is supported in decomposition APIs while gate-split does not currently support distributed tensors."
       ],
-      "fairness": "Compare on supported hardware and exactly matched gate/state/error conditions; separate projection-MPS and direct gate-split workflows."
+      "fairness": "Compare on supported hardware and exactly matched gate/state/error conditions; separate projection-MPS and direct gate-split workflows.",
+      "special_cases": [
+        "ProjectionMPS insertion exposes absolute/relative/discarded-weight cutoffs, SVD normalization and per-insertion SVD_MAX_EXTENT.",
+        "Keep normalization-preserving and no-renormalization runs in separate result tables.",
+        "Distributed tensor SVD in decomposition APIs is not the same as distributed gateSplit; gateSplit currently does not support distributed tensors."
+      ],
+      "match_controls": [
+        "bond extents",
+        "absolute/relative/discarded-weight truncation",
+        "SVD algorithm",
+        "GPU architecture",
+        "precision",
+        "SVD_S_NORMALIZATION"
+      ],
+      "docs": [
+        "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
+        "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/examples/mps.html"
+      ]
     }
+  },
+  "benchmark_protocol": {
+    "dense_statevector_is_ground_truth_for_sites_lte_12": true,
+    "quimb_norm_estimate_not_ground_truth": true,
+    "aer_discarded_weight_not_global_l2": true,
+    "cutensornet_svd_normalization_must_be_logged": true,
+    "itensor_qn_gpu_cpu_runs_separated": true,
+    "cutoff_semantics_must_be_translated_to_measured_output_error": true
   }
 }
