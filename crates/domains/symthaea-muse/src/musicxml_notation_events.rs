@@ -13,8 +13,10 @@ use crate::barline_eval::{MeasureSpan, RationalBeat};
 use serde::{Deserialize, Serialize};
 
 pub const MUSICXML_NOTATION_EVENTS_SCHEMA_V1: &str = "muse-musicxml-notation-events-v1";
-pub const MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1: &str =
+pub const LEGACY_MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1: &str =
     "musicxml-partwise-source-ordered-exact-quarter-beats-v1";
+pub const MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1: &str =
+    "musicxml-partwise-timewise-source-ordered-exact-quarter-beats-v2";
 
 const MAX_NOTATION_EVENTS_PER_PART: usize = 200_000;
 const MAX_SOURCE_TREE_DEPTH: usize = 32;
@@ -295,7 +297,10 @@ pub fn parse_musicxml_part_metadata(
     part_id: &str,
 ) -> Result<Option<MusicXmlPartMetadataV1>, String> {
     let namespace = root.tag_name().namespace();
-    if !is_musicxml_element(root, "score-partwise", namespace) || part_id.trim().is_empty() {
+    if !(is_musicxml_element(root, "score-partwise", namespace)
+        || is_musicxml_element(root, "score-timewise", namespace))
+        || part_id.trim().is_empty()
+    {
         return Err("invalid MusicXML root or empty part identity".into());
     }
     let Some(part_list) = root.children().find(|node| is_musicxml_element(*node, "part-list", namespace)) else {
@@ -348,7 +353,26 @@ pub fn parse_musicxml_part_notation_events(
             "supplied part identity does not match the source MusicXML part locator",
         );
     }
-    match parse_part_events(part, part_id, measure_spans) {
+    let measure_inputs: Vec<_> = part
+        .children()
+        .filter(|node| is_musicxml_element(*node, "measure", namespace))
+        .map(|measure| crate::musicxml_barline_adapter::MusicXmlMeasureInputV1 {
+            container: measure,
+            content: measure,
+        })
+        .collect();
+    parse_musicxml_measure_inputs(&measure_inputs, part_id, measure_spans)
+}
+
+/// Parse notation events from a caller-ordered sequence of original measure
+/// and part-content nodes. This is shared by score-partwise and score-timewise;
+/// no intermediate XML serialization or node-order synthesis is performed.
+pub(crate) fn parse_musicxml_measure_inputs(
+    measure_inputs: &[crate::musicxml_barline_adapter::MusicXmlMeasureInputV1<'_, '_>],
+    part_id: &str,
+    measure_spans: &[MeasureSpan],
+) -> MusicXmlPartNotationEventsV1 {
+    match parse_part_events(measure_inputs, part_id, measure_spans) {
         Ok((note_events, attribute_events, auxiliary_events, cursor_moves)) => MusicXmlPartNotationEventsV1 {
             schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
             canonicalization_version: MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into(),
@@ -364,7 +388,7 @@ pub fn parse_musicxml_part_notation_events(
 }
 
 fn parse_part_events(
-    part: roxmltree::Node<'_, '_>,
+    measure_inputs: &[crate::musicxml_barline_adapter::MusicXmlMeasureInputV1<'_, '_>],
     part_id: &str,
     measure_spans: &[MeasureSpan],
 ) -> Result<
@@ -376,12 +400,10 @@ fn parse_part_events(
     ),
     ParseEventError,
 > {
-    let namespace = part.tag_name().namespace();
-    let measure_nodes: Vec<_> = part
-        .children()
-        .filter(|node| is_musicxml_element(*node, "measure", namespace))
-        .collect();
-    if measure_nodes.len() != measure_spans.len() || measure_nodes.is_empty() {
+    if part_id.trim().is_empty()
+        || measure_inputs.len() != measure_spans.len()
+        || measure_inputs.is_empty()
+    {
         return Err(ParseEventError::Unknown(
             "explicit measure nodes and supported measure spans do not align".into(),
         ));
@@ -396,13 +418,16 @@ fn parse_part_events(
     let mut auxiliary_events = Vec::new();
     let mut cursor_moves = Vec::new();
 
-    for (measure_index, measure) in measure_nodes.iter().enumerate() {
+    for (measure_index, input) in measure_inputs.iter().enumerate() {
+        let measure = input.content;
+        let measure_container = input.container;
+        let namespace = measure.tag_name().namespace();
         let measure_start = measure_spans[measure_index].start;
         let measure_duration = measure_spans[measure_index]
             .end
             .checked_sub(measure_start)
             .map_err(|_| ParseEventError::Unknown("invalid measure span".into()))?;
-        let measure_number = measure.attribute("number").map(str::to_string);
+        let measure_number = measure_container.attribute("number").map(str::to_string);
         let mut cursor = zero;
         let mut chord_anchor: Option<ChordAnchor> = None;
 
