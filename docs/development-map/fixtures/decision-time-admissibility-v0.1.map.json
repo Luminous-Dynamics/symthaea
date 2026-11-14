@@ -546,7 +546,9 @@
         "available_to_actor_at": "2026-11-14T09:00:00Z",
         "valid_from": "2026-11-01T00:00:00Z",
         "valid_through": "2026-11-14T17:00:00Z",
-        "owner_record_disposition": "source_declares_authorized"
+        "owner_record_disposition": "source_declares_authorized",
+        "owner_record_ref": "synthetic://mycelix/authority-grant/AG-001",
+        "owner_record_type": "synthetic-authority-grant-fixture"
       }
     },
     {
