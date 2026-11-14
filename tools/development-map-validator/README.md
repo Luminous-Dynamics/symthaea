@@ -32,6 +32,7 @@ For federation manifests, a successful structural check does **not** fetch membe
 - edge endpoints, event targets, invalidation-event references and event watermark;
 - evidence invalidation/supersession consistency;
 - DTEA actor-authority evidence references: owner record/node/event binding, actor/scope/policy match, source-observed versus actor-available ordering, availability by cutoff, and effective validity over the decision time;
+- DTEA consulted-evidence validity: explicit complete/incomplete applicability, known open interval edges, reversed interval rejection and start/end boundary handling;
 - proposed development actions remain proposals;
 - passed_local / ci_passed / independently_qualified claims require the corresponding stronger evidence authority;
 - containment edges are acyclic;
@@ -53,4 +54,4 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Fifty Rust unit-test cases are authored at the current branch head; compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Fifty-nine Rust unit-test cases are authored at the current branch head; compilation and execution remain pending. Do not treat unexecuted tests as passing.
