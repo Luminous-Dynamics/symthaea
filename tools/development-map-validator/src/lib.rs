@@ -3402,9 +3402,14 @@ mod tests {
         let report = validate_federation_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-043"));
 
-        value["relationships"][6]["compatibility_receipt"]["contract_id"] =
+        let relationship = value["relationships"]
+            .as_array_mut().expect("relationships")
+            .iter_mut()
+            .find(|item| item["relation"] == "shared_schema_candidate")
+            .expect("shared schema candidate");
+        relationship["compatibility_receipt"]["contract_id"] =
             Value::String("EGDDM-SNAPSHOT".to_owned());
-        value["relationships"][6]["compatibility_receipt"]["contract_version"] =
+        relationship["compatibility_receipt"]["contract_version"] =
             Value::String("9.9.9".to_owned());
         let report = validate_federation_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-044"));
