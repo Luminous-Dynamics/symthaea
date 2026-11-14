@@ -292,12 +292,28 @@ pub(super) fn validate_transfer_case(
     bridge_dimension_keys: &[String],
 ) -> Result<Decision> {
     let fixture = read_fixture(path)?;
-    let Some(case) = fixture.cases.iter().find(|case| case.id == composition_case_id) else {
+    if fixture.schema_version != "plasma-transfer-composition-fixture-v0.1" {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "transfer composition fixture schema is not the required version",
+        });
+    }
+    let matches: Vec<&CompositionCase> = fixture.cases.iter()
+        .filter(|case| case.id == composition_case_id)
+        .collect();
+    if matches.is_empty() {
         return Ok(Decision {
             disposition: Disposition::Blocked,
             reason: "transfer bridge references a missing method-qualified composition case",
         });
-    };
+    }
+    if matches.len() != 1 {
+        return Ok(Decision {
+            disposition: Disposition::Rejected,
+            reason: "composition fixture contains duplicate case identities",
+        });
+    }
+    let case = matches[0];
     let decision = audit_case(case);
     if decision.disposition != Disposition::Pass {
         return Ok(decision);
