@@ -21,7 +21,7 @@ It searches integer-degree headings and uses bilinear interpolation only inside 
 - Current direction is the direction the current flows **toward**.
 - Polar angles are absolute true-wind angles (TWA), not apparent-wind angles.
 - Boat speed is in metres per second.
-- The polar surface, no-go half-angle and configuration digest must belong to the exact craft + sail-plan + loading condition.
+- The polar surface carries an exact source-artifact digest and craft-configuration digest. Wind, current and waypoint-bearing evidence carries a source digest, freshness window and common-timebase identity. These metadata checks do not authenticate a publisher, sensor or physical measurement. The no-go half-angle and polar must belong to the exact craft + sail-plan + loading condition.
 
 The 40-degree no-go half-angle in the unit-test fixture is a synthetic example only. It is not a universal sailing value or a physical vessel limit.
 
