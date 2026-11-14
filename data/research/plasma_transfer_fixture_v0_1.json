@@ -118,7 +118,23 @@
       },
       "bridges": [],
       "expected_disposition": "PASS",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "material-lot-bridged",
@@ -202,7 +218,23 @@
         }
       ],
       "expected_disposition": "PASS",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "material-lot-no-bridge",
@@ -236,7 +268,23 @@
       },
       "bridges": [],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "supplier-bridged",
@@ -320,7 +368,23 @@
         }
       ],
       "expected_disposition": "PASS",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "supplier-and-head-without-joint",
@@ -453,7 +517,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "supplier-and-head-with-joint",
@@ -639,7 +719,23 @@
         }
       ],
       "expected_disposition": "PASS",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "line-speed-outside-envelope",
@@ -723,7 +819,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "delay-missing-aged-endpoint",
@@ -800,7 +912,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "interval-crosses-equivalence-margin",
@@ -884,7 +1012,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "interval-proves-outside-margin",
@@ -968,7 +1112,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "overlapping-sample-identity",
@@ -1052,7 +1212,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "overlapping-independence-groups",
@@ -1136,7 +1312,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "invalid-artifact-digest",
@@ -1220,7 +1412,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "untracked-factor-change",
@@ -1408,7 +1616,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "b96011b12b17086f9dbe69f3a2526827d764645762760e2dfa18994b0a55662f",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "three-factor-only-pairwise-bridge",
@@ -1643,7 +1867,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "three-factor-exact-joint-bridge",
@@ -1882,7 +2122,23 @@
         }
       ],
       "expected_disposition": "PASS",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "confidence-below-profile-threshold",
@@ -1966,7 +2222,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "missing-failure-mode-endpoint",
@@ -2043,7 +2315,23 @@
         }
       ],
       "expected_disposition": "BLOCKED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "supplier-outside-qualified-scope",
@@ -2127,7 +2415,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "stale-factor-mapping",
@@ -2211,7 +2515,23 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
     },
     {
       "id": "duplicate-bridge-artifact",
@@ -2397,7 +2717,305 @@
         }
       ],
       "expected_disposition": "REJECTED",
-      "rationale": "Synthetic known-answer control."
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "baseline-profile-hash-mismatch",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Baseline qualification receipt digest does not match the exact baseline profile.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "missing-baseline-qualification-receipt",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "No source-bound qualification receipt exists for the baseline profile."
+    },
+    {
+      "id": "baseline-qualification-missing-endpoint",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The baseline qualification does not cover all required product endpoints.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa"
+        ]
+      }
     }
   ]
 }
