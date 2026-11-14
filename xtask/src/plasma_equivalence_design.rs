@@ -116,7 +116,7 @@ struct DesignCase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Disposition {
+pub(super) enum Disposition {
     Pass,
     Blocked,
     Rejected,
@@ -132,10 +132,10 @@ impl Disposition {
     }
 }
 
-struct Decision {
-    disposition: Disposition,
-    equivalence: &'static str,
-    reason: &'static str,
+pub(super) struct Decision {
+    pub(super) disposition: Disposition,
+    pub(super) equivalence: &'static str,
+    pub(super) reason: &'static str,
 }
 
 fn sha256_shape(value: &str) -> bool {
@@ -171,7 +171,7 @@ fn attrition_rate(included: usize, excluded: usize) -> f64 {
     if total == 0 { 1.0 } else { excluded as f64 / total as f64 }
 }
 
-fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
+pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     let blocked = |reason| Decision {
         disposition: Disposition::Blocked,
         equivalence: "NOT_EVALUATED",
@@ -344,11 +344,19 @@ fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         return DispositionDecision::blocked("specimen attrition exceeds the preregistered allowance");
     }
 
-    let baseline_cluster_total = baseline_clusters.len() + excluded_clusters_by_arm[0].len();
-    let candidate_cluster_total = candidate_clusters.len() + excluded_clusters_by_arm[1].len();
-    if attrition_rate(baseline_clusters.len(), excluded_clusters_by_arm[0].len())
+    let baseline_all_clusters: HashSet<&str> = baseline_clusters
+        .union(&excluded_clusters_by_arm[0])
+        .copied()
+        .collect();
+    let candidate_all_clusters: HashSet<&str> = candidate_clusters
+        .union(&excluded_clusters_by_arm[1])
+        .copied()
+        .collect();
+    let baseline_excluded_cluster_count = baseline_all_clusters.len() - baseline_clusters.len();
+    let candidate_excluded_cluster_count = candidate_all_clusters.len() - candidate_clusters.len();
+    if attrition_rate(baseline_clusters.len(), baseline_excluded_cluster_count)
         > receipt.max_cluster_attrition_rate
-        || attrition_rate(candidate_clusters.len(), excluded_clusters_by_arm[1].len())
+        || attrition_rate(candidate_clusters.len(), candidate_excluded_cluster_count)
             > receipt.max_cluster_attrition_rate
     {
         return blocked("independent-cluster attrition exceeds the preregistered allowance");
@@ -431,12 +439,51 @@ fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
 
     // Included + excluded totals remain available for the attrition contract;
     // only the included samples and clusters feed the analysis-result counts.
-    let _ = (baseline_total, candidate_total, baseline_cluster_total, candidate_cluster_total);
+    let _ = (baseline_total, candidate_total);
     Decision {
         disposition: Disposition::Pass,
         equivalence: outcome,
         reason: "frozen design, independent-unit grouping, method receipts, actual sample manifest and analysis-result lineage are structurally consistent; numerical validity is not certified",
     }
+}
+
+pub(super) fn validate_bridge(
+    receipt: &EquivalenceDesignReceipt,
+    endpoint: &str,
+    baseline_method_receipt: &ScopeEvidence,
+    candidate_method_receipt: &ScopeEvidence,
+) -> Decision {
+    let decision = audit_receipt(receipt);
+    if decision.disposition != Disposition::Pass {
+        return decision;
+    }
+    if receipt.endpoint_id != endpoint
+        || !same_scope_evidence(&receipt.baseline_method_receipt, baseline_method_receipt)
+        || !same_scope_evidence(&receipt.candidate_method_receipt, candidate_method_receipt)
+    {
+        return Decision {
+            disposition: Disposition::Rejected,
+            equivalence: "NOT_EVALUATED",
+            reason: "design receipt is not bound to the exact method-qualified endpoint receipts used by the transfer bridge",
+        };
+    }
+    decision
+}
+
+fn same_scope_evidence(left: &ScopeEvidence, right: &ScopeEvidence) -> bool {
+    left.id == right.id
+        && left.method_id == right.method_id
+        && left.edition == right.edition
+        && left.evidence_kind == right.evidence_kind
+        && left.material_pair_class == right.material_pair_class
+        && left.geometry == right.geometry
+        && left.endpoint == right.endpoint
+        && left.requested_claim == right.requested_claim
+        && left.protocol_id == right.protocol_id
+        && left.protocol_sha256 == right.protocol_sha256
+        && left.raw_data_sha256 == right.raw_data_sha256
+        && left.suitability_review_sha256 == right.suitability_review_sha256
+        && left.specimen_ids == right.specimen_ids
 }
 
 fn specimen_set_from_strings<'a>(values: &'a [String]) -> HashSet<&'a str> {
