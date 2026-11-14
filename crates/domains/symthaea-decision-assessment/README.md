@@ -74,7 +74,9 @@ Operation start, cancellation request, cancellation acknowledgement, unknown out
 
 The evaluator consumes event/clock/causal-order and operation-outcome qualifications from their owners. It does not authenticate signatures, qualify clocks, prove trace completeness, execute cancellation, authorize effects, or replace the event/history owners.
 
-The frozen synthetic fixture is `benchmarks/engineering-change-impact/action-event-order-v0.1.json` (10 event traces). Its standalone Rust integration reference test also checks canonical trace digests, a separately expressed ordering relation, and invariance under reverse delivery order.
+A stop trigger remains an active no-new-effect obligation until a separate `StopObligationDischarged` event is ordered after the trigger and its `stop_disposition` owner qualification is PASS. A discharge cannot be used while any started operation remains unreconciled. An effect, operation start or retry after the trigger is accepted only when it is definitely after that qualified discharge.
+
+The frozen synthetic fixture is `benchmarks/engineering-change-impact/action-event-order-v0.1.json` (11 event traces). Its standalone Rust integration reference test also checks canonical trace digests, a separately expressed ordering relation, and invariance under reverse delivery order.
 
 Run the composition tests from the workspace root:
 
@@ -84,4 +86,4 @@ cargo clippy -p symthaea-decision-assessment --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
-These tests are authored but are not qualified as passed until executed at the exact branch head.
+These tests are authored but are not qualified as passed until executed at the exact branch head. The event-order reference adds canonical event-trace digest checks, independent ordering reconstruction, delivery-order permutation tests, and malformed-graph/operation-terminal controls.
