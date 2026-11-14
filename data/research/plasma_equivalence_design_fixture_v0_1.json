@@ -40,7 +40,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -139,7 +144,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-VALID-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-VALID-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-VALID-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "PASS",
       "expected_equivalence": "EQUIVALENCE_ESTABLISHED",
@@ -184,7 +198,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -273,7 +292,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-PAIRED-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-PAIRED-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-PAIRED-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "PASS",
       "expected_equivalence": "EQUIVALENCE_ESTABLISHED",
@@ -318,7 +346,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -417,7 +450,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-PSEUDOREP-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-PSEUDOREP-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-PSEUDOREP-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "BLOCKED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -462,7 +504,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -561,7 +608,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-OVERLAP-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-OVERLAP-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-OVERLAP-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -606,7 +662,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -695,7 +756,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-PAIR-MISMATCH-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-PAIR-MISMATCH-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-PAIR-MISMATCH-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -740,7 +810,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -839,7 +914,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-POSTHOC-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-POSTHOC-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-POSTHOC-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -884,7 +968,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -983,7 +1072,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-POSTHOC-MARGIN-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-POSTHOC-MARGIN-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-POSTHOC-MARGIN-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1028,7 +1126,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -1127,7 +1230,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-PLAN-DIGEST-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-PLAN-DIGEST-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-PLAN-DIGEST-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1172,7 +1284,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -1271,7 +1388,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-MANIFEST-DIGEST-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-MANIFEST-DIGEST-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-MANIFEST-DIGEST-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1316,7 +1442,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -1415,7 +1546,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-MISSING-POWER-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-MISSING-POWER-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-MISSING-POWER-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "BLOCKED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1460,7 +1600,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -1558,7 +1703,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-METHOD-SAMPLE-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-METHOD-SAMPLE-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-METHOD-SAMPLE-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1603,7 +1757,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -1709,7 +1868,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-ATTRITION-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-ATTRITION-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-ATTRITION-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "BLOCKED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1754,7 +1922,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -1866,7 +2039,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-ATTRITION-EXCESS-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-ATTRITION-EXCESS-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-ATTRITION-EXCESS-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "BLOCKED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -1911,7 +2093,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -2010,7 +2197,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-UNIT-UNKNOWN-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-UNIT-UNKNOWN-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-UNIT-UNKNOWN-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "BLOCKED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -2055,7 +2251,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -2154,7 +2355,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-ALPHA-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-ALPHA-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-ALPHA-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -2199,7 +2409,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -2298,7 +2513,16 @@
           "ci_lower": -8,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_NOT_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-INTERVAL-OUTSIDE-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-INTERVAL-OUTSIDE-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-INTERVAL-OUTSIDE-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "PASS",
       "expected_equivalence": "EQUIVALENCE_NOT_ESTABLISHED",
@@ -2343,7 +2567,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "observed_power_certified"
+          "claim_ceiling": "observed_power_certified",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -2442,7 +2671,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-POWER-CLAIM-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-POWER-CLAIM-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-POWER-CLAIM-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -2487,7 +2725,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -2586,7 +2829,16 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-ENDPOINT-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-ENDPOINT-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-ENDPOINT-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
@@ -2631,7 +2883,12 @@
           "target_power": 0.8,
           "target_precision_half_width": 2.5,
           "method_ref": "symthaea-statistics:power-planning-reference-v1",
-          "claim_ceiling": "planning_only"
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
         },
         "baseline_samples": [
           {
@@ -2720,11 +2977,652 @@
           "ci_lower": -2,
           "ci_upper": 2,
           "outcome": "EQUIVALENCE_ESTABLISHED"
-        }
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-UNIT-SCHEME-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-UNIT-SCHEME-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-UNIT-SCHEME-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
       },
       "expected_disposition": "REJECTED",
       "expected_equivalence": "NOT_EVALUATED",
       "rationale": "Paired-by-cluster designs count paired clusters as the independent unit."
+    },
+    {
+      "id": "power-assumption-digest-mismatch",
+      "receipt": {
+        "design_id": "power-assumption-digest-mismatch",
+        "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "endpoint_id": "apparent_shear_strength",
+        "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+        "quantity_unit": "MPa",
+        "analysis_profile": "two_sample_tost_v1",
+        "grouping_scheme": "independent_arms",
+        "independent_unit": "material_lot",
+        "margin_lower": -5,
+        "margin_upper": 5,
+        "alpha": 0.05,
+        "confidence_level": 0.9,
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "design_changed_after_outcome": false,
+        "planned_min_baseline_specimens": 2,
+        "planned_min_candidate_specimens": 2,
+        "planned_min_baseline_clusters": 3,
+        "planned_min_candidate_clusters": 3,
+        "max_specimen_attrition_rate": 0.25,
+        "max_cluster_attrition_rate": 0.25,
+        "target_power": 0.8,
+        "target_precision_half_width": 2.5,
+        "power_receipt": {
+          "receipt_id": "power-assumption-digest-mismatch-POWER",
+          "calculation_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "design_id": "power-assumption-digest-mismatch",
+          "endpoint_id": "apparent_shear_strength",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "planned_baseline_clusters": 3,
+          "planned_candidate_clusters": 3,
+          "target_power": 0.8,
+          "target_precision_half_width": 2.5,
+          "method_ref": "symthaea-statistics:power-planning-reference-v1",
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
+        },
+        "baseline_samples": [
+          {
+            "specimen_id": "power-assumption-digest-mismatch-BASE-1",
+            "cluster_id": "LOT-A"
+          },
+          {
+            "specimen_id": "power-assumption-digest-mismatch-BASE-2",
+            "cluster_id": "LOT-B"
+          },
+          {
+            "specimen_id": "power-assumption-digest-mismatch-BASE-3",
+            "cluster_id": "LOT-C"
+          },
+          {
+            "specimen_id": "power-assumption-digest-mismatch-BASE-4",
+            "cluster_id": "LOT-D"
+          }
+        ],
+        "candidate_samples": [
+          {
+            "specimen_id": "power-assumption-digest-mismatch-CAND-1",
+            "cluster_id": "LOT-E"
+          },
+          {
+            "specimen_id": "power-assumption-digest-mismatch-CAND-2",
+            "cluster_id": "LOT-F"
+          },
+          {
+            "specimen_id": "power-assumption-digest-mismatch-CAND-3",
+            "cluster_id": "LOT-G"
+          },
+          {
+            "specimen_id": "power-assumption-digest-mismatch-CAND-4",
+            "cluster_id": "LOT-H"
+          }
+        ],
+        "excluded_samples": [],
+        "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+        "baseline_method_receipt": {
+          "id": "power-assumption-digest-mismatch-BASE-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "power-assumption-digest-mismatch-BASE-1",
+            "power-assumption-digest-mismatch-BASE-2",
+            "power-assumption-digest-mismatch-BASE-3",
+            "power-assumption-digest-mismatch-BASE-4"
+          ]
+        },
+        "candidate_method_receipt": {
+          "id": "power-assumption-digest-mismatch-CAND-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "power-assumption-digest-mismatch-CAND-1",
+            "power-assumption-digest-mismatch-CAND-2",
+            "power-assumption-digest-mismatch-CAND-3",
+            "power-assumption-digest-mismatch-CAND-4"
+          ]
+        },
+        "analysis_result": {
+          "result_id": "power-assumption-digest-mismatch-RESULT",
+          "result_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "design_id": "power-assumption-digest-mismatch",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "endpoint_id": "apparent_shear_strength",
+          "analysis_profile": "two_sample_tost_v1",
+          "margin_lower": -5,
+          "margin_upper": 5,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "baseline_sample_count": 4,
+          "candidate_sample_count": 4,
+          "baseline_cluster_count": 4,
+          "candidate_cluster_count": 4,
+          "ci_lower": -2,
+          "ci_upper": 2,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-VALID-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-VALID-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-VALID-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+      },
+      "expected_disposition": "REJECTED",
+      "expected_equivalence": "NOT_EVALUATED",
+      "rationale": "Power calculation must bind the exact low/central/high variance and effect-assumption digest."
+    },
+    {
+      "id": "variance-sensitivity-grid-not-ordered",
+      "receipt": {
+        "design_id": "variance-sensitivity-grid-not-ordered",
+        "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "endpoint_id": "apparent_shear_strength",
+        "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+        "quantity_unit": "MPa",
+        "analysis_profile": "two_sample_tost_v1",
+        "grouping_scheme": "independent_arms",
+        "independent_unit": "material_lot",
+        "margin_lower": -5,
+        "margin_upper": 5,
+        "alpha": 0.05,
+        "confidence_level": 0.9,
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "design_changed_after_outcome": false,
+        "planned_min_baseline_specimens": 2,
+        "planned_min_candidate_specimens": 2,
+        "planned_min_baseline_clusters": 3,
+        "planned_min_candidate_clusters": 3,
+        "max_specimen_attrition_rate": 0.25,
+        "max_cluster_attrition_rate": 0.25,
+        "target_power": 0.8,
+        "target_precision_half_width": 2.5,
+        "power_receipt": {
+          "receipt_id": "variance-sensitivity-grid-not-ordered-POWER",
+          "calculation_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "design_id": "variance-sensitivity-grid-not-ordered",
+          "endpoint_id": "apparent_shear_strength",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "planned_baseline_clusters": 3,
+          "planned_candidate_clusters": 3,
+          "target_power": 0.8,
+          "target_precision_half_width": 2.5,
+          "method_ref": "symthaea-statistics:power-planning-reference-v1",
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
+        },
+        "baseline_samples": [
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-BASE-1",
+            "cluster_id": "LOT-A"
+          },
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-BASE-2",
+            "cluster_id": "LOT-B"
+          },
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-BASE-3",
+            "cluster_id": "LOT-C"
+          },
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-BASE-4",
+            "cluster_id": "LOT-D"
+          }
+        ],
+        "candidate_samples": [
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-CAND-1",
+            "cluster_id": "LOT-E"
+          },
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-CAND-2",
+            "cluster_id": "LOT-F"
+          },
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-CAND-3",
+            "cluster_id": "LOT-G"
+          },
+          {
+            "specimen_id": "variance-sensitivity-grid-not-ordered-CAND-4",
+            "cluster_id": "LOT-H"
+          }
+        ],
+        "excluded_samples": [],
+        "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+        "baseline_method_receipt": {
+          "id": "variance-sensitivity-grid-not-ordered-BASE-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "variance-sensitivity-grid-not-ordered-BASE-1",
+            "variance-sensitivity-grid-not-ordered-BASE-2",
+            "variance-sensitivity-grid-not-ordered-BASE-3",
+            "variance-sensitivity-grid-not-ordered-BASE-4"
+          ]
+        },
+        "candidate_method_receipt": {
+          "id": "variance-sensitivity-grid-not-ordered-CAND-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "variance-sensitivity-grid-not-ordered-CAND-1",
+            "variance-sensitivity-grid-not-ordered-CAND-2",
+            "variance-sensitivity-grid-not-ordered-CAND-3",
+            "variance-sensitivity-grid-not-ordered-CAND-4"
+          ]
+        },
+        "analysis_result": {
+          "result_id": "variance-sensitivity-grid-not-ordered-RESULT",
+          "result_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "design_id": "variance-sensitivity-grid-not-ordered",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "endpoint_id": "apparent_shear_strength",
+          "analysis_profile": "two_sample_tost_v1",
+          "margin_lower": -5,
+          "margin_upper": 5,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "baseline_sample_count": 4,
+          "candidate_sample_count": 4,
+          "baseline_cluster_count": 4,
+          "candidate_cluster_count": 4,
+          "ci_lower": -2,
+          "ci_upper": 2,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 0.25,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-VALID-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-VALID-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-VALID-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+      },
+      "expected_disposition": "REJECTED",
+      "expected_equivalence": "NOT_EVALUATED",
+      "rationale": "Variance scenario envelope must be ordered low <= central <= high."
+    },
+    {
+      "id": "missing-randomization-protocol-ref",
+      "receipt": {
+        "design_id": "missing-randomization-protocol-ref",
+        "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "endpoint_id": "apparent_shear_strength",
+        "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+        "quantity_unit": "MPa",
+        "analysis_profile": "two_sample_tost_v1",
+        "grouping_scheme": "independent_arms",
+        "independent_unit": "material_lot",
+        "margin_lower": -5,
+        "margin_upper": 5,
+        "alpha": 0.05,
+        "confidence_level": 0.9,
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "design_changed_after_outcome": false,
+        "planned_min_baseline_specimens": 2,
+        "planned_min_candidate_specimens": 2,
+        "planned_min_baseline_clusters": 3,
+        "planned_min_candidate_clusters": 3,
+        "max_specimen_attrition_rate": 0.25,
+        "max_cluster_attrition_rate": 0.25,
+        "target_power": 0.8,
+        "target_precision_half_width": 2.5,
+        "power_receipt": {
+          "receipt_id": "missing-randomization-protocol-ref-POWER",
+          "calculation_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "design_id": "missing-randomization-protocol-ref",
+          "endpoint_id": "apparent_shear_strength",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "planned_baseline_clusters": 3,
+          "planned_candidate_clusters": 3,
+          "target_power": 0.8,
+          "target_precision_half_width": 2.5,
+          "method_ref": "symthaea-statistics:power-planning-reference-v1",
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
+        },
+        "baseline_samples": [
+          {
+            "specimen_id": "missing-randomization-protocol-ref-BASE-1",
+            "cluster_id": "LOT-A"
+          },
+          {
+            "specimen_id": "missing-randomization-protocol-ref-BASE-2",
+            "cluster_id": "LOT-B"
+          },
+          {
+            "specimen_id": "missing-randomization-protocol-ref-BASE-3",
+            "cluster_id": "LOT-C"
+          },
+          {
+            "specimen_id": "missing-randomization-protocol-ref-BASE-4",
+            "cluster_id": "LOT-D"
+          }
+        ],
+        "candidate_samples": [
+          {
+            "specimen_id": "missing-randomization-protocol-ref-CAND-1",
+            "cluster_id": "LOT-E"
+          },
+          {
+            "specimen_id": "missing-randomization-protocol-ref-CAND-2",
+            "cluster_id": "LOT-F"
+          },
+          {
+            "specimen_id": "missing-randomization-protocol-ref-CAND-3",
+            "cluster_id": "LOT-G"
+          },
+          {
+            "specimen_id": "missing-randomization-protocol-ref-CAND-4",
+            "cluster_id": "LOT-H"
+          }
+        ],
+        "excluded_samples": [],
+        "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+        "baseline_method_receipt": {
+          "id": "missing-randomization-protocol-ref-BASE-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "missing-randomization-protocol-ref-BASE-1",
+            "missing-randomization-protocol-ref-BASE-2",
+            "missing-randomization-protocol-ref-BASE-3",
+            "missing-randomization-protocol-ref-BASE-4"
+          ]
+        },
+        "candidate_method_receipt": {
+          "id": "missing-randomization-protocol-ref-CAND-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "missing-randomization-protocol-ref-CAND-1",
+            "missing-randomization-protocol-ref-CAND-2",
+            "missing-randomization-protocol-ref-CAND-3",
+            "missing-randomization-protocol-ref-CAND-4"
+          ]
+        },
+        "analysis_result": {
+          "result_id": "missing-randomization-protocol-ref-RESULT",
+          "result_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "design_id": "missing-randomization-protocol-ref",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "endpoint_id": "apparent_shear_strength",
+          "analysis_profile": "two_sample_tost_v1",
+          "margin_lower": -5,
+          "margin_upper": 5,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "baseline_sample_count": 4,
+          "candidate_sample_count": 4,
+          "baseline_cluster_count": 4,
+          "candidate_cluster_count": 4,
+          "ci_lower": -2,
+          "ci_upper": 2,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 1,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "",
+        "analysis_plan_ref": "DESIGN-VALID-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-VALID-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_equivalence": "NOT_EVALUATED",
+      "rationale": "Randomization protocol reference is required before outcomes."
+    },
+    {
+      "id": "zero-effect-alternative-not-informative",
+      "receipt": {
+        "design_id": "zero-effect-alternative-not-informative",
+        "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+        "endpoint_id": "apparent_shear_strength",
+        "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+        "quantity_unit": "MPa",
+        "analysis_profile": "two_sample_tost_v1",
+        "grouping_scheme": "independent_arms",
+        "independent_unit": "material_lot",
+        "margin_lower": -5,
+        "margin_upper": 5,
+        "alpha": 0.05,
+        "confidence_level": 0.9,
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "design_changed_after_outcome": false,
+        "planned_min_baseline_specimens": 2,
+        "planned_min_candidate_specimens": 2,
+        "planned_min_baseline_clusters": 3,
+        "planned_min_candidate_clusters": 3,
+        "max_specimen_attrition_rate": 0.25,
+        "max_cluster_attrition_rate": 0.25,
+        "target_power": 0.8,
+        "target_precision_half_width": 2.5,
+        "power_receipt": {
+          "receipt_id": "zero-effect-alternative-not-informative-POWER",
+          "calculation_sha256": "1515151515151515151515151515151515151515151515151515151515151515",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "design_id": "zero-effect-alternative-not-informative",
+          "endpoint_id": "apparent_shear_strength",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "planned_baseline_clusters": 3,
+          "planned_candidate_clusters": 3,
+          "target_power": 0.8,
+          "target_precision_half_width": 2.5,
+          "method_ref": "symthaea-statistics:power-planning-reference-v1",
+          "claim_ceiling": "planning_only",
+          "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+          "effect_under_alternative": 1,
+          "variance_low": 0.5,
+          "variance_central": 1,
+          "variance_high": 1.5
+        },
+        "baseline_samples": [
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-BASE-1",
+            "cluster_id": "LOT-A"
+          },
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-BASE-2",
+            "cluster_id": "LOT-B"
+          },
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-BASE-3",
+            "cluster_id": "LOT-C"
+          },
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-BASE-4",
+            "cluster_id": "LOT-D"
+          }
+        ],
+        "candidate_samples": [
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-CAND-1",
+            "cluster_id": "LOT-E"
+          },
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-CAND-2",
+            "cluster_id": "LOT-F"
+          },
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-CAND-3",
+            "cluster_id": "LOT-G"
+          },
+          {
+            "specimen_id": "zero-effect-alternative-not-informative-CAND-4",
+            "cluster_id": "LOT-H"
+          }
+        ],
+        "excluded_samples": [],
+        "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+        "baseline_method_receipt": {
+          "id": "zero-effect-alternative-not-informative-BASE-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "zero-effect-alternative-not-informative-BASE-1",
+            "zero-effect-alternative-not-informative-BASE-2",
+            "zero-effect-alternative-not-informative-BASE-3",
+            "zero-effect-alternative-not-informative-BASE-4"
+          ]
+        },
+        "candidate_method_receipt": {
+          "id": "zero-effect-alternative-not-informative-CAND-METHOD",
+          "method_id": "ASTM_D3163",
+          "edition": "D3163-01R23",
+          "evidence_kind": "measurement",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "single_lap",
+          "endpoint": "apparent_shear_strength",
+          "requested_claim": "comparative_screening",
+          "protocol_id": "PLASMA-D3163-PROTOCOL-01",
+          "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "raw_data_sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "zero-effect-alternative-not-informative-CAND-1",
+            "zero-effect-alternative-not-informative-CAND-2",
+            "zero-effect-alternative-not-informative-CAND-3",
+            "zero-effect-alternative-not-informative-CAND-4"
+          ]
+        },
+        "analysis_result": {
+          "result_id": "zero-effect-alternative-not-informative-RESULT",
+          "result_sha256": "1414141414141414141414141414141414141414141414141414141414141414",
+          "design_id": "zero-effect-alternative-not-informative",
+          "plan_sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
+          "endpoint_id": "apparent_shear_strength",
+          "analysis_profile": "two_sample_tost_v1",
+          "margin_lower": -5,
+          "margin_upper": 5,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "sample_manifest_sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
+          "baseline_sample_count": 4,
+          "candidate_sample_count": 4,
+          "baseline_cluster_count": 4,
+          "candidate_cluster_count": 4,
+          "ci_lower": -2,
+          "ci_upper": 2,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        },
+        "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+        "effect_under_alternative": 0,
+        "variance_low": 0.5,
+        "variance_central": 1,
+        "variance_high": 1.5,
+        "randomization_plan_ref": "DESIGN-VALID-01-RANDOMIZATION",
+        "analysis_plan_ref": "DESIGN-VALID-01-ANALYSIS",
+        "exclusion_protocol_ref": "DESIGN-VALID-01-EXCLUSIONS",
+        "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+      },
+      "expected_disposition": "REJECTED",
+      "expected_equivalence": "NOT_EVALUATED",
+      "rationale": "A zero assumed effect cannot substantiate a power target for a non-zero transfer effect."
     }
   ]
 }
