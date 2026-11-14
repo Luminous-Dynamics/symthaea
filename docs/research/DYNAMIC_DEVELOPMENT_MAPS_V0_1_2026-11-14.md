@@ -50,6 +50,18 @@ SWE-Time reports 1,661 cases across 65 repositories and 15 agents; the highest r
 
 CoReGraph is an important nearby research direction, so we must not claim that temporal, provenance-bearing repository knowledge graphs are novel in isolation. Our differentiating research hypothesis is the compositional layer: explicit intent-to-capability traceability, evidence lifecycle and validity, cross-repository contract reasoning, and measured development-path planning.
 
+### Important comparator limits — and what they imply for EGDDM
+
+These limitations matter as much as the headline results:
+
+- **SWE-Time is narrower than a general development map.** Its backward task localizes first-bad commits; its forward task predicts GitHub Actions workflow activation under a fixed pull-request event context. The authors explicitly say that other CI systems, build pipelines and non-GitHub environments remain untested, and that public histories may have appeared in pretraining. Its paired-state analysis also reports only 48.7% Pair Exact, with a 12.8% invariance error, showing that adapting predictions across changed workflow states remains difficult. EGDDM should preserve SWE-Time's official score as-is, then add separate evaluation for requirements, APIs, capabilities, evidence applicability and cross-repository effects—not relabel those extensions as SWE-Time.
+- **RIG/SPADE is structurally useful but build/test-centric.** The paper's SPADE prototype automatically extracts only a subset of CMake using CMake File API/CTest; several other ecosystems in its study (including Cargo) used manually authored RIGs. Its study ran at least one full evaluation per cell and says there were too few repetitions for tight confidence intervals. The authors also say RIG omits code-level semantic/data-flow and higher-level requirements/documentation. This is a strong deterministic structural baseline, but not an end-to-end multi-ecosystem extractor or intent/evidence planner.
+- **Aider optimizes context selection.** Its dependency-ranked map is valuable for token-budgeted repository navigation, but it is not designed as an authoritative longitudinal record or development-qualification system.
+- **CoReGraph overlaps the temporal/provenance graph concept.** We should compete on falsifiable integration quality and measured outcome improvements, not assert that temporal repository graphs are unprecedented.
+- **CodeQL is a security/data-flow specialist.** Treat its outputs as one scoped evidence stream with its own rules and versions, not the authority for all structure, intent, or maturity claims.
+
+The differentiating research hypotheses are therefore: deterministic and auditable multi-source reconciliation; bitemporal evidence validity; explicit capability/requirement-to-proof traceability; prospective and retrospective cross-domain impact; incremental updates that converge exactly with clean rebuilds; and experimentally calibrated development planning. Each is an independent benchmark claim and must be evaluated separately.
+
 ## 2. Existing Luminous ownership — compose, do not duplicate
 
 The Symthaea repository already has foundational work:
