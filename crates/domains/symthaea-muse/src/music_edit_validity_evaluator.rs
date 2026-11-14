@@ -452,7 +452,7 @@ fn relation_result(
                         changed = true;
                     }
                 } else {
-                    if pair[1] - uncertainty > pair[0] + uncertainty {
+                    if pair[1] - *uncertainty > pair[0] + *uncertainty {
                         return (Status::Violated, Reason::NonMonotonicSeries);
                     }
                     if pair[1] + *uncertainty > pair[0] - *uncertainty {
