@@ -1,0 +1,46 @@
+name: AIRROAD IQC Source Equation RCF/LFT Audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_IQC_2610_20248_SOURCE_EQUATION_AUDIT_V0_1.md"
+      - "docs/research/fixtures/airroad-iqc-source-equation-rcf-lft-v0.1.json"
+      - "tools/airroad-iqc-source-equation-audit/verify_rcf_lft_conformance.py"
+      - ".github/workflows/airroad-iqc-source-equation-audit.yml"
+  push:
+    branches:
+      - research/airroad-iqc-source-equation-audit-v0.1
+    paths:
+      - "docs/research/AIRROAD_IQC_2610_20248_SOURCE_EQUATION_AUDIT_V0_1.md"
+      - "docs/research/fixtures/airroad-iqc-source-equation-rcf-lft-v0.1.json"
+      - "tools/airroad-iqc-source-equation-audit/verify_rcf_lft_conformance.py"
+      - ".github/workflows/airroad-iqc-source-equation-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-iqc-source-equation-audit-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rcf-lft-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute source-equation oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-iqc-source-equation-audit/verify_rcf_lft_conformance.py
+          python3 \
+            tools/airroad-iqc-source-equation-audit/verify_rcf_lft_conformance.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-iqc-source-equation-rcf-lft-v0.1.json \
+            > /dev/null
