@@ -917,7 +917,8 @@ pub fn qualify_recovery_route(
                     ) {
                         reasons.push(RouteReason::InvalidFibreLengthDistribution);
                     }
-                    if !fibre_length_protocol_valid(length) {
+                    let protocol_valid = fibre_length_protocol_valid(length);
+                    if !protocol_valid {
                         reasons.push(RouteReason::InvalidFibreLengthMeasurementProtocol);
                     }
                     let sample_exceeds_output = bundle
@@ -937,15 +938,20 @@ pub fn qualify_recovery_route(
                     if !trial_binding_matches && !sample_exceeds_output {
                         reasons.push(RouteReason::FibreLengthTrialBindingMismatch);
                     }
-                    match fibre_length_fraction_at_or_above(length, policy.minimum_fibre_length_um)
-                    {
-                        None => reasons.push(RouteReason::InvalidFibreLengthDistribution),
-                        Some(fraction)
-                            if fraction < policy.minimum_mass_fraction_at_or_above_length_ppm =>
-                        {
-                            reasons.push(RouteReason::FibreLengthBelowPolicy)
+                    if protocol_valid {
+                        match fibre_length_fraction_at_or_above(
+                            length,
+                            policy.minimum_fibre_length_um,
+                        ) {
+                            None => reasons.push(RouteReason::InvalidFibreLengthDistribution),
+                            Some(fraction)
+                                if fraction
+                                    < policy.minimum_mass_fraction_at_or_above_length_ppm =>
+                            {
+                                reasons.push(RouteReason::FibreLengthBelowPolicy)
+                            }
+                            Some(_) => {}
                         }
-                        Some(_) => {}
                     }
                 }
             }
@@ -1050,6 +1056,8 @@ fn assessment(
                 | RouteReason::InvalidCompositionEvidence
                 | RouteReason::InvalidFibreLengthDistribution
                 | RouteReason::FibreLengthTrialBindingMismatch
+                | RouteReason::FibreLengthSampleExceedsOutput
+                | RouteReason::InvalidFibreLengthMeasurementProtocol
                 | RouteReason::InvalidChemicalCompatibilityEvidence
                 | RouteReason::InvalidDownstreamAcceptance
                 | RouteReason::DownstreamAcceptanceBindingMismatch
@@ -1207,21 +1215,24 @@ mod tests {
     }
 
     fn length() -> FibreLengthEvidence {
+        let method_ref = "FIBRE-ARRAY-ASTM-D1440-V1".to_owned();
+        let mut measurement = evidence(
+            "LENGTH-01",
+            EvidenceKind::FibreLengthMeasurement,
+            EvidenceTier::SensorMeasured,
+            "fibre-lab",
+            None,
+        );
+        measurement.method_ref = method_ref.clone();
         FibreLengthEvidence {
-            method_ref: "FIBRE-ARRAY-ASTM-D1440-V1".to_owned(),
+            method_ref,
             sampling_plan_ref: "FIBRE-SAMPLING-PLAN-V1".to_owned(),
             sample_mass_mg: 25_000,
             replicate_count: 3,
             measurement_uncertainty_ppm: 20_000,
             accepted_output_lot_id: "ACCEPTED-FIBRE-LOT-01".to_owned(),
             source_trial_evidence_id: "TRIAL-01".to_owned(),
-            evidence: evidence(
-                "LENGTH-01",
-                EvidenceKind::FibreLengthMeasurement,
-                EvidenceTier::SensorMeasured,
-                "fibre-lab",
-                None,
-            ),
+            evidence: measurement,
             bins: vec![
                 FibreLengthBin {
                     lower_bound_um: 0,
@@ -1462,6 +1473,45 @@ mod tests {
             result
                 .reasons
                 .contains(&RouteReason::FibreLengthTrialBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn fibre_length_protocol_requires_sampling_plan_sample_mass_and_replicates() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.replicate_count = 0;
+        distribution.sampling_plan_ref.clear();
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::InvalidFibreLengthMeasurementProtocol)
+        );
+    }
+
+    #[test]
+    fn fibre_length_sample_mass_cannot_exceed_accepted_output_lot() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.sample_mass_mg = 900_000;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::FibreLengthSampleExceedsOutput)
         );
     }
 
@@ -1959,6 +2009,14 @@ mod tests {
                     Some("DownstreamAcceptanceNotIndependentOfBasis"),
                 )
             }
+            "ROUTE-037-FIBRE-LENGTH-PROTOCOL-INCOMPLETE" => {
+                fibre_length_protocol_requires_sampling_plan_sample_mass_and_replicates();
+                ("ineligible", Some("InvalidFibreLengthMeasurementProtocol"))
+            }
+            "ROUTE-038-FIBRE-LENGTH-SAMPLE-EXCEEDS-OUTPUT" => {
+                fibre_length_sample_mass_cannot_exceed_accepted_output_lot();
+                ("ineligible", Some("FibreLengthSampleExceedsOutput"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -1980,12 +2038,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(36));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(38));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 36, "review route corpus case count changes");
+        assert_eq!(cases.len(), 38, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"].as_str().expect("case_id must be a string");
@@ -2008,7 +2066,7 @@ mod tests {
             );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 36);
+        assert_eq!(seen.len(), 38);
     }
 
     #[test]
