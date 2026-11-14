@@ -95,7 +95,7 @@
       "target_configuration": "CFG-7",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-001",
-      "source_inventory_sha256": "611adc4c37b9c12a60614e19009d97a88e9fd45b1b8497d6441087097464cf30",
+      "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
       "candidate_visible_evidence_ids": [
         "E-A1",
         "E-A1-COPY",
@@ -106,7 +106,7 @@
           "world_id": "BASELINE",
           "target_configuration": "CFG-7",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "611adc4c37b9c12a60614e19009d97a88e9fd45b1b8497d6441087097464cf30",
+          "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
           "evidence": [
             {
               "id": "E-A1",
@@ -183,7 +183,7 @@
           "world_id": "REDUNDANT_COPY_REMOVED",
           "target_configuration": "CFG-7",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "611adc4c37b9c12a60614e19009d97a88e9fd45b1b8497d6441087097464cf30",
+          "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
           "evidence": [
             {
               "id": "E-A1",
@@ -310,7 +310,7 @@
       "target_configuration": "BOND-4",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-001",
-      "source_inventory_sha256": "39455ee8aac4e0967ceb5c2bf4d7f3fbe8403bcd99822a0a47e0c2dec0656251",
+      "source_inventory_sha256": "75b0f4401d5cb36fc9655dfbb999595f192f9dfd664c1fc371d94498a6fd262c",
       "candidate_visible_evidence_ids": [
         "E-PRIMARY",
         "E-EXPORT"
@@ -356,7 +356,7 @@
       "target_configuration": "PACK-3",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-002",
-      "source_inventory_sha256": "c3ca6dcb83074590fac4500459b312faa182b8a58b370b6d699c9e1dddd0f176",
+      "source_inventory_sha256": "f8077b939eb8f836880bbcf9c201f854e1ee5d2e3e9c5c371c9a59ef3b927721",
       "candidate_visible_evidence_ids": [
         "E-THERM-A"
       ],
@@ -365,7 +365,7 @@
           "world_id": "BASELINE",
           "target_configuration": "PACK-3",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "21c97bafbdfbb499f508e8252b8ed8ff7341e76682da08626f13dd7fafb7e603",
+          "source_inventory_sha256": "42b2fc41d5702466539412148c92dcb5d58e44ba529a3715966d14f23bfc0e8a",
           "evidence": [
             {
               "id": "E-THERM-A",
@@ -411,7 +411,7 @@
           "world_id": "LAST_SUPPORT_REMOVED",
           "target_configuration": "PACK-3",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "c3ca6dcb83074590fac4500459b312faa182b8a58b370b6d699c9e1dddd0f176",
+          "source_inventory_sha256": "f8077b939eb8f836880bbcf9c201f854e1ee5d2e3e9c5c371c9a59ef3b927721",
           "evidence": [
             {
               "id": "E-THERM-A",
@@ -496,7 +496,7 @@
       "target_configuration": "JOINT-NEW",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-003",
-      "source_inventory_sha256": "904f7690fdcb562909f97387c1b2324def31a0c55028908e9ce6a286c87e9476",
+      "source_inventory_sha256": "f227432b3c2cb3e2a63c0ddf799f58cc5ca7abed19416e5b07a75ac24147df78",
       "candidate_visible_evidence_ids": [
         "E-BOLT-A",
         "E-BOLT-B"
@@ -506,7 +506,7 @@
           "world_id": "BASELINE_CONFIGURATION_MATCH",
           "target_configuration": "JOINT-NEW",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "0a34cc732d77034541cb190a6d1e976b7b848fe13389155dda9dde13cb348a03",
+          "source_inventory_sha256": "16e9b441e29f521e1ffa13f4a1783b202e054dc355f0e6cd733f1026d173271d",
           "evidence": [
             {
               "id": "E-BOLT-A",
@@ -553,7 +553,7 @@
           "world_id": "IDENTICAL_CONTENT_WRONG_CONFIGURATION",
           "target_configuration": "JOINT-NEW",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "e8198d710637d7f7554fca9ce6cd0e5601b91efb4ce9b4088e7939061fd356e6",
+          "source_inventory_sha256": "ec5a1cbf36fdefa1a7c4b475ea012e4a51f28084063146eec51b95eae40aa38f",
           "evidence": [
             {
               "id": "E-BOLT-A",
@@ -593,7 +593,7 @@
         }
       ],
       "expected_intervention_relation": "flip",
-      "candidate_visible_manifest_sha256": "9794994e76a3a5de3fe8463ff14d37fa1805a80a62c531c99f6b3b0ef02ad4b0",
+      "candidate_visible_manifest_sha256": "0b9c19ee838c551ba2aff494af810d72ea8f532c9fbad0e3247d52d90cf1ac08",
       "candidate_action": "revalidate"
     },
     {
@@ -1026,7 +1026,7 @@
         }
       ],
       "irrelevant_evidence_injection_count": 40,
-      "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1",
+      "irrelevant_evidence_injection_digest": "1ff4cfa17a5468a18bbf83086ea7e81537bb5d7910ff1f6232be65030db69df2",
       "expected": {
         "state": "supported",
         "action": "revalidate",
@@ -1049,7 +1049,7 @@
       "target_configuration": "VESSEL-2",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-002",
-      "source_inventory_sha256": "dc99f01eeb8c800feeac754bc870ee4013f367a004192ec0f36299a3b96435a7",
+      "source_inventory_sha256": "3a77d6ddae613f47aa561e7f82f7baaeb389e0311af5eaeac8592a0828fa7753",
       "candidate_visible_evidence_ids": [
         "E-PRESS-A",
         "E-PRESS-B",
@@ -1099,7 +1099,7 @@
           "world_id": "BASELINE",
           "target_configuration": "VESSEL-2",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "22b14d8c8bfec38bc450ce49ade7eaa1de4e3e3c11135402b5246bdc71ea9a66",
+          "source_inventory_sha256": "a7aa2b29e37de5a5513f755c55cf408be3bfc55ee9cb164c76bcce9efed5185b",
           "evidence": [
             {
               "id": "E-PRESS-A",
@@ -1146,7 +1146,7 @@
           "world_id": "FORTY_IRRELEVANT_RECORDS_INJECTED",
           "target_configuration": "VESSEL-2",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "7806c324bb47318468cefec604880b7d476d6738d47e68afde40ee307cf2e898",
+          "source_inventory_sha256": "e0e491f1ca77e48c78245013e68cf9369b8b2bd81a6610ed6b357e65e9e5cbeb",
           "evidence": [
             {
               "id": "E-PRESS-A",
@@ -2026,8 +2026,8 @@
               ]
             }
           },
-          "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1",
-          "candidate_visible_manifest_sha256": "98690f0a4abd53e69921a89950c9aec24511607a08420e0921507816432337e5",
+          "irrelevant_evidence_injection_digest": "43a35a6001170ee11c97e5c4a55c2afb499f203f9f5b5c6299c229e7fe8bbb9f",
+          "candidate_visible_manifest_sha256": "422d36f875535b8948af3069008ca00268e072126dfc38de7a6decb141ee5a12",
           "candidate_action": "revalidate",
           "injected_evidence_ids": [
             "E-IRRELEVANT-001",
@@ -2144,7 +2144,7 @@
       "target_configuration": "PIPE-6",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-003",
-      "source_inventory_sha256": "79a66ddc838ec2103d035776c76501d3db88c0d016bc187951c89d37b068c729",
+      "source_inventory_sha256": "70e535eca7013d633d03929f0a9c26bcf73ad3c353b984312c1b00c4900c991a",
       "candidate_visible_evidence_ids": [
         "E-CORR-A",
         "E-CORR-A-SUMMARY",
@@ -2204,7 +2204,7 @@
               ]
             }
           },
-          "source_inventory_sha256": "8f532ce52b19bf3576ad5ac2af98f0d1f11ad403252379d5fea43f11dba4bb63",
+          "source_inventory_sha256": "3e9eaaa7c2c5a8a7cba59f6f8269d30aefc6ba1d7aaac7209ae95a60bb1742c3",
           "candidate_visible_manifest_sha256": "e9a5a3e77f15256bae6b152c433dc1400165ff7f1c91982d2734560c18b6b1f8",
           "candidate_action": "revalidate"
         },
@@ -2251,7 +2251,7 @@
               ]
             }
           },
-          "source_inventory_sha256": "d852a9ddb35abd15658869a96264b3da522330f1c8d4392006f5f1a7295da195",
+          "source_inventory_sha256": "ff108c1a087bfef90c0b9d7385da2f47c66d85985646b481e59aae7a8b31f136",
           "candidate_visible_manifest_sha256": "1c0ba3af5437018120e5b7827332ffe741bcb9699694a9aefb3b4d8d28ada767",
           "candidate_action": "revalidate"
         }
@@ -2327,7 +2327,7 @@
       "target_configuration": "ANCHOR-5",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-UNK-001",
-      "source_inventory_sha256": "2d3dacacab099406f4f4e8b9858c2c2e5255fe0985d44b1451f5406e1a3f43ff",
+      "source_inventory_sha256": "7fc55c4fdaa749258f0e0821b7a23b135d84d7b9cc91396a1e55d22e47f8cea9",
       "candidate_visible_evidence_ids": [
         "E-SEISMIC-A",
         "E-SEISMIC-UNK"
@@ -2337,7 +2337,7 @@
           "world_id": "UNKNOWN_PROVENANCE",
           "target_configuration": "ANCHOR-5",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "2d3dacacab099406f4f4e8b9858c2c2e5255fe0985d44b1451f5406e1a3f43ff",
+          "source_inventory_sha256": "7fc55c4fdaa749258f0e0821b7a23b135d84d7b9cc91396a1e55d22e47f8cea9",
           "evidence": [
             {
               "id": "E-SEISMIC-A",
@@ -2378,7 +2378,7 @@
           "world_id": "INDEPENDENT_ROOT_QUALIFIED",
           "target_configuration": "ANCHOR-5",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "b01ec2fefc6918c8da683024ae8505660b00fe34ffb0c8dab6cab44a03e6259a",
+          "source_inventory_sha256": "96d21e476137fee63835083f2efc7018481e10f08e76aaa12ffb22d9bca9d983",
           "evidence": [
             {
               "id": "E-SEISMIC-A",
