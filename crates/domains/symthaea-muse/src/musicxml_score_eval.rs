@@ -84,7 +84,7 @@ impl Default for MusicXmlScoreEvaluationConfigV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreDistanceV1 {
     pub reference_symbol_count: usize,
     pub prediction_symbol_count: usize,
@@ -104,13 +104,13 @@ pub enum MusicXmlScorePartStatusV1 {
     Unknown { reason: String },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreFamilyDistanceV1 {
     pub family: MusicXmlSymbolFamilyV1,
     pub distance: MusicXmlScoreDistanceV1,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScorePartReportV1 {
     pub part_id: String,
     pub status: MusicXmlScorePartStatusV1,
@@ -126,7 +126,7 @@ pub enum MusicXmlScoreEvaluationStatusV1 {
     Unavailable,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreEvaluationCoverageV1 {
     pub total_part_ids: usize,
     pub compared_part_ids: usize,
@@ -136,7 +136,7 @@ pub struct MusicXmlScoreEvaluationCoverageV1 {
     pub supported_part_coverage: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreEvaluationReportV1 {
     pub schema: String,
     pub evaluator_version: String,
@@ -294,7 +294,10 @@ fn append_source_node(
     // XML attribute order is not visible notation. Sort namespace/local-name
     // pairs to make equivalent documents compare identically.
     let mut attributes: Vec<_> = node.attributes.iter()
-        .filter(|attribute| attribute.name != "id")
+        .filter(|attribute| {
+            attribute.name != "id"
+                || matches!(node.element.as_str(), "score-instrument" | "midi-instrument" | "instrument")
+        })
         .collect();
     attributes.sort_by(|left, right| {
         left.namespace_uri.cmp(&right.namespace_uri)
@@ -1090,7 +1093,7 @@ mod tests {
     fn attribute_order_and_indentation_do_not_change_notation_tokens() {
         let left = r#"<score-partwise><part id="P1"><measure number="1">
             <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
-            <note id="x" color="#FFFFFF"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+            <note id="x" color="FFFFFF"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
             <note><rest/><duration>12</duration></note>
         </measure></part></score-partwise>"#;
         let right = r#"<score-partwise>
@@ -1133,7 +1136,7 @@ mod tests {
         ).unwrap();
         assert_eq!(missing.coverage.reference_only_part_ids, 0);
         assert_eq!(missing.coverage.prediction_only_part_ids, 1);
-        assert_eq!(missing.overall_distance.unwrap().edit_distance > 0, true);
+        assert!(missing.overall_distance.unwrap().edit_distance > 0);
     }
 
     #[test]
