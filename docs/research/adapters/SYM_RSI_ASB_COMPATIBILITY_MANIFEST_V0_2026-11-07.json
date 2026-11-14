@@ -1,0 +1,209 @@
+{
+  "manifest_version": "sym-rsi-asb-compatibility-manifest-v0",
+  "status": "PINNED_UPSTREAM_COMPATIBILITY_TARGET_NOT_YET_RUN",
+  "generated_utc_date": "2026-11-07",
+  "compatibility": {
+    "mode": "read_only_upstream_replay_and_twin",
+    "official_benchmark_claim": false,
+    "upstream_gate_mutation_permitted": false,
+    "note": "This manifest pins task contracts and metric mappings for an adapter. It does not establish adapter conformance or a Symthaea benchmark result."
+  },
+  "upstream": {
+    "repository": "Yibo-Wen/as-bench",
+    "url": "https://github.com/Yibo-Wen/as-bench",
+    "commit": "b82ee550344e6055197b5eef3db47a44082cae4d",
+    "commit_url": "https://github.com/Yibo-Wen/as-bench/commit/b82ee550344e6055197b5eef3db47a44082cae4d",
+    "task_schema_version": "1.4",
+    "lab_api_version": 1,
+    "pinned_files": [
+      {
+        "path": "README.md",
+        "git_blob_sha": "f5430803960bdbe8e4c2fb0f2bd3dca25dbe52a9",
+        "purpose": "benchmark overview, task catalogue, published pilot results and backend tiers"
+      },
+      {
+        "path": "docs/ARCHITECTURE.md",
+        "git_blob_sha": "c056f367ec6f92ab91057465ed21b417e4ce0645",
+        "purpose": "lab/verifier separation, API semantics, ledger and backend invariants"
+      },
+      {
+        "path": "runtime/api/openapi.yaml",
+        "git_blob_sha": "db5c272a5ffd13ac79d0ed9682a90ed6ffdd27dc",
+        "purpose": "Lab API v1 contract"
+      },
+      {
+        "path": "task-template.toml",
+        "git_blob_sha": "4e60ee6d88d8ddc83c6b677163e0d944a67e6560",
+        "purpose": "task metadata and schema version"
+      },
+      {
+        "path": "tasks/biology/deepmind/nuclease-active-learning/task.toml",
+        "git_blob_sha": "f5cd2ab065844cad9209697aa2e559d5caa84542",
+        "purpose": "replay campaign configuration"
+      },
+      {
+        "path": "tasks/biology/deepmind/nuclease-active-learning/README.md",
+        "git_blob_sha": "2eb8d04d8c8e89efc2bbe4b85a33690fb3ff68e7",
+        "purpose": "replay campaign task design, gates and provenance"
+      },
+      {
+        "path": "tasks/chemistry/sargent-lab/propylene-active-learning/task.toml",
+        "git_blob_sha": "31a26d7baf312520d1eabd803fa40912ca43e4b9",
+        "purpose": "digital-twin campaign configuration"
+      },
+      {
+        "path": "tasks/chemistry/sargent-lab/propylene-active-learning/README.md",
+        "git_blob_sha": "05513bae497d1c66fa9dd39253bf6bbaa6bb054d",
+        "purpose": "twin campaign task design, gates and measured/surrogate provenance"
+      },
+      {
+        "path": "tasks/biology/deepmind/nuclease-active-learning/environment/lab/campaign/campaign.json",
+        "git_blob_sha": "75681198b0ecc70d38130c08fd1b1d8e5a8e10fb",
+        "purpose": "private lab campaign rules pinned for public-card fixture derivation"
+      },
+      {
+        "path": "tasks/chemistry/sargent-lab/propylene-active-learning/environment/lab/campaign/campaign.json",
+        "git_blob_sha": "18920080073338f64500db4d0ccd4ffea425e9c1",
+        "purpose": "private lab campaign rules pinned for public-card fixture derivation"
+      }
+    ]
+  },
+  "adapter_scope": {
+    "first_backend": "replay",
+    "second_backend": "twin",
+    "excluded_backends": [
+      "live"
+    ],
+    "excluded_claims": [
+      "physical laboratory execution",
+      "wet-lab discovery",
+      "official AS-Bench leaderboard submission",
+      "scientific discovery from adapter conformance alone"
+    ]
+  },
+  "campaigns": [
+    {
+      "id": "nuclease-active-learning",
+      "task_path": "tasks/biology/deepmind/nuclease-active-learning",
+      "backend": "replay",
+      "domain": "biology",
+      "source": "DeepMind / Triplebar",
+      "source_doi": "10.1016/j.cels.2025.101236",
+      "preprint_doi": "10.1101/2024.03.21.585615",
+      "data_license": "CC-BY-4.0",
+      "design_space": {
+        "orderable_designs": 20000,
+        "rounds": 4,
+        "batch_size": 96,
+        "total_measurement_budget": 384
+      },
+      "gates": {
+        "discovery": [
+          {
+            "metric": "discovery_hits",
+            "operator": ">=",
+            "threshold": 190
+          },
+          {
+            "metric": "distinct_hit_families",
+            "operator": ">=",
+            "threshold": 175
+          }
+        ],
+        "learning": [
+          {
+            "metric": "ndcg_at_100",
+            "operator": ">=",
+            "threshold": 0.42,
+            "held_out_designs": 5000
+          }
+        ],
+        "combination": "all_discovery_and_learning_gates_must_pass"
+      },
+      "reference_shipped_split": {
+        "discovery_hits": 278,
+        "distinct_hit_families": 215,
+        "ndcg_at_100": 0.488,
+        "role": "upstream_reference_solution_result_not_a_Symthaea_result"
+      },
+      "observation_semantics": {
+        "measurement_source": "published replay table",
+        "agent_visible_truth": false,
+        "repeated_designs_permitted": false,
+        "duplicate_submission_latest_accepted_batch_is_idempotent": true
+      }
+    },
+    {
+      "id": "propylene-active-learning",
+      "task_path": "tasks/chemistry/sargent-lab/propylene-active-learning",
+      "backend": "twin",
+      "domain": "chemistry",
+      "source": "Sargent / Sinton / Hattrick-Simpers groups",
+      "source_doi": "10.1016/j.joule.2025.102213",
+      "dataset_doi": "10.5281/zenodo.15107045",
+      "data_license": "CC-BY-4.0",
+      "design_space": {
+        "orderable_designs": 736,
+        "rounds": 3,
+        "batch_size": 20,
+        "total_measurement_budget": 60,
+        "held_out_designs": 244
+      },
+      "gates": {
+        "discovery": [
+          {
+            "metric": "discovery_hits",
+            "operator": ">=",
+            "threshold": 7
+          }
+        ],
+        "learning": [
+          {
+            "metric": "ndcg_at_20",
+            "operator": ">=",
+            "threshold": 0.52,
+            "held_out_designs": 244
+          }
+        ],
+        "combination": "all_discovery_and_learning_gates_must_pass"
+      },
+      "reference_shipped_split": {
+        "discovery_hits": 8,
+        "ndcg_at_20": 0.626,
+        "role": "upstream_reference_solution_result_not_a_Symthaea_result"
+      },
+      "observation_semantics": {
+        "measurement_source": "digital twin of source-study virtual screening space",
+        "exact_published_measurements": 96,
+        "surrogate_model_outputs": 884,
+        "twin_is_noiseless_mean_output": true,
+        "live_laboratory_measurements": false,
+        "agent_visible_truth": false,
+        "repeated_designs_permitted": false,
+        "note": "Never describe twin outputs as live laboratory observations. Keep source-measured and surrogate-generated provenance distinct where the API/task exposes it."
+      }
+    }
+  ],
+  "invariants": [
+    "Discovery and learning are separate gates; a campaign passes only when all gates pass.",
+    "Learning metrics are computed on designs the agent did not measure.",
+    "The verifier/oracle and held-out truth are outside the agent process.",
+    "A queued or running job is not a completed measurement.",
+    "Failed jobs do not count as accepted completed campaign stages.",
+    "Rejected requests do not consume budget or advance stages.",
+    "The lab sidecar owns stage order, batch size, eligibility, uniqueness and budget enforcement.",
+    "The verifier receives lab-owned ledger and deliverables, not agent-container files.",
+    "Upstream task gates, instructions, data, and verifier semantics are not modified by the adapter.",
+    "Adapter conformance, benchmark performance, scientific discovery and R4 are distinct claim tiers."
+  ],
+  "ownership": {
+    "research_taste": 10877,
+    "direction_board": 9230,
+    "scientific_tool_allocation": 8721,
+    "adaptive_benchmark_generation_and_oracle": 9332,
+    "evaluator_integrity": 10756,
+    "causal_attribution": 10717,
+    "evidence_continuity": 10630,
+    "recursive_improver_claims": 10497
+  }
+}
