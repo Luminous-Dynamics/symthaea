@@ -35,3 +35,6 @@ The package tests valid signature and monotonic advance, exact replay, rollback,
 
 
 When the OpenSSL CLI is available, `openssl_interop_test.go` verifies the published vector with OpenSSL's Ed25519 implementation, independently of Go's `crypto/ed25519`. The test skips explicitly if OpenSSL is unavailable; the Go-side test vector check remains mandatory.
+
+
+`AcceptObserved` is the safer integration entry point when a caller has a separately observed destination snapshot. It requires the observed database identity, journal sequence and head digest to match the signed checkpoint before advancing the monotonic cursor. The observer must obtain those values from one coherent snapshot; the helper cannot make an incomplete or self-reported observer independent.
