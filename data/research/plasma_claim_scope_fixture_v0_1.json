@@ -1,0 +1,348 @@
+{
+  "schema_version": "plasma-claim-scope-fixture-v0.1",
+  "cases": [
+    {
+      "id": "iso4587-in-scope-observation",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Exact edition, rigid-to-rigid single-lap geometry and tensile lap-shear endpoint."
+    },
+    {
+      "id": "iso4587-design-allowable-escalation",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "ISO 4587 explicitly says the procedure does not provide design information."
+    },
+    {
+      "id": "iso4587-calendar-life-escalation",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "service_lifetime",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A short-term lap-shear observation is not a service-life estimate."
+    },
+    {
+      "id": "astm-d1002-comparative-metal-joint",
+      "method_id": "ASTM_D1002",
+      "edition": "2026",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D1002-26 identifies its use as primarily comparative for metal-to-metal single-lap specimens."
+    },
+    {
+      "id": "astm-d1002-polymer-scope-mismatch",
+      "method_id": "ASTM_D1002",
+      "edition": "2026",
+      "material_pair_class": "polymer_to_polymer",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D1002-26 scope is metal-to-metal, not polymer-to-polymer."
+    },
+    {
+      "id": "astm-d1002-design-allowable-escalation",
+      "method_id": "ASTM_D1002",
+      "edition": "2026",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D1002-26 explicitly warns against using its apparent shear result as a design-allowable stress."
+    },
+    {
+      "id": "astm-d3762-aluminium-wedge-screen",
+      "method_id": "ASTM_D3762",
+      "edition": "2024",
+      "material_pair_class": "aluminum_to_aluminum",
+      "geometry": "wedge",
+      "endpoint": "qualitative_wedge_durability",
+      "requested_claim": "qualitative_surface_durability_screen",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D3762-24 supports qualitative wedge-test surface-durability discrimination and failure-mode evaluation."
+    },
+    {
+      "id": "astm-d3762-fracture-strength-escalation",
+      "method_id": "ASTM_D3762",
+      "edition": "2024",
+      "material_pair_class": "aluminum_to_aluminum",
+      "geometry": "wedge",
+      "endpoint": "qualitative_wedge_durability",
+      "requested_claim": "quantitative_fracture_strength",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D3762-24 explicitly is not a quantitative fracture-strength method."
+    },
+    {
+      "id": "astm-d3762-polymer-suitability-review-unverified",
+      "method_id": "ASTM_D3762",
+      "edition": "2024",
+      "material_pair_class": "polymer_to_polymer",
+      "geometry": "wedge",
+      "endpoint": "qualitative_wedge_durability",
+      "requested_claim": "qualitative_surface_durability_screen",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "suitability_review_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "expected_disposition": "BLOCKED",
+      "rationale": "The standard permits considering other materials with thickness/rigidity considerations, but S0 cannot authenticate or approve that suitability review."
+    },
+    {
+      "id": "astm-d1002-unrecognized-edition",
+      "method_id": "ASTM_D1002",
+      "edition": "2019",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "An unrecognized edition cannot inherit the currently pinned D1002-26 scope."
+    },
+    {
+      "id": "iso4587-missing-protocol-digest",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": null,
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Protocol identity alone is insufficient without a well-formed protocol digest reference."
+    },
+    {
+      "id": "iso4587-missing-raw-data-digest",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": null,
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The raw-data artifact digest reference is absent."
+    },
+    {
+      "id": "iso4587-duplicate-specimen-identities",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-DUP",
+        "SPEC-DUP"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Duplicated specimen identities prevent independent specimen accounting."
+    },
+    {
+      "id": "water-contact-angle-wettability-only",
+      "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+      "edition": "protocol-defined-v1",
+      "material_pair_class": "material_surface",
+      "geometry": "sessile_drop",
+      "endpoint": "water_contact_angle",
+      "requested_claim": "wettability_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The protocol supports a wettability observation only."
+    },
+    {
+      "id": "water-contact-angle-to-bond-strength",
+      "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+      "edition": "protocol-defined-v1",
+      "material_pair_class": "material_surface",
+      "geometry": "sessile_drop",
+      "endpoint": "water_contact_angle",
+      "requested_claim": "bond_strength_from_contact_angle",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Contact angle is not a direct bond-strength measurement."
+    },
+    {
+      "id": "iso4587-endpoint-to-fatigue-life",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "fatigue_life",
+      "requested_claim": "fatigue_life",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "An ISO 4587 lap-shear endpoint does not establish fatigue life."
+    },
+    {
+      "id": "unknown-model-only-method",
+      "method_id": "ML_MODEL_SCORE_ONLY",
+      "edition": "v0",
+      "material_pair_class": "unknown",
+      "geometry": "not_a_test",
+      "endpoint": "model_score",
+      "requested_claim": "model_generalization",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "A model score without a registered test method cannot be promoted into a physical measurement claim."
+    },
+    {
+      "id": "astm-d1002-wrong-joint-geometry",
+      "method_id": "ASTM_D1002",
+      "edition": "2026",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "double_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The geometry does not match the registered standard single-lap method."
+    },
+    {
+      "id": "iso4587-malformed-raw-digest",
+      "method_id": "ISO_4587",
+      "edition": "2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "sha256:not-a-lowercase-hex-digest",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The raw-data digest reference does not have the required lowercase SHA-256 shape."
+    }
+  ]
+}
