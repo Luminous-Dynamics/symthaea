@@ -175,16 +175,6 @@
           "supports": [
             "thermal_runaway_limit"
           ]
-        },
-        {
-          "id": "E-THERM-B",
-          "root_id": "THERM-B",
-          "derived_from": [],
-          "admissibility": "admissible",
-          "configuration": "PACK-3",
-          "supports": [
-            "thermal_runaway_limit"
-          ]
         }
       ],
       "expected": {
@@ -213,23 +203,74 @@
       "candidate_worlds": [
         {
           "world_id": "BASELINE",
+          "target_configuration": "PACK-3",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence": [
+            {
+              "id": "E-THERM-A",
+              "root_id": "THERM-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "PACK-3",
+              "supports": [
+                "thermal_runaway_limit"
+              ]
+            },
+            {
+              "id": "E-THERM-B",
+              "root_id": "THERM-B",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "PACK-3",
+              "supports": [
+                "thermal_runaway_limit"
+              ]
+            }
+          ],
           "candidate_visible_evidence_ids": [
             "E-THERM-A",
             "E-THERM-B"
           ],
           "expected": {
             "state": "supported",
-            "action": "revalidate"
+            "action": "revalidate",
+            "sufficient_root_sets_by_predicate": {
+              "thermal_runaway_limit": [
+                [
+                  "THERM-A",
+                  "THERM-B"
+                ]
+              ]
+            }
           }
         },
         {
           "world_id": "LAST_SUPPORT_REMOVED",
+          "target_configuration": "PACK-3",
+          "source_inventory_state": "complete_frozen",
+          "source_inventory_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "evidence": [
+            {
+              "id": "E-THERM-A",
+              "root_id": "THERM-A",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "PACK-3",
+              "supports": [
+                "thermal_runaway_limit"
+              ]
+            }
+          ],
           "candidate_visible_evidence_ids": [
             "E-THERM-A"
           ],
           "expected": {
             "state": "unsupported",
-            "action": "hold"
+            "action": "hold",
+            "sufficient_root_sets_by_predicate": {
+              "thermal_runaway_limit": []
+            }
           }
         }
       ],
@@ -590,7 +631,7 @@
     {
       "id": "ME-PAIR-002",
       "case_id": "ME-NEG-002",
-      "intervention": "remove E-THERM-B from the selected evidence",
+      "intervention": "remove E-THERM-B from the frozen candidate-visible evidence inventory and source manifest",
       "expected_relation": "flip",
       "expected_action": "hold"
     },
