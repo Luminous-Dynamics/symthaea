@@ -34,18 +34,47 @@ pub struct PatternPart {
     pub edge_ids: BTreeSet<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum InterfaceKind {
+    Seam,
+    Hem,
+    Fold,
+    Opening,
+    Binding,
+    Fastener,
+    JoiningOther,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum EdgeOrientation {
+    Forward,
+    Reversed,
+    Unknown,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct EdgeRef {
     pub part_id: String,
     pub edge_id: String,
+    pub orientation: EdgeOrientation,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SewingInterface {
     pub interface_id: String,
+    pub interface_kind: InterfaceKind,
     pub edge_refs: Vec<EdgeRef>,
     pub seam_allowance_micrometres: u64,
     pub tolerance_micrometres: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum MachineProfileBasis {
+    ManufacturerSpecification,
+    IndependentlyTested,
+    OperatorDeclared,
+    SyntheticFixture,
+    Unknown,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -54,6 +83,7 @@ pub struct MachineProfile {
     pub revision: u64,
     pub sha256: String,
     pub supported_operations: BTreeSet<OperationKind>,
+    pub profile_basis: MachineProfileBasis,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -65,6 +95,10 @@ pub struct SewingOperation {
     pub interface_refs: Vec<String>,
     pub machine_profile_ref: Option<String>,
     pub manual: bool,
+    pub requires_human_review: bool,
+    pub irreversible: bool,
+    pub evidence_requirements: BTreeSet<String>,
+    pub ambiguity_notes: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -168,6 +202,9 @@ pub fn validate_plan(
         if interface.edge_refs.len() < 2 {
             issue(&mut issues, "insufficient_interface_edges", format!("{path}.edge_refs"), "an assembly interface requires at least two edge references");
         }
+        if interface.interface_kind == InterfaceKind::Seam && interface.edge_refs.len() != 2 {
+            issue(&mut issues, "seam_interface_edge_count", format!("{path}.edge_refs"), "a sewn seam interface must name exactly two mating edges");
+        }
         if interface.seam_allowance_micrometres > 100_000 {
             issue(&mut issues, "seam_allowance_out_of_range", format!("{path}.seam_allowance_micrometres"), "seam allowance exceeds the declared 100 mm guardrail");
         }
@@ -218,6 +255,31 @@ pub fn validate_plan(
         if operation_map.insert(operation.operation_id.as_str(), operation).is_some() {
             issue(&mut issues, "duplicate_operation_id", format!("{path}.operation_id"), "operation id is duplicated");
         }
+        if operation.part_refs.is_empty() {
+            issue(&mut issues, "operation_without_parts", format!("{path}.part_refs"), "every assembly operation must identify at least one part");
+        }
+        if matches!(
+            operation.kind,
+            OperationKind::Join
+                | OperationKind::EdgeFinish
+                | OperationKind::Dart
+                | OperationKind::Gather
+                | OperationKind::Attach
+                | OperationKind::Insert
+                | OperationKind::Topstitch
+        ) && operation.interface_refs.is_empty()
+        {
+            issue(&mut issues, "operation_without_interface", format!("{path}.interface_refs"), "this operation kind requires an explicit pattern interface");
+        }
+        if operation.irreversible && !operation.requires_human_review {
+            issue(&mut issues, "irreversible_operation_without_review", format!("{path}.requires_human_review"), "irreversible operations require an explicit human review gate");
+        }
+        if !operation.ambiguity_notes.is_empty() && !operation.requires_human_review {
+            issue(&mut issues, "ambiguity_without_review", format!("{path}.requires_human_review"), "operations with unresolved ambiguity require human review");
+        }
+        if operation.irreversible && operation.evidence_requirements.is_empty() {
+            issue(&mut issues, "irreversible_operation_without_evidence", format!("{path}.evidence_requirements"), "irreversible operations require explicit evidence/inspection requirements");
+        }
         if operation.manual && operation.machine_profile_ref.is_some() {
             issue(&mut issues, "manual_operation_has_machine_profile", format!("{path}.machine_profile_ref"), "manual operation must not silently declare machine execution");
         }
@@ -229,6 +291,17 @@ pub fn validate_plan(
                 None => issue(&mut issues, "unknown_machine_profile", format!("{path}.machine_profile_ref"), "operation references an unknown machine profile"),
                 Some(machine) if !machine.supported_operations.contains(&operation.kind) => {
                     issue(&mut issues, "unsupported_machine_operation", format!("{path}.kind"), "machine profile does not declare this operation kind");
+                }
+                Some(machine) if machine.profile_basis == MachineProfileBasis::Unknown && !operation.manual => {
+                    issue(&mut issues, "unknown_machine_profile_basis", format!("{path}.machine_profile_ref"), "an automated operation cannot rely on an unknown machine-profile evidence basis");
+                }
+                Some(machine)
+                    if matches!(
+                        machine.profile_basis,
+                        MachineProfileBasis::SyntheticFixture | MachineProfileBasis::OperatorDeclared
+                    ) && !operation.requires_human_review =>
+                {
+                    issue(&mut issues, "machine_profile_requires_review", format!("{path}.requires_human_review"), "synthetic or operator-declared machine capabilities require human review");
                 }
                 Some(_) => {}
             }
@@ -247,8 +320,21 @@ pub fn validate_plan(
             if !interface_refs.insert(interface_id) {
                 issue(&mut issues, "duplicate_operation_interface_ref", format!("{path}.interface_refs[{interface_index}]"), "interface reference is duplicated");
             }
-            if !interface_map.contains_key(interface_id.as_str()) {
-                issue(&mut issues, "unknown_operation_interface", format!("{path}.interface_refs[{interface_index}]"), "operation references an unknown interface");
+            match interface_map.get(interface_id.as_str()) {
+                None => issue(&mut issues, "unknown_operation_interface", format!("{path}.interface_refs[{interface_index}]"), "operation references an unknown interface"),
+                Some(interface) => {
+                    let operation_parts: BTreeSet<&str> = operation.part_refs.iter().map(String::as_str).collect();
+                    for edge_ref in &interface.edge_refs {
+                        if !operation_parts.contains(edge_ref.part_id.as_str()) {
+                            issue(&mut issues, "interface_part_not_declared", format!("{path}.interface_refs[{interface_index}]"), "operation must explicitly reference every part used by its interface");
+                        }
+                    }
+                    if interface.edge_refs.iter().any(|edge| edge.orientation == EdgeOrientation::Unknown)
+                        && !operation.requires_human_review
+                    {
+                        issue(&mut issues, "unknown_edge_orientation_without_review", format!("{path}.requires_human_review"), "unknown edge orientation requires human review");
+                    }
+                }
             }
         }
     }
@@ -348,21 +434,24 @@ mod tests {
             revision: 1,
             sha256: "3".repeat(64),
             supported_operations: BTreeSet::from([OperationKind::Join, OperationKind::Topstitch]),
+            profile_basis: MachineProfileBasis::SyntheticFixture,
         };
         let shoulder = SewingInterface {
             interface_id: "shoulder".to_owned(),
+            interface_kind: InterfaceKind::Seam,
             edge_refs: vec![
-                EdgeRef { part_id: "front".to_owned(), edge_id: "shoulder".to_owned() },
-                EdgeRef { part_id: "back".to_owned(), edge_id: "shoulder".to_owned() },
+                EdgeRef { part_id: "front".to_owned(), edge_id: "shoulder".to_owned(), orientation: EdgeOrientation::Forward },
+                EdgeRef { part_id: "back".to_owned(), edge_id: "shoulder".to_owned(), orientation: EdgeOrientation::Reversed },
             ],
             seam_allowance_micrometres: 10_000,
             tolerance_micrometres: 1_500,
         };
         let side = SewingInterface {
             interface_id: "side".to_owned(),
+            interface_kind: InterfaceKind::Seam,
             edge_refs: vec![
-                EdgeRef { part_id: "front".to_owned(), edge_id: "side".to_owned() },
-                EdgeRef { part_id: "back".to_owned(), edge_id: "side".to_owned() },
+                EdgeRef { part_id: "front".to_owned(), edge_id: "side".to_owned(), orientation: EdgeOrientation::Forward },
+                EdgeRef { part_id: "back".to_owned(), edge_id: "side".to_owned(), orientation: EdgeOrientation::Reversed },
             ],
             seam_allowance_micrometres: 10_000,
             tolerance_micrometres: 1_500,
@@ -375,6 +464,10 @@ mod tests {
             interface_refs: vec!["shoulder".to_owned()],
             machine_profile_ref: Some("lockstitch".to_owned()),
             manual: false,
+            requires_human_review: true,
+            irreversible: true,
+            evidence_requirements: BTreeSet::from(["seam-inspection".to_owned()]),
+            ambiguity_notes: Vec::new(),
         };
         let join_sides = SewingOperation {
             operation_id: "join-sides".to_owned(),
@@ -384,6 +477,10 @@ mod tests {
             interface_refs: vec!["side".to_owned()],
             machine_profile_ref: Some("lockstitch".to_owned()),
             manual: false,
+            requires_human_review: true,
+            irreversible: true,
+            evidence_requirements: BTreeSet::from(["seam-inspection".to_owned()]),
+            ambiguity_notes: Vec::new(),
         };
         SewingAssemblyPlan {
             plan_id: "synthetic-overshirt".to_owned(),
