@@ -5720,4 +5720,225 @@ mod tests {
         ));
         assert_eq!(state.to_dense(8).unwrap(), before);
     }
+
+    fn deterministic_unit(seed: &mut u64) -> f64 {
+        *seed = seed
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        let fraction = (*seed >> 11) as f64 / ((1_u64 << 53) as f64);
+        2.0 * fraction - 1.0
+    }
+
+    fn deterministic_fixed_charge_dense(
+        site_count: usize,
+        total_charge: i32,
+        seed: &mut u64,
+    ) -> Vec<Complex64> {
+        let dimension = 1_usize << site_count;
+        let mut dense = vec![complex_zero(); dimension];
+        let mut norm_squared = 0.0;
+        for (basis, amplitude) in dense.iter_mut().enumerate() {
+            if basis.count_ones() as i32 == total_charge {
+                *amplitude = Complex64::new(
+                    deterministic_unit(seed),
+                    deterministic_unit(seed),
+                );
+                norm_squared += amplitude.norm_sqr();
+            }
+        }
+        assert!(norm_squared.is_finite() && norm_squared > 0.0);
+        let inverse_norm = norm_squared.sqrt().recip();
+        for amplitude in &mut dense {
+            *amplitude *= inverse_norm;
+        }
+        dense
+    }
+
+    fn deterministic_u1_gate(seed: &mut u64, time_step: f64) -> U1TwoSiteGate {
+        let mut hamiltonian = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            hamiltonian[index][index] =
+                Complex64::new(0.5 * deterministic_unit(seed), 0.0);
+        }
+        let hopping = Complex64::new(
+            0.7 * deterministic_unit(seed),
+            0.7 * deterministic_unit(seed),
+        );
+        hamiltonian[1][2] = hopping;
+        hamiltonian[2][1] = hopping.conj();
+        U1TwoSiteHamiltonian::new(hamiltonian, 1.0e-12)
+            .unwrap()
+            .evolution_gate(time_step, 1.0e-12)
+            .unwrap()
+    }
+
+    fn apply_two_site_gate_dense(
+        input: &[Complex64],
+        site_count: usize,
+        bond: usize,
+        gate: &U1TwoSiteGate,
+    ) -> Vec<Complex64> {
+        let mut output = vec![complex_zero(); input.len()];
+        let first_shift = site_count - 1 - bond;
+        let second_shift = site_count - 2 - bond;
+        let pair_mask = (1_usize << first_shift) | (1_usize << second_shift);
+        for (basis, amplitude) in input.iter().copied().enumerate() {
+            let first_bit = (basis >> first_shift) & 1;
+            let second_bit = (basis >> second_shift) & 1;
+            let input_pair = first_bit * 2 + second_bit;
+            let spectator_bits = basis & !pair_mask;
+            for output_pair in 0..4 {
+                let output_first = (output_pair >> 1) & 1;
+                let output_second = output_pair & 1;
+                let output_basis = spectator_bits
+                    | (output_first << first_shift)
+                    | (output_second << second_shift);
+                output[output_basis] += gate.matrix()[output_pair][input_pair] * amplitude;
+            }
+        }
+        output
+    }
+
+    fn apply_nonunitary_virtual_gauge_rescaling(
+        state: &ComplexU1Mps,
+        bond: usize,
+        seed: &mut u64,
+    ) -> ComplexU1Mps {
+        let mut tensors = state.tensors().to_vec();
+        let mut left_data = tensors[bond].data().to_vec();
+        let mut right_data = tensors[bond + 1].data().to_vec();
+        let left_right_dimension = tensors[bond].right_dimension();
+        let right_right_dimension = tensors[bond + 1].right_dimension();
+        let mut scales = Vec::with_capacity(left_right_dimension);
+        for _ in 0..left_right_dimension {
+            // Positive, bounded, non-unitary diagonal gauge transform.
+            scales.push(0.35 + 1.65 * (0.5 * (deterministic_unit(seed) + 1.0)));
+        }
+        for left in 0..tensors[bond].left_dimension() {
+            for physical in 0..2 {
+                for right in 0..left_right_dimension {
+                    let index = (left * 2 + physical) * left_right_dimension + right;
+                    left_data[index] *= scales[right];
+                }
+            }
+        }
+        for left in 0..left_right_dimension {
+            for physical in 0..2 {
+                for right in 0..right_right_dimension {
+                    let index = (left * 2 + physical) * right_right_dimension + right;
+                    right_data[index] /= scales[left];
+                }
+            }
+        }
+        tensors[bond] = U1MpsTensor::new(
+            tensors[bond].left_charges().to_vec(),
+            tensors[bond].right_charges().to_vec(),
+            left_data,
+        )
+        .unwrap();
+        tensors[bond + 1] = U1MpsTensor::new(
+            tensors[bond + 1].left_charges().to_vec(),
+            tensors[bond + 1].right_charges().to_vec(),
+            right_data,
+        )
+        .unwrap();
+        ComplexU1Mps::new(tensors, state.total_charge(), 1.0e-9).unwrap()
+    }
+
+    #[test]
+    fn global_error_certificate_falsification_grid_dominates_dense_oracle_for_noncanonical_gauges() {
+        const CASES: usize = 48;
+        let mut qualified_cases = 0;
+        let mut compression_cases = 0;
+        let mut nontrivial_gauge_cases = 0;
+
+        for case_index in 0..CASES {
+            let mut seed = 0x9e37_79b9_7f4a_7c15_u64 ^ (case_index as u64 + 1);
+            let site_count = 3 + (case_index % 6);
+            let total_charge = 1 + (case_index % (site_count - 1)) as i32;
+            let bond = (case_index * 7 + 3) % (site_count - 1);
+            let gauge_bond = (case_index * 5 + 1) % (site_count - 1);
+            let dense = deterministic_fixed_charge_dense(site_count, total_charge, &mut seed);
+            let mut input =
+                ComplexU1Mps::from_dense_fixed_charge(&dense, site_count, total_charge, 1.0e-12)
+                    .unwrap();
+            input = apply_nonunitary_virtual_gauge_rescaling(&input, gauge_bond, &mut seed);
+
+            let gauged_dense = input.to_dense(10).unwrap();
+            let gauge_state_error = dense
+                .iter()
+                .zip(gauged_dense.iter())
+                .map(|(left, right)| (*left - *right).norm_sqr())
+                .sum::<f64>()
+                .sqrt();
+            assert!(
+                gauge_state_error <= 1.0e-9,
+                "case={case_index}, non-unitary virtual gauge changed the physical state: {gauge_state_error}"
+            );
+            if (input.tensors()[gauge_bond].data()
+                != ComplexU1Mps::from_dense_fixed_charge(
+                    &dense,
+                    site_count,
+                    total_charge,
+                    1.0e-12,
+                )
+                .unwrap()
+                .tensors()[gauge_bond]
+                    .data())
+            {
+                nontrivial_gauge_cases += 1;
+            }
+
+            let gate = deterministic_u1_gate(&mut seed, 0.03 + 0.01 * (case_index % 5) as f64);
+            let exact_dense = apply_two_site_gate_dense(&gauged_dense, site_count, bond, &gate);
+            let layer = U1TeBDLayer::new(
+                site_count,
+                (bond % 2) as u8,
+                vec![U1TeBDGate::new(bond, gate)],
+            )
+            .unwrap();
+            let policy = U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1 + (case_index % 3),
+                relative_singular_value_cutoff: if case_index % 2 == 0 { 0.0 } else { 0.04 },
+                tolerance: 1.0e-9,
+            };
+            let result = layer.apply(&input, policy).unwrap();
+            assert!(
+                result.global_l2_bound_qualified,
+                "case={case_index}, canonical gauge receipt did not qualify: {:?}",
+                result.canonical_gauge_receipts
+            );
+            assert_eq!(result.output_total_charge, total_charge);
+            assert!(result.output_selection_rule_residual <= 1.0e-9);
+            assert_eq!(result.gate_receipts.len(), 1);
+            assert!(result.gate_receipts[0].canonical_gauge.qualifies(1.0e-9));
+
+            let approximated_dense = result.state.to_dense(10).unwrap();
+            let actual_error = exact_dense
+                .iter()
+                .zip(approximated_dense.iter())
+                .map(|(left, right)| (*left - *right).norm_sqr())
+                .sum::<f64>()
+                .sqrt();
+            let bound = result
+                .truncation_ledger
+                .global_state_error_bound_upper()
+                .expect("qualified certificate must carry a global bound");
+            assert!(
+                bound + 2.0e-8 >= actual_error,
+                "case={case_index}, N={site_count}, K={total_charge}, bond={bond}, actual={actual_error}, bound={bound}, receipt={:?}",
+                result.gate_receipts[0]
+            );
+            assert!(bound.is_finite() && bound >= 0.0);
+            if result.gate_truncations[0].discarded_weight > 1.0e-12 {
+                compression_cases += 1;
+            }
+            qualified_cases += 1;
+        }
+
+        assert_eq!(qualified_cases, CASES);
+        assert!(compression_cases > CASES / 3);
+        assert_eq!(nontrivial_gauge_cases, CASES);
+    }
+
 }
