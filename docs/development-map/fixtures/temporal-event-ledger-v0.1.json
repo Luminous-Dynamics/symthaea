@@ -1,0 +1,141 @@
+{
+  "schema_version": "0.1.0",
+  "ledger_id": "synthetic-egddm-temporal-v0.1",
+  "repository_full_name": "synthetic/decision-api",
+  "events": [
+    {
+      "event_id": "evt-001",
+      "sequence": 1,
+      "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "event_hash": "860062084c3b2026e98e49364f8a413969810d7ed14991e15afe41c6c4af8f2f",
+      "body": {
+        "operation": "assert",
+        "fact_id": "receipt-contract-conformance",
+        "recorded_at": "2026-11-14T08:05:00Z",
+        "observed_at": "2026-11-14T08:00:00Z",
+        "actor_availability": [
+          {
+            "actor_id": "release-steward",
+            "available_at": "2026-11-14T08:10:00Z",
+            "proof_ref": "receipt://synthetic/actor-availability/evt-001"
+          }
+        ],
+        "scope": {
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "effective_at": null,
+        "valid_from": "2026-11-14T08:00:00Z",
+        "valid_through": null,
+        "validity_completeness": "complete",
+        "target_event_id": null,
+        "payload": {
+          "contract": "v1",
+          "result": "pass",
+          "test": "receipt-contract"
+        }
+      }
+    },
+    {
+      "event_id": "evt-002",
+      "sequence": 2,
+      "previous_hash": "860062084c3b2026e98e49364f8a413969810d7ed14991e15afe41c6c4af8f2f",
+      "event_hash": "2b236a5aea52a86f1e8b113342026f0687651aeb20046f68369aa6d53e83db32",
+      "body": {
+        "operation": "invalidate",
+        "fact_id": "receipt-contract-conformance",
+        "recorded_at": "2026-11-14T10:20:00Z",
+        "observed_at": "2026-11-14T10:15:00Z",
+        "actor_availability": [
+          {
+            "actor_id": "release-steward",
+            "available_at": "2026-11-14T10:30:00Z",
+            "proof_ref": "receipt://synthetic/actor-availability/evt-002"
+          }
+        ],
+        "scope": {
+          "revision": "dddddddddddddddddddddddddddddddddddddddd",
+          "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "effective_at": "2026-11-14T09:30:00Z",
+        "valid_from": null,
+        "valid_through": null,
+        "validity_completeness": null,
+        "target_event_id": "evt-001",
+        "payload": {
+          "reason": "contract semantics changed",
+          "superseding_contract": "v2"
+        }
+      }
+    },
+    {
+      "event_id": "evt-003",
+      "sequence": 3,
+      "previous_hash": "2b236a5aea52a86f1e8b113342026f0687651aeb20046f68369aa6d53e83db32",
+      "event_hash": "c6cdad7f742b2465bae982ea74f762dcd026c6c6302f27d936f2f1500c0ff0b0",
+      "body": {
+        "operation": "assert",
+        "fact_id": "late-captured-build-observation",
+        "recorded_at": "2026-11-14T11:30:00Z",
+        "observed_at": "2026-11-14T09:00:00Z",
+        "actor_availability": [
+          {
+            "actor_id": "release-steward",
+            "available_at": "2026-11-14T09:05:00Z",
+            "proof_ref": "receipt://synthetic/actor-availability/evt-003"
+          }
+        ],
+        "scope": {
+          "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "effective_at": null,
+        "valid_from": "2026-11-14T09:00:00Z",
+        "valid_through": null,
+        "validity_completeness": "complete",
+        "target_event_id": null,
+        "payload": {
+          "capture": "late-ingest",
+          "result": "pass",
+          "test": "build-check"
+        }
+      }
+    },
+    {
+      "event_id": "evt-004",
+      "sequence": 4,
+      "previous_hash": "c6cdad7f742b2465bae982ea74f762dcd026c6c6302f27d936f2f1500c0ff0b0",
+      "event_hash": "5de55bd46b1b43ad3a8b8e2183e17f15126f3b92a6fa91734e6ce3b39244ad04",
+      "body": {
+        "operation": "propose",
+        "fact_id": "contract-v2-remediation",
+        "recorded_at": "2026-11-14T11:36:00Z",
+        "observed_at": "2026-11-14T11:35:00Z",
+        "actor_availability": [
+          {
+            "actor_id": "release-steward",
+            "available_at": "2026-11-14T11:37:00Z",
+            "proof_ref": "receipt://synthetic/actor-availability/evt-004"
+          }
+        ],
+        "scope": {
+          "revision": "dddddddddddddddddddddddddddddddddddddddd",
+          "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "effective_at": null,
+        "valid_from": null,
+        "valid_through": null,
+        "validity_completeness": null,
+        "target_event_id": null,
+        "payload": {
+          "proposed_change": "update consumer contract tests",
+          "status": "not-executed"
+        }
+      }
+    }
+  ]
+}
