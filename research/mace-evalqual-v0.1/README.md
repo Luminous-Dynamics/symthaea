@@ -57,6 +57,21 @@ The comparator distinguishes delivery sequence from source sequence. A reordered
 
 This remains a simulator laboratory: ground truth is authored by the fixture and is not an independent OS or service oracle. The next step is to replace the fixture's event source with independently instrumented filesystem/process/network/API boundaries while retaining this comparator as a conformance oracle.
 
+## Destination effect-or-fence experiment
+
+The `effectbridge` package is a stateful destination fixture, not a broker or authority issuer.
+
+A normal `GET /v1/reconcile/{key}` result of `not_found_unfenced` remains indeterminate: a delayed request may still arrive after the lookup. The destination's `PUT /v1/fence/{key}` serializes against `POST /v1/effects` under the same journal lock and durably commits an exact-intent tombstone. After a fence commits, later arrivals for that key are rejected. The two terminal states are mutually exclusive: effect committed or fence committed.
+
+Run the local service:
+
+    go run ./cmd/mace-effectsvc -listen 127.0.0.1:8087 -journal ./effects.jsonl
+
+The service has no production authentication/TLS. Keep it on loopback and use disposable test state. The modeled business effect is the journal commit itself; a real destination must atomically commit its business mutation and idempotency/fence state, or retain indeterminate.
+
+This composes with #11647 (durable broker/IPC/grant accounting) and #9490 (action authority). It does not mint permits or claim distributed exactly-once behavior.
+
+
 ## Corpus contract
 
 Each corpus pins benchmark name, exact version/revision, split and task-set digest. Each fixture has a unique ID, task, family, kind and expected result vector.
