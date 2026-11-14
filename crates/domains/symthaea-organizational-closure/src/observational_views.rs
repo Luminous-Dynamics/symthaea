@@ -20,6 +20,12 @@ pub enum IdentificationRegime {
     FrontDoor,
     InstrumentalVariable,
     Proximal,
+    /// Hidden-confounding stress view: X, T and Y are observed, U is hidden.
+    HiddenConfounding,
+    /// Partial-identification companion views from CausalIDView.
+    ManskiBounds,
+    MonotoneIvBounds,
+    SensitivityBounds,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -152,6 +158,34 @@ impl Default for ObservationalViewPolicy {
                 RegimeColumnPolicy::new(
                     ["X", "Z_P", "W_P", "T", "Y"].into_iter().map(str::to_owned),
                     ["X", "Z_P", "W_P"].into_iter().map(str::to_owned),
+                ),
+            ),
+            (
+                IdentificationRegime::HiddenConfounding,
+                RegimeColumnPolicy::new(
+                    ["X", "T", "Y"].into_iter().map(str::to_owned),
+                    ["X"].into_iter().map(str::to_owned),
+                ),
+            ),
+            (
+                IdentificationRegime::ManskiBounds,
+                RegimeColumnPolicy::new(
+                    ["X", "T", "Y"].into_iter().map(str::to_owned),
+                    ["X"].into_iter().map(str::to_owned),
+                ),
+            ),
+            (
+                IdentificationRegime::MonotoneIvBounds,
+                RegimeColumnPolicy::new(
+                    ["X", "I", "T", "Y"].into_iter().map(str::to_owned),
+                    ["X", "I"].into_iter().map(str::to_owned),
+                ),
+            ),
+            (
+                IdentificationRegime::SensitivityBounds,
+                RegimeColumnPolicy::new(
+                    ["X", "T", "Y"].into_iter().map(str::to_owned),
+                    ["X"].into_iter().map(str::to_owned),
                 ),
             ),
         ]
@@ -657,6 +691,10 @@ mod tests {
             IdentificationRegime::FrontDoor => (vec!["M"], vec!["M"]),
             IdentificationRegime::InstrumentalVariable => (vec!["I"], vec!["I"]),
             IdentificationRegime::Proximal => (vec!["Z_P", "W_P"], vec!["Z_P", "W_P"]),
+            IdentificationRegime::HiddenConfounding => (vec![], vec![]),
+            IdentificationRegime::ManskiBounds => (vec![], vec![]),
+            IdentificationRegime::MonotoneIvBounds => (vec!["I"], vec!["I"]),
+            IdentificationRegime::SensitivityBounds => (vec![], vec![]),
         };
         let mut context_columns = vec!["X", "T", "Y"];
         context_columns.extend(extra);
@@ -693,6 +731,41 @@ mod tests {
         assert_eq!(report.view_count, 4);
         assert_eq!(report.context_row_count, 2);
         assert_eq!(report.query_row_count, 2);
+    }
+
+    #[test]
+    fn hidden_confounding_view_is_supported_as_an_optional_nonidentified_regime() {
+        let mut matched = matched();
+        let first = &matched.views[0];
+        matched.views.push(view(
+            IdentificationRegime::HiddenConfounding,
+            first.scm_digest,
+            first.estimand_digest,
+        ));
+        let report = validate_matched_observational_views(
+            &matched,
+            &ObservationalViewPolicy::default(),
+        );
+        assert_eq!(report.qualification, ObservationalViewQualification::Qualified, "{:?}", report.findings);
+        assert_eq!(report.view_count, 5);
+    }
+
+    #[test]
+    fn partial_identification_companion_views_have_distinct_allowlists() {
+        let mut matched = matched();
+        let scm = matched.views[0].scm_digest;
+        let estimand = matched.views[0].estimand_digest;
+        matched.views.extend([
+            view(IdentificationRegime::ManskiBounds, scm, estimand),
+            view(IdentificationRegime::MonotoneIvBounds, scm, estimand),
+            view(IdentificationRegime::SensitivityBounds, scm, estimand),
+        ]);
+        let report = validate_matched_observational_views(
+            &matched,
+            &ObservationalViewPolicy::default(),
+        );
+        assert_eq!(report.qualification, ObservationalViewQualification::Qualified, "{:?}", report.findings);
+        assert_eq!(report.view_count, 7);
     }
 
     #[test]
