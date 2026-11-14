@@ -77,6 +77,37 @@ The Symthaea repository already has foundational work:
 
 The separate engineering design/configuration evidence lane (#10543) should remain distinct from code/repository graph accuracy. It can contribute evidence-applicability concepts without merging unlike gold sets or scores.
 
+### Temporal retrieval is not decision-time correctness
+
+Two new/current temporal benchmarks clarify the opportunity:
+
+- **TEMPO (EMNLP 2026)** has 1,730 complex queries across 13 domains and 3,976 decomposed retrieval steps. Its leaderboard reports best Temporal Coverage@10 of 71.4% (DiVeR) and best NDCG@10 of 32.0. These measure temporally relevant retrieval and coverage, not whether an institutional or engineering decision used only evidence that was available to the actor when the decision was made. Source: https://aclanthology.org/2026.emnlp-main.291/ and https://tempo-bench.github.io/
+- **SWE-Time (2026-11-09)** evaluates retrospective first-bad-commit reasoning and prospective change-scope/CI workflow reasoning on 1,661 cases from 65 repositories. Its best reported Claude Code result is 61.9 average for Opus 4.8. It does not directly evaluate whether the evidence cited to justify a past decision was available to the decision-maker at the decision time. Source: https://arxiv.org/abs/2611.12083
+
+EGDDM should add **Decision-Time Evidence Admissibility (DTEA)** as a distinct research lane.
+
+For every decision event, distinguish at least:
+1. **Valid/effective time:** when the underlying fact or requirement applies in the world.
+2. **Observed/recorded time:** when the system actually learned or recorded the evidence.
+3. **Available-to-actor time:** when the specific decision-maker could access and was authorized to use it.
+4. **Decision time:** when the consequential decision was made.
+5. **Retrospective correction time:** when later evidence invalidated, amended or clarified an earlier understanding.
+
+A document may describe an earlier fact but arrive after the decision. It may be public but outside the actor's authorized scope. A later correction may make evidence stale today without necessarily making an earlier decision unreasonable on the information legitimately available then. Conversely, hindsight cannot be used to justify a decision that was unsupported at the time.
+
+The map must retain both the historical decision basis and the current evidence state. Never rewrite the past decision's cited evidence to match today's graph.
+
+A decision record should bind:
+- the decision subject and exact decision time;
+- the policy/contract version and actor/authority scope;
+- the knowledge cut-off used for the decision;
+- the evidence IDs actually consulted;
+- each cited item's availability time, authority and admissibility disposition at decision time;
+- excluded or unavailable evidence with reason;
+- the outcome, abstention/defer disposition and later supersession/correction links.
+
+This enables a new class of tests: backdated evidence, delayed publication, delayed ingestion, post-decision corrections, expired credentials, revocations, contested sources, incomplete retrieval and unauthorized information. The evaluator should ask not only "is the reconstructed answer true now?" but "was this decision justified using only admissible evidence available to this actor at this time?"
+
 ## 3. Model: four connected views
 
 ### 3.1 Structural and semantic view
@@ -238,6 +269,7 @@ DynaMapBench is a proposed evaluation profile, not a new task/receipt/evaluator 
 | Capability traceability | Can intent be traced to proof of implementation? | Requirement-to-implementation/test/evidence coverage; unsupported-claim detection |
 | Cross-repository | Can contract breaks be detected across projects? | Version mismatch recall/precision; compatibility false negatives; map reconciliation correctness |
 | Planning | Does map-guided development improve outcomes? | Independently accepted capability gain per budget; expected/observed calibration; human review effort |
+| Decision-time admissibility | Was the decision justified using only evidence available and authorized at the decision time? | Admissible-evidence precision/recall; future-evidence leakage; backdated/late-arrival rejection; decision-time reconstruction accuracy; abstention correctness |
 | Safety/evidence | Does the map resist false confidence? | False-current acceptance; authority inflation; fabricated evidence detection; unauthorized mutation rate |
 
 ### Required comparison arms
@@ -269,6 +301,7 @@ These are research hypotheses, not achieved results or industry standards:
 - Capability traceability completeness ≥0.95 on a clearly scoped requirement set.
 - Cross-repository critical contract-mismatch recall ≥0.95, with high-severity false negatives treated as hard failures.
 - Zero unsupported evidence promotion and zero unauthorized mutation in deterministic adversarial controls.
+- DTEA pilot: 100% detection of the explicitly planted future-evidence and unauthorized-source negative controls; ≥0.95 precision/recall on adjudicated decision-time admissibility labels, after calibration and power analysis; report decision correctness separately from evidence-admissibility correctness.
 
 Report confidence intervals, per-relation/task-family breakdowns, cost, latency, memory, human minutes and abstention. Do not publish one aggregate score that can hide a critical failure. Use repository-family/time-held-out splits and keep development, calibration and confirmatory answer custody separate.
 
