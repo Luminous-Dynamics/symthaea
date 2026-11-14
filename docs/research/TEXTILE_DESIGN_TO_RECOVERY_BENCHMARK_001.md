@@ -68,6 +68,16 @@ The design dossier now has an explicit `OpeningCharacterized` intent. For every 
 
 These are as-designed/specification fields used to stratify trials, not physical measurements or guarantees of opening behaviour. A mill/pattern source reference is required; the physical pilot must independently verify the sample's actual construction before opening. The 7 November cotton study's interlacement result is woven-specific and must not be transferred to knitted or nonwoven constructions.
 
+### Construction descriptors and opening strata
+
+The static design contract requires type-specific inputs only when `OpeningCharacterized` is declared:
+- woven: weave pattern, yarn system/count, warp/weft density and interlacement density;
+- knitted: knit structure, yarn system/count and wale/course density;
+- nonwoven: bonding method;
+- laminated: lamination method and substrate-structure reference.
+
+The 20-case synthetic design corpus now exercises missing and unknown construction descriptors. The corpus checks metadata completeness only. An independent specimen inspection must verify that the physical article matches the declared construction before it enters a fibre-opening trial.
+
 ## 3. Benchmark arms
 
 All arms must use the same frozen incoming specimens/lots, acceptance methods and declared end points.
