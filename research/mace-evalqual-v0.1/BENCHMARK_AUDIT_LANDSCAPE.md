@@ -7,6 +7,17 @@
 
 MACE should not claim to have invented benchmark auditing. Several 2026 efforts now audit benchmark components, evaluator oracles and agent trajectories. The competitive opportunity is to compose with them and address the missing connection between audited specifications, actual effect boundaries and reproducible evidence.
 
+
+### Terminal-Bench 4.1 — verifier isolation is now a baseline, not a novelty claim
+
+Terminal-Bench 4.1 is the most direct operational comparator. Its maintainers report that 44 TB4.0 tasks ran agent-authored code during verification, creating paths such as reading grader tests/logs, monkeypatching pytest to skip tests, or leaving a daemon that overwrites reward files. TB4.1 strips dangerous symlinks/permissions, runs the submitted code as an untrusted user in a separate Worker process, kills child processes, and has a trusted grader inspect the results. This is the process-isolation baseline MACE should adopt.
+
+The re-grade retained historical honesty: 162 trials changed score; 134 were classified as expected verifier-fix effects and 28 as measurement discrepancies, for which the original scores were retained. Errored trials or trials without stored artifacts also retained their previous results. The maintainers report $0 additional inference to regrade saved artifacts, versus $116,000 in original TB4.0 inference cost.
+
+**MACE response:** do not claim that separating a grader into another process is new. Add the layers that Worker isolation does not itself establish: independent filesystem/process/API effect-origin observation, oracle non-interference and order invariance, exact authority/receipt joins, and destination-side effect-or-fence after remote-success/lost-ack. Regrade saved artifacts under pinned verifiers; retain both original and revised outcomes, input digests and discrepancy decisions.
+
+Source: https://www.tbench.ai/news/terminal-bench-4-1
+
 ### AgentSuite / COBA — benchmark component validity
 
 AgentSuite's COBA pipeline decomposes benchmark tasks into User, Environment, Ground Truth and Evaluation components, then combines rule-based detectors with taxonomy-guided LLM evaluation. Across six benchmarks it reports F1 alignment with expert judgments from 0.791 to 0.874 and provides audited benchmark variants.
