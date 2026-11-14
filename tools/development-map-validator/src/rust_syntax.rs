@@ -4,9 +4,11 @@
 //! never expands macros, follows modules, executes build scripts, resolves
 //! names, evaluates cfg predicates, or claims compiler-resolved semantics.
 
+use proc_macro2::Span;
 use quote::ToTokens;
 use serde::Serialize;
 use syn::{
+    spanned::Spanned,
     visit::{self, Visit},
     Attribute, File, Visibility,
 };
@@ -21,8 +23,32 @@ pub struct RustFileAnchor {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RustSourceSpan {
+    /// One-based line number.
+    pub start_line: usize,
+    /// Zero-based column number.
+    pub start_column: usize,
+    /// One-based line number.
+    pub end_line: usize,
+    /// Zero-based column number.
+    pub end_column: usize,
+}
+
+fn source_span(span: Span) -> RustSourceSpan {
+    let start = span.start();
+    let end = span.end();
+    RustSourceSpan {
+        start_line: start.line,
+        start_column: start.column,
+        end_line: end.line,
+        end_column: end.column,
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct RustSyntaxFact {
     pub source_order: usize,
+    pub source_span: RustSourceSpan,
     pub kind: String,
     pub name: Option<String>,
     pub module_path: Vec<String>,
@@ -95,12 +121,14 @@ impl Extractor {
         &mut self,
         kind: &str,
         name: Option<String>,
+        span: Span,
         visibility: Option<&Visibility>,
         attributes: &[Attribute],
         declaration: Option<String>,
     ) {
         self.facts.push(RustSyntaxFact {
             source_order: self.facts.len(),
+            source_span: source_span(span),
             kind: kind.to_owned(),
             name,
             module_path: self.module_path.clone(),
@@ -116,6 +144,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             if node.content.is_some() { "inline_module" } else { "module_declaration" },
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(node.ident.to_token_stream().to_string()),
@@ -131,6 +160,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "use_declaration",
             None,
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(node.tree.to_token_stream().to_string()),
@@ -142,6 +172,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "function",
             Some(node.sig.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(node.sig.to_token_stream().to_string()),
@@ -153,6 +184,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "struct",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
@@ -164,6 +196,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "enum",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
@@ -175,6 +208,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "union",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
@@ -186,6 +220,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "trait",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
@@ -197,6 +232,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "type_alias",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
@@ -208,6 +244,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "constant",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{}: {}", node.ident, node.ty.to_token_stream())),
@@ -219,6 +256,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "static",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(format!("{}: {}", node.ident, node.ty.to_token_stream())),
@@ -230,6 +268,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "extern_crate",
             Some(node.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(node.to_token_stream().to_string()),
@@ -241,6 +280,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "macro_syntax",
             node.ident.as_ref().map(ToString::to_string),
+            node.span(),
             None,
             &node.attrs,
             Some(node.mac.path.to_token_stream().to_string()),
@@ -260,6 +300,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "impl_block",
             None,
+            node.span(),
             None,
             &node.attrs,
             declaration,
@@ -271,6 +312,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "impl_method",
             Some(node.sig.ident.to_string()),
+            node.span(),
             Some(&node.vis),
             &node.attrs,
             Some(node.sig.to_token_stream().to_string()),
@@ -282,6 +324,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "trait_method",
             Some(node.sig.ident.to_string()),
+            node.span(),
             None,
             &node.attrs,
             Some(node.sig.to_token_stream().to_string()),
@@ -311,7 +354,7 @@ pub fn project_rust_file(
     }
 
     let mut limitations = vec![
-        "Syntax-extracted declarations are not compiler-resolved symbols or dependency edges.".to_owned(),
+        "Syntax-extracted declarations and parser-derived source spans are not compiler-resolved symbols or dependency edges.".to_owned(),
         "Out-of-line module declarations are recorded but their source files are not followed.".to_owned(),
         "Item-position macro invocations and macro definitions are recorded as opaque syntax; macros inside function bodies are not inventoried or expanded.".to_owned(),
         "cfg and cfg_attr expressions are preserved as attributes and are not evaluated into configuration worlds.".to_owned(),
@@ -423,6 +466,16 @@ mod tests {
         assert!(projection.facts.iter().any(|fact| fact.kind == "trait_method" && fact.name.as_deref() == Some("start")));
         assert!(projection.facts.iter().any(|fact| fact.kind == "impl_method" && fact.name.as_deref() == Some("start")));
         assert!(projection.facts.iter().any(|fact| fact.kind == "impl_block"));
+    }
+
+    #[test]
+    fn emits_source_line_and_column_spans_for_declarations() {
+        let source = "pub struct Request;\n\npub fn start() {}\n";
+        let projection = project_rust_file(source, anchor()).expect("projection");
+        let structure = projection.facts.iter().find(|fact| fact.name.as_deref() == Some("Request")).expect("struct");
+        assert_eq!(structure.source_span.start_line, 1);
+        let function = projection.facts.iter().find(|fact| fact.name.as_deref() == Some("start")).expect("function");
+        assert_eq!(function.source_span.start_line, 3);
     }
 
     #[test]
