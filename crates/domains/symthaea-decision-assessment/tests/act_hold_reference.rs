@@ -76,7 +76,7 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
                 critical_premature = true;
                 reasons.insert("IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned());
             } else if effect_step == first {
-                premature_count = 1;
+                premature_effect_detected = true;
                 critical_premature = true;
                 reasons.insert("TRIGGER_EFFECT_ORDER_AMBIGUOUS".to_owned());
             }
@@ -85,12 +85,12 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
             }
         }
         (Some(first), None, Some(effect_step)) if effect_step > first => {
-            premature_count = 1;
+            premature_effect_detected = true;
             critical_premature = true;
             reasons.insert("IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned());
         }
         (Some(first), None, Some(effect_step)) if effect_step == first => {
-            premature_count = 1;
+            premature_effect_detected = true;
             critical_premature = true;
             reasons.insert("TRIGGER_EFFECT_ORDER_AMBIGUOUS".to_owned());
         }
