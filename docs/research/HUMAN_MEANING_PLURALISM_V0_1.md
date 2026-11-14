@@ -126,7 +126,7 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 
 1. Publish the four RFCs and shared schema/fixture; obtain independent review.
 2. Use the two Rust fixture audits (`cargo run -p xtask -- hmp-record-audit` and `cargo run -p xtask -- hmp-bench-audit`) and their negative-control tests; add a standards-compliant JSON Schema 2020-12 validator before claiming full schema validation.
-3. Extend the 14-case HMP-Bench starter set and 10-case PIB system-level fixture; wire explicit audits and add blinded human-reviewed items only after permissions and review are in place.
+3. Extend the 14-case HMP-Bench starter set and 11-case PIB system-level fixture; run the two synthetic fixture audits and add blinded human-reviewed items only after permissions and review are in place.
 4. Curate a small public-source pilot with explicit reuse rights and expert/community review; keep restricted content outside the public corpus.
 5. Run matched model baselines and publish per-track metrics.
 6. Only after review, integrate Mycelix permission enforcement, Sol-Atlas records, Symtropy experiment receipts and Symthaea retrieval/synthesis.
@@ -138,13 +138,13 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 | Shared programme contract | Proposed in this document |
 | JSON Schema | Included as a draft |
 | Synthetic example fixture | Included; not a real cultural record |
-| HMP-Bench synthetic adversarial starter set | Fourteen fictional edge-case fixtures across all nine registered tracks, including SOURCE, PSYCH and SOC; not a validated benchmark |\n| PIB system-level plurality fixture | Ten fictional multi-agent interaction and governance edge cases; not yet wired into the xtask auditors and not a validated benchmark |
+| HMP-Bench synthetic adversarial starter set | Fourteen fictional edge-case fixtures across all nine registered tracks, including SOURCE, PSYCH and SOC; not a validated benchmark |\n| PIB system-level plurality fixture | Eleven fictional multi-agent interaction and governance edge cases across all nine PIB tracks; JSON Schema and Rust fixture-integrity audit authored, not yet executed; not a validated benchmark |
 | Mycelix runtime permission enforcement | Not implemented by this RFC |
 | Sol-Atlas ingestion/catalog integration | Not implemented by this RFC |
 | Symtropy simulation runner | Not implemented by this RFC |
 | Symthaea evaluation runner | Not implemented by this RFC |
 | Symthaea `xtask hmp-record-audit` | Implemented on this research branch; record/provenance/permission semantics, including reference-only citation constraints, are covered by authored negative-control tests; Cargo tests not yet run |
-| Symthaea `xtask hmp-bench-audit` | Implemented on this research branch; validates 14 synthetic cases across all nine HMP-Bench tracks, including operation-scoped rights and authority references; 17 Rust unit tests are authored; Cargo tests not yet run |
+| Symthaea `xtask hmp-bench-audit` | Implemented on this research branch; validates 14 synthetic cases across all nine HMP-Bench tracks, including operation-scoped rights and authority references; 17 Rust unit tests are authored; Cargo tests not yet run |\n| Symthaea `xtask hmp-pib-audit` | Implemented on this research branch; validates 11 synthetic interaction episodes across all nine PIB tracks, unique agents/episodes and rights negative controls; 10 Rust unit tests are authored; Cargo tests not yet run |
 | Human/community validation | Not performed |
 | SOTA comparison | Not performed |
 
