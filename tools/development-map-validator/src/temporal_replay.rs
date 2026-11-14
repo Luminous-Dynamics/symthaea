@@ -150,7 +150,10 @@ pub struct ReplayProjection {
 
 #[derive(Serialize)]
 struct HashMaterial<'a> {
+    schema_version: &'a str,
     ledger_id: &'a str,
+    repository_full_name: &'a str,
+    event_id: &'a str,
     sequence: u64,
     previous_hash: &'a str,
     body: &'a LedgerEventBody,
@@ -177,9 +180,20 @@ fn sha256_hex(bytes: &[u8]) -> String {
     }
     result
 }
-fn calculate_event_hash(ledger_id: &str, event: &LedgerEvent) -> Result<String, String> {
+fn calculate_event_hash(
+    schema_version: &str,
+    ledger_id: &str,
+    repository_full_name: &str,
+    event: &LedgerEvent,
+) -> Result<String, String> {
     let material = HashMaterial {
-        ledger_id, sequence: event.sequence, previous_hash: &event.previous_hash, body: &event.body,
+        schema_version,
+        ledger_id,
+        repository_full_name,
+        event_id: &event.event_id,
+        sequence: event.sequence,
+        previous_hash: &event.previous_hash,
+        body: &event.body,
     };
     Ok(sha256_hex(&serde_json::to_vec(&material).map_err(|error| error.to_string())?))
 }
@@ -344,7 +358,7 @@ pub fn validate_ledger(ledger: &EventLedger) -> LedgerValidationReport {
         if !valid_sha256(&event.previous_hash) || !valid_sha256(&event.event_hash) {
             diagnostics.push(diagnostic("D2-HASH-002", &path, "event hashes must be 64-character SHA-256 digests"));
         }
-        match calculate_event_hash(&ledger.ledger_id, event) {
+        match calculate_event_hash(&ledger.schema_version, &ledger.ledger_id, &ledger.repository_full_name, event) {
             Ok(expected) if expected == event.event_hash => {}
             Ok(_) => diagnostics.push(diagnostic("D2-HASH-003", format!("{path}.event_hash"), "event_hash does not match canonical event content")),
             Err(error) => diagnostics.push(diagnostic("D2-HASH-004", &path, error)),
@@ -624,7 +638,7 @@ pub fn resume_replay_cursor(
         if !valid_sha256(&event.previous_hash) || !valid_sha256(&event.event_hash) {
             return Err(format!("{path}: event hashes must be SHA-256 digests"));
         }
-        let expected_hash = calculate_event_hash(&cursor.ledger_id, event)?;
+        let expected_hash = calculate_event_hash(&cursor.schema_version, &cursor.ledger_id, &cursor.repository_full_name, event)?;
         if event.event_hash != expected_hash {
             return Err(format!("{path}.event_hash: content hash mismatch"));
         }
@@ -713,7 +727,7 @@ mod tests {
         for (index, event) in ledger.events.iter_mut().enumerate() {
             event.sequence = index as u64 + 1;
             event.previous_hash = previous.clone();
-            event.event_hash = calculate_event_hash(&ledger.ledger_id, event).expect("hash");
+            event.event_hash = calculate_event_hash(&ledger.schema_version, &ledger.ledger_id, &ledger.repository_full_name, event).expect("hash");
             previous = event.event_hash.clone();
         }
     }
