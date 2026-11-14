@@ -95,7 +95,7 @@
       "target_configuration": "CFG-7",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-001",
-      "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
+      "source_inventory_sha256": "611adc4c37b9c12a60614e19009d97a88e9fd45b1b8497d6441087097464cf30",
       "candidate_visible_evidence_ids": [
         "E-A1",
         "E-A1-COPY",
@@ -106,7 +106,7 @@
           "world_id": "BASELINE",
           "target_configuration": "CFG-7",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
+          "source_inventory_sha256": "611adc4c37b9c12a60614e19009d97a88e9fd45b1b8497d6441087097464cf30",
           "evidence": [
             {
               "id": "E-A1",
@@ -176,13 +176,14 @@
               ]
             }
           },
-          "candidate_visible_manifest_sha256": "8f06909e6133903dc3babcead5c1221b8f6c03d4201684ddf46990c88f59cafc"
+          "candidate_visible_manifest_sha256": "8f06909e6133903dc3babcead5c1221b8f6c03d4201684ddf46990c88f59cafc",
+          "candidate_action": "revalidate"
         },
         {
           "world_id": "REDUNDANT_COPY_REMOVED",
           "target_configuration": "CFG-7",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "ab7567460ed8e0c539a6ddcaffe3fb5e5f33f07685d89eac76cbef97e3c04e8c",
+          "source_inventory_sha256": "611adc4c37b9c12a60614e19009d97a88e9fd45b1b8497d6441087097464cf30",
           "evidence": [
             {
               "id": "E-A1",
@@ -251,11 +252,13 @@
               ]
             }
           },
-          "candidate_visible_manifest_sha256": "9019cccad0659058c0cec7dcf22dc84f5547d5404e1b6f184f26849b1bdbc2aa"
+          "candidate_visible_manifest_sha256": "9019cccad0659058c0cec7dcf22dc84f5547d5404e1b6f184f26849b1bdbc2aa",
+          "candidate_action": "revalidate"
         }
       ],
       "expected_intervention_relation": "invariant",
-      "candidate_visible_manifest_sha256": "8f06909e6133903dc3babcead5c1221b8f6c03d4201684ddf46990c88f59cafc"
+      "candidate_visible_manifest_sha256": "8f06909e6133903dc3babcead5c1221b8f6c03d4201684ddf46990c88f59cafc",
+      "candidate_action": "revalidate"
     },
     {
       "id": "ME-NEG-001",
@@ -307,12 +310,13 @@
       "target_configuration": "BOND-4",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-001",
-      "source_inventory_sha256": "75b0f4401d5cb36fc9655dfbb999595f192f9dfd664c1fc371d94498a6fd262c",
+      "source_inventory_sha256": "39455ee8aac4e0967ceb5c2bf4d7f3fbe8403bcd99822a0a47e0c2dec0656251",
       "candidate_visible_evidence_ids": [
         "E-PRIMARY",
         "E-EXPORT"
       ],
-      "candidate_visible_manifest_sha256": "cc00cba62562381eb90bfc62d99cc524358d38389367196f5cfa204ce31a3eef"
+      "candidate_visible_manifest_sha256": "cc00cba62562381eb90bfc62d99cc524358d38389367196f5cfa204ce31a3eef",
+      "candidate_action": "request_evidence"
     },
     {
       "id": "ME-NEG-002",
@@ -352,7 +356,7 @@
       "target_configuration": "PACK-3",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-002",
-      "source_inventory_sha256": "f8077b939eb8f836880bbcf9c201f854e1ee5d2e3e9c5c371c9a59ef3b927721",
+      "source_inventory_sha256": "c3ca6dcb83074590fac4500459b312faa182b8a58b370b6d699c9e1dddd0f176",
       "candidate_visible_evidence_ids": [
         "E-THERM-A"
       ],
@@ -361,7 +365,7 @@
           "world_id": "BASELINE",
           "target_configuration": "PACK-3",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "42b2fc41d5702466539412148c92dcb5d58e44ba529a3715966d14f23bfc0e8a",
+          "source_inventory_sha256": "21c97bafbdfbb499f508e8252b8ed8ff7341e76682da08626f13dd7fafb7e603",
           "evidence": [
             {
               "id": "E-THERM-A",
@@ -400,13 +404,14 @@
               ]
             }
           },
-          "candidate_visible_manifest_sha256": "3e9aaaf0efecc05325f3434b118226ef8b360632fc0a2bb9da089721ae232b9f"
+          "candidate_visible_manifest_sha256": "3e9aaaf0efecc05325f3434b118226ef8b360632fc0a2bb9da089721ae232b9f",
+          "candidate_action": "revalidate"
         },
         {
           "world_id": "LAST_SUPPORT_REMOVED",
           "target_configuration": "PACK-3",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "f8077b939eb8f836880bbcf9c201f854e1ee5d2e3e9c5c371c9a59ef3b927721",
+          "source_inventory_sha256": "c3ca6dcb83074590fac4500459b312faa182b8a58b370b6d699c9e1dddd0f176",
           "evidence": [
             {
               "id": "E-THERM-A",
@@ -429,7 +434,8 @@
               "thermal_runaway_limit": []
             }
           },
-          "candidate_visible_manifest_sha256": "6d8536c93394342306e21dd49b56cca97b330568c6594a559f32f8093aaa9bc1"
+          "candidate_visible_manifest_sha256": "6d8536c93394342306e21dd49b56cca97b330568c6594a559f32f8093aaa9bc1",
+          "candidate_action": "hold"
         }
       ],
       "expected_intervention_relation": "flip",
@@ -437,7 +443,8 @@
         "revalidate",
         "hold"
       ],
-      "candidate_visible_manifest_sha256": "6d8536c93394342306e21dd49b56cca97b330568c6594a559f32f8093aaa9bc1"
+      "candidate_visible_manifest_sha256": "6d8536c93394342306e21dd49b56cca97b330568c6594a559f32f8093aaa9bc1",
+      "candidate_action": "hold"
     },
     {
       "id": "ME-NEG-003",
@@ -455,7 +462,8 @@
           "configuration": "JOINT-NEW",
           "supports": [
             "bolt_preload_limit"
-          ]
+          ],
+          "content_equivalence_group": "CONTENT-IDENTICAL-BOLT-REVISION"
         },
         {
           "id": "E-BOLT-B",
@@ -463,10 +471,10 @@
           "derived_from": [],
           "admissibility": "inadmissible_scope",
           "configuration": "JOINT-OLD",
-          "content_digest": "same-content-digest",
           "supports": [
             "bolt_preload_limit"
-          ]
+          ],
+          "content_equivalence_group": "CONTENT-IDENTICAL-BOLT-REVISION"
         }
       ],
       "expected": {
@@ -488,7 +496,7 @@
       "target_configuration": "JOINT-NEW",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-NEG-003",
-      "source_inventory_sha256": "ec5a1cbf36fdefa1a7c4b475ea012e4a51f28084063146eec51b95eae40aa38f",
+      "source_inventory_sha256": "904f7690fdcb562909f97387c1b2324def31a0c55028908e9ce6a286c87e9476",
       "candidate_visible_evidence_ids": [
         "E-BOLT-A",
         "E-BOLT-B"
@@ -498,7 +506,7 @@
           "world_id": "BASELINE_CONFIGURATION_MATCH",
           "target_configuration": "JOINT-NEW",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "16e9b441e29f521e1ffa13f4a1783b202e054dc355f0e6cd733f1026d173271d",
+          "source_inventory_sha256": "0a34cc732d77034541cb190a6d1e976b7b848fe13389155dda9dde13cb348a03",
           "evidence": [
             {
               "id": "E-BOLT-A",
@@ -538,13 +546,14 @@
               ]
             }
           },
-          "candidate_visible_manifest_sha256": "bfa7b69f0d6c92438cc73ce371a7f102d13d9d7ef4c7442623d0880d2594bde7"
+          "candidate_visible_manifest_sha256": "bfa7b69f0d6c92438cc73ce371a7f102d13d9d7ef4c7442623d0880d2594bde7",
+          "candidate_action": "preserve"
         },
         {
           "world_id": "IDENTICAL_CONTENT_WRONG_CONFIGURATION",
           "target_configuration": "JOINT-NEW",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "ec5a1cbf36fdefa1a7c4b475ea012e4a51f28084063146eec51b95eae40aa38f",
+          "source_inventory_sha256": "e8198d710637d7f7554fca9ce6cd0e5601b91efb4ce9b4088e7939061fd356e6",
           "evidence": [
             {
               "id": "E-BOLT-A",
@@ -579,11 +588,13 @@
               "bolt_preload_limit": []
             }
           },
-          "candidate_visible_manifest_sha256": "9794994e76a3a5de3fe8463ff14d37fa1805a80a62c531c99f6b3b0ef02ad4b0"
+          "candidate_visible_manifest_sha256": "9794994e76a3a5de3fe8463ff14d37fa1805a80a62c531c99f6b3b0ef02ad4b0",
+          "candidate_action": "revalidate"
         }
       ],
       "expected_intervention_relation": "flip",
-      "candidate_visible_manifest_sha256": "9794994e76a3a5de3fe8463ff14d37fa1805a80a62c531c99f6b3b0ef02ad4b0"
+      "candidate_visible_manifest_sha256": "9794994e76a3a5de3fe8463ff14d37fa1805a80a62c531c99f6b3b0ef02ad4b0",
+      "candidate_action": "revalidate"
     },
     {
       "id": "ME-POS-002",
@@ -1038,7 +1049,7 @@
       "target_configuration": "VESSEL-2",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-002",
-      "source_inventory_sha256": "3a77d6ddae613f47aa561e7f82f7baaeb389e0311af5eaeac8592a0828fa7753",
+      "source_inventory_sha256": "dc99f01eeb8c800feeac754bc870ee4013f367a004192ec0f36299a3b96435a7",
       "candidate_visible_evidence_ids": [
         "E-PRESS-A",
         "E-PRESS-B",
@@ -1088,7 +1099,7 @@
           "world_id": "BASELINE",
           "target_configuration": "VESSEL-2",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "a7aa2b29e37de5a5513f755c55cf408be3bfc55ee9cb164c76bcce9efed5185b",
+          "source_inventory_sha256": "22b14d8c8bfec38bc450ce49ade7eaa1de4e3e3c11135402b5246bdc71ea9a66",
           "evidence": [
             {
               "id": "E-PRESS-A",
@@ -1128,13 +1139,14 @@
               ]
             }
           },
-          "candidate_visible_manifest_sha256": "fd92aae36d9bd5066a70dc20ddf62491c3042c4675847f19686caa473dfd49bf"
+          "candidate_visible_manifest_sha256": "fd92aae36d9bd5066a70dc20ddf62491c3042c4675847f19686caa473dfd49bf",
+          "candidate_action": "revalidate"
         },
         {
           "world_id": "FORTY_IRRELEVANT_RECORDS_INJECTED",
           "target_configuration": "VESSEL-2",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "3a77d6ddae613f47aa561e7f82f7baaeb389e0311af5eaeac8592a0828fa7753",
+          "source_inventory_sha256": "7806c324bb47318468cefec604880b7d476d6738d47e68afde40ee307cf2e898",
           "evidence": [
             {
               "id": "E-PRESS-A",
@@ -1555,6 +1567,406 @@
               "supports": [
                 "irrelevant_background"
               ]
+            },
+            {
+              "id": "E-IRRELEVANT-001",
+              "root_id": "IRRELEVANT-ROOT-001",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-002",
+              "root_id": "IRRELEVANT-ROOT-002",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-003",
+              "root_id": "IRRELEVANT-ROOT-003",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-004",
+              "root_id": "IRRELEVANT-ROOT-004",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-005",
+              "root_id": "IRRELEVANT-ROOT-005",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-006",
+              "root_id": "IRRELEVANT-ROOT-006",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-007",
+              "root_id": "IRRELEVANT-ROOT-007",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-008",
+              "root_id": "IRRELEVANT-ROOT-008",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-009",
+              "root_id": "IRRELEVANT-ROOT-009",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-010",
+              "root_id": "IRRELEVANT-ROOT-010",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-011",
+              "root_id": "IRRELEVANT-ROOT-011",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-012",
+              "root_id": "IRRELEVANT-ROOT-012",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-013",
+              "root_id": "IRRELEVANT-ROOT-013",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-014",
+              "root_id": "IRRELEVANT-ROOT-014",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-015",
+              "root_id": "IRRELEVANT-ROOT-015",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-016",
+              "root_id": "IRRELEVANT-ROOT-016",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-017",
+              "root_id": "IRRELEVANT-ROOT-017",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-018",
+              "root_id": "IRRELEVANT-ROOT-018",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-019",
+              "root_id": "IRRELEVANT-ROOT-019",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-020",
+              "root_id": "IRRELEVANT-ROOT-020",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-021",
+              "root_id": "IRRELEVANT-ROOT-021",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-022",
+              "root_id": "IRRELEVANT-ROOT-022",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-023",
+              "root_id": "IRRELEVANT-ROOT-023",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-024",
+              "root_id": "IRRELEVANT-ROOT-024",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-025",
+              "root_id": "IRRELEVANT-ROOT-025",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-026",
+              "root_id": "IRRELEVANT-ROOT-026",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-027",
+              "root_id": "IRRELEVANT-ROOT-027",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-028",
+              "root_id": "IRRELEVANT-ROOT-028",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-029",
+              "root_id": "IRRELEVANT-ROOT-029",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-030",
+              "root_id": "IRRELEVANT-ROOT-030",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-031",
+              "root_id": "IRRELEVANT-ROOT-031",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-032",
+              "root_id": "IRRELEVANT-ROOT-032",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-033",
+              "root_id": "IRRELEVANT-ROOT-033",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-034",
+              "root_id": "IRRELEVANT-ROOT-034",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-035",
+              "root_id": "IRRELEVANT-ROOT-035",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-036",
+              "root_id": "IRRELEVANT-ROOT-036",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-037",
+              "root_id": "IRRELEVANT-ROOT-037",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-038",
+              "root_id": "IRRELEVANT-ROOT-038",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-039",
+              "root_id": "IRRELEVANT-ROOT-039",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
+            },
+            {
+              "id": "E-IRRELEVANT-040",
+              "root_id": "IRRELEVANT-ROOT-040",
+              "derived_from": [],
+              "admissibility": "admissible",
+              "configuration": "VESSEL-2",
+              "supports": [
+                "unrelated_document_classification"
+              ]
             }
           ],
           "candidate_visible_evidence_ids": [
@@ -1615,11 +2027,55 @@
             }
           },
           "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1",
-          "candidate_visible_manifest_sha256": "98690f0a4abd53e69921a89950c9aec24511607a08420e0921507816432337e5"
+          "candidate_visible_manifest_sha256": "98690f0a4abd53e69921a89950c9aec24511607a08420e0921507816432337e5",
+          "candidate_action": "revalidate",
+          "injected_evidence_ids": [
+            "E-IRRELEVANT-001",
+            "E-IRRELEVANT-002",
+            "E-IRRELEVANT-003",
+            "E-IRRELEVANT-004",
+            "E-IRRELEVANT-005",
+            "E-IRRELEVANT-006",
+            "E-IRRELEVANT-007",
+            "E-IRRELEVANT-008",
+            "E-IRRELEVANT-009",
+            "E-IRRELEVANT-010",
+            "E-IRRELEVANT-011",
+            "E-IRRELEVANT-012",
+            "E-IRRELEVANT-013",
+            "E-IRRELEVANT-014",
+            "E-IRRELEVANT-015",
+            "E-IRRELEVANT-016",
+            "E-IRRELEVANT-017",
+            "E-IRRELEVANT-018",
+            "E-IRRELEVANT-019",
+            "E-IRRELEVANT-020",
+            "E-IRRELEVANT-021",
+            "E-IRRELEVANT-022",
+            "E-IRRELEVANT-023",
+            "E-IRRELEVANT-024",
+            "E-IRRELEVANT-025",
+            "E-IRRELEVANT-026",
+            "E-IRRELEVANT-027",
+            "E-IRRELEVANT-028",
+            "E-IRRELEVANT-029",
+            "E-IRRELEVANT-030",
+            "E-IRRELEVANT-031",
+            "E-IRRELEVANT-032",
+            "E-IRRELEVANT-033",
+            "E-IRRELEVANT-034",
+            "E-IRRELEVANT-035",
+            "E-IRRELEVANT-036",
+            "E-IRRELEVANT-037",
+            "E-IRRELEVANT-038",
+            "E-IRRELEVANT-039",
+            "E-IRRELEVANT-040"
+          ]
         }
       ],
       "expected_intervention_relation": "invariant",
-      "candidate_visible_manifest_sha256": "98690f0a4abd53e69921a89950c9aec24511607a08420e0921507816432337e5"
+      "candidate_visible_manifest_sha256": "98690f0a4abd53e69921a89950c9aec24511607a08420e0921507816432337e5",
+      "candidate_action": "revalidate"
     },
     {
       "id": "ME-POS-003",
@@ -1688,13 +2144,14 @@
       "target_configuration": "PIPE-6",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-POS-003",
-      "source_inventory_sha256": "70e535eca7013d633d03929f0a9c26bcf73ad3c353b984312c1b00c4900c991a",
+      "source_inventory_sha256": "79a66ddc838ec2103d035776c76501d3db88c0d016bc187951c89d37b068c729",
       "candidate_visible_evidence_ids": [
         "E-CORR-A",
         "E-CORR-A-SUMMARY",
         "E-CORR-B"
       ],
-      "candidate_visible_manifest_sha256": "be8d731ff281c84419fdb0aee0588eaf0b01714a82dc4254b3498e92718f2e53"
+      "candidate_visible_manifest_sha256": "be8d731ff281c84419fdb0aee0588eaf0b01714a82dc4254b3498e92718f2e53",
+      "candidate_action": "revalidate"
     },
     {
       "id": "ME-POS-004",
@@ -1747,8 +2204,9 @@
               ]
             }
           },
-          "source_inventory_sha256": "3e9eaaa7c2c5a8a7cba59f6f8269d30aefc6ba1d7aaac7209ae95a60bb1742c3",
-          "candidate_visible_manifest_sha256": "e9a5a3e77f15256bae6b152c433dc1400165ff7f1c91982d2734560c18b6b1f8"
+          "source_inventory_sha256": "8f532ce52b19bf3576ad5ac2af98f0d1f11ad403252379d5fea43f11dba4bb63",
+          "candidate_visible_manifest_sha256": "e9a5a3e77f15256bae6b152c433dc1400165ff7f1c91982d2734560c18b6b1f8",
+          "candidate_action": "revalidate"
         },
         {
           "world_id": "SUBSTITUTED",
@@ -1793,8 +2251,9 @@
               ]
             }
           },
-          "source_inventory_sha256": "ff108c1a087bfef90c0b9d7385da2f47c66d85985646b481e59aae7a8b31f136",
-          "candidate_visible_manifest_sha256": "1c0ba3af5437018120e5b7827332ffe741bcb9699694a9aefb3b4d8d28ada767"
+          "source_inventory_sha256": "d852a9ddb35abd15658869a96264b3da522330f1c8d4392006f5f1a7295da195",
+          "candidate_visible_manifest_sha256": "1c0ba3af5437018120e5b7827332ffe741bcb9699694a9aefb3b4d8d28ada767",
+          "candidate_action": "revalidate"
         }
       ],
       "expected": {
@@ -1815,7 +2274,8 @@
         "reason_codes": []
       },
       "target_configuration": "ACT-9",
-      "expected_intervention_relation": "invariant"
+      "expected_intervention_relation": "invariant",
+      "source_inventory_sha256": "8f532ce52b19bf3576ad5ac2af98f0d1f11ad403252379d5fea43f11dba4bb63"
     },
     {
       "id": "ME-UNK-001",
@@ -1867,7 +2327,7 @@
       "target_configuration": "ANCHOR-5",
       "source_inventory_state": "complete_frozen",
       "source_inventory_ref": "synthetic://source-inventory/ME-UNK-001",
-      "source_inventory_sha256": "7fc55c4fdaa749258f0e0821b7a23b135d84d7b9cc91396a1e55d22e47f8cea9",
+      "source_inventory_sha256": "2d3dacacab099406f4f4e8b9858c2c2e5255fe0985d44b1451f5406e1a3f43ff",
       "candidate_visible_evidence_ids": [
         "E-SEISMIC-A",
         "E-SEISMIC-UNK"
@@ -1877,7 +2337,7 @@
           "world_id": "UNKNOWN_PROVENANCE",
           "target_configuration": "ANCHOR-5",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "7fc55c4fdaa749258f0e0821b7a23b135d84d7b9cc91396a1e55d22e47f8cea9",
+          "source_inventory_sha256": "2d3dacacab099406f4f4e8b9858c2c2e5255fe0985d44b1451f5406e1a3f43ff",
           "evidence": [
             {
               "id": "E-SEISMIC-A",
@@ -1911,13 +2371,14 @@
               "seismic_anchor_capacity": []
             }
           },
-          "candidate_visible_manifest_sha256": "3331838aeeabfce3c78ae0165cc788c078bca3376d4c923b3824548412a1854a"
+          "candidate_visible_manifest_sha256": "3331838aeeabfce3c78ae0165cc788c078bca3376d4c923b3824548412a1854a",
+          "candidate_action": "request_evidence"
         },
         {
           "world_id": "INDEPENDENT_ROOT_QUALIFIED",
           "target_configuration": "ANCHOR-5",
           "source_inventory_state": "complete_frozen",
-          "source_inventory_sha256": "96d21e476137fee63835083f2efc7018481e10f08e76aaa12ffb22d9bca9d983",
+          "source_inventory_sha256": "b01ec2fefc6918c8da683024ae8505660b00fe34ffb0c8dab6cab44a03e6259a",
           "evidence": [
             {
               "id": "E-SEISMIC-A",
@@ -1956,11 +2417,13 @@
               ]
             }
           },
-          "candidate_visible_manifest_sha256": "8ee26b8461568f8edb0a2bf27f60e9c8ccb829e9238eae66158347ede1191728"
+          "candidate_visible_manifest_sha256": "8ee26b8461568f8edb0a2bf27f60e9c8ccb829e9238eae66158347ede1191728",
+          "candidate_action": "revalidate"
         }
       ],
       "expected_intervention_relation": "flip",
-      "candidate_visible_manifest_sha256": "3331838aeeabfce3c78ae0165cc788c078bca3376d4c923b3824548412a1854a"
+      "candidate_visible_manifest_sha256": "3331838aeeabfce3c78ae0165cc788c078bca3376d4c923b3824548412a1854a",
+      "candidate_action": "request_evidence"
     }
   ],
   "intervention_pairs": [
