@@ -4,8 +4,6 @@
 //! workspace globs, executes build scripts, expands procedural macros, or
 //! promotes manifest declarations to compiler-resolved relationships.
 
-use std::collections::BTreeMap;
-
 use serde::Serialize;
 use toml::Value;
 
@@ -162,6 +160,19 @@ fn optional_bool(value: Option<&Value>, default: bool, path: &str) -> Result<boo
     }
 }
 
+fn package_string(value: Option<&Value>, path: &str) -> Result<Option<String>, String> {
+    match value {
+        None => Ok(None),
+        Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(Value::Table(table))
+            if table.get("workspace").and_then(Value::as_bool) == Some(true) =>
+        {
+            Ok(None)
+        }
+        Some(_) => Err(format!("{path} must be a string or a workspace-inherited declaration")),
+    }
+}
+
 fn parse_package(value: &Value) -> Result<PackageDeclaration, String> {
     let package = table(value, "package")?;
     let name = optional_string(package.get("name"), "package.name")?
@@ -184,9 +195,9 @@ fn parse_package(value: &Value) -> Result<PackageDeclaration, String> {
 
     Ok(PackageDeclaration {
         name,
-        version: optional_string(package.get("version"), "package.version").ok().flatten(),
-        edition: optional_string(package.get("edition"), "package.edition").ok().flatten(),
-        rust_version: optional_string(package.get("rust-version"), "package.rust-version").ok().flatten(),
+        version: package_string(package.get("version"), "package.version")?,
+        edition: package_string(package.get("edition"), "package.edition")?,
+        rust_version: package_string(package.get("rust-version"), "package.rust-version")?,
         workspace_inherited_fields: inherited,
     })
 }
@@ -543,6 +554,21 @@ mod tests {
         assert_eq!(package.version.as_deref(), Some("0.1.0"));
         assert_eq!(package.edition.as_deref(), Some("2024"));
         assert!(package.workspace_inherited_fields.is_empty());
+    }
+
+    #[test]
+    fn records_inherited_package_fields_without_resolving_workspace_values() {
+        let manifest = PACKAGE_MANIFEST.replace(
+            "edition = \"2024\"",
+            "edition = { workspace = true }",
+        );
+        let projection = project_cargo_manifest(&manifest, anchor()).expect("projection");
+        let package = projection.package.expect("package");
+        assert_eq!(package.edition, None);
+        assert_eq!(package.workspace_inherited_fields, vec!["edition".to_owned()]);
+        assert!(projection.limitations.iter().any(|limitation| {
+            limitation.contains("edition")
+        }));
     }
 
     #[test]
