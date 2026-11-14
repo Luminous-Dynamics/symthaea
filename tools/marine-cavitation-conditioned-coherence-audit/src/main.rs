@@ -180,7 +180,7 @@ struct RunReport {
     band_reports: Vec<RunBandReport>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct RunBandReport {
     band_id: String,
     frequency_hz: f64,
@@ -191,7 +191,7 @@ struct RunBandReport {
     present_minus_absent_mean_residual_pressure_psd_pa2_per_hz: Option<f64>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct CohortSummary {
     window_count: usize,
     mean_coherence: f64,
