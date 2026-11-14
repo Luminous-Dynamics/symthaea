@@ -32,3 +32,6 @@ This is a verification building block, not a deployed E3/E4 witness. The tests u
 ## Tests
 
 The package tests valid signature and monotonic advance, exact replay, rollback, same-sequence fork, field/signature tampering, wrong database/key, predecessor mismatch, sequence gap, no-progress checkpoints, issue-time rollback, genesis validation and JSON transport round trip.
+
+
+When the OpenSSL CLI is available, `openssl_interop_test.go` verifies the published vector with OpenSSL's Ed25519 implementation, independently of Go's `crypto/ed25519`. The test skips explicitly if OpenSSL is unavailable; the Go-side test vector check remains mandatory.
