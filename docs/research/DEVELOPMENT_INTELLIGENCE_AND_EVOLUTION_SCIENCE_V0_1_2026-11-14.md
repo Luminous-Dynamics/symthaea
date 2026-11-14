@@ -275,6 +275,8 @@ The source-tree composition API is also exposed as a JSON request and CLI mode s
 
 ## DynaMapBench protocol
 
+The implementation and evaluation tracker is [DYNAMAPBENCH-001 #12164](https://github.com/Luminous-Dynamics/symthaea/issues/12164).
+
 The detailed versioned benchmark design is maintained in [DynaMapBench Protocol V0.1](DYNAMAPBENCH_PROTOCOL_V0_1_2026-11-14.md). It keeps structural fidelity, temporal admissibility, fixed-budget retrieval, impact/planning, causal attribution, paired act/defer competence and federation conformance as separate lanes. All targets remain prospective; the protocol requires exact benchmark artifact identities, frozen repositories, leakage-resistant splits, matched budgets, per-task reporting, paired ablations, uncertainty intervals and independent adjudication. No overall aggregate score may conceal a critical safety or authority error.
 
 

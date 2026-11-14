@@ -349,6 +349,8 @@ pub fn compose_repository_tree(
         }
     }
 
+    drop(by_path);
+
     let mut manifest_paths = tree_entries.iter()
         .filter(|entry| is_regular_blob(entry) && entry.path.rsplit('/').next() == Some("Cargo.toml"))
         .map(|entry| entry.path.clone()).collect::<Vec<_>>();

@@ -3,6 +3,7 @@
 **Date:** 2026-11-14  
 **Status:** Proposed evaluation protocol; no benchmark execution or SOTA result is claimed  
 **Parent:** [DYNMAP-001 #12020](https://github.com/Luminous-Dynamics/symthaea/issues/12020)  
+**Tracking:** [DYNAMAPBENCH-001 #12164](https://github.com/Luminous-Dynamics/symthaea/issues/12164)  
 **Retrieval lane:** [DYNRETR-001 #12080](https://github.com/Luminous-Dynamics/symthaea/issues/12080)  
 **Decision-time lane:** [DTEA-001 #12042](https://github.com/Luminous-Dynamics/symthaea/issues/12042)  
 **Execution boundary:** [#10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064)
