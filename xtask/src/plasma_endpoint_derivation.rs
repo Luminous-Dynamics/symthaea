@@ -57,10 +57,19 @@ struct RetentionResult {
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
+struct CategoryShare {
+    category_id: String,
+    percentage: f64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 struct FailureClassification {
     specimen_id: String,
     cluster_id: String,
     category_ids: Vec<String>,
+    #[serde(default)]
+    category_shares: Vec<CategoryShare>,
     rater_count: usize,
     adjudication_sha256: Option<String>,
 }
@@ -515,45 +524,79 @@ fn validate_failure_arm(
     samples: &[FailureClassification],
     evidence: &ScopeEvidence,
     minimum_clusters: usize,
+    selected_category: &str,
 ) -> std::result::Result<(usize, usize), Disposition> {
     if samples.is_empty() || !nonempty(&evidence.id) {
         return Err(Disposition::Blocked);
     }
-    if evidence.method_id != "ASTM_D5573" || evidence.edition != "D5573-99R19" {
-        return Err(Disposition::Blocked);
-    }
-    if evidence.material_pair_class != "frp_smc_joint" {
-        return Err(Disposition::Blocked);
-    }
-    if evidence.geometry != "failure_surface_classification"
-        || evidence.endpoint != "frp_joint_failure_mode_classification"
-        || evidence.requested_claim != "failure_mode_classification_reference"
-    {
-        return Err(Disposition::Rejected);
-    }
+
+    let allowed: &[&str] = match evidence.method_id.as_str() {
+        "ASTM_D5573" => {
+            if evidence.edition != "D5573-99R19" || evidence.material_pair_class != "frp_smc_joint" {
+                return Err(Disposition::Blocked);
+            }
+            if evidence.geometry != "failure_surface_classification"
+                || evidence.endpoint != "frp_joint_failure_mode_classification"
+                || evidence.requested_claim != "failure_mode_classification_reference"
+            {
+                return Err(Disposition::Rejected);
+            }
+            &[
+                "adhesive_failure",
+                "cohesive_failure",
+                "thin_layer_cohesive_failure",
+                "fiber_tear_failure",
+                "light_fiber_tear_failure",
+                "stock_break_failure",
+                "mixed_failure",
+                "unknown_unclassifiable",
+            ]
+        }
+        "ISO_10365" => {
+            if evidence.edition != "ISO 10365:2022" {
+                return Err(Disposition::Blocked);
+            }
+            if evidence.material_pair_class.trim().is_empty() {
+                return Err(Disposition::Blocked);
+            }
+            if evidence.geometry != "failure_surface_classification"
+                || evidence.endpoint != "bonded_assembly_failure_pattern_classification"
+                || evidence.requested_claim != "failure_mode_classification_reference"
+            {
+                return Err(Disposition::Rejected);
+            }
+            &[
+                "SF",
+                "CSF",
+                "DF",
+                "CF",
+                "SCF",
+                "SWCF",
+                "AF",
+                "ACFP",
+                "COR",
+                "unknown_unclassifiable",
+            ]
+        }
+        _ => return Err(Disposition::Blocked),
+    };
+
     let ids: Vec<String> = samples.iter().map(|sample| sample.specimen_id.clone()).collect();
-    if !unique_strings(&ids) || evidence.specimen_ids.iter().collect::<HashSet<_>>()
-        != ids.iter().collect::<HashSet<_>>()
+    if !unique_strings(&ids)
+        || evidence.specimen_ids.iter().collect::<HashSet<_>>()
+            != ids.iter().collect::<HashSet<_>>()
     {
         return Err(Disposition::Rejected);
     }
     validate_scope(evidence)?;
 
-    let allowed = [
-        "adhesive_failure",
-        "cohesive_failure",
-        "thin_layer_cohesive_failure",
-        "fiber_tear_failure",
-        "light_fiber_tear_failure",
-        "stock_break_failure",
-        "mixed_failure",
-        "unknown_unclassifiable",
-    ];
     let mut clusters = HashSet::new();
     let mut numerator = 0usize;
     for sample in samples {
-        if !nonempty(&sample.specimen_id) || !nonempty(&sample.cluster_id)
-            || sample.category_ids.is_empty() || !unique_strings(&sample.category_ids)
+        if !nonempty(&sample.specimen_id)
+            || !nonempty(&sample.cluster_id)
+            || sample.category_ids.is_empty()
+            || !unique_strings(&sample.category_ids)
         {
             return Err(Disposition::Rejected);
         }
@@ -565,16 +608,52 @@ fn validate_failure_arm(
         {
             return Err(Disposition::Rejected);
         }
+
+        // ISO 10365 requires approximate percentages when multiple failure patterns
+        // occur on one specimen. Apply the same explicit mixed-mode rule when a
+        // D5573 record reports multiple classes.
+        if sample.category_ids.len() > 1 {
+            if sample.category_shares.len() != sample.category_ids.len() {
+                return Err(Disposition::Blocked);
+            }
+            let mut share_ids = HashSet::new();
+            let mut total = 0.0;
+            for share in &sample.category_shares {
+                if !sample.category_ids.contains(&share.category_id)
+                    || !share_ids.insert(share.category_id.as_str())
+                    || !share.percentage.is_finite()
+                    || share.percentage <= 0.0
+                    || share.percentage > 100.0
+                {
+                    return Err(Disposition::Rejected);
+                }
+                total += share.percentage;
+            }
+            if !near(total, 100.0) {
+                return Err(Disposition::Rejected);
+            }
+        } else if !sample.category_shares.is_empty() {
+            if sample.category_shares.len() != 1
+                || sample.category_shares[0].category_id != sample.category_ids[0]
+                || !sample.category_shares[0].percentage.is_finite()
+                || !near(sample.category_shares[0].percentage, 100.0)
+            {
+                return Err(Disposition::Rejected);
+            }
+        }
+
         if sample.rater_count == 0 {
             return Err(Disposition::Blocked);
         }
-        if sample.rater_count > 1 && !sample.adjudication_sha256.as_deref().is_some_and(sha256_shape) {
+        if sample.rater_count > 1
+            && !sample.adjudication_sha256.as_deref().is_some_and(sha256_shape)
+        {
             return Err(Disposition::Blocked);
         }
         if sample.rater_count == 1 && sample.adjudication_sha256.is_some() {
             return Err(Disposition::Rejected);
         }
-        if sample.category_ids.contains(&"adhesive_failure".to_owned()) {
+        if sample.category_ids.iter().any(|id| id == selected_category) {
             numerator += 1;
         }
         clusters.insert(sample.cluster_id.as_str());
@@ -620,13 +699,27 @@ fn audit_failure_fraction(
     {
         return blocked("failure-mode endpoint/taxonomy/design identity is missing");
     }
-    if taxonomy_id != "ASTM-D5573-SMC-TAXONOMY-v1" {
-        return blocked("failure-mode taxonomy is unknown or not registered for the scoped D5573 SMC family");
+    let classification_method = baseline_scope_evidence.method_id.as_str();
+    if classification_method != candidate_scope_evidence.method_id {
+        return rejected("baseline and candidate use different failure-pattern classification methods");
     }
+    let expected_taxonomy = match classification_method {
+        "ASTM_D5573" => "ASTM-D5573-SMC-TAXONOMY-v1",
+        "ISO_10365" => "ISO-10365-2022-TAXONOMY-v1",
+        _ => return blocked("failure-pattern classification method is not registered"),
+    };
+    if taxonomy_id != expected_taxonomy {
+        return blocked("failure-pattern taxonomy is unknown or does not match the registered method");
+    }
+    let expected_category = match classification_method {
+        "ASTM_D5573" => "adhesive_failure",
+        "ISO_10365" => "AF",
+        _ => unreachable!("method registry checked above"),
+    };
     if endpoint_id != "failure_mode_fraction"
         || estimand != "candidate_minus_baseline_specimen_fraction"
         || quantity_unit != "fraction"
-        || category_id != "adhesive_failure"
+        || category_id != expected_category
         || denominator_policy != "all_tested_specimens_including_unknown"
         || !matches!(grouping_scheme, "independent_arms" | "paired_by_cluster")
     {
@@ -660,13 +753,30 @@ fn audit_failure_fraction(
         return rejected("failure-mode result is not bound to the frozen design and taxonomy");
     }
 
-    let (base_num, base_den) = match validate_failure_arm(baseline, baseline_scope_evidence, minimum_independent_clusters) {
+    if baseline_scope_evidence.material_pair_class != candidate_scope_evidence.material_pair_class
+        || baseline_scope_evidence.geometry != candidate_scope_evidence.geometry
+        || baseline_scope_evidence.edition != candidate_scope_evidence.edition
+    {
+        return rejected("baseline and candidate failure-pattern observations do not share a comparable material/geometry/method scope");
+    }
+
+    let (base_num, base_den) = match validate_failure_arm(
+        baseline,
+        baseline_scope_evidence,
+        minimum_independent_clusters,
+        category_id,
+    ) {
         Ok(value) => value,
         Err(Disposition::Blocked) => return blocked("baseline classifications, adjudication or independent clusters are incomplete"),
         Err(Disposition::Rejected) => return rejected("baseline classification evidence is outside D5573 scope or has invalid specimen/category lineage"),
         Err(Disposition::Pass) => unreachable!(),
     };
-    let (cand_num, cand_den) = match validate_failure_arm(candidate, candidate_scope_evidence, minimum_independent_clusters) {
+    let (cand_num, cand_den) = match validate_failure_arm(
+        candidate,
+        candidate_scope_evidence,
+        minimum_independent_clusters,
+        category_id,
+    ) {
         Ok(value) => value,
         Err(Disposition::Blocked) => return blocked("candidate classifications, adjudication or independent clusters are incomplete"),
         Err(Disposition::Rejected) => return rejected("candidate classification evidence is outside D5573 scope or has invalid specimen/category lineage"),
