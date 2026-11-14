@@ -72,7 +72,7 @@ fn canonical_inventory_sha256(case: &Value, world: &Value) -> String {
 fn irrelevant_injection_sha256(evidence: &[Value]) -> String {
     let mut irrelevant: Vec<Value> = evidence
         .iter()
-        .filter(|record| strings_at(record, "supports").iter().any(|p| p == "unrelated_document_classification"))
+        .filter(|record| strings_at(record, "supports").iter().any(|p| p == "irrelevant_background"))
         .cloned()
         .collect();
     irrelevant.sort_by(|left, right| string_at(left, "id").cmp(string_at(right, "id")));
@@ -447,7 +447,7 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                     let evidence = world_evidence(case, case);
                     assert_eq!(irrelevant_injection_sha256(evidence), string_at(case, "irrelevant_evidence_injection_digest"), "{case_id}: top-level irrelevant batch digest");
                     let injected: Vec<&Value> = evidence.iter().filter(|record| {
-                        strings_at(record, "supports").iter().any(|p| p == "unrelated_document_classification")
+                        strings_at(record, "supports").iter().any(|p| p == "irrelevant_background")
                     }).collect();
                     assert_eq!(injected.len(), count as usize, "{case_id}: top-level irrelevant record count");
                     let visible: BTreeSet<String> = visible_ids(case, case).into_iter().collect();
