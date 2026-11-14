@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea typed research decision records v0",
+  "description": "Synthetic examples for structural contract validation; not DCR reproduction, expert gold or agent performance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_issue",
+    "purpose",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-typed-research-decision-records-v0"
+    },
+    "status": {
+      "const": "SYNTHETIC_DECISION_CONTRACT_CASES_NOT_DCR_REPRODUCTION_OR_AGENT_RESULTS"
+    },
+    "source_issue": {
+      "const": "#10877"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "records": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/record"
+      }
+    }
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "decision_type",
+        "research_state",
+        "action_probabilities",
+        "selected_action",
+        "expected_selected_action",
+        "prediction_set",
+        "nominal_coverage",
+        "rationale_evidence_refs",
+        "abstention_reason"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_type": {
+          "enum": [
+            "direction_selection",
+            "approach_selection",
+            "experiment_selection",
+            "tool_allocation",
+            "result_interpretation",
+            "stop_continue_pivot_replicate",
+            "correction_acceptance",
+            "transfer_acceptance",
+            "evidence_request",
+            "model_abstention"
+          ]
+        },
+        "research_state": {
+          "$ref": "#/$defs/state"
+        },
+        "action_probabilities": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/actionProbability"
+          }
+        },
+        "selected_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_selected_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prediction_set": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "nominal_coverage": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "rationale_evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "abstention_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "research_state_id",
+        "state_digest",
+        "evidence_prefix_digest",
+        "visible_evidence_ids",
+        "identifiability",
+        "available_actions"
+      ],
+      "properties": {
+        "research_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evidence_prefix_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "visible_evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "identifiability": {
+          "enum": [
+            "identifiable",
+            "equivalence_class",
+            "not_identifiable"
+          ]
+        },
+        "available_actions": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "actionProbability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "probability"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

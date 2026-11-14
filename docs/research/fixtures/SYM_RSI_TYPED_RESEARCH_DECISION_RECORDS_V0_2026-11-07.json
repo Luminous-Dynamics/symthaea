@@ -1,0 +1,224 @@
+{
+  "schema_version": "sym-rsi-typed-research-decision-records-v0",
+  "status": "SYNTHETIC_DECISION_CONTRACT_CASES_NOT_DCR_REPRODUCTION_OR_AGENT_RESULTS",
+  "source_issue": "#10877",
+  "purpose": "Synthetic examples of a typed, evidence-prefix-bound research decision record. They test structural semantics only; they are not DCR reproductions, human gold labels, or agent results.",
+  "records": [
+    {
+      "decision_id": "DR-01",
+      "decision_type": "direction_selection",
+      "research_state": {
+        "research_state_id": "state-direction-01",
+        "state_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "evidence_prefix_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "visible_evidence_ids": [
+          "ev-01",
+          "ev-02"
+        ],
+        "identifiability": "identifiable",
+        "available_actions": [
+          "DIRECTION-A",
+          "DIRECTION-B",
+          "ABSTAIN"
+        ]
+      },
+      "action_probabilities": [
+        {
+          "action": "DIRECTION-A",
+          "probability": 0.6
+        },
+        {
+          "action": "DIRECTION-B",
+          "probability": 0.3
+        },
+        {
+          "action": "ABSTAIN",
+          "probability": 0.1
+        }
+      ],
+      "selected_action": "DIRECTION-A",
+      "expected_selected_action": "DIRECTION-A",
+      "prediction_set": [
+        "DIRECTION-A",
+        "DIRECTION-B"
+      ],
+      "nominal_coverage": 0.9,
+      "rationale_evidence_refs": [
+        "ev-01"
+      ],
+      "abstention_reason": null
+    },
+    {
+      "decision_id": "DR-02",
+      "decision_type": "experiment_selection",
+      "research_state": {
+        "research_state_id": "state-experiment-02",
+        "state_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "evidence_prefix_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "visible_evidence_ids": [
+          "ev-11",
+          "ev-12",
+          "ev-13"
+        ],
+        "identifiability": "identifiable",
+        "available_actions": [
+          "PROBE-1",
+          "PROBE-2",
+          "ABSTAIN"
+        ]
+      },
+      "action_probabilities": [
+        {
+          "action": "PROBE-1",
+          "probability": 0.7
+        },
+        {
+          "action": "PROBE-2",
+          "probability": 0.2
+        },
+        {
+          "action": "ABSTAIN",
+          "probability": 0.1
+        }
+      ],
+      "selected_action": "PROBE-1",
+      "expected_selected_action": "PROBE-1",
+      "prediction_set": [
+        "PROBE-1",
+        "PROBE-2"
+      ],
+      "nominal_coverage": 0.85,
+      "rationale_evidence_refs": [
+        "ev-11",
+        "ev-13"
+      ],
+      "abstention_reason": null
+    },
+    {
+      "decision_id": "DR-03",
+      "decision_type": "result_interpretation",
+      "research_state": {
+        "research_state_id": "state-equivalence-03",
+        "state_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "evidence_prefix_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "visible_evidence_ids": [
+          "ev-21"
+        ],
+        "identifiability": "equivalence_class",
+        "available_actions": [
+          "REPORT_EQUIVALENCE_CLASS",
+          "ABSTAIN",
+          "CLAIM_UNIQUE_MODEL"
+        ]
+      },
+      "action_probabilities": [
+        {
+          "action": "REPORT_EQUIVALENCE_CLASS",
+          "probability": 0.55
+        },
+        {
+          "action": "ABSTAIN",
+          "probability": 0.35
+        },
+        {
+          "action": "CLAIM_UNIQUE_MODEL",
+          "probability": 0.1
+        }
+      ],
+      "selected_action": "REPORT_EQUIVALENCE_CLASS",
+      "expected_selected_action": "REPORT_EQUIVALENCE_CLASS",
+      "prediction_set": [
+        "REPORT_EQUIVALENCE_CLASS",
+        "ABSTAIN"
+      ],
+      "nominal_coverage": 0.9,
+      "rationale_evidence_refs": [
+        "ev-21"
+      ],
+      "abstention_reason": null
+    },
+    {
+      "decision_id": "DR-04",
+      "decision_type": "model_abstention",
+      "research_state": {
+        "research_state_id": "state-unidentified-04",
+        "state_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "evidence_prefix_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "visible_evidence_ids": [
+          "ev-31",
+          "ev-32"
+        ],
+        "identifiability": "not_identifiable",
+        "available_actions": [
+          "ABSTAIN",
+          "CLAIM_UNIQUE_MODEL"
+        ]
+      },
+      "action_probabilities": [
+        {
+          "action": "ABSTAIN",
+          "probability": 0.9
+        },
+        {
+          "action": "CLAIM_UNIQUE_MODEL",
+          "probability": 0.1
+        }
+      ],
+      "selected_action": "ABSTAIN",
+      "expected_selected_action": "ABSTAIN",
+      "prediction_set": [
+        "ABSTAIN"
+      ],
+      "nominal_coverage": 0.9,
+      "rationale_evidence_refs": [
+        "ev-31"
+      ],
+      "abstention_reason": "Available observations and interventions do not identify a unique structure."
+    },
+    {
+      "decision_id": "DR-05",
+      "decision_type": "correction_acceptance",
+      "research_state": {
+        "research_state_id": "state-correction-05",
+        "state_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "evidence_prefix_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "visible_evidence_ids": [
+          "ev-41",
+          "ev-42"
+        ],
+        "identifiability": "identifiable",
+        "available_actions": [
+          "ACCEPT_CORRECTION_FOR_TEST",
+          "REJECT_CORRECTION",
+          "ABSTAIN"
+        ]
+      },
+      "action_probabilities": [
+        {
+          "action": "ACCEPT_CORRECTION_FOR_TEST",
+          "probability": 0.5
+        },
+        {
+          "action": "REJECT_CORRECTION",
+          "probability": 0.4
+        },
+        {
+          "action": "ABSTAIN",
+          "probability": 0.1
+        }
+      ],
+      "selected_action": "ACCEPT_CORRECTION_FOR_TEST",
+      "expected_selected_action": "ACCEPT_CORRECTION_FOR_TEST",
+      "prediction_set": [
+        "ACCEPT_CORRECTION_FOR_TEST",
+        "REJECT_CORRECTION"
+      ],
+      "nominal_coverage": 0.9,
+      "rationale_evidence_refs": [
+        "ev-41",
+        "ev-42"
+      ],
+      "abstention_reason": null
+    }
+  ]
+}

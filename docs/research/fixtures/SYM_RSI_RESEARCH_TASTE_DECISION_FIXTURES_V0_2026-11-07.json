@@ -1,0 +1,470 @@
+{
+  "schema_version": "sym-rsi-research-taste-decision-fixtures-v0",
+  "status": "SYNTHETIC_POLICY_CASES_NOT_EXPERT_GOLD_OR_BENCHMARK_RESULTS",
+  "source_issue": "#10877",
+  "purpose": "Synthetic case descriptions for protocol and rubric development. Expected actions follow the explicit facts/rules in each case; they are not human expert gold labels, scientific findings or measured system performance.",
+  "fixtures": [
+    {
+      "fixture_id": "RT-D01",
+      "stage": "direction_selection",
+      "scenario": "Two research opportunities compete under a fixed 20-unit pilot budget. A has independently estimated expected net value 18 units, 0.8 probability of tractable completion and total cost 6. B has expected net value 24, 0.9 probability and cost 18. The preregistered allocation rule is maximize expected net value per total cost subject to probability of completion >=0.75.",
+      "facts": {
+        "A": {
+          "expected_net_value": 18,
+          "completion_probability": 0.8,
+          "total_cost": 6
+        },
+        "B": {
+          "expected_net_value": 24,
+          "completion_probability": 0.9,
+          "total_cost": 18
+        },
+        "budget": 20,
+        "rule": "maximize expected_net_value / total_cost"
+      },
+      "expected_action": "select_A_for_pilot",
+      "required_response": [
+        "compute and compare expected value per cost",
+        "state feasibility constraint and budget",
+        "report uncertainty and what would change the ranking"
+      ],
+      "prohibited_inference": [
+        "B is better only because its absolute expected value is larger",
+        "the expected value estimate is a realized outcome"
+      ],
+      "evidence_to_request": [
+        "source of value estimates",
+        "calibration history",
+        "cost ledger"
+      ],
+      "why": "A has 3.0 expected net value per cost versus B's 1.33 and both pass the feasibility threshold."
+    },
+    {
+      "fixture_id": "RT-D02",
+      "stage": "direction_selection",
+      "scenario": "A high-prestige research direction has extensive citations, but a frozen literature map and baseline audit show that its claimed gap was already solved by an existing method. The proposed project changes only the name and prompt of that method; no distinct hypothesis or stakeholder value is identified.",
+      "facts": {
+        "citation_volume": "high",
+        "gap_status": "already addressed by existing method",
+        "proposed_delta": "renaming and prompt wording only",
+        "new_hypothesis": false
+      },
+      "expected_action": "deprioritize_as_duplicate",
+      "required_response": [
+        "identify the missing contribution",
+        "request a baseline reproduction or a materially distinct question",
+        "do not reward citation volume alone"
+      ],
+      "prohibited_inference": [
+        "high citation count implies high research value",
+        "renaming is a new method"
+      ],
+      "evidence_to_request": [
+        "prior-art source map",
+        "baseline artifact and reproduction"
+      ],
+      "why": "Popularity and citation coverage do not establish an unresolved problem or a distinct research contribution."
+    },
+    {
+      "fixture_id": "RT-D03",
+      "stage": "direction_selection",
+      "scenario": "A neglected research opportunity has high plausible value but wide uncertainty. A low-cost 2-unit pilot can distinguish two competing feasibility assumptions before a 30-unit commitment. The pilot is within budget and has a predeclared stop criterion.",
+      "facts": {
+        "expected_value_range": [
+          5,
+          40
+        ],
+        "pilot_cost": 2,
+        "full_commitment_cost": 30,
+        "pilot_discriminates_assumptions": true,
+        "stop_rule_frozen": true
+      },
+      "expected_action": "run_low_cost_information_pilot",
+      "required_response": [
+        "explain value of information",
+        "state the result-dependent action branches",
+        "retain the possibility of abandoning the direction"
+      ],
+      "prohibited_inference": [
+        "uncertain means worthless",
+        "pilot success proves the full research programme will succeed"
+      ],
+      "evidence_to_request": [
+        "pilot outcome predictions",
+        "stop rule",
+        "follow-on budget approval"
+      ],
+      "why": "The low-cost pilot resolves a decision-relevant uncertainty before a much larger commitment."
+    },
+    {
+      "fixture_id": "RT-A01",
+      "stage": "approach_design",
+      "scenario": "A proposal claims a new mechanism causes lower model error, but the mechanism is not operationally defined, has no predicted intermediate observation, and the proposed experiment changes the data, optimizer and evaluator together.",
+      "facts": {
+        "mechanism_operationalized": false,
+        "predicted_intermediate_effect": false,
+        "simultaneous_changes": [
+          "data",
+          "optimizer",
+          "evaluator"
+        ],
+        "causal_identifiability": "none"
+      },
+      "expected_action": "return_for_mechanism_and_falsifiability",
+      "required_response": [
+        "request a typed mechanism and causal chain",
+        "specify intermediate predictions",
+        "separate interventions and freeze the evaluator"
+      ],
+      "prohibited_inference": [
+        "polished narrative is evidence of mechanism",
+        "an outcome change can be attributed to one component"
+      ],
+      "evidence_to_request": [
+        "mechanism definition",
+        "factorial or matched intervention design",
+        "independent evaluator identity"
+      ],
+      "why": "The proposal is not falsifiable and its bundled changes make causal attribution impossible."
+    },
+    {
+      "fixture_id": "RT-A02",
+      "stage": "approach_design",
+      "scenario": "A proposal specifies a memory update mechanism, predicts that stale claim reuse will fall while valid-claim retention remains stable, names a counterexample condition, and proposes an ablation against untyped history using a held-out repository family.",
+      "facts": {
+        "mechanism_operationalized": true,
+        "predicted_intermediate_effects": [
+          "lower stale-claim action rate",
+          "preserved valid-claim retention"
+        ],
+        "counterexample_condition_defined": true,
+        "held_out_family": true,
+        "ablation": "untyped_history"
+      },
+      "expected_action": "accept_for_discriminating_pilot",
+      "required_response": [
+        "retain both target and protected outcome",
+        "freeze the ablation and family split",
+        "state that this is pilot readiness, not proof"
+      ],
+      "prohibited_inference": [
+        "proposal quality proves effectiveness",
+        "one held-out task is broad transfer"
+      ],
+      "evidence_to_request": [
+        "source/build identities",
+        "preregistered outcome definitions",
+        "rights review"
+      ],
+      "why": "The mechanism and its predictions are operational and falsifiable; the proper next action is a bounded pilot."
+    },
+    {
+      "fixture_id": "RT-A03",
+      "stage": "approach_design",
+      "scenario": "A proposal matches a known future paper's title and abstract closely but reproduces its method without a new hypothesis, intervention or independent baseline comparison.",
+      "facts": {
+        "future_paper_match": "high",
+        "new_hypothesis": false,
+        "method_delta": "none",
+        "independent_baseline": false
+      },
+      "expected_action": "classify_as_reproduction_not_novelty",
+      "required_response": [
+        "label reproduction separately from extension",
+        "verify method fidelity and baseline first",
+        "avoid claiming an original discovery"
+      ],
+      "prohibited_inference": [
+        "future-paper match implies novelty",
+        "reproduction alone proves the paper's scientific claim"
+      ],
+      "evidence_to_request": [
+        "source method specification",
+        "independent reproduction",
+        "original-claim evidence"
+      ],
+      "why": "Historical match can inform coverage but does not turn faithful reproduction into a novel contribution."
+    },
+    {
+      "fixture_id": "RT-E01",
+      "stage": "experiment_design",
+      "scenario": "Two hypotheses predict exactly the same observed metric under the proposed experiment. Both outcomes are compatible with either hypothesis, and no intermediate measurement is collected.",
+      "facts": {
+        "hypotheses": 2,
+        "predicted_observations": "identical under both hypotheses",
+        "intermediate_measurement": false,
+        "decision_relevance": "hypothesis discrimination"
+      },
+      "expected_action": "redesign_non_discriminating_experiment",
+      "required_response": [
+        "identify the non-identifiability",
+        "propose an intervention or measurement with divergent predictions",
+        "do not spend the full budget on the current design"
+      ],
+      "prohibited_inference": [
+        "any positive result identifies the preferred mechanism",
+        "more repetitions fix structural non-identifiability"
+      ],
+      "evidence_to_request": [
+        "predictions under each hypothesis",
+        "measurement model",
+        "candidate discriminating intervention"
+      ],
+      "why": "The proposed experiment cannot distinguish the competing explanations regardless of sample size."
+    },
+    {
+      "fixture_id": "RT-E02",
+      "stage": "experiment_design",
+      "scenario": "A candidate improvement and fixed baseline can be run on paired seeds and task clusters. The plan includes a no-op control, a negative control, a practical effect threshold, predeclared stopping and an independent sealed-family confirmation set.",
+      "facts": {
+        "paired_design": true,
+        "clusters_defined": true,
+        "no_op_control": true,
+        "negative_control": true,
+        "practical_effect_threshold": true,
+        "stopping_rule_frozen": true,
+        "sealed_family": true
+      },
+      "expected_action": "run_preregistered_paired_test",
+      "required_response": [
+        "verify the task-family split and evaluator identity",
+        "include all failed and invalid attempts in accounting",
+        "report uncertainty and practical effect"
+      ],
+      "prohibited_inference": [
+        "a point estimate alone establishes superiority",
+        "development results are sealed confirmation"
+      ],
+      "evidence_to_request": [
+        "preregistration digest",
+        "seed randomization record",
+        "complete cost boundary"
+      ],
+      "why": "The design is discriminating and has predeclared controls, costs and independent confirmation."
+    },
+    {
+      "fixture_id": "RT-E03",
+      "stage": "experiment_design",
+      "scenario": "A 100-unit full-scale experiment and a 4-unit screening experiment have similar probability of rejecting a known-bad mechanism. The screen cannot confirm final efficacy, but can eliminate clearly bad candidates before the expensive study.",
+      "facts": {
+        "full_cost": 100,
+        "screen_cost": 4,
+        "screen_can_reject_bad_candidate": true,
+        "screen_can_confirm_efficacy": false,
+        "followup_available": true
+      },
+      "expected_action": "stage_low_cost_screen_before_confirmation",
+      "required_response": [
+        "state the limited claim the screen can support",
+        "freeze criteria for advancing to full confirmation",
+        "include screen and follow-up costs in the total ledger"
+      ],
+      "prohibited_inference": [
+        "screen pass equals efficacy",
+        "screen cost alone is the full programme cost"
+      ],
+      "evidence_to_request": [
+        "screen sensitivity/specificity assumptions",
+        "advancement threshold",
+        "follow-up cost"
+      ],
+      "why": "The screen has value as a triage step but cannot substitute for final confirmation."
+    },
+    {
+      "fixture_id": "RT-I01",
+      "stage": "result_interpretation",
+      "scenario": "A paired experiment estimates a positive effect, but the interval includes zero and the observed effect is below the preregistered practical threshold. There are only two independent task-family clusters.",
+      "facts": {
+        "point_estimate": "positive",
+        "interval_includes_zero": true,
+        "practical_effect_threshold_met": false,
+        "independent_clusters": 2
+      },
+      "expected_action": "abstain_or_replicate",
+      "required_response": [
+        "report inconclusive evidence",
+        "do not convert absence of evidence into proof of no effect",
+        "design additional independent clusters if value justifies cost"
+      ],
+      "prohibited_inference": [
+        "positive point estimate means confirmed gain",
+        "two clusters justify narrow population inference"
+      ],
+      "evidence_to_request": [
+        "raw paired outcomes",
+        "cluster structure",
+        "preregistered precision target"
+      ],
+      "why": "The result is insufficiently precise and does not meet the practical effect threshold."
+    },
+    {
+      "fixture_id": "RT-I02",
+      "stage": "result_interpretation",
+      "scenario": "A well-powered intervention shows no predicted intermediate effect; a predeclared manipulation check passes, and the confidence interval excludes the smallest effect considered practically meaningful. A competing mechanism predicts the observed pattern.",
+      "facts": {
+        "manipulation_check": "passed",
+        "predicted_intermediate_effect": "absent",
+        "interval_excludes_practical_effect": true,
+        "alternative_mechanism": "consistent"
+      },
+      "expected_action": "reject_current_mechanism_and_test_alternative",
+      "required_response": [
+        "update against the original hypothesis",
+        "preserve the null/falsified result",
+        "design a distinct test of the alternative"
+      ],
+      "prohibited_inference": [
+        "continue repeating the same intervention without new reason",
+        "hide the failed prediction from the research state"
+      ],
+      "evidence_to_request": [
+        "manipulation-check evidence",
+        "effect interval",
+        "alternative-mechanism predictions"
+      ],
+      "why": "The evidence directly contradicts the registered mechanism and supports a targeted alternative test."
+    },
+    {
+      "fixture_id": "RT-I03",
+      "stage": "result_interpretation",
+      "scenario": "The candidate's result appears strong, but an audit discovers that the evaluator changed between baseline and candidate, and the candidate could read the confirmation seed. The numerical score is therefore not admissible.",
+      "facts": {
+        "effect": "large_positive",
+        "evaluator_epoch_matched": false,
+        "confirmation_seed_leaked": true
+      },
+      "expected_action": "invalidate_result_and_requalify",
+      "required_response": [
+        "reject the result as invalid evidence",
+        "quarantine the compromised confirmation set",
+        "repair evaluator and custody before a new test"
+      ],
+      "prohibited_inference": [
+        "large observed effect compensates for leaked confirmation data",
+        "average score remains publishable"
+      ],
+      "evidence_to_request": [
+        "evaluator epoch logs",
+        "workspace/credential access logs",
+        "fresh custodian-controlled split"
+      ],
+      "why": "Evaluator drift and confirmation leakage independently invalidate the comparison."
+    },
+    {
+      "fixture_id": "RT-T01",
+      "stage": "transfer",
+      "scenario": "A method improves its original task family and is hypothesized to transfer to a fresh domain with a different surface representation but the same declared causal mechanism. No target-domain tuning is allowed.",
+      "facts": {
+        "original_gain_independently_confirmed": true,
+        "fresh_domain": true,
+        "same_mechanism_hypothesis": true,
+        "retuning_prohibited": true
+      },
+      "expected_action": "run_blinded_mechanism_transfer_test",
+      "required_response": [
+        "freeze the mechanism mapping before target access",
+        "include a matched no-transfer control",
+        "report positive, null and negative transfer"
+      ],
+      "prohibited_inference": [
+        "similar surface appearance proves transfer",
+        "original task improvement implies transfer"
+      ],
+      "evidence_to_request": [
+        "mechanism mapping",
+        "target family manifest",
+        "no-retuning audit"
+      ],
+      "why": "The method has a plausible transfer hypothesis, but transfer must be tested under a frozen mapping."
+    },
+    {
+      "fixture_id": "RT-T02",
+      "stage": "transfer",
+      "scenario": "An improvement works only after a prompt is rewritten specifically for each held-out task and the researcher is allowed to inspect target scores repeatedly. The claim is 'zero-shot transferable research method'.",
+      "facts": {
+        "task_specific_retuning": true,
+        "sealed_scores_repeatedly_visible": true,
+        "claimed_transfer": "zero-shot"
+      },
+      "expected_action": "reject_transfer_claim",
+      "required_response": [
+        "classify result as task-specific adaptation",
+        "separate target development from confirmation",
+        "repeat with frozen policy on fresh family"
+      ],
+      "prohibited_inference": [
+        "retuned per-task success is zero-shot transfer",
+        "repeated sealed feedback preserves independence"
+      ],
+      "evidence_to_request": [
+        "prompt history",
+        "sealed-access log",
+        "frozen transfer protocol"
+      ],
+      "why": "The experiment violates both no-retuning and sealed-confirmation requirements."
+    },
+    {
+      "fixture_id": "RT-T03",
+      "stage": "transfer",
+      "scenario": "The successor improves on the target benchmark but violates a predeclared protected capability floor on a second domain. The scalar aggregate rises because the target domain is weighted more heavily.",
+      "facts": {
+        "target_score_delta": "positive",
+        "protected_capability_floor": "violated",
+        "aggregate_score": "positive",
+        "domain_vector": "regression"
+      },
+      "expected_action": "reject_successor_promotion",
+      "required_response": [
+        "apply non-compensatory capability floor",
+        "report per-domain regression",
+        "do not allow aggregate weights to cancel the violation"
+      ],
+      "prohibited_inference": [
+        "higher aggregate means safe/valid successor",
+        "protected floor is a soft preference"
+      ],
+      "evidence_to_request": [
+        "per-domain raw results",
+        "frozen capability floor",
+        "promotion policy"
+      ],
+      "why": "The protected regression is a hard gate regardless of aggregate target improvement."
+    },
+    {
+      "fixture_id": "RT-T04",
+      "stage": "transfer",
+      "scenario": "A successor retains only successful experiments; rejected approaches, null results, costs and evaluator epochs are discarded. It claims improved research-state continuity because its recall score is high.",
+      "facts": {
+        "accepted_findings_retained": true,
+        "rejected_hypotheses_retained": false,
+        "null_results_retained": false,
+        "costs_retained": false,
+        "evaluator_epochs_retained": false,
+        "raw_recall": "high"
+      },
+      "expected_action": "reject_research_state_continuity_claim",
+      "required_response": [
+        "require full evidence-qualified record classes",
+        "audit false-currentness and duplication rate",
+        "test cold restart and successor migration"
+      ],
+      "prohibited_inference": [
+        "raw recall or memory volume proves useful continuity",
+        "success-only history is adequate"
+      ],
+      "evidence_to_request": [
+        "record schema",
+        "cold-restart restore test",
+        "independent provenance audit"
+      ],
+      "why": "The memory omits essential counterevidence and provenance needed for safe research continuation."
+    }
+  ],
+  "evaluation_policy": {
+    "adjudication": "Expected action is a constrained policy target for these synthetic facts. Real benchmark cases require independent domain expert adjudication and prospective empirical outcomes.",
+    "scoring": "Score each capability dimension separately; any critical integrity failure is non-compensatory.",
+    "denominator": "Retain all refusals, invalid runs, incomplete responses and abstentions. Do not drop cases after observing candidate outputs.",
+    "no_single_oracle": "Do not treat one human preference label, one future paper match, or one LLM judge as a universal truth oracle.",
+    "transfer": "A transfer claim requires fresh task/problem/method family, frozen mapping and no retuning."
+  }
+}
