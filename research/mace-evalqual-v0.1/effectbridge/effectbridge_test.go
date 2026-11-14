@@ -1,8 +1,8 @@
 package effectbridge
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -339,6 +339,7 @@ func TestEightClientProcessesShareOneIdempotencyDecision(t *testing.T) {
 	const clients = 8
 	type child struct {
 		cmd *exec.Cmd
+		output *bytes.Buffer
 	}
 	children := make([]child, 0, clients)
 	for i := 0; i < clients; i++ {
@@ -353,11 +354,11 @@ func TestEightClientProcessesShareOneIdempotencyDecision(t *testing.T) {
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
 		}
-		children = append(children, child{cmd: cmd})
+		children = append(children, child{cmd: cmd, output: &output})
 	}
 	for i, child := range children {
-		if output, err := child.cmd.CombinedOutput(); err != nil {
-			t.Fatalf("client %d failed: %v: %s", i, err, output)
+		if err := child.cmd.Wait(); err != nil {
+			t.Fatalf("client %d failed: %v: %s", i, err, child.output.String())
 		}
 	}
 	records, summary, err := ReadJournal(journal)
