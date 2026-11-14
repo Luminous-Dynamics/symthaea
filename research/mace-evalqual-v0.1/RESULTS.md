@@ -155,3 +155,10 @@ Added `effectbridge/modelcheck_test.go`, a dependency-free breadth-first explore
 Observed local exploration: **68 unique reachable states, 200 transitions, maximum shortest trace depth 7**, with effect, fence, late-arrival-after-fence and rollback-with-pending-request cases all reached. Local verification on the assembled v0.2 source snapshot (Go 1.23.2/Linux amd64): both new tests passed under three consecutive race-detector runs; `go vet ./...`, default `go test -count=1 ./...`, and optional SQLite-tagged `go test -count=1 -tags mace_sqlite ./...` passed.
 
 This is exhaustive only for the small declared finite abstraction. It is not TLC/TLA+ verification, not a proof of the Go implementation, and not a model of arbitrary message multiplicity, multiple hosts, storage firmware, power failure or Byzantine destinations. The next formal step is to encode the same invariants in TLA+/PlusCal and independently check captured implementation histories with a separate linearizability checker.
+
+
+## 14 November 2026 — generated multi-key concurrent histories
+
+Added `effectbridge/linearizability_schedules_test.go`. With a fixed reproducible seed, it generates 256 histories of six overlapping operations over two idempotency keys and two possible intents. Each operation is an append, fence or lookup. A legal sequential history must match every returned result and respect real-time precedence; each key's terminal lookup is also compared before and after journal restart.
+
+Local execution on the assembled companion snapshot (Go 1.23.2/Linux amd64): generated-history test passed; the three linearizability/model tests passed three consecutive race-detector runs; default tests, SQLite-tagged tests, `go vet`, and `CGO_ENABLED=0` tests passed. These 256 fixed-seed histories are a bounded conformance corpus, not IID trials or a population reliability estimate. The local companion snapshot has 52 named test functions by default and 67 with the SQLite tag. SQLite source remains outside this public PR diff.
