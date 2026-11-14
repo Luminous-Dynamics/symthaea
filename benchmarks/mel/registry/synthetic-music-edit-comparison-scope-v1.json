@@ -1,0 +1,15 @@
+{
+  "schema_version": "mel-music-edit-comparison-scope-v1",
+  "benchmark_id": "synthetic-music-edit-adapter-contract",
+  "benchmark_version": "synthetic-contract-v1",
+  "native_track_id": "synthetic-music-edit-dev",
+  "dataset_stratum": "midi_synthesized",
+  "split_id": "development",
+  "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "scorer_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "native_metric_ids": [
+    "target_agreement",
+    "source_preservation"
+  ],
+  "sample_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

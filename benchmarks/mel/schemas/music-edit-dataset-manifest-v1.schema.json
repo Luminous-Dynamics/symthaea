@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-dataset-manifest-v1.schema.json",
+  "title": "Melothaea music-edit benchmark dataset manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_version",
+    "benchmark_track_id",
+    "protocol_sha256",
+    "scorer_sha256",
+    "access_tier",
+    "access_evidence_sha256",
+    "intended_use",
+    "rights",
+    "rows"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-dataset-manifest-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "enum": [
+          "latest",
+          "current",
+          "stable"
+        ]
+      }
+    },
+    "benchmark_track_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "scorer_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "access_tier": {
+      "enum": [
+        "public",
+        "organizer_restricted"
+      ]
+    },
+    "access_evidence_sha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "intended_use": {
+      "$ref": "#/$defs/use"
+    },
+    "rights": {
+      "$ref": "#/$defs/rights"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "use": {
+      "enum": [
+        "evaluation_only",
+        "training",
+        "redistribution",
+        "public_release"
+      ]
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "rights_reference",
+        "rights_evidence_sha256",
+        "permitted_uses"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "cleared",
+            "restricted",
+            "unresolved"
+          ]
+        },
+        "rights_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "permitted_uses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/use"
+          }
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "source_lineage_sha256",
+        "split",
+        "stratum",
+        "operation",
+        "target_scope",
+        "source_audio_sha256",
+        "instruction_sha256",
+        "target_audio_sha256",
+        "source_symbolic_sha256",
+        "target_selector_sha256",
+        "metadata_sha256"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split": {
+          "enum": [
+            "train",
+            "development",
+            "test"
+          ]
+        },
+        "stratum": {
+          "enum": [
+            "midi_synthesized",
+            "real_multitrack",
+            "mmae_music_subset",
+            "mmae_full_multimodal"
+          ]
+        },
+        "operation": {
+          "enum": [
+            "remove_instrument",
+            "replace_instrument",
+            "extract_instrument",
+            "double_instrument",
+            "remove_drums",
+            "replace_drums",
+            "extract_drums",
+            "staccato",
+            "legato",
+            "crescendo",
+            "decrescendo",
+            "tuning_correction440"
+          ]
+        },
+        "target_scope": {
+          "enum": [
+            "instrument",
+            "drum_kit",
+            "mixture"
+          ]
+        },
+        "source_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "instruction_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source_symbolic_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_selector_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metadata_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

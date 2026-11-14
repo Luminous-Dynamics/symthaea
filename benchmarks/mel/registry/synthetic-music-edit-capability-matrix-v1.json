@@ -1,0 +1,77 @@
+{
+  "schema_version": "mel-music-edit-capability-matrix-v1",
+  "capabilities": [
+    {
+      "operation": "remove_instrument",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "A single event-removal verifier is not qualification for complete part removal."
+    },
+    {
+      "operation": "replace_instrument",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Instrument identity, program/bank and target-part preservation require a separate verifier."
+    },
+    {
+      "operation": "extract_instrument",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Part-isolated stems require qualified source binding and renderer execution evidence."
+    },
+    {
+      "operation": "double_instrument",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Doubling requires explicit orchestration identity and leakage-safe stem validation."
+    },
+    {
+      "operation": "remove_drums",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Drum removal is a multi-event/percussion-track task, not a single-note removal."
+    },
+    {
+      "operation": "replace_drums",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Drum replacement requires drum-kit/note identity and independent target verification."
+    },
+    {
+      "operation": "extract_drums",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Drum extraction requires part-isolated audio qualification and real multitrack checks."
+    },
+    {
+      "operation": "staccato",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Duration changes need exact tick/tempo-map semantics and acoustic articulation validation."
+    },
+    {
+      "operation": "legato",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Duration changes need exact tick/tempo-map semantics and acoustic overlap validation."
+    },
+    {
+      "operation": "crescendo",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Instrument and whole-mixture dynamic scopes must be qualified separately."
+    },
+    {
+      "operation": "decrescendo",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Instrument and whole-mixture dynamic scopes must be qualified separately."
+    },
+    {
+      "operation": "tuning_correction440",
+      "qualification": "not_yet_qualified",
+      "qualification_evidence_sha256": null,
+      "boundary": "Integer MIDI semitone transposition is not cent-level tuning correction."
+    }
+  ]
+}
