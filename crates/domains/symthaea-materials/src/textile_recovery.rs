@@ -1513,6 +1513,25 @@ mod tests {
     }
 
     #[test]
+    fn fibre_sampling_plan_must_bind_a_valid_content_digest() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.sampling_plan_sha256 = "not-a-digest".to_owned();
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::InvalidFibreLengthMeasurementProtocol)
+        );
+    }
+
+    #[test]
     fn fibre_length_sample_mass_cannot_exceed_accepted_output_lot() {
         let mut bundle = empty_bundle();
         bundle.composition = Some(composition());
@@ -2056,6 +2075,10 @@ mod tests {
                 fibre_length_measurement_uncertainty_must_meet_receiving_policy();
                 ("ineligible", Some("FibreLengthMeasurementUncertaintyAbovePolicy"))
             }
+            "ROUTE-040-FIBRE-SAMPLING-PLAN-DIGEST-INVALID" => {
+                fibre_sampling_plan_must_bind_a_valid_content_digest();
+                ("ineligible", Some("InvalidFibreLengthMeasurementProtocol"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -2077,12 +2100,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(39));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(40));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 39, "review route corpus case count changes");
+        assert_eq!(cases.len(), 40, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"].as_str().expect("case_id must be a string");
@@ -2105,7 +2128,7 @@ mod tests {
             );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 39);
+        assert_eq!(seen.len(), 40);
     }
 
     #[test]
