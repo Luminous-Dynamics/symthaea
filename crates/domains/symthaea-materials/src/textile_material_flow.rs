@@ -140,7 +140,7 @@ pub struct MaterialFlowLedger {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaterialFlowFinding {
     /// Stable finding code.
-    pub code: &'static str,
+    pub code: String,
     /// Lot or event identifier to which the finding applies.
     pub entity_id: String,
     /// Human-readable explanation.
@@ -191,7 +191,7 @@ fn add(
     message: impl Into<String>,
 ) {
     findings.push(MaterialFlowFinding {
-        code,
+        code: code.to_owned(),
         entity_id: entity_id.into(),
         message: message.into(),
     });
