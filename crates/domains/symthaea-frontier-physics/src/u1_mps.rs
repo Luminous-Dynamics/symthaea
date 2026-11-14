@@ -141,6 +141,7 @@ pub enum U1MpsError {
         max_bond_dimension: usize,
     },
     InvalidErrorBudget,
+    GlobalErrorBoundNotQualified,
     InvalidTeBDParity(u8),
     TeBDGateOutOfRange {
         bond_index: usize,
@@ -312,6 +313,9 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::InvalidErrorBudget => {
                 write!(f, "error budget must be positive, finite, and allocated fractions must sum to at most one")
+            },
+            Self::GlobalErrorBoundNotQualified => {
+                write!(f, "global observable error cannot be certified without a qualified global state-error bound")
             },
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
@@ -2376,6 +2380,143 @@ pub struct U1MpsErrorBudgetPlan {
     pub time_discretization_l2_error: f64,
     pub reserved_l2_error: f64,
 }
+
+
+
+/// Requested absolute error for the expectation of a bounded observable.
+///
+/// The exact-state norm upper bound must be justified by the caller from the
+/// exact reference dynamics (for unitary reference evolution, the initial
+/// state norm is sufficient). This type never assumes the approximate MPS is
+/// normalized.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsObservableErrorTarget {
+    pub maximum_expectation_error: f64,
+    pub observable_operator_norm_upper_bound: f64,
+    pub exact_state_norm_upper_bound: f64,
+}
+
+/// Observable-level error interval derived from a qualified global state L2 bound.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsObservableErrorReceipt {
+    pub requested_expectation_error: f64,
+    pub observable_operator_norm_upper_bound: f64,
+    pub approximate_state_norm_upper_bound: f64,
+    pub exact_state_norm_upper_bound: f64,
+    pub global_state_l2_error_bound: f64,
+    pub compiled_state_l2_error_budget: Option<f64>,
+    pub expectation_error_upper_bound: f64,
+    pub budget_satisfied: bool,
+}
+
+impl U1MpsObservableErrorTarget {
+    fn validate(&self) -> Result<(), U1MpsError> {
+        if !self.maximum_expectation_error.is_finite()
+            || self.maximum_expectation_error < 0.0
+            || !self.observable_operator_norm_upper_bound.is_finite()
+            || self.observable_operator_norm_upper_bound < 0.0
+            || !self.exact_state_norm_upper_bound.is_finite()
+            || self.exact_state_norm_upper_bound < 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        Ok(())
+    }
+
+    /// Convert an absolute expectation-error target into a sufficient global
+    /// state L2 budget using
+    /// |<a|A|a>-<b|A|b>| <= ||A|| ||a-b|| (||a||+||b||).
+    ///
+    /// None means the supplied observable norm bound is zero, so its
+    /// expectation is insensitive to state error under this bound.
+    pub fn compile_state_l2_error_budget(
+        &self,
+        approximate_state_norm_upper_bound: f64,
+    ) -> Result<Option<f64>, U1MpsError> {
+        self.validate()?;
+        if !approximate_state_norm_upper_bound.is_finite()
+            || approximate_state_norm_upper_bound < 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        if self.observable_operator_norm_upper_bound == 0.0 {
+            return Ok(None);
+        }
+        let denominator = self.observable_operator_norm_upper_bound
+            * (approximate_state_norm_upper_bound + self.exact_state_norm_upper_bound);
+        if !denominator.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "observable error-budget denominator",
+            ));
+        }
+        if denominator == 0.0 {
+            return Ok(None);
+        }
+        let budget = self.maximum_expectation_error / denominator;
+        if !budget.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "compiled observable state-error budget",
+            ));
+        }
+        Ok(Some(budget))
+    }
+
+    /// Certify an expectation-error envelope using the global ledger.
+    ///
+    /// The ledger must have a qualified global state-vector bound. A local
+    /// tensor Frobenius ledger is deliberately insufficient.
+    pub fn certify(
+        &self,
+        ledger: &U1MpsTruncationLedger,
+        approximate_state_norm_squared: f64,
+    ) -> Result<U1MpsObservableErrorReceipt, U1MpsError> {
+        self.validate()?;
+        if !approximate_state_norm_squared.is_finite() || approximate_state_norm_squared < 0.0 {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let approximate_state_norm_upper_bound = approximate_state_norm_squared.sqrt();
+        if self.observable_operator_norm_upper_bound == 0.0 {
+            return Ok(U1MpsObservableErrorReceipt {
+                requested_expectation_error: self.maximum_expectation_error,
+                observable_operator_norm_upper_bound: 0.0,
+                approximate_state_norm_upper_bound,
+                exact_state_norm_upper_bound: self.exact_state_norm_upper_bound,
+                global_state_l2_error_bound: 0.0,
+                compiled_state_l2_error_budget: None,
+                expectation_error_upper_bound: 0.0,
+                budget_satisfied: true,
+            });
+        }
+        if !ledger.global_state_error_bound_qualified {
+            return Err(U1MpsError::GlobalErrorBoundNotQualified);
+        }
+        let global_state_l2_error_bound = ledger
+            .global_state_error_bound_upper
+            .filter(|bound| bound.is_finite() && *bound >= 0.0)
+            .ok_or(U1MpsError::GlobalErrorBoundNotQualified)?;
+        let compiled_state_l2_error_budget =
+            self.compile_state_l2_error_budget(approximate_state_norm_upper_bound)?;
+        let expectation_error_upper_bound = self.observable_operator_norm_upper_bound
+            * global_state_l2_error_bound
+            * (approximate_state_norm_upper_bound + self.exact_state_norm_upper_bound);
+        if !expectation_error_upper_bound.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "observable expectation error bound",
+            ));
+        }
+        Ok(U1MpsObservableErrorReceipt {
+            requested_expectation_error: self.maximum_expectation_error,
+            observable_operator_norm_upper_bound: self.observable_operator_norm_upper_bound,
+            approximate_state_norm_upper_bound,
+            exact_state_norm_upper_bound: self.exact_state_norm_upper_bound,
+            global_state_l2_error_bound,
+            compiled_state_l2_error_budget,
+            expectation_error_upper_bound,
+            budget_satisfied: expectation_error_upper_bound <= self.maximum_expectation_error,
+        })
+    }
+}
+
 
 impl U1MpsErrorBudgetPlan {
     pub fn compile(
