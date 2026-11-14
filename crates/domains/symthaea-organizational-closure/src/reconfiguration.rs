@@ -130,6 +130,8 @@ pub enum ReconfigurationFindingCode {
     ExecutableIdentityChangeNotAllowed,
     UnknownProcessInput,
     UnknownProcessOutput,
+    ProtectedInputEdgeRemoved,
+    ProtectedComponentProduced,
     RequiredOptionalInputOverlap,
     RequiredOptionalOutputOverlap,
     RequiredOptionalDependencyOverlap,
@@ -440,6 +442,27 @@ pub fn evaluate_reconfiguration(
     diff.added_inputs = difference(&candidate_inputs, &baseline_inputs);
     diff.removed_inputs = difference(&baseline_inputs, &candidate_inputs);
 
+    // A reconfiguration may add new consumers of provisioned roots and
+    // constraints, but it cannot sever a pre-existing dependency on them.
+    // Otherwise a candidate could retain a policy component in the inventory
+    // while silently removing the process edge that enforces it.
+    for edge in &diff.removed_inputs {
+        let protected = baseline.components.get(&edge.component_id).is_some_and(|component| {
+            matches!(
+                component.class,
+                ComponentClass::ProvisionedImmutable | ComponentClass::Constraint
+            ) || policy.protected_components.contains(&edge.component_id)
+        });
+        if protected {
+            finding(
+                &mut findings,
+                ReconfigurationFindingCode::ProtectedInputEdgeRemoved,
+                Some(format!("{}:{}", edge.process_id.0, edge.component_id.0)),
+                "candidate cannot remove or weaken a pre-existing input dependency on a provisioned root or constraint",
+            );
+        }
+    }
+
     let baseline_outputs = output_edges(baseline);
     let candidate_outputs = output_edges(candidate);
     diff.added_outputs = difference(&candidate_outputs, &baseline_outputs);
@@ -468,6 +491,18 @@ pub fn evaluate_reconfiguration(
                     ReconfigurationFindingCode::UnknownProcessOutput,
                     Some(process_id.0.clone()),
                     format!("process output {} is not declared in the candidate", component_id.0),
+                );
+            } else if let Some(component) = candidate.components.get(component_id)
+                && (matches!(
+                    component.class,
+                    ComponentClass::ProvisionedImmutable | ComponentClass::Constraint
+                ) || policy.protected_components.contains(component_id))
+            {
+                finding(
+                    &mut findings,
+                    ReconfigurationFindingCode::ProtectedComponentProduced,
+                    Some(format!("{}:{}", process_id.0, component_id.0)),
+                    "candidate process cannot manufacture a provisioned root or externally governed constraint",
                 );
             }
         }
@@ -552,8 +587,19 @@ mod tests {
             ComponentClass::Constraint,
             false,
         )));
+        assert!(organization.insert_component(ComponentSpec::new(
+            "cache-a",
+            ComponentClass::RegenerativeInternal,
+            false,
+        )));
+        assert!(organization.insert_component(ComponentSpec::new(
+            "cache-b",
+            ComponentClass::RegenerativeInternal,
+            false,
+        )));
         let mut producer = process("refresh");
         producer.required_inputs.insert("config-root".into());
+        producer.optional_inputs.insert("cache-a".into());
         producer.required_outputs.insert("memory".into());
         assert!(organization.insert_process(producer));
         organization
@@ -708,8 +754,8 @@ mod tests {
         let before = baseline();
         let mut after = before.clone();
         let producer = after.processes.get_mut(&ProcessId::from("refresh")).unwrap();
-        producer.required_inputs.remove(&ComponentId::from("config-root"));
-        producer.optional_inputs.insert("memory".into());
+        producer.optional_inputs.remove(&ComponentId::from("cache-a"));
+        producer.optional_inputs.insert("cache-b".into());
         let mut policy = ReconfigurationPolicy {
             max_structural_edits: 3,
             ..ReconfigurationPolicy::default()
@@ -719,6 +765,53 @@ mod tests {
         assert!(report.qualifies_candidate(), "{:?}", report.findings);
         assert_eq!(report.diff.removed_inputs.len(), 1);
         assert_eq!(report.diff.added_inputs.len(), 1);
+    }
+
+    #[test]
+    fn constraint_input_cannot_be_severed_even_with_contract_allowlist() {
+        let before = baseline();
+        let mut after = before.clone();
+        after.processes.get_mut(&ProcessId::from("refresh")).unwrap()
+            .required_inputs.insert("policy".into());
+        // The baseline did not previously bind this process to policy; first
+        // establish the binding in both snapshots, then try to remove it.
+        let mut before = before;
+        before.processes.get_mut(&ProcessId::from("refresh")).unwrap()
+            .required_inputs.insert("policy".into());
+        after.processes.get_mut(&ProcessId::from("refresh")).unwrap()
+            .required_inputs.remove(&ComponentId::from("policy"));
+        let mut policy = ReconfigurationPolicy {
+            max_structural_edits: 10,
+            ..ReconfigurationPolicy::default()
+        };
+        policy.allowed_process_contract_changes.insert("refresh".into());
+        let report = evaluate_reconfiguration(&before, &after, &policy);
+        assert!(!report.qualifies_candidate());
+        assert!(report.findings.iter().any(|item| {
+            item.code == ReconfigurationFindingCode::ProtectedInputEdgeRemoved
+        }));
+    }
+
+    #[test]
+    fn candidate_process_cannot_produce_a_provisioned_root_or_constraint() {
+        let before = baseline();
+        let mut after = before.clone();
+        let producer = after.processes.get_mut(&ProcessId::from("refresh")).unwrap();
+        producer.optional_outputs.insert("config-root".into());
+        producer.optional_outputs.insert("policy".into());
+        let mut policy = ReconfigurationPolicy {
+            max_structural_edits: 10,
+            ..ReconfigurationPolicy::default()
+        };
+        policy.allowed_process_contract_changes.insert("refresh".into());
+        let report = evaluate_reconfiguration(&before, &after, &policy);
+        assert!(!report.qualifies_candidate());
+        assert_eq!(
+            report.findings.iter().filter(|item| {
+                item.code == ReconfigurationFindingCode::ProtectedComponentProduced
+            }).count(),
+            2
+        );
     }
 
     #[test]
