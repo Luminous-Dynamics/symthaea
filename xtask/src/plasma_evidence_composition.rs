@@ -94,9 +94,274 @@ fn is_sha256(value: &str) -> bool {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct FailurePatternShare {
+    designation: String,
+    percentage: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FailureClassificationRecord {
+    specimen_id: String,
+    status: String,
+    patterns: Vec<FailurePatternShare>,
+    oscillating: bool,
+    reviewer_refs: Vec<String>,
+    adjudication_ref: String,
+    reason_ref: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FailureModeAnalysis {
+    endpoint: String,
+    target_pattern: String,
+    grouping_scheme: String,
+    baseline_sample_count: usize,
+    candidate_sample_count: usize,
+    baseline_cluster_count: usize,
+    candidate_cluster_count: usize,
+    baseline_fraction: f64,
+    candidate_fraction: f64,
+    difference_fraction: f64,
+    margin: f64,
+    lower_abs_difference_bound: f64,
+    upper_abs_difference_bound: f64,
+    confidence_level: f64,
+    rounding_tolerance_percentage: f64,
+    max_unclassified_rate: f64,
+    baseline_unclassified_rate: f64,
+    candidate_unclassified_rate: f64,
+    analysis_profile: String,
+    analysis_result_sha256: String,
+    analysis_receipt_ref: String,
+    claim_ceiling: String,
+    acceptability_assessment: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct EmbeddedTransferComposition {
     transfer_bridge_artifact_sha256: String,
     composition: CompositionCase,
+    failure_classification_receipt: ScopeEvidence,
+    baseline_failure_classifications: Vec<FailureClassificationRecord>,
+    candidate_failure_classifications: Vec<FailureClassificationRecord>,
+    failure_mode_analysis: FailureModeAnalysis,
+}
+
+const ISO_10365_PATTERNS: &[&str] = &[
+    "SF", "CSF", "DF", "CF", "SCF", "SWCF", "AF", "ACFP", "COR",
+];
+
+fn classification_share(
+    records: &[FailureClassificationRecord],
+    expected_ids: &[String],
+    target_pattern: &str,
+    rounding_tolerance: f64,
+) -> std::result::Result<(f64, f64), Disposition> {
+    if records.is_empty() || !unique_nonempty(expected_ids) {
+        return Err(Disposition::Blocked);
+    }
+    let actual_ids: Vec<String> = records.iter().map(|record| record.specimen_id.clone()).collect();
+    if !same_members(expected_ids, &actual_ids) {
+        return Err(Disposition::Rejected);
+    }
+
+    let mut unclassified = 0usize;
+    let mut classified_count = 0usize;
+    let mut target_total = 0.0f64;
+    for record in records {
+        if !nonempty(&record.specimen_id)
+            || !unique_nonempty(&record.reviewer_refs)
+            || !nonempty(&record.adjudication_ref)
+        {
+            return Err(Disposition::Blocked);
+        }
+        match record.status.as_str() {
+            "classified" => {
+                if record.patterns.is_empty() || record.reason_ref.is_some() {
+                    return Err(Disposition::Rejected);
+                }
+                if record.oscillating && record.patterns.len() < 2 {
+                    return Err(Disposition::Rejected);
+                }
+                let mut seen = HashSet::new();
+                let mut total = 0.0f64;
+                let mut target = 0.0f64;
+                for pattern in &record.patterns {
+                    if !ISO_10365_PATTERNS.contains(&pattern.designation.as_str()) {
+                        return Err(Disposition::Rejected);
+                    }
+                    if !seen.insert(pattern.designation.as_str())
+                        || !pattern.percentage.is_finite()
+                        || pattern.percentage <= 0.0
+                        || pattern.percentage > 100.0
+                    {
+                        return Err(Disposition::Rejected);
+                    }
+                    total += pattern.percentage;
+                    if pattern.designation == target_pattern {
+                        target += pattern.percentage;
+                    }
+                }
+                if (total - 100.0).abs() > rounding_tolerance {
+                    return Err(Disposition::Rejected);
+                }
+                classified_count += 1;
+                target_total += target;
+            }
+            "ambiguous" | "unclassifiable" => {
+                if !record.patterns.is_empty()
+                    || record.reason_ref.as_deref().is_none_or(str::is_empty)
+                {
+                    return Err(Disposition::Rejected);
+                }
+                unclassified += 1;
+            }
+            _ => return Err(Disposition::Rejected),
+        }
+    }
+    if classified_count == 0 {
+        return Err(Disposition::Blocked);
+    }
+    let fraction = target_total / (classified_count as f64 * 100.0);
+    let unclassified_rate = unclassified as f64 / records.len() as f64;
+    Ok((fraction, unclassified_rate))
+}
+
+fn validate_failure_mode_distribution(
+    envelope: &EmbeddedTransferComposition,
+    evidence: &Value,
+    baseline_ids: &[String],
+    candidate_ids: &[String],
+    baseline_groups: &[String],
+    candidate_groups: &[String],
+) -> Disposition {
+    let blocked = Disposition::Blocked;
+    let rejected = Disposition::Rejected;
+    let receipt = &envelope.failure_classification_receipt;
+    if receipt.method_id != "ISO_10365"
+        || receipt.edition != "ISO 10365:2022"
+        || receipt.evidence_kind != "classification_practice"
+        || receipt.material_pair_class != "bonded_assembly_any_adherends"
+        || receipt.geometry != "failure_surface_classification"
+        || receipt.endpoint != "adhesive_joint_failure_pattern"
+        || receipt.requested_claim != "failure_pattern_classification_reference"
+    {
+        return rejected;
+    }
+    let mut expected_specimens = baseline_ids.to_vec();
+    expected_specimens.extend(candidate_ids.iter().cloned());
+    if !unique_nonempty(&expected_specimens)
+        || !same_members(&expected_specimens, &receipt.specimen_ids)
+    {
+        return rejected;
+    }
+    match decide(receipt).disposition {
+        ClaimDisposition::Supported => {}
+        ClaimDisposition::Blocked => return blocked,
+        ClaimDisposition::Rejected => return rejected,
+    }
+
+    let analysis = &envelope.failure_mode_analysis;
+    if analysis.endpoint != "failure_mode_fraction"
+        || analysis.grouping_scheme != "independent_arms"
+        || analysis.analysis_profile != "cluster_aware_pattern_share_difference_v1"
+        || analysis.claim_ceiling != "descriptive_distribution_only"
+        || analysis.acceptability_assessment.is_some()
+        || !is_sha256(&analysis.analysis_result_sha256)
+        || !nonempty(&analysis.analysis_receipt_ref)
+        || !ISO_10365_PATTERNS.contains(&analysis.target_pattern.as_str())
+    {
+        return rejected;
+    }
+    if analysis.baseline_sample_count != baseline_ids.len()
+        || analysis.candidate_sample_count != candidate_ids.len()
+        || analysis.baseline_cluster_count != baseline_groups.len()
+        || analysis.candidate_cluster_count != candidate_groups.len()
+    {
+        return rejected;
+    }
+
+    let rounding = analysis.rounding_tolerance_percentage;
+    if !rounding.is_finite() || !(0.0..=2.0).contains(&rounding)
+        || !analysis.max_unclassified_rate.is_finite()
+        || !(0.0..1.0).contains(&analysis.max_unclassified_rate)
+    {
+        return rejected;
+    }
+    let baseline = match classification_share(
+        &envelope.baseline_failure_classifications,
+        baseline_ids,
+        &analysis.target_pattern,
+        rounding,
+    ) {
+        Ok(value) => value,
+        Err(disposition) => return disposition,
+    };
+    let candidate = match classification_share(
+        &envelope.candidate_failure_classifications,
+        candidate_ids,
+        &analysis.target_pattern,
+        rounding,
+    ) {
+        Ok(value) => value,
+        Err(disposition) => return disposition,
+    };
+
+    if !analysis.baseline_fraction.is_finite()
+        || !analysis.candidate_fraction.is_finite()
+        || !analysis.difference_fraction.is_finite()
+        || !analysis.margin.is_finite()
+        || !analysis.lower_abs_difference_bound.is_finite()
+        || !analysis.upper_abs_difference_bound.is_finite()
+        || !analysis.confidence_level.is_finite()
+        || !close(analysis.baseline_fraction, baseline.0)
+        || !close(analysis.candidate_fraction, candidate.0)
+        || !close(analysis.difference_fraction, (candidate.0 - baseline.0).abs())
+        || !close(analysis.baseline_unclassified_rate, baseline.1)
+        || !close(analysis.candidate_unclassified_rate, candidate.1)
+        || baseline.1 > analysis.max_unclassified_rate
+        || candidate.1 > analysis.max_unclassified_rate
+    {
+        return rejected;
+    }
+    if analysis.margin <= 0.0
+        || analysis.lower_abs_difference_bound < 0.0
+        || analysis.upper_abs_difference_bound < analysis.lower_abs_difference_bound
+        || analysis.confidence_level < 0.0
+        || analysis.confidence_level > 1.0
+    {
+        return rejected;
+    }
+
+    let Some(intervals) = evidence.get("intervals").and_then(Value::as_array) else {
+        return blocked;
+    };
+    let Some(interval) = intervals.iter().find(|row| {
+        row.get("endpoint").and_then(Value::as_str) == Some("failure_mode_fraction")
+    }) else {
+        return blocked;
+    };
+    let (Some(margin), Some(lower), Some(upper), Some(confidence)) = (
+        interval.get("margin").and_then(Value::as_f64),
+        interval.get("lower_abs_difference_bound").and_then(Value::as_f64),
+        interval.get("upper_abs_difference_bound").and_then(Value::as_f64),
+        interval.get("confidence_level").and_then(Value::as_f64),
+    ) else {
+        return blocked;
+    };
+    if !close(analysis.margin, margin)
+        || !close(analysis.lower_abs_difference_bound, lower)
+        || !close(analysis.upper_abs_difference_bound, upper)
+        || !close(analysis.confidence_level, confidence)
+        || analysis.difference_fraction < lower - rounding / 100.0
+        || analysis.difference_fraction > upper + rounding / 100.0
+    {
+        return rejected;
+    }
+    Disposition::Pass
 }
 
 pub(super) fn audit_transfer_bridge(
@@ -201,7 +466,18 @@ pub(super) fn audit_transfer_bridge(
         return rejected;
     }
 
-    audit_case(&envelope.composition).disposition
+    let composition = audit_case(&envelope.composition).disposition;
+    if composition != Disposition::Pass {
+        return composition;
+    }
+    validate_failure_mode_distribution(
+        &envelope,
+        evidence,
+        &baseline_ids,
+        &candidate_ids,
+        &baseline_groups,
+        &candidate_groups,
+    )
 }
 
 fn audit_case(case: &CompositionCase) -> Decision {
