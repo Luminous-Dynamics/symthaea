@@ -10,6 +10,7 @@ on:
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_corpus_qualification.rs"
       - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
@@ -17,6 +18,7 @@ on:
   push:
     branches:
       - "research/melothaea-musicxml-notation-events-v1"
+      - "research/melothaea-corpus-qualification-v1-rebased"
     paths:
       - ".github/workflows/muse-musicxml-notation.yml"
       - "Cargo.toml"
@@ -88,6 +90,9 @@ jobs:
 
       - name: Test multidimensional MusicXML score-event evaluator
         run: cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::
+
+      - name: Test rights-aware corpus qualification and split isolation
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_corpus_qualification::tests::
 
       - name: Check Add Music UI for wasm
         run: cargo check --locked -p symthaea-muse-ui --target wasm32-unknown-unknown
