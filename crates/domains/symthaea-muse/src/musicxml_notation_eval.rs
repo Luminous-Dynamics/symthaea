@@ -32,6 +32,8 @@ pub const MUSICXML_NOTATION_EVALUATION_ALGORITHM_V1: &str =
 pub const MUSICXML_NOTATION_EVALUATION_MAX_EVENTS_V1: usize = 10_000;
 pub const MUSICXML_NOTATION_EVALUATION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
 pub const MUSICXML_NOTATION_EVALUATION_MAX_MATCHING_SCANS_V1: usize = 10_000_000;
+pub const MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_DEPTH_V1: usize = 32;
+pub const MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1: usize = 1_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlNotationEvaluationConfigV1 {
@@ -160,6 +162,8 @@ pub enum MusicXmlNotationEvaluationErrorV1 {
     NotationCanonicalizationMismatch,
     InvalidGraphStructure { side: String, reason: String },
     EventBudgetExceeded { side: String, count: usize, maximum: usize },
+    SourceTreeBudgetExceeded { side: String, count: usize, maximum: usize },
+    SourceTreeDepthExceeded { side: String, depth: usize, maximum: usize },
     CandidatePairBudgetExceeded { count: usize, maximum: usize },
     MatchingWorkBudgetExceeded { scans: usize, maximum: usize },
     InvalidConfiguration { field: String },
@@ -310,6 +314,77 @@ fn span_contains(span: &crate::barline_eval::MeasureSpan, value: RationalBeat) -
         && value.compare_exact(span.end) != Ordering::Greater
 }
 
+fn count_source_node(
+    node: &MusicXmlSourceNodeV1,
+    side: &str,
+    depth: usize,
+    count: &mut usize,
+) -> Result<(), MusicXmlNotationEvaluationErrorV1> {
+    if depth > MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_DEPTH_V1 {
+        return Err(MusicXmlNotationEvaluationErrorV1::SourceTreeDepthExceeded {
+            side: side.into(),
+            depth,
+            maximum: MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_DEPTH_V1,
+        });
+    }
+    *count = count.checked_add(1).ok_or_else(|| {
+        MusicXmlNotationEvaluationErrorV1::SourceTreeBudgetExceeded {
+            side: side.into(),
+            count: usize::MAX,
+            maximum: MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1,
+        }
+    })?;
+    if *count > MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1 {
+        return Err(MusicXmlNotationEvaluationErrorV1::SourceTreeBudgetExceeded {
+            side: side.into(),
+            count: *count,
+            maximum: MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1,
+        });
+    }
+    for child in &node.children {
+        count_source_node(child, side, depth + 1, count)?;
+    }
+    Ok(())
+}
+
+fn validate_source_tree_budget(
+    graph: &MusicXmlPartNotationGraphV1,
+    side: &str,
+) -> Result<(), MusicXmlNotationEvaluationErrorV1> {
+    let mut count = 0usize;
+    let mut add = |node: &MusicXmlSourceNodeV1| {
+        count_source_node(node, side, 1, &mut count)
+    };
+    for note in &graph.notation_events.note_events {
+        add(&note.source_note)?;
+        if let Some(grace) = &note.grace {
+            add(&grace.source)?;
+        }
+        for tuplet in &note.tuplet_notations {
+            add(tuplet)?;
+        }
+        if let Some(notehead) = &note.notehead {
+            add(notehead)?;
+        }
+        if let Some(accidental) = &note.accidental {
+            add(accidental)?;
+        }
+    }
+    for event in &graph.notation_events.attribute_events {
+        add(&event.source)?;
+    }
+    for event in &graph.notation_events.auxiliary_events {
+        add(&event.source)?;
+    }
+    for event in &graph.notation_events.cursor_moves {
+        add(&event.source)?;
+    }
+    if let Some(metadata) = &graph.part_metadata {
+        add(&metadata.source_score_part)?;
+    }
+    Ok(())
+}
+
 fn validate_graph(
     graph: &MusicXmlPartNotationGraphV1,
     side: &str,
@@ -371,6 +446,7 @@ fn validate_graph(
         }
         previous_end = Some(span.end);
     }
+    validate_source_tree_budget(graph, side)?;
     let note_count = graph.notation_events.note_events.len();
     let other_count = graph
         .notation_events
@@ -2063,6 +2139,37 @@ mod tests {
         assert_eq!(report.part_metadata_reference_absent_count, 0);
         assert_eq!(report.part_metadata_unexpected_count, 0);
         assert_eq!(report.note_event_presence.f1, Some(1.0));
+    }
+
+
+    #[test]
+    fn oversized_source_tree_depth_is_rejected_before_matching() {
+        let mut reference = graph(fixture_xml());
+        let mut nested = MusicXmlSourceNodeV1 {
+            element: "deep".into(),
+            attributes: Vec::new(),
+            text: None,
+            content: Vec::new(),
+            children: Vec::new(),
+        };
+        for _ in 0..=MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_DEPTH_V1 {
+            nested = MusicXmlSourceNodeV1 {
+                element: "nested".into(),
+                attributes: Vec::new(),
+                text: None,
+                content: vec![crate::musicxml_notation_events::MusicXmlSourceContentV1::ElementIndex(0)],
+                children: vec![nested],
+            };
+        }
+        reference.notation_events.note_events[0].source_note = nested;
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(
+                &reference,
+                &reference,
+                default_config()
+            ),
+            Err(MusicXmlNotationEvaluationErrorV1::SourceTreeDepthExceeded { .. })
+        ));
     }
 
 }
