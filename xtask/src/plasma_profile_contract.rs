@@ -156,6 +156,43 @@ fn audit_profile(case: &Case) -> Decision {
         if claims.insert(claim.claim_id.as_str(), claim).is_some() {
             return rejected("profile repeats a claim ID");
         }
+        let family_valid = match claim.claim_family.as_str() {
+            "joint_strength" => claim.roles.iter().all(|role| {
+                matches!(role.method_id.as_str(), "ISO_4587" | "ASTM_D1002" | "ASTM_D3163" | "ASTM_D5868")
+                    && role.evidence_kind == "measurement"
+                    && role.material_pair_class == content.material_pair_class
+                    && role.geometry == content.joint_geometry
+            }),
+            "failure_pattern" => claim.roles.iter().all(|role| {
+                matches!(role.method_id.as_str(), "ASTM_D5573" | "ISO_10365")
+                    && role.evidence_kind == "classification_practice"
+                    && role.geometry == "failure_surface_classification"
+            }),
+            "adhesive_constitutive_response" => claim.roles.iter().all(|role| {
+                role.method_id == "ASTM_D5656_D5656M"
+                    && role.evidence_kind == "measurement"
+                    && content.material_pair_class == "aluminum_thick_adherend_joint"
+                    && content.joint_geometry == "thick_adherend_lap"
+            }),
+            "surface_state" => claim.roles.iter().all(|role| {
+                role.method_id == "WATER_CONTACT_ANGLE_PROTOCOL"
+                    && role.evidence_kind == "measurement"
+                    && role.endpoint == "water_contact_angle"
+            }),
+            "conditioned_measurement" => {
+                claim.roles.iter().any(|role| role.evidence_kind == "conditioning_practice")
+                    && claim.roles.iter().any(|role| {
+                        role.evidence_kind == "measurement"
+                            && role.material_pair_class == content.material_pair_class
+                            && role.geometry == content.joint_geometry
+                    })
+            }
+            _ => false,
+        };
+        if !family_valid {
+            return rejected("claim family is incompatible with its declared method/evidence roles or profile scope");
+        }
+
         let mut roles = HashSet::new();
         for role in &claim.roles {
             if !nonempty(&role.role_id)
@@ -180,7 +217,7 @@ fn audit_profile(case: &Case) -> Decision {
     let mut raw_digests = HashSet::new();
     for binding in &case.evidence {
         let Some(claim) = claims.get(binding.claim_id.as_str()) else {
-            return Disposition::Rejected.into_decision("evidence is supplied for a claim not declared by the frozen profile");
+            return rejected("evidence is supplied for a claim not declared by the frozen profile");
         };
         let Some(role) = claim.roles.iter().find(|role| role.role_id == binding.role_id) else {
             return rejected("evidence is supplied for an undeclared method role");
