@@ -121,3 +121,8 @@ The public reference tests now include two complementary bounded analyses:
 The current abstract model reaches 68 states and 200 transitions (maximum shortest trace depth 7) without finding a registered safety counterexample. The model invariants are deliberately narrow: effect implies receipt plus business row; fence implies receipt and no business row; a terminal decision is immutable; and unfenced absence remains indeterminate.
 
 This is a finite abstraction, not a proof of the implementation or the unbounded distributed protocol. The next tier should model-check the protocol in TLA+/PlusCal and check implementation histories using an independent checker such as [Porcupine](https://github.com/anishathalye/porcupine). TLA+ tooling separates explicit-state exploration from symbolic bounded checking; [Apalache's manual](https://apalache-mc.org/docs/apalache/index.html) documents the latter's finite-parameter/bounded-execution assumptions. Do not represent either tool as having been run until a pinned version, model configuration and reproducible artifact are published.
+
+
+## Generated history corpus
+
+The implementation test suite adds 256 fixed-seed concurrent histories of six operations each, spanning two keys and two intent values. Append, fence and lookup results must admit a sequential ordering that respects real-time precedence. This tests key isolation and changed-intent conflict behavior in addition to the four-operation single-key race. These generated histories are a deterministic test corpus, not IID population sampling and not exhaustive over all possible schedules.
