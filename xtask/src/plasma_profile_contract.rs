@@ -408,7 +408,7 @@ fn audit_profile(case: &Case) -> Decision {
                         return rejected("baseline and candidate use overlapping specimen identities");
                     }
                 }
-                (None, None) if !claim.required && !role.required => {}
+                (None, None) if !claim.required => {},
                 (None, None) => return blocked("required role is absent from both transfer cohorts"),
                 _ => return rejected("baseline and candidate do not supply the same profile claim/role set"),
             }
@@ -497,6 +497,20 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
         let case = fixture.cases.iter().find(|case| case.id == "candidate-missing-required-role").expect("case exists");
         assert_eq!(audit_profile(case).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn candidate_cannot_omit_a_required_profile_role() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "candidate-missing-required-role").expect("case exists");
+        assert_eq!(audit_profile(case).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn baseline_and_candidate_both_supply_same_roles_and_distinct_data() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid profile fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-pp-profile-without-classification").expect("case exists");
+        assert_eq!(audit_profile(case).disposition, Disposition::Pass);
     }
 
     #[test]
