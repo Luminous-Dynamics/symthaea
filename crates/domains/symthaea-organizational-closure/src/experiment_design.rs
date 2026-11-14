@@ -940,6 +940,7 @@ mod tests {
         let b = evaluate_sequential_experiment(&scaled, &oracle, &trace);
         assert!((a.trial_assessments[0].expected_information_gain_bits
             - b.trial_assessments[0].expected_information_gain_bits).abs() < 1e-12);
+        assert_eq!(a.qualification, b.qualification);
         assert_eq!(a.remaining_target_classes, b.remaining_target_classes);
     }
 
