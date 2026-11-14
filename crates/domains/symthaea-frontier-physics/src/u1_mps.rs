@@ -140,6 +140,7 @@ pub enum U1MpsError {
         achievable_l2_error: f64,
         max_bond_dimension: usize,
     },
+    InvalidErrorBudget,
     InvalidTeBDParity(u8),
     TeBDGateOutOfRange {
         bond_index: usize,
@@ -309,6 +310,9 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "local L2 truncation budget {requested_l2_error} is infeasible with max bond {max_bond_dimension}; best achievable residual is {achievable_l2_error}"
             ),
+            Self::InvalidErrorBudget => {
+                write!(f, "error budget must be positive, finite, and allocated fractions must sum to at most one")
+            },
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
             }
@@ -2318,6 +2322,109 @@ pub struct U1TwoSiteTruncationDiagnostics {
     pub reconstruction_max_residual: f64,
     pub reconstruction_l2_residual: f64,
 }
+
+
+
+/// Absolute local two-site tensor L2 error target for adaptive compression.
+///
+/// The target is measured in the Frobenius norm of the two-site center. A
+/// canonical-gauge exterior-norm receipt is still required before interpreting
+/// it as a global state-vector error.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TwoSiteErrorBudgetPolicy {
+    pub max_bond_dimension: usize,
+    pub maximum_local_l2_error: f64,
+    pub tolerance: f64,
+}
+
+/// Result of selecting the smallest bond dimension that meets a local error target.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteBudgetedSplitDiagnostics {
+    pub truncation: U1TwoSiteTruncationDiagnostics,
+    pub requested_local_l2_error: f64,
+    pub achieved_local_l2_error: f64,
+    pub minimum_required_bond_dimension: usize,
+    pub selected_bond_dimension: usize,
+    pub cap_headroom: usize,
+    pub budget_satisfied: bool,
+}
+
+/// Fractions of a user-requested end-to-end simulation error budget.
+///
+/// Fractions must be finite, non-negative, and sum to at most one. Unallocated
+/// mass remains an explicit reserve rather than being silently consumed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsErrorBudgetFractions {
+    pub canonicalization: f64,
+    pub gate_quality: f64,
+    pub hamiltonian_projection: f64,
+    pub compression: f64,
+    pub time_discretization: f64,
+}
+
+/// Compiled absolute error allowances for the distinct numerical error channels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsErrorBudgetPlan {
+    pub total_l2_error: f64,
+    pub canonicalization_l2_error: f64,
+    pub gate_quality_l2_error: f64,
+    pub hamiltonian_projection_l2_error: f64,
+    pub compression_l2_error: f64,
+    pub time_discretization_l2_error: f64,
+    pub reserved_l2_error: f64,
+}
+
+impl U1MpsErrorBudgetPlan {
+    pub fn compile(
+        total_l2_error: f64,
+        fractions: U1MpsErrorBudgetFractions,
+    ) -> Result<Self, U1MpsError> {
+        let values = [
+            fractions.canonicalization,
+            fractions.gate_quality,
+            fractions.hamiltonian_projection,
+            fractions.compression,
+            fractions.time_discretization,
+        ];
+        if !total_l2_error.is_finite()
+            || total_l2_error <= 0.0
+            || values
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let allocated_fraction = values.iter().sum::<f64>();
+        if !allocated_fraction.is_finite() || allocated_fraction > 1.0 + 8.0 * f64::EPSILON {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+
+        let reserve_fraction = (1.0 - allocated_fraction).max(0.0);
+        Ok(Self {
+            total_l2_error,
+            canonicalization_l2_error: total_l2_error * fractions.canonicalization,
+            gate_quality_l2_error: total_l2_error * fractions.gate_quality,
+            hamiltonian_projection_l2_error: total_l2_error
+                * fractions.hamiltonian_projection,
+            compression_l2_error: total_l2_error * fractions.compression,
+            time_discretization_l2_error: total_l2_error
+                * fractions.time_discretization,
+            reserved_l2_error: total_l2_error * reserve_fraction,
+        })
+    }
+
+    /// Equal per-gate allocation for a fixed number of planned compression events.
+    pub fn per_gate_compression_l2_error(
+        &self,
+        gate_count: usize,
+    ) -> Result<f64, U1MpsError> {
+        if gate_count == 0 {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        Ok(self.compression_l2_error / gate_count as f64)
+    }
+}
+
 
 impl U1TwoSiteState {
     /// Construct a checked two-site tensor with external virtual-charge labels.
