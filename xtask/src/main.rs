@@ -45,6 +45,12 @@ enum Commands {
         #[arg(long, default_value = "schemas/pluralistic-knowledge-record-v0.1.0.schema.json")]
         schema: PathBuf,
     },
+    /// Audit HMP-Bench fixture integrity and rights-related negative controls.
+    /// This does not score models or validate cultural competence.
+    HmpBenchAudit {
+        #[arg(long, default_value = "research-fixtures/hmp-bench/synthetic-adversarial-v0.1.0.json")]
+        file: PathBuf,
+    },
     RhnSweep {
         #[arg(long, default_value = "1024")]
         dims: String,
@@ -156,6 +162,13 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::HmpBenchAudit { file } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            hmp_record_audit::run_benchmark(&root, &file)?;
         }
         Commands::HmpRecordAudit { file, schema } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
