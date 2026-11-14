@@ -257,8 +257,8 @@ fn normalize_text_segment(value: &str) -> Option<String> {
         return None;
     }
     let collapsed = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    let leading = value.chars().next().is_some_and(char::is_whitespace);
-    let trailing = value.chars().last().is_some_and(char::is_whitespace);
+    let leading = value.chars().next().is_some_and(|character| character.is_whitespace());
+    let trailing = value.chars().last().is_some_and(|character| character.is_whitespace());
     let mut normalized = String::with_capacity(collapsed.len() + 2);
     if leading {
         normalized.push(' ');
@@ -296,7 +296,7 @@ fn append_source_node(
     let mut attributes: Vec<_> = node.attributes.iter()
         .filter(|attribute| {
             attribute.name != "id"
-                || matches!(node.element.as_str(), "score-instrument" | "midi-instrument" | "instrument")
+                || matches!(node.element.as_str(), "score-instrument" | "midi-instrument")
         })
         .collect();
     attributes.sort_by(|left, right| {
@@ -505,26 +505,9 @@ fn append_graph_tokens(
         )?;
     }
     if let Some(metadata) = &graph.part_metadata {
-        streams.push(
-            MusicXmlSymbolFamilyV1::PartMetadata,
-            format!("part-name|{}", metadata.part_name.as_deref().unwrap_or("")),
-            part_id,
-            config.max_symbols_per_part,
-        )?;
-        streams.push(
-            MusicXmlSymbolFamilyV1::PartMetadata,
-            format!("part-abbreviation|{}", metadata.part_abbreviation.as_deref().unwrap_or("")),
-            part_id,
-            config.max_symbols_per_part,
-        )?;
-        for id in &metadata.score_instrument_ids {
-            streams.push(
-                MusicXmlSymbolFamilyV1::VoiceStaffInstrument,
-                format!("score-instrument-id|{id}"),
-                part_id,
-                config.max_symbols_per_part,
-            )?;
-        }
+        // The source score-part subtree already contains the part name,
+        // abbreviation and score-instrument declarations. Keep their exact
+        // source relationship once rather than double-counting typed copies.
         append_source_node(
             &metadata.source_score_part,
             &mut streams,
@@ -1210,7 +1193,7 @@ mod tests {
             Err(MusicXmlScoreEvaluationErrorV1::SymbolBudgetExceeded { .. })
         ));
         let changed = parse(&simple_score(
-            r#"<note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff></note>"#
+            r#"<note><rest measure="yes"/><duration>4</duration><voice>2</voice><staff>2</staff><type>half</type><notations><tuplet type="start" number="1"/></notations></note>"#
         ));
         assert!(matches!(
             evaluate_musicxml_score_graphs_v1(
