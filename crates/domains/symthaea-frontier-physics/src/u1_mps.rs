@@ -327,7 +327,10 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "local Hamiltonian couples charge {input_charge} to {output_charge} with amplitude {amplitude}, tolerance {tolerance}"
             ),
-            Self::HamiltonianHermiticityResidual { residual, tolerance } => write!(
+            Self::HamiltonianHermiticityResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "local Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
             ),
@@ -1707,8 +1710,6 @@ pub struct U1TwoSiteState {
     selection_rule_residual: f64,
 }
 
-
-
 /// Provenance and numerical checks for one local Hamiltonian exponential.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct U1TwoSiteHamiltonianGateReceipt {
@@ -1791,7 +1792,6 @@ impl U1TwoSiteGate {
         })
     }
 
-
     /// Construct exp(-i * time_step * H) for a Hermitian, U(1)-conserving
     /// two-qubit Hamiltonian. Basis order is |00>, |01>, |10>, |11|.
     ///
@@ -1822,8 +1822,8 @@ impl U1TwoSiteGate {
                         index: row * 4 + column,
                     });
                 }
-                hermiticity_residual = hermiticity_residual
-                    .max((value - hamiltonian[column][row].conj()).norm());
+                hermiticity_residual =
+                    hermiticity_residual.max((value - hamiltonian[column][row].conj()).norm());
                 if row.count_ones() != column.count_ones() {
                     let amplitude = value.norm();
                     if amplitude > charge_residual {
@@ -1849,9 +1849,7 @@ impl U1TwoSiteGate {
         }
 
         let minus_i = Complex64::new(0.0, -1.0);
-        let phase_for = |energy: f64| {
-            Complex64::from_polar(1.0, -time_step * energy)
-        };
+        let phase_for = |energy: f64| Complex64::from_polar(1.0, -time_step * energy);
         let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
         matrix[0][0] = phase_for(hamiltonian[0][0].re);
         matrix[3][3] = phase_for(hamiltonian[3][3].re);
@@ -1865,17 +1863,14 @@ impl U1TwoSiteGate {
         let radius = (half_difference * half_difference + z.norm_sqr()).sqrt();
         let angle = time_step * radius;
         let sinc_factor = if angle.abs() <= 1.0e-8 {
-            time_step
-                * (1.0 - angle * angle / 6.0 + angle.powi(4) / 120.0)
+            time_step * (1.0 - angle * angle / 6.0 + angle.powi(4) / 120.0)
         } else {
             angle.sin() / radius
         };
         let phase = phase_for(mean);
         let cosine = angle.cos();
-        let diagonal_a = Complex64::new(cosine, 0.0)
-            + minus_i * (sinc_factor * half_difference);
-        let diagonal_d = Complex64::new(cosine, 0.0)
-            - minus_i * (sinc_factor * half_difference);
+        let diagonal_a = Complex64::new(cosine, 0.0) + minus_i * (sinc_factor * half_difference);
+        let diagonal_d = Complex64::new(cosine, 0.0) - minus_i * (sinc_factor * half_difference);
         let off_diagonal = minus_i * sinc_factor * z;
         matrix[1][1] = phase * diagonal_a;
         matrix[1][2] = phase * off_diagonal;
@@ -3035,8 +3030,6 @@ impl U1TeBDLayer {
     }
 }
 
-
-
 /// Symmetric second-order TEBD composition for a nearest-neighbour Hamiltonian.
 ///
 /// The discrete propagator is
@@ -3138,9 +3131,7 @@ impl U1TeBDStrangStepper {
         self.time_step
     }
 
-    pub fn local_hamiltonian_receipts(
-        &self,
-    ) -> &[(usize, U1TwoSiteHamiltonianGateReceipt)] {
+    pub fn local_hamiltonian_receipts(&self) -> &[(usize, U1TwoSiteHamiltonianGateReceipt)] {
         &self.local_hamiltonian_receipts
     }
 
@@ -3201,13 +3192,12 @@ impl U1TeBDStrangStepper {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, U1TwoSiteHamiltonianGateReceipt, U1TeBDStrangStepper,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TeBDStrangStepper, U1TwoSiteGate,
+        U1TwoSiteHamiltonianGateReceipt, U1TwoSiteState, U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
@@ -4765,22 +4755,18 @@ mod tests {
             3,
             3,
             &[
-                0.0, coupling, 0.0,
-                coupling, 0.0, coupling,
-                0.0, coupling, 0.0,
+                0.0, coupling, 0.0, coupling, 0.0, coupling, 0.0, coupling, 0.0,
             ],
         );
         let decomposition = hamiltonian.symmetric_eigen();
         let mut output = [complex_zero(); 3];
         for mode in 0..3 {
             let coefficient = decomposition.eigenvectors[(initial_site, mode)];
-            let phase =
-                Complex64::from_polar(1.0, -time * decomposition.eigenvalues[mode]);
+            let phase = Complex64::from_polar(1.0, -time * decomposition.eigenvalues[mode]);
             for site in 0..3 {
-                output[site] += Complex64::new(
-                    decomposition.eigenvectors[(site, mode)] * coefficient,
-                    0.0,
-                ) * phase;
+                output[site] +=
+                    Complex64::new(decomposition.eigenvectors[(site, mode)] * coefficient, 0.0)
+                        * phase;
             }
         }
         output
@@ -4793,7 +4779,10 @@ mod tests {
     ) -> (ComplexU1Mps, U1TeBDStrangStepResult) {
         let stepper = U1TeBDStrangStepper::new(
             3,
-            vec![exchange_hamiltonian(coupling), exchange_hamiltonian(coupling)],
+            vec![
+                exchange_hamiltonian(coupling),
+                exchange_hamiltonian(coupling),
+            ],
             time_step,
             1.0e-10,
         )
@@ -4862,10 +4851,8 @@ mod tests {
         let coupling = 0.7;
         let total_time = 1.0;
         let exact = exact_three_site_single_excitation(total_time, coupling, 0);
-        let (coarse, coarse_receipt) =
-            simulate_three_site_strang(0.1, total_time, coupling);
-        let (fine, fine_receipt) =
-            simulate_three_site_strang(0.05, total_time, coupling);
+        let (coarse, coarse_receipt) = simulate_three_site_strang(0.1, total_time, coupling);
+        let (fine, fine_receipt) = simulate_three_site_strang(0.05, total_time, coupling);
 
         let dense_indices = [4, 2, 1]; // |100>, |010>, |001> in MSB-first order.
         let coarse_dense = coarse.to_dense(4).unwrap();
@@ -4906,12 +4893,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            U1TeBDStrangStepper::new(
-                2,
-                vec![exchange_hamiltonian(0.5)],
-                f64::INFINITY,
-                1.0e-10
-            ),
+            U1TeBDStrangStepper::new(2, vec![exchange_hamiltonian(0.5)], f64::INFINITY, 1.0e-10),
             Err(U1MpsError::InvalidTimeStep(_))
         ));
     }
