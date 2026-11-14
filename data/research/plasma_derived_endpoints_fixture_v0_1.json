@@ -419,7 +419,7 @@
       "id": "aged-retention-cohort-mismatch",
       "kind": "aged_strength_retention",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic matched-lot aged-retention derivation; not a service-life or lifetime model.",
       "aged_retention": {
         "endpoint_id": "aged_strength_retention_ratio",
@@ -715,7 +715,7 @@
       "id": "aged-retention-below-minimum",
       "kind": "aged_strength_retention",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic matched-lot aged-retention derivation; not a service-life or lifetime model.",
       "aged_retention": {
         "endpoint_id": "aged_strength_retention_ratio",
@@ -863,7 +863,7 @@
       "id": "aged-retention-plan-changed-after-outcome",
       "kind": "aged_strength_retention",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic matched-lot aged-retention derivation; not a service-life or lifetime model.",
       "aged_retention": {
         "endpoint_id": "aged_strength_retention_ratio",
@@ -1011,7 +1011,7 @@
       "id": "aged-retention-to-service-life-overclaim",
       "kind": "aged_strength_retention",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic matched-lot aged-retention derivation; not a service-life or lifetime model.",
       "aged_retention": {
         "endpoint_id": "aged_strength_retention_ratio",
@@ -1307,7 +1307,7 @@
       "id": "aged-retention-baseline-aged-specimen-overlap",
       "kind": "aged_strength_retention",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic matched-lot aged-retention derivation; not a service-life or lifetime model.",
       "aged_retention": {
         "endpoint_id": "aged_strength_retention_ratio",
@@ -1455,7 +1455,7 @@
       "id": "aged-retention-conditioning-manifest-incomplete",
       "kind": "aged_strength_retention",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic matched-lot aged-retention derivation; not a service-life or lifetime model.",
       "aged_retention": {
         "endpoint_id": "aged_strength_retention_ratio",
@@ -2175,13 +2175,6 @@
             "category_id": "cohesive",
             "confidence": 0.95,
             "adjudication_ref": "HUMAN-ADJUDICATION-01"
-          },
-          {
-            "specimen_id": "failure-mode-denominator-omits-unclear-SPEC-4",
-            "independent_cluster_id": "LOT-01",
-            "category_id": "unclear",
-            "confidence": 0.4,
-            "adjudication_ref": "HUMAN-ADJUDICATION-01"
           }
         ],
         "category_counts": [
@@ -2276,7 +2269,7 @@
       "id": "failure-mode-acceptability-overclaim",
       "kind": "failure_mode_distribution",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic full-denominator D5573 descriptive distribution; no failure acceptability inference.",
       "aged_retention": null,
       "failure_mode_distribution": {
@@ -2462,7 +2455,7 @@
       "id": "failure-mode-category-count-mismatch",
       "kind": "failure_mode_distribution",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic full-denominator D5573 descriptive distribution; no failure acceptability inference.",
       "aged_retention": null,
       "failure_mode_distribution": {
@@ -2834,7 +2827,7 @@
       "id": "failure-mode-image-manifest-mismatch",
       "kind": "failure_mode_distribution",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic full-denominator D5573 descriptive distribution; no failure acceptability inference.",
       "aged_retention": null,
       "failure_mode_distribution": {
@@ -3020,7 +3013,7 @@
       "id": "low-confidence-classification-not-unclear",
       "kind": "failure_mode_distribution",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic full-denominator D5573 descriptive distribution; no failure acceptability inference.",
       "aged_retention": null,
       "failure_mode_distribution": {
@@ -3392,7 +3385,7 @@
       "id": "failure-mode-plan-changed-after-outcome",
       "kind": "failure_mode_distribution",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic full-denominator D5573 descriptive distribution; no failure acceptability inference.",
       "aged_retention": null,
       "failure_mode_distribution": {
@@ -3578,7 +3571,7 @@
       "id": "failure-mode-fraction-result-mismatch",
       "kind": "failure_mode_distribution",
       "expected_disposition": "REJECTED",
-      "expected_claim": "REJECTED_BY_CLAIM_CEILING",
+      "expected_claim": "REJECTED",
       "rationale": "Synthetic full-denominator D5573 descriptive distribution; no failure acceptability inference.",
       "aged_retention": null,
       "failure_mode_distribution": {
