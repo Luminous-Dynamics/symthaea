@@ -70,7 +70,15 @@ The companion JSON fixture contains eight known-answer scenarios:
 - admissible independent substitution;
 - unknown provenance that cannot establish independence.
 
-The expected results include effective candidate-visible roots per predicate, all valid sufficient root sets in the frozen world, disposition and exact reason codes. Paired worlds carry their own evidence manifests and source-inventory digests. These are synthetic oracle labels, not engineering facts.
+The expected results include effective candidate-visible roots per predicate, all valid sufficient root sets in the frozen world, disposition and exact reason codes. Paired worlds carry their own evidence manifests and source-inventory digests. The corpus has six explicit intervention pairs: redundant-copy removal, last-root removal, irrelevant injection, wrong-configuration lookalike, unknown-to-qualified provenance resolution, and admissible independent substitution. These are synthetic oracle labels, not engineering facts.
+
+A standalone Rust reference-test package is provided at `benchmarks/engineering-change-impact/minimal-evidence-reference`. Run it from the repository root with:
+
+```sh
+cargo test --manifest-path benchmarks/engineering-change-impact/minimal-evidence-reference/Cargo.toml
+```
+
+The reference tests independently reconstruct root sets, sufficient sets, state dispositions and pair relations from the frozen manifests. They do not call Symthaea's production decision evaluator and do not establish performance of an AI candidate.
 
 ## 5. Metrics
 
@@ -147,6 +155,10 @@ NIST IR 8536 (final, September 2026) is relevant to provenance, traceability lin
 7. Exact reason-code agreement and deterministic replay are required.
 8. No result grants approval, release, manufacture, operation or effect authority.
 
-## 10. Explicit nonclaims
+## 10. Current execution boundary
+
+The public branch contains eight synthetic cases, six paired interventions, sixteen preregistered mutation controls and a standalone Rust reference-test package. A separate JavaScript reference replay was used during authoring to inspect the expected root sets, sufficient sets, reason codes and paired relations. The Rust reference tests are authored but have not yet been compiled or executed; the mutation controls are preregistered controls, not executed mutation outcomes.
+
+## 11. Explicit nonclaims
 
 This benchmark does not prove physical truth, causal truth, universal statistical independence, source-inventory completeness outside the declared task, legal admissibility, safety, vendor superiority or general SOTA. Results are bounded to exact evidence owners, provenance ontology, task families, minimum-root policy, evaluator build and frozen source inventory.
