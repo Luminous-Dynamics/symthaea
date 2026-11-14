@@ -103,6 +103,63 @@ def inverse_2x2(matrix: Matrix) -> Matrix:
     ]
 
 
+def determinant(matrix: Matrix) -> Fraction:
+    rows, cols = shape(matrix)
+    if rows != cols:
+        raise ValueError("determinant requires a square matrix")
+    work = [row[:] for row in matrix]
+    result = Fraction(1)
+    for pivot_index in range(rows):
+        pivot_row = next(
+            (row for row in range(pivot_index, rows)
+             if work[row][pivot_index] != 0),
+            None,
+        )
+        if pivot_row is None:
+            return Fraction(0)
+        if pivot_row != pivot_index:
+            work[pivot_index], work[pivot_row] = (
+                work[pivot_row],
+                work[pivot_index],
+            )
+            result = -result
+        pivot = work[pivot_index][pivot_index]
+        result *= pivot
+        for row in range(pivot_index + 1, rows):
+            factor = work[row][pivot_index] / pivot
+            for col in range(pivot_index + 1, rows):
+                work[row][col] -= factor * work[pivot_index][col]
+    return result
+
+
+def leading_principal_minors(matrix: Matrix) -> list[Fraction]:
+    rows, cols = shape(matrix)
+    if rows != cols:
+        raise ValueError("principal minors require a square matrix")
+    return [
+        determinant([row[:size] for row in matrix[:size]])
+        for size in range(1, rows + 1)
+    ]
+
+
+def is_positive_definite(matrix: Matrix) -> bool:
+    return all(
+        minor > 0
+        for minor in leading_principal_minors(matrix)
+    )
+
+
+def is_negative_definite(matrix: Matrix) -> bool:
+    return all(
+        ((-1) ** index) * minor > 0
+        for index, minor in enumerate(leading_principal_minors(matrix), start=1)
+    )
+
+
+def transpose(matrix: Matrix) -> Matrix:
+    return [list(values) for values in zip(*matrix)]
+
+
 def block_matrix(blocks: list[list[Matrix]]) -> Matrix:
     if not blocks or not blocks[0]:
         raise ValueError("block matrix cannot be empty")
@@ -343,6 +400,102 @@ def run_negative_controls(data: dict[str, Any], baseline: dict[str, Matrix]) -> 
     require(wrong_lft != baseline["T_lft"], "wrong LFT port orientation was accepted")
 
 
+def verify_schur_complement_case(
+    case: dict[str, Any],
+    expected_feasible: bool,
+) -> dict[str, Any]:
+    pi11 = decode_matrix(case["Pi11"])
+    pi12 = decode_matrix(case["Pi12"])
+    pi22 = decode_matrix(case["Pi22"])
+    m_matrix = decode_matrix(case["M"])
+    require(shape(pi11) == (2, 2), "Pi11 must be 2x2 in V0.1")
+    require(shape(pi12) == (2, 2), "Pi12 must be 2x2 in V0.1")
+    require(shape(pi22) == (2, 2), "Pi22 must be 2x2 in V0.1")
+    require(shape(m_matrix) == (2, 2), "M must be 2x2 in V0.1")
+    require(pi11[0][1] == pi11[1][0], "Pi11 must be symmetric")
+    require(pi22[0][1] == pi22[1][0], "Pi22 must be symmetric")
+    require(pi12[0][1] == pi12[1][0], "Pi12 must be symmetric in this real fixture")
+    require(is_positive_definite(pi11), "Pi11 must be strictly positive definite")
+
+    pi11_inverse = inverse_2x2(pi11)
+    m_transpose = transpose(m_matrix)
+    s_matrix = add(
+        add(pi22, matmul(m_transpose, pi12)),
+        matmul(transpose(pi12), m_matrix),
+    )
+    reduced = add(
+        s_matrix,
+        matmul(matmul(m_transpose, pi11), m_matrix),
+    )
+    q_matrix = block_matrix([
+        [s_matrix, m_transpose],
+        [m_matrix, scale(Fraction(-1), pi11_inverse)],
+    ])
+
+    expected = case["expected"]
+    require(
+        leading_principal_minors(pi11)
+        == [q(value) for value in expected["Pi11_leading_principal_minors"]]
+        if "Pi11_leading_principal_minors" in expected
+        else is_positive_definite(pi11),
+        "Pi11 principal-minor check failed",
+    )
+    require(s_matrix == decode_matrix(expected["S"]), "Schur block S mismatch")
+    require(
+        reduced == decode_matrix(expected["reduced_schur"]),
+        "Schur-complement reduced matrix mismatch",
+    )
+    require(q_matrix == decode_matrix(expected["Q"]), "full block Q mismatch")
+
+    q_minors = leading_principal_minors(q_matrix)
+    require(
+        q_minors == [q(value) for value in expected["Q_leading_principal_minors"]],
+        "full block Q principal-minor witness mismatch",
+    )
+    q_is_negative = is_negative_definite(q_matrix)
+    reduced_is_negative = is_negative_definite(reduced)
+    require(q_is_negative is expected["Q_negative_definite"],
+            "full block Q definiteness status mismatch")
+    require(
+        reduced_is_negative is expected["reduced_schur_negative_definite"],
+        "reduced Schur definiteness status mismatch",
+    )
+    require(q_is_negative is expected_feasible,
+            "source LMI feasibility classification mismatch")
+    require(reduced_is_negative is expected_feasible,
+            "Schur-reduced feasibility classification mismatch")
+
+    q_det = determinant(q_matrix)
+    if "Q_determinant" in expected:
+        require(q_det == q(expected["Q_determinant"]), "full Q determinant mismatch")
+
+    wrong_sign_reduced = sub(
+        s_matrix,
+        matmul(matmul(m_transpose, pi11), m_matrix),
+    )
+    if "wrong_sign_reduced_schur" in expected:
+        require(
+            wrong_sign_reduced == decode_matrix(expected["wrong_sign_reduced_schur"]),
+            "wrong-sign Schur control mismatch",
+        )
+        require(
+            is_negative_definite(wrong_sign_reduced)
+            is expected["wrong_sign_would_misclassify_as_feasible"],
+            "wrong-sign control did not expose false feasibility",
+        )
+
+    return {
+        "S": s_matrix,
+        "reduced": reduced,
+        "Q": q_matrix,
+        "Q_minors": q_minors,
+        "Q_determinant": q_det,
+        "Q_negative_definite": q_is_negative,
+        "reduced_negative_definite": reduced_is_negative,
+        "wrong_sign_reduced": wrong_sign_reduced,
+    }
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     require(
@@ -356,6 +509,20 @@ def main() -> None:
     validate_against_expected(result, data["expected"])
     run_negative_controls(data, result)
 
+    schur = data["schur_complement_conformance"]
+    feasible_schur = verify_schur_complement_case(
+        schur["feasible_case"],
+        expected_feasible=True,
+    )
+    infeasible_schur = verify_schur_complement_case(
+        schur["infeasible_case"],
+        expected_feasible=False,
+    )
+    require(
+        infeasible_schur["wrong_sign_reduced"] != infeasible_schur["reduced"],
+        "Schur sign negative control did not change the result",
+    )
+
     print("AIRROAD IQC source equation RCF/LFT conformance: PASS")
     print(f"P_yu = D^-1 N: {result['Pyu_from_lcf']}")
     print(f"K = U V^-1: {result['K']}")
@@ -366,6 +533,12 @@ def main() -> None:
     print(f"LFT Tzw: {result['T_lft']}")
     print(f"M: {result['M']}")
     print("factor-order, feedback-sign, singular-RCF, Bézout and LFT-order controls: PASS")
+    print(f"feasible Schur-reduced matrix: {feasible_schur['reduced']}")
+    print(f"feasible full-Q leading minors: {feasible_schur['Q_minors']}")
+    print(f"infeasible Schur-reduced matrix: {infeasible_schur['reduced']}")
+    print(f"wrong-sign control would appear negative definite: "
+          f"{is_negative_definite(infeasible_schur['wrong_sign_reduced'])}")
+    print("Schur complement sign, inverse and strict-negative controls: PASS")
     print("full paper generator construction / SDP / robust stability: NOT IMPLEMENTED")
 
 
