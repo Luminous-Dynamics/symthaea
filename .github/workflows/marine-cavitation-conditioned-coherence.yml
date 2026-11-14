@@ -1,0 +1,61 @@
+name: Marine Cavitation-Conditioned Coherence Audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/marine-cavitation-conditioned-coherence-audit/**"
+      - "docs/research/marine/marine-cavitation-conditioned-coherence-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-cavitation-conditioned-coherence-v0.1.0.json"
+      - ".github/workflows/marine-cavitation-conditioned-coherence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/marine-cavitation-conditioned-coherence-audit/**"
+      - "docs/research/marine/marine-cavitation-conditioned-coherence-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-cavitation-conditioned-coherence-v0.1.0.json"
+      - ".github/workflows/marine-cavitation-conditioned-coherence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Format, lint and conditioned coherence known-answer tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format Rust source
+        run: rustfmt --edition 2024 tools/marine-cavitation-conditioned-coherence-audit/src/main.rs
+      - name: Preserve formatted source
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-cavitation-conditioned-coherence-rustfmt
+          path: tools/marine-cavitation-conditioned-coherence-audit/src/main.rs
+          if-no-files-found: error
+      - name: Verify formatting
+        run: rustfmt --edition 2024 --check tools/marine-cavitation-conditioned-coherence-audit/src/main.rs
+      - name: Generate isolated Cargo lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-cavitation-conditioned-coherence-audit/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path tools/marine-cavitation-conditioned-coherence-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Run tests
+        run: cargo test --locked --manifest-path tools/marine-cavitation-conditioned-coherence-audit/Cargo.toml
+      - name: Validate schema and fixture JSON
+        run: |
+          python3 -c "import json; json.load(open('docs/research/marine/marine-cavitation-conditioned-coherence-v0.1.0.schema.json')); json.load(open('docs/research/marine/fixtures/synthetic-marine-cavitation-conditioned-coherence-v0.1.0.json'))"
+      - name: Assert synthetic disposition and known-answer delta
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-cavitation-conditioned-coherence-audit/Cargo.toml -- docs/research/marine/fixtures/synthetic-marine-cavitation-conditioned-coherence-v0.1.0.json > /tmp/marine-conditioned-coherence-report.json
+          code=$?
+          set -e
+          test "$code" -eq 3
+          python3 -c "import json; r=json.load(open('/tmp/marine-conditioned-coherence-report.json')); assert r['disposition'] == 'INCOMPLETE'; assert len(r['run_reports']) == 2; assert abs(r['aggregate_band_reports'][0]['present_minus_absent_equal_run_weighted_mean_coherence'] - 0.5) < 1e-12"
