@@ -206,3 +206,18 @@ Latest source and fixture were fetched from the exact branch and independently r
 This is a profile-contract audit, not yet a replacement of the old global required-endpoint list inside the legacy #12006 transfer command. The next integration step is to make the transfer decision consume this profile receipt while preserving its existing bounded-scope, individual bridge and multi-factor interaction gates.
 
 Validation boundary: seven Rust tests are authored but not executed; Rust formatting, compilation, Clippy and exact-head CI are not verified. No physical joint strength, transfer equivalence, aging performance, product acceptance or production release is claimed.
+
+
+### 2026-11-14 follow-on — both sides of transfer must satisfy the profile
+
+The profile receipt has been advanced from one evidence list to explicit `baseline_evidence` and `candidate_evidence` sets. Both cohorts are checked against the same frozen profile claim matrix. The audit now requires:
+- all required roles present on both sides;
+- optional claim roles either absent on both sides or supplied symmetrically;
+- identical method ID, edition, evidence kind, material scope, geometry, endpoint, claim, protocol ID and protocol digest;
+- distinct baseline/candidate evidence IDs and raw-data artifacts;
+- non-overlapping specimen IDs across cohorts;
+- for conditioned measurements, the conditioning receipt and post-condition strength receipt bind the same specimens within each cohort.
+
+The v0.2 fixture contains **32 cases** (8 PASS, 4 BLOCKED, 20 REJECTED) and independently replays **32/32**, including candidate-side omissions and one-sided optional evidence. Eight Rust tests are authored but remain unexecuted.
+
+The contract is now transfer-oriented, but the legacy #12006 audit still needs to consume it directly while preserving its existing bridge, interval and multi-factor interaction checks.
