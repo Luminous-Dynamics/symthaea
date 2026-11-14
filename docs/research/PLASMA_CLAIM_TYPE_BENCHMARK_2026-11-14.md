@@ -368,12 +368,12 @@ cargo run -p xtask -- plasma-claim-scope-audit
 
 Fixture: `data/research/plasma_claim_scope_fixture_v0_2.json`
 
-It contains 35 synthetic known-answer cases:
+It contains 38 synthetic known-answer cases:
 - 11 SUPPORTED;
 - 8 BLOCKED;
-- 16 REJECTED.
+- 19 REJECTED.
 
-Additional adversarial cases cover rigid-plastic D3163, FRP-to-FRP and FRP-to-metal D5868, metal-only mismatch, design-allowable escalation, stale editions, D2093 misuse as a bond test, conditioning practices promoted to service lifetime, and D4896 guidance misused as a design allowable.
+Additional adversarial cases cover rigid-plastic D3163, FRP-to-FRP and FRP-to-metal D5868, metal-only mismatch, design-allowable escalation, stale editions, D2093 misuse as a bond test, conditioning practices promoted to service lifetime, and D4896 guidance misused as a design allowable. The later v0.2 fixtures also reject a method/evidence-kind mismatch, a D5868 geometry mismatch, and a D1151 conditioning record presented as a retained-strength measurement.
 
 These are source/contract fixtures only. The audit does not verify actual procedure execution, sample conditioning, laboratory competence, instrument calibration, raw-data authenticity, retained strength, fatigue, service life, or design allowables. It validates SHA-256 field shape only. Rust formatting, compilation, Clippy, unit-test execution and exact-head CI remain pending.
 
