@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-14  
 **Parent:** [AOBENCH-011 / #12173](https://github.com/Luminous-Dynamics/symthaea/issues/12173)  
-**Initial evaluator:** [#12186](https://github.com/Luminous-Dynamics/symthaea/pull/12186)
+**Initial evaluator:** [AOBENCH-011 / #12173](https://github.com/Luminous-Dynamics/symthaea/issues/12173) · [initial evaluator PR #12186](https://github.com/Luminous-Dynamics/symthaea/pull/12186) · [AOBENCH-012 / #12194](https://github.com/Luminous-Dynamics/symthaea/issues/12194) · [implementation PR #12195](https://github.com/Luminous-Dynamics/symthaea/pull/12195)
 
 ## Why this correction matters
 
@@ -25,6 +25,7 @@ The evaluator preserves the distinction between identifying a target-equivalence
 - A qualified observation receives information credit only for its realized posterior entropy reduction.
 - Multiplying every positive prior weight by a common positive factor preserves expected information gain and the decision outcome.
 - Reversing hypothesis and probe input order preserves the evaluation result.
+- Bijectively renaming every outcome label in both the frozen probe table and observed trace preserves qualification, posterior state and both information-gain metrics.
 
 These are deterministic finite-model contract tests, not measurements of real-world causal discovery.
 
