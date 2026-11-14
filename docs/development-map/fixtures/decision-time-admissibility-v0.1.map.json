@@ -471,8 +471,8 @@
     {
       "id": "event-001",
       "kind": "repository_revision_observed",
-      "occurred_at": "2026-11-14T09:05:00Z",
-      "observed_at": "2026-11-14T09:05:00Z",
+      "occurred_at": "2026-11-14T08:50:00Z",
+      "observed_at": "2026-11-14T08:50:00Z",
       "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "prior_revision": null,
       "targets": [
@@ -506,43 +506,6 @@
     },
     {
       "id": "event-002",
-      "kind": "test_evidence_recorded",
-      "occurred_at": "2026-11-14T09:05:00Z",
-      "observed_at": "2026-11-14T09:05:00Z",
-      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "prior_revision": null,
-      "targets": [
-        "dtea:evidence:E1"
-      ],
-      "state_effect": "observes",
-      "provenance": {
-        "authority": "runtime_observed",
-        "sources": [
-          {
-            "kind": "other",
-            "uri": "synthetic://dtea/evidence/E1",
-            "digest": null
-          }
-        ],
-        "extracted_by": {
-          "name": "synthetic-dtea-fixture",
-          "version": "0.1.0",
-          "digest": null
-        },
-        "observed_at": "2026-11-14T09:05:00Z",
-        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "valid_for_world": "synthetic-linux-default",
-        "limitations": [
-          "Synthetic fixture only."
-        ]
-      },
-      "payload": {
-        "result": "pass",
-        "available_to_actor_at": "2026-11-14T09:05:00Z"
-      }
-    },
-    {
-      "id": "event-003",
       "kind": "authority_evidence_recorded",
       "occurred_at": "2026-11-14T08:55:00Z",
       "observed_at": "2026-11-14T09:00:00Z",
@@ -584,6 +547,43 @@
         "valid_from": "2026-11-01T00:00:00Z",
         "valid_through": "2026-11-14T17:00:00Z",
         "owner_record_disposition": "source_declares_authorized"
+      }
+    },
+    {
+      "id": "event-003",
+      "kind": "test_evidence_recorded",
+      "occurred_at": "2026-11-14T09:05:00Z",
+      "observed_at": "2026-11-14T09:05:00Z",
+      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prior_revision": null,
+      "targets": [
+        "dtea:evidence:E1"
+      ],
+      "state_effect": "observes",
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:05:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "result": "pass",
+        "available_to_actor_at": "2026-11-14T09:05:00Z"
       }
     },
     {
