@@ -20207,14 +20207,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "symthaea-organizational-closure"
-version = "0.1.0"
-dependencies = [
- "serde",
- "sha2 0.10.9",
-]
-
-[[package]]
 name = "symthaea-web"
 version = "0.1.0"
 dependencies = [
