@@ -347,11 +347,12 @@ fn profiles_compatible(
     }
 }
 
-fn outgoing<'a>(
-    model: &'a TransitionSystem,
-    state: &str,
-) -> impl Iterator<Item = &'a Transition> {
-    model.transitions.iter().filter(move |transition| transition.from == state)
+fn outgoing<'a>(model: &'a TransitionSystem, state: &str) -> Vec<&'a Transition> {
+    model
+        .transitions
+        .iter()
+        .filter(|transition| transition.from == state)
+        .collect()
 }
 
 fn transition_labels_match(left: &Transition, right: &Transition) -> bool {
@@ -523,13 +524,13 @@ pub fn evaluate_operational_continuity(
     for baseline_initial in &baseline.initial_states {
         let matching = candidate.initial_states.iter().find(|candidate_initial| {
             relation.contains(&(
-                baseline_initial.clone(),
+                baseline_initial.as_str().to_owned(),
                 candidate_initial.as_str().to_owned(),
             ))
         });
         if let Some(candidate_initial) = matching {
             initial_pairs.push((
-                baseline_initial.clone(),
+                baseline_initial.as_str().to_owned(),
                 candidate_initial.as_str().to_owned(),
             ));
         } else {
@@ -548,7 +549,7 @@ pub fn evaluate_operational_continuity(
             if !baseline
                 .initial_states
                 .iter()
-                .any(|baseline_initial| relation.contains(&(baseline_initial.clone(), candidate_initial.as_str().to_owned())))
+                .any(|baseline_initial| relation.contains(&(baseline_initial.as_str().to_owned(), candidate_initial.as_str().to_owned())))
             {
                 push_finding(
                     &mut findings,
