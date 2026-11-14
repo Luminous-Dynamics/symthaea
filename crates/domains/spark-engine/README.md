@@ -29,3 +29,27 @@ cargo run --bin spark -- analyze
 (with its own public-facing README), crate on
 [crates.io](https://crates.io/crates/spark-engine). `docs/TECHNICAL_REPORT.pdf`
 (regenerate with `docs/render_pdf.sh`) is the citable technical report.
+
+
+## Numerical authority and stale-snapshot warning (2026-11-14)
+
+<blockquote>
+**This vendored directory is a historical, excluded snapshot. Do not use it for current quantitative results.**
+
+The authoritative implementation and numerical benchmark work live in the standalone
+[ Luminous-Dynamics/spark-engine repository ](https://github.com/Luminous-Dynamics/spark-engine),
+not in this copy. The standalone project has identified and is correcting a Maxwellian
+reactivity prefactor/unit-conversion defect and a D-D branch S-factor normalization defect.
+Its correction is tracked in [draft PR #7](https://github.com/Luminous-Dynamics/spark-engine/pull/7),
+with a new [NRL reference benchmark](https://github.com/Luminous-Dynamics/spark-engine/blob/fix/dd-reactivity-unit-baseline-2026/docs/DD_MAXWELLIAN_REACTIVITY_REFERENCE_BENCHMARK.md).
+
+The correction is not yet merged or CI-verified. The 300 K lattice/beam regime remains outside
+the 1–20 keV Maxwellian reference benchmark. Neither this snapshot nor the standalone draft
+establishes a validated lattice reaction rate, a net-energy reactor or a qualified neutron source.
+</blockquote>
+
+This directory remains excluded from the Symthaea workspace and has no application consumers.
+It is not a second physics authority. Do not independently patch or consume its numerical outputs.
+Any future integration must use a versioned standalone Spark dependency or an explicit evidence
+adapter with pinned revision and model-validity metadata. See
+[SPARK-VENDORED-SNAPSHOT-DRIFT-001](https://github.com/Luminous-Dynamics/symthaea/issues/12088).
