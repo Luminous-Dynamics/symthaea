@@ -69,7 +69,26 @@ pub struct ComponentLicenseV1 {
     pub source_uri: String,
     pub license_text_sha256: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rights_holder_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retrieved_at_utc: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inherited_from: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RightsHumanReviewV1 {
+    /// Opaque reviewer reference; do not put personal contact details here.
+    pub reviewer_ref: String,
+    pub reviewer_role: String,
+    pub jurisdiction: String,
+    pub reviewed_at_utc: String,
+    pub rationale: String,
+    /// Digest of the human review record, not a signature or identity proof.
+    pub decision_record_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,7 +109,7 @@ pub struct ComponentRightsV1 {
     pub share_alike_scope: Option<String>,
     pub review_status: RightsReviewStatusV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub human_review_receipt_sha256: Option<String>,
+    pub human_review: Option<RightsHumanReviewV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,7 +203,8 @@ pub enum RightsPolicyIssueV1 {
     InvalidComponentDigest { component_id: String },
     EmptyLicenseField { component_id: String, field: &'static str },
     InvalidLicenseDigest { component_id: String },
-    InvalidReviewDigest { component_id: String },
+    InvalidHumanReviewRecord { component_id: String },
+    ReviewRecordStatusMismatch { component_id: String },
     MissingAttributionStatement { component_id: String },
     MissingNoticeStatement { component_id: String },
     MissingShareAlikeScope { component_id: String },
@@ -273,9 +293,23 @@ pub fn validate_music_component_rights_bundle_v1(
                 component_id: component.component_id.clone(),
             });
         }
-        if let Some(receipt) = component.human_review_receipt_sha256.as_deref() {
-            if !valid_rights_sha256(receipt) {
-                issues.push(RightsPolicyIssueV1::InvalidReviewDigest {
+        if let Some(review) = component.human_review.as_ref() {
+            let review_fields = [
+                review.reviewer_ref.as_str(),
+                review.reviewer_role.as_str(),
+                review.jurisdiction.as_str(),
+                review.reviewed_at_utc.as_str(),
+                review.rationale.as_str(),
+            ];
+            if review_fields.iter().any(|value| value.trim().is_empty())
+                || !valid_rights_sha256(&review.decision_record_sha256)
+            {
+                issues.push(RightsPolicyIssueV1::InvalidHumanReviewRecord {
+                    component_id: component.component_id.clone(),
+                });
+            }
+            if component.review_status != RightsReviewStatusV1::HumanReviewed {
+                issues.push(RightsPolicyIssueV1::ReviewRecordStatusMismatch {
                     component_id: component.component_id.clone(),
                 });
             }
@@ -417,7 +451,7 @@ pub fn evaluate_music_rights_use_v1(
     for component in &bundle.components {
         match component.review_status {
             RightsReviewStatusV1::HumanReviewed => {
-                if component.human_review_receipt_sha256.is_none() {
+                if component.human_review.is_none() {
                     reasons.push(RightsDecisionReasonV1 {
                         component_id: component.component_id.clone(),
                         code: RightsDecisionReasonCodeV1::MissingHumanReviewReceipt,
@@ -600,6 +634,9 @@ mod tests {
                 license_version: "4.0".to_owned(),
                 source_uri: "https://example.invalid/license".to_owned(),
                 license_text_sha256: LICENSE_SHA.to_owned(),
+                rights_holder_ref: Some("synthetic-rights-holder-ref".to_owned()),
+                source_revision: Some("synthetic-license-revision-v1".to_owned()),
+                retrieved_at_utc: Some("2026-11-14".to_owned()),
                 inherited_from: None,
             },
             permissions,
@@ -610,7 +647,14 @@ mod tests {
             share_alike: ShareAlikeStatusV1::NotApplicable,
             share_alike_scope: None,
             review_status: RightsReviewStatusV1::HumanReviewed,
-            human_review_receipt_sha256: Some(REVIEW_SHA.to_owned()),
+            human_review: Some(RightsHumanReviewV1 {
+                reviewer_ref: "reviewer-ref-001".to_owned(),
+                reviewer_role: "rights-reviewer".to_owned(),
+                jurisdiction: "review-jurisdiction-recorded".to_owned(),
+                reviewed_at_utc: "2026-11-14T07:00:00Z".to_owned(),
+                rationale: "Synthetic fixture review; no external license determination".to_owned(),
+                decision_record_sha256: REVIEW_SHA.to_owned(),
+            }),
         }
     }
 
@@ -688,7 +732,7 @@ mod tests {
     fn machine_extracted_terms_are_not_human_review() {
         let mut item = component("machine-extracted", "CC-BY-4.0", permissive_permissions());
         item.review_status = RightsReviewStatusV1::MachineExtracted;
-        item.human_review_receipt_sha256 = None;
+        item.human_review = None;
         let rights = bundle(vec![item]);
         let receipt =
             evaluate_music_rights_use_v1(&rights, &request(RightsPurposeV1::Evaluation)).unwrap();
