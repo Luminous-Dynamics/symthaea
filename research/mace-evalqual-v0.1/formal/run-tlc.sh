@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
-: "\${TLA2TOOLS_JAR:?Set TLA2TOOLS_JAR to a locally verified tla2tools.jar (v1.7.4)}"
+: "${TLA2TOOLS_JAR:?Set TLA2TOOLS_JAR to a locally verified tla2tools.jar (v1.7.4)}"
 [[ -f "$TLA2TOOLS_JAR" ]] || { echo "TLA2TOOLS_JAR does not exist: $TLA2TOOLS_JAR" >&2; exit 2; }
 expected="bee4a54f3ee3d4afc347c3240ec2d9e93b075104"
 actual="$(sha1sum "$TLA2TOOLS_JAR" | awk '{print $1}')"
