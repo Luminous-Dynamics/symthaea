@@ -79,7 +79,7 @@ A missing factor is not an implicit assertion that the factor is invariant. A fa
 
 ### 0. Qualified baseline receipt
 
-A transfer cannot begin from an assumed baseline. Each case must carry a baseline qualification receipt with a qualification/protocol identity, SHA-256 of the exact serialized baseline profile, a source artifact digest, specimen identities, an independence group, and coverage of every required product endpoint. The audit recomputes the baseline profile digest and rejects a mismatch. This proves the receipt is structurally bound to the profile; it does not authenticate the remote artifact or prove the physical qualification itself.
+A transfer cannot begin from an assumed baseline. The baseline profile itself must also lie inside the declared qualification scope. The baseline qualification artifact digest is reserved and cannot be reused as the bridge-test artifact. Each case must carry a baseline qualification receipt with a qualification/protocol identity, SHA-256 of the exact serialized baseline profile, a source artifact digest, specimen identities, an independence group, and coverage of every required product endpoint. The audit recomputes the baseline profile digest and rejects a mismatch. This proves the receipt is structurally bound to the profile; it does not authenticate the remote artifact or prove the physical qualification itself.
 
 ### 1. Factor completeness
 
@@ -121,19 +121,19 @@ This is not a generic significance test. A non-significant difference is not acc
 
 ### 6. Evidence integrity
 
-Missing evidence blocks. A missing baseline qualification receipt blocks; a baseline-profile digest mismatch rejects. Duplicate specimen identities, overlapping baseline/candidate independence groups, malformed digests, stale factor mappings, duplicated bridge dimension sets, or reused artifact digests reject. This is a source-structure guard, not cryptographic verification of remote artifacts or laboratory independence.
+Missing evidence blocks. A missing baseline qualification receipt blocks; a baseline-profile digest mismatch rejects; an out-of-scope baseline rejects; reusing the baseline artifact as the bridge artifact rejects. Duplicate specimen identities, overlapping baseline/candidate independence groups, malformed digests, stale factor mappings, duplicated bridge dimension sets, or reused artifact digests reject. This is a source-structure guard, not cryptographic verification of remote artifacts or laboratory independence.
 
 ## S0 fixture results
 
-The fixture contains **24 synthetic known-answer challenges**, including missing and tampered baseline-qualification receipts:
+The fixture contains **26 synthetic known-answer challenges**, including missing and tampered baseline-qualification receipts:
 
 | Disposition | Cases | Meaning |
 |---|---:|---|
 | PASS | 5 | structurally complete evidence within the synthetic contract |
 | BLOCKED | 10 | insufficient evidence, missing exact interaction, or interval crossing |
-| REJECTED | 9 | hard-scope violation, contradictory evidence, identity collision, or invalid digest |
+| REJECTED | 11 | hard-scope violation, contradictory evidence, identity collision, or invalid digest |
 
-Independent JavaScript replay of the committed fixture matched all 24 expected dispositions. This source-side replay is not execution of the Rust implementation. Ten Rust unit tests are authored in the new module; compilation, formatting, Clippy and unit-test execution are not claimed.
+Independent JavaScript replay of the committed fixture matched all 26 expected dispositions. This source-side replay is not execution of the Rust implementation. Twelve Rust unit tests are authored in the new module; compilation, formatting, Clippy and unit-test execution are not claimed.
 
 ## Benchmark versus current approaches
 
