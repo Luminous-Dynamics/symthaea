@@ -299,3 +299,51 @@ func TestCorruptTrustedCursorIsRejected(t *testing.T) {
 		t.Fatalf("expected corrupt trust cursor rejection, got %v", err)
 	}
 }
+
+
+func TestAcceptObservedBindsCheckpointToExactSnapshot(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state := bootstrapTest(t, priv, pub)
+	next := signCheckpoint(t, makeCheckpoint(2, 9, state.CheckpointDigestSHA256, "head-9", 101), priv)
+	observed := ObservedHead{DatabaseID: "payments-db-prod-1", JournalSequence: 9, JournalHeadSHA256: hashLabel("head-9")}
+	advanced, result, err := AcceptObserved(next, pub, state, observed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != AcceptedAdvanced || advanced.CheckpointSequence != 2 {
+		t.Fatalf("unexpected accepted observed checkpoint: %s %+v", result, advanced)
+	}
+}
+
+func TestAcceptObservedRejectsWrongJournalHead(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state := bootstrapTest(t, priv, pub)
+	next := signCheckpoint(t, makeCheckpoint(2, 9, state.CheckpointDigestSHA256, "head-9", 101), priv)
+	observed := ObservedHead{DatabaseID: "payments-db-prod-1", JournalSequence: 9, JournalHeadSHA256: hashLabel("rewritten-head")}
+	_, _, err := AcceptObserved(next, pub, state, observed)
+	if !errors.Is(err, ErrObservedHeadMismatch) {
+		t.Fatalf("expected observed head mismatch, got %v", err)
+	}
+}
+
+func TestAcceptObservedRejectsWrongJournalSequence(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state := bootstrapTest(t, priv, pub)
+	next := signCheckpoint(t, makeCheckpoint(2, 9, state.CheckpointDigestSHA256, "head-9", 101), priv)
+	observed := ObservedHead{DatabaseID: "payments-db-prod-1", JournalSequence: 10, JournalHeadSHA256: hashLabel("head-9")}
+	_, _, err := AcceptObserved(next, pub, state, observed)
+	if !errors.Is(err, ErrObservedHeadMismatch) {
+		t.Fatalf("expected observed sequence mismatch, got %v", err)
+	}
+}
+
+func TestAcceptObservedRejectsWrongDatabase(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state := bootstrapTest(t, priv, pub)
+	next := signCheckpoint(t, makeCheckpoint(2, 9, state.CheckpointDigestSHA256, "head-9", 101), priv)
+	observed := ObservedHead{DatabaseID: "other-database", JournalSequence: 9, JournalHeadSHA256: hashLabel("head-9")}
+	_, _, err := AcceptObserved(next, pub, state, observed)
+	if !errors.Is(err, ErrWrongDatabase) {
+		t.Fatalf("expected database mismatch, got %v", err)
+	}
+}
