@@ -80,6 +80,8 @@ A promising hybrid is:
 
 The target is not "more context." It is greater **useful evidence yield per token/line**, with lower missed-critical-context and false-context rates.
 
+The current Agent Retrieval Bench paper also reports an RRF fusion result of **0.2713 weighted MRR and 0.7331 Recall@20**, improving over its best single-run values in that comparison. This is the stronger retrieval baseline to beat; a hybrid EGDDM ranker should not claim progress by comparing only against a single dense model or lexical search. SWE-Explore's K=5 result reports CoSIL at **0.788 line-level recall and 0.602 F1** (non-oracle), making graph-guided high-recall exploration a concrete comparator rather than a hypothetical future system. These numbers are protocol-specific and must be reproduced before a leaderboard comparison. Sources: https://arxiv.org/abs/2607.24882 and https://arxiv.org/abs/2606.07297
+
 ## 2. Existing Luminous ownership — compose, do not duplicate
 
 The Symthaea repository already has foundational work:
@@ -337,7 +339,7 @@ These are research hypotheses, not achieved results or industry standards:
 - Zero unsupported evidence promotion and zero unauthorized mutation in deterministic adversarial controls.
 - DTEA pilot: 100% detection of the explicitly planted future-evidence and unauthorized-source negative controls; ≥0.95 precision/recall on adjudicated decision-time admissibility labels, after calibration and power analysis; report decision correctness separately from evidence-admissibility correctness.
 - Federation pilot: 100% of exact artifact path/blob pins resolve at the pinned artifact commit; 100% separation of subject-source and map-artifact identity; zero independently-qualified edges without two-sided conformance evidence; missing or mismatched owner contracts remain unjoined/unknown; zero authority transfer.
-- Retrieval pilot: reproduce official Agent Retrieval Bench and SWE-Explore baselines first. On held-out repository families, target a statistically supported ≥5 percentage-point improvement in SWE-Explore line recall at the same K=5/line budget over the strongest matched non-oracle baseline, without >1 percentage-point precision regression; target ≥5% relative improvement in Agent Retrieval Bench BCY@8k over the strongest matched baseline on at least three of four positive task families. Preserve task-level, repository-macro and natural no-gold results; no pooling of wrong-repository counterfactuals into the natural no-gold primary score.
+- Retrieval pilot: reproduce official Agent Retrieval Bench and SWE-Explore baselines first. On held-out repository families, target a statistically supported ≥5 percentage-point improvement over the reproduced SWE-Explore K=5 line-recall baseline (including CoSIL's published 0.788 result) under the same region/line budget, without >1 percentage-point precision regression; target ≥5% relative improvement over the reproduced Agent Retrieval Bench fused-retrieval baselines (including RRF) in BCY@8k on at least three of four positive task families. Preserve task-level, repository-macro and natural no-gold results; no pooling of wrong-repository counterfactuals into the natural no-gold primary score.
 
 Report confidence intervals, per-relation/task-family breakdowns, cost, latency, memory, human minutes and abstention. Do not publish one aggregate score that can hide a critical failure. Use repository-family/time-held-out splits and keep development, calibration and confirmatory answer custody separate.
 
