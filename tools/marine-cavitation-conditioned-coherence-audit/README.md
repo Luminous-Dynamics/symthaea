@@ -38,6 +38,11 @@ The aggregate first computes each run's group means and present-minus-absent del
 
 Per-window marginal lower/upper envelopes are averaged and explicitly labelled **not a joint confidence interval**. Magnitude coherence remains usable when H1 phase is unresolved; no phase or source attribution is inferred from that condition.
 
+
+Uncertainty-unresolved parent coherence bands are preserved as unresolved: their marginal interval fields may be null only when the parent band explicitly declares `coherent_residual_interval_unresolved` and the per-window report disposition is `UNCERTAINTY_UNRESOLVED`. The join excludes that window from conditioned cohorts and reports INCOMPLETE; it must not coerce missing uncertainty bounds to point estimates.
+
+A continuous accelerometer raw-trace digest may legitimately be shared by multiple non-overlapping window-level coherence reports, because those reports may be slices of one longer acquisition. Pressure/acoustic trace digests, cavitation observation digests, joined window IDs and coherence report digests remain window-specific and must not be reused.
+
 ## Claim ceiling
 
 This result is a descriptive association between cavitation-observed window state and pressure power linearly coherent with one declared accelerometer reference, within the supplied operating envelope. Coherence does not identify a unique physical source: common-cause excitation can also create coherence. The residual is not a cavitation-only component.
