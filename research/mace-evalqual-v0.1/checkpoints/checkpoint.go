@@ -24,6 +24,9 @@ var (
 	ErrNoProgress          = errors.New("checkpoint does not advance journal head")
 	ErrInvalidTrustedState = errors.New("invalid trusted checkpoint state")
 	ErrObservedHeadMismatch = errors.New("observed journal head does not match signed checkpoint")
+	// ErrPeerFork indicates two consumers have observed different signed
+	// histories for the same witness/database identity.
+	ErrPeerFork = errors.New("peer checkpoint histories are inconsistent or forked")
 )
 
 const (
@@ -336,4 +339,57 @@ func AcceptObserved(s SignedCheckpoint, publicKey ed25519.PublicKey, current Tru
 		return TrustedState{}, 0, ErrObservedHeadMismatch
 	}
 	return AcceptNext(s, publicKey, current)
+}
+
+ 
+// VerifyPeerConsistency checks whether newer is a valid descendant of older
+// under the same pinned witness key and database identity. bridge must contain
+// every intervening signed checkpoint in sequence order. Consumers can exchange
+// these proofs to detect witness split views; without exchange/gossip a hidden
+// fork cannot be detected by either isolated consumer.
+func VerifyPeerConsistency(older, newer TrustedState, bridge []SignedCheckpoint, publicKey ed25519.PublicKey) error {
+	if err := older.Validate(); err != nil {
+		return fmt.Errorf("older peer cursor: %w", err)
+	}
+	if err := newer.Validate(); err != nil {
+		return fmt.Errorf("newer peer cursor: %w", err)
+	}
+	if older.KeyID != newer.KeyID {
+		return ErrWrongKey
+	}
+	if older.DatabaseID != newer.DatabaseID {
+		return ErrWrongDatabase
+	}
+	if newer.CheckpointSequence < older.CheckpointSequence {
+		return ErrRollback
+	}
+	if newer.CheckpointSequence == older.CheckpointSequence {
+		if len(bridge) != 0 || newer.CheckpointDigestSHA256 != older.CheckpointDigestSHA256 ||
+			newer.JournalSequence != older.JournalSequence || newer.JournalHeadSHA256 != older.JournalHeadSHA256 ||
+			newer.IssuedAtUnix != older.IssuedAtUnix {
+			return ErrPeerFork
+		}
+		return nil
+	}
+
+	state := older
+	for index, signed := range bridge {
+		next, result, err := AcceptNext(signed, publicKey, state)
+		if err != nil {
+			return fmt.Errorf("peer bridge checkpoint %d: %w", index, err)
+		}
+		if result != AcceptedAdvanced {
+			return ErrPeerFork
+		}
+		state = next
+	}
+	if state.CheckpointSequence != newer.CheckpointSequence {
+		return ErrGap
+	}
+	if state.CheckpointDigestSHA256 != newer.CheckpointDigestSHA256 ||
+		state.JournalSequence != newer.JournalSequence || state.JournalHeadSHA256 != newer.JournalHeadSHA256 ||
+		state.IssuedAtUnix != newer.IssuedAtUnix {
+		return ErrPeerFork
+	}
+	return nil
 }
