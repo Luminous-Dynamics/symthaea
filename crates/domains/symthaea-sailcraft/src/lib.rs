@@ -418,7 +418,7 @@ pub fn evaluate_route_candidates(
 
     let direct_twa =
         signed_angle_deg(wind.from_direction_deg, target_bearing).abs();
-    let direct_inside_no_go = direct_twa < polar.no_go_angle_deg;
+    let direct_inside_no_go = direct_twa <= polar.no_go_angle_deg;
 
     let mut best_port: Option<CourseCandidate> = None;
     let mut best_starboard: Option<CourseCandidate> = None;
@@ -430,7 +430,7 @@ pub fn evaluate_route_candidates(
             signed_angle_deg(wind.from_direction_deg, heading_deg);
         let absolute_twa = signed_twa.abs();
 
-        if absolute_twa < polar.no_go_angle_deg {
+        if absolute_twa <= polar.no_go_angle_deg {
             continue;
         }
 
@@ -570,6 +570,29 @@ mod tests {
             .candidates
             .iter()
             .all(|c| c.heading_deg != 0.0 && c.velocity_made_good_mps > 0.0));
+    }
+
+    #[test]
+    fn no_go_sector_boundary_is_inclusive() {
+        let result = evaluate_route_candidates(&polar(), request(40.0));
+        assert_eq!(result.status, PlanStatus::CandidatesAvailable);
+        assert_eq!(result.direct_course_inside_no_go_sector, Some(true));
+        assert!(result
+            .candidates
+            .iter()
+            .all(|candidate| candidate.signed_true_wind_angle_deg.abs() > 40.0));
+    }
+
+    #[test]
+    fn north_crossing_bearings_use_circular_angle_distance() {
+        let mut input = request(0.0);
+        input.wind = Evidence::qualified(WindObservation {
+            from_direction_deg: 359.0,
+            speed_mps: 8.0,
+        });
+        let result = evaluate_route_candidates(&polar(), input);
+        assert_eq!(result.status, PlanStatus::CandidatesAvailable);
+        assert_eq!(result.direct_course_inside_no_go_sector, Some(true));
     }
 
     #[test]
