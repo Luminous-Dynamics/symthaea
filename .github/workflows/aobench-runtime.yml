@@ -1,0 +1,71 @@
+name: AOBench Runtime Qualification
+
+on:
+  push:
+    branches:
+      - main
+      - research/aobench-*
+    paths:
+      - "crates/domains/symthaea-organizational-closure/**"
+      - "Cargo.toml"
+      - "scripts/check-workspace-targets.sh"
+      - ".github/workflows/aobench-runtime.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-organizational-closure/**"
+      - "Cargo.toml"
+      - "scripts/check-workspace-targets.sh"
+      - ".github/workflows/aobench-runtime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aobench-runtime-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Runtime verifier (standalone exact package)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_NET_RETRY: 10
+      CARGO_HTTP_TIMEOUT: 120
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/domains/symthaea-organizational-closure/target
+          key: ${{ runner.os }}-aobench-runtime-${{ hashFiles('crates/domains/symthaea-organizational-closure/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-aobench-runtime-
+
+      - name: Format check
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo fmt --all -- --check
+
+      - name: Compile all package targets
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo check --locked --all-targets
+
+      - name: Run deterministic verifier tests
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo test --locked
+
+      - name: Strict package Clippy
+        working-directory: crates/domains/symthaea-organizational-closure
+        run: cargo clippy --locked --all-targets -- -D warnings

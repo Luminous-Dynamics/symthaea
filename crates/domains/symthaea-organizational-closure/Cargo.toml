@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-organizational-closure"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence-verified functional self-maintenance and organizational recurrence primitives for AOBench"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+sha2 = "=0.10.9"
+
+# Keep this research package independently buildable; the main Symthaea
+# workspace explicitly excludes this nested workspace.
+[workspace]

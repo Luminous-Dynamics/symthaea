@@ -22,6 +22,15 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Stale/dangling path matched by crates/core/* in CI; no Cargo.toml exists.
+    "crates/core/symthaea",
+    # Source-only / examples-only directories documented in workspace issue #9906.
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
@@ -31,6 +40,8 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # AOBench is a separately locked research workspace; avoid resolving the full monorepo.
+    "crates/domains/symthaea-organizational-closure",
 ]
 default-members = [
     "xtask",
