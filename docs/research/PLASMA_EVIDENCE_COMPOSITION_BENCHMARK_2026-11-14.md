@@ -144,3 +144,16 @@ The present increment demonstrates the composed contract on synthetic transfer c
 - Hash validation is syntactic; referenced data bytes are not retrieved, authenticated or recalculated.
 - No confidence intervals are calculated by this module.
 - No physical equivalence, plasma performance, standard compliance, laboratory competence, product qualification, service life, production savings or release authority is claimed.
+
+
+## 2026-11-14 — v0.2 requires preregistered equivalence design receipts
+
+The transfer composition contract has been advanced: each `EndpointEvidence` now carries a `EquivalenceDesignReceipt` validated by the new `plasma_equivalence_design` module. The receipt binds the endpoint's exact baseline/candidate method receipts, specimen sets, independent clusters, frozen plan, power/precision planning assumptions and analysis result.
+
+The composition auditor compares the design's baseline/candidate method receipts field-by-field with the exact receipts used by transfer composition. A design that is internally valid but belongs to different method observations cannot be substituted.
+
+The command now defaults to `data/research/plasma_evidence_composition_fixture_v0_2.json`. Its 15 synthetic cases (16 endpoint receipts) independently replayed 15/15 with 2 PASS, 3 BLOCKED and 10 REJECTED dispositions. The v0.2 composition schema intentionally makes the design receipt required rather than optional.
+
+See `docs/research/PLASMA_EQUIVALENCE_DESIGN_BENCHMARK_2026-11-14.md` for the standalone design contract, SOTA/industry comparison and validation boundaries.
+
+The design audit validates structural linkage only. Numerical power/TOST, actual artifact authentication, sample/lot authenticity and physical equivalence remain external owner responsibilities.

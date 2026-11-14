@@ -1,0 +1,3140 @@
+{
+  "schema_version": "plasma-evidence-composition-fixture-v0.2",
+  "cases": [
+    {
+      "id": "valid-rigid-plastic-d3163",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "valid-d3163-BASE-01",
+            "valid-d3163-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "valid-d3163-CAND-01",
+            "valid-d3163-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "valid-d3163-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d3163-BASE-01",
+              "valid-d3163-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "valid-d3163-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d3163-CAND-01",
+              "valid-d3163-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "valid-rigid-plastic-d3163-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "valid-d3163-BASE-01",
+                "cluster_id": "valid-rigid-plastic-d3163-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "valid-d3163-BASE-02",
+                "cluster_id": "valid-rigid-plastic-d3163-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "valid-d3163-CAND-01",
+                "cluster_id": "valid-rigid-plastic-d3163-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "valid-d3163-CAND-02",
+                "cluster_id": "valid-rigid-plastic-d3163-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "valid-d3163-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "valid-d3163-BASE-01",
+                "valid-d3163-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "valid-d3163-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "valid-d3163-CAND-01",
+                "valid-d3163-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "valid-rigid-plastic-d3163-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "PASS",
+      "rationale": "Both cohorts carry D3163-01R23 receipts for rigid-plastic single-lap apparent shear."
+    },
+    {
+      "id": "valid-frp-to-frp-d5868",
+      "baseline_profile": {
+        "material_pair_class": "frp_to_frp",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "frp_to_frp",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "valid-d5868-BASE-01",
+            "valid-d5868-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "valid-d5868-CAND-01",
+            "valid-d5868-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "valid-d5868-BASE-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d5868-BASE-01",
+              "valid-d5868-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "valid-d5868-CAND-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d5868-CAND-01",
+              "valid-d5868-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "valid-frp-to-frp-d5868-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "valid-d5868-BASE-01",
+                "cluster_id": "valid-frp-to-frp-d5868-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "valid-d5868-BASE-02",
+                "cluster_id": "valid-frp-to-frp-d5868-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "valid-d5868-CAND-01",
+                "cluster_id": "valid-frp-to-frp-d5868-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "valid-d5868-CAND-02",
+                "cluster_id": "valid-frp-to-frp-d5868-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "valid-d5868-BASE-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "valid-d5868-BASE-01",
+                "valid-d5868-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "valid-d5868-CAND-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "valid-d5868-CAND-01",
+                "valid-d5868-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "valid-frp-to-frp-d5868-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "PASS",
+      "rationale": "Both cohorts carry D5868-01R23 receipts for FRP-to-FRP single-lap apparent shear."
+    },
+    {
+      "id": "contact-angle-cannot-supply-lap-shear",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "contact-angle-BASE-01",
+            "contact-angle-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "contact-angle-CAND-01",
+            "contact-angle-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "contact-angle-BASE-RECEIPT",
+            "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+            "edition": "protocol-defined-v1",
+            "evidence_kind": "measurement",
+            "material_pair_class": "material_surface",
+            "geometry": "sessile_drop",
+            "endpoint": "water_contact_angle",
+            "requested_claim": "wettability_observation",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "contact-angle-BASE-01",
+              "contact-angle-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "contact-angle-CAND-RECEIPT",
+            "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+            "edition": "protocol-defined-v1",
+            "evidence_kind": "measurement",
+            "material_pair_class": "material_surface",
+            "geometry": "sessile_drop",
+            "endpoint": "water_contact_angle",
+            "requested_claim": "wettability_observation",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "contact-angle-CAND-01",
+              "contact-angle-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "contact-angle-BASE-01",
+                "cluster_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "contact-angle-BASE-02",
+                "cluster_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "contact-angle-CAND-01",
+                "cluster_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "contact-angle-CAND-02",
+                "cluster_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "contact-angle-BASE-RECEIPT",
+              "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+              "edition": "protocol-defined-v1",
+              "evidence_kind": "measurement",
+              "material_pair_class": "material_surface",
+              "geometry": "sessile_drop",
+              "endpoint": "water_contact_angle",
+              "requested_claim": "wettability_observation",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "contact-angle-BASE-01",
+                "contact-angle-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "contact-angle-CAND-RECEIPT",
+              "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+              "edition": "protocol-defined-v1",
+              "evidence_kind": "measurement",
+              "material_pair_class": "material_surface",
+              "geometry": "sessile_drop",
+              "endpoint": "water_contact_angle",
+              "requested_claim": "wettability_observation",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "contact-angle-CAND-01",
+                "contact-angle-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A wettability observation cannot supply an apparent-shear transfer endpoint."
+    },
+    {
+      "id": "lap-shear-cannot-support-service-life",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "lifetime-BASE-01",
+            "lifetime-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "lifetime-CAND-01",
+            "lifetime-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "lifetime-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "service_lifetime",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "lifetime-BASE-01",
+              "lifetime-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "lifetime-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "service_lifetime",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "lifetime-CAND-01",
+              "lifetime-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "lifetime-BASE-01",
+                "cluster_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "lifetime-BASE-02",
+                "cluster_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "lifetime-CAND-01",
+                "cluster_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "lifetime-CAND-02",
+                "cluster_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "lifetime-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "service_lifetime",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "lifetime-BASE-01",
+                "lifetime-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "lifetime-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "service_lifetime",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "lifetime-CAND-01",
+                "lifetime-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A lap-shear measurement cannot be promoted to a service-lifetime claim."
+    },
+    {
+      "id": "unrecognized-test-edition-blocks-transfer",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "unknown-edition-BASE-01",
+            "unknown-edition-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "unknown-edition-CAND-01",
+            "unknown-edition-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "unknown-edition-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R14",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "unknown-edition-BASE-01",
+              "unknown-edition-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "unknown-edition-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R14",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "unknown-edition-CAND-01",
+              "unknown-edition-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "unknown-edition-BASE-01",
+                "cluster_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "unknown-edition-BASE-02",
+                "cluster_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "unknown-edition-CAND-01",
+                "cluster_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "unknown-edition-CAND-02",
+                "cluster_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "unknown-edition-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R14",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "unknown-edition-BASE-01",
+                "unknown-edition-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "unknown-edition-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R14",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "unknown-edition-CAND-01",
+                "unknown-edition-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The older reaffirmation is not the active D3163-01R23 registry entry."
+    },
+    {
+      "id": "method-material-pair-mismatch",
+      "baseline_profile": {
+        "material_pair_class": "metal_to_metal",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "metal_to_metal",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "wrong-material-BASE-01",
+            "wrong-material-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "wrong-material-CAND-01",
+            "wrong-material-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "wrong-material-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "metal_to_metal",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wrong-material-BASE-01",
+              "wrong-material-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "wrong-material-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "metal_to_metal",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wrong-material-CAND-01",
+              "wrong-material-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "method-material-pair-mismatch-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "wrong-material-BASE-01",
+                "cluster_id": "method-material-pair-mismatch-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "wrong-material-BASE-02",
+                "cluster_id": "method-material-pair-mismatch-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "wrong-material-CAND-01",
+                "cluster_id": "method-material-pair-mismatch-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "wrong-material-CAND-02",
+                "cluster_id": "method-material-pair-mismatch-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "wrong-material-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "metal_to_metal",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "wrong-material-BASE-01",
+                "wrong-material-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "wrong-material-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "metal_to_metal",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "wrong-material-CAND-01",
+                "wrong-material-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "method-material-pair-mismatch-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D3163 is not the metal-to-metal lap-shear method."
+    },
+    {
+      "id": "wrong-specimen-geometry",
+      "baseline_profile": {
+        "material_pair_class": "frp_to_frp",
+        "geometry": "double_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "frp_to_frp",
+        "geometry": "double_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "wrong-geometry-BASE-01",
+            "wrong-geometry-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "wrong-geometry-CAND-01",
+            "wrong-geometry-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "wrong-geometry-BASE-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "double_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wrong-geometry-BASE-01",
+              "wrong-geometry-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "wrong-geometry-CAND-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "double_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wrong-geometry-CAND-01",
+              "wrong-geometry-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "wrong-specimen-geometry-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "wrong-geometry-BASE-01",
+                "cluster_id": "wrong-specimen-geometry-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "wrong-geometry-BASE-02",
+                "cluster_id": "wrong-specimen-geometry-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "wrong-geometry-CAND-01",
+                "cluster_id": "wrong-specimen-geometry-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "wrong-geometry-CAND-02",
+                "cluster_id": "wrong-specimen-geometry-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "wrong-geometry-BASE-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "double_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "wrong-geometry-BASE-01",
+                "wrong-geometry-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "wrong-geometry-CAND-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "double_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "wrong-geometry-CAND-01",
+                "wrong-geometry-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "wrong-specimen-geometry-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5868 is registered for single-lap FRP joints, not double-lap."
+    },
+    {
+      "id": "missing-protocol-digest-blocks-transfer",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "missing-digest-BASE-01",
+            "missing-digest-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "missing-digest-CAND-01",
+            "missing-digest-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "missing-digest-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": null,
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "missing-digest-BASE-01",
+              "missing-digest-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "missing-digest-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "missing-digest-CAND-01",
+              "missing-digest-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "missing-digest-BASE-01",
+                "cluster_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "missing-digest-BASE-02",
+                "cluster_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "missing-digest-CAND-01",
+                "cluster_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "missing-digest-CAND-02",
+                "cluster_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "missing-digest-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": null,
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "missing-digest-BASE-01",
+                "missing-digest-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "missing-digest-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "missing-digest-CAND-01",
+                "missing-digest-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The baseline method receipt lacks a well-formed protocol digest."
+    },
+    {
+      "id": "bridge-specimens-do-not-match-receipt",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "specimen-mismatch-BASE-01",
+            "specimen-mismatch-BASE-03"
+          ],
+          "candidate_specimen_ids": [
+            "specimen-mismatch-CAND-01",
+            "specimen-mismatch-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "specimen-mismatch-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "specimen-mismatch-BASE-01",
+              "specimen-mismatch-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "specimen-mismatch-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "specimen-mismatch-CAND-01",
+              "specimen-mismatch-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "specimen-mismatch-BASE-01",
+                "cluster_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "specimen-mismatch-BASE-02",
+                "cluster_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "specimen-mismatch-CAND-01",
+                "cluster_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "specimen-mismatch-CAND-02",
+                "cluster_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "specimen-mismatch-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "specimen-mismatch-BASE-01",
+                "specimen-mismatch-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "specimen-mismatch-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "specimen-mismatch-CAND-01",
+                "specimen-mismatch-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The bridge cohort identities must exactly match each method receipt."
+    },
+    {
+      "id": "baseline-candidate-specimens-overlap",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "shared-01",
+            "base-02"
+          ],
+          "candidate_specimen_ids": [
+            "shared-01",
+            "candidate-02"
+          ],
+          "baseline_receipt": {
+            "id": "overlap-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "shared-01",
+              "base-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "overlap-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "shared-01",
+              "candidate-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "shared-01",
+                "cluster_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "base-02",
+                "cluster_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "shared-01",
+                "cluster_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "candidate-02",
+                "cluster_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "overlap-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "shared-01",
+                "base-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "overlap-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "shared-01",
+                "candidate-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The same specimen cannot be counted in both baseline and candidate cohorts."
+    },
+    {
+      "id": "missing-required-endpoint-receipt",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength",
+        "failure_mode_fraction"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "missing-endpoint-BASE-01",
+            "missing-endpoint-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "missing-endpoint-CAND-01",
+            "missing-endpoint-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "missing-endpoint-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "missing-endpoint-BASE-01",
+              "missing-endpoint-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "missing-endpoint-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "missing-endpoint-CAND-01",
+              "missing-endpoint-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "missing-required-endpoint-receipt-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "missing-endpoint-BASE-01",
+                "cluster_id": "missing-required-endpoint-receipt-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "missing-endpoint-BASE-02",
+                "cluster_id": "missing-required-endpoint-receipt-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "missing-endpoint-CAND-01",
+                "cluster_id": "missing-required-endpoint-receipt-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "missing-endpoint-CAND-02",
+                "cluster_id": "missing-required-endpoint-receipt-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "missing-endpoint-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "missing-endpoint-BASE-01",
+                "missing-endpoint-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "missing-endpoint-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "missing-endpoint-CAND-01",
+                "missing-endpoint-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "missing-required-endpoint-receipt-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Every required endpoint must have a method-qualified bridge receipt."
+    },
+    {
+      "id": "same-observation-reused-for-baseline-and-candidate",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "reuse-BASE-01",
+            "reuse-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "reuse-CAND-01",
+            "reuse-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "reuse-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "reuse-BASE-01",
+              "reuse-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "reuse-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "reuse-CAND-01",
+              "reuse-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "reuse-BASE-01",
+                "cluster_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "reuse-BASE-02",
+                "cluster_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "reuse-CAND-01",
+                "cluster_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "reuse-CAND-02",
+                "cluster_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "reuse-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "reuse-BASE-01",
+                "reuse-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "reuse-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "reuse-CAND-01",
+                "reuse-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A single observation receipt cannot represent both independent cohorts."
+    },
+    {
+      "id": "protocol-mismatch-rejects-comparison",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "protocol-mismatch-BASE-01",
+            "protocol-mismatch-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "protocol-mismatch-CAND-01",
+            "protocol-mismatch-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "protocol-mismatch-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-BASE-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "protocol-mismatch-BASE-01",
+              "protocol-mismatch-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "protocol-mismatch-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-CAND-02",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "protocol-mismatch-CAND-01",
+              "protocol-mismatch-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "protocol-mismatch-BASE-01",
+                "cluster_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "protocol-mismatch-BASE-02",
+                "cluster_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "protocol-mismatch-CAND-01",
+                "cluster_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "protocol-mismatch-CAND-02",
+                "cluster_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "protocol-mismatch-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-BASE-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "protocol-mismatch-BASE-01",
+                "protocol-mismatch-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "protocol-mismatch-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-CAND-02",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "protocol-mismatch-CAND-01",
+                "protocol-mismatch-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Baseline and candidate comparisons must use the same test protocol revision and digest."
+    },
+    {
+      "id": "endpoint-claim-cannot-be-reused-as-failure-mode",
+      "baseline_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "rigid_plastic_pair",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "extra-endpoint-BASE-01",
+            "extra-endpoint-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "extra-endpoint-CAND-01",
+            "extra-endpoint-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "extra-endpoint-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "extra-endpoint-BASE-01",
+              "extra-endpoint-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "extra-endpoint-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "extra-endpoint-CAND-01",
+              "extra-endpoint-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "extra-endpoint-BASE-01",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "extra-endpoint-BASE-02",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "extra-endpoint-CAND-01",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "extra-endpoint-CAND-02",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "extra-endpoint-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "extra-endpoint-BASE-01",
+                "extra-endpoint-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "extra-endpoint-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "extra-endpoint-CAND-01",
+                "extra-endpoint-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        },
+        {
+          "endpoint": "failure_mode_fraction",
+          "baseline_specimen_ids": [
+            "extra-endpoint-BASE-01",
+            "extra-endpoint-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "extra-endpoint-CAND-01",
+            "extra-endpoint-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "extra-endpoint-BASE-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "extra-endpoint-BASE-01",
+              "extra-endpoint-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "extra-endpoint-CAND-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "extra-endpoint-CAND-01",
+              "extra-endpoint-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "failure_mode_fraction",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN",
+              "endpoint_id": "failure_mode_fraction",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "extra-endpoint-BASE-01",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "extra-endpoint-BASE-02",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "extra-endpoint-CAND-01",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "extra-endpoint-CAND-02",
+                "cluster_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "extra-endpoint-BASE-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "extra-endpoint-BASE-01",
+                "extra-endpoint-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "extra-endpoint-CAND-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "extra-endpoint-CAND-01",
+                "extra-endpoint-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "failure_mode_fraction",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A receipt for apparent shear cannot be reused to claim a different failure-mode endpoint."
+    },
+    {
+      "id": "frp-pair-class-change-rejects-transfer",
+      "baseline_profile": {
+        "material_pair_class": "frp_to_frp",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "frp_to_metal",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "valid-d5868-BASE-01",
+            "valid-d5868-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "valid-d5868-CAND-01",
+            "valid-d5868-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "frp-pair-class-change-BASE-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d5868-BASE-01",
+              "valid-d5868-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "frp-pair-class-change-CAND-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_metal",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d5868-CAND-01",
+              "valid-d5868-CAND-02"
+            ]
+          },
+          "equivalence_design": {
+            "design_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN",
+            "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "endpoint_id": "apparent_shear_strength",
+            "estimand": "candidate_minus_baseline_mean_apparent_shear_strength",
+            "quantity_unit": "MPa",
+            "analysis_profile": "two_sample_tost_v1",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "material_lot",
+            "margin_lower": -5,
+            "margin_upper": 5,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "planned_min_baseline_specimens": 2,
+            "planned_min_candidate_specimens": 2,
+            "planned_min_baseline_clusters": 2,
+            "planned_min_candidate_clusters": 2,
+            "max_specimen_attrition_rate": 0.25,
+            "max_cluster_attrition_rate": 0.25,
+            "target_power": 0.8,
+            "target_precision_half_width": 2.5,
+            "power_receipt": {
+              "receipt_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-POWER",
+              "calculation_sha256": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "design_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN",
+              "endpoint_id": "apparent_shear_strength",
+              "independent_unit": "material_lot",
+              "grouping_scheme": "independent_arms",
+              "planned_baseline_clusters": 2,
+              "planned_candidate_clusters": 2,
+              "target_power": 0.8,
+              "target_precision_half_width": 2.5,
+              "method_ref": "symthaea-statistics:power-planning-reference-v1",
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
+            },
+            "baseline_samples": [
+              {
+                "specimen_id": "valid-d5868-BASE-01",
+                "cluster_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-BASE-LOT-1"
+              },
+              {
+                "specimen_id": "valid-d5868-BASE-02",
+                "cluster_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-BASE-LOT-2"
+              }
+            ],
+            "candidate_samples": [
+              {
+                "specimen_id": "valid-d5868-CAND-01",
+                "cluster_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-CAND-LOT-1"
+              },
+              {
+                "specimen_id": "valid-d5868-CAND-02",
+                "cluster_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-CAND-LOT-2"
+              }
+            ],
+            "excluded_samples": [],
+            "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+            "baseline_method_receipt": {
+              "id": "frp-pair-class-change-BASE-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "valid-d5868-BASE-01",
+                "valid-d5868-BASE-02"
+              ]
+            },
+            "candidate_method_receipt": {
+              "id": "frp-pair-class-change-CAND-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_metal",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-SAME-01",
+              "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+              "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "valid-d5868-CAND-01",
+                "valid-d5868-CAND-02"
+              ]
+            },
+            "analysis_result": {
+              "result_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-RESULT",
+              "result_sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+              "design_id": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN",
+              "plan_sha256": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+              "endpoint_id": "apparent_shear_strength",
+              "analysis_profile": "two_sample_tost_v1",
+              "margin_lower": -5,
+              "margin_upper": 5,
+              "alpha": 0.05,
+              "confidence_level": 0.9,
+              "sample_manifest_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+              "baseline_sample_count": 2,
+              "candidate_sample_count": 2,
+              "baseline_cluster_count": 2,
+              "candidate_cluster_count": 2,
+              "ci_lower": -2,
+              "ci_upper": 2,
+              "outcome": "EQUIVALENCE_ESTABLISHED"
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5868 covers both FRP-to-FRP and FRP-to-metal, but the same standard family does not establish equivalence between two different adherend pair classes."
+    }
+  ]
+}
