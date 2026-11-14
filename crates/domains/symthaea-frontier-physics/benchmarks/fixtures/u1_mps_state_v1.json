@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "U1 MPS core, dense factorization, local gates, exact charge-block split, explicit global-cap truncation, deterministic TEBD parity layers, mixed-canonical charge-block sweeps, measured exterior-isometry receipts and gate-quality-aware global L2 error ledger are source-authored. Exact-head Rust 1.96 harness pending.",
+  "execution_status": "U1 MPS state, charge-block factorization, local gates, exact split, explicit truncation, canonical-gauge receipts, deterministic TEBD layers, Hamiltonian-generated U1 gates and symmetric second-order Strang stepper are source-authored. Exact-head Rust 1.96 Strang harness pending.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -274,6 +274,51 @@
         "tebd_rejects_a_gate_constructed_with_a_looser_unitarity_tolerance",
         "tebd_global_error_receipt_includes_gate_unitarity_defect"
       ]
+    },
+    "hamiltonian_gate_generation": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TwoSiteGate::from_hermitian_u1_hamiltonian(H, dt, tolerance)",
+      "convention": "Basis |00>,|01>,|10>,|11>; U=exp(-i dt H).",
+      "algorithm": "Scalar exponentials in charge 0 and 2, analytic Hermitian 2x2 exponential in charge 1.",
+      "checks": [
+        "finite entries",
+        "Hermiticity residual",
+        "cross-charge Hamiltonian leakage",
+        "generated gate unitarity",
+        "generated gate U1 conservation"
+      ],
+      "receipt_fields": [
+        "time_step",
+        "hamiltonian_charge_leakage_residual",
+        "hamiltonian_hermiticity_residual",
+        "gate_unitarity_residual",
+        "gate_charge_conservation_residual"
+      ],
+      "authored_tests": [
+        "hermitian_u1_hamiltonian_exponential_matches_analytic_xy_rotation",
+        "hermitian_u1_hamiltonian_exponential_handles_complex_exchange_phase_and_reverses",
+        "hermitian_u1_hamiltonian_exponential_rejects_leakage_nonhermiticity_and_bad_time"
+      ]
+    },
+    "tebd_strang_stepper": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TeBDStrangStepper::new(site_count, bond_hamiltonians, time_step, tolerance)",
+      "composition": "even(dt/2) -> odd(dt) -> even(dt/2)",
+      "order": 2,
+      "outputs": [
+        "three ordered U1TeBDLayerResult receipts",
+        "input_norm_squared",
+        "output_norm_squared",
+        "global_compression_error_bound_upper",
+        "global_compression_error_bound_qualified",
+        "trotter_error_bound"
+      ],
+      "qualification": "Global compression bound is for the discrete Strang gate product only. It excludes continuous-time Strang/Trotter discretization error; trotter_error_bound remains None.",
+      "authored_tests": [
+        "strang_stepper_executes_even_odd_even_and_preserves_charge_norm_and_receipts",
+        "strang_stepper_has_second_order_global_convergence_against_dense_exact_dynamics",
+        "strang_stepper_rejects_bad_site_and_bond_counts"
+      ]
     }
   },
   "known_answers": [
@@ -472,7 +517,13 @@
     "reuse a gate constructed under a looser unitarity tolerance in a stricter TEBD layer",
     "claim a global state-vector bound while omitting gate unitarity defect",
     "claim a global U1 bound while omitting gate charge-off-block residual",
-    "detach per-gate truncation diagnostics from the canonical-gauge and gate-quality receipt"
+    "detach per-gate truncation diagnostics from the canonical-gauge and gate-quality receipt",
+    "local Hamiltonian couples different total U1 charge sectors",
+    "local Hamiltonian is not Hermitian",
+    "complex off-diagonal exchange phase is conjugated with the wrong sign",
+    "Strang layers are applied in odd/even/odd order instead of even/odd/even",
+    "report compression error bound as a bound on continuous-time Strang error",
+    "claim Trotter temporal bound without a Hamiltonian commutator certificate"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -538,7 +589,15 @@
     "gate_unitarity_distance_upper_bound",
     "gate_charge_distance_upper_bound",
     "per_gate_receipt_bond_index",
-    "per_gate_receipt_global_l2_error_contribution"
+    "per_gate_receipt_global_l2_error_contribution",
+    "local_hamiltonian_time_step",
+    "local_hamiltonian_hermiticity_residual",
+    "local_hamiltonian_charge_leakage_residual",
+    "strang_trotter_order",
+    "strang_layer_sequence",
+    "global_compression_error_bound_upper",
+    "global_compression_error_bound_qualified",
+    "trotter_error_bound_status"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
@@ -562,6 +621,15 @@
       ],
       "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error."
     },
-    "differentiator": "Per-operation charge-sector receipts, separation of truncation sources and cumulative error accounting with explicit assumptions."
+    "differentiator": "Per-operation charge-sector receipts, separation of truncation sources and cumulative error accounting with explicit assumptions.",
+    "tenpy": {
+      "reference": "https://tenpy.readthedocs.io/en/latest/reference/tenpy.algorithms.tebd.html",
+      "capabilities": [
+        "even/odd nearest-neighbour TEBD",
+        "higher-order Suzuki/TEBD schemes",
+        "truncation error returned after each bond update"
+      ],
+      "fairness": "Match local Hamiltonian, dt, integrator order, truncation policy, canonical form, initial state and observable/dense-oracle checkpoints."
+    }
   }
 }
