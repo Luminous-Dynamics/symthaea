@@ -1,0 +1,11 @@
+[package]
+name = "capability-qualified-edit-planner"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Deterministic planner for typed, capability-qualified audio edit DAGs"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
