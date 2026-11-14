@@ -720,7 +720,7 @@ pub fn parse_musicxml_part_notation_graph(
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
-                part_id,
+                part_id: part_id.clone(),
                 map: MeasureMap {
                     source_id: format!("{source_id}#part={}", part_id),
                     score_clock_id: score_clock_id.to_string(),
@@ -905,7 +905,7 @@ fn parse_playback_controls_for_inputs(
             let mut path = Vec::new();
             let mut current = Some(node);
             while let Some(ancestor) = current {
-                if ancestor == *measure {
+                if ancestor == *content {
                     path.push("measure".to_string());
                     break;
                 }
