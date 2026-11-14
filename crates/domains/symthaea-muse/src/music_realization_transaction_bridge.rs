@@ -92,6 +92,9 @@ pub struct MusicRealizerExecutionEventV1 {
     /// One-based contiguous event position.
     pub sequence: u64,
     pub state: MusicRealizerExecutionEventStateV1,
+    /// Provider request ID or adapter-generated immutable submission ID.
+    /// The verifier requires this correlation identity on every event so a
+    /// completion/reconciliation cannot be attached to a different request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_request_id: Option<String>,
     /// Reconciliation events must name the earlier OutcomeUnknown sequence.
