@@ -22,8 +22,9 @@ use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
 pub mod identity;
-pub mod viability;
 pub mod reconfiguration;
+pub mod viability;
+pub mod semantic_continuity;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
@@ -34,11 +35,17 @@ pub use identity::{
     ContinuityReport, RelationMode, StateId, StateProfile, Transition, TransitionSystem,
     evaluate_operational_continuity,
 };
+pub use semantic_continuity::{
+    AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
+    EffectReversibility, EvidenceRef, EvidenceStatus, GrantStatus, LineageStep,
+    SemanticContinuityPolicy, SemanticContinuityReport, SemanticFinding,
+    SemanticFindingCode, SemanticPlane, SemanticTransition, SemanticTransitionKey,
+    SubstrateDependency, evaluate_semantic_continuity,
+};
 pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
-    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode,
-    ReconfigurationPolicy, ReconfigurationQualification, ReconfigurationReport,
-    evaluate_reconfiguration,
+    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode, ReconfigurationPolicy,
+    ReconfigurationQualification, ReconfigurationReport, evaluate_reconfiguration,
 };
 
 macro_rules! string_id {
