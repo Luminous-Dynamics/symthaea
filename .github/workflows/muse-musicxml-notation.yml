@@ -70,6 +70,7 @@ jobs:
         run: |
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
+            crates/domains/symthaea-muse/src/musicxml_notation_eval.rs \
             crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
             crates/domains/symthaea-muse/src/bin/muse_studio.rs \
             crates/domains/symthaea-muse/src/lib.rs \
