@@ -1,0 +1,1183 @@
+{
+  "schema_version": "0.1.0",
+  "map_id": "symthaea:readme-and-active-workstream-projection:2026-11-14",
+  "repository": {
+    "canonical_name": "Luminous-Dynamics/symthaea",
+    "visibility": "public",
+    "default_branch": "main"
+  },
+  "snapshot": {
+    "revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+    "tree_digest": "74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
+    "tree_digest_algorithm": "git_tree_oid_sha1",
+    "observed_at": "2026-11-14T07:07:00.000Z",
+    "parent_snapshot": null,
+    "source_event_high_watermark": null,
+    "configuration_world": {
+      "map_kind": "read_only_source_projection",
+      "source_scope": "README.md and selected public GitHub issues"
+    }
+  },
+  "extractor": {
+    "name": "manual-readonly-readme-and-issue-projection",
+    "version": "0.1.0",
+    "build_digest": null
+  },
+  "nodes": [
+    {
+      "id": "symthaea:project",
+      "type": "project",
+      "label": "Symthaea",
+      "claim_state": "observed",
+      "attributes": {
+        "description": "Experimental cognitive architecture for verifiable state transitions, representation mechanisms, consciousness-relevant computational indicators, and privacy-preserving attestation.",
+        "declared_scope": "Root README description",
+        "main_revision": "dcffe1060ece4815cf42548a8f646cec4f075535"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L3-L8",
+            "path": "README.md",
+            "line_start": 3,
+            "line_end": 8,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Project description is source-declared and is not an independent system audit."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:capability:hdc",
+      "type": "capability",
+      "label": "Hyperdimensional computing",
+      "claim_state": "observed",
+      "attributes": {
+        "declared_dimensions": "16,384D binary + continuous",
+        "README_core_crate": "symthaea-core",
+        "README_test_count": "3K+",
+        "capability_status": "README describes HDC vectors and operations; exact current-head runtime qualification not re-run by this snapshot."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L8-L8",
+            "path": "README.md",
+            "line_start": 8,
+            "line_end": 8,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Capability declaration; no current build, test or runtime execution was performed."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:capability:cfc",
+      "type": "capability",
+      "label": "Closed-form liquid neural dynamics",
+      "claim_state": "observed",
+      "attributes": {
+        "acronym": "CfC",
+        "evidence_table": "CfC temporal proof and CfC+sigmoid circuit timings are reported in README.",
+        "README_core_crate": "symthaea-core",
+        "README_test_count": "3K+"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L8-L8",
+            "path": "README.md",
+            "line_start": 8,
+            "line_end": 8,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Source-declared capability; listed circuit benchmark values are not independently re-run by this snapshot."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:capability:zkp",
+      "type": "capability",
+      "label": "Zero-knowledge proof stack",
+      "claim_state": "observed",
+      "attributes": {
+        "stated_examples": [
+          "HDC XOR binding",
+          "health-value range proof",
+          "selective credential disclosure",
+          "federated-learning aggregation",
+          "verifiable search",
+          "cognitive-loop state-transition proof"
+        ],
+        "README_core_crate": "mycelix-zkp-core",
+        "README_test_count": "65+",
+        "explicit_non_claims": [
+          "not HIPAA certification",
+          "not eIDAS 2.0 wallet certification",
+          "computation proof is not consciousness proof"
+        ]
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L18-L20",
+            "path": "README.md",
+            "line_start": 18,
+            "line_end": 20,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Performance and primitive claims are reproduced internally per README, not independently audited."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:capability:language-generation",
+      "type": "capability",
+      "label": "Broca language generation",
+      "claim_state": "observed",
+      "attributes": {
+        "README_crate": "symthaea-broca",
+        "README_claimed_method": "CfC-HDC thought-to-text",
+        "README_test_count": "229+"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L101-L110",
+            "path": "README.md",
+            "line_start": 101,
+            "line_end": 110,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "README-level crate description only; no current dialogue benchmark or executable training path was independently inspected."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:capability:consciousness-measurement",
+      "type": "capability",
+      "label": "Consciousness-relevant computational indicators",
+      "claim_state": "observed",
+      "attributes": {
+        "declared_scope": "IIT-inspired Φ and Butlin indicator probes",
+        "construct_validity": "4/12 probe rows survive internal construct-validity re-check; 1 has scope-limited empirical support",
+        "explicit_non_claim": "not evidence of consciousness, sentience or general intelligence"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L8-L25",
+            "path": "README.md",
+            "line_start": 8,
+            "line_end": 25,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Not a consciousness or sentience claim. The README explicitly describes construct-validity limitations."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:evidence:retractions",
+      "type": "evidence",
+      "label": "Publicly documented benchmark correction and retractions",
+      "claim_state": "observed",
+      "attributes": {
+        "example": "Hendrycks Ethics earlier 91.1%/94.5%/84.7% figures retracted as leakage-inflated; corrected 2026-07-15 result is 56.2% overall according to README.",
+        "process": "README states incorrect results are retained and documented rather than erased."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L21-L25",
+            "path": "README.md",
+            "line_start": 21,
+            "line_end": 25,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "The snapshot records what README declares; it does not reproduce the benchmark."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:development:repo-twin",
+      "type": "development_action",
+      "label": "Repository-twin typed graph and change-impact benchmark",
+      "claim_state": "proposed",
+      "attributes": {
+        "issue_number": 10173,
+        "status": "open",
+        "last_updated": "2026-11-14T06:59:20Z",
+        "issue_title": "Build a repository-twin gold set for typed graph accuracy and change-impact prediction",
+        "current_fixture_declaration": "five-crate synthetic Rust workspace; 32 nodes; 37 edges; seven mutation scenarios; ten Cargo target/feature worlds",
+        "execution_status": "design_only; no compiler/LSP/fixture execution claimed in current issue history",
+        "role": "owns repository graph and code-change-impact gold set"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10173",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue describes design-only benchmark work; fixture existence and expected graph are not an executed semantic result."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:development:ceb-intelligence",
+      "type": "development_action",
+      "label": "Engineering context, review, secure correctness and Rust semantics",
+      "claim_state": "proposed",
+      "attributes": {
+        "issue_number": 10419,
+        "status": "open",
+        "last_updated": "2026-11-07T15:18:26Z",
+        "issue_title": "CEB-INTELLIGENCE-001: evaluate context retrieval, code review, secure correctness and Rust semantics",
+        "execution_boundary": "design-only task authoring until isolation, trust and evaluator-custody prerequisites are satisfied"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10419",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue is an open research/task-authoring plan; target metrics are prospective."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:development:collaboration",
+      "type": "development_action",
+      "label": "Human-agent engineering collaboration and handoff qualification",
+      "claim_state": "proposed",
+      "attributes": {
+        "issue_number": 10637,
+        "status": "open",
+        "last_updated": "2026-11-05T20:24:06Z",
+        "issue_title": "CEB-COLLAB-001: qualify process adherence, handoff quality and human-agent engineering collaboration"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10637",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue describes benchmark design and prospective gates, not measured agent collaboration performance."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:development:judge-qualification",
+      "type": "development_action",
+      "label": "Independent task judges and evidence oracles",
+      "claim_state": "proposed",
+      "attributes": {
+        "issue_number": 11772,
+        "status": "open",
+        "last_updated": "2026-11-13T14:32:30Z",
+        "issue_title": "research(memory): qualify independent task judges and evidence oracles",
+        "claim_ceiling": "measurement reliability only; not evidence of actual execution authority or correctness"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/11772",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue is open; judge qualification targets are proposals, not achieved results."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:authority:execution-isolation",
+      "type": "authority_boundary",
+      "label": "Unqualified host runner is not a security isolation boundary",
+      "claim_state": "observed",
+      "attributes": {
+        "issue_number": 10064,
+        "status": "open",
+        "last_updated": "2026-11-04T17:53:22Z",
+        "issue_title": "Code execution sandbox is an opt-in host runner, not an isolation boundary",
+        "restriction": "Do not execute repository-controlled builds, tests, build scripts, procedural macros or candidate programs outside a qualified OS-level isolation boundary.",
+        "scope": "repository-controlled execution only"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10064",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue reports a source-level security finding; this snapshot does not independently reproduce the sandbox audit."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:development:dynmap",
+      "type": "development_action",
+      "label": "Evidence-grounded dynamical development intelligence",
+      "claim_state": "proposed",
+      "attributes": {
+        "issue_number": 12020,
+        "status": "open",
+        "last_updated": "2026-11-14T07:03:43Z",
+        "issue_title": "DYNMAP-001: evidence-grounded dynamical development intelligence",
+        "draft_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/12024",
+        "plan": "compose repository-twin, intent/capability traceability, evidence lifecycle, temporal replay, cross-repository contracts and constrained planning"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/12020",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "This map proposal is itself an open workstream, not an implemented capability."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "symthaea:edge:001",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:capability:hdc",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L8-L8",
+            "path": "README.md",
+            "line_start": 8,
+            "line_end": 8,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Capability declaration; no current build, test or runtime execution was performed."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:002",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:capability:cfc",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L8-L8",
+            "path": "README.md",
+            "line_start": 8,
+            "line_end": 8,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Source-declared capability; listed circuit benchmark values are not independently re-run by this snapshot."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:003",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:capability:zkp",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L18-L20",
+            "path": "README.md",
+            "line_start": 18,
+            "line_end": 20,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Performance and primitive claims are reproduced internally per README, not independently audited."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:004",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:capability:language-generation",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L101-L110",
+            "path": "README.md",
+            "line_start": 101,
+            "line_end": 110,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "README-level crate description only; no current dialogue benchmark or executable training path was independently inspected."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:005",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:capability:consciousness-measurement",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L8-L25",
+            "path": "README.md",
+            "line_start": 8,
+            "line_end": 25,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "Not a consciousness or sentience claim. The README explicitly describes construct-validity limitations."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:006",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:evidence:retractions",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/dcffe1060ece4815cf42548a8f646cec4f075535/README.md#L21-L25",
+            "path": "README.md",
+            "line_start": 21,
+            "line_end": 25,
+            "digest": "609c1424ce0ab9349fa961f9c1c3b8e55f89dcf2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": "root-README-only",
+        "limitations": [
+          "The snapshot records what README declares; it does not reproduce the benchmark."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:007",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:development:repo-twin",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10173",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue describes design-only benchmark work; fixture existence and expected graph are not an executed semantic result."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:008",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:development:ceb-intelligence",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10419",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue is an open research/task-authoring plan; target metrics are prospective."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:009",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:development:collaboration",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10637",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue describes benchmark design and prospective gates, not measured agent collaboration performance."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:010",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:development:judge-qualification",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/11772",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue is open; judge qualification targets are proposals, not achieved results."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:011",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:authority:execution-isolation",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10064",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Issue reports a source-level security finding; this snapshot does not independently reproduce the sandbox audit."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:012",
+      "from": "symthaea:project",
+      "relation": "contains",
+      "to": "symthaea:development:dynmap",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/12020",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "This map proposal is itself an open workstream, not an implemented capability."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:013",
+      "from": "symthaea:development:dynmap",
+      "relation": "depends_on",
+      "to": "symthaea:development:repo-twin",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/12020",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:014",
+      "from": "symthaea:development:dynmap",
+      "relation": "depends_on",
+      "to": "symthaea:development:ceb-intelligence",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/12020",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:015",
+      "from": "symthaea:development:dynmap",
+      "relation": "depends_on",
+      "to": "symthaea:development:collaboration",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/12020",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:016",
+      "from": "symthaea:development:dynmap",
+      "relation": "depends_on",
+      "to": "symthaea:development:judge-qualification",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/12020",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:017",
+      "from": "symthaea:development:repo-twin",
+      "relation": "blocked_by",
+      "to": "symthaea:authority:execution-isolation",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10173",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "symthaea:edge:018",
+      "from": "symthaea:development:ceb-intelligence",
+      "relation": "blocked_by",
+      "to": "symthaea:authority:execution-isolation",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "issue",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/issues/10419",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-readme-and-issue-projection",
+          "version": "0.1.0",
+          "build_digest": null
+        },
+        "observed_at": "2026-11-14T07:07:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    }
+  ],
+  "limitations": [
+    "This is a bounded README and selected-issue projection, not a full code or capability map.",
+    "README claims are source-declared, not independently rebuilt or tested by this snapshot.",
+    "The historical Honest Status document is dated 2026-02-05 and must not be treated as a current-head audit.",
+    "Issue status is observed at map generation time and must be refreshed; issue descriptions are proposals/observations, not test evidence.",
+    "No Rust source, build script, test, procedural macro, candidate program or benchmark was executed.",
+    "The current execution-isolation blocker #10064 remains in force; this snapshot does not qualify a replacement sandbox.",
+    "Consciousness indicator rows are explicitly not evidence of consciousness or sentience.",
+    "ZKP primitive demonstrations are not regulatory compliance certifications."
+  ]
+}
