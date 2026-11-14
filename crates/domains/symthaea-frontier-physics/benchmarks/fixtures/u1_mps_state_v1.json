@@ -6,8 +6,8 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "U1 MPS core, exact charge-block split, global truncation receipts, mixed-canonical gauge sweeps, and TEBD integration of gauge-weighted global error contributions are source-authored. Exact-head Rust 1.96 harness pending.",
-  "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
+  "execution_status": "U1 MPS core, exact charge-block factorization/splitting, truncation diagnostics, mixed-canonical gauge receipts, canonical-gauge-weighted global TEBD truncation ledger, analytic U1 two-site Hamiltonian exponentiation and Strang time-stepper are source-authored. Exact-head Rust 1.96 harness pending.",
+  "claim_ceiling": "Second-order nearest-neighbour real-time U1 evolution and canonical-gauge-qualified global truncation bound are source-authored. Trotter discretization error and formal interval-arithmetic roundoff bounds are not yet qualified. No SOTA performance or quantum-advantage claim.",
   "conventions": {
     "physical_dimension": 2,
     "physical_charges": [
@@ -273,6 +273,46 @@
         "global_l2_bound_qualified"
       ],
       "claim_ceiling": "The code computes a conservative candidate bound; no global error claim is qualified until the new exact-head harness and dense sequential-circuit oracle tests pass."
+    },
+    "strang_time_stepper": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "U1TwoSiteHamiltonian::new(matrix,tolerance)",
+        "U1TwoSiteHamiltonian::real_time_gate(time_step,tolerance)",
+        "U1TeBDStrangStepper::new(bond_hamiltonians,time_step,tolerance)",
+        "U1TeBDStrangStepper::apply(input,truncation_policy)"
+      ],
+      "hamiltonian": {
+        "basis": [
+          "|00>",
+          "|01>",
+          "|10>",
+          "|11>"
+        ],
+        "structure": "Hermitian 1 ⊕ 2 ⊕ 1 block structure under total excitation number.",
+        "exponentiation": "Analytic exponential of two 1x1 sectors and Hermitian 2x2 single-excitation sector; output is revalidated as a unitary U(1)-preserving gate."
+      },
+      "formula": "exp(-i*dt*H_even/2) exp(-i*dt*H_odd) exp(-i*dt*H_even/2)",
+      "order": 2,
+      "output_receipts": [
+        "time_step",
+        "trotter_order",
+        "three_layer_bond_receipts",
+        "input_norm_squared",
+        "output_norm_squared",
+        "total_charge",
+        "global_truncation_l2_error_upper_bound",
+        "global_truncation_bound_qualified",
+        "trotter_error_bound",
+        "trotter_error_qualified"
+      ],
+      "error_boundary": "Global truncation bound covers only canonical-gauge-qualified compression contributions under unitary gates/no renormalization. Product-formula Trotter error is explicitly not bounded; trotter_error_bound=None and trotter_error_qualified=false.",
+      "authored_tests": [
+        "two_site_hamiltonian_exponential_matches_analytic_xy_rotation",
+        "two_site_hamiltonian_rejects_nonhermitian_and_charge_changing_terms",
+        "two_site_strang_step_equals_direct_exponential_and_reverse_step",
+        "three_site_xy_chain_strang_step_has_second_order_global_convergence"
+      ]
     }
   },
   "known_answers": [
@@ -438,6 +478,41 @@
         "local truncation measurements remain available when global qualification fails",
         "sequential gate circuits agree with exact dense-oracle state-vector residual bounds for N<=10"
       ]
+    },
+    {
+      "id": "MPS-6",
+      "name": "Analytic U(1) two-site Hamiltonian exponentiation",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "reject non-Hermitian matrices",
+        "reject cross-charge Hamiltonian terms",
+        "analytic 1⊕2⊕1 block exponential matches XY known answer",
+        "resulting 4x4 gate passes unitarity and charge checks"
+      ]
+    },
+    {
+      "id": "MPS-7",
+      "name": "Second-order real-time Strang TEBD",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "even-half / odd-full / even-half deterministic layer order",
+        "two-site chain matches direct single-bond exponential",
+        "negative time step reverses the single-bond evolution",
+        "three-site XY chain matches analytic continuous-time solution",
+        "halving dt reduces global Trotter error by approximately 4",
+        "total U(1) charge and norm receipts after each step"
+      ]
+    },
+    {
+      "id": "MPS-8",
+      "name": "Separate truncation, Trotter and floating-point error budgets",
+      "status": "planned",
+      "acceptance": [
+        "global truncation error bound independently checked against dense oracle",
+        "Trotter estimator from step-doubling or commutator bound",
+        "roundoff contribution bounded or explicitly left as numerical residual",
+        "combined total error budget is sum of independently qualified terms"
+      ]
     }
   ],
   "negative_controls": [
@@ -484,7 +559,13 @@
     "global TEBD bound omits exterior operator-norm amplification",
     "global TEBD bound remains qualified after one invalid gauge receipt",
     "gauge receipt is applied to a different bond or total-charge sector",
-    "global TEBD bound is claimed after implicit nonlinear renormalization"
+    "global TEBD bound is claimed after implicit nonlinear renormalization",
+    "accept non-Hermitian two-site Hamiltonian",
+    "accept Hamiltonian terms that change total U(1) charge",
+    "wrong sign in exp(-i dt H) phase convention",
+    "Strang layer order differs from even-half/odd-full/even-half",
+    "claim global physical evolution accuracy from truncation bound while Trotter error is unqualified",
+    "report second-order convergence without analytic dense reference"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -545,7 +626,21 @@
     "tebd_gate_global_error_contribution",
     "tebd_cumulative_global_l2_error_upper_bound",
     "tebd_global_error_qualified",
-    "tebd_failed_gauge_receipt_count"
+    "tebd_failed_gauge_receipt_count",
+    "bond_hamiltonian_hermiticity_residuals",
+    "bond_hamiltonian_charge_conservation_residuals",
+    "real_time_gate_unitarity_residuals",
+    "real_time_gate_charge_residuals",
+    "integrator_name",
+    "trotter_order",
+    "time_step",
+    "strang_layer_parity_sequence",
+    "strang_layer_global_truncation_bounds",
+    "strang_global_truncation_error_bound",
+    "trotter_error_bound",
+    "trotter_error_qualified",
+    "energy_drift",
+    "charge_drift"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
@@ -553,22 +648,36 @@
       "capabilities": [
         "CircuitMPS max_bond",
         "cutoff",
-        "gate_opts",
-        "auto-mps swap+split for two-qubit gates",
-        "norm-based fidelity_estimate",
-        "error_estimate"
+        "gate_opts and compress_opts",
+        "direct SVD, density-matrix and successive-randomized compression modes",
+        "auto-mps two-site gate contraction and swap/split variants",
+        "norm-based fidelity_estimate and error_estimate",
+        "lazy/permuted MPS option to trade qubit-order tracking for gate efficiency"
       ],
       "fairness": "Same initial vector, gate sequence, qubit order, dtype, cutoff policy, bond cap, hardware and measurement checkpoints."
     },
     "itensor": {
-      "reference": "https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html",
+      "reference": "https://docs.itensor.org/ITensorMPS/stable/tutorials/MPSTimeEvolution.html",
       "capabilities": [
-        "Abelian quantum-number conserving MPS",
-        "block-sparse tensor storage",
-        "symmetry constraints propagated by QN-aware indices"
+        "QN-conserving MPS with fixed total quantum-number sector",
+        "TEBD/Trotter-Suzuki local Hamiltonian gate evolution",
+        "apply(gates,psi; cutoff) with maxdim/cutoff truncation",
+        "orthogonalize MPS gauge before two-site gate and SVD",
+        "MPS/MPO expectation and energy observables"
       ],
-      "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error."
+      "fairness": "Same local Hamiltonian, initial total-charge sector, spatial order, time-step, Trotter order, cutoff, max bond, dtype, backend/hardware and observable checkpoints."
     },
-    "differentiator": "Per-operation charge-sector receipts, separation of truncation sources and cumulative error accounting with explicit assumptions."
+    "differentiator": "Per-gate charge-sector and canonical-gauge receipts; a dense sequential-circuit falsification of the global truncation bound; analytic block Hamiltonian exponentiation; separate truncation and Trotter status. MPS/QN/TEBD capability itself is not novel."
+  },
+  "proposed_targets": {
+    "trotter_order_two_step_halving_error_ratio": "3.3..4.8 in asymptotic second-order regime",
+    "dense_oracle_global_truncation": "measured dense state-vector residual <= canonical-gauge global truncation bound + documented floating-point allowance",
+    "performance": "At equal measured state error, target >=20% lower runtime OR peak memory on a preregistered U(1)-dominated workload versus best Quimb and ITensor configuration",
+    "scale_points": [
+      16,
+      32,
+      64
+    ],
+    "note": "All targets are prospective, not achieved results."
   }
 }

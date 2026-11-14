@@ -133,25 +133,56 @@ where \(\delta^{\mathrm{gauge}}_j\) is the measured MPS state-reconstruction L2 
 
 A single missing, mismatched or failing receipt invalidates the global bound for the entire layer. The local discarded-weight ledger remains available, but the global upper bound is cleared and cannot be silently re-enabled later in that layer. Every result carries both the individual receipts and the global qualification flag.
 
+
+## U(1)-conserving Hamiltonian evolution and Strang time stepping
+
+The real-time layer connects local physics to the already-qualified gate/split/compression path.
+
+- \`U1TwoSiteHamiltonian::new\` validates finite entries, Hermiticity and the U(1) block structure in basis \(|00\rangle,|01\rangle,|10\rangle,|11\rangle\).
+- \`real_time_gate(dt)\` analytically evaluates \(e^{-i\,dt\,h}\): independent phases in the zero- and two-excitation sectors plus a closed-form Hermitian \(2\times2\) exponential in the single-excitation sector.
+- \`U1TeBDStrangStepper::new\` takes one nearest-neighbour Hamiltonian per bond and creates even half-step and odd full-step gate layers.
+- \`apply\` executes even-half / odd-full / even-half, returning each layer's canonical-gauge and truncation receipts, charge, norm and the cumulative *truncation-only* global L2 bound.
+- Trotter/product-formula error is separate: \`trotter_error_bound = None\` and \`trotter_error_qualified = false\` until an independent estimator is implemented. The global truncation bound must never be presented as a bound against the exact continuous-time Hamiltonian flow.
+
+Known-answer tests cover the analytic two-site XY exponential, rejection of non-Hermitian or charge-changing Hamiltonians, exact two-site forward/reverse evolution, and second-order convergence of a three-site XY chain against its analytic solution. For second-order Strang, halving \(\Delta t\) should reduce the global discretization error by approximately four in the asymptotic regime.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- Second-order even/odd/even or odd/even/odd Trotter time-stepper and Hamiltonian gate generation.
-- Mixed-canonical gauge sweeps with machine-checkable exterior-isometry receipts.
-- Global circuit-level state-vector and reduced-state error bounds.
-- Nonlocal MPO evolution, adaptive time stepping and any N=16–64 scaling or matched Quimb/ITensor performance claim.
+- An independent Trotter error estimator (step-doubling, commutator bound, or embedded integrator) or adaptive time-step control.
+- Higher-order Suzuki compositions (fourth and above) or a Trotter-versus-truncation global error budget.
+- Nonlocal MPO evolution, periodic-boundary MPS, long-range Hamiltonian compression, or multi-symmetry \(U(1)^k\)/non-Abelian sectors.
+- Outward-rounded/interval arithmetic for a formal floating-point proof of every residual; current receipts are numerically qualified in f64 and must be checked against dense known-answer oracles.
+- N=16–64 scaling and matched Quimb/ITensor performance evidence.
 
-Those are the next stages. The implementation should add them in this order: Hamiltonian-to-gate generation and Strang layer composition, mixed-canonical sweeps and gauge receipts, global circuit-level error qualification, then controlled scaling against Quimb and ITensor.
+The next steps are: (1) add step-doubling and energy/observable drift receipts; (2) allocate an explicit total error budget between Trotter, truncation and floating-point contributions; (3) benchmark matched circuits and Hamiltonians against Quimb and ITensor; (4) generalize charge labels to multiple commuting conserved quantities; (5) explore a hybrid TEBD / two-site TDVP / Krylov path when entanglement growth makes fixed-bond TEBD inefficient.
 
 ## Competitive benchmark policy
 
-Quimb CircuitMPS exposes maximum bond dimension, singular-value cutoff and state-norm-based error/fidelity estimates; those are useful external controls, but raw elapsed time alone is not comparable. Match the gate tensors, qubit ordering, initial state, seeds, checkpoints, observables, bond cap and truncation policy. Compare error envelopes and dense overlap on small N before comparing throughput. ITensor's QN-conserving MPS facilities are another specialist implementation reference.
+A fair comparison is not "same \(N\)" or "same max bond" alone. Freeze and publish the initial state, conserved sector, exact gate/Hamiltonian tensors, qubit/site ordering, time step, dtype, arithmetic backend, thread count, hardware, compression semantics, checkpoints and observables.
 
-Primary external references:
+**Quimb.** Current \`CircuitMPS\` exposes \`max_bond\`, \`cutoff\`, \`gate_opts\`, and compression choices including direct SVD, density-matrix and successive-randomized compression. It also provides norm-based fidelity/error estimates. Its documentation includes 960-gate examples (one reported \(D_{\max}=143\), error about \(3.09\times10^{-3}\); a permuted-MPS variant reports \(D_{\max}=99\), error about \(1.75\times10^{-3}\) at lower runtime). These examples are useful reference points, not directly comparable benchmark results: circuits, qubit ordering and hardware settings must be matched.
+
+**ITensor/ITensorMPS.** The current TEBD tutorial constructs nearest-neighbour gates from local Hamiltonians, applies them to an MPS with a cutoff, and explicitly describes the second-order Trotter error. The QN tutorial uses QN-enabled indices and an initial state with a fixed total quantum number; the library then preserves that QN sector. This is a strong baseline for both symmetry and physical time evolution.
+
+**Our intended differentiator** is the receipt chain: per-gate charge-block ranks, local discarded weights, canonical-gauge checks, exterior norm factors, a dense sequential-circuit falsification test, and separate Trotter/truncation status. We should aim to win on *verified error per unit memory/time*, not by claiming MPS, U(1) conservation, TEBD or block-sparse tensors as novel.
+
+The benchmark ladder should be:
+1. **Exact regime:** \(N=2\ldots12\), exact dense overlap, fixed-charge random states, W/Dicke states and small XY/XXZ chains.
+2. **Numerical evolution:** Strang order-two convergence, norm/charge/energy drift, local densities and correlations, and an independent dense oracle wherever feasible.
+3. **Controlled approximation:** vary \(D_{\max}\), relative cutoff and \(\Delta t\) independently; report truncation and Trotter errors separately, and compare the dense residual against the canonical-gauge truncation bound.
+4. **Scaling:** \(N=16,32,64\) at fixed filling and several entanglement regimes; publish peak/median bond, total retained charge-block ranks, wall time, peak RSS, allocations, energy drift and bound tightness.
+5. **External matched runs:** compare Quimb direct/DM/SRC modes and ITensor QN-TEBD at equal initial states, Hamiltonians, site ordering, precision, hardware, bond caps and measured global error.
+
+Proposed research targets—not current results—are: a second-order convergence ratio between 3.3 and 4.8 under step halving; dense-oracle residual below the reported truncation bound plus the documented roundoff allowance; and, at equal measured error, at least 20% lower peak memory or runtime on a pre-registered U(1)-dominated workload. If neither resource target is achieved, retain the auditability value proposition and do not claim SOTA superiority.
+
+Primary references:
 - Quimb CircuitMPS API: https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html
 - Quimb MPS circuit guide: https://quimb.readthedocs.io/en/latest/circuit/circuit-mps.html
-- ITensor QN conserving MPS documentation: https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html
+- ITensor QN-conserving DMRG: https://docs.itensor.org/ITensorMPS/stable/tutorials/QN_DMRG.html
+- ITensor MPS time evolution / TEBD: https://docs.itensor.org/ITensorMPS/stable/tutorials/MPSTimeEvolution.html
+- ITensor MPS/MPO gate application and canonicalization: https://docs.itensor.org/ITensorMPS/stable/MPSandMPO.html
 
 ## Claim ceiling
 
-A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It now includes a deterministic nearest-neighbour layer executor, but it does not yet establish a complete TEBD time-stepper, globally certified circuit error, an efficient large-scale tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense factorization, local U(1) gates, truncation receipts, mixed-canonical gauge checks, a numerically qualified global truncation bound, and a second-order nearest-neighbour real-time stepper. It would not establish a total physical-error bound until Trotter and roundoff terms are bounded, nor SOTA performance, large-scale tensor-network superiority, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
