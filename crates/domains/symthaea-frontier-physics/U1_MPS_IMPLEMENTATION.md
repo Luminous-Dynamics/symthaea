@@ -159,7 +159,7 @@ The new adaptive path reverses the traditional tuning workflow. Instead of selec
 - The policy is global across charge sectors; selection is by largest Schmidt values, with charge labels preserved.
 - If the maximum bond cannot meet the requested residual, the method returns \`TruncationBudgetInfeasible\` with the best measured residual under the cap. It does not return an under-qualified state.
 - No implicit renormalization occurs.
-- The receipt reports requested and achieved local residual, selected/minimum bond dimension, cap headroom and SVD factorization passes. The pass count is intentionally visible because the first version re-factorizes to validate the measured residual; reducing that overhead is a separate optimization target.
+- The receipt reports requested and achieved local residual, selected/minimum bond dimension, cap headroom and SVD factorization passes. Candidate ranks reuse the exact charge-block factors; the current path performs one factorization pass regardless of how many retained ranks are checked.
 
 The accompanying \`U1MpsErrorBudgetPlan\` compiles an end-to-end L2 target into explicit canonicalization, gate-quality, Hamiltonian-projection, compression and time-discretization allowances. Fractions must be finite, non-negative and sum to at most one. The unallocated fraction is retained as an explicit reserve. Its equal-per-gate compression allocation is a baseline for unitary/equal-sensitivity circuits; a later sensitivity-weighted planner must account for downstream operator-norm amplification and exterior gauge factors before claiming global optimality.
 
