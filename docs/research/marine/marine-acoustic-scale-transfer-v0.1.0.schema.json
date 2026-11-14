@@ -1,0 +1,550 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json",
+  "title": "Marine acoustic model-to-full-scale transfer audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "evidence_kind",
+    "frequency_match_tolerance_fraction",
+    "pairs",
+    "scaling",
+    "schema_version",
+    "similarity",
+    "source",
+    "validation_split"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scaling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_id",
+        "bandwidth",
+        "representation"
+      ],
+      "properties": {
+        "method_id": {
+          "const": "ITTC-7.5-02-03-03.9-2024-Rev03"
+        },
+        "bandwidth": {
+          "enum": [
+            "proportional",
+            "constant"
+          ]
+        },
+        "representation": {
+          "enum": [
+            "power_spectrum",
+            "power_spectral_density"
+          ]
+        }
+      }
+    },
+    "similarity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wake",
+        "cavitation_pattern",
+        "gas_nuclei_state",
+        "reynolds_scale_review",
+        "facility_transfer_function"
+      ],
+      "properties": {
+        "wake": {
+          "enum": [
+            "qualified",
+            "dissimilar",
+            "unknown"
+          ]
+        },
+        "cavitation_pattern": {
+          "enum": [
+            "qualified",
+            "dissimilar",
+            "unknown"
+          ]
+        },
+        "gas_nuclei_state": {
+          "enum": [
+            "qualified",
+            "dissimilar",
+            "unknown"
+          ]
+        },
+        "reynolds_scale_review": {
+          "enum": [
+            "reviewed",
+            "not_reviewed"
+          ]
+        },
+        "facility_transfer_function": {
+          "enum": [
+            "measured_and_applied",
+            "unknown",
+            "rejected"
+          ]
+        }
+      }
+    },
+    "frequency_match_tolerance_fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "benchmark_group_id",
+          "cavitation_pattern",
+          "cavitation_pattern_comparability",
+          "full_scale",
+          "model",
+          "pair_id"
+        ],
+        "properties": {
+          "pair_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "$ref": "#/$defs/modelRun"
+          },
+          "full_scale": {
+            "$ref": "#/$defs/fullScaleRun"
+          },
+          "cavitation_pattern": {
+            "enum": [
+              "sheet",
+              "cloud",
+              "bubble",
+              "tip_vortex",
+              "mixed",
+              "unknown"
+            ]
+          },
+          "cavitation_pattern_comparability": {
+            "enum": [
+              "matched",
+              "mismatch",
+              "partial",
+              "unknown"
+            ]
+          },
+          "benchmark_group_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "validation_split": {
+      "$ref": "#/$defs/validationSplit"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "modelRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "background_measurement_method",
+        "background_trace_sha256",
+        "bands",
+        "calibration_certificate_sha256",
+        "cavitation_number_n_d",
+        "diameter_m",
+        "facility_transfer_function_sha256",
+        "hydrophone_instrument_id",
+        "operating_point_receipt_sha256",
+        "raw_trace_sha256",
+        "rpm_hz",
+        "rpm_u95_hz",
+        "run_id",
+        "source_reference_distance_m",
+        "timebase_receipt_sha256"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "diameter_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rpm_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cavitation_number_n_d": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_reference_distance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/modelBand"
+          }
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rpm_u95_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "background_measurement_method": {
+          "enum": [
+            "bare_hub",
+            "pressure_suppressed",
+            "unknown"
+          ]
+        },
+        "background_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "facility_transfer_function_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "modelBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "center_frequency_hz",
+        "frequency_regime",
+        "frequency_regime_basis",
+        "total_spl_db",
+        "background_spl_db",
+        "facility_transfer_function_db",
+        "total_u95_db",
+        "background_u95_db",
+        "facility_transfer_u95_db",
+        "scale_transfer_u95_db"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "frequency_regime": {
+          "enum": [
+            "high_frequency",
+            "low_frequency"
+          ]
+        },
+        "frequency_regime_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_spl_db": {
+          "type": "number"
+        },
+        "background_spl_db": {
+          "type": "number"
+        },
+        "facility_transfer_function_db": {
+          "type": "number"
+        },
+        "total_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "background_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "facility_transfer_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "scale_transfer_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "fullScaleRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bands",
+        "calibration_certificate_sha256",
+        "cavitation_number_n_d",
+        "diameter_m",
+        "hydrophone_instrument_id",
+        "operating_point_receipt_sha256",
+        "raw_trace_sha256",
+        "rpm_hz",
+        "run_id",
+        "source_level_method_id",
+        "source_reference_distance_m",
+        "timebase_receipt_sha256"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "diameter_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rpm_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cavitation_number_n_d": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_reference_distance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_level_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fullScaleBand"
+          }
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "fullScaleBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "center_frequency_hz",
+        "source_level_db",
+        "source_level_u95_db"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_level_db": {
+          "type": "number"
+        },
+        "source_level_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "groupingDimension": {
+      "enum": [
+        "model_facility_id",
+        "full_scale_trial_site_id",
+        "vessel_id",
+        "propeller_design_id",
+        "propeller_revision",
+        "campaign_id",
+        "operating_condition_family_id"
+      ]
+    },
+    "benchmarkGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "role",
+        "model_facility_id",
+        "full_scale_trial_site_id",
+        "vessel_id",
+        "propeller_design_id",
+        "propeller_revision",
+        "campaign_id",
+        "operating_condition_family_id"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "calibration",
+            "held_out"
+          ]
+        },
+        "model_facility_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "full_scale_trial_site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_condition_family_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "validationSplit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_manifest_sha256",
+        "protocol_id",
+        "grouping_dimensions",
+        "groups"
+      ],
+      "properties": {
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "protocol_id": {
+          "enum": [
+            "leave_one_model_facility_out",
+            "leave_one_full_scale_trial_site_out",
+            "leave_one_vessel_out",
+            "leave_one_propeller_design_out",
+            "leave_one_propeller_revision_out",
+            "leave_one_campaign_out",
+            "leave_one_operating_condition_family_out",
+            "nested_group_holdout"
+          ]
+        },
+        "grouping_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/groupingDimension"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/benchmarkGroup"
+          }
+        }
+      }
+    }
+  }
+}
