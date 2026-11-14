@@ -24,6 +24,7 @@ pub mod assay;
 pub mod experiment_design;
 pub mod identity;
 pub mod model_refinement;
+pub mod observational_views;
 pub mod partial_identification;
 pub mod reconfiguration;
 pub mod semantic_continuity;
@@ -51,6 +52,12 @@ pub use model_refinement::{
     ModelRefinementFindingCode, ModelRefinementOracle, ModelRefinementProposal,
     ModelRefinementQualification, ModelRefinementReport, RefinementProbe,
     evaluate_model_refinement,
+};
+pub use observational_views::{
+    IdentificationRegime, MatchedObservationalViewReport, MatchedObservationalViews,
+    ObservationTable, ObservationalViewFinding, ObservationalViewFindingCode,
+    ObservationalViewPolicy, ObservationalViewQualification, RegimeColumnPolicy,
+    RegimeObservationalView, validate_matched_observational_views,
 };
 pub use partial_identification::{
     AdmissibleCausalWorld, BidirectedCausalEdge, CausalEffectQuery, CausalGraphDescriptor,
