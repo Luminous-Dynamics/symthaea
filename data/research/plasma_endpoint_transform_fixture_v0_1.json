@@ -2654,8 +2654,7 @@
           "interval_lower": -0.03,
           "interval_upper": 0.04,
           "source_receipt_ids": [
-            "baseline_strength-RECEIPT",
-            "candidate_strength-RECEIPT"
+            "baseline_strength-RECEIPT"
           ],
           "source_artifact_digests": [
             "000000000000000000000000000000000000000000000000000000000000207a",
