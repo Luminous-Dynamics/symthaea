@@ -25,6 +25,26 @@ The fixture separates the **evaluator-frozen source inventory** from the **candi
 
 Each case freezes target configuration, source-inventory state/reference/digest, mandatory predicates, minimum independent-root thresholds, and candidate-visible IDs. The last-support case contains paired baseline and intervention worlds: the baseline inventory has two independent roots; the intervention inventory removes one root entirely. This prevents "not retrieved" and "not present in the world" from being conflated.
 
+### Inventory and candidate-visible commitments
+
+Each source-inventory SHA-256 is computed over a domain-separated v0.1 projection:
+
+- domain: `symthaea.engineering-decision-min-evidence.source-inventory.v0.1`;
+- target configuration;
+- source-inventory state;
+- mandatory predicates (sorted);
+- minimum independent-root threshold;
+- full evidence records (sorted by evidence ID).
+
+The projection is serialized as compact JSON with object keys sorted recursively; array order is retained except where this contract explicitly sorts evidence IDs and mandatory predicates. This is a project-specific canonicalization contract, not a claim of RFC 8785 conformance.
+
+The candidate-visible manifest SHA-256 separately binds:
+- domain: `symthaea.engineering-decision-min-evidence.candidate-visible-set.v0.1`;
+- the source-inventory SHA-256;
+- candidate-visible evidence IDs (sorted).
+
+This separation allows an evaluator to distinguish a changed source universe from a different subset actually exposed to the candidate. The 40-record irrelevant batch has its own domain-separated digest, and every record is present in the injection world rather than represented only by a count.
+
 ## 2. Formal object
 
 For a decision claim q, configuration c and knowledge frontier K, let E be the evaluator-frozen evidence inventory and R(e) the provenance root of evidence item e.
