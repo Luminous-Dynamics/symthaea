@@ -462,8 +462,14 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     }
 
     let mut auxiliary_roles = HashSet::new();
-    let mut auxiliary_ids = HashSet::new();
-    let mut auxiliary_digests = HashSet::new();
+    let mut auxiliary_ids = HashSet::from([
+        baseline_receipt.id.as_str(),
+        candidate_receipt.id.as_str(),
+    ]);
+    let mut auxiliary_digests = HashSet::from([
+        baseline_receipt.raw_data_sha256.as_deref().unwrap_or(""),
+        candidate_receipt.raw_data_sha256.as_deref().unwrap_or(""),
+    ]);
     let mut cohort_sample_maps = HashMap::<&str, HashMap<&str, &str>>::new();
     let baseline_primary: HashMap<&str, &str> = receipt.baseline_samples
         .iter().map(|sample| (sample.specimen_id.as_str(), sample.cluster_id.as_str())).collect();
