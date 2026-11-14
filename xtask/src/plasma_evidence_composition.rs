@@ -287,6 +287,8 @@ pub(super) fn validate_transfer_case(
     transfer_bridge_id: &str,
     baseline_profile_sha256: &str,
     candidate_profile_sha256: &str,
+    material_pair_class: &str,
+    geometry: &str,
     bridge_dimension_keys: &[String],
 ) -> Result<Decision> {
     let fixture = read_fixture(path)?;
@@ -340,6 +342,10 @@ pub(super) fn validate_transfer_case(
         || case_bridge_id != transfer_bridge_id
         || base_digest != baseline_profile_sha256
         || candidate_digest != candidate_profile_sha256
+        || case.baseline_profile.material_pair_class != material_pair_class
+        || case.candidate_profile.material_pair_class != material_pair_class
+        || case.baseline_profile.geometry != geometry
+        || case.candidate_profile.geometry != geometry
         || actual_keys != expected_keys
     {
         return Ok(Decision {
