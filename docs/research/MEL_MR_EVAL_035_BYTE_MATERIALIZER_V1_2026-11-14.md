@@ -1,7 +1,7 @@
 # MEL-MR-EVAL-035 — Rights-gated music-edit byte materializer v1
 
 **Date:** 14 November 2026  
-**Status:** Implementation tranche; exact-head qualification pending  
+**Status:** Focused exact-head Rust 1.96 qualification passed; broader repository jobs skipped  
 **Parent:** [MEL-MR-EVAL-030 / PR #9284](https://github.com/Luminous-Dynamics/symthaea/pull/9284)  
 **Tracking:** [Issue #12003](https://github.com/Luminous-Dynamics/symthaea/issues/12003)
 
@@ -73,7 +73,7 @@ Prospective targets (not measurements): at least 95% target-property success on 
 
 ## Validation state
 
-The production adapter extension, schemas, synthetic map fixture, CLI example, standalone harness and workflow integration are part of this implementation tranche. Ten materializer test functions are authored. Compilation, formatting, tests and Clippy are not claimed until the exact-head Rust 1.96 workflow finishes. No local Rust execution result is asserted.
+The production adapter extension, schemas, synthetic map fixture, CLI example, standalone harness and workflow integration are committed. The exact-head workflow run [#43572978854](https://github.com/Luminous-Dynamics/symthaea/actions/runs/43572978854) checked out PR head `92b769c3b7a12574eef1fb12f656063597115a3b` and passed the focused adapter job: Rust 1.96 formatting, 23 unit tests (13 adapter plus 10 materializer), synthetic fixture validation, materializer CLI compile check and Clippy with `-D warnings`. The broader benchmark-registry job was correctly skipped because its sources did not change; repository-wide CI, PR Governance and Workflow Syntax checks were skipped, not passed. This is an isolated harness qualification, not a full workspace build or external benchmark run. The authoring environment itself still has no local Rust toolchain.
 
 ## Next boundary
 
