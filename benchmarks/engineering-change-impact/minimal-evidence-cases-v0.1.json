@@ -175,7 +175,8 @@
                 ]
               ]
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "aa674a0091a4998aa97271542dcc91cf148f07fd62eda547efe0ad48c2e99c1e"
         },
         {
           "world_id": "REDUNDANT_COPY_REMOVED",
@@ -249,10 +250,12 @@
                 ]
               ]
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "bad4b52c5f81f98f8c34edbdaa0cda4d6764712e12e1c5e81f46224210c8ec6c"
         }
       ],
-      "expected_intervention_relation": "invariant"
+      "expected_intervention_relation": "invariant",
+      "candidate_visible_manifest_sha256": "aa674a0091a4998aa97271542dcc91cf148f07fd62eda547efe0ad48c2e99c1e"
     },
     {
       "id": "ME-NEG-001",
@@ -308,7 +311,8 @@
       "candidate_visible_evidence_ids": [
         "E-PRIMARY",
         "E-EXPORT"
-      ]
+      ],
+      "candidate_visible_manifest_sha256": "60a11a8b76b4f1e73dadfd03ab61b5319cb0d55e01b414bfc414a87053eac8af"
     },
     {
       "id": "ME-NEG-002",
@@ -395,7 +399,8 @@
                 ]
               ]
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "82fc665ffefbe066bfc87327fa97817e2c37208046d63d5c1b189f5e13387271"
         },
         {
           "world_id": "LAST_SUPPORT_REMOVED",
@@ -423,14 +428,16 @@
             "sufficient_root_sets_by_predicate": {
               "thermal_runaway_limit": []
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "1be7be11ea41c16468c88471273a72cdfd054d499f34771153bfaff60c1c20a2"
         }
       ],
       "expected_intervention_relation": "flip",
       "expected_intervention_actions": [
         "revalidate",
         "hold"
-      ]
+      ],
+      "candidate_visible_manifest_sha256": "1be7be11ea41c16468c88471273a72cdfd054d499f34771153bfaff60c1c20a2"
     },
     {
       "id": "ME-NEG-003",
@@ -530,7 +537,8 @@
                 ]
               ]
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "6e9ede9d52840680368b806b88684f56f763915601f54b382e3101f6716b71fc"
         },
         {
           "world_id": "IDENTICAL_CONTENT_WRONG_CONFIGURATION",
@@ -570,10 +578,12 @@
             "sufficient_root_sets_by_predicate": {
               "bolt_preload_limit": []
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "1569c9a48754e95192189800832f23efede147f83bbba82774d84b9456fdef45"
         }
       ],
-      "expected_intervention_relation": "flip"
+      "expected_intervention_relation": "flip",
+      "candidate_visible_manifest_sha256": "1569c9a48754e95192189800832f23efede147f83bbba82774d84b9456fdef45"
     },
     {
       "id": "ME-POS-002",
@@ -1117,7 +1127,8 @@
                 ]
               ]
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "8cd920276eb3cbaf23aefaa521f9474cd9656f85280acd9e3a4ab940607c7554"
         },
         {
           "world_id": "FORTY_IRRELEVANT_RECORDS_INJECTED",
@@ -1603,10 +1614,12 @@
               ]
             }
           },
-          "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1"
+          "irrelevant_evidence_injection_digest": "e7a77dbe70e7b1492bef51a9fb93ee9f37d63fdccabb328a7c2b73e14858a6a1",
+          "candidate_visible_manifest_sha256": "0e855304366a2925e6dbb53853fec2e7802f1a4f1206de35e0a51d47930718a6"
         }
       ],
-      "expected_intervention_relation": "invariant"
+      "expected_intervention_relation": "invariant",
+      "candidate_visible_manifest_sha256": "0e855304366a2925e6dbb53853fec2e7802f1a4f1206de35e0a51d47930718a6"
     },
     {
       "id": "ME-POS-003",
@@ -1680,7 +1693,8 @@
         "E-CORR-A",
         "E-CORR-A-SUMMARY",
         "E-CORR-B"
-      ]
+      ],
+      "candidate_visible_manifest_sha256": "6518674bb8e73ff77ce647ed1b68180f09956e49047ac904b7a27a9570b418ea"
     },
     {
       "id": "ME-POS-004",
@@ -1733,7 +1747,8 @@
               ]
             }
           },
-          "source_inventory_sha256": "3e9eaaa7c2c5a8a7cba59f6f8269d30aefc6ba1d7aaac7209ae95a60bb1742c3"
+          "source_inventory_sha256": "3e9eaaa7c2c5a8a7cba59f6f8269d30aefc6ba1d7aaac7209ae95a60bb1742c3",
+          "candidate_visible_manifest_sha256": "33ffd8ef28cd0d1423920bd255c1722abf55cb03d1a700b8d648cbfbbaaaa0ee"
         },
         {
           "world_id": "SUBSTITUTED",
@@ -1778,7 +1793,8 @@
               ]
             }
           },
-          "source_inventory_sha256": "ff108c1a087bfef90c0b9d7385da2f47c66d85985646b481e59aae7a8b31f136"
+          "source_inventory_sha256": "ff108c1a087bfef90c0b9d7385da2f47c66d85985646b481e59aae7a8b31f136",
+          "candidate_visible_manifest_sha256": "01becfe2c7222413063a214f97dd90154e679a6bf3fdb2dc1b601c092a15b10f"
         }
       ],
       "expected": {
@@ -1894,7 +1910,8 @@
             "sufficient_root_sets_by_predicate": {
               "seismic_anchor_capacity": []
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "d411ea3068da38c0b1ee20dbe77210565ebc6eddad5cf39969970c2cd830db4a"
         },
         {
           "world_id": "INDEPENDENT_ROOT_QUALIFIED",
@@ -1938,10 +1955,12 @@
                 ]
               ]
             }
-          }
+          },
+          "candidate_visible_manifest_sha256": "8862b388f468443817e0b78998415d6f4a183b51de0ef6a4cca348aece773799"
         }
       ],
-      "expected_intervention_relation": "flip"
+      "expected_intervention_relation": "flip",
+      "candidate_visible_manifest_sha256": "d411ea3068da38c0b1ee20dbe77210565ebc6eddad5cf39969970c2cd830db4a"
     }
   ],
   "intervention_pairs": [
