@@ -161,6 +161,7 @@ fn baseline_qualification() -> EventTraceQualification {
         scope: GateState::Pass,
         completeness: GateState::Pass,
         causal_ordering: GateState::Pass,
+        stop_disposition: GateState::NotApplicable,
     }
 }
 
@@ -182,14 +183,14 @@ fn test_clock(
 }
 
 #[test]
-fn ten_frozen_event_traces_match_gold_and_independent_ordering() {
+fn eleven_frozen_event_traces_match_gold_and_independent_ordering() {
     let data = fixture();
     assert_eq!(
         data["schema_version"].as_str(),
         Some("engineering-decision-event-order-v0.1")
     );
     let cases = data["cases"].as_array().expect("cases");
-    assert_eq!(cases.len(), 10);
+    assert_eq!(cases.len(), 11);
 
     let mut seen_case_ids = BTreeSet::new();
     for case in cases {
@@ -257,7 +258,7 @@ fn ten_frozen_event_traces_match_gold_and_independent_ordering() {
             .unwrap_or_else(|error| panic!("{case_id} permuted: {error}"));
         assert_eq!(permuted_report, report, "{case_id}: delivery permutation");
     }
-    assert_eq!(seen_case_ids.len(), 10);
+    assert_eq!(seen_case_ids.len(), 11);
 }
 
 #[test]
