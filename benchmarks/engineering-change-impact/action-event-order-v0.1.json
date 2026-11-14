@@ -1187,7 +1187,7 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "not_applicable",
+        "causal_ordering": "pass",
         "stop_disposition": "pass"
       },
       "events": [
@@ -1286,19 +1286,17 @@
         }
       ],
       "expected": {
-        "disposition": "indeterminate",
-        "block_irreversible_actions": true,
+        "disposition": "safe",
+        "block_irreversible_actions": false,
         "stop_trigger_event_id": "stop",
         "effect_orders": {
           "effect": "after"
         },
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
-        "reason_codes": [
-          "CAUSAL_ORDER_QUALIFICATION_INDETERMINATE"
-        ]
+        "reason_codes": []
       },
-      "event_trace_sha256": "85d63c55f0b580142876e7c07ddf3bfbfc4b85674d7830dc181b9a65cd80d420"
+      "event_trace_sha256": "e7acbb1a256325bb9e3fdcf5b06903b48ae73a84bfb06ad8cd2d91ee89ca82ff"
     }
   ]
 }
