@@ -165,6 +165,16 @@ Per attempt, record:
 A partial removal is not a successful complete removal. A closed mass balance is not proof of purity. An evidence reference does not authenticate its issuer or reviewer.
 
 ### 5.4 Fibre opening and fibre quality
+The fibre-length distribution must be bound to the exact physical process trial and accepted output lot, and must record:
+- measurement method/standard and version;
+- a versioned sampling plan (sampling locations, subsampling, conditioning and specimen selection);
+- total sampled mass in milligrams;
+- number of independent subsamples/replicates represented;
+- expanded measurement uncertainty and the receiving-policy ceiling;
+- exact accepted output lot ID and source trial evidence ID.
+
+A valid histogram summing to 1,000,000 ppm is not sufficient if its sampling plan is absent, the replicate count is zero, the measurement uncertainty exceeds the declared receiver limit, or the sample mass exceeds the accepted output-lot mass. Record repeatability and between-subsample variation separately when available; do not treat repeated reads of one specimen as independent physical samples.
+
 
 For each accepted fibre output lot, record:
 - source process-trial evidence ID and exact accepted output-lot ID;
