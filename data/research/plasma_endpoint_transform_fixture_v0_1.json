@@ -5756,7 +5756,7 @@
           "result_sha256": "000000000000000000000000000000000000000000000000000000000000209c",
           "graph_id": "GRAPH-DESIGN-MISSING",
           "design_id": "GRAPH-DESIGN-MISSING-DESIGN",
-          "design_sha256": "000000000000000000000000000000000000000000000000000000000000a05c",
+          "design_sha256": null,
           "plan_sha256": "000000000000000000000000000000000000000000000000000000000000a05a",
           "transform_sha256": "0000000000000000000000000000000000000000000000000000000000002098",
           "graph_sha256": "000000000000000000000000000000000000000000000000000000000000209a",
@@ -5924,12 +5924,12 @@
           "endpoint_transform_id": "unit_preserving_strength_projection_v1",
           "observation_endpoint_id": "apparent_shear_strength",
           "endpoint_transform_sha256": "0000000000000000000000000000000000000000000000000000000000002098",
-          "receipt_sha256": "000000000000000000000000000000000000000000000000000000000000a05c"
+          "receipt_sha256": null
         }
       },
       "expected_disposition": "BLOCKED",
       "expected_outcome": "NOT_EVALUATED",
-      "rationale": "The derived endpoint requires a source-bound preregistered design receipt."
+      "rationale": "The full equivalence-design receipt has no receipt digest; its derived endpoint must remain blocked even though the other plan fields are present."
     },
     {
       "id": "specimen-reused-across-strength-cohorts",
