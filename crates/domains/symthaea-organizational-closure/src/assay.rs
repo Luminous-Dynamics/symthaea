@@ -350,9 +350,10 @@ mod tests {
             })
         );
         assert!(
-            report.findings.iter().any(|finding| {
-                finding.code == AssayFindingCode::UnknownModelObservation
-            })
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == AssayFindingCode::UnknownModelObservation })
         );
     }
 
