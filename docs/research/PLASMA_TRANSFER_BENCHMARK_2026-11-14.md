@@ -77,9 +77,13 @@ A missing factor is not an implicit assertion that the factor is invariant. A fa
 
 ## Transfer contract
 
+### 0. Qualified baseline receipt
+
+A transfer cannot begin from an assumed baseline. Each case must carry a baseline qualification receipt with a qualification/protocol identity, SHA-256 of the exact serialized baseline profile, a source artifact digest, specimen identities, an independence group, and coverage of every required product endpoint. The audit recomputes the baseline profile digest and rejects a mismatch. This proves the receipt is structurally bound to the profile; it does not authenticate the remote artifact or prove the physical qualification itself.
+
 ### 1. Factor completeness
 
-Both baseline and candidate profiles must identify every required factor. Any changed, untracked field blocks. The profile is a structured tuple, not a free-text recipe label.
+Both baseline and candidate profiles must identify every required factor. The baseline qualification receipt must bind to the exact baseline profile digest and cover all required endpoints. Any changed, untracked field blocks. The profile is a structured tuple, not a free-text recipe label.
 
 ### 2. Qualified scope
 
@@ -117,19 +121,19 @@ This is not a generic significance test. A non-significant difference is not acc
 
 ### 6. Evidence integrity
 
-Missing evidence blocks. Duplicate specimen identities, overlapping baseline/candidate independence groups, malformed digests, stale factor mappings, duplicated bridge dimension sets, or reused artifact digests reject. This is a source-structure guard, not cryptographic verification of remote artifacts or laboratory independence.
+Missing evidence blocks. A missing baseline qualification receipt blocks; a baseline-profile digest mismatch rejects. Duplicate specimen identities, overlapping baseline/candidate independence groups, malformed digests, stale factor mappings, duplicated bridge dimension sets, or reused artifact digests reject. This is a source-structure guard, not cryptographic verification of remote artifacts or laboratory independence.
 
 ## S0 fixture results
 
-The fixture contains **21 synthetic known-answer challenges**:
+The fixture contains **24 synthetic known-answer challenges**, including missing and tampered baseline-qualification receipts:
 
 | Disposition | Cases | Meaning |
 |---|---:|---|
 | PASS | 5 | structurally complete evidence within the synthetic contract |
-| BLOCKED | 8 | insufficient evidence, missing exact interaction, or interval crossing |
-| REJECTED | 8 | hard-scope violation, contradictory evidence, identity collision, or invalid digest |
+| BLOCKED | 10 | insufficient evidence, missing exact interaction, or interval crossing |
+| REJECTED | 9 | hard-scope violation, contradictory evidence, identity collision, or invalid digest |
 
-Independent JavaScript replay of the constructed fixture matched all 21 expected dispositions. This source-side replay is not execution of the Rust implementation. Eight Rust unit tests are authored in the new module; compilation, formatting, Clippy and unit-test execution are not claimed.
+Independent JavaScript replay of the committed fixture matched all 24 expected dispositions. This source-side replay is not execution of the Rust implementation. Ten Rust unit tests are authored in the new module; compilation, formatting, Clippy and unit-test execution are not claimed.
 
 ## Benchmark versus current approaches
 
