@@ -1126,6 +1126,12 @@ mod tests {
             MusicEditValidityScopeV1::TargetPart,
             MusicEditValidityRelationV1::NoChange,
         ));
+        envelope.protected_invariants.push(constraint(
+            "protect.drum-rhythm",
+            MusicEditValidityPropertyV1::Rhythm,
+            MusicEditValidityScopeV1::TargetPart,
+            MusicEditValidityRelationV1::NoChange,
+        ));
         envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
         assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
     }
