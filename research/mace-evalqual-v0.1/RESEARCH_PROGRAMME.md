@@ -33,6 +33,9 @@ The figures below are not a common ranking. Task sets, agent harnesses, budget c
 
 Sources: [Scale SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full); [Terminal-Bench 4.1](https://www.tbench.ai/news/terminal-bench-4-1); [OSWorld 2.1 snapshot](https://benchlm.ai/benchmarks/osworld-2-1); [Epoch OSWorld audit](https://epoch.ai/benchmarks/osworld-2-1/review); [Sierra τ-bench leaderboard](https://taubench.com/leaderboard/).
 
+
+**Public/private contamination control is a required axis.** Scale's V2 write-up reports Claude Opus 5 at 638/642 on its public split versus 222/272 on its private split (17.8 percentage points). Scale states that network locking does not remove training-time exposure to public repositories and fixing commits. The two sets differ, so the gap is not a causal estimate of contamination; it is a warning that runtime network restrictions alone do not establish generalization. MACE should preregister temporal/private task holdouts, secret reference states and artifact-preserving regrades, and publish public/private results separately. Source: https://labs.scale.com/blog/swe-bench-pro-v2.
+
 **Competitive interpretation:** MACE cannot beat a solver benchmark with a verifier microbenchmark. It should aim for higher *trustworthy completion at matched utility*: identical agent, task revision, harness, network policy, budgets and seeds across baseline, telemetry-only and full-MACE arms. Publish the Pareto frontier for utility, unauthorized effects, observer coverage, reconciliation correctness, latency/cost and human intervention. Do not hide failures inside a weighted composite.
 
 
