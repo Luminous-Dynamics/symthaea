@@ -2881,12 +2881,340 @@ fn validate_development_plan_oracle_value(value: &Value) -> ValidationReport {
     report
 }
 
+
+fn validate_retrieval_case_value(value: &Value) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    let Some(root) = object(value, "$", &mut report) else {
+        return report;
+    };
+    check_allowed_keys(
+        root,
+        &[
+            "document_type", "schema_version", "benchmark_id", "task_id",
+            "status", "observed_at", "evaluation_contract",
+            "repository_snapshot", "cases", "claim_ceiling",
+        ],
+        "$",
+        &mut report,
+    );
+    if value.get("document_type").and_then(Value::as_str) != Some("retrieval_exploration_benchmark_case") {
+        report.error("DYNRETR-DOC-001", "$.document_type", "unexpected retrieval benchmark case document type");
+    }
+    if value.get("schema_version").and_then(Value::as_str) != Some("0.1.0")
+        || value.get("benchmark_id").and_then(Value::as_str) != Some("DYNRETR-001")
+    {
+        report.error("DYNRETR-DOC-002", "$", "DYNRETR case requires schema_version 0.1.0 and benchmark_id DYNRETR-001");
+    }
+    for key in ["task_id", "claim_ceiling"] {
+        if let Some(item) = field(value, key, "$", &mut report) {
+            string(item, &format!("$.{key}"), &mut report);
+        }
+    }
+    if let Some(status) = field(value, "status", "$", &mut report) {
+        enum_value(status, "$.status", &["public_synthetic_known_answer", "design_only", "sealed_holdout"], &mut report);
+    }
+    if let Some(observed_at) = field(value, "observed_at", "$", &mut report) {
+        parse_rfc3339(observed_at, "$.observed_at", &mut report);
+    }
+
+    if let Some(contract_value) = field(value, "evaluation_contract", "$", &mut report) {
+        if let Some(contract) = object(contract_value, "$.evaluation_contract", &mut report) {
+            check_allowed_keys(
+                contract,
+                &["tokenizer_id", "token_budget", "line_budget", "region_unit", "ranking_direction", "no_gold_policy"],
+                "$.evaluation_contract",
+                &mut report,
+            );
+            if let Some(tokenizer) = field(contract_value, "tokenizer_id", "$.evaluation_contract", &mut report) {
+                string(tokenizer, "$.evaluation_contract.tokenizer_id", &mut report);
+            }
+            for key in ["token_budget", "line_budget"] {
+                if let Some(item) = field(contract_value, key, "$.evaluation_contract", &mut report) {
+                    if item.as_u64().is_none_or(|n| n == 0) {
+                        report.error("DYNRETR-BUDGET-001", format!("$.evaluation_contract.{key}"), "budget must be a positive integer");
+                    }
+                }
+            }
+            if let Some(unit) = field(contract_value, "region_unit", "$.evaluation_contract", &mut report) {
+                enum_value(unit, "$.evaluation_contract.region_unit", &["file", "symbol", "line_span", "mixed"], &mut report);
+            }
+            if field(contract_value, "ranking_direction", "$.evaluation_contract", &mut report).and_then(Value::as_str) != Some("lower_rank_is_better") {
+                report.error("DYNRETR-CONTRACT-001", "$.evaluation_contract.ranking_direction", "ranking_direction must be lower_rank_is_better");
+            }
+            if let Some(policy) = field(contract_value, "no_gold_policy", "$.evaluation_contract", &mut report) {
+                enum_value(policy, "$.evaluation_contract.no_gold_policy", &["explicit_abstain", "abstain_or_indeterminate"], &mut report);
+            }
+        }
+    }
+
+    if let Some(snapshot_value) = field(value, "repository_snapshot", "$", &mut report) {
+        if let Some(snapshot) = object(snapshot_value, "$.repository_snapshot", &mut report) {
+            check_allowed_keys(snapshot, &["repository_id", "revision", "tree_oid", "configuration_world"], "$.repository_snapshot", &mut report);
+            if let Some(repository_id) = field(snapshot_value, "repository_id", "$.repository_snapshot", &mut report) {
+                string(repository_id, "$.repository_snapshot.repository_id", &mut report);
+            }
+            for key in ["revision", "tree_oid"] {
+                if let Some(hash) = field(snapshot_value, key, "$.repository_snapshot", &mut report)
+                    .and_then(|v| string(v, &format!("$.repository_snapshot.{key}"), &mut report))
+                {
+                    if hash.len() != 40 || !hex_string(hash) {
+                        report.error("DYNRETR-SNAPSHOT-001", format!("$.repository_snapshot.{key}"), "snapshot identity must be a 40-character hexadecimal Git OID");
+                    }
+                }
+            }
+            if let Some(world) = field(snapshot_value, "configuration_world", "$.repository_snapshot", &mut report) {
+                if !world.is_object() {
+                    report.error("DYNRETR-WORLD-001", "$.repository_snapshot.configuration_world", "configuration world must be an object");
+                }
+            }
+        }
+    }
+
+    let mut case_ids = HashSet::new();
+    if let Some(cases) = field(value, "cases", "$", &mut report)
+        .and_then(|v| array(v, "$.cases", &mut report))
+    {
+        if cases.is_empty() {
+            report.error("DYNRETR-CASES-001", "$.cases", "retrieval corpus must contain at least one case");
+        }
+        for (index, case_value) in cases.iter().enumerate() {
+            let path = format!("$.cases[{index}]");
+            let Some(case) = object(case_value, &path, &mut report) else {
+                continue;
+            };
+            check_allowed_keys(
+                case,
+                &[
+                    "case_id", "case_kind", "repository_id", "counterfactual_pair_of",
+                    "query", "configuration_world", "token_budget", "line_budget",
+                    "changed_entities", "candidate_regions", "expected_disposition", "notes",
+                ],
+                &path,
+                &mut report,
+            );
+            let case_id = field(case_value, "case_id", &path, &mut report)
+                .and_then(|v| string(v, &format!("{path}.case_id"), &mut report));
+            if let Some(case_id) = case_id {
+                if !case_ids.insert(case_id.to_owned()) {
+                    report.error("DYNRETR-ID-001", format!("{path}.case_id"), "duplicate retrieval case ID");
+                }
+            }
+            if let Some(kind) = field(case_value, "case_kind", &path, &mut report) {
+                enum_value(kind, &format!("{path}.case_kind"), &[
+                    "positive_context_retrieval", "natural_no_gold",
+                    "wrong_repository_counterfactual", "configuration_world_mismatch",
+                    "temporal_revision_mismatch", "nonlocal_change_impact", "lexical_decoy",
+                ], &mut report);
+            }
+            for key in ["repository_id", "query"] {
+                if let Some(item) = field(case_value, key, &path, &mut report) {
+                    string(item, &format!("{path}.{key}"), &mut report);
+                }
+            }
+            if let Some(pair) = case.get("counterfactual_pair_of") {
+                optional_string(pair, &format!("{path}.counterfactual_pair_of"), &mut report);
+            }
+            if let Some(world) = field(case_value, "configuration_world", &path, &mut report) {
+                if !world.is_object() {
+                    report.error("DYNRETR-WORLD-001", format!("{path}.configuration_world"), "configuration world must be an object");
+                }
+            }
+            for key in ["token_budget", "line_budget"] {
+                if let Some(item) = field(case_value, key, &path, &mut report) {
+                    if item.as_u64().is_none_or(|n| n == 0) {
+                        report.error("DYNRETR-BUDGET-002", format!("{path}.{key}"), "case budget must be a positive integer");
+                    }
+                }
+            }
+            for key in ["changed_entities"] {
+                if let Some(items) = field(case_value, key, &path, &mut report) {
+                    validate_plan_string_array(items, &format!("{path}.{key}"), &mut report);
+                }
+            }
+            if let Some(disposition) = field(case_value, "expected_disposition", &path, &mut report) {
+                enum_value(disposition, &format!("{path}.expected_disposition"), &["retrieve", "abstain", "indeterminate"], &mut report);
+            }
+            if let Some(notes) = case.get("notes") {
+                string(notes, &format!("{path}.notes"), &mut report);
+            }
+
+            if let Some(regions) = field(case_value, "candidate_regions", &path, &mut report)
+                .and_then(|v| array(v, &format!("{path}.candidate_regions"), &mut report))
+            {
+                if regions.is_empty() {
+                    report.error("DYNRETR-REGION-001", format!("{path}.candidate_regions"), "case must include at least one candidate region");
+                }
+                let mut region_ids = HashSet::new();
+                for (region_index, region_value) in regions.iter().enumerate() {
+                    let region_path = format!("{path}.candidate_regions[{region_index}]");
+                    let Some(region) = object(region_value, &region_path, &mut report) else {
+                        continue;
+                    };
+                    check_allowed_keys(
+                        region,
+                        &[
+                            "region_id", "path", "line_start", "line_end", "token_estimate",
+                            "authority", "source_revision", "availability",
+                            "configuration_requirements", "lexical_terms",
+                        ],
+                        &region_path,
+                        &mut report,
+                    );
+                    if let Some(id) = field(region_value, "region_id", &region_path, &mut report)
+                        .and_then(|v| string(v, &format!("{region_path}.region_id"), &mut report))
+                    {
+                        if !region_ids.insert(id.to_owned()) {
+                            report.error("DYNRETR-ID-002", format!("{region_path}.region_id"), "duplicate region ID within case");
+                        }
+                    }
+                    if let Some(source_path) = field(region_value, "path", &region_path, &mut report) {
+                        string(source_path, &format!("{region_path}.path"), &mut report);
+                    }
+                    let line_start = field(region_value, "line_start", &region_path, &mut report).and_then(Value::as_u64);
+                    let line_end = field(region_value, "line_end", &region_path, &mut report).and_then(Value::as_u64);
+                    if line_start.is_none_or(|n| n == 0) || line_end.is_none_or(|n| n == 0) || line_start > line_end {
+                        report.error("DYNRETR-REGION-002", region_path.clone(), "region line span must satisfy 1 <= line_start <= line_end");
+                    }
+                    if let Some(tokens) = field(region_value, "token_estimate", &region_path, &mut report) {
+                        if tokens.as_u64().is_none_or(|n| n == 0) {
+                            report.error("DYNRETR-BUDGET-003", format!("{region_path}.token_estimate"), "token estimate must be positive");
+                        }
+                    }
+                    if let Some(authority) = field(region_value, "authority", &region_path, &mut report) {
+                        enum_value(authority, &format!("{region_path}.authority"), AUTHORITIES, &mut report);
+                    }
+                    if let Some(revision) = field(region_value, "source_revision", &region_path, &mut report)
+                        .and_then(|v| string(v, &format!("{region_path}.source_revision"), &mut report))
+                    {
+                        if revision.len() != 40 || !hex_string(revision) {
+                            report.error("DYNRETR-REVISION-001", format!("{region_path}.source_revision"), "region revision must be a 40-character Git OID");
+                        }
+                    }
+                    if let Some(availability) = field(region_value, "availability", &region_path, &mut report) {
+                        enum_value(availability, &format!("{region_path}.availability"), &[
+                            "available", "inactive_configuration", "stale_revision", "missing", "unauthorized", "unknown",
+                        ], &mut report);
+                    }
+                    for key in ["configuration_requirements", "lexical_terms"] {
+                        if let Some(items) = field(region_value, key, &region_path, &mut report) {
+                            validate_plan_string_array(items, &format!("{region_path}.{key}"), &mut report);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    report.sort();
+    report
+}
+
+fn validate_retrieval_oracle_value(value: &Value) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    let Some(root) = object(value, "$", &mut report) else {
+        return report;
+    };
+    check_allowed_keys(
+        root,
+        &[
+            "document_type", "schema_version", "benchmark_id", "fixture_id", "status",
+            "expected_dispositions", "negative_controls", "metrics", "claim_ceiling",
+        ],
+        "$",
+        &mut report,
+    );
+    if value.get("document_type").and_then(Value::as_str) != Some("retrieval_exploration_benchmark_oracle") {
+        report.error("DYNRETR-ORACLE-001", "$.document_type", "unexpected retrieval oracle document type");
+    }
+    if value.get("schema_version").and_then(Value::as_str) != Some("0.1.0")
+        || value.get("benchmark_id").and_then(Value::as_str) != Some("DYNRETR-001")
+    {
+        report.error("DYNRETR-ORACLE-002", "$", "retrieval oracle requires schema_version 0.1.0 and benchmark_id DYNRETR-001");
+    }
+    for key in ["fixture_id", "claim_ceiling"] {
+        if let Some(item) = field(value, key, "$", &mut report) {
+            string(item, &format!("$.{key}"), &mut report);
+        }
+    }
+    if let Some(status) = field(value, "status", "$", &mut report) {
+        enum_value(status, "$.status", &["public_synthetic_known_answer", "design_only", "sealed_holdout"], &mut report);
+    }
+
+    let mut case_ids = HashSet::new();
+    if let Some(entries) = field(value, "expected_dispositions", "$", &mut report)
+        .and_then(|v| array(v, "$.expected_dispositions", &mut report))
+    {
+        for (index, entry_value) in entries.iter().enumerate() {
+            let path = format!("$.expected_dispositions[{index}]");
+            let Some(entry) = object(entry_value, &path, &mut report) else {
+                continue;
+            };
+            check_allowed_keys(entry, &["case_id", "disposition", "relevant_regions", "forbidden_regions"], &path, &mut report);
+            if let Some(id) = field(entry_value, "case_id", &path, &mut report)
+                .and_then(|v| string(v, &format!("{path}.case_id"), &mut report))
+            {
+                if !case_ids.insert(id.to_owned()) {
+                    report.error("DYNRETR-ORACLE-003", format!("{path}.case_id"), "duplicate case_id in oracle");
+                }
+            }
+            if let Some(disposition) = field(entry_value, "disposition", &path, &mut report) {
+                enum_value(disposition, &format!("{path}.disposition"), &["retrieve", "abstain", "indeterminate"], &mut report);
+            }
+            let relevant = entry_value.get("relevant_regions")
+                .map(|v| validate_plan_string_array(v, &format!("{path}.relevant_regions"), &mut report))
+                .unwrap_or_default();
+            let forbidden = entry_value.get("forbidden_regions")
+                .map(|v| validate_plan_string_array(v, &format!("{path}.forbidden_regions"), &mut report))
+                .unwrap_or_default();
+            for id in &relevant {
+                if forbidden.contains(id) {
+                    report.error("DYNRETR-ORACLE-004", &path, format!("region {id:?} cannot be both relevant and forbidden"));
+                }
+            }
+            if entry_value.get("disposition").and_then(Value::as_str) == Some("abstain") && !relevant.is_empty() {
+                report.error("DYNRETR-ORACLE-005", &path, "abstain disposition must not contain relevant retrieval regions");
+            }
+        }
+    }
+
+    if let Some(controls) = field(value, "negative_controls", "$", &mut report)
+        .and_then(|v| array(v, "$.negative_controls", &mut report))
+    {
+        let mut ids = HashSet::new();
+        for (index, control_value) in controls.iter().enumerate() {
+            let path = format!("$.negative_controls[{index}]");
+            let Some(control) = object(control_value, &path, &mut report) else {
+                continue;
+            };
+            check_allowed_keys(control, &["id", "mutation", "expected"], &path, &mut report);
+            if let Some(id) = field(control_value, "id", &path, &mut report)
+                .and_then(|v| string(v, &format!("{path}.id"), &mut report))
+            {
+                if !ids.insert(id.to_owned()) {
+                    report.error("DYNRETR-ORACLE-006", format!("{path}.id"), "duplicate negative-control ID");
+                }
+            }
+            for key in ["mutation", "expected"] {
+                if let Some(item) = field(control_value, key, &path, &mut report) {
+                    string(item, &format!("{path}.{key}"), &mut report);
+                }
+            }
+        }
+    }
+    if let Some(metrics) = field(value, "metrics", "$", &mut report) {
+        validate_plan_string_array(metrics, "$.metrics", &mut report);
+    }
+    report.sort();
+    report
+}
+
 /// Autodetect and validate an EGDDM snapshot or federation directory.
 pub fn validate_document_json(input: &str) -> Result<ValidationReport, serde_json::Error> {
     let value: Value = serde_json::from_str(input)?;
     match value.get("document_type").and_then(Value::as_str) {
         Some("development_trajectory_planning_case") => Ok(validate_development_plan_fixture_value(&value)),
         Some("development_trajectory_planning_oracle") => Ok(validate_development_plan_oracle_value(&value)),
+        Some("retrieval_exploration_benchmark_case") => Ok(validate_retrieval_case_value(&value)),
+        Some("retrieval_exploration_benchmark_oracle") => Ok(validate_retrieval_oracle_value(&value)),
         _ if value.get("federation_id").is_some() => Ok(validate_federation_value(&value)),
         _ => Ok(validate_value(&value)),
     }
@@ -3164,6 +3492,56 @@ mod tests {
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-011"));
     }
 
+
+    const DYNRETR_CASE: &str = include_str!(
+        "../../../docs/development-map/fixtures/retrieval-exploration-v0.1.json"
+    );
+    const DYNRETR_ORACLE: &str = include_str!(
+        "../../../docs/development-map/fixtures/retrieval-exploration-v0.1.expected.json"
+    );
+
+    #[test]
+    fn retrieval_exploration_fixture_satisfies_local_contract() {
+        let report = validate_document_json(DYNRETR_CASE).expect("DYNRETR case JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn retrieval_exploration_oracle_satisfies_local_contract() {
+        let report = validate_document_json(DYNRETR_ORACLE).expect("DYNRETR oracle JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn retrieval_natural_no_gold_and_wrong_repository_stay_separate() {
+        let case: Value = serde_json::from_str(DYNRETR_CASE).expect("DYNRETR case JSON");
+        let cases = case["cases"].as_array().expect("cases");
+        let natural = cases.iter().find(|item| item["case_id"] == "DYNRETR-SYN-002").expect("natural no-gold");
+        let counterfactual = cases.iter().find(|item| item["case_id"] == "DYNRETR-SYN-003").expect("counterfactual no-gold");
+        assert_eq!(natural["case_kind"], "natural_no_gold");
+        assert_eq!(counterfactual["case_kind"], "wrong_repository_counterfactual");
+        assert_eq!(natural["expected_disposition"], "abstain");
+        assert_eq!(counterfactual["expected_disposition"], "abstain");
+    }
+
+    #[test]
+    fn retrieval_configuration_and_temporal_decoys_are_explicit() {
+        let case: Value = serde_json::from_str(DYNRETR_CASE).expect("DYNRETR case JSON");
+        let cases = case["cases"].as_array().expect("cases");
+        let config = cases.iter().find(|item| item["case_id"] == "DYNRETR-SYN-004").expect("config case");
+        assert!(config["candidate_regions"].as_array().unwrap().iter().any(|r| r["availability"] == "inactive_configuration"));
+        let temporal = cases.iter().find(|item| item["case_id"] == "DYNRETR-SYN-005").expect("temporal case");
+        assert!(temporal["candidate_regions"].as_array().unwrap().iter().any(|r| r["availability"] == "stale_revision"));
+    }
+
+    #[test]
+    fn retrieval_oracle_cannot_mark_a_region_both_relevant_and_forbidden() {
+        let mut oracle: Value = serde_json::from_str(DYNRETR_ORACLE).expect("DYNRETR oracle JSON");
+        oracle["expected_dispositions"][0]["forbidden_regions"] =
+            Value::Array(vec![Value::String("r1".to_owned())]);
+        let report = validate_retrieval_oracle_value(&oracle);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNRETR-ORACLE-004"));
+    }
 
     const DYNPLAN_CASE: &str = include_str!(
         "../../../docs/development-map/fixtures/development-trajectory-planning-v0.1.json"
