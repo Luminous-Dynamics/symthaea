@@ -146,6 +146,8 @@ def validate_structural_contract(
         raise ValueError("support declaration does not cover the entire admitted set")
     if contract["source_identity"] == "":
         raise ValueError("structural source identity is missing")
+    if contract["exact_form"] != "Delta(alpha,beta) = diag(alpha,beta), alpha^2 + beta^2 <= 1":
+        raise ValueError("the declared source set is not the frozen diagonal-real support family")
     if contract["model_identity"] != data["model_identity"]:
         raise ValueError("model identity mismatch in structural contract")
     if contract["topology_identity"] != data["topology_identity"]:
@@ -213,6 +215,10 @@ def validate_simplex(
         raise ValueError("simplex requires r+1 facets in this V0.1 construction")
     if len(vertices) != support_dimension + 1:
         raise ValueError("simplex requires r+1 vertices")
+    if simplex.get("inequalities") != [
+        "n1 dot q <= 1", "n2 dot q <= 1", "n3 dot q <= 1"
+    ]:
+        raise ValueError("simplex half-space orientation is missing or reversed")
 
     for normal in normals:
         if dot(normal, normal) != 1:
@@ -297,17 +303,40 @@ def run_negative_controls(data: dict[str, Any], basis: Matrix) -> None:
     if controls != expected_controls:
         raise AssertionError("negative-control manifest changed")
 
+    # Explicit off-diagonal and imaginary generators must break the support
+    # annihilator proof, even when their amplitudes are small.
     off_diagonal = [Fraction(0) for _ in range(8)]
     off_diagonal[1] = Fraction(1, 10)
     imaginary = [Fraction(0) for _ in range(8)]
     imaginary[4] = Fraction(1, 10)
+    constraints = contract["hard_constraints"]
     for perturbation in (off_diagonal, imaginary):
-        if any(
-            perturbation[int(item["coordinate_index"])] != q(item["value"])
-            for item in contract["hard_constraints"]
-        ):
-            continue
-        raise AssertionError("out-of-support perturbation was accepted")
+        violations = [
+            item for item in constraints
+            if perturbation[int(item["coordinate_index"])] != q(item["value"])
+        ]
+        if not violations:
+            raise AssertionError("out-of-support perturbation did not violate the hard constraints")
+
+    # Try to enlarge the admitted basis with a real off-diagonal generator.
+    off_diagonal_basis = [row[:] + [Fraction(0)] for row in basis]
+    off_diagonal_basis[1][2] = Fraction(1)
+    try:
+        validate_structural_contract(data, off_diagonal_basis)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an allowed off-diagonal basis generator was accepted")
+
+    # Try to enlarge the admitted basis with an imaginary generator.
+    imaginary_basis = [row[:] + [Fraction(0)] for row in basis]
+    imaginary_basis[4][2] = Fraction(1)
+    try:
+        validate_structural_contract(data, imaginary_basis)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an allowed imaginary basis generator was accepted")
 
     dependent_basis = [basis[0][:], basis[0][:]]
     if rank(dependent_basis) == 2:
@@ -318,18 +347,32 @@ def run_negative_controls(data: dict[str, Any], basis: Matrix) -> None:
     if matmul(transpose(bad_gram_basis), bad_gram_basis) == identity(2):
         raise AssertionError("non-orthonormal basis was accepted")
 
-    bad_normal = decode_vector(data["simplex"]["normals"][1])
-    bad_normal[0] = Fraction(-1, 2)
-    if dot(bad_normal, bad_normal) == 1:
-        raise AssertionError("nonunit simplex normal control was ineffective")
+    bad_normal_simplex = json.loads(json.dumps(data["simplex"]))
+    bad_normal_simplex["normals"][1][0] = {"numerator": "-1", "denominator": "2"}
+    try:
+        validate_simplex(bad_normal_simplex, 2)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("nonunit simplex normal was accepted")
 
-    missing_vertex_count = len(data["simplex"]["vertices"]) - 1
-    if missing_vertex_count == data["simplex"]["expected_vertex_count"]:
-        raise AssertionError("missing simplex vertex control was ineffective")
+    missing_vertex_simplex = json.loads(json.dumps(data["simplex"]))
+    missing_vertex_simplex["vertices"] = missing_vertex_simplex["vertices"][:-1]
+    try:
+        validate_simplex(missing_vertex_simplex, 2)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("missing simplex vertex was accepted")
 
-    reversed_inequality = "n_i^T q >= 1"
-    if reversed_inequality == "n_i^T q <= 1":
-        raise AssertionError("reversed half-space control was ineffective")
+    reversed_halfspace_simplex = json.loads(json.dumps(data["simplex"]))
+    reversed_halfspace_simplex["inequalities"][1] = "n2 dot q >= 1"
+    try:
+        validate_simplex(reversed_halfspace_simplex, 2)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("reversed half-space was accepted")
 
     covariance_only = dict(contract)
     covariance_only["authority_class"] = "empirical_covariance_rank"
