@@ -111,7 +111,7 @@ The hashes establish content consistency, not the identity of the parser, truth 
 
 ## Tests authored
 
-27 focused tests currently cover:
+28 focused tests currently cover:
 - identical graph yields perfect independent dimensions, including onset, duration, note, auxiliary, attribute and cursor outputs;
 - wrong pitch spelling does not suppress note-event presence;
 - equivalent decimal alteration lexemes compare numerically exactly, including implicit natural versus explicit zero;
@@ -127,7 +127,7 @@ The hashes establish content consistency, not the identity of the parser, truth 
 - augmenting-path matching reaches maximum cardinality where a greedy first pairing would fail;
 - grace slash/steal-time, cue flags, chord-member flags and chord-anchor relationships are independently scored.
 
-All 27 focused tests are authored, not compiled or run. The final tranche independently mutates part name/abbreviation, nested MIDI setup, metadata presence/absence and legacy metadata-layer coverage, and rejects pathological source-tree depth.
+All 28 focused tests are authored, not compiled or run. The final tranche independently mutates part name/abbreviation, nested MIDI setup, metadata presence/absence and legacy metadata-layer coverage, and rejects pathological source-tree depth.
 
 ## External comparison and honest SOTA strategy
 
