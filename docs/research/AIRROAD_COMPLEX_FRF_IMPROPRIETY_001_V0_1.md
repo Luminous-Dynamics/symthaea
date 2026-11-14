@@ -78,7 +78,52 @@ The proper control is:
 ]
 Both models therefore have the same ordinary complex covariance (C=5), but different complementary covariance and different real/augmented joint covariance. A covariance-only representation cannot distinguish these models.
 
-## 4. Required V0.1 checks
+## 4. Exact two-coordinate MIMO fixture
+
+V0.1 also includes a two-coordinate complex vector (z=x+iy\in\mathbb C^2). Its real vectorization is frozen as ([x_0,x_1,y_0,y_1]^T), corresponding to `f0:Re(z0), f1:Re(z1), f0:Im(z0), f1:Im(z1)`.
+
+The improper real covariance is:
+[
+\Sigma_{\mathbb R}=\begin{bmatrix}
+4&0&1/2&1/4\\
+0&3&-1/4&1/2\\
+1/2&-1/4&1&0\\
+1/4&1/2&0&2
+\end{bmatrix}.
+]
+It induces:
+[
+C=\begin{bmatrix}5&-i/2\\i/2&5\end{bmatrix},\qquad
+P=\begin{bmatrix}3+i&0\\0&1+i\end{bmatrix}.
+]
+The (4\times4) augmented covariance is:
+[
+C_a=\begin{bmatrix}
+5&-i/2&3+i&0\\
+i/2&5&0&1+i\\
+3-i&0&5&i/2\\
+0&1-i&-i/2&5
+\end{bmatrix}.
+]
+The exact leading principal minors of (\Sigma_{\mathbb R}) are (4,12,11,5353/256); those of (C_a) are (5,99/4,295/4,5353/16). All are positive. The determinant relation is:
+[
+\det(C_a)=16\det(\Sigma_{\mathbb R})=5353/16.
+]
+
+A matched proper control uses:
+[
+\Sigma_{\mathbb R}^{\rm proper}=\begin{bmatrix}
+5/2&0&0&1/4\\
+0&5/2&-1/4&0\\
+0&-1/4&5/2&0\\
+1/4&0&0&5/2
+\end{bmatrix}.
+]
+It has the **same ordinary covariance matrix (C)** as the improper case, but (P=0). Its real and augmented leading principal minors are positive, with determinants (9801/256) and (9801/16), respectively. The same-(C), different-(P) counterexample therefore holds for a two-coordinate complex vector, not only for one scalar.
+
+The verifier independently constructs (C), (P), the augmented matrix and the real covariance from each representation. It does not simply compare precomputed matrix literals.
+
+## 5. Required V0.1 checks
 
 Use exact Fraction arithmetic and pairs of rational real/imaginary components:
 - derive (C,P) from the real covariance;
@@ -105,4 +150,4 @@ Freeze vectorization order across frequency, output/input ports, and real/imagin
 
 ## 6. Claim ceiling
 
-V0.1 is an exact scalar statistical-representation reference. It does not establish that real AIRROAD FRF errors are improper, Gaussianity, a physical pseudo-covariance estimate, finite-sample coverage, deterministic uncertainty bounds, IQC feasibility, robust stability or airworthiness.
+V0.1 is an exact scalar and two-coordinate MIMO statistical-representation reference. It does not establish that real AIRROAD FRF errors are improper, Gaussianity, a physical pseudo-covariance estimate, finite-sample coverage, deterministic uncertainty bounds, IQC feasibility, robust stability or airworthiness.
