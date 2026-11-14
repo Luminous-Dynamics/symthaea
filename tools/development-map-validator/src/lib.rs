@@ -541,20 +541,22 @@ fn validate_decision_evidence_list(
 
         let available = field(entry, "available_to_actor_at", &entry_path, report)
             .and_then(|v| parse_rfc3339(v, &format!("{entry_path}.available_to_actor_at"), report));
-        if let Some(available) = available.as_ref() {
-            if available > cutoff {
-                report.error(
-                    "DTEA-EVIDENCE-004",
-                    format!("{entry_path}.available_to_actor_at"),
-                    "evidence was not available to the actor by the decision knowledge cutoff",
-                );
-            }
-            if available > decision_at {
-                report.error(
-                    "DTEA-EVIDENCE-005",
-                    format!("{entry_path}.available_to_actor_at"),
-                    "evidence became available after the decision",
-                );
+        if expect_admissible {
+            if let Some(available) = available.as_ref() {
+                if available > cutoff {
+                    report.error(
+                        "DTEA-EVIDENCE-004",
+                        format!("{entry_path}.available_to_actor_at"),
+                        "consulted evidence was not available to the actor by the decision knowledge cutoff",
+                    );
+                }
+                if available > decision_at {
+                    report.error(
+                        "DTEA-EVIDENCE-005",
+                        format!("{entry_path}.available_to_actor_at"),
+                        "consulted evidence became available after the decision",
+                    );
+                }
             }
         }
 
@@ -1252,6 +1254,12 @@ mod tests {
         value["events"][2]["payload"]["excluded_evidence"] = Value::Array(vec![]);
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-004"));
+    }
+
+    #[test]
+    fn excluded_evidence_may_arrive_after_decision() {
+        let report = validate_json(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
     }
 
     #[test]
