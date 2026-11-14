@@ -237,7 +237,7 @@ impl PrototypeSpecification {
             if result.feasible {
                 "PASSED — MODEL SCREEN ONLY; NOT PHYSICALLY VALIDATED"
             } else {
-                "FAILED — MODEL SCREEN ONLY; REQUIRES REVIEW"
+                "FAILED — MODEL SCREEN ONLY; NOT PHYSICALLY VALIDATED; REQUIRES REVIEW"
             }
         );
 
@@ -779,7 +779,11 @@ mod tests {
         assert!(output.contains("CONCEPT SCREENING REPORT"));
         assert!(output.contains("NOT PHYSICALLY VALIDATED"));
         assert!(output.contains("NOT A SAFETY CASE"));
+        assert!(output.contains("MANUFACTURING QUALIFICATION — NOT PROVIDED"));
+        assert!(output.contains("REGULATORY REVIEW REQUIRED"));
         assert!(!output.contains("DESIGN VALIDATED"));
+        assert!(!output.contains("MANUFACTURING PROCESS"));
+        assert!(!output.contains("REGULATORY COMPLIANCE"));
         assert!(!output.contains("Step 1:"));
 
         // Print first 2000 chars for inspection
