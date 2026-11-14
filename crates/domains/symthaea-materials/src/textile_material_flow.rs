@@ -336,7 +336,6 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "event-produced lot must identify its producer event",
                     );
                 }
-                }
             }
         }
 
