@@ -386,6 +386,29 @@ fn validate_metamorphic_observation_v1(
 /// Compare independently verified base/transformed edit observations under a typed
 /// property map. The relation can pass only if both edits satisfy their requested
 /// obligations and both preserve their declared protected content.
+/// Recompute the content commitment and verify that the pass/fail summary
+/// agrees with the recorded per-property residuals and independent gates.
+pub fn verify_music_edit_metamorphic_assessment_v1(
+    assessment: &MusicEditMetamorphicAssessmentV1,
+) -> Result<(), MusicEditMetamorphicAssessmentIssueV1> {
+    let relation_satisfied = assessment.residuals.iter().all(|residual| residual.matched);
+    let expected_pass = assessment.base_obligation_satisfied
+        && assessment.transformed_obligation_satisfied
+        && assessment.base_preservation_satisfied
+        && assessment.transformed_preservation_satisfied
+        && relation_satisfied;
+    if relation_satisfied != assessment.relation_satisfied || expected_pass != assessment.passed {
+        return Err(MusicEditMetamorphicAssessmentIssueV1::SerializationError);
+    }
+    let mut commitment = assessment.clone();
+    commitment.assessment_sha256.clear();
+    let expected = canonical_metamorphic_json_digest(b"assessment", &commitment)?;
+    if expected != assessment.assessment_sha256 {
+        return Err(MusicEditMetamorphicAssessmentIssueV1::SerializationError);
+    }
+    Ok(())
+}
+
 pub fn evaluate_music_edit_metamorphic_pair_v1(
     pair: &MusicEditMetamorphicPairV1,
     mapping: &MusicEditMetamorphicPropertyMappingV1,
@@ -462,7 +485,7 @@ pub fn evaluate_music_edit_metamorphic_pair_v1(
                     ));
                     continue;
                 }
-                let residual = actual - (source * scale + offset);
+                let residual = *actual - (*source * *scale + *offset);
                 numeric_residual = Some(residual);
                 tolerance = Some(*tol);
                 matched = residual.abs() <= *tol;
@@ -639,6 +662,10 @@ mod tests {
         let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
         assert!(result.passed);
         assert!(result.relation_satisfied);
+        assert!(verify_music_edit_metamorphic_assessment_v1(&result).is_ok());
+        let mut tampered = result;
+        tampered.passed = false;
+        assert!(verify_music_edit_metamorphic_assessment_v1(&tampered).is_err());
     }
 
     #[test]
