@@ -189,6 +189,42 @@ pub fn AddMusicPage() -> impl IntoView {
                                         structure.measure_count,
                                         structure.barline_event_count
                                     )}</span>
+                                    <span>{format!(
+                                        "{} notation events · {} rests · {} grace notes · {} tuplets · {} sound ties · {} visual ties",
+                                        structure.notation_event_count,
+                                        structure.rest_event_count,
+                                        structure.grace_note_count,
+                                        structure.tuplet_notation_count,
+                                        structure.sound_tie_count,
+                                        structure.visual_tie_count
+                                    )}</span>
+                                    <span>{format!(
+                                        "{} parts with notation events · {} unknown · {} voice labels · {} staff labels",
+                                        structure.notation_supported_part_count,
+                                        structure.notation_unknown_part_count,
+                                        structure.voice_assignment_count,
+                                        structure.staff_assignment_count
+                                    )}</span>
+                                    <span>{format!(
+                                        "{} positioned directions/harmony/etc. · {} attribute changes · {} backup/forward moves",
+                                        structure.notation_auxiliary_event_count,
+                                        structure.notation_attribute_event_count,
+                                        structure.notation_cursor_move_count
+                                    )}</span>
+                                    <span>{format!(
+                                        "{} unpitched · {} cue · {} chord members · {} time-modified notes",
+                                        structure.unpitched_event_count,
+                                        structure.cue_note_count,
+                                        structure.chord_member_count,
+                                        structure.time_modification_count
+                                    )}</span>
+                                    <span>{format!(
+                                        "{} part declarations · {} score instruments · {} MIDI instrument setups · {} unbound note instrument references",
+                                        structure.part_metadata_count,
+                                        structure.score_instrument_count,
+                                        structure.midi_instrument_count,
+                                        structure.unresolved_note_instrument_reference_count
+                                    )}</span>
                                     {structure.explanation.map(|reason| view! {
                                         <p class="muted small">{reason}</p>
                                     })}
