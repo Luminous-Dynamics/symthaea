@@ -44,3 +44,11 @@ The `reconfiguration` module compares a frozen `OrganizationSpec` with a candida
 This is only a **structural admission** result. A passing candidate is not thereby authorized, viable, causally beneficial, or proven to have executed. Promotion still requires external authority and durable receipts; viability, runtime recurrence, intervention isolation and capability preservation remain separate evidence planes.
 
 Focused API: `evaluate_reconfiguration(baseline, candidate, policy)`.
+
+## Operational continuity witness
+
+The `identity` module evaluates a finite labelled transition-system relation between a baseline and candidate organization. It distinguishes one-way `Simulation` (preserve baseline behavior while allowing candidate extensions) from two-way `Bisimulation` (both transition directions match and state-local capability sets are equal). It permits state-ID renaming, checks exact state observation labels, baseline capability preservation and the frozen required-invariant set, and returns `Inconclusive` if state-pair or transition-match budgets are exhausted.
+
+A pass is relative to the declared finite models and action/observation alphabet. It is not universal behavioral equivalence, a metaphysical identity claim, or proof that the candidate was authorized or actually executed. Governance and evidence continuity still require the external authority and authenticated runtime-receipt planes.
+
+Focused API: `evaluate_operational_continuity(baseline, candidate, policy)`.
