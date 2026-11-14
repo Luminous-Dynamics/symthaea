@@ -224,9 +224,9 @@ fn validate_artifacts(root: &Path, receipt: &Receipt) -> Result<BTreeMap<String,
         nonempty(&artifact.role, "artifact.role")?;
         nonempty(&artifact.media_type, "artifact.media_type")?;
         validate_digest(&artifact.sha256, "artifact.sha256")?;
-        if !artifacts
+        if artifacts
             .insert(artifact.artifact_id.clone(), artifact)
-            .is_none()
+            .is_some()
         {
             bail!("duplicate artifact_id {}", artifact.artifact_id);
         }
@@ -371,9 +371,12 @@ fn validate_profile_csv(
         let record = record?;
         let elapsed = parse_csv_number(&record, time_index, "profile.elapsed_s")?;
         let value = parse_csv_number(&record, value_index, value_column)?;
-        if elapsed < 0.0 || value < 0.0 {
-            bail!("profile time and load values must be non-negative");
+        if elapsed < 0.0 {
+            bail!("profile elapsed_s must be non-negative");
         }
+        // Signed load current is valid: regenerative and bidirectional profiles
+        // must not be silently clipped to a discharge-only convention.
+        let _profile_value = value;
         if previous_time.is_some_and(|previous| elapsed <= previous) {
             bail!("profile elapsed_s must increase strictly");
         }
@@ -594,8 +597,7 @@ fn validate_json_cross_links(
     {
         bail!("protocol event order does not match receipt event order");
     }
-    if json_string(&protocol_value, "device_boundary", "protocol")
-        .unwrap_or(receipt.protocol.device_boundary)
+    if json_string(&protocol_value, "device_boundary", "protocol")?
         != receipt.protocol.device_boundary
     {
         bail!("protocol device boundary mismatch");
