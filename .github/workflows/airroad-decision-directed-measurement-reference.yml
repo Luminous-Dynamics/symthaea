@@ -1,0 +1,46 @@
+name: AIRROAD Decision-Directed Measurement Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_DECISION_DIRECTED_MEASUREMENT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-decision-directed-measurement-v0.1.json"
+      - "tools/airroad-decision-directed-measurement/verify_decision_selection.py"
+      - ".github/workflows/airroad-decision-directed-measurement-reference.yml"
+  push:
+    branches:
+      - research/airroad-decision-directed-measurement-v0.1
+    paths:
+      - "docs/research/AIRROAD_DECISION_DIRECTED_MEASUREMENT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-decision-directed-measurement-v0.1.json"
+      - "tools/airroad-decision-directed-measurement/verify_decision_selection.py"
+      - ".github/workflows/airroad-decision-directed-measurement-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-decision-directed-measurement-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python standard-library runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute exact policy discriminator
+        run: |
+          python3 -m py_compile \
+            tools/airroad-decision-directed-measurement/verify_decision_selection.py
+          python3 \
+            tools/airroad-decision-directed-measurement/verify_decision_selection.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-decision-directed-measurement-v0.1.json \
+            > /dev/null

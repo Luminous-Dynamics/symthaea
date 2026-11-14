@@ -1,0 +1,99 @@
+{
+  "schema": "luminous.airroad.decision_directed_measurement.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_hard_set_policy_discriminator",
+  "model_identity": "sha256:synthetic-two-coordinate-margin-v0.1",
+  "solver_witness_identity": "sha256:synthetic-limiting-margin-witness-v0.1",
+  "uncertainty_semantics": "deterministic_hard_set",
+  "margin": {
+    "constant": {"numerator": "1", "denominator": "1"},
+    "negative_coefficients": {
+      "x": {"numerator": "1", "denominator": "10"},
+      "y": {"numerator": "2", "denominator": "1"}
+    },
+    "expression": "1 - (1/10)*upper(x) - 2*upper(y)"
+  },
+  "initial_uncertainty": {
+    "x": {
+      "lower": {"numerator": "0", "denominator": "1"},
+      "upper": {"numerator": "1", "denominator": "1"}
+    },
+    "y": {
+      "lower": {"numerator": "0", "denominator": "1"},
+      "upper": {"numerator": "4", "denominator": "5"}
+    }
+  },
+  "risk_budget": {"numerator": "1", "denominator": "1"},
+  "actions": [
+    {
+      "action_id": "refine-x",
+      "target_coordinate_id": "x",
+      "action_kind": "synthetic_guaranteed_contraction",
+      "update_basis": "stipulated_synthetic_bound",
+      "upper_updates": {
+        "x": {"numerator": "1", "denominator": "10"}
+      },
+      "cost": {"numerator": "1", "denominator": "1"},
+      "risk": {"numerator": "1", "denominator": "2"}
+    },
+    {
+      "action_id": "calibrate-y",
+      "target_coordinate_id": "y",
+      "action_kind": "synthetic_guaranteed_contraction",
+      "update_basis": "stipulated_synthetic_bound",
+      "upper_updates": {
+        "y": {"numerator": "1", "denominator": "10"}
+      },
+      "cost": {"numerator": "1", "denominator": "1"},
+      "risk": {"numerator": "1", "denominator": "2"}
+    }
+  ],
+  "expected": {
+    "initial_margin_lower": {"numerator": "-7", "denominator": "10"},
+    "width_only_action": "refine-x",
+    "widths": {
+      "x": {"numerator": "1", "denominator": "1"},
+      "y": {"numerator": "4", "denominator": "5"}
+    },
+    "action_results": {
+      "refine-x": {
+        "margin_lower": {"numerator": "-61", "denominator": "100"},
+        "margin_improvement": {"numerator": "9", "denominator": "100"}
+      },
+      "calibrate-y": {
+        "margin_lower": {"numerator": "7", "denominator": "10"},
+        "margin_improvement": {"numerator": "7", "denominator": "5"}
+      }
+    },
+    "decision_value_action": "calibrate-y",
+    "selected_action_margin_lower": {"numerator": "7", "denominator": "10"},
+    "selected_action_margin_is_positive": true
+  },
+  "negative_controls": [
+    {
+      "id": "unproved-hard-set-contraction",
+      "expected": "reject-no-guaranteed-progress"
+    },
+    {
+      "id": "statistical-covariance-as-hard-set",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "stale-solver-witness",
+      "expected": "reject-action-ranking"
+    },
+    {
+      "id": "unauthorized-physical-excitation",
+      "expected": "reject-action"
+    },
+    {
+      "id": "incomplete-outcome-partition",
+      "expected": "not-established"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact-rational two-coordinate decision-value discriminator only.",
+    "Action contractions are stipulated and are not observed or physically validated measurements.",
+    "No IQC solve, actual excitation, FRF qualification, aircraft stability or certification is established."
+  ]
+}
