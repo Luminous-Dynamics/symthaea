@@ -2053,13 +2053,582 @@ pub fn validate_federation_json(input: &str) -> Result<ValidationReport, serde_j
     Ok(validate_federation_value(&value))
 }
 
+
+fn read_nonnegative_number(value: &Value, path: &str, report: &mut ValidationReport) -> Option<f64> {
+    match value.as_f64() {
+        Some(number) if number.is_finite() && number >= 0.0 => Some(number),
+        _ => {
+            report.error("DYNPLAN-NUMBER-001", path, "expected a finite non-negative number");
+            None
+        }
+    }
+}
+
+fn validate_numeric_range(value: &Value, path: &str, report: &mut ValidationReport) -> Option<f64> {
+    let Some(range) = object(value, path, report) else {
+        return None;
+    };
+    check_allowed_keys(range, &["min", "expected", "max"], path, report);
+    let min = field(value, "min", path, report)
+        .and_then(|v| read_nonnegative_number(v, &format!("{path}.min"), report));
+    let expected = field(value, "expected", path, report)
+        .and_then(|v| read_nonnegative_number(v, &format!("{path}.expected"), report));
+    let max = field(value, "max", path, report)
+        .and_then(|v| read_nonnegative_number(v, &format!("{path}.max"), report));
+    if let (Some(min), Some(expected), Some(max)) = (min, expected, max) {
+        if min > expected || expected > max {
+            report.error("DYNPLAN-RANGE-001", path, "numeric range must satisfy min <= expected <= max");
+        }
+    }
+    expected
+}
+
+fn validate_plan_string_array(
+    value: &Value,
+    path: &str,
+    report: &mut ValidationReport,
+) -> Vec<String> {
+    let mut output = Vec::new();
+    if let Some(items) = array(value, path, report) {
+        let mut seen = HashSet::new();
+        for (index, item) in items.iter().enumerate() {
+            if let Some(item) = string(item, &format!("{path}[{index}]"), report) {
+                if !seen.insert(item.to_owned()) {
+                    report.error("DYNPLAN-ID-001", format!("{path}[{index}]"), "duplicate identifier in array");
+                }
+                output.push(item.to_owned());
+            }
+        }
+    }
+    output
+}
+
+fn validate_development_plan_fixture_value(value: &Value) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    let Some(root) = object(value, "$", &mut report) else {
+        return report;
+    };
+    check_allowed_keys(
+        root,
+        &[
+            "document_type", "schema_version", "benchmark_id", "task_id", "status",
+            "observed_at", "scenario_clock", "objective", "resource_budget",
+            "federation_snapshot", "hard_constraints", "evidence_state", "actions",
+            "candidate_plans", "claim_ceiling",
+        ],
+        "$",
+        &mut report,
+    );
+
+    if field(value, "document_type", "$", &mut report).and_then(Value::as_str)
+        != Some("development_trajectory_planning_case")
+    {
+        report.error("DYNPLAN-DOCUMENT-001", "$.document_type", "unexpected DYNPLAN case document type");
+    }
+    if field(value, "schema_version", "$", &mut report).and_then(Value::as_str) != Some("0.1.0") {
+        report.error("DYNPLAN-DOCUMENT-002", "$.schema_version", "only DYNPLAN schema_version 0.1.0 is supported");
+    }
+    if field(value, "benchmark_id", "$", &mut report).and_then(Value::as_str) != Some("DYNPLAN-001") {
+        report.error("DYNPLAN-DOCUMENT-003", "$.benchmark_id", "benchmark_id must be DYNPLAN-001");
+    }
+    for key in ["task_id", "scenario_clock", "claim_ceiling"] {
+        if let Some(item) = field(value, key, "$", &mut report) {
+            string(item, &format!("$.{key}"), &mut report);
+        }
+    }
+    if let Some(status) = field(value, "status", "$", &mut report) {
+        enum_value(status, "$.status", &["public_synthetic_known_answer", "development", "validation", "confirmatory"], &mut report);
+    }
+    if let Some(observed) = field(value, "observed_at", "$", &mut report) {
+        parse_rfc3339(observed, "$.observed_at", &mut report);
+    }
+
+    if let Some(objective_value) = field(value, "objective", "$", &mut report) {
+        if let Some(objective) = object(objective_value, "$.objective", &mut report) {
+            check_allowed_keys(objective, &["id", "description", "required_capability", "acceptance_evidence"], "$.objective", &mut report);
+            for key in ["id", "description", "required_capability"] {
+                if let Some(item) = field(objective_value, key, "$.objective", &mut report) {
+                    string(item, &format!("$.objective.{key}"), &mut report);
+                }
+            }
+            if let Some(items) = field(objective_value, "acceptance_evidence", "$.objective", &mut report) {
+                validate_plan_string_array(items, "$.objective.acceptance_evidence", &mut report);
+            }
+        }
+    }
+
+    let mut budget_total = None;
+    if let Some(budget_value) = field(value, "resource_budget", "$", &mut report) {
+        if let Some(budget) = object(budget_value, "$.resource_budget", &mut report) {
+            check_allowed_keys(
+                budget,
+                &["unit", "total", "time_budget_hours", "execution_authority", "mutation_authority"],
+                "$.resource_budget",
+                &mut report,
+            );
+            for key in ["unit", "execution_authority", "mutation_authority"] {
+                if let Some(item) = field(budget_value, key, "$.resource_budget", &mut report) {
+                    string(item, &format!("$.resource_budget.{key}"), &mut report);
+                }
+            }
+            budget_total = field(budget_value, "total", "$.resource_budget", &mut report)
+                .and_then(|v| read_nonnegative_number(v, "$.resource_budget.total", &mut report));
+            if let Some(hours) = field(budget_value, "time_budget_hours", "$.resource_budget", &mut report) {
+                read_nonnegative_number(hours, "$.resource_budget.time_budget_hours", &mut report);
+            }
+        }
+    }
+
+    if let Some(federation_value) = field(value, "federation_snapshot", "$", &mut report) {
+        if let Some(federation) = object(federation_value, "$.federation_snapshot", &mut report) {
+            check_allowed_keys(
+                federation,
+                &[
+                    "manifest_repository", "manifest_path", "manifest_artifact_branch",
+                    "manifest_blob_oid", "shared_schema", "members", "cross_project_contract",
+                ],
+                "$.federation_snapshot",
+                &mut report,
+            );
+            for key in ["manifest_repository", "manifest_path", "manifest_artifact_branch"] {
+                if let Some(item) = field(federation_value, key, "$.federation_snapshot", &mut report) {
+                    string(item, &format!("$.federation_snapshot.{key}"), &mut report);
+                }
+            }
+            if let Some(blob) = field(federation_value, "manifest_blob_oid", "$.federation_snapshot", &mut report)
+                .and_then(|v| string(v, "$.federation_snapshot.manifest_blob_oid", &mut report))
+            {
+                if !valid_digest(&blob) || blob.len() != 40 {
+                    report.error("DYNPLAN-PIN-001", "$.federation_snapshot.manifest_blob_oid", "manifest_blob_oid must be a 40-character Git OID");
+                }
+            }
+            if let Some(shared) = field(federation_value, "shared_schema", "$.federation_snapshot", &mut report) {
+                if let Some(shared) = object(shared, "$.federation_snapshot.shared_schema", &mut report) {
+                    check_allowed_keys(shared, &["contract_id", "version", "schema_path", "schema_blob_oid", "status"], "$.federation_snapshot.shared_schema", &mut report);
+                    for key in ["contract_id", "version", "schema_path", "status"] {
+                        if let Some(item) = field(&Value::Object(shared.clone()), key, "$.federation_snapshot.shared_schema", &mut report) {
+                            string(item, &format!("$.federation_snapshot.shared_schema.{key}"), &mut report);
+                        }
+                    }
+                    if let Some(blob) = field(&Value::Object(shared.clone()), "schema_blob_oid", "$.federation_snapshot.shared_schema", &mut report)
+                        .and_then(|v| string(v, "$.federation_snapshot.shared_schema.schema_blob_oid", &mut report))
+                    {
+                        if blob.len() != 40 || !hex_string(&blob) {
+                            report.error("DYNPLAN-PIN-002", "$.federation_snapshot.shared_schema.schema_blob_oid", "schema_blob_oid must be a 40-character Git OID");
+                        }
+                    }
+                }
+            }
+            if let Some(members) = field(federation_value, "members", "$.federation_snapshot", &mut report)
+                .and_then(|v| array(v, "$.federation_snapshot.members", &mut report))
+            {
+                if members.len() < 2 {
+                    report.error("DYNPLAN-FEDERATION-001", "$.federation_snapshot.members", "cross-project planning task requires at least two pinned members");
+                }
+                let mut member_ids = HashSet::new();
+                for (index, member) in members.iter().enumerate() {
+                    let member_path = format!("$.federation_snapshot.members[{index}]");
+                    if let Some(member) = object(member, &member_path, &mut report) {
+                        check_allowed_keys(member, &["project_id", "repository", "subject_revision", "map_path", "map_blob_oid"], &member_path, &mut report);
+                        for key in ["project_id", "repository", "subject_revision", "map_path", "map_blob_oid"] {
+                            if let Some(item) = field(&Value::Object(member.clone()), key, &member_path, &mut report) {
+                                string(item, &format!("{member_path}.{key}"), &mut report);
+                            }
+                        }
+                        if let Some(id) = member.get("project_id").and_then(Value::as_str) {
+                            if !member_ids.insert(id.to_owned()) {
+                                report.error("DYNPLAN-FEDERATION-002", format!("{member_path}.project_id"), "duplicate federation project_id");
+                            }
+                        }
+                        for key in ["subject_revision", "map_blob_oid"] {
+                            if let Some(oid) = member.get(key).and_then(Value::as_str) {
+                                if oid.len() != 40 || !hex_string(oid) {
+                                    report.error("DYNPLAN-PIN-003", format!("{member_path}.{key}"), "member identity must be a 40-character Git OID");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some(contract) = field(federation_value, "cross_project_contract", "$.federation_snapshot", &mut report) {
+                if let Some(contract) = object(contract, "$.federation_snapshot.cross_project_contract", &mut report) {
+                    check_allowed_keys(
+                        contract,
+                        &[
+                            "relation", "status", "contract_binding", "two_sided_owner_conformance",
+                            "independent_consumer_conformance", "critical_unknowns",
+                        ],
+                        "$.federation_snapshot.cross_project_contract",
+                        &mut report,
+                    );
+                    for key in ["relation", "status", "two_sided_owner_conformance", "independent_consumer_conformance"] {
+                        if let Some(item) = contract.get(key) {
+                            string(item, &format!("$.federation_snapshot.cross_project_contract.{key}"), &mut report);
+                        } else {
+                            report.error("EGDDM-REQUIRED-001", format!("$.federation_snapshot.cross_project_contract.{key}"), "required field is missing");
+                        }
+                    }
+                    if let Some(unknowns) = contract.get("critical_unknowns") {
+                        validate_plan_string_array(unknowns, "$.federation_snapshot.cross_project_contract.critical_unknowns", &mut report);
+                    }
+                    if let Some(binding) = contract.get("contract_binding") {
+                        if let Some(binding) = object(binding, "$.federation_snapshot.cross_project_contract.contract_binding", &mut report) {
+                            check_allowed_keys(binding, &["contract_id", "version", "contract_blob_oid", "status"], "$.federation_snapshot.cross_project_contract.contract_binding", &mut report);
+                            for key in ["contract_id", "version", "contract_blob_oid", "status"] {
+                                if let Some(item) = binding.get(key) {
+                                    string(item, &format!("$.federation_snapshot.cross_project_contract.contract_binding.{key}"), &mut report);
+                                } else {
+                                    report.error("EGDDM-REQUIRED-001", format!("$.federation_snapshot.cross_project_contract.contract_binding.{key}"), "required field is missing");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(constraints) = field(value, "hard_constraints", "$", &mut report)
+        .and_then(|v| array(v, "$.hard_constraints", &mut report))
+    {
+        if constraints.is_empty() {
+            report.error("DYNPLAN-CONSTRAINT-001", "$.hard_constraints", "at least one hard constraint is required");
+        }
+        let mut ids = HashSet::new();
+        for (index, constraint) in constraints.iter().enumerate() {
+            let path = format!("$.hard_constraints[{index}]");
+            if let Some(constraint) = object(constraint, &path, &mut report) {
+                check_allowed_keys(constraint, &["id", "rule", "failure"], &path, &mut report);
+                for key in ["id", "rule", "failure"] {
+                    if let Some(item) = constraint.get(key).and_then(Value::as_str) {
+                        string(&Value::String(item.to_owned()), &format!("{path}.{key}"), &mut report);
+                        if key == "id" && !ids.insert(item.to_owned()) {
+                            report.error("DYNPLAN-ID-001", format!("{path}.id"), "duplicate hard constraint ID");
+                        }
+                    } else {
+                        report.error("EGDDM-REQUIRED-001", format!("{path}.{key}"), "required string is missing");
+                    }
+                }
+            }
+        }
+    }
+
+    let mut evidence_ids = HashSet::new();
+    if let Some(evidence_values) = field(value, "evidence_state", "$", &mut report)
+        .and_then(|v| array(v, "$.evidence_state", &mut report))
+    {
+        for (index, evidence) in evidence_values.iter().enumerate() {
+            let path = format!("$.evidence_state[{index}]");
+            if let Some(evidence) = object(evidence, &path, &mut report) {
+                check_allowed_keys(evidence, &["id", "status", "scope", "limitation"], &path, &mut report);
+                for key in ["id", "status", "scope", "limitation"] {
+                    if let Some(item) = evidence.get(key).and_then(Value::as_str) {
+                        if key == "id" && !evidence_ids.insert(item.to_owned()) {
+                            report.error("DYNPLAN-ID-002", format!("{path}.id"), "duplicate evidence ID");
+                        }
+                        string(&Value::String(item.to_owned()), &format!("{path}.{key}"), &mut report);
+                    } else {
+                        report.error("EGDDM-REQUIRED-001", format!("{path}.{key}"), "required string is missing");
+                    }
+                }
+            }
+        }
+    }
+
+    let mut action_ids = HashSet::new();
+    let mut action_costs = HashMap::new();
+    let action_values = field(value, "actions", "$", &mut report)
+        .and_then(|v| array(v, "$.actions", &mut report))
+        .cloned()
+        .unwrap_or_default();
+    for (index, action) in action_values.iter().enumerate() {
+        let path = format!("$.actions[{index}]");
+        if let Some(action) = object(action, &path, &mut report) {
+            check_allowed_keys(
+                action,
+                &[
+                    "id", "kind", "description", "cost", "duration_hours",
+                    "prerequisites", "resolves", "produces", "risk", "reversible",
+                    "execution_authority_required", "acceptance",
+                ],
+                &path,
+                &mut report,
+            );
+            if let Some(id) = action.get("id").and_then(Value::as_str) {
+                if !action_ids.insert(id.to_owned()) {
+                    report.error("DYNPLAN-ID-003", format!("{path}.id"), "duplicate action ID");
+                }
+                string(&Value::String(id.to_owned()), &format!("{path}.id"), &mut report);
+            } else {
+                report.error("EGDDM-REQUIRED-001", format!("{path}.id"), "action id is required");
+            }
+            if let Some(kind) = action.get("kind") {
+                enum_value(kind, &format!("{path}.kind"), &[
+                    "evidence_acquisition", "owner_review", "validation_design",
+                    "implementation_proposal", "analysis", "benchmark_proposal", "defer",
+                ], &mut report);
+            }
+            for key in ["description", "acceptance"] {
+                if let Some(item) = action.get(key) {
+                    string(item, &format!("{path}.{key}"), &mut report);
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.{key}"), "required field is missing");
+                }
+            }
+            let cost = action.get("cost")
+                .and_then(|v| validate_numeric_range(v, &format!("{path}.cost"), &mut report));
+            if let (Some(id), Some(cost)) = (action.get("id").and_then(Value::as_str), cost) {
+                action_costs.insert(id.to_owned(), cost);
+            }
+            if let Some(duration) = action.get("duration_hours") {
+                validate_numeric_range(duration, &format!("{path}.duration_hours"), &mut report);
+            }
+            if let Some(risk) = action.get("risk") {
+                enum_value(risk, &format!("{path}.risk"), &["low", "medium", "high", "unknown"], &mut report);
+            }
+            for key in ["reversible", "execution_authority_required"] {
+                if !action.get(key).is_some_and(Value::is_boolean) {
+                    report.error("DYNPLAN-TYPE-001", format!("{path}.{key}"), "expected a boolean");
+                }
+            }
+            for key in ["prerequisites", "resolves", "produces"] {
+                if let Some(items) = action.get(key) {
+                    validate_plan_string_array(items, &format!("{path}.{key}"), &mut report);
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.{key}"), "required array is missing");
+                }
+            }
+        }
+    }
+
+    for (index, action) in action_values.iter().enumerate() {
+        let path = format!("$.actions[{index}]");
+        let action_id = action.get("id").and_then(Value::as_str).unwrap_or_default();
+        if let Some(prerequisites) = action.get("prerequisites").and_then(Value::as_array) {
+            for (pre_index, prerequisite) in prerequisites.iter().enumerate() {
+                if let Some(prerequisite) = prerequisite.as_str() {
+                    if !action_ids.contains(prerequisite) && !evidence_ids.contains(prerequisite) {
+                        report.error(
+                            "DYNPLAN-REF-001",
+                            format!("{path}.prerequisites[{pre_index}]"),
+                            format!("unknown action/evidence prerequisite {prerequisite:?}"),
+                        );
+                    }
+                }
+            }
+        }
+        let _ = action_id;
+    }
+
+    if let Some(plans) = field(value, "candidate_plans", "$", &mut report)
+        .and_then(|v| array(v, "$.candidate_plans", &mut report))
+    {
+        let mut plan_ids = HashSet::new();
+        for (index, plan) in plans.iter().enumerate() {
+            let path = format!("$.candidate_plans[{index}]");
+            if let Some(plan) = object(plan, &path, &mut report) {
+                check_allowed_keys(
+                    plan,
+                    &[
+                        "id", "actions", "declared_cost", "claimed_benefit",
+                        "declared_status", "plan_rationale", "claim_state",
+                        "implementation_contingency",
+                    ],
+                    &path,
+                    &mut report,
+                );
+                let id = plan.get("id").and_then(Value::as_str);
+                if let Some(id) = id {
+                    if !plan_ids.insert(id.to_owned()) {
+                        report.error("DYNPLAN-ID-004", format!("{path}.id"), "duplicate plan ID");
+                    }
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.id"), "plan id is required");
+                }
+                let action_refs = plan.get("actions")
+                    .map(|v| validate_plan_string_array(v, &format!("{path}.actions"), &mut report))
+                    .unwrap_or_default();
+                let mut sum = 0.0;
+                for action_id in action_refs {
+                    match action_costs.get(&action_id) {
+                        Some(cost) => sum += cost,
+                        None => report.error("DYNPLAN-REF-002", format!("{path}.actions"), format!("unknown action {action_id:?}")),
+                    }
+                }
+                let declared_cost = plan.get("declared_cost")
+                    .and_then(|v| read_nonnegative_number(v, &format!("{path}.declared_cost"), &mut report));
+                if let Some(declared_cost) = declared_cost {
+                    if (declared_cost - sum).abs() > 0.000_001 {
+                        report.error("DYNPLAN-COST-001", format!("{path}.declared_cost"), format!("declared plan cost {declared_cost} does not equal expected action cost sum {sum}"));
+                    }
+                }
+                for key in ["claimed_benefit", "plan_rationale"] {
+                    if let Some(item) = plan.get(key) {
+                        string(item, &format!("{path}.{key}"), &mut report);
+                    } else {
+                        report.error("EGDDM-REQUIRED-001", format!("{path}.{key}"), "required field is missing");
+                    }
+                }
+                if let Some(status) = plan.get("declared_status") {
+                    enum_value(status, &format!("{path}.declared_status"), &["ready", "conditional-feasible", "infeasible", "defer"], &mut report);
+                }
+                if plan.get("claim_state").and_then(Value::as_str) != Some("proposed") {
+                    report.error("DYNPLAN-CLAIM-001", format!("{path}.claim_state"), "candidate development plans must remain proposed");
+                }
+            }
+        }
+    }
+
+    if budget_total.is_none() {
+        report.error("DYNPLAN-BUDGET-001", "$.resource_budget.total", "resource budget total is required");
+    }
+    report.sort();
+    report
+}
+
+fn validate_development_plan_oracle_value(value: &Value) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    let Some(root) = object(value, "$", &mut report) else {
+        return report;
+    };
+    check_allowed_keys(
+        root,
+        &[
+            "document_type", "benchmark_id", "fixture_id", "status",
+            "candidate_plan_ids", "action_ids", "selected_plan",
+            "selected_first_action", "conditional_next_actions",
+            "implementation_authorization", "implementation_status",
+            "plan_dispositions", "hard_invariants", "negative_controls",
+            "metrics", "claim_ceiling",
+        ],
+        "$",
+        &mut report,
+    );
+    if value.get("document_type").and_then(Value::as_str) != Some("development_trajectory_planning_oracle") {
+        report.error("DYNPLAN-ORACLE-001", "$.document_type", "unexpected DYNPLAN oracle document type");
+    }
+    if value.get("benchmark_id").and_then(Value::as_str) != Some("DYNPLAN-001") {
+        report.error("DYNPLAN-ORACLE-002", "$.benchmark_id", "benchmark_id must be DYNPLAN-001");
+    }
+    for key in ["fixture_id", "claim_ceiling"] {
+        if let Some(item) = field(value, key, "$", &mut report) {
+            string(item, &format!("$.{key}"), &mut report);
+        }
+    }
+    if let Some(status) = field(value, "status", "$", &mut report) {
+        enum_value(status, "$.status", &["public_synthetic_known_answer", "development", "validation", "confirmatory"], &mut report);
+    }
+
+    let candidate_ids = value.get("candidate_plan_ids")
+        .map(|v| validate_plan_string_array(v, "$.candidate_plan_ids", &mut report))
+        .unwrap_or_default();
+    let action_ids = value.get("action_ids")
+        .map(|v| validate_plan_string_array(v, "$.action_ids", &mut report))
+        .unwrap_or_default();
+    let selected_plan = field(value, "selected_plan", "$", &mut report)
+        .and_then(|v| string(v, "$.selected_plan", &mut report));
+    let selected_first_action = field(value, "selected_first_action", "$", &mut report)
+        .and_then(|v| string(v, "$.selected_first_action", &mut report));
+    if let Some(selected_plan) = selected_plan {
+        if !candidate_ids.iter().any(|id| id == selected_plan) {
+            report.error("DYNPLAN-ORACLE-003", "$.selected_plan", "selected_plan is absent from candidate_plan_ids");
+        }
+    }
+    if let Some(selected_action) = selected_first_action {
+        if !action_ids.iter().any(|id| id == selected_action) {
+            report.error("DYNPLAN-ORACLE-004", "$.selected_first_action", "selected_first_action is absent from action_ids");
+        }
+    }
+    if value.get("implementation_authorization").and_then(Value::as_str) != Some("not_granted") {
+        report.error("DYNPLAN-ORACLE-005", "$.implementation_authorization", "benchmark oracle must not grant implementation authority");
+    }
+    for key in ["implementation_status"] {
+        if let Some(item) = value.get(key) {
+            string(item, &format!("$.{key}"), &mut report);
+        } else {
+            report.error("EGDDM-REQUIRED-001", format!("$.{key}"), "required field is missing");
+        }
+    }
+
+    if let Some(dispositions) = field(value, "plan_dispositions", "$", &mut report)
+        .and_then(|v| array(v, "$.plan_dispositions", &mut report))
+    {
+        let mut ids = HashSet::new();
+        for (index, disposition) in dispositions.iter().enumerate() {
+            let path = format!("$.plan_dispositions[{index}]");
+            if let Some(disposition) = object(disposition, &path, &mut report) {
+                check_allowed_keys(disposition, &["plan_id", "disposition", "reason_codes"], &path, &mut report);
+                let id = disposition.get("plan_id").and_then(Value::as_str);
+                if let Some(id) = id {
+                    if !candidate_ids.iter().any(|candidate| candidate == id) {
+                        report.error("DYNPLAN-ORACLE-006", format!("{path}.plan_id"), "disposition references unknown candidate plan");
+                    }
+                    if !ids.insert(id.to_owned()) {
+                        report.error("DYNPLAN-ORACLE-007", format!("{path}.plan_id"), "duplicate plan disposition");
+                    }
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.plan_id"), "plan_id is required");
+                }
+                if let Some(status) = disposition.get("disposition") {
+                    enum_value(status, &format!("{path}.disposition"), &["feasible", "conditional_feasible", "infeasible", "dominated", "defer", "indeterminate"], &mut report);
+                }
+                if let Some(codes) = disposition.get("reason_codes") {
+                    validate_plan_string_array(codes, &format!("{path}.reason_codes"), &mut report);
+                }
+            }
+        }
+        if ids.len() != candidate_ids.len() {
+            report.error("DYNPLAN-ORACLE-008", "$.plan_dispositions", "oracle must have exactly one disposition for every candidate plan");
+        }
+    }
+    for key in ["hard_invariants", "metrics"] {
+        if let Some(items) = value.get(key) {
+            validate_plan_string_array(items, &format!("$.{key}"), &mut report);
+        } else {
+            report.error("EGDDM-REQUIRED-001", format!("$.{key}"), "required array is missing");
+        }
+    }
+    if let Some(controls) = field(value, "negative_controls", "$", &mut report)
+        .and_then(|v| array(v, "$.negative_controls", &mut report))
+    {
+        let mut ids = HashSet::new();
+        for (index, control) in controls.iter().enumerate() {
+            let path = format!("$.negative_controls[{index}]");
+            if let Some(control) = object(control, &path, &mut report) {
+                check_allowed_keys(control, &["id", "mutation", "expected"], &path, &mut report);
+                let id = control.get("id").and_then(Value::as_str);
+                if let Some(id) = id {
+                    if !ids.insert(id.to_owned()) {
+                        report.error("DYNPLAN-ORACLE-009", format!("{path}.id"), "duplicate negative-control ID");
+                    }
+                } else {
+                    report.error("EGDDM-REQUIRED-001", format!("{path}.id"), "negative control ID is required");
+                }
+                for key in ["mutation", "expected"] {
+                    if let Some(item) = control.get(key) {
+                        string(item, &format!("{path}.{key}"), &mut report);
+                    } else {
+                        report.error("EGDDM-REQUIRED-001", format!("{path}.{key}"), "required string is missing");
+                    }
+                }
+            }
+        }
+        if controls.is_empty() {
+            report.error("DYNPLAN-ORACLE-010", "$.negative_controls", "oracle must include negative controls");
+        }
+    }
+    report.sort();
+    report
+}
+
 /// Autodetect and validate an EGDDM snapshot or federation directory.
 pub fn validate_document_json(input: &str) -> Result<ValidationReport, serde_json::Error> {
     let value: Value = serde_json::from_str(input)?;
-    if value.get("federation_id").is_some() {
-        Ok(validate_federation_value(&value))
-    } else {
-        Ok(validate_value(&value))
+    match value.get("document_type").and_then(Value::as_str) {
+        Some("development_trajectory_planning_case") => Ok(validate_development_plan_fixture_value(&value)),
+        Some("development_trajectory_planning_oracle") => Ok(validate_development_plan_oracle_value(&value)),
+        _ if value.get("federation_id").is_some() => Ok(validate_federation_value(&value)),
+        _ => Ok(validate_value(&value)),
     }
 }
 
@@ -2201,6 +2770,51 @@ mod tests {
         value["relationships"][0]["status"] = Value::String("independently_qualified".to_owned());
         let report = validate_federation_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-011"));
+    }
+
+
+    const DYNPLAN_CASE: &str = include_str!(
+        "../../../docs/development-map/fixtures/development-trajectory-planning-v0.1.json"
+    );
+    const DYNPLAN_ORACLE: &str = include_str!(
+        "../../../docs/development-map/fixtures/development-trajectory-planning-v0.1.expected.json"
+    );
+
+    #[test]
+    fn development_trajectory_fixture_has_closed_references_and_plan_costs() {
+        let report = validate_document_json(DYNPLAN_CASE).expect("DYNPLAN case JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn development_trajectory_oracle_references_every_candidate_plan() {
+        let report = validate_document_json(DYNPLAN_ORACLE).expect("DYNPLAN oracle JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn development_plan_unknown_action_reference_is_rejected() {
+        let mut value: Value = serde_json::from_str(DYNPLAN_CASE).expect("DYNPLAN case JSON");
+        value["candidate_plans"][0]["actions"] =
+            Value::Array(vec![Value::String("missing:action".to_owned())]);
+        let report = validate_development_plan_fixture_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNPLAN-REF-002"));
+    }
+
+    #[test]
+    fn development_plan_cost_must_match_action_expected_costs() {
+        let mut value: Value = serde_json::from_str(DYNPLAN_CASE).expect("DYNPLAN case JSON");
+        value["candidate_plans"][1]["declared_cost"] = Value::Number(serde_json::Number::from_f64(3.0).expect("finite"));
+        let report = validate_development_plan_fixture_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNPLAN-COST-001"));
+    }
+
+    #[test]
+    fn development_plan_oracle_cannot_select_an_unknown_plan() {
+        let mut value: Value = serde_json::from_str(DYNPLAN_ORACLE).expect("DYNPLAN oracle JSON");
+        value["selected_plan"] = Value::String("missing:plan".to_owned());
+        let report = validate_development_plan_oracle_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNPLAN-ORACLE-003"));
     }
 
     const DTEA_FIXTURE: &str = include_str!(
