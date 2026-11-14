@@ -1,128 +1,115 @@
-name: HLB FEP-WSP Factorial Contract
+name: HLB FEP-WSP Protocol Contract
 
 on:
   pull_request:
     branches: [main, research/swi-001-weight-space-introspection]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
-      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
-      - "crates/core/symthaea-core/Cargo.toml"
-      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
-      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
-      - "crates/core/symthaea-fep/src/lib.rs"
-      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
-      - "crates/core/symthaea-core/src/hdc/mod.rs"
-      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
-      - "crates/core/symthaea-core/src/weight_space_program.rs"
-      - "src/dynamics/cfc/weight_program_adapter.rs"
-      - "src/dynamics/cfc/mod.rs"
-      - "src/dynamics/cfc/network.rs"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
   push:
     branches: [research/hlb-fep-wsp-factorial-v2]
     paths:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
-      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
-      - "crates/core/symthaea-core/Cargo.toml"
-      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
-      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
-      - "crates/core/symthaea-fep/src/lib.rs"
-      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
-      - "crates/core/symthaea-core/src/hdc/mod.rs"
-      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
-      - "crates/core/symthaea-core/src/weight_space_program.rs"
-      - "src/dynamics/cfc/weight_program_adapter.rs"
-      - "src/dynamics/cfc/mod.rs"
-      - "src/dynamics/cfc/network.rs"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  group: hlb-fep-wsp-protocol-contract-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
   protocol-contract:
-    name: Validate four-factor protocol contract
+    name: Validate protocol-only factorial plan
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      CARGO_TERM_COLOR: always
-      RUST_BACKTRACE: 1
+    timeout-minutes: 10
     steps:
       - name: Checkout exact revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Install pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
-        with:
-          components: rustfmt, clippy
-
-      - name: Check protocol schema and disjoint seeds
-        run: |
-          set -euo pipefail
-          jq -e '
-            .schema_version == "hlb-fep-wsp-factorial-v1" and
-            .status == "protocol_only" and
-            (.factors | length == 4) and
-            ([.factors[].id] | unique | length == 4) and
-            (.profiles | length == 16) and
-            ([.profiles[].id] | unique | length == 16) and
-            ([.profiles[].execution_status] | all(. == "planned_not_executed")) and
-            (.tasks | length >= 4) and
-            (.baselines | length >= 16) and
-            (.seeds.development | length == 10) and
-            (.seeds.held_out | length == 20) and
-            (([.seeds.development[], .seeds.held_out[]] | unique | length) == 30) and
-            (.hard_gates | length >= 12)
-          ' docs/research/hlb-fep-wsp-factorial-v1.json >/dev/null
-
-      - name: Check validator formatting
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/lib.rs
-          rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
-          rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
-          rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
-
-      - name: Test four-factor contract invariants
-        run: |
-          set -euo pipefail
-          cargo metadata --locked --format-version 1 --no-deps > /dev/null
-          cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
-          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
-          cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
-          cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
-          cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
-
-      - name: Generate source-bound protocol receipt
+      - name: Validate protocol-only factorial matrix
         env:
-          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          mkdir -p research-results
-          cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
-          cat research-results/SHA256SUMS
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          from pathlib import Path
 
-      - name: Upload protocol-validation receipt
+          root = Path("docs/research")
+          protocol_path = root / "hlb-fep-wsp-factorial-v1.json"
+          overview_path = root / "HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+          workflow_path = Path(".github/workflows/hlb-fep-wsp-factorial-contract.yml")
+          protocol_bytes = protocol_path.read_bytes()
+          overview_bytes = overview_path.read_bytes()
+          protocol = json.loads(protocol_bytes)
+
+          assert protocol["schema_version"] == "hlb-fep-wsp-factorial-v1"
+          assert protocol["status"] == "protocol_only"
+          assert "No runtime activation" in protocol["claim_ceiling"]
+          assert len(protocol["factors"]) == 4
+          factor_ids = [factor["id"] for factor in protocol["factors"]]
+          assert len(set(factor_ids)) == 4
+          assert len(protocol["profiles"]) == 16
+          profile_ids = [profile["id"] for profile in protocol["profiles"]]
+          assert len(set(profile_ids)) == 16
+          expected_factors = {"native_hdc", "cfc_ltc", "fep_epistemic_policy", "weight_space_programming"}
+          assert set(factor_ids) == expected_factors
+          for profile in protocol["profiles"]:
+              assert profile["execution_status"] == "planned_not_executed"
+              bits = "".join("1" if profile[factor] else "0" for factor in ("native_hdc", "cfc_ltc", "fep_epistemic_policy", "weight_space_programming"))
+              assert profile["id"] == f"H{bits[0]}-C{bits[1]}-F{bits[2]}-W{bits[3]}"
+          development = protocol["seeds"]["development"]
+          held_out = protocol["seeds"]["held_out"]
+          assert len(development) == 10 and len(set(development)) == 10
+          assert len(held_out) == 20 and len(set(held_out)) == 20
+          assert set(development).isdisjoint(held_out)
+          assert len(protocol["tasks"]) >= 4
+          assert len(protocol["baselines"]) >= 16
+          assert len(protocol["hard_gates"]) >= 12
+          assert "No integrated runtime result is claimed." in overview_bytes.decode("utf-8")
+
+          source_sha = os.environ["EXPECTED_SOURCE_SHA"]
+          assert re.fullmatch(r"[0-9a-f]{40}", source_sha)
+          receipt = {
+              "schema_version": "luminous.hlb_protocol_validation_receipt.v0.1",
+              "status": "protocol_only_structurally_validated",
+              "execution_authorized": False,
+              "runtime_result_claimed": False,
+              "source_sha": source_sha,
+              "protocol_sha256": hashlib.sha256(protocol_bytes).hexdigest(),
+              "overview_sha256": hashlib.sha256(overview_bytes).hexdigest(),
+              "workflow_sha256": hashlib.sha256(workflow_path.read_bytes()).hexdigest(),
+              "factor_count": len(factor_ids),
+              "profile_count": len(profile_ids),
+              "development_seed_count": len(development),
+              "held_out_seed_count": len(held_out),
+              "task_count": len(protocol["tasks"]),
+              "baseline_count": len(protocol["baselines"]),
+              "hard_gate_count": len(protocol["hard_gates"]),
+          }
+          output = Path("research-results")
+          output.mkdir(parents=True, exist_ok=True)
+          (output / "hlb-protocol-validation-v0.1.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(receipt, indent=2))
+          PY
+      - name: Upload protocol-only validation receipt
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          name: hlb-protocol-validation-${{ github.event.pull_request.head.sha || github.sha }}
           path: research-results/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30

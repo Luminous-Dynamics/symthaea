@@ -1,0 +1,42 @@
+name: Finite symmetry quotient reference
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/symmetry-quotient-001/**"
+      - ".github/workflows/symmetry-quotient-reference.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/symmetry-quotient-001/**"
+      - ".github/workflows/symmetry-quotient-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symmetry-quotient-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path research/symmetry-quotient-001/Cargo.toml --all -- --check
+      - name: Test
+        run: cargo test --locked --manifest-path research/symmetry-quotient-001/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/symmetry-quotient-001/Cargo.toml --all-targets -- -D warnings
