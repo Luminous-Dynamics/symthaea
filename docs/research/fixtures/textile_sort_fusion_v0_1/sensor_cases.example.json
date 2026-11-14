@@ -152,6 +152,16 @@
         "reason": null
       },
       "invariant": "Grouped split integrity permits multiple rows from one physical subject when they remain in one partition."
+    },
+    {
+      "case_id": "SORT-016-OPENTEXTILE-HSI-PIXEL-LEAKAGE",
+      "case_kind": "dataset_split",
+      "mutation": "Two hyperspectral tiles/patches derived from the same OpenTextile-NIR physical sample are assigned to Train and Test.",
+      "expected": {
+        "disposition": "group_leakage",
+        "reason": "GroupLeakage:PhysicalSpecimen"
+      },
+      "invariant": "All pixels, tiles, patches, crops and augmentations derived from one physical sample remain in one partition; pixel count is not independent sample count."
     }
   ],
   "claim_ceiling": "Synthetic test-intention corpus only. It does not contain real spectra or garment images, implement a fibre classifier, validate a physical sorting line, or qualify recycling, secondary grade, safety or lifecycle benefit."
