@@ -1245,6 +1245,8 @@ struct ReportBodyV1<'a> {
     duration_presence: &'a MusicXmlNotationAccuracyV1,
     duration_error: &'a MusicXmlNotationErrorDistributionV1,
     written_type_and_dots: &'a MusicXmlNotationAccuracyV1,
+    note_performance_directives: &'a MusicXmlNotationAccuracyV1,
+    note_performance_directive_unresolved_count: usize,
     grace_semantics: &'a MusicXmlNotationAccuracyV1,
     cue_semantics: &'a MusicXmlNotationAccuracyV1,
     chord_member_semantics: &'a MusicXmlNotationAccuracyV1,
@@ -1307,6 +1309,9 @@ fn report_commitment(
         duration_presence: &report.duration_presence,
         duration_error: &report.duration_error,
         written_type_and_dots: &report.written_type_and_dots,
+        note_performance_directives: &report.note_performance_directives,
+        note_performance_directive_unresolved_count:
+            report.note_performance_directive_unresolved_count,
         grace_semantics: &report.grace_semantics,
         cue_semantics: &report.cue_semantics,
         chord_member_semantics: &report.chord_member_semantics,
@@ -2421,6 +2426,27 @@ mod tests {
         assert_eq!(report.note_performance_directives.sample_count, 0);
         assert_eq!(report.note_performance_directives.accuracy, None);
         assert_eq!(report.note_performance_directive_unresolved_count, 1);
+    }
+
+
+    #[test]
+    fn report_commitment_binds_every_metric_including_performance_directive_coverage() {
+        let reference = graph(fixture_xml());
+        let mut report = evaluate_musicxml_notation_graphs(
+            &reference, &reference, default_config()
+        ).unwrap();
+        let original = report.report_sha256.clone();
+
+        report.note_performance_directives.correct_count += 1;
+        assert_ne!(report_commitment(&report).unwrap(), original);
+        report.note_performance_directives.correct_count -= 1;
+
+        report.note_performance_directive_unresolved_count += 1;
+        assert_ne!(report_commitment(&report).unwrap(), original);
+        report.note_performance_directive_unresolved_count -= 1;
+
+        report.note_performance_directives.accuracy = Some(0.0);
+        assert_ne!(report_commitment(&report).unwrap(), original);
     }
 
 }
