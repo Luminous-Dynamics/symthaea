@@ -1,0 +1,46 @@
+name: AIRROAD Hierarchical FRF UQ Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_HIERARCHICAL_FRF_UQ_001_V0_1.md"
+      - "docs/research/fixtures/airroad-hierarchical-frf-uq-v0.1.json"
+      - "tools/airroad-hierarchical-frf-uq/verify_hierarchical_covariance.py"
+      - ".github/workflows/airroad-hierarchical-frf-uq-reference.yml"
+  push:
+    branches:
+      - research/airroad-hierarchical-frf-uq-v0.1
+    paths:
+      - "docs/research/AIRROAD_HIERARCHICAL_FRF_UQ_001_V0_1.md"
+      - "docs/research/fixtures/airroad-hierarchical-frf-uq-v0.1.json"
+      - "tools/airroad-hierarchical-frf-uq/verify_hierarchical_covariance.py"
+      - ".github/workflows/airroad-hierarchical-frf-uq-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-hierarchical-frf-uq-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-covariance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute exact covariance reference
+        run: |
+          python3 -m py_compile \
+            tools/airroad-hierarchical-frf-uq/verify_hierarchical_covariance.py
+          python3 \
+            tools/airroad-hierarchical-frf-uq/verify_hierarchical_covariance.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-hierarchical-frf-uq-v0.1.json \
+            > /dev/null
