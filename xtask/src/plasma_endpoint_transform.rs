@@ -19,6 +19,7 @@ struct AgingExposure {
     exposure_receipt_id: String,
     protocol_id: String,
     protocol_sha256: String,
+    conditioning_mode: String,
     exposure_receipt_sha256: String,
     conditions_sha256: String,
     conditioning_method_receipt: ScopeEvidence,
@@ -267,6 +268,10 @@ fn validate_aging_exposure(node: &ObservationNode) -> std::result::Result<(), Di
     if !matches!(method.method_id.as_str(), "ASTM_D1151" | "ASTM_D1183")
         || method.evidence_kind != "conditioning_practice"
         || method.requested_claim != "conditioning_protocol_reference"
+        || exposure.protocol_id != method.protocol_id.as_deref().unwrap_or("")
+        || exposure.protocol_sha256 != method.protocol_sha256.as_deref().unwrap_or("")
+        || (method.method_id == "ASTM_D1151" && exposure.conditioning_mode != "continuous")
+        || (method.method_id == "ASTM_D1183" && exposure.conditioning_mode != "cyclic")
     {
         return Err(Disposition::Rejected);
     }
@@ -639,7 +644,7 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
 fn expected_analysis_profile(graph: &EndpointGraph) -> &'static str {
     match graph.transform_id.as_str() {
         "unit_preserving_strength_projection_v1" | "aged_strength_retention_ratio_v1" => "two_sample_tost_v1",
-        "predeclared_failure_mode_fraction_v1" => "two_proportion_tost_v1",
+        "predeclared_failure_mode_fraction_v1" => "clustered_two_proportion_equivalence_pending_v1",
         _ => "unsupported",
     }
 }
@@ -699,6 +704,13 @@ mod tests {
     fn aged_strength_requires_four_separate_observation_cohorts() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
         let case = fixture.cases.iter().find(|case| case.id == "aged-retention-missing-unaged-reference").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn failure_mode_fraction_stays_blocked_until_clustered_proportion_method_is_qualified() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-failure-mode-fraction-classification").expect("case exists");
         assert_eq!(audit_graph(&case.graph).disposition, Disposition::Blocked);
     }
 
