@@ -18,11 +18,20 @@
 //! charge conservation structural rather than a post-hoc expectation-value
 //! check.
 //!
-//! This first implementation provides validated complex tensors, exact
-//! product-state construction, charge-block dense-to-MPS SVD factorization,
-//! exact small-system dense expansion, and contraction-based norm evaluation.
-//! It does not yet implement two-site gate
-//! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
+//! The implementation includes:
+//! - validated complex charge-labelled tensors and fixed-charge open-boundary MPS;
+//! - charge-block dense-to-MPS factorization and a small-N dense oracle;
+//! - validated U(1)-preserving gates and exact/truncated charge-block two-site SVD;
+//! - deterministic even/odd nearest-neighbour TEBD layers;
+//! - mixed-canonical left/right SVD sweeps with measured gauge receipts;
+//! - gate, Hamiltonian-model projection, canonicalization and Schmidt-compression
+//!   error components in a state-bound continuation ledger;
+//! - analytic U(1)-preserving two-site Hamiltonian exponentials and a second-order
+//!   even/odd/even Strang stepper.
+//!
+//! Trotter/time-discretization error is intentionally not covered by the global
+//! representation/gate/model-projection/compression receipt. Long-range MPO,
+//! TDVP, matched performance, and large-N scalability remain separate work.
 
 use nalgebra::DMatrix;
 use num_complex::Complex64;
