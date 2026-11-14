@@ -145,6 +145,9 @@ struct CoherenceBand {
 struct AuditReport {
     schema_version: &'static str,
     case_id: String,
+    source_dataset_id: String,
+    source_citation: String,
+    source_data_sha256: String,
     intermittency_report_case_id: String,
     intermittency_report_sha256: String,
     evidence_kind: &'static str,
@@ -315,6 +318,8 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
     for (label, value) in [
         ("case_id", case.case_id.as_str()),
+        ("source dataset_id", case.source.dataset_id.as_str()),
+        ("source citation", case.source.citation.as_str()),
         ("intermittency_report_case_id", case.intermittency_report_case_id.as_str()),
         ("vessel_id", case.vessel_id.as_str()),
         ("propeller_revision", case.propeller_revision.as_str()),
@@ -771,27 +776,33 @@ fn audit(case: &Case) -> AuditReport {
         });
     }
 
-    let mut disposition = "CONDITIONED_SUMMARY_ONLY";
-    if invalid_input || reasons.iter().any(|reason| reason.contains("parent coherence report is invalid") || reason.contains("disposition conflicts with per-band phase status")) {
-        disposition = "INVALID";
-        if invalid_input {
-            reasons.push("one or more joined input records are malformed".to_string());
-        }
-    } else if has_incomparable_identity {
-        disposition = "INCOMPARABLE";
-    } else if reasons.iter().any(|reason| reason.contains("frequency for band")) {
-        disposition = "INCOMPARABLE";
-    } else if reasons.iter().any(|reason| reason.contains("coherence uncertainty is unresolved") || reason.contains("parent coherence report is incomplete")) {
-        disposition = "INCOMPLETE";
-    } else if case.evidence_kind == EvidenceKind::Synthetic
+    let invalid_coherence_parent = reasons.iter().any(|reason| {
+        reason.contains("parent coherence report is invalid")
+            || reason.contains("disposition conflicts with per-band phase status")
+    });
+    let frequency_incomparable = reasons.iter().any(|reason| reason.contains("frequency for band"));
+    let unresolved_parent = reasons.iter().any(|reason| {
+        reason.contains("coherence uncertainty is unresolved")
+            || reason.contains("parent coherence report is incomplete")
+    });
+    let evidence_incomplete = case.evidence_kind == EvidenceKind::Synthetic
         || case.source.rights_status != RightsStatus::PublicOrPermitted
         || !case.source.independently_reviewed
         || case.intermittency_disposition != "DISTRIBUTIONAL_SUMMARY_ONLY"
         || insufficient_runs
         || runs_with_both_cohorts < case.minimum_independent_runs
-        || run_reports.iter().any(|r| r.excluded_unknown_cavitation_state > 0 || r.excluded_alignment_ineligible > 0)
-    {
-        disposition = "INCOMPLETE";
+        || run_reports.iter().any(|r| r.excluded_unknown_cavitation_state > 0 || r.excluded_alignment_ineligible > 0);
+    let disposition = if invalid_input || invalid_coherence_parent {
+        "INVALID"
+    } else if has_incomparable_identity || frequency_incomparable {
+        "INCOMPARABLE"
+    } else if unresolved_parent || evidence_incomplete {
+        "INCOMPLETE"
+    } else {
+        "CONDITIONED_SUMMARY_ONLY"
+    };
+    if invalid_input {
+        reasons.push("one or more joined input records are malformed".to_string());
     }
 
     if case.evidence_kind == EvidenceKind::Synthetic {
@@ -813,6 +824,9 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
+        source_dataset_id: case.source.dataset_id.clone(),
+        source_citation: case.source.citation.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
         intermittency_report_case_id: case.intermittency_report_case_id.clone(),
         intermittency_report_sha256: case.intermittency_report_sha256.clone(),
         evidence_kind: match case.evidence_kind { EvidenceKind::Synthetic => "synthetic", EvidenceKind::Measured => "measured" },
@@ -1043,6 +1057,15 @@ mod tests {
         assert_eq!(report.disposition, "INCOMPLETE");
         assert_eq!(report.run_reports.len(), 2);
         assert!((report.aggregate_band_reports[0].present_minus_absent_equal_run_weighted_mean_coherence.unwrap() - 0.5).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn source_dataset_citation_and_digest_survive_receipt() {
+        let input = case();
+        let report = audit(&input);
+        assert_eq!(report.source_dataset_id, input.source.dataset_id);
+        assert_eq!(report.source_citation, input.source.citation);
+        assert_eq!(report.source_data_sha256, input.source.raw_data_sha256);
     }
 
     #[test]
