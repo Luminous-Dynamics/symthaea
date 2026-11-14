@@ -624,8 +624,8 @@ fn parse_part_events(
                     release_divisions: element.attribute("release").map(str::to_string),
                     performance_offset_divisions: (element.attribute("attack").is_some()
                         || element.attribute("release").is_some())
-                    .then_some(divisions)
-                    .flatten(),
+                        .then_some(divisions)
+                        .flatten(),
                     performed_duration,
                     kind,
                     is_grace,
