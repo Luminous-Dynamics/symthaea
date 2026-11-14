@@ -59,6 +59,12 @@ mod tests {
     }
 
     #[test]
+    fn viability_regulation_accessor_accepts_trailing_receiver_comma() {
+        let s = make_service();
+        let _ = s.viability_regulation();
+    }
+
+    #[test]
     fn stats_initial_total_cycles() {
         let s = make_service();
         assert_eq!(s.stats().total_cycles, 0);
