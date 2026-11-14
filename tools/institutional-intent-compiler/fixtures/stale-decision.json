@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.1",
+  "brief_id": "synthetic-brief-009",
+  "baseline_version": 1,
+  "sources": [
+    {
+      "id": "brief",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byte_length": 100,
+      "classification": "public"
+    }
+  ],
+  "derivations": [],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "statement": "The system shall not disclose secrets in a public view.",
+      "class": "data_privacy",
+      "declared_modality": "mandatory",
+      "proposed_modality": "mandatory",
+      "lifecycle": "accepted",
+      "traceability": {
+        "source_spans": [
+          {
+            "source_id": "brief",
+            "start_byte": 0,
+            "end_byte": 24,
+            "quote_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ],
+        "derivation_ref": null
+      },
+      "verification": {
+        "method": "test",
+        "acceptance_condition": "No synthetic secret marker appears in public output.",
+        "limitation": null
+      },
+      "owner": {
+        "system": "mycelix",
+        "reference": "privacy-view-contract"
+      },
+      "links": [],
+      "review_decision_ref": "DEC-001",
+      "modality_change_decision_ref": null,
+      "unverifiable_exception_decision_ref": null
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-001",
+      "subject_type": "requirement",
+      "subject_id": "REQ-001",
+      "action": "accept",
+      "reviewer_ref": "reviewer:synthetic-01",
+      "authority_profile_ref": "profile:synthetic-review-v1",
+      "baseline_version": 0,
+      "rationale": "Accepted in synthetic fixture."
+    }
+  ]
+}
