@@ -110,13 +110,13 @@
         "block_irreversible_actions": false,
         "stop_trigger_event_id": "stop",
         "effect_orders": {
-          "effect": "after"
+          "effect": "before"
         },
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "63eb4d55eed26a5d737ceb6c53255b2949f04daa0e340c22d3cbf61c08b2cdae"
+      "event_trace_sha256": "aa6eb6c92c43e08aec558c03c7b5660269df11202387a47e07bc2c7d3a401444"
     },
     {
       "id": "EO-NEG-001",
@@ -207,7 +207,7 @@
         "block_irreversible_actions": true,
         "stop_trigger_event_id": "stop",
         "effect_orders": {
-          "effect": "before"
+          "effect": "after"
         },
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
@@ -215,7 +215,7 @@
           "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:effect"
         ]
       },
-      "event_trace_sha256": "5f17d2e16269ea5d8bd10174e86b10442cbb1d764aa226fc0b5e2d4f18a76457"
+      "event_trace_sha256": "91d7093f0a45a2659c942a3b5db83fe26395e91b7d1f5b9fc1a878dd2251e4d4"
     },
     {
       "id": "EO-UNK-001",
@@ -309,7 +309,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING:effect"
         ]
       },
-      "event_trace_sha256": "064b6d6d02a7740f3171ec51ba47205efc4c9eb825e56b1d0de380c4d23044e3"
+      "event_trace_sha256": "1da76dfce224ff6691b433f6fded576365d9763b265fad297182ae42ea170e5a"
     },
     {
       "id": "EO-UNK-002",
@@ -321,7 +321,7 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "not_applicable"
+        "causal_ordering": "pass"
       },
       "events": [
         {
@@ -329,7 +329,16 @@
           "kind": "operation_started",
           "operation_id": "OP-4",
           "reconciled_outcome": null,
-          "clock": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
           "causal_predecessors": []
         },
         {
@@ -337,10 +346,17 @@
           "kind": "stop_trigger_observed",
           "operation_id": null,
           "reconciled_outcome": null,
-          "clock": null,
-          "causal_predecessors": [
-            "op-start"
-          ]
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
         },
         {
           "event_id": "effect",
@@ -348,9 +364,7 @@
           "operation_id": "OP-4",
           "reconciled_outcome": null,
           "clock": null,
-          "causal_predecessors": [
-            "op-start"
-          ]
+          "causal_predecessors": []
         },
         {
           "event_id": "outcome-applied",
@@ -373,13 +387,10 @@
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
         "reason_codes": [
-          "CAUSAL_ORDER_QUALIFICATION_INDETERMINATE",
-          "EFFECT_OUTCOME_ORDER_UNRESOLVED:OP-4",
-          "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN:effect",
-          "OPERATION_START_ORDER_UNRESOLVED:op-start"
+          "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN:effect"
         ]
       },
-      "event_trace_sha256": "2239c0e3b903e40d6b8bc11f0923d70da5285f1139decb57fe85dd5fbbd0e8d2"
+      "event_trace_sha256": "707bd6438f5d861865c43911373b749cb180971b8ea18e92c0745e4665683b60"
     },
     {
       "id": "EO-UNK-003",
@@ -494,7 +505,7 @@
           "OPERATION_OUTCOME_UNKNOWN:OP-5"
         ]
       },
-      "event_trace_sha256": "0f0bac08961bbb754236dc27036908073bbfd658fe7730599f6bb6bc6d876bc0"
+      "event_trace_sha256": "d320e9fa1ebd76fdb270bdafa3ce1f92133518a7a34bb632203469f246b32eb1"
     },
     {
       "id": "EO-POS-002",
@@ -624,7 +635,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "002d8733f188ac1dad38b87a82f00a7bcce8e9d05bccdd6b0bd7930c006d60ef"
+      "event_trace_sha256": "4c56f516367f71441559124e6e5b84b2164d9ea0cf089f05f54ddd2a078f0934"
     },
     {
       "id": "EO-NEG-002",
@@ -724,7 +735,7 @@
           "RETRY_BEFORE_RECONCILIATION:OP-7"
         ]
       },
-      "event_trace_sha256": "bdbf0601390431ac637a2b698a6d37f4159e806e9e65f69f9366b9e4b9feede2"
+      "event_trace_sha256": "b01c7d33c76ac3dc70fee19e504af30a4eb2eb13576957980e415efd68c512c1"
     },
     {
       "id": "EO-POS-003",
@@ -810,13 +821,13 @@
         "block_irreversible_actions": false,
         "stop_trigger_event_id": "stop",
         "effect_orders": {
-          "effect": "after"
+          "effect": "before"
         },
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "1bd92f815f755fb3870585773128e45a244af086bf14b03bb604eee9aca16772"
+      "event_trace_sha256": "69793f1c3133625182774f72ad82fe604b643e4bcb58b04688358fe3062300fa"
     },
     {
       "id": "EO-NEG-003",
@@ -919,7 +930,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT:effect"
         ]
       },
-      "event_trace_sha256": "97465cfe2d25e233fe974c41b2484dcae1f6a1f1e5566e007fed8eb06468000a"
+      "event_trace_sha256": "11c59cc04d0f0ce51dea9b20c98d6d1f038362626e0693c2c0f70e0d4545f821"
     },
     {
       "id": "EO-NEG-004",
@@ -1010,7 +1021,7 @@
         "block_irreversible_actions": true,
         "stop_trigger_event_id": "stop",
         "effect_orders": {
-          "effect": "before"
+          "effect": "after"
         },
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
@@ -1018,7 +1029,7 @@
           "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:effect"
         ]
       },
-      "event_trace_sha256": "04640dd3376466cfd5ae7defc8464304c90bd23f802213207b0ba36b2018bce8"
+      "event_trace_sha256": "9be52ca169e600a4ba420f8a67cb43fd94be88e4bbcdcafa345abe02bb3cc24f"
     }
   ]
 }
