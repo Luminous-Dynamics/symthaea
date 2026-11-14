@@ -201,10 +201,13 @@ pub fn run(root: &Path, file: &Path, schema_path: &Path) -> Result<()> {
 
 const REQUIRED_BENCH_TRACKS: &[&str] = &[
     "HMP-ATTR",
+    "HMP-SOURCE",
     "HMP-PLURAL",
     "HMP-UNCERTAINTY",
-    "HMP-PHILO",
     "HMP-RIGHTS",
+    "HMP-PHILO",
+    "HMP-PSYCH",
+    "HMP-SOC",
     "HMP-CORRECT",
 ];
 
@@ -318,8 +321,9 @@ pub fn audit_benchmark(fixture: &Value) -> Result<usize> {
             if status != "granted" && !allowed.is_empty() {
                 bail!("HMP-RIGHTS non-granted permission must have zero permitted_uses");
             }
+            // A denial or pending grant still needs a traceable authority basis.
+            required_string(rights, "authority_reference", "permission")?;
             if status == "granted" {
-                required_string(rights, "authority_reference", "permission")?;
                 required_string(rights, "permission_reference", "permission")?;
             }
 
@@ -433,7 +437,7 @@ mod tests {
         let cases = fixture["cases"]
             .as_array()
             .expect("benchmark cases must be an array");
-        assert_eq!(cases.len(), 10, "synthetic starter fixture case count changed");
+        assert_eq!(cases.len(), 14, "synthetic starter fixture case count changed");
 
         let mut ids = BTreeSet::new();
         let mut tracks = BTreeSet::new();
@@ -459,7 +463,7 @@ mod tests {
                 "case {id} needs hard-fail conditions"
             );
         }
-        assert_eq!(tracks.len(), 6, "each starter case should cover a distinct track");
+        assert_eq!(tracks.len(), 9, "each registered v0.1 track must be represented");
     }
 
     fn bench_fixture() -> Value {
@@ -471,7 +475,7 @@ mod tests {
 
     #[test]
     fn hmp_bench_fixture_passes_integrity_audit() {
-        assert_eq!(audit_benchmark(&bench_fixture()).expect("fixture should pass"), 10);
+        assert_eq!(audit_benchmark(&bench_fixture()).expect("fixture should pass"), 14);
     }
 
     #[test]
@@ -522,6 +526,13 @@ mod tests {
     fn granted_community_rights_require_permission_reference() {
         let mut fixture = bench_fixture();
         fixture["cases"][9]["permission"]["permission_reference"] = Value::Null;
+        assert!(audit_benchmark(&fixture).is_err());
+    }
+
+    #[test]
+    fn denied_restricted_knowledge_still_requires_authority_reference() {
+        let mut fixture = bench_fixture();
+        fixture["cases"][4]["permission"]["authority_reference"] = Value::Null;
         assert!(audit_benchmark(&fixture).is_err());
     }
 
