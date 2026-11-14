@@ -341,8 +341,8 @@
           "thermal_runaway_limit": []
         },
         "reason_codes": [
-          "LAST_SUFFICIENT_ROOT_REMOVED",
-          "INSUFFICIENT_INDEPENDENT_ROOTS:thermal_runaway_limit"
+          "INSUFFICIENT_INDEPENDENT_ROOTS:thermal_runaway_limit",
+          "LAST_SUFFICIENT_ROOT_REMOVED"
         ]
       },
       "target_configuration": "PACK-3",
@@ -1076,7 +1076,8 @@
       "expected_relation": "invariant",
       "expected_baseline_state": "supported",
       "expected_intervention_state": "supported",
-      "expected_action": "revalidate"
+      "expected_action": "revalidate",
+      "expected_baseline_action": "revalidate"
     },
     {
       "id": "ME-PAIR-002",
@@ -1099,7 +1100,8 @@
       "expected_relation": "invariant",
       "expected_baseline_state": "supported",
       "expected_intervention_state": "supported",
-      "expected_action": "revalidate"
+      "expected_action": "revalidate",
+      "expected_baseline_action": "revalidate"
     },
     {
       "id": "ME-PAIR-004",
@@ -1134,7 +1136,8 @@
       "expected_relation": "invariant",
       "expected_baseline_state": "supported",
       "expected_intervention_state": "supported",
-      "expected_action": "revalidate"
+      "expected_action": "revalidate",
+      "expected_baseline_action": "revalidate"
     }
   ],
   "provenance_contract": {
