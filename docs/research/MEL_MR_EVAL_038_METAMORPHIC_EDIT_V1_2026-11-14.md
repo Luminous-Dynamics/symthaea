@@ -40,7 +40,7 @@ The output evaluator should compare symbolic and acoustic properties separately.
 
 ## What is not implemented
 
-The pair contract does not execute transforms, verify transform receipts against local bytes or run an editor. The first observation evaluator now compares independently produced operation/preservation reports using numeric affine, categorical and boolean property maps; it calculates per-property residuals, binds observations and mappings, and prevents a relation pass when either side failed its operation or preservation gate. The evaluator still does not compare raw waveforms or produce perceptual judgments. The fixture contains declarations and synthetic digests only. No audio assets or real editing results are included.
+The pair contract does not execute transforms, verify transform receipts against local bytes or run an editor. The first observation evaluator now compares independently produced operation/preservation reports using numeric affine, categorical and boolean property maps; it calculates per-property residuals, binds observations and mappings, replay-verifies the assessment commitment, and prevents a relation pass when either side failed its operation or preservation gate. The evaluator still does not compare raw waveforms or produce perceptual judgments. The fixture contains declarations and synthetic digests only. No audio assets or real editing results are included.
 
 ## Evaluation protocol enabled
 
