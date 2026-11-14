@@ -156,6 +156,15 @@ def validate_structural_contract(
     coordinates = contract["coordinate_frequency_bindings"]
     if not coordinates:
         raise ValueError("shared calibration coordinate bindings are missing")
+    expected_frequency_ids = [
+        item["frequency_id"] for item in data["support_basis"].get(
+            "coordinate_frequency_bindings",
+            [{"frequency_id": "f0"}, {"frequency_id": "f1"}],
+        )
+    ]
+    bound_frequency_ids = [item["frequency_id"] for item in coordinates]
+    if bound_frequency_ids != expected_frequency_ids:
+        raise ValueError("shared calibration frequency bindings are incomplete or reordered")
     nuisance_ids = {item["calibration_nuisance_id"] for item in coordinates}
     if nuisance_ids != {contract["calibration_nuisance_id"]}:
         raise ValueError("calibration coordinates split across frequencies")
@@ -384,10 +393,16 @@ def run_negative_controls(data: dict[str, Any], basis: Matrix) -> None:
     else:
         raise AssertionError("reversed half-space was accepted")
 
-    covariance_only = dict(contract)
-    covariance_only["authority_class"] = "empirical_covariance_rank"
-    if covariance_only["authority_class"] == contract["authority_class"]:
-        raise AssertionError("covariance rank cannot establish hard support")
+    covariance_only = json.loads(json.dumps(data))
+    covariance_only["structural_contract"]["authority_class"] = (
+        "empirical_covariance_rank"
+    )
+    try:
+        validate_structural_contract(covariance_only, basis)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("covariance rank was accepted as a hard support proof")
 
     split_coordinates = json.loads(json.dumps(data))
     split_coordinates["structural_contract"]["coordinate_frequency_bindings"][1][
