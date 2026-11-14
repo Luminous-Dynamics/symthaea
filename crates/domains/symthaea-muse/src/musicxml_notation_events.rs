@@ -409,32 +409,46 @@ fn parse_part_events(
         for element in measure.children().filter(|node| node.is_element()) {
             if is_musicxml_element(element, "attributes", namespace) {
                 chord_anchor = None;
-                for attribute in element.children().filter(|node| {
-                    node.is_element() && node.tag_name().namespace() == namespace
-                }) {
+                for attribute in element.children().filter(|node| node.is_element()) {
                     let source = source_node(attribute, 0, &mut source_tree_nodes)?;
-                    attribute_events.push(MusicXmlAttributeEventV1 {
-                        source_order,
-                        measure_index,
-                        measure_number: measure_number.clone(),
-                        part_id: part_id.to_string(),
-                        score_offset: measure_start
-                            .checked_add(cursor)
-                            .map_err(|_| ParseEventError::Unknown("attribute score offset overflow".into()))?,
-                        source,
-                    });
-                    source_order = next_order(source_order)?;
-                    if is_musicxml_element(attribute, "divisions", namespace) {
-                        let value = parse_i64(attribute.text()).ok_or_else(|| {
-                            ParseEventError::Unknown("invalid MusicXML divisions value".into())
-                        })?;
-                        if value <= 0 {
-                            return Err(ParseEventError::Unknown(
-                                "MusicXML divisions must be positive".into(),
-                            ));
+                    let score_offset = measure_start
+                        .checked_add(cursor)
+                        .map_err(|_| ParseEventError::Unknown("attribute score offset overflow".into()))?;
+                    if attribute.tag_name().namespace() == namespace {
+                        attribute_events.push(MusicXmlAttributeEventV1 {
+                            source_order,
+                            measure_index,
+                            measure_number: measure_number.clone(),
+                            part_id: part_id.to_string(),
+                            score_offset,
+                            source,
+                        });
+                        if is_musicxml_element(attribute, "divisions", namespace) {
+                            let value = parse_i64(attribute.text()).ok_or_else(|| {
+                                ParseEventError::Unknown("invalid MusicXML divisions value".into())
+                            })?;
+                            if value <= 0 {
+                                return Err(ParseEventError::Unknown(
+                                    "MusicXML divisions must be positive".into(),
+                                ));
+                            }
+                            divisions = Some(value);
                         }
-                        divisions = Some(value);
+                    } else {
+                        // Foreign-namespace children inside <attributes> are
+                        // extension data, not divisions/key/clef/etc. Keep
+                        // them in the auxiliary source stream instead of
+                        // filtering them out or misreading their local names.
+                        auxiliary_events.push(MusicXmlAuxiliaryEventV1 {
+                            source_order,
+                            measure_index,
+                            measure_number: measure_number.clone(),
+                            part_id: part_id.to_string(),
+                            score_offset,
+                            source,
+                        });
                     }
+                    source_order = next_order(source_order)?;
                 }
             } else if is_musicxml_element(element, "note", namespace) {
                 if note_events.len() >= MAX_NOTATION_EVENTS_PER_PART {
