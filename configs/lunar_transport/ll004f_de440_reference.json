@@ -1,0 +1,57 @@
+{
+  "lineage_id": "ll004f-de440-reference-v1",
+  "kernels": [
+    {
+      "filename": "naif0012.tls",
+      "role": "leapseconds",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls"
+    },
+    {
+      "filename": "de440s.bsp",
+      "role": "planetary_ephemeris",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp"
+    },
+    {
+      "filename": "moon_pa_de440_200625.bpc",
+      "role": "lunar_principal_axes_orientation",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/moon_pa_de440_200625.bpc"
+    },
+    {
+      "filename": "moon_de440_250416.tf",
+      "role": "lunar_de440_frame_definitions",
+      "source_url": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/fk/satellites/moon_de440_250416.tf"
+    }
+  ],
+  "body_fixed_frame": "MOON_ME_DE440_ME421",
+  "inertial_frame": "J2000",
+  "orientation_finite_difference_s": 1.0,
+  "epochs": [
+    "2026-09-11T00:00:00 UTC",
+    "2026-09-11T06:00:00 UTC",
+    "2026-09-11T12:00:00 UTC"
+  ],
+  "targets": [
+    {
+      "name": "EARTH",
+      "observer": "MOON",
+      "aberration": "NONE"
+    },
+    {
+      "name": "SUN",
+      "observer": "MOON",
+      "aberration": "NONE"
+    }
+  ],
+  "output_filename": "ll004f_de440_reference_v1.json",
+  "evidence_refs": [
+    "NAIF generic kernels: DE440s planetary SPK",
+    "NAIF moon_pa_de440_200625 binary PCK",
+    "NAIF moon_de440_250416 lunar frames kernel",
+    "NAIF naif0012 leapseconds kernel"
+  ],
+  "non_claims": [
+    "This fixture lineage does not define an operational launcher site or catcher orbit.",
+    "Generated state/orientation parity does not establish navigation, guidance, rendezvous, or launch qualification.",
+    "Changing any kernel, frame, generator, or configuration creates a new evidence lineage."
+  ]
+}
