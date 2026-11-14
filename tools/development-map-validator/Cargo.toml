@@ -12,6 +12,7 @@ serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 syn = { version = "2.0", features = ["full", "visit"] }
 quote = "1.0"
+proc-macro2 = { version = "1.0", features = ["span-locations"] }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 
 [workspace]
