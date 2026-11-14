@@ -20,6 +20,8 @@ use crate::barline_eval::{
 };
 
 pub const MUSICXML_BARLINE_CANONICALIZATION_V1: &str =
+    "musicxml-partwise-timewise-explicit-measures-quarter-beats-v2";
+const LEGACY_MUSICXML_BARLINE_CANONICALIZATION_V1: &str =
     "musicxml-partwise-explicit-measures-quarter-beats-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -767,11 +769,22 @@ pub fn validate_musicxml_notation_graph_replay(
     // requiring every graph emitted by the current parser to commit metadata
     // presence explicitly (even when the source has no <part-list>).
     for (current, stored) in replayed.iter_mut().zip(supplied) {
+        if stored.map.canonicalization_version
+            == LEGACY_MUSICXML_BARLINE_CANONICALIZATION_V1
+        {
+            current.map.canonicalization_version =
+                LEGACY_MUSICXML_BARLINE_CANONICALIZATION_V1.to_string();
+        }
         if crate::musicxml_notation_events::is_legacy_missing_notation_events(
             &stored.notation_events,
         ) {
             current.notation_events =
                 crate::musicxml_notation_events::legacy_missing_notation_events();
+        } else if stored.notation_events.canonicalization_version
+            == crate::musicxml_notation_events::LEGACY_MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1
+        {
+            current.notation_events.canonicalization_version =
+                crate::musicxml_notation_events::LEGACY_MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into();
         }
         if !stored.part_metadata_layer_present {
             current.part_metadata = None;
