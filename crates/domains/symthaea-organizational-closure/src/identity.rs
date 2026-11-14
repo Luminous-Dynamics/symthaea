@@ -351,7 +351,7 @@ fn outgoing<'a>(model: &'a TransitionSystem, state: &str) -> Vec<&'a Transition>
     model
         .transitions
         .iter()
-        .filter(|transition| transition.from == state)
+        .filter(|transition| transition.from.as_str() == state)
         .collect()
 }
 
@@ -676,6 +676,57 @@ mod tests {
         candidate.transitions.clear();
         let report = evaluate_operational_continuity(&baseline, &candidate, &ContinuityPolicy::default());
         assert!(!report.preserves_operational_continuity());
+    }
+
+    #[test]
+    fn deep_trace_divergence_propagates_back_to_the_initial_pair() {
+        fn chain(prefix: &str, terminal_action: &str) -> TransitionSystem {
+            let mut system = TransitionSystem::default();
+            let start = format!("{prefix}-start");
+            let middle = format!("{prefix}-middle");
+            let done = format!("{prefix}-done");
+            assert!(system.insert_state(
+                start.clone(),
+                profile(&["idle"], &["predict"], &["policy"]),
+                true,
+            ));
+            assert!(system.insert_state(
+                middle.clone(),
+                profile(&["working"], &["predict"], &["policy"]),
+                false,
+            ));
+            assert!(system.insert_state(
+                done.clone(),
+                profile(&["ready"], &["predict"], &["policy"]),
+                false,
+            ));
+            assert!(system.insert_transition(Transition::new(
+                start,
+                "begin",
+                "started",
+                middle.clone(),
+            )));
+            assert!(system.insert_transition(Transition::new(
+                middle,
+                terminal_action,
+                "finished",
+                done,
+            )));
+            system
+        }
+
+        let baseline = chain("old", "commit");
+        let candidate = chain("new", "discard");
+        let report = evaluate_operational_continuity(
+            &baseline,
+            &candidate,
+            &ContinuityPolicy::default(),
+        );
+        assert!(!report.preserves_operational_continuity());
+        assert!(report.refinement_iterations >= 2);
+        assert!(report.findings.iter().any(|item| {
+            item.code == ContinuityFindingCode::UnmatchedBaselineInitialState
+        }));
     }
 
     #[test]
