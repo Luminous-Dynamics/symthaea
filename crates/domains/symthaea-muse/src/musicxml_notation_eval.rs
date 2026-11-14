@@ -25,10 +25,10 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-pub const MUSICXML_NOTATION_EVALUATION_SCHEMA_V1: &str =
-    "muse-musicxml-notation-evaluation-v1";
-pub const MUSICXML_NOTATION_EVALUATION_ALGORITHM_V1: &str =
-    "exact-quarter-beat-kind-onset-one-to-one-augmenting-path-v1";
+pub const MUSICXML_NOTATION_EVALUATION_SCHEMA_V2: &str =
+    "muse-musicxml-notation-evaluation-v2";
+pub const MUSICXML_NOTATION_EVALUATION_ALGORITHM_V2: &str =
+    "exact-quarter-beat-kind-onset-one-to-one-augmenting-path-v2-divisions-normalized-performance-offsets";
 pub const MUSICXML_NOTATION_EVALUATION_MAX_EVENTS_V1: usize = 10_000;
 pub const MUSICXML_NOTATION_EVALUATION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
 pub const MUSICXML_NOTATION_EVALUATION_MAX_MATCHING_SCANS_V1: usize = 10_000_000;
@@ -115,6 +115,13 @@ pub struct MusicXmlNotationEvaluationReportV1 {
     pub duration_presence: MusicXmlNotationAccuracyV1,
     pub duration_error: MusicXmlNotationErrorDistributionV1,
     pub written_type_and_dots: MusicXmlNotationAccuracyV1,
+    /// Note-level time-only/attack/release playback directives, separate from
+    /// written notation and divisions-derived score time.
+    pub note_performance_directives: MusicXmlNotationAccuracyV1,
+    /// Matched notes whose attack/release offsets could not be normalized
+    /// because a legacy graph lacks the active divisions scale or its source
+    /// value is invalid. These events are excluded from directive accuracy.
+    pub note_performance_directive_unresolved_count: usize,
     pub grace_semantics: MusicXmlNotationAccuracyV1,
     pub cue_semantics: MusicXmlNotationAccuracyV1,
     pub chord_member_semantics: MusicXmlNotationAccuracyV1,
@@ -244,7 +251,66 @@ fn canonical_decimal(value: &str) -> Option<(i128, i128)> {
     Some((numerator / divisor, scale / divisor))
 }
 
-pub(crate) fn written_pitch_equal(
+
+/// Compare signed MusicXML divisions offsets as exact quarter-note beats.
+/// A present raw offset without a positive divisions scale is unresolved,
+/// never guessed equal or treated as a transcription error.
+fn divisions_offset_equal(
+    left_raw: Option<&str>,
+    left_divisions: Option<i64>,
+    right_raw: Option<&str>,
+    right_divisions: Option<i64>,
+) -> Option<bool> {
+    match (left_raw, right_raw) {
+        (None, None) => Some(true),
+        (None, Some(_)) | (Some(_), None) => Some(false),
+        (Some(left), Some(right)) => {
+            let (left_numerator, left_decimal_denominator) = canonical_decimal(left)?;
+            let (right_numerator, right_decimal_denominator) = canonical_decimal(right)?;
+            let left_scale = i128::from(left_divisions.filter(|value| *value > 0)?);
+            let right_scale = i128::from(right_divisions.filter(|value| *value > 0)?);
+            let left_denominator = left_decimal_denominator.checked_mul(left_scale)?;
+            let right_denominator = right_decimal_denominator.checked_mul(right_scale)?;
+            let left_gcd = gcd_i128(left_numerator, left_denominator);
+            let right_gcd = gcd_i128(right_numerator, right_denominator);
+            Some((
+                left_numerator / left_gcd,
+                left_denominator / left_gcd,
+            ) == (
+                right_numerator / right_gcd,
+                right_denominator / right_gcd,
+            ))
+        }
+    }
+}
+
+fn performance_directives_equal(
+    left: &crate::musicxml_notation_events::MusicXmlNotationEventV1,
+    right: &crate::musicxml_notation_events::MusicXmlNotationEventV1,
+) -> Option<bool> {
+    let attack = divisions_offset_equal(
+        left.attack_divisions.as_deref(),
+        left.performance_offset_divisions,
+        right.attack_divisions.as_deref(),
+        right.performance_offset_divisions,
+    );
+    let release = divisions_offset_equal(
+        left.release_divisions.as_deref(),
+        left.performance_offset_divisions,
+        right.release_divisions.as_deref(),
+        right.performance_offset_divisions,
+    );
+    if left.time_only != right.time_only || attack == Some(false) || release == Some(false) {
+        return Some(false);
+    }
+    if attack.is_none() || release.is_none() {
+        None
+    } else {
+        Some(true)
+    }
+}
+
+fn written_pitch_equal(
     left: &crate::musicxml_notation_events::MusicXmlWrittenPitchV1,
     right: &crate::musicxml_notation_events::MusicXmlWrittenPitchV1,
 ) -> bool {
@@ -402,8 +468,8 @@ fn validate_part_metadata_graph_binding(
                 .source_score_part
                 .attributes
                 .iter()
-                .find(|(name, _)| name == "id")
-                .map(|(_, value)| value.as_str());
+                .find(|attribute| attribute.name == "id")
+                .map(|attribute| attribute.value.as_str());
             let instrument_ids: Vec<String> = metadata
                 .source_score_part
                 .children
@@ -412,8 +478,8 @@ fn validate_part_metadata_graph_binding(
                 .filter_map(|node| {
                     node.attributes
                         .iter()
-                        .find(|(name, _)| name == "id")
-                        .map(|(_, value)| value.clone())
+                        .find(|attribute| attribute.name == "id")
+                        .map(|attribute| attribute.value.clone())
                 })
                 .collect();
             if metadata.source_part_id != graph.part_id
@@ -802,6 +868,8 @@ struct NotePairDimensionsV1 {
     duration_presence: MusicXmlNotationAccuracyV1,
     duration_error: MusicXmlNotationErrorDistributionV1,
     written_type_and_dots: MusicXmlNotationAccuracyV1,
+    note_performance_directives: MusicXmlNotationAccuracyV1,
+    note_performance_directive_unresolved_count: usize,
     grace_semantics: MusicXmlNotationAccuracyV1,
     cue_semantics: MusicXmlNotationAccuracyV1,
     chord_member_semantics: MusicXmlNotationAccuracyV1,
@@ -840,6 +908,9 @@ fn note_pair_dimensions(
     let mut duration_within = 0;
     let mut written_samples = 0;
     let mut written_correct = 0;
+    let mut performance_directive_samples = 0;
+    let mut performance_directive_correct = 0;
+    let mut performance_directive_unresolved = 0;
     let mut grace_samples = 0;
     let mut grace_correct = 0;
     let mut cue_samples = 0;
@@ -932,6 +1003,14 @@ fn note_pair_dimensions(
         written_samples += 1;
         if gold.written_type == predicted.written_type && gold.dot_count == predicted.dot_count {
             written_correct += 1;
+        }
+
+        match performance_directives_equal(gold, predicted) {
+            Some(correct) => {
+                performance_directive_samples += 1;
+                performance_directive_correct += usize::from(correct);
+            }
+            None => performance_directive_unresolved += 1,
         }
 
         grace_samples += 1;
@@ -1040,6 +1119,11 @@ fn note_pair_dimensions(
         duration_presence: accuracy(duration_presence_samples, duration_presence_correct),
         duration_error: error_distribution(&mut duration_errors, duration_within),
         written_type_and_dots: accuracy(written_samples, written_correct),
+        note_performance_directives: accuracy(
+            performance_directive_samples,
+            performance_directive_correct,
+        ),
+        note_performance_directive_unresolved_count: performance_directive_unresolved,
         grace_semantics: accuracy(grace_samples, grace_correct),
         cue_semantics: accuracy(cue_samples, cue_correct),
         chord_member_semantics: accuracy(chord_member_samples, chord_member_correct),
@@ -1161,6 +1245,8 @@ struct ReportBodyV1<'a> {
     duration_presence: &'a MusicXmlNotationAccuracyV1,
     duration_error: &'a MusicXmlNotationErrorDistributionV1,
     written_type_and_dots: &'a MusicXmlNotationAccuracyV1,
+    note_performance_directives: &'a MusicXmlNotationAccuracyV1,
+    note_performance_directive_unresolved_count: usize,
     grace_semantics: &'a MusicXmlNotationAccuracyV1,
     cue_semantics: &'a MusicXmlNotationAccuracyV1,
     chord_member_semantics: &'a MusicXmlNotationAccuracyV1,
@@ -1223,6 +1309,9 @@ fn report_commitment(
         duration_presence: &report.duration_presence,
         duration_error: &report.duration_error,
         written_type_and_dots: &report.written_type_and_dots,
+        note_performance_directives: &report.note_performance_directives,
+        note_performance_directive_unresolved_count:
+            report.note_performance_directive_unresolved_count,
         grace_semantics: &report.grace_semantics,
         cue_semantics: &report.cue_semantics,
         chord_member_semantics: &report.chord_member_semantics,
@@ -1384,7 +1473,7 @@ fn part_metadata_dimensions(
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MusicXmlNotationMatchSetV1 {
     pub note_pairs: Vec<(usize, usize)>,
     pub auxiliary_pairs: Vec<(usize, usize)>,
@@ -1392,16 +1481,14 @@ pub(crate) struct MusicXmlNotationMatchSetV1 {
     pub cursor_pairs: Vec<(usize, usize)>,
 }
 
-/// Public MIR-019 report API. The shared internal evaluation performs matching
-/// once; correction-ledger consumers use the companion API below to receive
-/// those same pairs rather than running a second aligner.
 pub fn evaluate_musicxml_notation_graphs(
     reference: &MusicXmlPartNotationGraphV1,
     prediction: &MusicXmlPartNotationGraphV1,
     config: MusicXmlNotationEvaluationConfigV1,
 ) -> Result<MusicXmlNotationEvaluationReportV1, MusicXmlNotationEvaluationErrorV1> {
-    evaluate_musicxml_notation_graphs_with_matches(reference, prediction, config)
-        .map(|(report, _matches)| report)
+    let (report, _matches) =
+        evaluate_musicxml_notation_graphs_with_matches(reference, prediction, config)?;
+    Ok(report)
 }
 
 pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
@@ -1468,6 +1555,7 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         &predicted.auxiliary_events,
         |left, right| {
             Ok(left.source.element == right.source.element
+                && left.source.namespace_uri == right.source.namespace_uri
                 && exact_within(
                     left.score_offset,
                     right.score_offset,
@@ -1488,6 +1576,7 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         &predicted.attribute_events,
         |left, right| {
             Ok(left.source.element == right.source.element
+                && left.source.namespace_uri == right.source.namespace_uri
                 && exact_within(
                     left.score_offset,
                     right.score_offset,
@@ -1551,8 +1640,8 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
     let part_metadata = part_metadata_dimensions(reference, prediction);
 
     let mut report = MusicXmlNotationEvaluationReportV1 {
-        schema: MUSICXML_NOTATION_EVALUATION_SCHEMA_V1.into(),
-        algorithm: MUSICXML_NOTATION_EVALUATION_ALGORITHM_V1.into(),
+        schema: MUSICXML_NOTATION_EVALUATION_SCHEMA_V2.into(),
+        algorithm: MUSICXML_NOTATION_EVALUATION_ALGORITHM_V2.into(),
         config,
         part_id: reference.part_id.clone(),
         score_clock_id: reference.map.score_clock_id.clone(),
@@ -1581,6 +1670,9 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         duration_presence: note_dimensions.duration_presence,
         duration_error: note_dimensions.duration_error,
         written_type_and_dots: note_dimensions.written_type_and_dots,
+        note_performance_directives: note_dimensions.note_performance_directives,
+        note_performance_directive_unresolved_count:
+            note_dimensions.note_performance_directive_unresolved_count,
         grace_semantics: note_dimensions.grace_semantics,
         cue_semantics: note_dimensions.cue_semantics,
         chord_member_semantics: note_dimensions.chord_member_semantics,
@@ -1627,15 +1719,13 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
     };
     report.report_sha256 = report_commitment(&report)
         .map_err(|_| MusicXmlNotationEvaluationErrorV1::SerializationFailed)?;
-    Ok((
-        report,
-        MusicXmlNotationMatchSetV1 {
-            note_pairs,
-            auxiliary_pairs,
-            attribute_pairs,
-            cursor_pairs,
-        },
-    ))
+    let matches = MusicXmlNotationMatchSetV1 {
+        note_pairs,
+        auxiliary_pairs,
+        attribute_pairs,
+        cursor_pairs,
+    };
+    Ok((report, matches))
 }
 
 /// Recompute all dimensions and the domain-separated commitment. A changed
@@ -2226,6 +2316,7 @@ mod tests {
         let mut reference = graph(fixture_xml());
         let mut nested = MusicXmlSourceNodeV1 {
             element: "deep".into(),
+            namespace_uri: None,
             attributes: Vec::new(),
             text: None,
             content: Vec::new(),
@@ -2234,6 +2325,7 @@ mod tests {
         for _ in 0..=MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_DEPTH_V1 {
             nested = MusicXmlSourceNodeV1 {
                 element: "nested".into(),
+                namespace_uri: None,
                 attributes: Vec::new(),
                 text: None,
                 content: vec![crate::musicxml_notation_events::MusicXmlSourceContentV1::ElementIndex(0)],
@@ -2272,6 +2364,116 @@ mod tests {
             ),
             Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
         ));
+    }
+
+
+    #[test]
+    fn note_performance_directives_are_independent_from_written_note_values() {
+        let reference_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="1" attack="-2" release="3">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>
+                <type>quarter</type><dot/>
+            </note>
+        </measure></part></score-partwise>"#;
+        let prediction_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="2" attack="0" release="4">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>
+                <type>quarter</type><dot/>
+            </note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(reference_xml);
+        let prediction = graph(prediction_xml);
+        let report = evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
+        assert_eq!(report.written_type_and_dots.accuracy, Some(1.0));
+        assert_eq!(report.note_performance_directives.accuracy, Some(0.0));
+    }
+
+
+    #[test]
+    fn attack_and_release_offsets_are_normalized_across_division_scales() {
+        let reference_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="1" attack="-1" release="1">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><type>whole</type>
+            </note>
+        </measure></part></score-partwise>"#;
+        let equivalent_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>8</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note time-only="1" attack="-2" release="2">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>32</duration><type>whole</type>
+            </note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(reference_xml);
+        let equivalent = graph(equivalent_xml);
+        assert_eq!(
+            reference.notation_events.note_events[0].performance_offset_divisions,
+            Some(4)
+        );
+        assert_eq!(
+            equivalent.notation_events.note_events[0].performance_offset_divisions,
+            Some(8)
+        );
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &equivalent, default_config()
+        ).unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.duration_error.mean_absolute_quarter_beats, Some(0.0));
+        assert_eq!(report.note_performance_directives.accuracy, Some(1.0));
+        assert_eq!(report.note_performance_directive_unresolved_count, 0);
+
+        let different_offset_xml = equivalent_xml.replace("release=\"2\"", "release=\"4\"");
+        let different = graph(&different_offset_xml);
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &different, default_config()
+        ).unwrap();
+        assert_eq!(report.note_performance_directives.accuracy, Some(0.0));
+    }
+
+    #[test]
+    fn legacy_raw_performance_offsets_without_divisions_scale_are_unresolved() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note attack="-1"><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(xml);
+        let mut prediction = reference.clone();
+        prediction.notation_events.note_events[0].performance_offset_divisions = None;
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert_eq!(report.note_performance_directives.sample_count, 0);
+        assert_eq!(report.note_performance_directives.accuracy, None);
+        assert_eq!(report.note_performance_directive_unresolved_count, 1);
+    }
+
+
+    #[test]
+    fn report_commitment_binds_every_metric_including_performance_directive_coverage() {
+        let reference = graph(fixture_xml());
+        let mut report = evaluate_musicxml_notation_graphs(
+            &reference, &reference, default_config()
+        ).unwrap();
+        let original = report.report_sha256.clone();
+
+        report.note_performance_directives.correct_count += 1;
+        assert_ne!(report_commitment(&report).unwrap(), original);
+        report.note_performance_directives.correct_count -= 1;
+
+        report.note_performance_directive_unresolved_count += 1;
+        assert_ne!(report_commitment(&report).unwrap(), original);
+        report.note_performance_directive_unresolved_count -= 1;
+
+        report.note_performance_directives.accuracy = Some(0.0);
+        assert_ne!(report_commitment(&report).unwrap(), original);
     }
 
 }
