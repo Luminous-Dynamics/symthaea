@@ -958,6 +958,71 @@
       ],
       "expected_disposition": "REJECTED",
       "rationale": "A receipt for apparent shear cannot be reused to claim a different failure-mode endpoint."
+    },
+    {
+      "id": "frp-pair-class-change-rejects-transfer",
+      "baseline_profile": {
+        "material_pair_class": "frp_to_frp",
+        "geometry": "single_lap"
+      },
+      "candidate_profile": {
+        "material_pair_class": "frp_to_metal",
+        "geometry": "single_lap"
+      },
+      "required_endpoints": [
+        "apparent_shear_strength"
+      ],
+      "endpoint_evidence": [
+        {
+          "endpoint": "apparent_shear_strength",
+          "baseline_specimen_ids": [
+            "valid-d5868-BASE-01",
+            "valid-d5868-BASE-02"
+          ],
+          "candidate_specimen_ids": [
+            "valid-d5868-CAND-01",
+            "valid-d5868-CAND-02"
+          ],
+          "baseline_receipt": {
+            "id": "frp-pair-class-change-BASE-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d5868-BASE-01",
+              "valid-d5868-BASE-02"
+            ]
+          },
+          "candidate_receipt": {
+            "id": "frp-pair-class-change-CAND-RECEIPT",
+            "method_id": "ASTM_D5868",
+            "edition": "D5868-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_metal",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-SAME-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000384",
+            "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "valid-d5868-CAND-01",
+              "valid-d5868-CAND-02"
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5868 covers both FRP-to-FRP and FRP-to-metal, but the same standard family does not establish equivalence between two different adherend pair classes."
     }
   ]
 }
