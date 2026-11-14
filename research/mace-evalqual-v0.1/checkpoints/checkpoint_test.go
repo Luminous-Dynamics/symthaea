@@ -347,3 +347,14 @@ func TestAcceptObservedRejectsWrongDatabase(t *testing.T) {
 		t.Fatalf("expected database mismatch, got %v", err)
 	}
 }
+
+
+func TestJournalHeadMustChangeWhenSequenceAdvances(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state := bootstrapTest(t, priv, pub)
+	staleHead := signCheckpoint(t, makeCheckpoint(2, 9, state.CheckpointDigestSHA256, "genesis", 101), priv)
+	_, _, err := AcceptNext(staleHead, pub, state)
+	if !errors.Is(err, ErrNoProgress) {
+		t.Fatalf("expected repeated journal head to be rejected, got %v", err)
+	}
+}
