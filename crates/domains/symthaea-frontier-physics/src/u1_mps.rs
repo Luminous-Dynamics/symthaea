@@ -4527,6 +4527,42 @@ mod tests {
     }
 
     #[test]
+    fn truncation_ledger_uses_measured_residual_for_tolerated_charge_leakage() {
+        // |00> is outside the declared total-charge-one sector, but its
+        // amplitude is below the constructor tolerance. It contributes no
+        // Schmidt weight to the charge-block SVD, yet the reconstruction
+        // residual must still be counted by the ledger.
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(1.0e-13, 0.0),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        let diagnostics = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 2,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(diagnostics.discarded_weight, 0.0);
+        assert!(diagnostics.reconstruction_l2_residual >= 1.0e-13);
+
+        let mut ledger = U1MpsTruncationLedger::default();
+        ledger.record(&diagnostics).unwrap();
+        assert!(
+            ledger.cumulative_local_l2_error_bound >= diagnostics.reconstruction_l2_residual
+        );
+        assert!(!ledger.global_state_error_bound_qualified);
+    }
+
+    #[test]
     fn truncation_ledger_rejects_nonfinite_receipts() {
         let mut ledger = U1MpsTruncationLedger::default();
         let mut state = U1TwoSiteState::new(
