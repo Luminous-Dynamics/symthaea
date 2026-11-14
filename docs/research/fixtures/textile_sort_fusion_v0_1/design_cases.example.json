@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "corpus_id": "TEXTILE-DESIGN-CASES-001",
   "fixture_class": "synthetic",
-  "claim_ceiling": "Static design-dossier topology checks only; no physical seam-strength, durability, repair, disassembly or material recovery result.",
+  "claim_ceiling": "Static component/joint topology and as-designed fabric-architecture checks only; no physical seam-strength, durability, repair, disassembly, opening or material recovery result.",
   "cases": [
     {
       "case_id": "DESIGN-001-COMPLETE-MODULAR",
@@ -106,6 +106,46 @@
       "expected": {
         "disposition": "incomplete",
         "reason": "DisassemblyIntentWithoutTargetJoints"
+      }
+    },
+    {
+      "case_id": "DESIGN-014-WOVEN-OPENING-METADATA",
+      "mutation": "Woven components declare weave, yarn system/count, warp/weft density, interlacement and basis weight for opening-trial stratification.",
+      "expected": {
+        "disposition": "complete",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "DESIGN-015-MISSING-FABRIC-STRUCTURE",
+      "mutation": "Opening characterization is requested but one textile component has no fabric-structure descriptor.",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "FabricStructureMissing"
+      }
+    },
+    {
+      "case_id": "DESIGN-016-WOVEN-MISSING-INTERLACEMENT",
+      "mutation": "Woven descriptor omits interlacement density needed to stratify the opening trial.",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "FabricStructureMissingWovenMetrics"
+      }
+    },
+    {
+      "case_id": "DESIGN-017-KNIT-WALE-COURSE-METADATA",
+      "mutation": "Knitted components declare knit structure, yarn system/count and separate wale/course density, without inventing woven interlacement values.",
+      "expected": {
+        "disposition": "complete",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "DESIGN-018-UNKNOWN-FABRIC-STRUCTURE",
+      "mutation": "Unknown fabric architecture is not promoted to an opening-characterized design.",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "FabricStructureUnknown"
       }
     }
   ]
