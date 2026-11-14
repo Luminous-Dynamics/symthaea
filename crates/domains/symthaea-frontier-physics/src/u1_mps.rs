@@ -1684,6 +1684,302 @@ impl ComplexU1Mps {
         Ok(overlap)
     }
 
+
+    fn left_identity_environment(
+        &self,
+        end_site_exclusive: usize,
+    ) -> Result<(Vec<Complex64>, usize), U1MpsError> {
+        if end_site_exclusive > self.site_count() {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let mut environment = vec![Complex64::new(1.0, 0.0)];
+        let mut dimension = 1_usize;
+        for tensor in self.tensors.iter().take(end_site_exclusive) {
+            if tensor.left_dimension() != dimension {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "left observable environment dimension",
+                ));
+            }
+            let next_dimension = tensor.right_dimension();
+            let mut next = vec![Complex64::new(0.0, 0.0); next_dimension * next_dimension];
+            for bra_left in 0..dimension {
+                for ket_left in 0..dimension {
+                    let env = environment[bra_left * dimension + ket_left];
+                    for physical in 0..2 {
+                        for bra_right in 0..next_dimension {
+                            let bra = tensor.get(bra_left, physical, bra_right).conj();
+                            for ket_right in 0..next_dimension {
+                                let ket = tensor.get(ket_left, physical, ket_right);
+                                next[bra_right * next_dimension + ket_right] += env * bra * ket;
+                            }
+                        }
+                    }
+                }
+            }
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "left observable transfer environment",
+                ));
+            }
+            environment = next;
+            dimension = next_dimension;
+        }
+        Ok((environment, dimension))
+    }
+
+    fn right_identity_environment(
+        &self,
+        start_site: usize,
+    ) -> Result<(Vec<Complex64>, usize), U1MpsError> {
+        if start_site > self.site_count() {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let mut environment = vec![Complex64::new(1.0, 0.0)];
+        let mut dimension = 1_usize;
+        for tensor in self.tensors.iter().skip(start_site).rev() {
+            if tensor.right_dimension() != dimension {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "right observable environment dimension",
+                ));
+            }
+            let previous_dimension = tensor.left_dimension();
+            let mut previous =
+                vec![Complex64::new(0.0, 0.0); previous_dimension * previous_dimension];
+            for bra_left in 0..previous_dimension {
+                for ket_left in 0..previous_dimension {
+                    let mut value = Complex64::new(0.0, 0.0);
+                    for physical in 0..2 {
+                        for bra_right in 0..dimension {
+                            let bra = tensor.get(bra_left, physical, bra_right).conj();
+                            for ket_right in 0..dimension {
+                                let ket = tensor.get(ket_left, physical, ket_right);
+                                value += bra
+                                    * ket
+                                    * environment[bra_right * dimension + ket_right];
+                            }
+                        }
+                    }
+                    previous[bra_left * previous_dimension + ket_left] = value;
+                }
+            }
+            if previous
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "right observable transfer environment",
+                ));
+            }
+            environment = previous;
+            dimension = previous_dimension;
+        }
+        Ok((environment, dimension))
+    }
+
+    fn one_site_expectation_raw(
+        &self,
+        site_index: usize,
+        operator: &[[Complex64; 2]; 2],
+    ) -> Result<Complex64, U1MpsError> {
+        let tensor = &self.tensors[site_index];
+        let (left_environment, left_dimension) =
+            self.left_identity_environment(site_index)?;
+        let (right_environment, right_dimension) =
+            self.right_identity_environment(site_index + 1)?;
+        if left_dimension != tensor.left_dimension()
+            || right_dimension != tensor.right_dimension()
+        {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+
+        let mut expectation = Complex64::new(0.0, 0.0);
+        for bra_left in 0..left_dimension {
+            for ket_left in 0..left_dimension {
+                let left = left_environment[bra_left * left_dimension + ket_left];
+                for bra_physical in 0..2 {
+                    for ket_physical in 0..2 {
+                        let matrix_element = operator[bra_physical][ket_physical];
+                        if matrix_element.norm_sqr() == 0.0 {
+                            continue;
+                        }
+                        for bra_right in 0..right_dimension {
+                            let bra = tensor
+                                .get(bra_left, bra_physical, bra_right)
+                                .conj();
+                            for ket_right in 0..right_dimension {
+                                let ket = tensor.get(ket_left, ket_physical, ket_right);
+                                let right = right_environment
+                                    [bra_right * right_dimension + ket_right];
+                                expectation += left * bra * matrix_element * ket * right;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if !expectation.re.is_finite() || !expectation.im.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "one-site observable expectation",
+            ));
+        }
+        Ok(expectation)
+    }
+
+    fn two_site_expectation_raw(
+        &self,
+        bond_index: usize,
+        operator: &[[Complex64; 4]; 4],
+    ) -> Result<Complex64, U1MpsError> {
+        let left_tensor = &self.tensors[bond_index];
+        let right_tensor = &self.tensors[bond_index + 1];
+        if left_tensor.right_charges != right_tensor.left_charges {
+            return Err(U1MpsError::TwoSiteBondMismatch);
+        }
+        let (left_environment, left_dimension) =
+            self.left_identity_environment(bond_index)?;
+        let (right_environment, right_dimension) =
+            self.right_identity_environment(bond_index + 2)?;
+        if left_dimension != left_tensor.left_dimension()
+            || right_dimension != right_tensor.right_dimension()
+        {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+
+        let center_entries = left_dimension
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(right_dimension))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut center = vec![Complex64::new(0.0, 0.0); center_entries];
+        for left in 0..left_dimension {
+            for physical_pair in 0..4 {
+                let first_physical = physical_pair / 2;
+                let second_physical = physical_pair % 2;
+                for right in 0..right_dimension {
+                    let mut value = Complex64::new(0.0, 0.0);
+                    for middle in 0..left_tensor.right_dimension() {
+                        value += left_tensor.get(left, first_physical, middle)
+                            * right_tensor.get(middle, second_physical, right);
+                    }
+                    let index =
+                        (left * 4 + physical_pair) * right_dimension + right;
+                    center[index] = value;
+                }
+            }
+        }
+
+        let mut expectation = Complex64::new(0.0, 0.0);
+        for bra_left in 0..left_dimension {
+            for ket_left in 0..left_dimension {
+                let left = left_environment[bra_left * left_dimension + ket_left];
+                for bra_pair in 0..4 {
+                    let bra_offset = (bra_left * 4 + bra_pair) * right_dimension;
+                    for ket_pair in 0..4 {
+                        let matrix_element = operator[bra_pair][ket_pair];
+                        if matrix_element.norm_sqr() == 0.0 {
+                            continue;
+                        }
+                        let ket_offset = (ket_left * 4 + ket_pair) * right_dimension;
+                        for bra_right in 0..right_dimension {
+                            let bra = center[bra_offset + bra_right].conj();
+                            for ket_right in 0..right_dimension {
+                                let ket = center[ket_offset + ket_right];
+                                let right = right_environment
+                                    [bra_right * right_dimension + ket_right];
+                                expectation += left * bra * matrix_element * ket * right;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if !expectation.re.is_finite() || !expectation.im.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site observable expectation",
+            ));
+        }
+        Ok(expectation)
+    }
+
+    /// Contract a one-site operator directly through MPS transfer environments.
+    ///
+    /// The operator matrix uses computational basis order |0>, |1>. No dense
+    /// state-vector expansion is performed.
+    pub fn expectation_one_site(
+        &self,
+        site_index: usize,
+        operator: [[Complex64; 2]; 2],
+        tolerance: f64,
+    ) -> Result<U1ObservableReceipt, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if site_index >= self.site_count() {
+            return Err(U1MpsError::ObservableSiteOutOfRange {
+                site_index,
+                site_count: self.site_count(),
+            });
+        }
+        let operator_norm = matrix_frobenius_norm(&operator)?;
+        let expectation = self.one_site_expectation_raw(site_index, &operator)?;
+        let norm_squared = self.norm_squared(tolerance)?;
+        let identity = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        ];
+        let identity_expectation = self.one_site_expectation_raw(site_index, &identity)?;
+        let identity_norm_residual =
+            (identity_expectation - Complex64::new(norm_squared, 0.0)).norm();
+        Ok(U1ObservableReceipt {
+            start_site: site_index,
+            support_sites: 1,
+            expectation,
+            norm_squared,
+            identity_norm_residual,
+            operator_frobenius_norm_upper_bound: operator_norm,
+        })
+    }
+
+    /// Contract a nearest-neighbour two-site operator directly through MPS
+    /// transfer environments. The matrix basis is |00>,|01>,|10>,|11>.
+    pub fn expectation_two_site(
+        &self,
+        bond_index: usize,
+        operator: [[Complex64; 4]; 4],
+        tolerance: f64,
+    ) -> Result<U1ObservableReceipt, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if bond_index + 1 >= self.site_count() {
+            return Err(U1MpsError::ObservableBondOutOfRange {
+                bond_index,
+                site_count: self.site_count(),
+            });
+        }
+        let operator_norm = matrix_frobenius_norm(&operator)?;
+        let expectation = self.two_site_expectation_raw(bond_index, &operator)?;
+        let norm_squared = self.norm_squared(tolerance)?;
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for index in 0..4 {
+            identity[index][index] = Complex64::new(1.0, 0.0);
+        }
+        let identity_expectation = self.two_site_expectation_raw(bond_index, &identity)?;
+        let identity_norm_residual =
+            (identity_expectation - Complex64::new(norm_squared, 0.0)).norm();
+        Ok(U1ObservableReceipt {
+            start_site: bond_index,
+            support_sites: 2,
+            expectation,
+            norm_squared,
+            identity_norm_residual,
+            operator_frobenius_norm_upper_bound: operator_norm,
+        })
+    }
+
+
     /// Compute the MPS norm by contracting the double-layer transfer matrices.
     pub fn norm_squared(&self, tolerance: f64) -> Result<f64, U1MpsError> {
         if !tolerance.is_finite() || tolerance <= 0.0 {
