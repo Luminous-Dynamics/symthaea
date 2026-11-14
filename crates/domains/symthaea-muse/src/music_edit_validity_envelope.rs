@@ -1481,6 +1481,189 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn double_instrument_requires_duplicate_lineage_and_preserved_source_part() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::DoubleInstrument;
+        envelope.requested_change.push(constraint(
+            "double.new-lineage",
+            MusicEditValidityPropertyV1::EventLineage,
+            MusicEditValidityScopeV1::EditedSupport,
+            MusicEditValidityRelationV1::Present,
+        ));
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+
+        envelope.protected_invariants.retain(|item| {
+            item.property != MusicEditValidityPropertyV1::OnsetTicks
+        });
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::DoubleInstrument,
+                property: MusicEditValidityPropertyV1::OnsetTicks,
+            }
+        ));
+    }
+
+    #[test]
+    fn drum_removal_requires_symbolic_and_acoustic_absence_with_rhythm_protection() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::RemoveDrums;
+        envelope.target_scope = MusicEditTargetScopeV1::DrumKit;
+        envelope.requested_change = vec![
+            MusicEditValidityConstraintV1 {
+                constraint_id: "remove.drums.symbolic".to_owned(),
+                property: MusicEditValidityPropertyV1::DrumKitIdentity,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::Absent,
+                expected_value: None,
+                allowed_values: Vec::new(),
+                minimum: None,
+                maximum: None,
+                unit: None,
+                evidence: MusicEditValidityEvidenceV1::Symbolic,
+                rationale: "the selected drum kit is absent from the symbolic target".to_owned(),
+            },
+            MusicEditValidityConstraintV1 {
+                constraint_id: "remove.drums.acoustic".to_owned(),
+                property: MusicEditValidityPropertyV1::EventPresence,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::Absent,
+                expected_value: None,
+                allowed_values: Vec::new(),
+                minimum: None,
+                maximum: None,
+                unit: None,
+                evidence: MusicEditValidityEvidenceV1::Acoustic,
+                rationale: "the rendered target contains no residual selected drum events".to_owned(),
+            },
+        ];
+        envelope.protected_invariants = vec![constraint(
+            "protect.other-rhythm",
+            MusicEditValidityPropertyV1::Rhythm,
+            MusicEditValidityScopeV1::UnaffectedParts,
+            MusicEditValidityRelationV1::NoChange,
+        )];
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+
+        envelope.protected_invariants.clear();
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::RemoveDrums,
+                property: MusicEditValidityPropertyV1::Rhythm,
+            }
+        ));
+    }
+
+    #[test]
+    fn drum_extraction_requires_target_presence_and_non_drum_leakage_absence() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::ExtractDrums;
+        envelope.target_scope = MusicEditTargetScopeV1::DrumKit;
+        envelope.requested_change = vec![
+            constraint(
+                "extract.kit",
+                MusicEditValidityPropertyV1::DrumKitIdentity,
+                MusicEditValidityScopeV1::TargetPart,
+                MusicEditValidityRelationV1::EqualTo,
+            ),
+            constraint(
+                "extract.drums-present",
+                MusicEditValidityPropertyV1::EventPresence,
+                MusicEditValidityScopeV1::TargetPart,
+                MusicEditValidityRelationV1::Present,
+            ),
+            constraint(
+                "extract.non-drum-absent",
+                MusicEditValidityPropertyV1::EventPresence,
+                MusicEditValidityScopeV1::UnaffectedParts,
+                MusicEditValidityRelationV1::Absent,
+            ),
+        ];
+        envelope.requested_change[0].expected_value = Some("standard_kit".to_owned());
+        envelope.requested_change[1].evidence = MusicEditValidityEvidenceV1::Acoustic;
+        envelope.requested_change[2].evidence = MusicEditValidityEvidenceV1::Acoustic;
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+
+        let leakage = envelope.requested_change.iter_mut()
+            .find(|item| item.constraint_id == "extract.non-drum-absent")
+            .unwrap();
+        leakage.evidence = MusicEditValidityEvidenceV1::Symbolic;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::ExtractDrums,
+                property: MusicEditValidityPropertyV1::EventPresence,
+            }
+        ));
+    }
+
+    #[test]
+    fn decrescendo_requires_negative_audible_delta_and_decreasing_contour() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::Decrescendo;
+        envelope.requested_change = vec![
+            constraint(
+                "dynamic.decreasing-contour",
+                MusicEditValidityPropertyV1::DynamicContour,
+                MusicEditValidityScopeV1::TargetPart,
+                MusicEditValidityRelationV1::MonotonicDecrease,
+            ),
+            MusicEditValidityConstraintV1 {
+                constraint_id: "dynamic.minimum-audible-change".to_owned(),
+                property: MusicEditValidityPropertyV1::DynamicContour,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::WithinRange,
+                expected_value: None,
+                allowed_values: Vec::new(),
+                minimum: Some(-8.0),
+                maximum: Some(-3.0),
+                unit: Some("dB_delta".to_owned()),
+                evidence: MusicEditValidityEvidenceV1::Acoustic,
+                rationale: "the decline must exceed the declared audible-change floor".to_owned(),
+            },
+        ];
+        for item in &mut envelope.requested_change {
+            item.evidence = MusicEditValidityEvidenceV1::Acoustic;
+        }
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+
+        let delta = envelope.requested_change.iter_mut()
+            .find(|item| item.constraint_id == "dynamic.minimum-audible-change")
+            .unwrap();
+        delta.minimum = Some(0.0);
+        delta.maximum = Some(3.0);
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::Decrescendo,
+                property: MusicEditValidityPropertyV1::DynamicContour,
+            }
+        ));
+    }
+
+    #[test]
+    fn every_operation_rejects_a_mismatched_target_scope() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::RemoveDrums;
+        envelope.target_scope = MusicEditTargetScopeV1::Instrument;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::OperationScopeMismatch(
+                MusicEditOperationV1::RemoveDrums
+            )
+        ));
+    }
+
     #[test]
     fn permitted_variation_cannot_overlap_a_protected_no_change_invariant() {
         let mut envelope = valid_envelope();
