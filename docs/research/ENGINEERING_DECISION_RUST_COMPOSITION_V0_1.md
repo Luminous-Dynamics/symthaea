@@ -183,3 +183,38 @@ Blind the adjudicators to candidate identity. Publish software versions, configu
 The public branch contains the initial Rust crate, a seven-pair ACT/HOLD fixture, an updated schema comment and a synthetic example with the canonical candidate digest. An independent JavaScript reference implementation reproduced all seven ACT/HOLD fixtures and exact reason-code sets.
 
 Not yet established: Rust compilation, Rust unit-test execution, Clippy, formatter, Draft 2020-12 schema-engine conformance, owner adapter qualification, independent engineering adjudication, hosted CI, physical validation, industrial baseline results or benchmark performance. No SOTA improvement is claimed.
+
+
+## 11. Partial-order event ordering and reconciliation
+
+Follow-on: [ENG-DECISION-EVENT-ORDER-001 #12180](https://github.com/Luminous-Dynamics/symthaea/issues/12180).
+
+The ACT/HOLD step counter is adequate for a single sequential harness but does not establish a total order across concurrent tool calls, device clocks, delayed delivery or cancellation. The additive `evaluate_event_order` API therefore consumes qualified event/clock/causal-order receipts and reports the effect's relation to the stop trigger as BEFORE, AFTER, OVERLAPPING, UNKNOWN or INCONSISTENT.
+
+- An effect definitely AFTER the stop trigger is a critical failure.
+- OVERLAPPING or UNKNOWN order is INDETERMINATE and blocks irreversible actions.
+- Contradictory qualified clock and causal ordering is INCONSISTENT and blocks.
+- A cancellation request or acknowledgement does not resolve whether an operation was applied.
+- A started operation remains pending until an exact operation-outcome receipt says APPLIED or NOT_APPLIED.
+- A retry is accepted by the bounded evaluator only when the exact prior operation is qualified NOT_APPLIED and that reconciliation is ordered before the retry.
+- Event-array order is never used as chronology; reversed-delivery controls must replay identically.
+
+The companion synthetic fixture is `benchmarks/engineering-change-impact/action-event-order-v0.1.json`: ten cases cover definitely-before and definitely-after effects, overlapping clock intervals, unknown order, cancellation without final outcome, exact NOT_APPLIED reconciliation, retry before reconciliation, causal resolution of overlapping clocks, contradictory ordering, and reverse delivery.
+
+The event trace digest is domain-separated with `symthaea.engineering-decision.event-trace.v0.1`, commits the qualified trace state plus all event records sorted by event ID, and is checked against the standard SHA-256 test vectors by the authoring reference. The independent Rust integration test recomputes the digest and ordering relation and checks exact dispositions/reason codes and delivery permutation invariance.
+
+This is a non-authoritative chronology/reconciliation assessment. It does not prove clocks correct, event inventory physically complete, or absence of unobserved effects. It does not authenticate owner receipts or authorize/retry/execute operations.
+
+### Event-order targets (proposed, not measured)
+
+| Metric | Target |
+|---|---:|
+| Critical effect definitely AFTER observable stop trigger | 0 |
+| OVERLAPPING / UNKNOWN ordering incorrectly classified safe | 0 |
+| Retry before exact NOT_APPLIED reconciliation | 0 |
+| Cancellation acknowledgement mistaken for terminal outcome | 0 |
+| Contradictory qualified-order detection | 100% on frozen controls |
+| Delivery-permutation invariance | 100% on frozen controls |
+| BEFORE / AFTER / OVERLAPPING / UNKNOWN classification | ≥95% on blinded held-out traces |
+
+A zero-failure synthetic suite is a falsification gate, not a population reliability estimate. Independent trace lineages and cluster-aware sampling are required for population claims.
