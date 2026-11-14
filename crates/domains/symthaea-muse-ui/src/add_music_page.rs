@@ -218,6 +218,13 @@ pub fn AddMusicPage() -> impl IntoView {
                                         structure.chord_member_count,
                                         structure.time_modification_count
                                     )}</span>
+                                    <span>{format!(
+                                        "{} part declarations · {} score instruments · {} MIDI instrument setups · {} unbound note instrument references",
+                                        structure.part_metadata_count,
+                                        structure.score_instrument_count,
+                                        structure.midi_instrument_count,
+                                        structure.unresolved_note_instrument_reference_count
+                                    )}</span>
                                     {structure.explanation.map(|reason| view! {
                                         <p class="muted small">{reason}</p>
                                     })}
