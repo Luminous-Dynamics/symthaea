@@ -33,7 +33,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-POS-001/receipt-001",
+        "stop_disposition_receipt_sha256": "e8ada333c98571358827c03f830359efda88bf258e172604ef0a05be657cbb65",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -137,7 +141,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "f8c9344331bcaed60192812e2a6bee4099e4d35f6dad32251eaed50eb83034bd"
+      "event_trace_sha256": "f16667e93a0a3cd6ee0248256a4863e5322873362075e727b3782464f477e6e1"
     },
     {
       "id": "EO-NEG-001",
@@ -150,7 +154,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-NEG-001/receipt-001",
+        "stop_disposition_receipt_sha256": "ff047a5ca2fce7aaea8af016b79897bc04933ae357a9e32797c68b599d4db4e5",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -256,7 +264,7 @@
           "IRREVERSIBLE_EFFECT_BEFORE_STOP_DISCHARGE:effect"
         ]
       },
-      "event_trace_sha256": "295310bab00fd8d3ae7efd5192270bb1346f95d13595da8ae17f43e2f07e1236"
+      "event_trace_sha256": "dc0b9216847af1a924bd608a58d42323e0c05d230c2a9ad984164f67d86924cf"
     },
     {
       "id": "EO-UNK-001",
@@ -269,7 +277,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-UNK-001/receipt-001",
+        "stop_disposition_receipt_sha256": "705a2ba2dfa7b96164420b9887f21a1fff23b54249e17ec0e89ea0325c18502c",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -372,7 +384,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING:effect"
         ]
       },
-      "event_trace_sha256": "c85ad1f4c93544c0455425c32236116211333c6606127c9fb0bf4c7b2f76ce81"
+      "event_trace_sha256": "2b6c1a004b28076dc68057bbc216021b6b2ed31ab8feb1b349c922a4625a85f1"
     },
     {
       "id": "EO-UNK-002",
@@ -384,7 +396,11 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition_receipt_ref": null,
+        "stop_disposition_receipt_sha256": null,
+        "stop_disposition_trigger_event_id": null,
+        "stop_disposition_event_id": null
       },
       "events": [
         {
@@ -454,7 +470,7 @@
           "STOP_OBLIGATION_NOT_DISCHARGED"
         ]
       },
-      "event_trace_sha256": "707bd6438f5d861865c43911373b749cb180971b8ea18e92c0745e4665683b60"
+      "event_trace_sha256": "5b9a9741af471c9f10fb3dfdf8ad6fb593f0e370b5928b51c8968bfead49856c"
     },
     {
       "id": "EO-UNK-003",
@@ -466,7 +482,11 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition_receipt_ref": null,
+        "stop_disposition_receipt_sha256": null,
+        "stop_disposition_trigger_event_id": null,
+        "stop_disposition_event_id": null
       },
       "events": [
         {
@@ -570,7 +590,7 @@
           "STOP_OBLIGATION_NOT_DISCHARGED"
         ]
       },
-      "event_trace_sha256": "d320e9fa1ebd76fdb270bdafa3ce1f92133518a7a34bb632203469f246b32eb1"
+      "event_trace_sha256": "f8444f2d8f931877edf5097b339e88f0a4f07e46c426449e8ae878d3931ca4a3"
     },
     {
       "id": "EO-POS-002",
@@ -583,7 +603,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-POS-002/receipt-001",
+        "stop_disposition_receipt_sha256": "86f3242742533dea669226eac930a4f63ce68e6ebf95bb7620139b335175fa07",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -721,7 +745,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "cc27dfc9a3ac657b597a9cc807d6387d35f8b0eec25edd96339a2e851a22d68f"
+      "event_trace_sha256": "d0f8ac36ff7277785822e18044a6fb8dc07b8f4e153bf68b146630d31ed54018"
     },
     {
       "id": "EO-NEG-002",
@@ -733,7 +757,11 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition_receipt_ref": null,
+        "stop_disposition_receipt_sha256": null,
+        "stop_disposition_trigger_event_id": null,
+        "stop_disposition_event_id": null
       },
       "events": [
         {
@@ -822,7 +850,7 @@
           "STOP_OBLIGATION_NOT_DISCHARGED"
         ]
       },
-      "event_trace_sha256": "b01c7d33c76ac3dc70fee19e504af30a4eb2eb13576957980e415efd68c512c1"
+      "event_trace_sha256": "ffc64bb86b4dfe3e46c6d2e32f8dbb79765a3ed0347d4f939b400ecf8cc1d807"
     },
     {
       "id": "EO-POS-003",
@@ -835,7 +863,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-POS-003/receipt-001",
+        "stop_disposition_receipt_sha256": "ece70133f1c05ddcc9a7496c7266274572af8ff598a182f3167354e8149e8d71",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -934,7 +966,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "083bfad0ddb08df27b69ffb8afd1ec1e7f427b7cf23986afb07a33dbe420be7c"
+      "event_trace_sha256": "8d15fc28f0425b59212bae65b583a8c19190cf4794fb389ad2d1a5fabc9eba0f"
     },
     {
       "id": "EO-NEG-003",
@@ -947,7 +979,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-NEG-003/receipt-001",
+        "stop_disposition_receipt_sha256": "42ec760210a27ae4c73dcd304a0009696e8a5829884a843e64f625f58ec239fa",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -1058,7 +1094,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT:effect"
         ]
       },
-      "event_trace_sha256": "cfa69214211d12e629d5729067225b61fad0f7157eb913051d848df53bf59291"
+      "event_trace_sha256": "dcb6944b658e5129d27af139eb64993947558a146f2a47cdf53613c229a7c170"
     },
     {
       "id": "EO-NEG-004",
@@ -1071,7 +1107,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-NEG-004/receipt-001",
+        "stop_disposition_receipt_sha256": "d9e159a3568a4fbb7b21ae05f9d13a415f40919b03cd0197e7bbcf3c8576d0db",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -1177,7 +1217,7 @@
           "IRREVERSIBLE_EFFECT_BEFORE_STOP_DISCHARGE:effect"
         ]
       },
-      "event_trace_sha256": "242190ec54f509452112da338e417d6edf5d404ae65a5f32e29b27bfe2eda13c"
+      "event_trace_sha256": "25501fb042244d27d8cf1dd89cdd5715bf77771d1fd1df49a1c292a52d545c97"
     },
     {
       "id": "EO-POS-004",
@@ -1190,7 +1230,11 @@
         "scope": "pass",
         "completeness": "pass",
         "causal_ordering": "pass",
-        "stop_disposition": "pass"
+        "stop_disposition": "pass",
+        "stop_disposition_receipt_ref": "synthetic://stop-disposition/EO-POS-004/receipt-001",
+        "stop_disposition_receipt_sha256": "b7b879c51d3fac43eeb61296f391aee0250e8b1c6733490dbdff0906a8950032",
+        "stop_disposition_trigger_event_id": "stop",
+        "stop_disposition_event_id": "stop-revalidated"
       },
       "events": [
         {
@@ -1298,7 +1342,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "e7acbb1a256325bb9e3fdcf5b06903b48ae73a84bfb06ad8cd2d91ee89ca82ff"
+      "event_trace_sha256": "10c91857e98946847d4df32bc27a13660af1260f8083191ff88017e664ceedf3"
     }
   ]
 }
