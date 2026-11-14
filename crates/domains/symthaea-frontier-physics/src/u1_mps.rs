@@ -954,7 +954,6 @@ fn right_canonicalize_site(
 }
 
 impl ComplexU1Mps {
-
     /// Stable norm of the difference between two same-sector MPS.
     ///
     /// The two networks are embedded into a direct-sum virtual space. The
@@ -962,11 +961,7 @@ impl ComplexU1Mps {
     /// in block-diagonal form and are recombined only at the right boundary.
     /// This computes ||A-B||² without subtracting nearly equal O(1) norm and
     /// overlap scalars.
-    fn difference_norm_squared(
-        &self,
-        other: &Self,
-        tolerance: f64,
-    ) -> Result<f64, U1MpsError> {
+    fn difference_norm_squared(&self, other: &Self, tolerance: f64) -> Result<f64, U1MpsError> {
         if self.site_count() != other.site_count() || self.total_charge != other.total_charge {
             return Err(U1MpsError::TwoSiteShapeMismatch);
         }
@@ -980,8 +975,7 @@ impl ComplexU1Mps {
         if site_count == 1 {
             let left = &self.tensors[0];
             let right = &other.tensors[0];
-            if left.left_charges != right.left_charges
-                || left.right_charges != right.right_charges
+            if left.left_charges != right.left_charges || left.right_charges != right.right_charges
             {
                 return Err(U1MpsError::TwoSiteBondMismatch);
             }
@@ -1019,9 +1013,9 @@ impl ComplexU1Mps {
                         first_a.get(0, physical, right);
                 }
                 for right in 0..first_b.right_dimension() {
-                    first_data[physical * first_right_dimension
-                        + first_a.right_dimension()
-                        + right] = -first_b.get(0, physical, right);
+                    first_data
+                        [physical * first_right_dimension + first_a.right_dimension() + right] =
+                        -first_b.get(0, physical, right);
                 }
             }
             let mut first_right_charges = first_a.right_charges.clone();
@@ -1112,7 +1106,6 @@ impl ComplexU1Mps {
         let difference = Self::new(difference_tensors, self.total_charge, tolerance)?;
         difference.norm_squared(tolerance)
     }
-
 
     /// Validate a complete open-boundary MPS and its charge-selection rules.
     pub fn new(
