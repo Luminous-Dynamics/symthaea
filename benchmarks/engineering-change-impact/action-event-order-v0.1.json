@@ -9,10 +9,11 @@
       "unknown",
       "inconsistent"
     ],
-    "stop_rule": "A definitely-after effect is a critical failure. Overlapping or unknown order is indeterminate and blocks irreversible actions.",
-    "reconciliation_rule": "Cancellation acknowledgement is not terminal operation outcome. Retrying requires exact qualified NOT_APPLIED outcome ordered before the retry.",
+    "stop_rule": "A stop trigger creates an immediate no-new-effect obligation. A qualified stop-obligation discharge ordered after the trigger is required before a later operation start, retry, or irreversible effect can be treated as admissible.",
+    "reconciliation_rule": "Cancellation acknowledgement is not terminal operation outcome. Unknown outcomes remain pending; retry requires exact qualified NOT_APPLIED outcome ordered before the retry.",
     "clock_rule": "Wall-clock intervals are comparable only with qualified clock integrity. Monotonic sequences are comparable only within one qualified clock domain. Qualified causal edges can refine overlapping clock intervals; contradictions are inconsistent.",
-    "delivery_rule": "Input event-array order is not temporal order. Reordering delivery must not change the result."
+    "delivery_rule": "Input event-array order is not temporal order. Reordering delivery must not change the result.",
+    "discharge_rule": "Stop-obligation discharge is a distinct owner-qualified revalidation event. It cannot precede the trigger, cannot be inferred from candidate narration, and cannot discharge while any operation remains unreconciled."
   },
   "event_trace_digest_contract": {
     "domain": "symthaea.engineering-decision.event-trace.v0.1",
@@ -31,7 +32,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -103,6 +105,25 @@
             "clock_qualification": "pass"
           },
           "causal_predecessors": []
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 5,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 150,
+              "latest_unix_ms": 150
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
         }
       ],
       "expected": {
@@ -116,7 +137,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "aa6eb6c92c43e08aec558c03c7b5660269df11202387a47e07bc2c7d3a401444"
+      "event_trace_sha256": "f8c9344331bcaed60192812e2a6bee4099e4d35f6dad32251eaed50eb83034bd"
     },
     {
       "id": "EO-NEG-001",
@@ -128,7 +149,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -200,6 +222,25 @@
           "causal_predecessors": [
             "effect"
           ]
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 5,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 140,
+              "latest_unix_ms": 140
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
         }
       ],
       "expected": {
@@ -212,10 +253,10 @@
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
         "reason_codes": [
-          "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:effect"
+          "IRREVERSIBLE_EFFECT_BEFORE_STOP_DISCHARGE:effect"
         ]
       },
-      "event_trace_sha256": "91d7093f0a45a2659c942a3b5db83fe26395e91b7d1f5b9fc1a878dd2251e4d4"
+      "event_trace_sha256": "295310bab00fd8d3ae7efd5192270bb1346f95d13595da8ae17f43e2f07e1236"
     },
     {
       "id": "EO-UNK-001",
@@ -227,7 +268,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -294,6 +336,26 @@
           "causal_predecessors": [
             "effect"
           ]
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "review-clock",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 150,
+              "latest_unix_ms": 160
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop",
+            "effect"
+          ]
         }
       ],
       "expected": {
@@ -309,7 +371,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING:effect"
         ]
       },
-      "event_trace_sha256": "1da76dfce224ff6691b433f6fded576365d9763b265fad297182ae42ea170e5a"
+      "event_trace_sha256": "ee04272c91589981e3e9d1a4a5ad0d5b54817daf31aaea1c4e9e0c07cb038f23"
     },
     {
       "id": "EO-UNK-002",
@@ -387,7 +449,8 @@
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
         "reason_codes": [
-          "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN:effect"
+          "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN:effect",
+          "STOP_OBLIGATION_NOT_DISCHARGED"
         ]
       },
       "event_trace_sha256": "707bd6438f5d861865c43911373b749cb180971b8ea18e92c0745e4665683b60"
@@ -502,7 +565,8 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": [
           "CANCELLATION_ACK_NOT_FINAL:OP-5",
-          "OPERATION_OUTCOME_UNKNOWN:OP-5"
+          "OPERATION_OUTCOME_UNKNOWN:OP-5",
+          "STOP_OBLIGATION_NOT_DISCHARGED"
         ]
       },
       "event_trace_sha256": "d320e9fa1ebd76fdb270bdafa3ce1f92133518a7a34bb632203469f246b32eb1"
@@ -517,7 +581,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -624,6 +689,26 @@
             "outcome-unknown",
             "cancel-ack"
           ]
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 7,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 160,
+              "latest_unix_ms": 160
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "outcome-not-applied",
+            "stop"
+          ]
         }
       ],
       "expected": {
@@ -635,7 +720,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "4c56f516367f71441559124e6e5b84b2164d9ea0cf089f05f54ddd2a078f0934"
+      "event_trace_sha256": "cc27dfc9a3ac657b597a9cc807d6387d35f8b0eec25edd96339a2e851a22d68f"
     },
     {
       "id": "EO-NEG-002",
@@ -732,7 +817,8 @@
           "OPERATION_OUTCOME_UNKNOWN:OP-7",
           "OPERATION_OUTCOME_UNRECONCILED:OP-7",
           "RETRY_AFTER_STOP_TRIGGER:OP-7",
-          "RETRY_BEFORE_RECONCILIATION:OP-7"
+          "RETRY_BEFORE_RECONCILIATION:OP-7",
+          "STOP_OBLIGATION_NOT_DISCHARGED"
         ]
       },
       "event_trace_sha256": "b01c7d33c76ac3dc70fee19e504af30a4eb2eb13576957980e415efd68c512c1"
@@ -747,7 +833,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -814,6 +901,25 @@
           "causal_predecessors": [
             "effect"
           ]
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "review-clock",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 180,
+              "latest_unix_ms": 190
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
         }
       ],
       "expected": {
@@ -827,7 +933,7 @@
         "retry_before_reconciliation_count": 0,
         "reason_codes": []
       },
-      "event_trace_sha256": "69793f1c3133625182774f72ad82fe604b643e4bcb58b04688358fe3062300fa"
+      "event_trace_sha256": "083bfad0ddb08df27b69ffb8afd1ec1e7f427b7cf23986afb07a33dbe420be7c"
     },
     {
       "id": "EO-NEG-003",
@@ -839,7 +945,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -915,6 +1022,25 @@
           "causal_predecessors": [
             "effect"
           ]
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "review-clock",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 230,
+              "latest_unix_ms": 240
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
         }
       ],
       "expected": {
@@ -930,7 +1056,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT:effect"
         ]
       },
-      "event_trace_sha256": "11c59cc04d0f0ce51dea9b20c98d6d1f038362626e0693c2c0f70e0d4545f821"
+      "event_trace_sha256": "ab08a98043147dca732866807a2fb286489c7b0a622108a8de5e7fa80fa780d7"
     },
     {
       "id": "EO-NEG-004",
@@ -942,7 +1068,8 @@
         "authenticity": "pass",
         "scope": "pass",
         "completeness": "pass",
-        "causal_ordering": "pass"
+        "causal_ordering": "pass",
+        "stop_disposition": "pass"
       },
       "events": [
         {
@@ -1014,6 +1141,25 @@
             "clock_qualification": "pass"
           },
           "causal_predecessors": []
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 5,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 140,
+              "latest_unix_ms": 140
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
         }
       ],
       "expected": {
@@ -1026,10 +1172,133 @@
         "pending_operation_ids": [],
         "retry_before_reconciliation_count": 0,
         "reason_codes": [
-          "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:effect"
+          "IRREVERSIBLE_EFFECT_BEFORE_STOP_DISCHARGE:effect"
         ]
       },
-      "event_trace_sha256": "9be52ca169e600a4ba420f8a67cb43fd94be88e4bbcdcafa345abe02bb3cc24f"
+      "event_trace_sha256": "242190ec54f509452112da338e417d6edf5d404ae65a5f32e29b27bfe2eda13c"
+    },
+    {
+      "id": "EO-POS-004",
+      "family": "resume_only_after_qualified_stop_discharge",
+      "description": "A new operation is started and committed only after the stop obligation is explicitly discharged by a qualified revalidation receipt.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "not_applicable",
+        "stop_disposition": "pass"
+      },
+      "events": [
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop-revalidated",
+          "kind": "stop_obligation_discharged",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
+        },
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-11",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop-revalidated"
+          ]
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-11",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-11",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 5,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 140,
+              "latest_unix_ms": 140
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "indeterminate",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "after"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "CAUSAL_ORDER_QUALIFICATION_INDETERMINATE"
+        ]
+      },
+      "event_trace_sha256": "85d63c55f0b580142876e7c07ddf3bfbfc4b85674d7830dc181b9a65cd80d420"
     }
   ]
 }
