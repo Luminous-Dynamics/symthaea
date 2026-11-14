@@ -1154,6 +1154,537 @@ pub fn validate_json(input: &str) -> Result<ValidationReport, serde_json::Error>
     Ok(validate_value(&value))
 }
 
+
+const FEDERATION_RELATIONS: &[&str] = &[
+    "source_declared_integration",
+    "declares_role_for",
+    "shared_schema_candidate",
+    "benchmark_composition",
+];
+
+const FEDERATION_STATUSES: &[&str] = &[
+    "source_declared_unverified",
+    "contract_versioned_unqualified",
+    "independently_qualified",
+];
+
+fn validate_federation_snapshot(
+    value: &Value,
+    path: &str,
+    report: &mut ValidationReport,
+) {
+    let Some(snapshot) = object(value, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        snapshot,
+        &[
+            "revision", "tree_digest", "tree_digest_algorithm",
+            "observed_at", "configuration_world",
+        ],
+        path,
+        report,
+    );
+    if let Some(revision) = field(value, "revision", path, report)
+        .and_then(|v| string(v, &format!("{path}.revision"), report))
+    {
+        if revision.len() != 40 || !hex_string(revision) {
+            report.error("EGDDM-REVISION-001", format!("{path}.revision"), "federation subject revision must be a 40-character Git SHA-1 OID");
+        }
+    }
+    if let Some(tree) = field(value, "tree_digest", path, report)
+        .and_then(|v| string(v, &format!("{path}.tree_digest"), report))
+    {
+        if tree.len() != 40 || !hex_string(tree) {
+            report.error("EGDDM-DIGEST-003", format!("{path}.tree_digest"), "federation tree digest must be a 40-character Git tree OID");
+        }
+    }
+    if let Some(algorithm) = field(value, "tree_digest_algorithm", path, report) {
+        if algorithm.as_str() != Some("git_tree_oid_sha1") {
+            report.error("EGDDM-DIGEST-004", format!("{path}.tree_digest_algorithm"), "federation v0.1 requires git_tree_oid_sha1");
+        }
+    }
+    if let Some(observed) = field(value, "observed_at", path, report) {
+        parse_rfc3339(observed, &format!("{path}.observed_at"), report);
+    }
+    if let Some(world) = field(value, "configuration_world", path, report) {
+        if !world.is_object() {
+            report.error("EGDDM-TYPE-001", format!("{path}.configuration_world"), "configuration_world must be an object");
+        }
+    }
+}
+
+fn validate_federation_contract(
+    value: &Value,
+    path: &str,
+    report: &mut ValidationReport,
+) {
+    let Some(contract) = object(value, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        contract,
+        &[
+            "schema_version", "schema_path", "schema_blob_oid",
+            "schema_artifact_commit_sha", "status", "claim_ceiling",
+        ],
+        path,
+        report,
+    );
+    if field(value, "schema_version", path, report).and_then(Value::as_str) != Some("0.1.0") {
+        report.error("EGDDM-FEDERATION-001", format!("{path}.schema_version"), "shared contract schema_version must be 0.1.0");
+    }
+    for key in ["schema_path", "claim_ceiling"] {
+        if let Some(item) = field(value, key, path, report) {
+            string(item, &format!("{path}.{key}"), report);
+        }
+    }
+    for key in ["schema_blob_oid", "schema_artifact_commit_sha"] {
+        if let Some(item) = field(value, key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{key}"), report))
+        {
+            if item.len() != 40 || !hex_string(item) {
+                report.error("EGDDM-DIGEST-006", format!("{path}.{key}"), "field must be a 40-character Git object OID");
+            }
+        }
+    }
+    if let Some(status) = field(value, "status", path, report) {
+        enum_value(status, &format!("{path}.status"), &[
+            "provisional_unqualified", "schema_shape_checked", "independently_qualified",
+        ], report);
+    }
+}
+
+fn validate_federation_member(
+    value: &Value,
+    index: usize,
+    report: &mut ValidationReport,
+    project_ids: &mut HashSet<String>,
+    repository_names: &mut HashSet<String>,
+    map_ids: &mut HashSet<String>,
+    member_bindings: &mut HashMap<String, (String, String, String)>,
+) {
+    let path = format!("members[{index}]");
+    let Some(member) = object(value, &path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        member,
+        &[
+            "project_id", "repository_full_name", "visibility",
+            "default_branch", "role_summaries", "map",
+        ],
+        &path,
+        report,
+    );
+
+    let project_id = field(value, "project_id", &path, report)
+        .and_then(|v| string(v, &format!("{path}.project_id"), report))
+        .map(str::to_owned);
+    let repository = field(value, "repository_full_name", &path, report)
+        .and_then(|v| string(v, &format!("{path}.repository_full_name"), report))
+        .map(str::to_owned);
+    if let Some(visibility) = field(value, "visibility", &path, report) {
+        enum_value(visibility, &format!("{path}.visibility"), &["public", "private", "internal", "unknown"], report);
+    }
+    if let Some(branch) = field(value, "default_branch", &path, report) {
+        string(branch, &format!("{path}.default_branch"), report);
+    }
+    if let Some(roles) = field(value, "role_summaries", &path, report)
+        .and_then(|v| array(v, &format!("{path}.role_summaries"), report))
+    {
+        if roles.is_empty() {
+            report.error("EGDDM-FEDERATION-002", format!("{path}.role_summaries"), "at least one bounded role summary is required");
+        }
+        for (role_index, role) in roles.iter().enumerate() {
+            string(role, &format!("{path}.role_summaries[{role_index}]"), report);
+        }
+    }
+
+    let Some(map_value) = field(value, "map", &path, report) else {
+        return;
+    };
+    let map_path = format!("{path}.map");
+    let Some(map) = object(map_value, &map_path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        map,
+        &[
+            "map_id", "path", "blob_oid", "artifact_branch",
+            "artifact_commit_sha", "artifact_tree_oid", "artifact_url",
+            "subject_snapshot", "authority_summary", "node_count",
+            "edge_count", "claim_ceiling",
+        ],
+        &map_path,
+        report,
+    );
+    let map_id = field(map_value, "map_id", &map_path, report)
+        .and_then(|v| string(v, &format!("{map_path}.map_id"), report))
+        .map(str::to_owned);
+    for key in ["path", "artifact_branch", "artifact_url", "claim_ceiling"] {
+        if let Some(item) = field(map_value, key, &map_path, report) {
+            string(item, &format!("{map_path}.{key}"), report);
+        }
+    }
+    if let Some(url) = map.get("artifact_url").and_then(Value::as_str) {
+        if !url.starts_with("https://github.com/") {
+            report.error("EGDDM-FEDERATION-003", format!("{map_path}.artifact_url"), "artifact_url must be a GitHub HTTPS URL");
+        }
+    }
+    for key in ["blob_oid", "artifact_commit_sha", "artifact_tree_oid"] {
+        if let Some(item) = field(map_value, key, &map_path, report)
+            .and_then(|v| string(v, &format!("{map_path}.{key}"), report))
+        {
+            if item.len() != 40 || !hex_string(item) {
+                report.error("EGDDM-DIGEST-006", format!("{map_path}.{key}"), "field must be a 40-character Git object OID");
+            }
+        }
+    }
+    if let Some(authority) = field(map_value, "authority_summary", &map_path, report) {
+        enum_value(authority, &format!("{map_path}.authority_summary"), &[
+            "source_declared_projection", "mixed_source_authority_projection", "unknown",
+        ], report);
+    }
+    if let Some(count) = field(map_value, "node_count", &map_path, report) {
+        if count.as_u64().is_none_or(|value| value == 0) {
+            report.error("EGDDM-FEDERATION-004", format!("{map_path}.node_count"), "node_count must be a positive integer");
+        }
+    }
+    if let Some(count) = field(map_value, "edge_count", &map_path, report) {
+        if count.as_u64().is_none() {
+            report.error("EGDDM-FEDERATION-005", format!("{map_path}.edge_count"), "edge_count must be a non-negative integer");
+        }
+    }
+    if let Some(snapshot) = field(map_value, "subject_snapshot", &map_path, report) {
+        validate_federation_snapshot(snapshot, &format!("{map_path}.subject_snapshot"), report);
+    }
+
+    if let (Some(project_id), Some(repository), Some(map_id)) = (project_id, repository, map_id) {
+        if !project_ids.insert(project_id.clone()) {
+            report.error("EGDDM-FEDERATION-006", format!("{path}.project_id"), format!("duplicate project_id {project_id:?}"));
+        }
+        if !repository_names.insert(repository.clone()) {
+            report.error("EGDDM-FEDERATION-007", format!("{path}.repository_full_name"), format!("repository {repository:?} is listed more than once"));
+        }
+        if !map_ids.insert(map_id.clone()) {
+            report.error("EGDDM-FEDERATION-008", format!("{map_path}.map_id"), format!("duplicate map_id {map_id:?}"));
+        }
+        let snapshot_revision = map_value
+            .get("subject_snapshot")
+            .and_then(|value| value.get("revision"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let snapshot_tree = map_value
+            .get("subject_snapshot")
+            .and_then(|value| value.get("tree_digest"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        member_bindings.insert(project_id, (repository, map_id, format!("{snapshot_revision}:{snapshot_tree}")));
+    }
+}
+
+fn validate_federation_relationship(
+    value: &Value,
+    index: usize,
+    report: &mut ValidationReport,
+    members: &HashMap<String, (String, String, String)>,
+) {
+    let path = format!("relationships[{index}]");
+    let Some(relationship) = object(value, &path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        relationship,
+        &[
+            "from_project_id", "relation", "to_project_id", "status",
+            "authority", "source_refs", "contract_binding", "claim_limitations",
+        ],
+        &path,
+        report,
+    );
+    let from = field(value, "from_project_id", &path, report)
+        .and_then(|v| string(v, &format!("{path}.from_project_id"), report));
+    let to = field(value, "to_project_id", &path, report)
+        .and_then(|v| string(v, &format!("{path}.to_project_id"), report));
+    if let Some(from) = from {
+        if !members.contains_key(from) {
+            report.error("EGDDM-FEDERATION-009", format!("{path}.from_project_id"), format!("unknown project_id {from:?}"));
+        }
+    }
+    if let Some(to) = to {
+        if !members.contains_key(to) {
+            report.error("EGDDM-FEDERATION-010", format!("{path}.to_project_id"), format!("unknown project_id {to:?}"));
+        }
+    }
+    let relation = field(value, "relation", &path, report)
+        .and_then(|v| enum_value(v, &format!("{path}.relation"), FEDERATION_RELATIONS, report));
+    let status = field(value, "status", &path, report)
+        .and_then(|v| enum_value(v, &format!("{path}.status"), FEDERATION_STATUSES, report));
+    let authority = field(value, "authority", &path, report)
+        .and_then(|v| enum_value(v, &format!("{path}.authority"), &[
+            "source_declared", "manifest_resolved", "compiler_resolved",
+            "runtime_observed", "independently_adjudicated",
+        ], report));
+
+    if status.as_deref() == Some("independently_qualified")
+        && authority.as_deref() != Some("independently_adjudicated")
+    {
+        report.error("EGDDM-FEDERATION-011", format!("{path}.authority"), "independently_qualified relationship requires independently_adjudicated authority");
+    }
+    if status.as_deref() == Some("contract_versioned_unqualified")
+        && value.get("contract_binding").is_none_or(Value::is_null)
+    {
+        report.error("EGDDM-FEDERATION-012", format!("{path}.contract_binding"), "contract_versioned_unqualified relationship requires an exact contract binding");
+    }
+
+    if let Some(sources) = field(value, "source_refs", &path, report)
+        .and_then(|v| array(v, &format!("{path}.source_refs"), report))
+    {
+        if sources.is_empty() {
+            report.error("EGDDM-FEDERATION-013", format!("{path}.source_refs"), "relationship requires at least one source reference");
+        }
+        for (source_index, source) in sources.iter().enumerate() {
+            let source_path = format!("{path}.source_refs[{source_index}]");
+            let Some(source) = object(source, &source_path, report) else {
+                continue;
+            };
+            check_allowed_keys(
+                source,
+                &["repository_full_name", "path", "blob_oid", "line_start", "line_end"],
+                &source_path,
+                report,
+            );
+            let source_repo = field(&Value::Object(source.clone()), "repository_full_name", &source_path, report)
+                .and_then(|v| string(v, &format!("{source_path}.repository_full_name"), report));
+            if let Some(source_repo) = source_repo {
+                if !members.values().any(|(repository, _, _)| repository == source_repo) {
+                    report.error("EGDDM-FEDERATION-014", format!("{source_path}.repository_full_name"), format!("source repository {source_repo:?} is not a federation member"));
+                }
+            }
+            if let Some(source_file) = field(&Value::Object(source.clone()), "path", &source_path, report) {
+                string(source_file, &format!("{source_path}.path"), report);
+            }
+            if let Some(blob) = field(&Value::Object(source.clone()), "blob_oid", &source_path, report)
+                .and_then(|v| string(v, &format!("{source_path}.blob_oid"), report))
+            {
+                if blob.len() != 40 || !hex_string(blob) {
+                    report.error("EGDDM-FEDERATION-015", format!("{source_path}.blob_oid"), "source blob_oid must be a 40-character Git OID");
+                }
+            }
+            let start = source.get("line_start").and_then(Value::as_u64);
+            let end = source.get("line_end").and_then(Value::as_u64);
+            if start.is_none_or(|value| value == 0) || end.is_none_or(|value| value == 0) {
+                report.error("EGDDM-FEDERATION-016", source_path.clone(), "source line range requires positive line_start and line_end");
+            } else if start > end {
+                report.error("EGDDM-FEDERATION-017", source_path.clone(), "source line_start must not exceed line_end");
+            }
+        }
+    }
+
+    if let Some(binding) = relationship.get("contract_binding") {
+        if !binding.is_null() {
+            if let Some(binding) = object(binding, &format!("{path}.contract_binding"), report) {
+                check_allowed_keys(binding, &["contract_id", "version", "contract_blob_oid", "status"], &format!("{path}.contract_binding"), report);
+                for key in ["contract_id", "version"] {
+                    if let Some(item) = field(&Value::Object(binding.clone()), key, &format!("{path}.contract_binding"), report) {
+                        string(item, &format!("{path}.contract_binding.{key}"), report);
+                    }
+                }
+                if let Some(oid) = field(&Value::Object(binding.clone()), "contract_blob_oid", &format!("{path}.contract_binding"), report)
+                    .and_then(|v| string(v, &format!("{path}.contract_binding.contract_blob_oid"), report))
+                {
+                    if oid.len() != 40 || !hex_string(oid) {
+                        report.error("EGDDM-FEDERATION-018", format!("{path}.contract_binding.contract_blob_oid"), "contract_blob_oid must be a 40-character Git OID");
+                    }
+                }
+                if let Some(binding_status) = field(&Value::Object(binding.clone()), "status", &format!("{path}.contract_binding"), report) {
+                    enum_value(binding_status, &format!("{path}.contract_binding.status"), &[
+                        "declared", "two_sided_match", "independently_conformance_tested",
+                    ], report);
+                }
+            }
+        }
+    }
+    if let Some(limitations) = field(value, "claim_limitations", &path, report)
+        .and_then(|v| array(v, &format!("{path}.claim_limitations"), report))
+    {
+        for (limitation_index, limitation) in limitations.iter().enumerate() {
+            string(limitation, &format!("{path}.claim_limitations[{limitation_index}]"), report);
+        }
+    }
+
+    if relation.is_none() {
+        report.error("EGDDM-FEDERATION-019", path, "relationship has no valid relation");
+    }
+}
+
+fn validate_federation_join_policy(
+    value: &Value,
+    path: &str,
+    report: &mut ValidationReport,
+) {
+    let Some(policy) = object(value, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        policy,
+        &[
+            "map_identity", "cross_project_join", "authority_non_transfer",
+            "claim_promotion", "staleness",
+        ],
+        path,
+        report,
+    );
+    for key in [
+        "map_identity", "cross_project_join", "authority_non_transfer",
+        "claim_promotion", "staleness",
+    ] {
+        if let Some(item) = field(value, key, path, report) {
+            string(item, &format!("{path}.{key}"), report);
+        }
+    }
+}
+
+/// Validate a federation directory. This checks only the manifest's local
+/// structure and identity pins; it does not fetch or authenticate member maps.
+pub fn validate_federation_value(value: &Value) -> ValidationReport {
+    let mut report = ValidationReport::default();
+    let Some(root) = object(value, "$", &mut report) else {
+        return report;
+    };
+    check_allowed_keys(
+        root,
+        &[
+            "schema_version", "federation_id", "observed_at", "hub",
+            "shared_contract", "members", "relationships", "join_policy",
+            "limitations",
+        ],
+        "$",
+        &mut report,
+    );
+    if field(value, "schema_version", "$", &mut report).and_then(Value::as_str) != Some("0.1.0") {
+        report.error("EGDDM-FEDERATION-020", "$.schema_version", "only federation schema_version 0.1.0 is supported");
+    }
+    if let Some(id) = field(value, "federation_id", "$", &mut report) {
+        string(id, "$.federation_id", &mut report);
+    }
+    if let Some(observed) = field(value, "observed_at", "$", &mut report) {
+        parse_rfc3339(observed, "$.observed_at", &mut report);
+    }
+    if let Some(contract) = field(value, "shared_contract", "$", &mut report) {
+        validate_federation_contract(contract, "$.shared_contract", &mut report);
+    }
+    if let Some(hub) = field(value, "hub", "$", &mut report) {
+        if let Some(hub) = object(hub, "$.hub", &mut report) {
+            check_allowed_keys(
+                hub,
+                &[
+                    "repository_full_name", "default_branch", "subject_revision",
+                    "subject_tree_oid", "self_map_id", "self_map_path", "self_map_blob_oid",
+                ],
+                "$.hub",
+                &mut report,
+            );
+            for key in ["repository_full_name", "default_branch", "self_map_id", "self_map_path"] {
+                if let Some(item) = field(&Value::Object(hub.clone()), key, "$.hub", &mut report) {
+                    string(item, &format!("$.hub.{key}"), &mut report);
+                }
+            }
+            for key in ["subject_revision", "subject_tree_oid", "self_map_blob_oid"] {
+                if let Some(item) = field(&Value::Object(hub.clone()), key, "$.hub", &mut report)
+                    .and_then(|v| string(v, &format!("$.hub.{key}"), &mut report))
+                {
+                    if item.len() != 40 || !hex_string(item) {
+                        report.error("EGDDM-FEDERATION-021", format!("$.hub.{key}"), "hub identity must be a 40-character Git OID");
+                    }
+                }
+            }
+        }
+    }
+
+    let mut project_ids = HashSet::new();
+    let mut repository_names = HashSet::new();
+    let mut map_ids = HashSet::new();
+    let mut members = HashMap::new();
+    if let Some(member_values) = field(value, "members", "$", &mut report)
+        .and_then(|v| array(v, "$.members", &mut report))
+    {
+        if member_values.is_empty() {
+            report.error("EGDDM-FEDERATION-022", "$.members", "federation must contain at least one member");
+        }
+        for (index, member) in member_values.iter().enumerate() {
+            validate_federation_member(
+                member, index, &mut report,
+                &mut project_ids, &mut repository_names, &mut map_ids, &mut members,
+            );
+        }
+    }
+
+    if let Some(hub) = value.get("hub").and_then(Value::as_object) {
+        let hub_repo = hub.get("repository_full_name").and_then(Value::as_str);
+        let hub_map_id = hub.get("self_map_id").and_then(Value::as_str);
+        let hub_path = hub.get("self_map_path").and_then(Value::as_str);
+        let hub_blob = hub.get("self_map_blob_oid").and_then(Value::as_str);
+        let hub_member = members.values().find(|(repository, _, _)| Some(repository.as_str()) == hub_repo);
+        match hub_member {
+            Some((_, map_id, _)) if Some(map_id.as_str()) == hub_map_id => {
+                let member_map = value.get("members")
+                    .and_then(Value::as_array)
+                    .and_then(|items| items.iter().find(|member| member.get("repository_full_name").and_then(Value::as_str) == hub_repo))
+                    .and_then(|member| member.get("map"));
+                if member_map.and_then(|map| map.get("path")).and_then(Value::as_str) != hub_path
+                    || member_map.and_then(|map| map.get("blob_oid")).and_then(Value::as_str) != hub_blob
+                {
+                    report.error("EGDDM-FEDERATION-023", "$.hub", "hub self-map path/blob must match the hub repository's member map pin");
+                }
+            }
+            _ => report.error("EGDDM-FEDERATION-024", "$.hub", "hub must exactly match one member map by repository and map_id"),
+        }
+    }
+
+    if let Some(relationship_values) = field(value, "relationships", "$", &mut report)
+        .and_then(|v| array(v, "$.relationships", &mut report))
+    {
+        for (index, relationship) in relationship_values.iter().enumerate() {
+            validate_federation_relationship(relationship, index, &mut report, &members);
+        }
+    }
+    if let Some(policy) = field(value, "join_policy", "$", &mut report) {
+        validate_federation_join_policy(policy, "$.join_policy", &mut report);
+    }
+    if let Some(limitations) = field(value, "limitations", "$", &mut report)
+        .and_then(|v| array(v, "$.limitations", &mut report))
+    {
+        if limitations.is_empty() {
+            report.error("EGDDM-FEDERATION-025", "$.limitations", "federation must preserve explicit limitations");
+        }
+        for (index, limitation) in limitations.iter().enumerate() {
+            string(limitation, &format!("$.limitations[{index}]"), &mut report);
+        }
+    }
+
+    report.sort();
+    report
+}
+
+pub fn validate_federation_json(input: &str) -> Result<ValidationReport, serde_json::Error> {
+    let value: Value = serde_json::from_str(input)?;
+    Ok(validate_federation_value(&value))
+}
+
+/// Autodetect and validate an EGDDM snapshot or federation directory.
+pub fn validate_document_json(input: &str) -> Result<ValidationReport, serde_json::Error> {
+    let value: Value = serde_json::from_str(input)?;
+    if value.get("federation_id").is_some() {
+        Ok(validate_federation_value(&value))
+    } else {
+        Ok(validate_value(&value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1232,6 +1763,49 @@ mod tests {
     }
 
 
+
+
+    const FEDERATION_FIXTURE: &str = include_str!(
+        "../../../docs/development-map/federation-v0.1.json"
+    );
+
+    #[test]
+    fn four_project_federation_manifest_satisfies_local_contract() {
+        let report = validate_federation_json(FEDERATION_FIXTURE).expect("federation JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn federation_relationship_cannot_reference_unknown_project() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["relationships"][0]["to_project_id"] = Value::String("missing-project".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-010"));
+    }
+
+    #[test]
+    fn federation_artifact_identity_must_be_a_git_oid() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["members"][2]["map"]["artifact_commit_sha"] = Value::String("not-a-git-oid".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-DIGEST-006"));
+    }
+
+    #[test]
+    fn federation_hub_must_match_exact_member_map() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["hub"]["self_map_blob_oid"] = Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-023"));
+    }
+
+    #[test]
+    fn federation_qualified_relationship_requires_independent_authority() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["relationships"][0]["status"] = Value::String("independently_qualified".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-011"));
+    }
 
     const DTEA_FIXTURE: &str = include_str!(
         "../../../docs/development-map/fixtures/decision-time-admissibility-v0.1.map.json"
