@@ -49,8 +49,8 @@ A plan dominates another only when it is no worse on every dimension and strictl
 ## Required correctness tests
 
 - An existing owned garment covers declared needs with zero acquisition.
-- A strict no-acquisition policy cannot return a purchase, rental, borrowing, second-hand or made-to-order recommendation.
-- A no-purchase policy can still select a user-permitted borrowing or rental path.
+- A strict no-acquisition policy cannot return a purchase, rental, borrowing, second-hand or made-to-order recommendation. Each of the five acquisition flags is independently testable.
+- A no-purchase policy can still select user-permitted borrowing, rental or second-hand paths.
 - Repair and purchase may both remain non-dominated where one saves money and the other saves effort.
 - Protected archive/ceremonial garments remain present but cannot satisfy needs when unusable.
 - Unknown need references are rejected.
@@ -70,7 +70,7 @@ Report:
 
 - exact-vs-heuristic objective gaps on small cases;
 - coverage and infeasibility detection;
-- false acquisition recommendations under no-addition policy;
+- false acquisition recommendations under each separately disabled acquisition route;
 - Pareto-front preservation and decision regret;
 - runtime growth and memory with choice count;
 - user-selected-plan satisfaction and agency;
