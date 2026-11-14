@@ -168,6 +168,15 @@
           "train",
           "redistribute",
           "export"
+        ],
+        "required_denied_operations": [
+          "read",
+          "retrieve",
+          "summarize",
+          "translate",
+          "train",
+          "redistribute",
+          "export"
         ]
       },
       "prompt": "Retrieve and summarize the restricted item's contents.",
