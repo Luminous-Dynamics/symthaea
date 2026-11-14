@@ -1940,4 +1940,129 @@ mod tests {
         assert_eq!(report.chord_anchor_semantics.accuracy, Some(0.0));
     }
 
+
+    fn part_metadata_fixture(part_name: &str, midi_channel: u8) -> String {
+        format!(
+            r#"<score-partwise>
+                <part-list>
+                    <score-part id="P1">
+                        <part-name>{part_name}</part-name>
+                        <part-abbreviation>Vln.</part-abbreviation>
+                        <score-instrument id="P1-I1">
+                            <instrument-name>Violin</instrument-name>
+                            <midi-instrument id="P1-I1">
+                                <midi-channel>{midi_channel}</midi-channel>
+                                <midi-program>41</midi-program>
+                            </midi-instrument>
+                        </score-instrument>
+                    </score-part>
+                </part-list>
+                <part id="P1"><measure number="1">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                    <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><staff>1</staff><instrument id="P1-I1"/></note>
+                </measure></part>
+            </score-partwise>"#
+        )
+    }
+
+    #[test]
+    fn identical_part_list_metadata_scores_independently_from_note_events() {
+        let graph = graph(&part_metadata_fixture("Violin I", 1));
+        let report = evaluate_musicxml_notation_graphs(
+            &graph, &graph, default_config()
+        ).unwrap();
+        assert!(report.part_metadata_layer_covered);
+        assert_eq!(report.part_metadata_presence.f1, Some(1.0));
+        assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(1.0));
+        assert_eq!(report.score_instrument_ids.accuracy, Some(1.0));
+        assert_eq!(report.midi_instrument_setup.accuracy, Some(1.0));
+        assert_eq!(report.part_metadata_source_subtree.accuracy, Some(1.0));
+        assert_eq!(report.part_metadata_reference_absent_count, 0);
+        assert_eq!(report.part_metadata_unexpected_count, 0);
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+    }
+
+    #[test]
+    fn midi_setup_change_is_not_misreported_as_a_note_event_error() {
+        let reference = graph(&part_metadata_fixture("Violin I", 1));
+        let prediction = graph(&part_metadata_fixture("Violin I", 2));
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.instrument_assignment.accuracy, Some(1.0));
+        assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(1.0));
+        assert_eq!(report.score_instrument_ids.accuracy, Some(1.0));
+        assert_eq!(report.midi_instrument_setup.accuracy, Some(0.0));
+        assert_eq!(report.part_metadata_source_subtree.accuracy, Some(0.0));
+    }
+
+    #[test]
+    fn part_name_and_abbreviation_change_is_a_part_metadata_error_only() {
+        let reference = graph(&part_metadata_fixture("Violin I", 1));
+        let prediction = graph(&part_metadata_fixture("Viola", 1));
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.part_metadata_presence.f1, Some(1.0));
+        assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(0.0));
+        assert_eq!(report.score_instrument_ids.accuracy, Some(1.0));
+        assert_eq!(report.midi_instrument_setup.accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn removed_part_metadata_is_a_false_negative_for_new_graphs() {
+        let reference = graph(&part_metadata_fixture("Violin I", 1));
+        let mut prediction = reference.clone();
+        prediction.part_metadata = None;
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert!(report.part_metadata_layer_covered);
+        assert_eq!(report.part_metadata_presence.false_negatives, 1);
+        assert_eq!(report.part_metadata_presence.f1, Some(0.0));
+        assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(0.0));
+        assert_eq!(report.score_instrument_ids.accuracy, Some(0.0));
+        assert_eq!(report.midi_instrument_setup.accuracy, Some(0.0));
+        assert_eq!(report.part_metadata_source_subtree.accuracy, Some(0.0));
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+    }
+
+    #[test]
+    fn metadata_added_without_a_reference_declaration_is_an_unexpected_prediction() {
+        let reference_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><staff>1</staff></note>
+        </measure></part></score-partwise>"#;
+        let reference = graph(reference_xml);
+        let prediction = graph(&part_metadata_fixture("Violin I", 1));
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+        assert_eq!(report.part_metadata_presence.false_positives, 1);
+        assert_eq!(report.part_metadata_presence.f1, Some(0.0));
+        assert_eq!(report.part_metadata_reference_absent_count, 1);
+        assert_eq!(report.part_metadata_unexpected_count, 1);
+        assert_eq!(report.part_metadata_name_abbreviation.accuracy, None);
+    }
+
+    #[test]
+    fn historical_graph_without_part_metadata_layer_is_not_scored_as_absent() {
+        let mut reference = graph(&part_metadata_fixture("Violin I", 1));
+        reference.part_metadata = None;
+        reference.part_metadata_layer_present = false;
+        let prediction = graph(&part_metadata_fixture("Violin I", 1));
+        let report = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, default_config()
+        ).unwrap();
+        assert!(!report.part_metadata_layer_covered);
+        assert_eq!(report.part_metadata_presence.f1, None);
+        assert_eq!(report.part_metadata_name_abbreviation.accuracy, None);
+        assert_eq!(report.part_metadata_reference_absent_count, 0);
+        assert_eq!(report.part_metadata_unexpected_count, 0);
+        assert_eq!(report.note_event_presence.f1, Some(1.0));
+    }
+
 }
