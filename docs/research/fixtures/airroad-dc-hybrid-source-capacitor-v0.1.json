@@ -1,0 +1,281 @@
+{
+  "schema": "luminous.airroad.dc_hybrid_source_capacitor_state_reference.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_analytical_reference",
+  "topology": {
+    "ports": [
+      "source_terminal",
+      "dc_bus",
+      "return"
+    ],
+    "source_voltage_v": {
+      "numerator": "600",
+      "denominator": "1"
+    },
+    "source_series_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "source_series_inductance_h": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "fault_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "dc_link_capacitance_f": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "initial_inductor_current_a": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "initial_capacitor_voltage_v": {
+      "numerator": "600",
+      "denominator": "1"
+    },
+    "evaluation_time_s": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "sign_convention": {
+      "inductor_current": "source_to_bus_positive",
+      "capacitor_current": "current_into_positive_capacitor_terminal_positive",
+      "bus_voltage": "bus_to_return_positive",
+      "fault_current": "bus_to_return_positive"
+    },
+    "equations": [
+      "L*di_L/dt = V_s - R_s*i_L - v",
+      "C*dv/dt = i_L - v/R_f",
+      "i_fault = v/R_f",
+      "i_capacitor = C*dv/dt"
+    ]
+  },
+  "state_space": {
+    "state_order": [
+      "inductor_current_a",
+      "bus_voltage_v"
+    ],
+    "A": [
+      [
+        {
+          "numerator": "-1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "b": [
+      {
+        "numerator": "600",
+        "denominator": "1"
+      },
+      {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    ],
+    "initial_state": [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "600",
+        "denominator": "1"
+      }
+    ],
+    "equilibrium_state": [
+      {
+        "numerator": "300",
+        "denominator": "1"
+      },
+      {
+        "numerator": "300",
+        "denominator": "1"
+      }
+    ],
+    "matrix_exponential": "exp(-t) * [[cos(t), -sin(t)], [sin(t), cos(t)]]"
+  },
+  "taylor_contract": {
+    "exp_negative_t": {
+      "lower_order": 13,
+      "upper_order": 12
+    },
+    "sin_t": {
+      "lower_order": 7,
+      "upper_order": 6
+    },
+    "cos_t": {
+      "lower_order": 7,
+      "upper_order": 6
+    },
+    "admitted_t_interval": {
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    },
+    "arithmetic": "exact Fraction rational endpoints; no binary floating-point or libm functions"
+  },
+  "expected_enclosures": {
+    "source_forced_inductor_current_a": {
+      "lower": {
+        "numerator": "988663117330907651486493368978103427",
+        "denominator": "7522549982092978714906295323852800"
+      },
+      "upper": {
+        "numerator": "204009849607965071761439862348745807",
+        "denominator": "1552272218527122591964791098572800"
+      }
+    },
+    "source_forced_node_voltage_v": {
+      "lower": {
+        "numerator": "35417676570294412301827991287871",
+        "denominator": "2238854161337196046103064084480"
+      },
+      "upper": {
+        "numerator": "133943213211295239456991292377272929",
+        "denominator": "8466939373784305047080678719488000"
+      }
+    },
+    "initial_state_inductor_current_a": {
+      "lower": {
+        "numerator": "-25882729882580905540285805228281",
+        "denominator": "223885416133719604610306408448"
+      },
+      "upper": {
+        "numerator": "-5383607815576828335821994911695943801",
+        "denominator": "46568166555813677758943732957184000"
+      }
+    },
+    "initial_state_node_voltage_v": {
+      "lower": {
+        "numerator": "351398612876452178091955677441074233",
+        "denominator": "776136109263561295982395549286400"
+      },
+      "upper": {
+        "numerator": "1392376160488900752273797274491",
+        "denominator": "3075349122715928634756956160"
+      }
+    },
+    "total_inductor_current_a": {
+      "lower": {
+        "numerator": "119003393276189225332890313307861827",
+        "denominator": "7522549982092978714906295323852800"
+      },
+      "upper": {
+        "numerator": "736687672662123817021200958766430409",
+        "denominator": "46568166555813677758943732957184000"
+      }
+    },
+    "total_node_voltage_v": {
+      "lower": {
+        "numerator": "99184565660223883915433467569328049",
+        "denominator": "211673484344607626177016967987200"
+      },
+      "upper": {
+        "numerator": "14547069630166169712162799971551679673",
+        "denominator": "31045444370542451839295821971456000"
+      }
+    },
+    "direct_total_inductor_current_a": {
+      "lower": {
+        "numerator": "35417676570294412301827991287871",
+        "denominator": "2238854161337196046103064084480"
+      },
+      "upper": {
+        "numerator": "133943213211295239456991292377272929",
+        "denominator": "8466939373784305047080678719488000"
+      }
+    },
+    "direct_total_node_voltage_v": {
+      "lower": {
+        "numerator": "727353481508308483417434796794934193",
+        "denominator": "1552272218527122591964791098572800"
+      },
+      "upper": {
+        "numerator": "3524866871924879577457283825333576573",
+        "denominator": "7522549982092978714906295323852800"
+      }
+    },
+    "capacitor_current_a": {
+      "lower": {
+        "numerator": "-1392376160488900752273797274491",
+        "denominator": "3075349122715928634756956160"
+      },
+      "upper": {
+        "numerator": "-351398612876452178091955677441074233",
+        "denominator": "776136109263561295982395549286400"
+      }
+    },
+    "kcl_reconstructed_current_a": {
+      "lower": {
+        "numerator": "36834383633106185508230750799982619",
+        "denominator": "2328408327790683887947186647859200"
+      },
+      "upper": {
+        "numerator": "54569457234231398720508097100967817",
+        "denominator": "3449493818949161315477313552384000"
+      }
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "wrong-source-resistance",
+      "expected": "reject"
+    },
+    {
+      "id": "wrong-capacitor-initial-state",
+      "expected": "reject"
+    },
+    {
+      "id": "wrong-sign-convention",
+      "expected": "reject"
+    },
+    {
+      "id": "sum-absolute-component-currents",
+      "expected": "reject_as_not_the_linear_superposition"
+    },
+    {
+      "id": "different-state-matrix-for-component-responses",
+      "expected": "reject"
+    },
+    {
+      "id": "kcl-does-not-close",
+      "expected": "not_established"
+    },
+    {
+      "id": "instantaneous-power-balance-does-not-overlap",
+      "expected": "not_established"
+    },
+    {
+      "id": "source-and-capacitor-evidence-identities-mismatch",
+      "expected": "not_evaluable"
+    }
+  ],
+  "claim_ceiling": [
+    "One fixed linear series-source RL and bus shunt RC topology with one inductor state and one capacitor state.",
+    "Source-forced and initial-state responses are decompositions of the same state-space realization.",
+    "No switched protection, converter current limiting, arc, source dynamics, distributed cable, aircraft or hardware claim is made."
+  ]
+}

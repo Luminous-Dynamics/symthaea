@@ -1,0 +1,41 @@
+name: AIRROAD DC Hybrid Source Capacitor Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_DC_FAULT_TRANSIENT_COMPOSITION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-dc-hybrid-source-capacitor-v0.1.json"
+      - "tools/airroad-dc-hybrid-state-qualifier/verify_hybrid_source_capacitor.py"
+      - ".github/workflows/airroad-dc-hybrid-source-capacitor-reference.yml"
+  push:
+    branches:
+      - research/airroad-dc-hybrid-state-v0.1
+    paths:
+      - "docs/research/AIRROAD_DC_FAULT_TRANSIENT_COMPOSITION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-dc-hybrid-source-capacitor-v0.1.json"
+      - "tools/airroad-dc-hybrid-state-qualifier/verify_hybrid_source_capacitor.py"
+      - ".github/workflows/airroad-dc-hybrid-source-capacitor-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-dc-hybrid-source-capacitor-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute exact-rational hybrid oracle
+        run: |
+          python3 -m py_compile tools/airroad-dc-hybrid-state-qualifier/verify_hybrid_source_capacitor.py
+          python3 tools/airroad-dc-hybrid-state-qualifier/verify_hybrid_source_capacitor.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-dc-hybrid-source-capacitor-v0.1.json > /dev/null
