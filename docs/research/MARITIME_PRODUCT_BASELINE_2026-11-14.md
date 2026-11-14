@@ -244,3 +244,43 @@ The next design decisions that genuinely require project-owner input are:
 - cost / payload / range / maintenance trade-off priorities.
 
 Until those are selected, preserve multiple mission scenarios and do not optimize a single guessed product.
+
+
+## 9. SOTA research refresh — 2026-11-14
+
+This section adds recent research anchors to the product baseline. Published results remain study-specific: record the vessel/propulsor class, plant architecture, duty cycle, measurement boundary and evidence tier before comparing them with this programme.
+
+### 9.1 PWC / installed waterjet dynamics
+
+**MIT electric-PWC integration proof of concept (May 2025).** Hudspeth's MIT thesis documents conversion of a 1997 Yamaha Wave Venture 760 using a 72 V, 10.4 Ah battery pack, waterproof housing and a 5 kW motor coupled to the existing impeller shaft. The reported check is a dry test monitoring battery/motor health; it demonstrates an integration path, not an on-water range, power, reliability or product-performance result. The nominal battery energy implied by 72 V × 10.4 Ah is about 0.749 kWh before usable-SOC limits and conversion losses; at a continuous 5 kW draw that is about 9 minutes idealized. This arithmetic is a unit sanity check, not an estimate of actual prototype runtime because real load and battery voltage profile are not specified by the abstract. Rights status is In Copyright / Educational Use Permitted; do not copy thesis figures or data into commercial materials without permission. Source: https://dspace.mit.edu/entities/publication/3fb93265-740c-4252-8535-70916fa8b9e6
+
+**Waterjet dynamics during manoeuvring (May 2026).** Wang et al. investigate a fully coupled 6-DOF / rotating-waterjet CFD model for an amphibious vehicle. The abstract reports suction-induced attitude changes, vortex-associated performance loss during turning, transient pump operating-point shifts during zig-zag manoeuvres, and left/right inflow / jet-performance asymmetry. This is a high-value hypothesis source for installed PWC waterjet testing, but the vehicle class, geometry, operating points and validation domain differ; no numerical transfer to PWC is warranted. DOI: https://doi.org/10.1016/j.oceaneng.2026.125403
+
+**Low-speed waterjet pump loss decomposition (15 January 2026).** Fei et al. study a waterjet pump device at low navigational speeds and report that jet velocity is a major influence on propulsion efficiency and energy dissipation in their test/model domain. PWC planing speeds, intake immersion, hull acceleration and turning conditions may be materially different; this is a mechanism/reference source, not a PWC calibration dataset. DOI: https://doi.org/10.1016/j.oceaneng.2025.123706
+
+**Implication for PWC research:** the next differentiating benchmark should test the installed intake–pump–hull–nozzle system through acceleration, planing transition, both-direction turns, steering reversals and wave/current conditions. Record pump RPM/torque, thrust or a defensible force proxy, power, intake pressure/flow, hull six-DOF response, cavitation/ventilation indicators and rider-relevant acceleration. A steady open-water pump map alone is not enough.
+
+### 9.2 Tug hybrid powertrain / energy-management SOTA
+
+**TD3 tug EMS (9 February 2026).** Li, Long and Tian evaluate a methanol range-extended series-hybrid port tug. Their paper reports TD3 methanol-consumption reductions of 18.5% versus rule-based control, 10.2% versus ECMS and 7.3% versus DDPG, with a reported gap below 2.5% from dynamic programming. Their HIL setup uses a 1 ms model step, average communication/processing latency around 3 ms (maximum <=5 ms), and reports less than 1.8% deviation from pure simulation. This is a strong named-method comparator and an HIL result; it is not a full-scale vessel sea-trial or fleet-wide savings claim. The authors state that actual-vessel uncertainties such as complex flow, wind/waves, mooring loads, degradation and sensor noise remain for future work. The paper says data are in the article and further inquiries should go to the corresponding author. Source: https://www.mdpi.com/1996-1073/19/4/905
+
+**Methanol range-extender capacity matching (2 March 2026).** Li, Tian and Long report a battery-dominant series-hybrid design with 200 kWh / 600 kW LFP, a 250 kW methanol APU and 400/600 kW PMSM propulsion-motor ratings. They report 50.8% equivalent fuel saving versus a conventional diesel baseline over one typical simulated one-hour duty cycle, with 65% pure-electric time and 62% braking-energy recovery. Critically, the authors say the work uses a specific duty cycle and idealized component models, and calls for additional real operational data and HIL validation. Underlying data are available on request. Treat the 50.8% as a simulation result for that exact study, not a field result or a generic target. Source: https://www.mdpi.com/2075-1702/14/3/274
+
+**Implication for tug research:** a credible new result cannot be merely “our RL beats a weak rule base.” Reproduce or match TD3, rule-based, ECMS, DDPG, MPC and an offline DP oracle under identical plant maps and duty cycles. Then seek advantage in held-out vessel / port / job blocks, forecast-error and equipment-degradation robustness, hard-constraint compliance, worst-case execution time, lifecycle cost and port charging feasibility. Dynamic programming is a non-deployable clairvoyant reference, not a controller.
+
+### 9.3 Propeller and acoustic research: relevant mainly to tug / conventional-propeller classes
+
+- Gaggero et al. (published 30 July 2025) report a propeller optimized for underwater radiated-noise reduction on a small passenger boat, with numerical and model-scale work followed by a full-scale refit and test that confirmed the study-specific noise reduction. This is a valuable example of a simulation -> model test -> retrofit -> full-scale validation chain; it is not direct evidence for a PWC waterjet. DOI: https://doi.org/10.1016/j.oceaneng.2025.121412
+- Gaggero and Serani (January 2026) report physics-informed parametric dimensionality reduction for marine propeller shape optimization. The method embeds pressure distributions and performance observables into the reduced design space and uses BEM / RANS comparisons. It is a relevant methodology comparator for conventional tug / vessel propellers, not a waterjet pump validation result. DOI: https://doi.org/10.1016/j.apor.2026.104932
+- ITTC's Cavitation and Noise Round Robin page (updated 2 July 2026) specifies a 31 January 2027 results deadline; the no-rudder test is mandatory and the rudder test optional. The dataset is agreement-controlled; a downloadable geometry or catalogue listing is not proof of permission to reuse. Source: https://ittc.info/benchmark-repository/round-robin-test-cavitation-and-noise/
+
+### 9.4 How we can outperform responsibly
+
+We should not claim "better than SOTA" until we beat named baselines on equivalent conditions. The strongest opportunities are:
+
+1. **PWC:** demonstrate better *installed system* net energy and handling over a frozen mixed-use course, including turning/transient losses, at matched rider payload and water conditions. Compare petrol and electric systems using explicit onboard-energy and lifecycle-energy boundaries.
+2. **Tugs:** compete against tuned RB, ECMS, DDPG, TD3 and deployable MPC/robust-MPC baselines; include a DP oracle only as a clairvoyant bound. Report fuel/electricity, SOC reserve, battery throughput/degradation, transient thrust tracking, job completion, availability, emissions, compute/deadline performance and robustness.
+3. **Both:** turn design changes into an as-built configuration generation; trace materials, processes, serialized components, inspections, repairs and requalification. A digital twin is useful only when tied to the exact physical configuration.
+4. **Both:** compare complete experiment cost, including failed runs and required high-fidelity / physical validation. A design selected cheaply but requiring more expensive validation is not necessarily the better research strategy.
+
+All numeric literature values above are external reference results with their own model, cycle, assumptions and validation boundaries. They are not Symthaea achievements or expected outcomes.
