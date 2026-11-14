@@ -369,6 +369,15 @@ fn note_field_actions(
     let ref_offset = Some(gold.score_offset);
     let pred_offset = Some(predicted.score_offset);
 
+    if gold.score_offset != predicted.score_offset {
+        add_replace(
+            actions, reference, prediction, NoteEvent, "score_offset",
+            &gold.score_offset, &predicted.score_offset,
+            ref_measure, pred_measure, ref_order, pred_order,
+            ref_offset, pred_offset, maximum, "note_onset_differs"
+        )?;
+    }
+
     match (&gold.kind, &predicted.kind) {
         (
             crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Pitched(left),
@@ -435,12 +444,14 @@ fn note_field_actions(
     compare_field!(grace, "grace.attributes", "grace_attributes_differ");
     compare_field!(is_cue, "cue.flag", "cue_flag_differs");
     compare_field!(is_chord_member, "chord_member.flag", "chord_member_flag_differs");
-    if mapped_anchor != predicted.chord_anchor_source_order {
+    if (gold.chord_anchor_source_order.is_some() && mapped_anchor.is_none())
+        || mapped_anchor != predicted.chord_anchor_source_order
+    {
         add_replace(
             actions, reference, prediction, NoteEvent, "chord_member.anchor",
-            &mapped_anchor, &predicted.chord_anchor_source_order,
+            &gold.chord_anchor_source_order, &predicted.chord_anchor_source_order,
             ref_measure, pred_measure, ref_order, pred_order,
-            ref_offset, pred_offset, maximum, "chord_anchor_target_differs"
+            ref_offset, pred_offset, maximum, "chord_anchor_target_differs_or_is_unresolved"
         )?;
     }
     compare_field!(voice, "voice", "voice_assignment_differs");
@@ -698,7 +709,8 @@ fn measure_actions(
                 }
                 let gold_locator = reference.measure_locators.get(index);
                 let pred_locator = prediction.measure_locators.get(index);
-                if let (Some(a), Some(b)) = (gold_locator, pred_locator) {
+                match (gold_locator, pred_locator) {
+                    (Some(a), Some(b)) => {
                     macro_rules! locator_cmp {
                         ($field:ident, $path:literal, $reason:literal) => {
                             if a.$field != b.$field {
@@ -713,6 +725,20 @@ fn measure_actions(
                     locator_cmp!(display_text, "measure.display_text", "measure_display_text_differs");
                     locator_cmp!(implicit, "measure.implicit", "measure_implicit_flag_differs");
                     locator_cmp!(non_controlling, "measure.non_controlling", "measure_control_flag_differs");
+                    }
+                    (Some(locator), None) => {
+                        add_insert_delete(actions, reference, prediction, MusicXmlCorrectionFamilyV1::Measure,
+                            locator, MusicXmlCorrectionOperationV1::DeleteFromPrediction,
+                            Some(index), None, Some(gold.start), maximum,
+                            "reference_measure_locator_missing_from_prediction")?;
+                    }
+                    (None, Some(locator)) => {
+                        add_insert_delete(actions, reference, prediction, MusicXmlCorrectionFamilyV1::Measure,
+                            locator, MusicXmlCorrectionOperationV1::InsertInPrediction,
+                            None, Some(index), Some(predicted.start), maximum,
+                            "unexpected_prediction_measure_locator")?;
+                    }
+                    (None, None) => {}
                 }
             }
             (Some(gold), None) => {
