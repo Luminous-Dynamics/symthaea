@@ -312,8 +312,9 @@ pub fn evaluate_act_hold_pair(
                 hold_side_critical_premature = true;
                 reasons.insert("IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned());
             } else if effect == trigger {
-                premature_effects = 1;
+                premature_effect_detected = true;
                 critical_premature_action = true;
+                hold_side_critical_premature = true;
                 reasons.insert("TRIGGER_EFFECT_ORDER_AMBIGUOUS".to_owned());
             }
             if terminal < trigger {
@@ -321,13 +322,15 @@ pub fn evaluate_act_hold_pair(
             }
         }
         (Some(trigger), None, Some(effect)) if effect > trigger => {
-            premature_effects = 1;
+            premature_effect_detected = true;
             critical_premature_action = true;
+            hold_side_critical_premature = true;
             reasons.insert("IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned());
         }
         (Some(trigger), None, Some(effect)) if effect == trigger => {
-            premature_effects = 1;
+            premature_effect_detected = true;
             critical_premature_action = true;
+            hold_side_critical_premature = true;
             reasons.insert("TRIGGER_EFFECT_ORDER_AMBIGUOUS".to_owned());
         }
         (Some(_), None, _) | (None, _, _) => {
