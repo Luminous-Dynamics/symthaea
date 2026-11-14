@@ -124,3 +124,8 @@ The proposed E0–E4 observer taxonomy and trust-domain vector are documented in
 ## Formal protocol model
 
 A bounded TLA+ model and pinned TLC runner are available in [formal/](formal/README.md). The specification covers delayed dispatch, destination serialization, staged effect/fence transactions, rollback and reconciliation. The Go state explorer has passed its declared finite test; the new TLA+ module has **not yet been run through TLC** in this environment. The runner records the stable tool pin and refuses an unverified JAR.
+
+
+## Detached checkpoint chain
+
+The proposed Ed25519 checkpoint wire contract, monotonic consumer-state rules and cross-language test vector are documented in [CHECKPOINT_CHAIN.md](CHECKPOINT_CHAIN.md). The public branch publishes the JSON test vector and schema. A local companion Go verifier passes its signature/rollback/fork tests, but the signer, independently administered witness and external trust-state store are not deployed; the Go implementation itself is not part of this public PR's source diff.
