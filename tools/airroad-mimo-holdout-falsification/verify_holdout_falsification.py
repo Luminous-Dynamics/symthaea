@@ -192,7 +192,7 @@ def validate_contract(data: dict[str, Any]) -> None:
     )
     for encoded_matrix in training["nominal_matrices"]:
         decoded = [
-            [(q(cell["numerator"]), q(cell["denominator"])) for cell in row]
+            [Fraction(int(cell["numerator"]), int(cell["denominator"])) for cell in row]
             for row in encoded_matrix
         ]
         require(decoded == expected_training_matrix, "training matrix does not match frozen observations")
