@@ -88,3 +88,6 @@ The reference API includes `AcceptObserved`, which requires the independently ob
 
 
 The current public reference package has 21 checkpoint tests, including the `AcceptObserved` join cases and an optional OpenSSL cross-provider signature check. The integration API checks identity, sequence and head equality before accepting an advanced checkpoint. It still relies on the caller to obtain a coherent observer snapshot and keep the monotonic trust cursor in an independent domain.
+
+
+A checkpoint is not considered progress merely because its integer sequence advances: the journal-head digest must also differ from the currently trusted digest. A new witness checkpoint that repeats the old head is rejected as `ErrNoProgress`.
