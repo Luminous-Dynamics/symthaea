@@ -301,6 +301,11 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
     let mut evidence_digests = BTreeSet::<&str>::new();
     let mut incoming_lot_count = 0_usize;
     let mut terminal_lot_count = 0_usize;
+    let consumed_lot_ids: BTreeSet<&str> = ledger
+        .events
+        .iter()
+        .flat_map(|event| event.input_lot_ids.iter().map(String::as_str))
+        .collect();
     let mut consumer_by_lot = BTreeMap::<&str, &str>::new();
 
     for lot in &ledger.lots {
@@ -355,7 +360,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
             }
         }
 
-        if is_terminal(lot.disposition) {
+        let consumed_by_later_event = consumed_lot_ids.contains(lot.lot_id.as_str());
+        if is_terminal(lot.disposition) && !consumed_by_later_event {
             terminal_lot_count += 1;
         }
         match lot.disposition {
@@ -481,7 +487,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "receiver acceptance must reference distinct source bytes",
                     );
                 }
-                if receiver_valid
+                if !consumed_by_later_event
+                    && receiver_valid
                     && expected_outcome == AcceptanceOutcome::Accepted
                     && !add_total(&mut totals.accepted_mass_mg, lot.mass_mg)
                 {
@@ -492,7 +499,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "accepted mass total overflows u128",
                     );
                 }
-                if receiver_valid
+                if !consumed_by_later_event
+                    && receiver_valid
                     && expected_outcome == AcceptanceOutcome::Rejected
                     && !add_total(&mut totals.rejected_mass_mg, lot.mass_mg)
                 {
@@ -513,7 +521,9 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "awaiting-receiver lot cannot already contain a final receiver decision",
                     );
                 }
-                if !add_total(&mut totals.awaiting_receiver_mass_mg, lot.mass_mg) {
+                if !consumed_by_later_event
+                    && !add_total(&mut totals.awaiting_receiver_mass_mg, lot.mass_mg)
+                {
                     add(
                         &mut findings,
                         "MASS_TOTAL_OVERFLOW",
@@ -531,7 +541,9 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "waste disposition cannot also be counted as receiver-accepted/rejected product",
                     );
                 }
-                if !add_total(&mut totals.waste_mass_mg, lot.mass_mg) {
+                if !consumed_by_later_event
+                    && !add_total(&mut totals.waste_mass_mg, lot.mass_mg)
+                {
                     add(
                         &mut findings,
                         "MASS_TOTAL_OVERFLOW",
@@ -549,7 +561,9 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "quarantined lots cannot carry final receiver acceptance",
                     );
                 }
-                if !add_total(&mut totals.quarantined_mass_mg, lot.mass_mg) {
+                if !consumed_by_later_event
+                    && !add_total(&mut totals.quarantined_mass_mg, lot.mass_mg)
+                {
                     add(
                         &mut findings,
                         "MASS_TOTAL_OVERFLOW",
@@ -1153,6 +1167,39 @@ mod tests {
         assert!(report.valid, "{:#?}", report.findings);
         assert_eq!(report.totals.accepted_mass_mg, 0);
         assert_eq!(report.totals.rejected_mass_mg, 6_000);
+    }
+
+    #[test]
+    fn consumed_lot_is_never_double_counted_as_terminal_accepted_output() {
+        let mut ledger = sorting_split_ledger();
+        attach_receiver(
+            &mut ledger.lots[1],
+            AcceptanceOutcome::Accepted,
+            "receiver-before-rework",
+            'c',
+        );
+        ledger.lots.push(output_lot(
+            "reworked-cotton",
+            5_900,
+            "rework-001",
+            LotDisposition::AwaitingReceiver,
+        ));
+        ledger.events.push(event(
+            "rework-001",
+            FlowProcess::Repair,
+            &["cotton-stream"],
+            &["reworked-cotton"],
+            100,
+            10,
+            "rework-evidence",
+            'd',
+            40,
+        ));
+        let report = validate_material_flow(&ledger);
+        assert!(!report.valid);
+        assert!(report.findings.iter().any(|item| item.code == "TERMINAL_LOT_CONSUMED"));
+        assert_eq!(report.totals.accepted_mass_mg, 0);
+        assert_eq!(report.totals.awaiting_receiver_mass_mg, 9_700);
     }
 
     #[test]
