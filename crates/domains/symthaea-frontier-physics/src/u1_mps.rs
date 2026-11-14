@@ -6023,4 +6023,31 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn error_budget_accepts_zero_target_for_exact_product_pair() {
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        let result = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 1,
+                maximum_absolute_local_l2_error: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.minimum_required_bond_dimension, 1);
+        assert!(result.achieved_absolute_local_l2_error <= 1.0e-12);
+        assert!(result.budget_slack >= -1.0e-12);
+    }
+
 }
