@@ -269,10 +269,7 @@ pub fn evaluate_act_hold_pair(
             reasons.insert("SAFE_DISPOSITION_PRECEDES_RECORDED_TRIGGER".to_owned());
             None
         }
-        _ => {
-            reasons.insert("TRIGGER_OR_TERMINAL_DISPOSITION_TIME_UNKNOWN".to_owned());
-            None
-        }
+        _ => None
     };
 
     let unjustified_abstention = should_act.disposition != ActHoldDisposition::Act
