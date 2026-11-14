@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "corpus_id": "TEXTILE-ROUTE-CASES-001",
   "fixture_class": "synthetic",
-  "claim_ceiling": "Synthetic route-contract outcomes only; no real garment, process trial, yarn acceptance, chemical compatibility or environmental result.",
+  "claim_ceiling": "Synthetic route-contract outcomes only; no real garment, process trial, fibre sampling campaign, yarn acceptance, chemical compatibility or environmental result.",
   "cases": [
     {
       "case_id": "ROUTE-001-REUSE-ACCEPTED",
@@ -290,6 +290,30 @@
       "expected": {
         "disposition": "ineligible",
         "reason": "DownstreamAcceptanceNotIndependentOfBasis"
+      }
+    },
+    {
+      "case_id": "ROUTE-037-FIBRE-LENGTH-PROTOCOL-INCOMPLETE",
+      "mutation": "Fibre length histogram lacks a sampling plan and positive replicate count.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthMeasurementProtocol"
+      }
+    },
+    {
+      "case_id": "ROUTE-038-FIBRE-LENGTH-SAMPLE-EXCEEDS-OUTPUT",
+      "mutation": "Fibre-length sample mass exceeds the measured accepted-output mass for the exact lot.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthSampleExceedsOutput"
+      }
+    },
+    {
+      "case_id": "ROUTE-039-FIBRE-LENGTH-UNCERTAINTY-ABOVE-POLICY",
+      "mutation": "Fibre-length measurement expanded uncertainty exceeds the receiver's declared maximum.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthMeasurementUncertaintyAbovePolicy"
       }
     }
   ]
