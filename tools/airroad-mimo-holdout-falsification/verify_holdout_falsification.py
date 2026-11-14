@@ -183,8 +183,8 @@ def validate_contract(data: dict[str, Any]) -> None:
             "training measurement-error identity mismatch",
         )
     expected_training_matrix = [
-        [(Fraction(2), Fraction(0)), (Fraction(0), Fraction(0))],
-        [(Fraction(0), Fraction(0)), (Fraction(3), Fraction(0))],
+        [Fraction(2), Fraction(0)],
+        [Fraction(0), Fraction(3)],
     ]
     require(
         len(training["nominal_matrices"]) == len(training["frequencies"]),
