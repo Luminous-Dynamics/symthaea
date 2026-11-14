@@ -13,9 +13,11 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 
 ## Current implementation
 
-The first executable package is:
+The first executable package is a standalone nested Cargo workspace:
 
 - \`crates/domains/symthaea-organizational-closure\`
+
+It has exact \`serde\` / \`sha2\` dependency pins and its own lockfile, and is explicitly excluded from the root workspace's \`crates/domains/*\` glob. Its focused CI builds the nested workspace independently.
 
 It recomputes SHA-256 digests from stored artifact bytes and verifies process contracts, exact component-version lineage, observed external dependencies, and producer/consumer coverage for required regenerative components.
 
