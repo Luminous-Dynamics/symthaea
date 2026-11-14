@@ -65,10 +65,10 @@ cargo run -p xtask -- plasma-evidence-composition-audit
 
 Fixture: `data/research/plasma_evidence_composition_fixture_v0_1.json`
 
-The current fixture has **14 synthetic known-answer cases**:
+The current fixture has **15 synthetic known-answer cases**:
 - 2 PASS;
 - 3 BLOCKED;
-- 9 REJECTED.
+- 10 REJECTED.
 
 Challenge families include:
 - valid rigid-plastic D3163 baseline/candidate evidence;
@@ -85,7 +85,7 @@ Challenge families include:
 - different protocols used in the nominally matched comparison;
 - endpoint evidence reused to stand in for a different outcome.
 
-The exact committed fixture was fetched back from the branch and independently replayed in JavaScript: **14/14 expected dispositions matched** (2 PASS, 3 BLOCKED, 9 REJECTED).
+The exact committed fixture was fetched back from the branch and independently replayed in JavaScript: **15/15 expected dispositions matched** (2 PASS, 3 BLOCKED, 10 REJECTED).
 
 ## Baselines and benchmark targets
 
@@ -139,7 +139,7 @@ The present increment demonstrates the composed contract on synthetic transfer c
 
 - Source, fixture and command were fetched back from the exact branch.
 - Independent synthetic replay: **14/14** expected dispositions matched.
-- Four Rust unit tests are authored but **not executed**.
+- Five Rust unit tests are authored but **not executed**.
 - Rust formatting, compilation, Clippy and exact-head CI remain unverified.
 - Hash validation is syntactic; referenced data bytes are not retrieved, authenticated or recalculated.
 - No confidence intervals are calculated by this module.
