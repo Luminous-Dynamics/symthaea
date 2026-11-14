@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-metamorphic-observation-v1.schema.json",
+  "title": "Melothaea music-edit metamorphic observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pair_sha256",
+    "sample_id",
+    "source_lineage_sha256",
+    "split",
+    "obligation_satisfied",
+    "protected_invariants_satisfied",
+    "operation_report_sha256",
+    "validity_report_sha256",
+    "properties"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-metamorphic-observation-v1"
+    },
+    "pair_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "split": {
+      "enum": [
+        "train",
+        "development",
+        "test"
+      ]
+    },
+    "obligation_satisfied": {
+      "type": "boolean"
+    },
+    "protected_invariants_satisfied": {
+      "type": "boolean"
+    },
+    "operation_report_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "validity_report_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "properties": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/property"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "property": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "property_id",
+        "evidence",
+        "value"
+      ],
+      "properties": {
+        "property_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "enum": [
+            "symbolic",
+            "acoustic",
+            "human_adjudication"
+          ]
+        },
+        "value": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value",
+                "unit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "numeric"
+                },
+                "value": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "category"
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "boolean"
+                },
+                "value": {
+                  "type": "boolean"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

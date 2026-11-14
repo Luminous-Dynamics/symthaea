@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-metamorphic-property-map-v1.schema.json",
+  "title": "Melothaea music-edit metamorphic property mapping v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "properties"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-metamorphic-property-map-v1"
+    },
+    "properties": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "property_id",
+        "rule"
+      ],
+      "properties": {
+        "property_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rule": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "scale",
+                "offset",
+                "tolerance",
+                "unit"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "numeric_affine"
+                },
+                "scale": {
+                  "type": "number"
+                },
+                "offset": {
+                  "type": "number"
+                },
+                "tolerance": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "values"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "category_map"
+                },
+                "values": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "source_value",
+                      "transformed_value"
+                    ],
+                    "properties": {
+                      "source_value": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "transformed_value": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "boolean_identity"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
