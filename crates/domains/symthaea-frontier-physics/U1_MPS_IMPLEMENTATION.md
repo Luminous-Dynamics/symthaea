@@ -159,7 +159,7 @@ For each intermediate charge q it reports the allowed block shape:
 - columns: right-bond indices carrying q;
 - values: row_count times column_count.
 
-The receipt reports dense entries, symmetry-allowed entries, forbidden entries, forbidden nonzero entries and their squared weight, non-finite entries, dense payload bytes, ideal packed-value bytes, and the theoretical value-payload savings fraction.
+The receipt reports dense entries, symmetry-allowed entries, forbidden entries, forbidden nonzero and non-finite entries, their squared weight, dense payload bytes, ideal packed-value bytes, and the theoretical value-payload savings fraction.
 
 The ideal packed byte count assumes forbidden-sector values are exactly zero. Tolerated forbidden nonzero values are surfaced separately and cannot be silently dropped by a future packed representation. This is a storage audit, **not** a block-sparse production tensor or an observed memory reduction. The next storage milestone is a packed charge-block tensor with dense round-trip and exact operation equivalence tests.
 
