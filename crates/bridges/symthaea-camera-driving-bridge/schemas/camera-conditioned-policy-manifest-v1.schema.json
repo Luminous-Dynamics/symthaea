@@ -13,7 +13,9 @@
     "action_output_schema_sha256",
     "vision_config_sha256",
     "vehicle_encoder_seed_sha256",
+    "camera_id",
     "camera_calibration_sha256",
+    "simulator_revision",
     "renderer_revision",
     "visual_weight_ppm",
     "hdc_dimension",
@@ -103,6 +105,16 @@
     },
     "qualified_scope_sha256": {
       "$ref": "#/$defs/sha256"
+    },
+    "camera_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "simulator_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
     }
   },
   "$defs": {
