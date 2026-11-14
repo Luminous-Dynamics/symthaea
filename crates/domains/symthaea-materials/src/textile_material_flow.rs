@@ -353,6 +353,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                     continue;
                 };
+                let mut receiver_valid = true;
                 if !valid_evidence_ref(&acceptance.evidence)
                     || acceptance.evidence.kind != EvidenceKind::DownstreamAcceptance
                     || acceptance.evidence.tier != EvidenceTier::IndependentAcceptance
@@ -362,6 +363,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     || acceptance.specification_id.trim().is_empty()
                     || acceptance.accepted_output_lot_id != lot.lot_id
                 {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_DECISION_INVALID",
@@ -375,6 +377,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     _ => unreachable!(),
                 };
                 if acceptance.outcome != expected_outcome {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_DISPOSITION_MISMATCH",
@@ -400,6 +403,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         .unwrap_or(("", "", "", u64::MAX)),
                 };
                 if acceptance.basis_evidence_id != basis_id {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_BASIS_EVIDENCE_MISMATCH",
@@ -408,6 +412,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                 }
                 if acceptance.evidence.issuer_id == basis_issuer {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_NOT_INDEPENDENT_OF_PROCESS",
@@ -416,6 +421,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                 }
                 if acceptance.evidence.verifier_id.as_deref() == Some(basis_issuer) {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_VERIFIER_NOT_INDEPENDENT_OF_PROCESS",
@@ -424,6 +430,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                 }
                 if acceptance.evidence.sha256 == basis_digest {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_EVIDENCE_REUSES_BASIS_BYTES",
@@ -432,6 +439,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                 }
                 if acceptance.evidence.observed_at_ns < basis_time {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "RECEIVER_DECISION_PRECEDES_OUTPUT",
@@ -440,6 +448,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                 }
                 if !evidence_ids.insert(acceptance.evidence.evidence_id.as_str()) {
+                    receiver_valid = false;
                     add(
                         &mut findings,
                         "DUPLICATE_EVIDENCE_ID",
@@ -447,7 +456,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "receiver acceptance must have its own unique evidence ID",
                     );
                 }
-                if expected_outcome == AcceptanceOutcome::Accepted
+                if receiver_valid
+                    && expected_outcome == AcceptanceOutcome::Accepted
                     && !add_total(&mut totals.accepted_mass_mg, lot.mass_mg)
                 {
                     add(
@@ -457,7 +467,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "accepted mass total overflows u128",
                     );
                 }
-                if expected_outcome == AcceptanceOutcome::Rejected
+                if receiver_valid
+                    && expected_outcome == AcceptanceOutcome::Rejected
                     && !add_total(&mut totals.rejected_mass_mg, lot.mass_mg)
                 {
                     add(
@@ -1059,6 +1070,7 @@ mod tests {
         let report = validate_material_flow(&ledger);
         assert!(!report.valid);
         assert!(report.findings.iter().any(|item| item.code == "RECEIVER_DISPOSITION_MISMATCH"));
+        assert_eq!(report.totals.accepted_mass_mg, 0);
     }
 
     #[test]
