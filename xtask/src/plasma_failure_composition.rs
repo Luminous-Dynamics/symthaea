@@ -575,7 +575,7 @@ fn read_fixture(path: &Path) -> Result<Fixture> {
 
 pub fn run(path: &Path) -> Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-failure-composition-fixture-v0.1" {
+    if fixture.schema_version != "plasma-failure-composition-fixture-v0.2" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -610,12 +610,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_failure_composition_fixture_v0_1.json");
+        include_str!("../../data/research/plasma_failure_composition_fixture_v0_2.json");
 
     #[test]
     fn frozen_fixture_replays_all_expected_outcomes() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid failure-composition fixture");
-        assert_eq!(fixture.schema_version, "plasma-failure-composition-fixture-v0.1");
+        assert_eq!(fixture.schema_version, "plasma-failure-composition-fixture-v0.2");
         for case in &fixture.cases {
             let result = audit_receipt(&case.receipt);
             assert_eq!(result.disposition.as_str(), case.expected_disposition, "{}", case.id);
@@ -651,6 +651,17 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
         let case = fixture.cases.iter().find(|case| case.id == "many-specimens-one-lot").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn frozen_iso_v02_fixture_replays_all_expected_outcomes() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid failure-composition fixture");
+        assert_eq!(fixture.schema_version, "plasma-failure-composition-fixture-v0.2");
+        for case in &fixture.cases {
+            let result = audit_receipt(&case.receipt);
+            assert_eq!(result.disposition.as_str(), case.expected_disposition, "{}", case.id);
+            assert_eq!(result.outcome, case.expected_outcome, "{}", case.id);
+        }
     }
 
     #[test]
