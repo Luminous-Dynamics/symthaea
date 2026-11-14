@@ -1,0 +1,17 @@
+[package]
+name = "symmetry-harmonic-rank-oracle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact spherical-harmonic invariant-rank templates for proper cyclic and rotational-dihedral subgroups of SO(3)"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "template_ambiguity"
+path = "examples/template_ambiguity.rs"
+
+[workspace]
