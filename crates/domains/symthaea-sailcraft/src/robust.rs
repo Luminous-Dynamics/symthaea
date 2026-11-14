@@ -14,10 +14,7 @@
 //! The resulting interval is a deterministic envelope under the declared
 //! input bounds. It is not a probabilistic forecast or physical validation.
 
-use super::{
-    Evidence, EvidenceState, PlanStatus, PolarDiagram, PolarError, RouteRequest, TackSide,
-    bracket, evidence_gate, signed_angle_deg,
-};
+use super::{Evidence, PolarDiagram, PolarError, TackSide, evidence_gate, signed_angle_deg};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScalarInterval {
@@ -574,19 +571,20 @@ mod tests {
         }
     }
 
+    fn fresh<T>(value: T) -> Evidence<T> {
+        Evidence::qualified_with_freshness(
+            value,
+            [0xc7; 32],
+            "robust-synthetic-clock",
+            0.0,
+            2.0,
+        )
+    }
+
     fn request() -> RobustRouteRequest {
-        let freshness = |value| {
-            Evidence::qualified_with_freshness(
-                value,
-                [0xc7; 32],
-                "robust-synthetic-clock",
-                0.0,
-                2.0,
-            )
-        };
         RobustRouteRequest {
             configuration_digest: CONFIG,
-            wind: freshness(WindUncertainty {
+            wind: fresh(WindUncertainty {
                 from_direction: DirectionInterval {
                     center_deg: 0.0,
                     half_width_deg: 0.0,
@@ -596,7 +594,7 @@ mod tests {
                     upper: 8.0,
                 },
             }),
-            current: freshness(CurrentUncertainty {
+            current: fresh(CurrentUncertainty {
                 toward_direction: DirectionInterval {
                     center_deg: 90.0,
                     half_width_deg: 0.0,
@@ -606,7 +604,7 @@ mod tests {
                     upper: 0.0,
                 },
             }),
-            target_bearing: freshness(0.0),
+            target_bearing: fresh(0.0),
             polar_error: PolarErrorBound {
                 source_artifact_digest: [0xd8; 32],
                 configuration_digest: CONFIG,
