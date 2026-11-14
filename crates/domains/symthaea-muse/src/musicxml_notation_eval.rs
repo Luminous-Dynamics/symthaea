@@ -9,26 +9,20 @@
 //! dimensions independently.
 
 use crate::barline_eval::{MeasureMapStatus, RationalBeat};
-use crate::musicxml_barline_adapter::MUSICXML_BARLINE_CANONICALIZATION_V1;
 use crate::evidence_digest::canonical_json_sha256;
+use crate::musicxml_barline_adapter::MUSICXML_BARLINE_CANONICALIZATION_V1;
 use crate::musicxml_barline_adapter::MusicXmlPartNotationGraphV1;
 use crate::musicxml_notation_events::{
-    MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1,
-    MUSICXML_NOTATION_EVENTS_SCHEMA_V1,
-    MusicXmlNotationEventKindV1,
-    MusicXmlNotationEventsStatusV1,
-    MusicXmlPartMetadataV1,
-    MusicXmlPartNotationEventsV1,
-    MusicXmlSourceNodeV1,
+    MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1, MUSICXML_NOTATION_EVENTS_SCHEMA_V1,
+    MusicXmlNotationEventKindV1, MusicXmlNotationEventsStatusV1, MusicXmlPartMetadataV1,
+    MusicXmlPartNotationEventsV1, MusicXmlSourceNodeV1,
 };
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-pub const MUSICXML_NOTATION_EVALUATION_SCHEMA_V2: &str =
-    "muse-musicxml-notation-evaluation-v2";
-pub const MUSICXML_NOTATION_EVALUATION_ALGORITHM_V2: &str =
-    "exact-quarter-beat-kind-onset-one-to-one-augmenting-path-v2-divisions-normalized-performance-offsets";
+pub const MUSICXML_NOTATION_EVALUATION_SCHEMA_V2: &str = "muse-musicxml-notation-evaluation-v2";
+pub const MUSICXML_NOTATION_EVALUATION_ALGORITHM_V2: &str = "exact-quarter-beat-kind-onset-one-to-one-augmenting-path-v2-divisions-normalized-performance-offsets";
 pub const MUSICXML_NOTATION_EVALUATION_MAX_EVENTS_V1: usize = 10_000;
 pub const MUSICXML_NOTATION_EVALUATION_MAX_CANDIDATE_PAIRS_V1: usize = 2_000_000;
 pub const MUSICXML_NOTATION_EVALUATION_MAX_MATCHING_SCANS_V1: usize = 10_000_000;
@@ -167,13 +161,36 @@ pub enum MusicXmlNotationEvaluationErrorV1 {
     ScoreClockMismatch,
     MeasureCanonicalizationMismatch,
     NotationCanonicalizationMismatch,
-    InvalidGraphStructure { side: String, reason: String },
-    EventBudgetExceeded { side: String, count: usize, maximum: usize },
-    SourceTreeBudgetExceeded { side: String, count: usize, maximum: usize },
-    SourceTreeDepthExceeded { side: String, depth: usize, maximum: usize },
-    CandidatePairBudgetExceeded { count: usize, maximum: usize },
-    MatchingWorkBudgetExceeded { scans: usize, maximum: usize },
-    InvalidConfiguration { field: String },
+    InvalidGraphStructure {
+        side: String,
+        reason: String,
+    },
+    EventBudgetExceeded {
+        side: String,
+        count: usize,
+        maximum: usize,
+    },
+    SourceTreeBudgetExceeded {
+        side: String,
+        count: usize,
+        maximum: usize,
+    },
+    SourceTreeDepthExceeded {
+        side: String,
+        depth: usize,
+        maximum: usize,
+    },
+    CandidatePairBudgetExceeded {
+        count: usize,
+        maximum: usize,
+    },
+    MatchingWorkBudgetExceeded {
+        scans: usize,
+        maximum: usize,
+    },
+    InvalidConfiguration {
+        field: String,
+    },
     SerializationFailed,
 }
 
@@ -202,9 +219,11 @@ fn exact_within(
     } else {
         right.checked_sub(left)
     }
-    .map_err(|_| MusicXmlNotationEvaluationErrorV1::InvalidConfiguration {
-        field: "rational comparison overflow".into(),
-    })?;
+    .map_err(
+        |_| MusicXmlNotationEvaluationErrorV1::InvalidConfiguration {
+            field: "rational comparison overflow".into(),
+        },
+    )?;
     Ok(difference.compare_exact(tolerance) != Ordering::Greater)
 }
 
@@ -243,14 +262,23 @@ fn canonical_decimal(value: &str) -> Option<(i128, i128)> {
         return None;
     }
     let scale = 10_i128.checked_pow(u32::try_from(fraction.len()).ok()?)?;
-    let whole_value = if whole.is_empty() { 0 } else { whole.parse::<i128>().ok()? };
-    let fraction_value = if fraction.is_empty() { 0 } else { fraction.parse::<i128>().ok()? };
-    let magnitude = whole_value.checked_mul(scale)?.checked_add(fraction_value)?;
+    let whole_value = if whole.is_empty() {
+        0
+    } else {
+        whole.parse::<i128>().ok()?
+    };
+    let fraction_value = if fraction.is_empty() {
+        0
+    } else {
+        fraction.parse::<i128>().ok()?
+    };
+    let magnitude = whole_value
+        .checked_mul(scale)?
+        .checked_add(fraction_value)?;
     let numerator = if negative { -magnitude } else { magnitude };
     let divisor = gcd_i128(numerator, scale);
     Some((numerator / divisor, scale / divisor))
 }
-
 
 /// Compare signed MusicXML divisions offsets as exact quarter-note beats.
 /// A present raw offset without a positive divisions scale is unresolved,
@@ -273,13 +301,10 @@ fn divisions_offset_equal(
             let right_denominator = right_decimal_denominator.checked_mul(right_scale)?;
             let left_gcd = gcd_i128(left_numerator, left_denominator);
             let right_gcd = gcd_i128(right_numerator, right_denominator);
-            Some((
-                left_numerator / left_gcd,
-                left_denominator / left_gcd,
-            ) == (
-                right_numerator / right_gcd,
-                right_denominator / right_gcd,
-            ))
+            Some(
+                (left_numerator / left_gcd, left_denominator / left_gcd)
+                    == (right_numerator / right_gcd, right_denominator / right_gcd),
+            )
         }
     }
 }
@@ -346,10 +371,9 @@ fn metric(
     prediction_count: usize,
     true_positives: usize,
 ) -> MusicXmlNotationMetricV1 {
-    let precision = (prediction_count > 0)
-        .then_some(true_positives as f64 / prediction_count as f64);
-    let recall = (reference_count > 0)
-        .then_some(true_positives as f64 / reference_count as f64);
+    let precision =
+        (prediction_count > 0).then_some(true_positives as f64 / prediction_count as f64);
+    let recall = (reference_count > 0).then_some(true_positives as f64 / reference_count as f64);
     let f1 = if reference_count == 0 && prediction_count == 0 {
         None
     } else if true_positives == 0 {
@@ -401,11 +425,13 @@ fn count_source_node(
         }
     })?;
     if *count > MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1 {
-        return Err(MusicXmlNotationEvaluationErrorV1::SourceTreeBudgetExceeded {
-            side: side.into(),
-            count: *count,
-            maximum: MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1,
-        });
+        return Err(
+            MusicXmlNotationEvaluationErrorV1::SourceTreeBudgetExceeded {
+                side: side.into(),
+                count: *count,
+                maximum: MUSICXML_NOTATION_EVALUATION_MAX_SOURCE_TREE_NODES_V1,
+            },
+        );
     }
     for child in &node.children {
         count_source_node(child, side, depth + 1, count)?;
@@ -418,9 +444,7 @@ fn validate_source_tree_budget(
     side: &str,
 ) -> Result<(), MusicXmlNotationEvaluationErrorV1> {
     let mut count = 0usize;
-    let mut add = |node: &MusicXmlSourceNodeV1| {
-        count_source_node(node, side, 1, &mut count)
-    };
+    let mut add = |node: &MusicXmlSourceNodeV1| count_source_node(node, side, 1, &mut count);
     for note in &graph.notation_events.note_events {
         add(&note.source_note)?;
         if let Some(grace) = &note.grace {
@@ -555,7 +579,8 @@ fn validate_graph(
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
                 side: side.into(),
-                reason: "measure spans are noncanonical, empty, overlapping or discontinuous".into(),
+                reason: "measure spans are noncanonical, empty, overlapping or discontinuous"
+                    .into(),
             });
         }
         previous_end = Some(span.end);
@@ -659,10 +684,12 @@ fn validate_graph(
                 event.score_offset_after,
             );
         let duration_matches_direction = match event.direction.as_str() {
-            "backup" => event.score_offset_before
+            "backup" => event
+                .score_offset_before
                 .checked_sub(event.score_offset_after)
                 .is_ok_and(|distance| distance == event.duration),
-            "forward" => event.score_offset_after
+            "forward" => event
+                .score_offset_after
                 .checked_sub(event.score_offset_before)
                 .is_ok_and(|distance| distance == event.duration),
             _ => false,
@@ -681,16 +708,40 @@ fn validate_graph(
         }
     }
     let family_order_is_strict = [
-        graph.notation_events.note_events.iter().map(|event| event.source_order).collect::<Vec<_>>(),
-        graph.notation_events.attribute_events.iter().map(|event| event.source_order).collect::<Vec<_>>(),
-        graph.notation_events.auxiliary_events.iter().map(|event| event.source_order).collect::<Vec<_>>(),
-        graph.notation_events.cursor_moves.iter().map(|event| event.source_order).collect::<Vec<_>>(),
+        graph
+            .notation_events
+            .note_events
+            .iter()
+            .map(|event| event.source_order)
+            .collect::<Vec<_>>(),
+        graph
+            .notation_events
+            .attribute_events
+            .iter()
+            .map(|event| event.source_order)
+            .collect::<Vec<_>>(),
+        graph
+            .notation_events
+            .auxiliary_events
+            .iter()
+            .map(|event| event.source_order)
+            .collect::<Vec<_>>(),
+        graph
+            .notation_events
+            .cursor_moves
+            .iter()
+            .map(|event| event.source_order)
+            .collect::<Vec<_>>(),
     ]
     .iter()
     .all(|family| family.windows(2).all(|pair| pair[0] < pair[1]));
     if !family_order_is_strict
         || orders.len() != source_event_count
-        || orders.iter().copied().enumerate().any(|(expected, observed)| expected != observed)
+        || orders
+            .iter()
+            .copied()
+            .enumerate()
+            .any(|(expected, observed)| expected != observed)
     {
         return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
             side: side.into(),
@@ -720,10 +771,12 @@ where
         for (right_index, right_item) in right.iter().enumerate() {
             candidate_scans = candidate_scans.saturating_add(1);
             if candidate_scans > config.maximum_candidate_pairs {
-                return Err(MusicXmlNotationEvaluationErrorV1::CandidatePairBudgetExceeded {
-                    count: candidate_scans,
-                    maximum: config.maximum_candidate_pairs,
-                });
+                return Err(
+                    MusicXmlNotationEvaluationErrorV1::CandidatePairBudgetExceeded {
+                        count: candidate_scans,
+                        maximum: config.maximum_candidate_pairs,
+                    },
+                );
             }
             if candidate(left_item, right_item)? {
                 edges[left_index].push(right_index);
@@ -854,9 +907,11 @@ fn absolute_error_beats(
     } else {
         right.checked_sub(left)
     }
-    .map_err(|_| MusicXmlNotationEvaluationErrorV1::InvalidConfiguration {
-        field: "duration difference overflow".into(),
-    })?;
+    .map_err(
+        |_| MusicXmlNotationEvaluationErrorV1::InvalidConfiguration {
+            field: "duration difference overflow".into(),
+        },
+    )?;
     Ok(difference.as_beats())
 }
 
@@ -971,8 +1026,12 @@ fn note_pair_dimensions(
                 }
             }
             (
-                MusicXmlNotationEventKindV1::Unpitched { display: gold_display },
-                MusicXmlNotationEventKindV1::Unpitched { display: predicted_display },
+                MusicXmlNotationEventKindV1::Unpitched {
+                    display: gold_display,
+                },
+                MusicXmlNotationEventKindV1::Unpitched {
+                    display: predicted_display,
+                },
             ) => {
                 unpitched_samples += 1;
                 if gold_display == predicted_display {
@@ -990,11 +1049,7 @@ fn note_pair_dimensions(
             (gold.performed_duration, predicted.performed_duration)
         {
             let error = absolute_error_beats(gold_duration, predicted_duration)?;
-            if exact_within(
-                gold_duration,
-                predicted_duration,
-                config.duration_tolerance,
-            )? {
+            if exact_within(gold_duration, predicted_duration, config.duration_tolerance)? {
                 duration_within += 1;
             }
             duration_errors.push(error);
@@ -1310,8 +1365,8 @@ fn report_commitment(
         duration_error: &report.duration_error,
         written_type_and_dots: &report.written_type_and_dots,
         note_performance_directives: &report.note_performance_directives,
-        note_performance_directive_unresolved_count:
-            report.note_performance_directive_unresolved_count,
+        note_performance_directive_unresolved_count: report
+            .note_performance_directive_unresolved_count,
         grace_semantics: &report.grace_semantics,
         cue_semantics: &report.cue_semantics,
         chord_member_semantics: &report.chord_member_semantics,
@@ -1377,11 +1432,7 @@ fn collect_source_nodes_named(
 
 fn midi_instrument_setups(metadata: &MusicXmlPartMetadataV1) -> Vec<MusicXmlSourceNodeV1> {
     let mut output = Vec::new();
-    collect_source_nodes_named(
-        &metadata.source_score_part,
-        "midi-instrument",
-        &mut output,
-    );
+    collect_source_nodes_named(&metadata.source_score_part, "midi-instrument", &mut output);
     output
 }
 
@@ -1392,7 +1443,11 @@ fn optional_metadata_accuracy<T: PartialEq>(
     match reference {
         Some(reference) => accuracy(
             1,
-            if prediction.is_some_and(|prediction| prediction == reference) { 1 } else { 0 },
+            if prediction.is_some_and(|prediction| prediction == reference) {
+                1
+            } else {
+                0
+            },
         ),
         None => accuracy(0, 0),
     }
@@ -1429,7 +1484,10 @@ fn part_metadata_dimensions(
             (Some(gold), Some(predicted)) => (
                 optional_metadata_accuracy(
                     Some(&(gold.part_name.as_ref(), gold.part_abbreviation.as_ref())),
-                    Some(&(predicted.part_name.as_ref(), predicted.part_abbreviation.as_ref())),
+                    Some(&(
+                        predicted.part_name.as_ref(),
+                        predicted.part_abbreviation.as_ref(),
+                    )),
                 ),
                 optional_metadata_accuracy(
                     Some(&gold.score_instrument_ids),
@@ -1514,7 +1572,9 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         || config.maximum_matching_scans > MUSICXML_NOTATION_EVALUATION_MAX_MATCHING_SCANS_V1
     {
         return Err(MusicXmlNotationEvaluationErrorV1::InvalidConfiguration {
-            field: "event and matching work budgets must be positive and no greater than the V1 caps".into(),
+            field:
+                "event and matching work budgets must be positive and no greater than the V1 caps"
+                    .into(),
         });
     }
     validate_graph(reference, "reference", &config)?;
@@ -1536,19 +1596,16 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         &gold.note_events,
         &predicted.note_events,
         |left, right| {
-            Ok(
-            event_family(&left.kind) == event_family(&right.kind)
+            Ok(event_family(&left.kind) == event_family(&right.kind)
                 && exact_within(
                     left.score_offset,
                     right.score_offset,
                     config.position_tolerance,
-                )?,
-        )
+                )?)
         },
         &config,
     )?;
-    let note_dimensions =
-        note_pair_dimensions(gold, predicted, &note_pairs, &config)?;
+    let note_dimensions = note_pair_dimensions(gold, predicted, &note_pairs, &config)?;
 
     let auxiliary_pairs = maximum_cardinality_matching(
         &gold.auxiliary_events,
@@ -1622,20 +1679,12 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         },
     );
 
-    let reference_graph_sha256 =
-        canonical_json_sha256(reference).map_err(|_| {
-            MusicXmlNotationEvaluationErrorV1::SerializationFailed
-        })?;
-    let prediction_graph_sha256 =
-        canonical_json_sha256(prediction).map_err(|_| {
-            MusicXmlNotationEvaluationErrorV1::SerializationFailed
-        })?;
-    let note_onset_error = note_onset_error(
-        gold,
-        predicted,
-        &note_pairs,
-        config.position_tolerance,
-    )?;
+    let reference_graph_sha256 = canonical_json_sha256(reference)
+        .map_err(|_| MusicXmlNotationEvaluationErrorV1::SerializationFailed)?;
+    let prediction_graph_sha256 = canonical_json_sha256(prediction)
+        .map_err(|_| MusicXmlNotationEvaluationErrorV1::SerializationFailed)?;
+    let note_onset_error =
+        note_onset_error(gold, predicted, &note_pairs, config.position_tolerance)?;
 
     let part_metadata = part_metadata_dimensions(reference, prediction);
 
@@ -1671,8 +1720,8 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         duration_error: note_dimensions.duration_error,
         written_type_and_dots: note_dimensions.written_type_and_dots,
         note_performance_directives: note_dimensions.note_performance_directives,
-        note_performance_directive_unresolved_count:
-            note_dimensions.note_performance_directive_unresolved_count,
+        note_performance_directive_unresolved_count: note_dimensions
+            .note_performance_directive_unresolved_count,
         grace_semantics: note_dimensions.grace_semantics,
         cue_semantics: note_dimensions.cue_semantics,
         chord_member_semantics: note_dimensions.chord_member_semantics,
@@ -1684,8 +1733,10 @@ pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
         staff_reference_unassigned_count: note_dimensions.staff_reference_unassigned_count,
         staff_unexpected_assignment_count: note_dimensions.staff_unexpected_assignment_count,
         instrument_assignment: note_dimensions.instrument_assignment,
-        instrument_reference_unassigned_count: note_dimensions.instrument_reference_unassigned_count,
-        instrument_unexpected_assignment_count: note_dimensions.instrument_unexpected_assignment_count,
+        instrument_reference_unassigned_count: note_dimensions
+            .instrument_reference_unassigned_count,
+        instrument_unexpected_assignment_count: note_dimensions
+            .instrument_unexpected_assignment_count,
         sound_tie_semantics: note_dimensions.sound_tie_semantics,
         visual_tie_semantics: note_dimensions.visual_tie_semantics,
         time_modification: note_dimensions.time_modification,
@@ -1746,13 +1797,9 @@ mod tests {
     use crate::musicxml_barline_adapter::parse_musicxml_part_notation_graph;
 
     fn graph(xml: &str) -> MusicXmlPartNotationGraphV1 {
-        parse_musicxml_part_notation_graph(
-            xml.as_bytes(),
-            "sha256:fixture",
-            "score-clock-fixture",
-        )
-        .unwrap()
-        .remove(0)
+        parse_musicxml_part_notation_graph(xml.as_bytes(), "sha256:fixture", "score-clock-fixture")
+            .unwrap()
+            .remove(0)
     }
 
     fn fixture_xml() -> &'static str {
@@ -1777,12 +1824,8 @@ mod tests {
     #[test]
     fn identical_graphs_produce_perfect_independent_dimensions() {
         let reference = graph(fixture_xml());
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &reference,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &reference, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
         assert_eq!(report.rest_semantics.accuracy, Some(1.0));
@@ -1800,7 +1843,10 @@ mod tests {
         assert_eq!(report.time_modification.accuracy, Some(1.0));
         assert_eq!(report.tuplet_notation.accuracy, Some(1.0));
         assert_eq!(report.full_note_source_subtree.accuracy, Some(1.0));
-        assert_eq!(report.note_onset_error.mean_absolute_quarter_beats, Some(0.0));
+        assert_eq!(
+            report.note_onset_error.mean_absolute_quarter_beats,
+            Some(0.0)
+        );
         assert_eq!(report.auxiliary_event_presence.f1, Some(1.0));
         assert_eq!(report.auxiliary_source_subtree.accuracy, Some(1.0));
         assert_eq!(report.attribute_event_presence.f1, Some(1.0));
@@ -1817,12 +1863,8 @@ mod tests {
         reference.notation_events.note_events[0].voice = None;
         reference.notation_events.note_events[0].staff = None;
         prediction.notation_events.note_events[0].instrument_ids = vec!["P1-I1".into()];
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.voice_assignment.accuracy, Some(1.0));
         assert_eq!(report.voice_reference_unassigned_count, 1);
         assert_eq!(report.voice_unexpected_assignment_count, 1);
@@ -1842,12 +1884,8 @@ mod tests {
             "<step>C</step><alter>1</alter><octave>4</octave>",
         );
         let prediction = graph(&prediction_xml);
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.written_pitch_spelling.accuracy, Some(0.5));
     }
@@ -1863,12 +1901,8 @@ mod tests {
             <note><pitch><step>D</step>"#,
         );
         let prediction = graph(&prediction_xml);
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.true_positives, 4);
         assert_eq!(report.note_event_presence.false_positives, 1);
         assert_eq!(report.note_event_presence.false_negatives, 0);
@@ -1881,12 +1915,8 @@ mod tests {
             "<step>C</step><alter>0</alter><octave>4</octave>",
             "<step>C</step><alter>0.000</alter><octave>4</octave>",
         ));
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
     }
 
@@ -1897,12 +1927,8 @@ mod tests {
             "<step>C</step><octave>4</octave>",
         ));
         let prediction = graph(fixture_xml());
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
     }
 
@@ -1914,12 +1940,8 @@ mod tests {
             r#"<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><tie type="stop"/><notations><tied type="continue"/><tuplet type="start" number="1"/></notations>"#,
         );
         let prediction = graph(&prediction_xml);
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.sound_tie_semantics.accuracy, Some(0.75));
         assert_eq!(report.visual_tie_semantics.accuracy, Some(0.75));
@@ -1944,7 +1966,6 @@ mod tests {
             Err(MusicXmlNotationEvaluationErrorV1::PartIdentityMismatch)
         );
     }
-
 
     #[test]
     fn malformed_written_pitch_alteration_refuses_evaluation() {
@@ -2040,26 +2061,37 @@ mod tests {
         let reference = graph(fixture_xml());
         let prediction = graph(fixture_xml());
         let config = default_config();
-        let mut report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, config.clone()
-        ).unwrap();
-        assert!(validate_musicxml_notation_evaluation_report(
-            &reference,&prediction,config.clone(),&report
-        ).unwrap());
+        let mut report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, config.clone()).unwrap();
+        assert!(
+            validate_musicxml_notation_evaluation_report(
+                &reference,
+                &prediction,
+                config.clone(),
+                &report
+            )
+            .unwrap()
+        );
         report.note_event_presence.false_positives = 1;
-        assert!(!validate_musicxml_notation_evaluation_report(
-            &reference,&prediction,config.clone(),&report
-        ).unwrap());
+        assert!(
+            !validate_musicxml_notation_evaluation_report(
+                &reference,
+                &prediction,
+                config.clone(),
+                &report
+            )
+            .unwrap()
+        );
         let changed = graph(&fixture_xml().replace(
             "<step>D</step><octave>4</octave>",
             "<step>E</step><octave>4</octave>",
         ));
-        let original = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, config.clone()
-        ).unwrap();
-        assert!(!validate_musicxml_notation_evaluation_report(
-            &reference,&changed,config, &original
-        ).unwrap());
+        let original =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, config.clone()).unwrap();
+        assert!(
+            !validate_musicxml_notation_evaluation_report(&reference, &changed, config, &original)
+                .unwrap()
+        );
     }
 
     #[test]
@@ -2097,13 +2129,13 @@ mod tests {
         let mut config = default_config();
         config.maximum_events_per_part = 1;
         assert!(matches!(
-            evaluate_musicxml_notation_graphs(&reference,&reference,config),
+            evaluate_musicxml_notation_graphs(&reference, &reference, config),
             Err(MusicXmlNotationEvaluationErrorV1::EventBudgetExceeded { .. })
         ));
         config = default_config();
         config.maximum_candidate_pairs = 1;
         assert!(matches!(
-            evaluate_musicxml_notation_graphs(&reference,&reference,config),
+            evaluate_musicxml_notation_graphs(&reference, &reference, config),
             Err(MusicXmlNotationEvaluationErrorV1::CandidatePairBudgetExceeded { .. })
         ));
     }
@@ -2116,12 +2148,8 @@ mod tests {
             r#"<forward><duration>16</duration><voice>2</voice><staff>2</staff></forward>"#,
         );
         let prediction = graph(&prediction_xml);
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.false_negatives, 1);
         assert_eq!(report.note_event_presence.false_positives, 0);
         assert_eq!(report.note_event_presence.true_positives, 3);
@@ -2140,11 +2168,13 @@ mod tests {
         let pairs = maximum_cardinality_matching(
             &left,
             &right,
-            |l, r| Ok(match l {
-                0 => true,
-                1 => *r == 0,
-                _ => false,
-            }),
+            |l, r| {
+                Ok(match l {
+                    0 => true,
+                    1 => *r == 0,
+                    _ => false,
+                })
+            },
             &config,
         )
         .unwrap();
@@ -2161,30 +2191,30 @@ mod tests {
             <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><voice>2</voice></note>
         </measure></part></score-partwise>"#;
         let reference = graph(xml);
-        let identical = evaluate_musicxml_notation_graphs(
-            &reference, &reference, default_config()
-        ).unwrap();
+        let identical =
+            evaluate_musicxml_notation_graphs(&reference, &reference, default_config()).unwrap();
         assert_eq!(identical.grace_semantics.accuracy, Some(1.0));
         assert_eq!(identical.cue_semantics.accuracy, Some(1.0));
         assert_eq!(identical.chord_member_semantics.accuracy, Some(1.0));
         assert_eq!(identical.chord_anchor_semantics.accuracy, Some(1.0));
 
         let mut prediction = reference.clone();
-        prediction.notation_events.note_events[0].grace.as_mut().unwrap().slash =
-            Some("no".into());
+        prediction.notation_events.note_events[0]
+            .grace
+            .as_mut()
+            .unwrap()
+            .slash = Some("no".into());
         prediction.notation_events.note_events[2].is_cue = false;
         prediction.notation_events.note_events[1].is_chord_member = false;
         prediction.notation_events.note_events[1].chord_anchor_source_order = None;
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.grace_semantics.accuracy, Some(0.75));
         assert_eq!(report.cue_semantics.accuracy, Some(0.75));
         assert_eq!(report.chord_member_semantics.accuracy, Some(0.75));
         assert_eq!(report.chord_anchor_semantics.accuracy, Some(0.0));
     }
-
 
     fn part_metadata_fixture(part_name: &str, midi_channel: u8) -> String {
         format!(
@@ -2213,9 +2243,7 @@ mod tests {
     #[test]
     fn identical_part_list_metadata_scores_independently_from_note_events() {
         let graph = graph(&part_metadata_fixture("Violin I", 1));
-        let report = evaluate_musicxml_notation_graphs(
-            &graph, &graph, default_config()
-        ).unwrap();
+        let report = evaluate_musicxml_notation_graphs(&graph, &graph, default_config()).unwrap();
         assert!(report.part_metadata_layer_covered);
         assert_eq!(report.part_metadata_presence.f1, Some(1.0));
         assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(1.0));
@@ -2231,9 +2259,8 @@ mod tests {
     fn midi_setup_change_is_not_misreported_as_a_note_event_error() {
         let reference = graph(&part_metadata_fixture("Violin I", 1));
         let prediction = graph(&part_metadata_fixture("Violin I", 2));
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.instrument_assignment.accuracy, Some(1.0));
         assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(1.0));
@@ -2246,9 +2273,8 @@ mod tests {
     fn part_name_and_abbreviation_change_is_a_part_metadata_error_only() {
         let reference = graph(&part_metadata_fixture("Violin I", 1));
         let prediction = graph(&part_metadata_fixture("Viola", 1));
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.part_metadata_presence.f1, Some(1.0));
         assert_eq!(report.part_metadata_name_abbreviation.accuracy, Some(0.0));
@@ -2261,9 +2287,8 @@ mod tests {
         let reference = graph(&part_metadata_fixture("Violin I", 1));
         let mut prediction = reference.clone();
         prediction.part_metadata = None;
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert!(report.part_metadata_layer_covered);
         assert_eq!(report.part_metadata_presence.false_negatives, 1);
         assert_eq!(report.part_metadata_presence.f1, Some(0.0));
@@ -2282,9 +2307,8 @@ mod tests {
         </measure></part></score-partwise>"#;
         let reference = graph(reference_xml);
         let prediction = graph(&part_metadata_fixture("Violin I", 1));
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.part_metadata_presence.false_positives, 1);
         assert_eq!(report.part_metadata_presence.f1, Some(0.0));
@@ -2299,9 +2323,8 @@ mod tests {
         reference.part_metadata = None;
         reference.part_metadata_layer_present = false;
         let prediction = graph(&part_metadata_fixture("Violin I", 1));
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert!(!report.part_metadata_layer_covered);
         assert_eq!(report.part_metadata_presence.f1, None);
         assert_eq!(report.part_metadata_name_abbreviation.accuracy, None);
@@ -2309,7 +2332,6 @@ mod tests {
         assert_eq!(report.part_metadata_unexpected_count, 0);
         assert_eq!(report.note_event_presence.f1, Some(1.0));
     }
-
 
     #[test]
     fn oversized_source_tree_depth_is_rejected_before_matching() {
@@ -2328,21 +2350,18 @@ mod tests {
                 namespace_uri: None,
                 attributes: Vec::new(),
                 text: None,
-                content: vec![crate::musicxml_notation_events::MusicXmlSourceContentV1::ElementIndex(0)],
+                content: vec![
+                    crate::musicxml_notation_events::MusicXmlSourceContentV1::ElementIndex(0),
+                ],
                 children: vec![nested],
             };
         }
         reference.notation_events.note_events[0].source_note = nested;
         assert!(matches!(
-            evaluate_musicxml_notation_graphs(
-                &reference,
-                &reference,
-                default_config()
-            ),
+            evaluate_musicxml_notation_graphs(&reference, &reference, default_config()),
             Err(MusicXmlNotationEvaluationErrorV1::SourceTreeDepthExceeded { .. })
         ));
     }
-
 
     #[test]
     fn inconsistent_part_metadata_source_binding_refuses_scoring() {
@@ -2350,22 +2369,22 @@ mod tests {
         let mut prediction = reference.clone();
         prediction.part_metadata.as_mut().unwrap().source_part_id = "P2".into();
         assert!(matches!(
-            evaluate_musicxml_notation_graphs(
-                &reference, &prediction, default_config()
-            ),
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
             Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
         ));
 
         prediction = reference.clone();
-        prediction.part_metadata.as_mut().unwrap().score_instrument_ids.clear();
+        prediction
+            .part_metadata
+            .as_mut()
+            .unwrap()
+            .score_instrument_ids
+            .clear();
         assert!(matches!(
-            evaluate_musicxml_notation_graphs(
-                &reference, &prediction, default_config()
-            ),
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
             Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
         ));
     }
-
 
     #[test]
     fn note_performance_directives_are_independent_from_written_note_values() {
@@ -2385,18 +2404,13 @@ mod tests {
         </measure></part></score-partwise>"#;
         let reference = graph(reference_xml);
         let prediction = graph(prediction_xml);
-        let report = evaluate_musicxml_notation_graphs(
-            &reference,
-            &prediction,
-            default_config(),
-        )
-        .unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
         assert_eq!(report.written_type_and_dots.accuracy, Some(1.0));
         assert_eq!(report.note_performance_directives.accuracy, Some(0.0));
     }
-
 
     #[test]
     fn attack_and_release_offsets_are_normalized_across_division_scales() {
@@ -2422,9 +2436,8 @@ mod tests {
             equivalent.notation_events.note_events[0].performance_offset_divisions,
             Some(8)
         );
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &equivalent, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &equivalent, default_config()).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
         assert_eq!(report.duration_error.mean_absolute_quarter_beats, Some(0.0));
         assert_eq!(report.note_performance_directives.accuracy, Some(1.0));
@@ -2432,9 +2445,8 @@ mod tests {
 
         let different_offset_xml = equivalent_xml.replace("release=\"2\"", "release=\"4\"");
         let different = graph(&different_offset_xml);
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &different, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &different, default_config()).unwrap();
         assert_eq!(report.note_performance_directives.accuracy, Some(0.0));
     }
 
@@ -2447,21 +2459,18 @@ mod tests {
         let reference = graph(xml);
         let mut prediction = reference.clone();
         prediction.notation_events.note_events[0].performance_offset_divisions = None;
-        let report = evaluate_musicxml_notation_graphs(
-            &reference, &prediction, default_config()
-        ).unwrap();
+        let report =
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()).unwrap();
         assert_eq!(report.note_performance_directives.sample_count, 0);
         assert_eq!(report.note_performance_directives.accuracy, None);
         assert_eq!(report.note_performance_directive_unresolved_count, 1);
     }
 
-
     #[test]
     fn report_commitment_binds_every_metric_including_performance_directive_coverage() {
         let reference = graph(fixture_xml());
-        let mut report = evaluate_musicxml_notation_graphs(
-            &reference, &reference, default_config()
-        ).unwrap();
+        let mut report =
+            evaluate_musicxml_notation_graphs(&reference, &reference, default_config()).unwrap();
         let original = report.report_sha256.clone();
 
         report.note_performance_directives.correct_count += 1;
@@ -2475,5 +2484,4 @@ mod tests {
         report.note_performance_directives.accuracy = Some(0.0);
         assert_ne!(report_commitment(&report).unwrap(), original);
     }
-
 }
