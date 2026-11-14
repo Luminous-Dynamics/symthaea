@@ -277,6 +277,15 @@ fn unique_nonempty(values: &[String]) -> bool {
     values.iter().all(|value| !value.trim().is_empty() && seen.insert(value))
 }
 
+fn same_members(left: &[String], right: &[String]) -> bool {
+    if !unique_nonempty(left) || !unique_nonempty(right) || left.len() != right.len() {
+        return false;
+    }
+    let left_set: HashSet<&str> = left.iter().map(String::as_str).collect();
+    let right_set: HashSet<&str> = right.iter().map(String::as_str).collect();
+    left_set == right_set
+}
+
 fn intersects(left: &[String], right: &[String]) -> bool {
     let right_set: HashSet<&str> = right.iter().map(String::as_str).collect();
     left.iter().any(|value| right_set.contains(value.as_str()))
