@@ -399,6 +399,10 @@ fn validate(manifest: &Manifest) -> ValidationReport {
         );
     }
 
+    if manifest.requirements.is_empty() {
+        push(&mut diagnostics, "empty_requirements", "requirements", "manifest must contain at least one requirement candidate");
+    }
+
     let mut requirements = BTreeMap::new();
     for (index, requirement) in manifest.requirements.iter().enumerate() {
         if requirements.insert(requirement.id.clone(), requirement).is_some() {
@@ -449,7 +453,7 @@ fn validate(manifest: &Manifest) -> ValidationReport {
                     "an accepted requirement cannot retain unresolved modality",
                 );
             }
-            if matches!(requirement.owner.system, OwnerSystem::Unassigned) || requirement.owner.reference.as_deref().is_none_or(|v| !nonblank(v)) {
+            if matches!(&requirement.owner.system, OwnerSystem::Unassigned) || requirement.owner.reference.as_deref().is_none_or(|v| !nonblank(v)) {
                 push(
                     &mut diagnostics,
                     "accepted_without_owner",
@@ -467,7 +471,7 @@ fn validate(manifest: &Manifest) -> ValidationReport {
                 &format!("{path}.review_decision_ref"),
                 &mut diagnostics,
             );
-            match requirement.verification.method {
+            match &requirement.verification.method {
                 VerificationMethod::NotYetVerifiable => {
                     if requirement.verification.limitation.as_deref().is_none_or(|v| !nonblank(v)) {
                         push(
@@ -743,6 +747,29 @@ mod tests {
         }"#;
         let result = serde_json::from_str::<Manifest>(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn parses_and_accepts_checked_in_valid_fixture() {
+        let manifest: Manifest = serde_json::from_str(include_str!("../fixtures/valid.json")).unwrap();
+        let report = validate(&manifest);
+        assert_eq!(report.status, "STRUCTURALLY_VALID");
+        assert_eq!(report.diagnostic_count, 0);
+    }
+
+    #[test]
+    fn checked_in_negative_fixtures_are_rejected_for_expected_reasons() {
+        let cases = [
+            (include_str!("../fixtures/missing-trace.json"), "accepted_without_trace"),
+            (include_str!("../fixtures/unapproved-modality.json"), "missing_decision"),
+            (include_str!("../fixtures/unreviewed-acceptance.json"), "missing_decision"),
+        ];
+        for (json, expected_code) in cases {
+            let manifest: Manifest = serde_json::from_str(json).unwrap();
+            let report = validate(&manifest);
+            assert_eq!(report.status, "REJECTED");
+            assert!(report.diagnostics.iter().any(|d| d.code == expected_code));
+        }
     }
 
     #[test]
