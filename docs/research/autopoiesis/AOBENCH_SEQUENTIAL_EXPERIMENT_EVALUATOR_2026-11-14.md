@@ -72,14 +72,16 @@ An observed outcome outside the frozen model is \`Inconclusive\`, signalling tha
 
 ## 7. Deterministic tests added
 
+Fourteen tests cover:
 - Sequentially identify a hidden mechanism through two adaptive probes, then stop.
-- Reject premature stopping.
-- Ensure unavailable delivery evidence does not update hypotheses.
-- Keep qualified observations outside the frozen response model inconclusive.
+- Reject premature stopping and unnecessary continuation after target-class identification.
+- Ensure unavailable or rejected delivery evidence does not update hypotheses.
+- Keep qualified observations outside the frozen response model inconclusive, without misclassifying a zero-information probe as a design failure.
 - Enforce cost and risk budgets independently.
 - Accept target-class stopping without distinguishing mechanisms inside the same class.
 - Accept abstention when no informative safe/affordable probe remains.
-- Detect an uninformative no-op probe.
+- Detect uninformative/no-op probes.
+- Reject malformed probe-response tables as an invalid benchmark subject rather than scoring an agent.
 - Measure positive oracle-efficiency regret for a less efficient probe choice.
 
 ## 8. Next qualification work
