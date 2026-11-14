@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - research/aobench-runtime-verifier-*
+      - research/aobench-*
     paths:
       - "crates/domains/symthaea-organizational-closure/**"
       - "Cargo.toml"
