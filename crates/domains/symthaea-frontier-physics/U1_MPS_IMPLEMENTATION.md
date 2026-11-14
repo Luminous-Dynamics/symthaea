@@ -149,6 +149,26 @@ The latest increment connects local gates to an actual nearest-neighbour Hamilto
 
 The dense three-site one-excitation test checks the exact hopping-chain solution and a roughly fourfold reduction in global error when the time step is halved. A separate multi-step test checks that the global ledger is carried forward instead of being reset. These are authored acceptance tests until the consolidated exact-head runner passes.
 
+
+## Accuracy-budgeted adaptive compression
+
+The new \`U1TwoSiteState::split_with_error_budget\` policy changes the control variable from a heuristic singular-value cutoff to an absolute local two-site L2 error budget.
+
+Given a maximum bond dimension \(D_{\max}\) and requested local error \(\epsilon\):
+
+1. Compute the exact charge-block Schmidt spectrum, globally across all intermediate charge sectors.
+2. Sort the positive singular values in descending order.
+3. Find the smallest global rank \(D_{\min}\) for which
+   \[
+   \left(\sum_{i>D_{\min}}\sigma_i^2\right)^{1/2}\le \epsilon.
+   \]
+4. If \(D_{\min}>D_{\max}\), reject the request and return the minimum required rank plus the best achievable measured residual at the hard cap.
+5. Otherwise, compress at \(D_{\min}\), then check the *measured* reconstruction L2 residual. This captures floating-point decomposition residual and tolerated forbidden-sector components in addition to the ideal Schmidt tail.
+
+The output is not renormalized. The result carries the requested budget, measured achieved residual, minimum rank and remaining budget slack. A small numerical comparison margin \(\tau\|\Theta\|_2\) is used for floating-point boundary decisions; it is not counted as achieved accuracy.
+
+This is a local two-site tensor error budget. It becomes a global state-vector budget only when the canonical-gauge receipt supplies orthonormal exterior block bases and the gate/model error ledger is also qualified. Trotter error remains separate.
+
 ## Explicit limitations
 
 This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
