@@ -15,9 +15,11 @@ struct Fixture {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Profile {
+pub(super) struct Profile {
     material_pair_class: String,
     geometry: String,
+    #[serde(default)]
+    profile_sha256: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +35,7 @@ struct EndpointEvidence {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct CompositionCase {
+pub(super) struct CompositionCase {
     id: String,
     baseline_profile: Profile,
     candidate_profile: Profile,
@@ -41,10 +43,16 @@ struct CompositionCase {
     endpoint_evidence: Vec<EndpointEvidence>,
     expected_disposition: String,
     rationale: String,
+    #[serde(default)]
+    transfer_case_id: Option<String>,
+    #[serde(default)]
+    transfer_bridge_id: Option<String>,
+    #[serde(default)]
+    bridge_dimension_keys: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Disposition {
+pub(super) enum Disposition {
     Pass,
     Blocked,
     Rejected,
@@ -60,9 +68,9 @@ impl Disposition {
     }
 }
 
-struct Decision {
-    disposition: Disposition,
-    reason: &'static str,
+pub(super) struct Decision {
+    pub(super) disposition: Disposition,
+    pub(super) reason: &'static str,
 }
 
 fn unique_nonempty(values: &[String]) -> bool {
@@ -269,6 +277,105 @@ fn audit_case(case: &CompositionCase) -> Decision {
     } else {
         pass()
     }
+}
+
+
+pub(super) fn validate_transfer_case(
+    path: &Path,
+    composition_case_id: &str,
+    transfer_case_id: &str,
+    transfer_bridge_id: &str,
+    baseline_profile_sha256: &str,
+    candidate_profile_sha256: &str,
+    bridge_dimension_keys: &[String],
+) -> Result<Decision> {
+    let fixture = read_fixture(path)?;
+    let Some(case) = fixture.cases.iter().find(|case| case.id == composition_case_id) else {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "transfer bridge references a missing method-qualified composition case",
+        });
+    };
+    let decision = audit_case(case);
+    if decision.disposition != Disposition::Pass {
+        return Ok(decision);
+    }
+
+    let Some(case_transfer_id) = case.transfer_case_id.as_deref() else {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "composition case lacks transfer-case identity",
+        });
+    };
+    let Some(case_bridge_id) = case.transfer_bridge_id.as_deref() else {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "composition case lacks transfer-bridge identity",
+        });
+    };
+    let Some(case_keys) = case.bridge_dimension_keys.as_deref() else {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "composition case lacks an explicit bridge dimension set",
+        });
+    };
+    let Some(base_digest) = case.baseline_profile.profile_sha256.as_deref() else {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "composition case lacks exact baseline profile digest",
+        });
+    };
+    let Some(candidate_digest) = case.candidate_profile.profile_sha256.as_deref() else {
+        return Ok(Decision {
+            disposition: Disposition::Blocked,
+            reason: "composition case lacks exact candidate bridge profile digest",
+        });
+    };
+
+    let mut actual_keys = case_keys.to_vec();
+    let mut expected_keys = bridge_dimension_keys.to_vec();
+    actual_keys.sort();
+    expected_keys.sort();
+    if case_transfer_id != transfer_case_id
+        || case_bridge_id != transfer_bridge_id
+        || base_digest != baseline_profile_sha256
+        || candidate_digest != candidate_profile_sha256
+        || actual_keys != expected_keys
+    {
+        return Ok(Decision {
+            disposition: Disposition::Rejected,
+            reason: "composition evidence is bound to a different transfer case, bridge dimension set or exact profile digest",
+        });
+    }
+
+    for evidence in &case.endpoint_evidence {
+        let design = crate::plasma_equivalence_design::validate_transfer_binding(
+            &evidence.equivalence_design,
+            transfer_case_id,
+            transfer_bridge_id,
+            baseline_profile_sha256,
+            candidate_profile_sha256,
+            bridge_dimension_keys,
+            &evidence.endpoint,
+            &evidence.baseline_receipt,
+            &evidence.candidate_receipt,
+        );
+        if design.disposition != crate::plasma_equivalence_design::Disposition::Pass {
+            return Ok(Decision {
+                disposition: match design.disposition {
+                    crate::plasma_equivalence_design::Disposition::Pass => Disposition::Pass,
+                    crate::plasma_equivalence_design::Disposition::Blocked => Disposition::Blocked,
+                    crate::plasma_equivalence_design::Disposition::Rejected => Disposition::Rejected,
+                },
+                reason: design.reason,
+            });
+        }
+    }
+
+    Ok(Decision {
+        disposition: Disposition::Pass,
+        reason: "method-qualified endpoint observations and their study designs match the exact transfer profile pair and bridge dimension set",
+    })
 }
 
 fn read_fixture(path: &Path) -> Result<Fixture> {
