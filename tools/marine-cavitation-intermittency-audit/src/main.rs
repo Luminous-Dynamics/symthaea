@@ -1916,6 +1916,9 @@ mod tests {
             window.end_time_s += 1.0;
         }
         windows[1].cavitation_present = Some(false);
+        // End the final segment inactive so the assertion isolates the
+        // earlier gap-censored episode rather than also censoring at run end.
+        windows.last_mut().unwrap().cavitation_present = Some(false);
         let report = audit(&input);
         let run = &report.run_reports[0];
         assert_eq!(run.right_censored_active_window_segments_at_gaps, Some(1));
