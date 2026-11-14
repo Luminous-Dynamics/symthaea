@@ -2376,11 +2376,9 @@ fn render_import_audition(
     // those exact bytes first; re-exporting the flattened Score would discard
     // source tempo/event timing, velocities and program/controller events.
     if matches!(format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
-        if let Some(wav) = symthaea_muse::fluid_render::render_midi_bytes_to_wav(
-            source_bytes,
-            SAMPLE_RATE,
-            None,
-        ) {
+        if let Some(wav) =
+            symthaea_muse::fluid_render::render_midi_bytes_to_wav(source_bytes, SAMPLE_RATE, None)
+        {
             return Ok((
                 wav,
                 "fluidsynth",
@@ -2440,9 +2438,9 @@ async fn import_music(
     mut multipart: Multipart,
 ) -> Result<Json<symthaea_muse_protocol::ImportedWorkSummary>, (StatusCode, String)> {
     use symthaea_muse_protocol::{
-        AuthorizationBasis, ContributionManifest, ContributionScope, ImportedNotationStructureSummary,
-        ImportedWorkId, ImportedWorkSummary, MusicalContentLicense,
-        default_instrumentation_note,
+        AuthorizationBasis, ContributionManifest, ContributionScope,
+        ImportedNotationStructureSummary, ImportedWorkId, ImportedWorkSummary,
+        MusicalContentLicense, default_instrumentation_note,
     };
 
     let mut title = None;
@@ -2564,7 +2562,9 @@ async fn import_music(
             "supported formats are MIDI, MusicXML, and Muse score JSON".to_owned(),
         )
     })?;
-    if measure_sidecar.is_some() && !matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
+    if measure_sidecar.is_some()
+        && !matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi)
+    {
         return Err((
             StatusCode::BAD_REQUEST,
             "measure_sidecar is only valid with MIDI uploads".to_owned(),
@@ -2580,11 +2580,13 @@ async fn import_music(
         let source_sha256 = sha256_hex(&source);
         let score_clock_id = format!("source-score-clock:{source_sha256}");
         let structured = match measure_sidecar.as_deref() {
-            Some(sidecar) => symthaea_muse::symbolic_import::parse_symbolic_with_midi_measure_sidecar(
-                &source,
-                sidecar,
-                &score_clock_id,
-            ),
+            Some(sidecar) => {
+                symthaea_muse::symbolic_import::parse_symbolic_with_midi_measure_sidecar(
+                    &source,
+                    sidecar,
+                    &score_clock_id,
+                )
+            }
             None => symthaea_muse::symbolic_import::parse_symbolic_with_structure(
                 &source,
                 format.clone(),
@@ -2593,14 +2595,13 @@ async fn import_music(
         }
         .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
         if structured.source_sha256 != source_sha256 {
-            return Err(internal("symbolic importer source digest changed during import"));
+            return Err(internal(
+                "symbolic importer source digest changed during import",
+            ));
         }
         let score = structured.score;
         let (notation_structure, notation_artifact) =
-            summarize_imported_notation_structure(
-                &source_sha256,
-                structured.notation_structure,
-            )?;
+            summarize_imported_notation_structure(&source_sha256, structured.notation_structure)?;
         let analysis = symthaea_muse::symbolic_import::analyze(&score);
         let score_sha256 = serialized_sha256(&score)
             .map_err(|status| (status, "could not serialize the imported score".to_owned()))?;
@@ -2728,6 +2729,19 @@ enum ImportedNotationArtifact {
     MidiMeasureMaps(Vec<u8>),
 }
 
+fn count_musicxml_source_elements(
+    node: &symthaea_muse::musicxml_notation_events::MusicXmlSourceNodeV1,
+    element_name: &str,
+) -> usize {
+    let current = if node.element == element_name { 1 } else { 0 };
+    current
+        + node
+            .children
+            .iter()
+            .map(|child| count_musicxml_source_elements(child, element_name))
+            .sum::<usize>()
+}
+
 fn summarize_imported_notation_structure(
     source_sha256: &str,
     structure: symthaea_muse::symbolic_import::ImportedNotationStructureV1,
@@ -2741,15 +2755,34 @@ fn summarize_imported_notation_structure(
     use symthaea_muse_protocol::ImportedNotationStructureSummary;
 
     match structure {
-        symthaea_muse::symbolic_import::ImportedNotationStructureV1::MusicXmlPartGraphs(
-            graphs,
-        ) => {
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::MusicXmlPartGraphs(graphs) => {
             let part_count = graphs.len();
             let mut supported_part_count = 0usize;
             let mut unavailable_part_ids = Vec::new();
             let mut measure_count = 0usize;
             let mut barline_event_count = 0usize;
             let mut non_controlling_measure_count = 0usize;
+            let mut notation_event_count = 0usize;
+            let mut notation_auxiliary_event_count = 0usize;
+            let mut notation_attribute_event_count = 0usize;
+            let mut notation_cursor_move_count = 0usize;
+            let mut unpitched_event_count = 0usize;
+            let mut cue_note_count = 0usize;
+            let mut chord_member_count = 0usize;
+            let mut time_modification_count = 0usize;
+            let mut notation_supported_part_count = 0usize;
+            let mut notation_unknown_part_count = 0usize;
+            let mut rest_event_count = 0usize;
+            let mut grace_note_count = 0usize;
+            let mut tuplet_notation_count = 0usize;
+            let mut sound_tie_count = 0usize;
+            let mut visual_tie_count = 0usize;
+            let mut voice_assignment_count = 0usize;
+            let mut staff_assignment_count = 0usize;
+            let mut part_metadata_count = 0usize;
+            let mut score_instrument_count = 0usize;
+            let mut midi_instrument_count = 0usize;
+            let mut unresolved_note_instrument_reference_count = 0usize;
             for graph in &graphs {
                 match &graph.map.status {
                     symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
@@ -2757,24 +2790,87 @@ fn summarize_imported_notation_structure(
                     }
                     _ => unavailable_part_ids.push(graph.part_id.clone()),
                 }
+                match &graph.notation_events.status {
+                    symthaea_muse::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Supported => {
+                        notation_supported_part_count += 1;
+                    }
+                    symthaea_muse::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Unknown { .. } => {
+                        notation_unknown_part_count += 1;
+                    }
+                }
+                let declared_instrument_ids = if let Some(metadata) = &graph.part_metadata {
+                    part_metadata_count += 1;
+                    score_instrument_count += metadata.score_instrument_ids.len();
+                    midi_instrument_count += count_musicxml_source_elements(
+                        &metadata.source_score_part,
+                        "midi-instrument",
+                    );
+                    metadata.score_instrument_ids.clone()
+                } else {
+                    Vec::new()
+                };
                 measure_count += graph.map.measures.len();
                 barline_event_count += graph.barline_events.len();
-                non_controlling_measure_count +=
-                    graph.non_controlling_measure_indices.len();
+                non_controlling_measure_count += graph.non_controlling_measure_indices.len();
+                notation_event_count += graph.notation_events.note_events.len();
+                notation_auxiliary_event_count += graph.notation_events.auxiliary_events.len();
+                notation_attribute_event_count += graph.notation_events.attribute_events.len();
+                notation_cursor_move_count += graph.notation_events.cursor_moves.len();
+                for event in &graph.notation_events.note_events {
+                    for instrument_id in &event.instrument_ids {
+                        if !declared_instrument_ids.contains(instrument_id) {
+                            unresolved_note_instrument_reference_count += 1;
+                        }
+                    }
+                    if matches!(
+                        &event.kind,
+                        symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Unpitched { .. }
+                    ) {
+                        unpitched_event_count += 1;
+                    }
+                    if event.is_cue {
+                        cue_note_count += 1;
+                    }
+                    if event.is_chord_member {
+                        chord_member_count += 1;
+                    }
+                    if event.time_modification.is_some() {
+                        time_modification_count += 1;
+                    }
+                    if matches!(
+                        &event.kind,
+                        symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
+                    ) {
+                        rest_event_count += 1;
+                    }
+                    if event.is_grace {
+                        grace_note_count += 1;
+                    }
+                    tuplet_notation_count += event.tuplet_notations.len();
+                    sound_tie_count += event.sound_ties.len();
+                    visual_tie_count += event.visual_ties.len();
+                    if event.voice.is_some() {
+                        voice_assignment_count += 1;
+                    }
+                    if event.staff.is_some() {
+                        staff_assignment_count += 1;
+                    }
+                }
             }
             let unknown_part_count = part_count.saturating_sub(supported_part_count);
-            let status = if unknown_part_count == 0 && part_count > 0 {
-                "supported"
-            } else if supported_part_count > 0 {
-                "partially_unknown"
-            } else {
-                "unknown"
-            };
-            let graph_sha256 = symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
-                .map_err(internal)?;
+            let status =
+                if unknown_part_count == 0 && notation_unknown_part_count == 0 && part_count > 0 {
+                    "supported"
+                } else if supported_part_count > 0 || notation_supported_part_count > 0 {
+                    "partially_unknown"
+                } else {
+                    "unknown"
+                };
+            let graph_sha256 =
+                symthaea_muse::evidence_digest::canonical_json_sha256(&graphs).map_err(internal)?;
             let graph_json = serde_json::to_vec_pretty(&graphs).map_err(internal)?;
-            let explanation = (unknown_part_count > 0).then(|| {
-                "One or more parts lack a fully resolvable explicit measure map; inspect the per-part graph status before scoring or editing.".to_owned()
+            let explanation = (unknown_part_count > 0 || notation_unknown_part_count > 0).then(|| {
+                "One or more parts have unresolved measure-map or notation-event semantics; inspect both per-part statuses before scoring or editing.".to_owned()
             });
             Ok((
                 ImportedNotationStructureSummary {
@@ -2789,6 +2885,27 @@ fn summarize_imported_notation_structure(
                     measure_count,
                     barline_event_count,
                     non_controlling_measure_count,
+                    notation_event_count,
+                    notation_auxiliary_event_count,
+                    notation_attribute_event_count,
+                    notation_cursor_move_count,
+                    unpitched_event_count,
+                    cue_note_count,
+                    chord_member_count,
+                    time_modification_count,
+                    notation_supported_part_count,
+                    notation_unknown_part_count,
+                    rest_event_count,
+                    grace_note_count,
+                    tuplet_notation_count,
+                    sound_tie_count,
+                    visual_tie_count,
+                    voice_assignment_count,
+                    staff_assignment_count,
+                    part_metadata_count,
+                    score_instrument_count,
+                    midi_instrument_count,
+                    unresolved_note_instrument_reference_count,
                     unavailable_part_ids,
                     explanation,
                 },
@@ -2813,8 +2930,7 @@ fn summarize_imported_notation_structure(
                 }
                 measure_count += part.map.measures.len();
                 barline_event_count += part.map.measures.len().saturating_sub(1);
-                non_controlling_measure_count +=
-                    part.non_controlling_measure_indices.len();
+                non_controlling_measure_count += part.non_controlling_measure_indices.len();
             }
             let unknown_part_count = part_count.saturating_sub(supported_part_count);
             let status = if unknown_part_count == 0 && part_count > 0 {
@@ -2841,15 +2957,34 @@ fn summarize_imported_notation_structure(
                     measure_count,
                     barline_event_count,
                     non_controlling_measure_count,
+                    notation_event_count: 0,
+                    notation_auxiliary_event_count: 0,
+                    notation_attribute_event_count: 0,
+                    notation_cursor_move_count: 0,
+                    unpitched_event_count: 0,
+                    cue_note_count: 0,
+                    chord_member_count: 0,
+                    time_modification_count: 0,
+                    notation_supported_part_count: 0,
+                    notation_unknown_part_count: 0,
+                    rest_event_count: 0,
+                    grace_note_count: 0,
+                    tuplet_notation_count: 0,
+                    sound_tie_count: 0,
+                    visual_tie_count: 0,
+                    voice_assignment_count: 0,
+                    staff_assignment_count: 0,
+                    part_metadata_count: 0,
+                    score_instrument_count: 0,
+                    midi_instrument_count: 0,
+                    unresolved_note_instrument_reference_count: 0,
                     unavailable_part_ids,
                     explanation: None,
                 },
                 Some(ImportedNotationArtifact::MidiMeasureMaps(sidecar_json)),
             ))
         }
-        symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unknown {
-            reason,
-        } => Ok((
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unknown { reason } => Ok((
             ImportedNotationStructureSummary {
                 schema: "muse-imported-notation-structure-v1".into(),
                 status: "unknown".into(),
@@ -2862,31 +2997,73 @@ fn summarize_imported_notation_structure(
                 measure_count: 0,
                 barline_event_count: 0,
                 non_controlling_measure_count: 0,
+                notation_event_count: 0,
+                notation_auxiliary_event_count: 0,
+                notation_attribute_event_count: 0,
+                notation_cursor_move_count: 0,
+                unpitched_event_count: 0,
+                cue_note_count: 0,
+                chord_member_count: 0,
+                time_modification_count: 0,
+                notation_supported_part_count: 0,
+                notation_unknown_part_count: 0,
+                rest_event_count: 0,
+                grace_note_count: 0,
+                tuplet_notation_count: 0,
+                sound_tie_count: 0,
+                visual_tie_count: 0,
+                voice_assignment_count: 0,
+                staff_assignment_count: 0,
+                part_metadata_count: 0,
+                score_instrument_count: 0,
+                midi_instrument_count: 0,
+                unresolved_note_instrument_reference_count: 0,
                 unavailable_part_ids: Vec::new(),
                 explanation: Some(reason),
             },
             None,
         )),
-        symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unsupported {
-            reason,
-        } => Ok((
-            ImportedNotationStructureSummary {
-                schema: "muse-imported-notation-structure-v1".into(),
-                status: "unsupported".into(),
-                source_sha256: source_sha256.into(),
-                graph_sha256: None,
-                measure_map_sha256: None,
-                part_count: 0,
-                supported_part_count: 0,
-                unknown_part_count: 0,
-                measure_count: 0,
-                barline_event_count: 0,
-                non_controlling_measure_count: 0,
-                unavailable_part_ids: Vec::new(),
-                explanation: Some(reason),
-            },
-            None,
-        )),
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unsupported { reason } => {
+            Ok((
+                ImportedNotationStructureSummary {
+                    schema: "muse-imported-notation-structure-v1".into(),
+                    status: "unsupported".into(),
+                    source_sha256: source_sha256.into(),
+                    graph_sha256: None,
+                    measure_map_sha256: None,
+                    part_count: 0,
+                    supported_part_count: 0,
+                    unknown_part_count: 0,
+                    measure_count: 0,
+                    barline_event_count: 0,
+                    non_controlling_measure_count: 0,
+                    notation_event_count: 0,
+                    notation_auxiliary_event_count: 0,
+                    notation_attribute_event_count: 0,
+                    notation_cursor_move_count: 0,
+                    unpitched_event_count: 0,
+                    cue_note_count: 0,
+                    chord_member_count: 0,
+                    time_modification_count: 0,
+                    notation_supported_part_count: 0,
+                    notation_unknown_part_count: 0,
+                    rest_event_count: 0,
+                    grace_note_count: 0,
+                    tuplet_notation_count: 0,
+                    sound_tie_count: 0,
+                    visual_tie_count: 0,
+                    voice_assignment_count: 0,
+                    staff_assignment_count: 0,
+                    part_metadata_count: 0,
+                    score_instrument_count: 0,
+                    midi_instrument_count: 0,
+                    unresolved_note_instrument_reference_count: 0,
+                    unavailable_part_ids: Vec::new(),
+                    explanation: Some(reason),
+                },
+                None,
+            ))
+        }
     }
 }
 
@@ -2931,20 +3108,53 @@ async fn imported_works()
     Ok(Json(works))
 }
 
+fn validate_imported_musicxml_graph_artifact(
+    source_sha256: &str,
+    expected_graph_sha256: &str,
+    source_bytes: &[u8],
+    graphs: &[symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1],
+) -> Result<(), StatusCode> {
+    if sha256_hex(source_bytes) != source_sha256 {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    let actual_graph_sha256 = symthaea_muse::evidence_digest::canonical_json_sha256(graphs)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if actual_graph_sha256 != expected_graph_sha256 {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    let source_id = format!("sha256:{source_sha256}");
+    let score_clock_id = format!("source-score-clock:{source_sha256}");
+    let replay_valid =
+        symthaea_muse::musicxml_barline_adapter::validate_musicxml_notation_graph_replay(
+            source_bytes,
+            &source_id,
+            &score_clock_id,
+            graphs,
+        )
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !replay_valid {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    Ok(())
+}
+
 async fn imported_work_notation_graph(
     AxPath(id): AxPath<String>,
-) -> Result<Json<Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1>>, StatusCode>
-{
+) -> Result<
+    Json<Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1>>,
+    StatusCode,
+> {
     let summary = read_import_summary(&id)?;
-    let expected_digest = summary
+    let structure = summary
         .notation_structure
         .as_ref()
-        .and_then(|structure| structure.graph_sha256.as_deref())
         .ok_or(StatusCode::NOT_FOUND)?;
-    let bytes = std::fs::read(
-        Path::new(IMPORT_ROOT).join(&id).join("notation-graph.json"),
-    )
-    .map_err(|error| {
+    let expected_digest = structure
+        .graph_sha256
+        .as_deref()
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let import_dir = Path::new(IMPORT_ROOT).join(&id);
+    let bytes = std::fs::read(import_dir.join("notation-graph.json")).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             StatusCode::NOT_FOUND
         } else {
@@ -2953,19 +3163,30 @@ async fn imported_work_notation_graph(
     })?;
     let graphs: Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1> =
         serde_json::from_slice(&bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let actual_digest =
-        symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if actual_digest.as_str() != expected_digest {
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+
+    let mut source_path = None;
+    for entry in std::fs::read_dir(&import_dir).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if entry.file_name().to_string_lossy().starts_with("source.") {
+            if source_path.replace(entry.path()).is_some() {
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
     }
+    let source_path = source_path.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let source_bytes = std::fs::read(source_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    validate_imported_musicxml_graph_artifact(
+        &summary.manifest.source_sha256,
+        expected_digest,
+        &source_bytes,
+        &graphs,
+    )?;
     Ok(Json(graphs))
 }
 
 async fn imported_work_midi_measure_maps(
     AxPath(id): AxPath<String>,
-) -> Result<Json<symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1>, StatusCode>
-{
+) -> Result<Json<symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1>, StatusCode> {
     let summary = read_import_summary(&id)?;
     let expected_digest = summary
         .notation_structure
@@ -2973,7 +3194,9 @@ async fn imported_work_midi_measure_maps(
         .and_then(|structure| structure.measure_map_sha256.as_deref())
         .ok_or(StatusCode::NOT_FOUND)?;
     let bytes = std::fs::read(
-        Path::new(IMPORT_ROOT).join(&id).join("midi-measure-maps.json"),
+        Path::new(IMPORT_ROOT)
+            .join(&id)
+            .join("midi-measure-maps.json"),
     )
     .map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
@@ -5860,8 +6083,8 @@ mod compose_bars_contract_tests {
 #[cfg(test)]
 mod notation_summary_tests {
     use super::{
-        summarize_imported_notation_structure, verify_imported_audition_bytes,
-        ImportedNotationArtifact,
+        ImportedNotationArtifact, StatusCode, summarize_imported_notation_structure,
+        validate_imported_musicxml_graph_artifact, verify_imported_audition_bytes,
     };
     use symthaea_muse::symbolic_import::ImportedNotationStructureV1;
     use symthaea_muse_protocol::ImportedNotationStructureSummary;
@@ -5870,8 +6093,12 @@ mod notation_summary_tests {
     fn musicxml_graph_summary_commits_the_persisted_sidecar() {
         let xml = br#"<score-partwise><part id="P1">
             <measure number="1">
-                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
                 <note><rest/><duration>16</duration></note>
+                <backup><duration>16</duration></backup>
+                <forward><duration>16</duration></forward>
+                <direction><direction-type><dynamics><f/></dynamics></direction-type><offset>-2</offset><sound tempo="88"/></direction>
+                <harmony><root><root-step>G</root-step></root><kind>major</kind><offset>-4</offset></harmony>
                 <barline location="right" id="bar-1"><repeat direction="backward" times="2"/></barline>
             </measure>
         </part></score-partwise>"#;
@@ -5880,17 +6107,40 @@ mod notation_summary_tests {
             xml,
             &format!("sha256:{source_sha256}"),
             "test-score-clock",
-        ).unwrap();
+        )
+        .unwrap();
         let (summary, sidecar) = summarize_imported_notation_structure(
             &source_sha256,
             ImportedNotationStructureV1::MusicXmlPartGraphs(graphs),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(summary.status, "supported");
         assert_eq!(summary.part_count, 1);
         assert_eq!(summary.supported_part_count, 1);
         assert_eq!(summary.unknown_part_count, 0);
         assert_eq!(summary.measure_count, 1);
         assert_eq!(summary.barline_event_count, 1);
+        assert_eq!(summary.notation_event_count, 1);
+        assert_eq!(summary.notation_auxiliary_event_count, 2);
+        assert_eq!(summary.notation_attribute_event_count, 2);
+        assert_eq!(summary.notation_cursor_move_count, 2);
+        assert_eq!(summary.unpitched_event_count, 0);
+        assert_eq!(summary.cue_note_count, 0);
+        assert_eq!(summary.chord_member_count, 0);
+        assert_eq!(summary.time_modification_count, 0);
+        assert_eq!(summary.notation_supported_part_count, 1);
+        assert_eq!(summary.notation_unknown_part_count, 0);
+        assert_eq!(summary.rest_event_count, 1);
+        assert_eq!(summary.grace_note_count, 0);
+        assert_eq!(summary.tuplet_notation_count, 0);
+        assert_eq!(summary.sound_tie_count, 0);
+        assert_eq!(summary.visual_tie_count, 0);
+        assert_eq!(summary.voice_assignment_count, 0);
+        assert_eq!(summary.staff_assignment_count, 0);
+        assert_eq!(summary.part_metadata_count, 0);
+        assert_eq!(summary.score_instrument_count, 0);
+        assert_eq!(summary.midi_instrument_count, 0);
+        assert_eq!(summary.unresolved_note_instrument_reference_count, 0);
         assert_eq!(summary.source_sha256, source_sha256);
         let sidecar = match sidecar.expect("MusicXML graph must be persisted") {
             ImportedNotationArtifact::MusicXmlGraph(bytes) => bytes,
@@ -5916,7 +6166,8 @@ mod notation_summary_tests {
             ImportedNotationStructureV1::Unknown {
                 reason: "MIDI requires an explicit barline sidecar".into(),
             },
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(summary.status, "unknown");
         assert_eq!(summary.source_sha256, source_sha256);
         assert!(summary.graph_sha256.is_none());
@@ -5928,8 +6179,8 @@ mod notation_summary_tests {
     #[test]
     fn midi_measure_map_summary_commits_the_normalized_sidecar_receipt() {
         let midi: [u8; 26] = [
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 1, 0, 1, 1, 0xE0,
-            b'M', b'T', b'r', b'k', 0, 0, 0, 4, 0, 0xFF, 0x2F, 0,
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 1, 0, 1, 1, 0xE0, b'M', b'T', b'r', b'k', 0, 0,
+            0, 4, 0, 0xFF, 0x2F, 0,
         ];
         let midi_sha256 = symthaea_muse::evidence_digest::sha256_hex(&midi);
         let envelope = symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarV1 {
@@ -5937,30 +6188,38 @@ mod notation_summary_tests {
             midi_sha256: midi_sha256.clone(),
             ticks_per_quarter: 480,
             score_clock_id: "midi-summary-clock".into(),
-            parts: vec![symthaea_muse::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
-                part_id: "Piano".into(),
-                source_track_index: 0,
-                measures:source_channel: None,
-                measures:measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
-                    start_tick: 0,
-                    end_tick: 1920,
-                    kind: symthaea_muse::barline_eval::MeasureKind::Regular,
-                    measure_number: Some("1".into()),
-                    source_measure_id: None,
-                    display_text: None,
-                    implicit: false,
-                    non_controlling: false,
-                }],
-            }],
+            parts: vec![
+                symthaea_muse::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
+                    part_id: "Piano".into(),
+                    source_track_index: 0,
+                    source_channel: None,
+                    measures: vec![
+                        symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                            start_tick: 0,
+                            end_tick: 1920,
+                            kind: symthaea_muse::barline_eval::MeasureKind::Regular,
+                            measure_number: Some("1".into()),
+                            source_measure_id: None,
+                            display_text: None,
+                            implicit: false,
+                            non_controlling: false,
+                        },
+                    ],
+                },
+            ],
         };
         let input = serde_json::to_vec(&envelope).unwrap();
         let receipt = symthaea_muse::midi_measure_sidecar::parse_midi_measure_sidecar(
-            &midi, &input, "midi-summary-clock"
-        ).unwrap();
+            &midi,
+            &input,
+            "midi-summary-clock",
+        )
+        .unwrap();
         let (summary, artifact) = summarize_imported_notation_structure(
             &midi_sha256,
             ImportedNotationStructureV1::MidiExplicitMeasureSidecar(receipt),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(summary.status, "supported");
         assert_eq!(summary.source_sha256, midi_sha256);
         assert_eq!(summary.part_count, 1);
@@ -5975,13 +6234,10 @@ mod notation_summary_tests {
         };
         let decoded: symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1 =
             serde_json::from_slice(&bytes).unwrap();
-        let digest = symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(
-            &decoded
-        ).unwrap();
+        let digest =
+            symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&decoded).unwrap();
         assert_eq!(summary.measure_map_sha256.as_deref(), Some(digest.as_str()));
     }
-
-
     #[test]
     fn audition_audio_receipt_accepts_exact_bytes_and_rejects_tampering() {
         let expected = sha256_hex(b"source-midi-render");
@@ -5997,6 +6253,90 @@ mod notation_summary_tests {
             verify_imported_audition_bytes(None, b"legacy-render"),
             Ok(false)
         );
+    }
+
+
+    #[test]
+    fn musicxml_graph_artifact_verification_replays_source_and_rejects_tampering() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note>
+            <note><rest/><duration>16</duration><voice>1</voice></note>
+        </measure></part></score-partwise>"#;
+        let source_sha256 = sha256_hex(xml);
+        let source_id = format!("sha256:{source_sha256}");
+        let score_clock_id = format!("source-score-clock:{source_sha256}");
+        let graphs = symthaea_muse::musicxml_barline_adapter::parse_musicxml_part_notation_graph(
+            xml,
+            &source_id,
+            &score_clock_id,
+        )
+        .unwrap();
+        let graph_sha256 = symthaea_muse::evidence_digest::canonical_json_sha256(&graphs).unwrap();
+        assert!(
+            validate_imported_musicxml_graph_artifact(&source_sha256, &graph_sha256, xml, &graphs,)
+                .is_ok()
+        );
+        let mut tampered_graph = graphs.clone();
+        tampered_graph[0].notation_events.note_events[0].voice = Some("tampered".into());
+        assert_eq!(
+            validate_imported_musicxml_graph_artifact(
+                &source_sha256,
+                &graph_sha256,
+                xml,
+                &tampered_graph,
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+        assert_eq!(
+            validate_imported_musicxml_graph_artifact(
+                &source_sha256,
+                &graph_sha256,
+                b"<score-partwise/>",
+                &graphs,
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+    #[test]
+    fn musicxml_summary_counts_part_list_instruments_and_unresolved_references() {
+        let xml = br#"<score-partwise>
+            <part-list>
+                <score-part id="P1">
+                    <part-name>Violin I</part-name>
+                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name><midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument></score-instrument>
+                    <score-instrument id="P1-I2"><instrument-name>Muted Violin</instrument-name><midi-instrument id="P1-I2"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument></score-instrument>
+                </score-part>
+            </part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><instrument id="P1-I1"/></note>
+                <note><chord/><pitch><step>C</step><octave>5</octave></pitch><duration>8</duration><instrument id="P1-UNKNOWN"/></note>
+            </measure></part>
+        </score-partwise>"#;
+        let source_sha256 = symthaea_muse::evidence_digest::sha256_hex(xml);
+        let graphs = symthaea_muse::musicxml_barline_adapter::parse_musicxml_part_notation_graph(
+            xml,
+            &format!("sha256:{source_sha256}"),
+            "part-list-summary-clock",
+        )
+        .unwrap();
+        let (summary, artifact) = summarize_imported_notation_structure(
+            &source_sha256,
+            ImportedNotationStructureV1::MusicXmlPartGraphs(graphs),
+        )
+        .unwrap();
+        assert_eq!(summary.status, "supported");
+        assert_eq!(summary.part_metadata_count, 1);
+        assert_eq!(summary.score_instrument_count, 2);
+        assert_eq!(summary.midi_instrument_count, 2);
+        assert_eq!(summary.notation_event_count, 2);
+        assert_eq!(summary.chord_member_count, 1);
+        assert_eq!(summary.unresolved_note_instrument_reference_count, 1);
+        assert!(matches!(
+            artifact,
+            Some(ImportedNotationArtifact::MusicXmlGraph(_))
+        ));
     }
 
 }

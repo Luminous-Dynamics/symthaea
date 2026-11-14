@@ -7,33 +7,46 @@
 //! own declared time signature. This is not a MIDI meter-to-barline inference
 //! path. The global-map helper requires part reconciliation; separate APIs
 //! preserve polymetric per-part maps and the complete typed barline graph.
-
 use crate::evidence_digest::canonical_json_sha256;
-use serde::{Deserialize, Serialize};
-use crate::barline_eval::{
-    MeasureKind, MeasureMap, MeasureMapStatus, MeasureSpan, RationalBeat,
+use crate::musicxml_notation_events::{
+    MusicXmlPartMetadataV1, MusicXmlPartNotationEventsV1, legacy_missing_notation_events,
+    parse_musicxml_part_metadata, parse_musicxml_part_notation_events,
 };
-
+use serde::{Deserialize, Serialize};
 pub const MUSICXML_BARLINE_CANONICALIZATION_V1: &str =
     "musicxml-partwise-explicit-measures-quarter-beats-v1";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MusicXmlMeasureAdapterError {
     InvalidUtf8,
     MalformedXml(String),
     EmptySourceId,
     EmptyScoreClockId,
-    InvalidDivisions { value: i64 },
-    InvalidDuration { value: i64 },
+    InvalidDivisions {
+        value: i64,
+    },
+    InvalidDuration {
+        value: i64,
+    },
     ArithmeticOverflow,
     MissingPartId,
-    UnsupportedRoot { root: String },
+    UnsupportedRoot {
+        root: String,
+    },
     NoParts,
-    UnsupportedPartMap { part_id: String },
+    UnsupportedPartMap {
+        part_id: String,
+    },
     PartClockMismatch,
     PartCanonicalizationMismatch,
     SamePartCompared,
-    DuplicatePartId { id: String },
+    DuplicatePartId {
+        id: String,
+    },
+    PartMetadata(String),
+    ForeignNamespaceCoreElement {
+        element: String,
+        namespace: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,11 +73,21 @@ pub fn parse_musicxml_measure_map(
     if score_clock_id.trim().is_empty() {
         return Err(MusicXmlMeasureAdapterError::EmptyScoreClockId);
     }
-    let text =
-        std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
+    let text = std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
     let document = roxmltree::Document::parse(text)
         .map_err(|error| MusicXmlMeasureAdapterError::MalformedXml(error.to_string()))?;
     let root = document.root_element();
+    if let Some((element, namespace)) = foreign_namespace_core_element(root) {
+        return Ok(unavailable_map(
+            source_id,
+            score_clock_id,
+            MeasureMapStatus::Unsupported {
+                reason: format!(
+                    "foreign namespace {namespace} reuses MusicXML core element {element}"
+                ),
+            },
+        ));
+    }
 
     if root.has_tag_name("score-timewise") {
         return Ok(unavailable_map(
@@ -119,7 +142,11 @@ pub fn parse_musicxml_measure_map(
     }
 
     let reference = &normalized_parts[0];
-    if normalized_parts.iter().flatten().any(|measure| measure.non_controlling) {
+    if normalized_parts
+        .iter()
+        .flatten()
+        .any(|measure| measure.non_controlling)
+    {
         return Ok(unknown_map(
             source_id,
             score_clock_id,
@@ -149,9 +176,7 @@ pub fn parse_musicxml_measure_map(
                 ),
             ));
         }
-        for (measure_index, (left, right)) in
-            reference.iter().zip(measures.iter()).enumerate()
-        {
+        for (measure_index, (left, right)) in reference.iter().zip(measures.iter()).enumerate() {
             if left.duration != right.duration {
                 return Ok(unknown_map(
                     source_id,
@@ -164,8 +189,8 @@ pub fn parse_musicxml_measure_map(
         }
     }
 
-    let mut start = RationalBeat::new(0, 1)
-        .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
+    let mut start =
+        RationalBeat::new(0, 1).map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
     let mut spans = Vec::with_capacity(reference.len());
     for (measure_index, first_part_measure) in reference.iter().enumerate() {
         let kind = if normalized_parts
@@ -191,8 +216,6 @@ pub fn parse_musicxml_measure_map(
         measures: spans,
     })
 }
-
-
 /// One part's independent notated measure lattice.
 ///
 /// `non_controlling_measure_indices` records the zero-based measure indices
@@ -205,7 +228,6 @@ pub struct MusicXmlPartMeasureMapV1 {
     pub non_controlling_measure_indices: Vec<usize>,
     pub map: MeasureMap,
 }
-
 /// Parse every MusicXML score-partwise part into its own exact measure map.
 ///
 /// Unlike parse_musicxml_measure_map, this API preserves polymetric structure
@@ -223,8 +245,7 @@ pub fn parse_musicxml_part_measure_maps(
     if score_clock_id.trim().is_empty() {
         return Err(MusicXmlMeasureAdapterError::EmptyScoreClockId);
     }
-    let text =
-        std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
+    let text = std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
     let document = roxmltree::Document::parse(text)
         .map_err(|error| MusicXmlMeasureAdapterError::MalformedXml(error.to_string()))?;
     let root = document.root_element();
@@ -233,7 +254,6 @@ pub fn parse_musicxml_part_measure_maps(
             root: root.tag_name().name().to_string(),
         });
     }
-
     let parts: Vec<_> = root
         .children()
         .filter(|node| node.has_tag_name("part"))
@@ -241,7 +261,6 @@ pub fn parse_musicxml_part_measure_maps(
     if parts.is_empty() {
         return Err(MusicXmlMeasureAdapterError::NoParts);
     }
-
     let mut output = Vec::with_capacity(parts.len());
     let mut seen_part_ids = std::collections::BTreeSet::new();
     for part in parts {
@@ -258,7 +277,9 @@ pub fn parse_musicxml_part_measure_maps(
         let (status, measures, non_controlling_indices) = match parsed {
             Some(parsed)
                 if !parsed.is_empty()
-                    && parsed.iter().all(|measure| !measure.has_unmodelled_barline_events) =>
+                    && parsed
+                        .iter()
+                        .all(|measure| !measure.has_unmodelled_barline_events) =>
             {
                 let mut start = RationalBeat::new(0, 1)
                     .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
@@ -316,9 +337,6 @@ pub fn parse_musicxml_part_measure_maps(
     }
     Ok(output)
 }
-
-
-
 /// Typed MusicXML barline location in a single partwise measure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MusicXmlBarlineLocationV1 {
@@ -326,13 +344,11 @@ pub enum MusicXmlBarlineLocationV1 {
     Middle,
     Right,
 }
-
 /// Segno/coda marker presence plus an optional source identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlSignpostV1 {
     pub identifier: Option<String>,
 }
-
 /// Explicit repeat semantics retained from a MusicXML barline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlRepeatV1 {
@@ -343,7 +359,6 @@ pub struct MusicXmlRepeatV1 {
     /// Attributes introduced by a future MusicXML version or extension.
     pub unrecognized_attributes: Vec<(String, String)>,
 }
-
 /// Explicit numbered-ending semantics retained from a MusicXML barline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlEndingV1 {
@@ -351,7 +366,6 @@ pub struct MusicXmlEndingV1 {
     pub ending_type: Option<String>,
     pub text: Option<String>,
 }
-
 /// One source barline event at an exact position in the notated score clock.
 ///
 /// Repeats and endings remain graph annotations; this type does not expand
@@ -379,7 +393,6 @@ pub struct MusicXmlPartBarlineEventV1 {
     pub unrecognized_attributes: Vec<(String, String)>,
     pub staff: Option<String>,
 }
-
 /// Complete measure map plus every explicit MusicXML barline event for a part.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlFermataV1 {
@@ -387,7 +400,6 @@ pub struct MusicXmlFermataV1 {
     pub text: Option<String>,
     pub content: Option<String>,
 }
-
 /// Typed wavy-line marker attached to a barline (for example, a trill line).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlWavyLineV1 {
@@ -395,7 +407,6 @@ pub struct MusicXmlWavyLineV1 {
     pub number: Option<String>,
     pub placement: Option<String>,
 }
-
 /// MusicXML footnote/level annotation retained without interpreting its prose.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlBarlineAnnotationV1 {
@@ -431,6 +442,10 @@ pub struct MusicXmlMeasureLocatorV1 {
     pub non_controlling: bool,
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Complete measure map, typed barline events and playback controls for a part.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartNotationGraphV1 {
@@ -440,6 +455,22 @@ pub struct MusicXmlPartNotationGraphV1 {
     pub non_controlling_measure_indices: Vec<usize>,
     pub barline_events: Vec<MusicXmlPartBarlineEventV1>,
     pub playback_controls: Vec<MusicXmlPlaybackControlV1>,
+    /// Exact source-ordered note/rest/tuplet/tie/staff semantics. Older
+    /// serialized graphs omit this field; the legacy sentinel is skipped
+    /// again so their canonical commitments remain stable.
+    #[serde(
+        default = "legacy_missing_notation_events",
+        skip_serializing_if = "crate::musicxml_notation_events::is_legacy_missing_notation_events"
+    )]
+    pub notation_events: MusicXmlPartNotationEventsV1,
+    /// Optional score-part declaration outside the <part> body. None means
+    /// the source omitted a matching part-list entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_metadata: Option<MusicXmlPartMetadataV1>,
+    /// Explicitly records that the part-metadata layer was emitted, even when
+    /// no <part-list> declaration exists. Older graphs omit this marker.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub part_metadata_layer_present: bool,
 }
 
 /// Parse score-partwise into exact per-part measure maps plus typed barline
@@ -456,14 +487,19 @@ pub fn parse_musicxml_part_notation_graph(
     if score_clock_id.trim().is_empty() {
         return Err(MusicXmlMeasureAdapterError::EmptyScoreClockId);
     }
-    let text =
-        std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
+    let text = std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
     let document = roxmltree::Document::parse(text)
         .map_err(|error| MusicXmlMeasureAdapterError::MalformedXml(error.to_string()))?;
     let root = document.root_element();
     if !root.has_tag_name("score-partwise") {
         return Err(MusicXmlMeasureAdapterError::UnsupportedRoot {
             root: root.tag_name().name().to_string(),
+        });
+    }
+    if let Some((element, namespace)) = foreign_namespace_core_element(root) {
+        return Err(MusicXmlMeasureAdapterError::ForeignNamespaceCoreElement {
+            element,
+            namespace,
         });
     }
     let parts: Vec<_> = root
@@ -487,6 +523,8 @@ pub fn parse_musicxml_part_notation_graph(
             });
         }
         let measure_locators = parse_measure_locators_for_part(part);
+        let part_metadata = parse_musicxml_part_metadata(root, part_id)
+            .map_err(MusicXmlMeasureAdapterError::PartMetadata)?;
         let parsed = parse_part(part)?;
         match parsed {
             Some(measures) if !measures.is_empty() => {
@@ -512,6 +550,8 @@ pub fn parse_musicxml_part_notation_graph(
                 )?;
                 let playback_controls =
                     parse_playback_controls_for_part(part, part_id);
+                let notation_events =
+                    parse_musicxml_part_notation_events(part, part_id, &spans);
                 let map = MeasureMap {
                     source_id: format!("{source_id}#part={part_id}"),
                     score_clock_id: score_clock_id.to_string(),
@@ -531,6 +571,9 @@ pub fn parse_musicxml_part_notation_graph(
                     non_controlling_measure_indices,
                     barline_events,
                     playback_controls,
+                    notation_events,
+                    part_metadata,
+                    part_metadata_layer_present: true,
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
@@ -548,6 +591,9 @@ pub fn parse_musicxml_part_notation_graph(
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
+                notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
+                part_metadata,
+                part_metadata_layer_present: true,
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
                 part_id: part_id.to_string(),
@@ -560,20 +606,23 @@ pub fn parse_musicxml_part_notation_graph(
                     },
                     measures: Vec::new(),
                 },
+                measure_locators,
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
+                notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
+                part_metadata,
+                part_metadata_layer_present: true,
             }),
         }
     }
     Ok(output)
 }
-
-
 /// Canonical SHA-256 commitment to one parsed per-part notation graph.
 ///
-/// The commitment includes the measure map, non-controlling flags and every
-/// barline event. It is a content digest, not a signature or source-authenticity
+/// The commitment includes the measure map, non-controlling flags, barline
+/// events, playback controls and exact MusicXML notation-event layer. It is
+/// a content digest, not a signature or source-authenticity
 /// proof.
 pub fn musicxml_notation_graph_commitment(
     graph: &MusicXmlPartNotationGraphV1,
@@ -590,10 +639,99 @@ pub fn validate_musicxml_notation_graph_replay(
     score_clock_id: &str,
     supplied: &[MusicXmlPartNotationGraphV1],
 ) -> Result<bool, MusicXmlMeasureAdapterError> {
-    let replayed = parse_musicxml_part_notation_graph(bytes, source_id, score_clock_id)?;
+    let mut replayed = parse_musicxml_part_notation_graph(bytes, source_id, score_clock_id)?;
+    if replayed.len() != supplied.len() {
+        return Ok(false);
+    }
+    // Older v1 graphs predate both the notation-event layer and part-list
+    // metadata. MUSE-MIR-018 then introduced notation events before the
+    // part-metadata layer was added. Preserve both historical shapes while
+    // requiring every graph emitted by the current parser to commit metadata
+    // presence explicitly (even when the source has no <part-list>).
+    for (current, stored) in replayed.iter_mut().zip(supplied) {
+        if crate::musicxml_notation_events::is_legacy_missing_notation_events(
+            &stored.notation_events,
+        ) {
+            current.notation_events =
+                crate::musicxml_notation_events::legacy_missing_notation_events();
+        }
+        if !stored.part_metadata_layer_present {
+            current.part_metadata = None;
+            current.part_metadata_layer_present = false;
+        }
+    }
     Ok(replayed == supplied)
 }
 
+
+
+/// The legacy measure/barline parser uses MusicXML local element names.
+/// Reject foreign-namespace elements that collide with those names until
+/// every legacy branch is namespace-aware. The notation-event layer itself
+/// retains such elements as opaque extensions; this preflight prevents the
+/// older measure parser from interpreting them as score structure.
+fn foreign_namespace_core_element(root: roxmltree::Node<'_, '_>) -> Option<(String, String)> {
+    const CORE_ELEMENTS: &[&str] = &[
+        "score-partwise",
+        "score-timewise",
+        "part-list",
+        "score-part",
+        "part",
+        "measure",
+        "attributes",
+        "divisions",
+        "key",
+        "time",
+        "staves",
+        "clef",
+        "staff-details",
+        "transpose",
+        "note",
+        "grace",
+        "cue",
+        "chord",
+        "pitch",
+        "rest",
+        "unpitched",
+        "duration",
+        "backup",
+        "forward",
+        "barline",
+        "bar-style",
+        "repeat",
+        "ending",
+        "segno",
+        "coda",
+        "sound",
+        "direction",
+        "harmony",
+        "figured-bass",
+        "notations",
+        "tied",
+        "tie",
+        "time-modification",
+        "tuplet",
+        "instrument",
+        "score-instrument",
+        "midi-instrument",
+        "offset",
+        "beats",
+        "beat-type",
+    ];
+    let expected_namespace = root.tag_name().namespace();
+    root.descendants()
+        .filter(|node| node.is_element())
+        .find(|node| {
+            node.tag_name().namespace() != expected_namespace
+                && CORE_ELEMENTS.contains(&node.tag_name().name())
+        })
+        .map(|node| {
+            (
+                node.tag_name().name().to_string(),
+                node.tag_name().namespace().unwrap_or("").to_string(),
+            )
+        })
+}
 
 fn parse_measure_locators_for_part(
     part: roxmltree::Node<'_, '_>,
@@ -682,10 +820,7 @@ fn parse_playback_controls_for_part(
                 source_id: node.attribute("id").map(str::to_string),
                 attributes: node
                     .attributes()
-                    .map(|attribute| (
-                        attribute.name().to_string(),
-                        attribute.value().to_string(),
-                    ))
+                    .map(|attribute| (attribute.name().to_string(), attribute.value().to_string()))
                     .collect(),
                 text: node
                     .text()
@@ -716,8 +851,8 @@ fn parse_barline_events_for_part(
     let mut source_order = 0usize;
     let mut events = Vec::new();
     for (measure_index, measure) in measure_nodes.iter().enumerate() {
-        let mut cursor = RationalBeat::new(0, 1)
-            .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
+        let mut cursor =
+            RationalBeat::new(0, 1).map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
         for element in measure.children().filter(|node| node.is_element()) {
             if element.has_tag_name("attributes") {
                 for attribute in element.children().filter(|node| node.is_element()) {
@@ -808,10 +943,9 @@ fn parse_barline_events_for_part(
                         unrecognized_attributes: node
                             .attributes()
                             .filter(|attribute| !known_attributes.contains(&attribute.name()))
-                            .map(|attribute| (
-                                attribute.name().to_string(),
-                                attribute.value().to_string(),
-                            ))
+                            .map(|attribute| {
+                                (attribute.name().to_string(), attribute.value().to_string())
+                            })
                             .collect(),
                     }
                 });
@@ -819,7 +953,9 @@ fn parse_barline_events_for_part(
                 let ending = ending_node.map(|node| MusicXmlEndingV1 {
                     number: node.attribute("number").map(str::to_string),
                     ending_type: node.attribute("type").map(str::to_string),
-                    text: node.text().map(|value| value.trim().to_string())
+                    text: node
+                        .text()
+                        .map(|value| value.trim().to_string())
                         .filter(|value| !value.is_empty()),
                 });
                 let parse_signpost = |name: &str| {
@@ -841,21 +977,26 @@ fn parse_barline_events_for_part(
                 };
                 let segno = parse_signpost("segno");
                 let coda = parse_signpost("coda");
-                let bar_style = element.children()
+                let bar_style = element
+                    .children()
                     .find(|node| node.has_tag_name("bar-style"))
                     .and_then(|node| node.text())
                     .map(|value| value.trim().to_string())
                     .filter(|value| !value.is_empty());
-                let fermatas = element.children()
+                let fermatas = element
+                    .children()
                     .filter(|node| node.has_tag_name("fermata"))
                     .map(|node| MusicXmlFermataV1 {
                         fermata_type: node.attribute("type").map(str::to_string),
                         text: node.attribute("text").map(str::to_string),
-                        content: node.text().map(|value| value.trim().to_string())
+                        content: node
+                            .text()
+                            .map(|value| value.trim().to_string())
                             .filter(|value| !value.is_empty()),
                     })
                     .collect();
-                let wavy_lines = element.children()
+                let wavy_lines = element
+                    .children()
                     .filter(|node| node.has_tag_name("wavy-line"))
                     .map(|node| MusicXmlWavyLineV1 {
                         line_type: node.attribute("type").map(str::to_string),
@@ -863,48 +1004,59 @@ fn parse_barline_events_for_part(
                         placement: node.attribute("placement").map(str::to_string),
                     })
                     .collect();
-                let annotations = element.children()
+                let annotations = element
+                    .children()
                     .filter(|node| node.has_tag_name("footnote") || node.has_tag_name("level"))
                     .map(|node| MusicXmlBarlineAnnotationV1 {
                         element: node.tag_name().name().to_string(),
-                        attributes: node.attributes()
-                            .map(|attribute| (
-                                attribute.name().to_string(),
-                                attribute.value().to_string(),
-                            ))
+                        attributes: node
+                            .attributes()
+                            .map(|attribute| {
+                                (attribute.name().to_string(), attribute.value().to_string())
+                            })
                             .collect(),
-                        text: node.text().map(|value| value.trim().to_string())
+                        text: node
+                            .text()
+                            .map(|value| value.trim().to_string())
                             .filter(|value| !value.is_empty()),
                     })
                     .collect();
                 let known_barline_children = [
-                    "bar-style", "footnote", "level", "wavy-line", "segno", "coda",
-                    "fermata", "ending", "repeat",
+                    "bar-style",
+                    "footnote",
+                    "level",
+                    "wavy-line",
+                    "segno",
+                    "coda",
+                    "fermata",
+                    "ending",
+                    "repeat",
                 ];
-                let unrecognized_children = element.children()
+                let unrecognized_children = element
+                    .children()
                     .filter(|node| {
                         node.is_element()
                             && !known_barline_children.contains(&node.tag_name().name())
                     })
                     .map(|node| MusicXmlBarlineAnnotationV1 {
                         element: node.tag_name().name().to_string(),
-                        attributes: node.attributes()
-                            .map(|attribute| (
-                                attribute.name().to_string(),
-                                attribute.value().to_string(),
-                            ))
+                        attributes: node
+                            .attributes()
+                            .map(|attribute| {
+                                (attribute.name().to_string(), attribute.value().to_string())
+                            })
                             .collect(),
-                        text: node.text().map(|value| value.trim().to_string())
+                        text: node
+                            .text()
+                            .map(|value| value.trim().to_string())
                             .filter(|value| !value.is_empty()),
                     })
                     .collect();
                 let known_attributes = ["id", "location", "segno", "coda", "divisions", "staff"];
-                let unrecognized_attributes = element.attributes()
+                let unrecognized_attributes = element
+                    .attributes()
                     .filter(|attribute| !known_attributes.contains(&attribute.name()))
-                    .map(|attribute| (
-                        attribute.name().to_string(),
-                        attribute.value().to_string(),
-                    ))
+                    .map(|attribute| (attribute.name().to_string(), attribute.value().to_string()))
                     .collect();
                 let measure_number = measure.attribute("number").unwrap_or("");
                 events.push(MusicXmlPartBarlineEventV1 {
@@ -964,10 +1116,14 @@ pub fn compare_musicxml_part_boundaries(
         return Err(MusicXmlMeasureAdapterError::PartCanonicalizationMismatch);
     }
     if left.map.status != MeasureMapStatus::Supported {
-        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap { part_id: left.part_id.clone() });
+        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap {
+            part_id: left.part_id.clone(),
+        });
     }
     if right.map.status != MeasureMapStatus::Supported {
-        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap { part_id: right.part_id.clone() });
+        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap {
+            part_id: right.part_id.clone(),
+        });
     }
 
     let left_boundaries = part_internal_boundaries(left);
@@ -1034,12 +1190,19 @@ pub fn compare_musicxml_part_boundaries(
     Ok(result)
 }
 
-fn part_internal_boundaries(
-    part: &MusicXmlPartMeasureMapV1,
-) -> Vec<(RationalBeat, bool)> {
-    part.map.measures.iter().enumerate().skip(1).map(|(index, measure)| {
-        (measure.start, part.non_controlling_measure_indices.contains(&index))
-    }).collect()
+fn part_internal_boundaries(part: &MusicXmlPartMeasureMapV1) -> Vec<(RationalBeat, bool)> {
+    part.map
+        .measures
+        .iter()
+        .enumerate()
+        .skip(1)
+        .map(|(index, measure)| {
+            (
+                measure.start,
+                part.non_controlling_measure_indices.contains(&index),
+            )
+        })
+        .collect()
 }
 
 fn push_unmatched_boundary(
@@ -1055,11 +1218,7 @@ fn push_unmatched_boundary(
     }
 }
 
-fn unavailable_map(
-    source_id: &str,
-    score_clock_id: &str,
-    status: MeasureMapStatus,
-) -> MeasureMap {
+fn unavailable_map(source_id: &str, score_clock_id: &str, status: MeasureMapStatus) -> MeasureMap {
     MeasureMap {
         source_id: source_id.to_string(),
         score_clock_id: score_clock_id.to_string(),
@@ -1100,8 +1259,8 @@ fn parse_part(
         let non_controlling = measure
             .attribute("non-controlling")
             .is_some_and(|value| matches!(value, "yes" | "true" | "1"));
-        let mut cursor = RationalBeat::new(0, 1)
-            .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
+        let mut cursor =
+            RationalBeat::new(0, 1).map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
         let mut maximum_cursor = cursor;
         let mut has_unmodelled_barline_events = false;
 
@@ -1114,9 +1273,7 @@ fn parse_part(
                             return Ok(None);
                         };
                         if value <= 0 {
-                            return Err(MusicXmlMeasureAdapterError::InvalidDivisions {
-                                value,
-                            });
+                            return Err(MusicXmlMeasureAdapterError::InvalidDivisions { value });
                         }
                         divisions = Some(value);
                     } else if attribute.has_tag_name("time") {
@@ -1170,8 +1327,15 @@ fn parse_part(
                 // repeat/ending/playback semantics while claiming Supported.
                 let location = element.attribute("location").unwrap_or("right");
                 let known_children = [
-                    "bar-style", "footnote", "level", "wavy-line", "segno", "coda",
-                    "fermata", "ending", "repeat",
+                    "bar-style",
+                    "footnote",
+                    "level",
+                    "wavy-line",
+                    "segno",
+                    "coda",
+                    "fermata",
+                    "ending",
+                    "repeat",
                 ];
                 let has_unmodelled_semantics = element.children().any(|child| {
                     child.is_element()
@@ -1185,7 +1349,8 @@ fn parse_part(
                     child.is_element() && !known_children.contains(&child.tag_name().name())
                 });
                 let known_attributes = ["id", "location", "segno", "coda", "divisions", "staff"];
-                let has_unknown_attributes = element.attributes()
+                let has_unknown_attributes = element
+                    .attributes()
                     .any(|attribute| !known_attributes.contains(&attribute.name()));
                 if location == "middle"
                     || !matches!(location, "left" | "right")
@@ -1316,12 +1481,7 @@ mod tests {
     use super::*;
 
     fn parse(xml: &str) -> MeasureMap {
-        parse_musicxml_measure_map(
-            xml.as_bytes(),
-            "sha256:fixture",
-            "fixture-score-clock",
-        )
-        .unwrap()
+        parse_musicxml_measure_map(xml.as_bytes(), "sha256:fixture", "fixture-score-clock").unwrap()
     }
 
     fn supported(map: &MeasureMap) -> &[MeasureSpan] {
@@ -1425,7 +1585,8 @@ mod tests {
 
     #[test]
     fn empty_measure_without_explicit_duration_remains_unknown() {
-        let map = parse(r#"<score-partwise><part id="P1"><measure number="1"/></part></score-partwise>"#);
+        let map =
+            parse(r#"<score-partwise><part id="P1"><measure number="1"/></part></score-partwise>"#);
         assert!(matches!(map.status, MeasureMapStatus::Unknown { .. }));
         assert!(map.measures.is_empty());
     }
@@ -1466,23 +1627,25 @@ mod tests {
             </part>
         </score-partwise>"#;
 
-        let maps = parse_musicxml_part_measure_maps(
-            xml.as_bytes(),
-            "sha256:polymeter",
-            "score-clock-1",
-        )
-        .unwrap();
+        let maps =
+            parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:polymeter", "score-clock-1")
+                .unwrap();
         assert_eq!(maps.len(), 2);
         assert_eq!(maps[0].part_id, "P1");
         assert_eq!(maps[1].part_id, "P2");
         assert_eq!(maps[0].map.measures.len(), 2);
         assert_eq!(maps[1].map.measures.len(), 3);
-        assert_eq!(maps[0].map.measures[1].start, RationalBeat::new(3, 1).unwrap());
-        assert_eq!(maps[1].map.measures[1].start, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            maps[0].map.measures[1].start,
+            RationalBeat::new(3, 1).unwrap()
+        );
+        assert_eq!(
+            maps[1].map.measures[1].start,
+            RationalBeat::new(2, 1).unwrap()
+        );
         assert_eq!(maps[1].non_controlling_measure_indices, vec![1, 2]);
         assert_eq!(
-            maps[0].map.score_clock_id,
-            maps[1].map.score_clock_id,
+            maps[0].map.score_clock_id, maps[1].map.score_clock_id,
             "all parts share one exact notated score-clock coordinate frame"
         );
     }
@@ -1533,15 +1696,23 @@ mod tests {
                 <measure number="3" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
             </part>
         </score-partwise>"#;
-        let maps = parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:poly", "score-clock").unwrap();
+        let maps =
+            parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:poly", "score-clock").unwrap();
         let alignment = compare_musicxml_part_boundaries(&maps[0], &maps[1]).unwrap();
         assert!(alignment.coincident_boundaries.is_empty());
         assert!(alignment.unmatched_required_left.is_empty());
         assert!(alignment.unmatched_required_right.is_empty());
-        assert_eq!(alignment.unmatched_non_controlling_left, vec![RationalBeat::new(3, 1).unwrap()]);
-        assert_eq!(alignment.unmatched_non_controlling_right, vec![
-            RationalBeat::new(2, 1).unwrap(), RationalBeat::new(4, 1).unwrap()
-        ]);
+        assert_eq!(
+            alignment.unmatched_non_controlling_left,
+            vec![RationalBeat::new(3, 1).unwrap()]
+        );
+        assert_eq!(
+            alignment.unmatched_non_controlling_right,
+            vec![
+                RationalBeat::new(2, 1).unwrap(),
+                RationalBeat::new(4, 1).unwrap()
+            ]
+        );
     }
 
     #[test]
@@ -1556,9 +1727,14 @@ mod tests {
                 <measure number="2"><note><rest/><duration>32</duration></note></measure>
             </part>
         </score-partwise>"#;
-        let maps = parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:aligned", "score-clock").unwrap();
+        let maps =
+            parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:aligned", "score-clock")
+                .unwrap();
         let alignment = compare_musicxml_part_boundaries(&maps[0], &maps[1]).unwrap();
-        assert_eq!(alignment.coincident_boundaries, vec![RationalBeat::new(4, 1).unwrap()]);
+        assert_eq!(
+            alignment.coincident_boundaries,
+            vec![RationalBeat::new(4, 1).unwrap()]
+        );
         assert!(alignment.unmatched_required_left.is_empty());
         assert!(alignment.unmatched_required_right.is_empty());
     }
@@ -1569,9 +1745,14 @@ mod tests {
             <part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes><note><rest/><duration>16</duration></note></measure></part>
             <part id="P2"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes><note><rest/><duration>16</duration></note></measure></part>
         </score-partwise>"#;
-        let mut maps = parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:clock", "score-clock").unwrap();
+        let mut maps =
+            parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:clock", "score-clock")
+                .unwrap();
         maps[1].map.score_clock_id = "different-clock".into();
-        assert_eq!(compare_musicxml_part_boundaries(&maps[0], &maps[1]), Err(MusicXmlMeasureAdapterError::PartClockMismatch));
+        assert_eq!(
+            compare_musicxml_part_boundaries(&maps[0], &maps[1]),
+            Err(MusicXmlMeasureAdapterError::PartClockMismatch)
+        );
     }
 
     #[test]
@@ -1635,9 +1816,13 @@ mod tests {
             xml.as_bytes(),
             "sha256:internal-barline",
             "score-clock-1",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(parts.len(), 1);
-        assert!(matches!(parts[0].map.status, MeasureMapStatus::Unknown { .. }));
+        assert!(matches!(
+            parts[0].map.status,
+            MeasureMapStatus::Unknown { .. }
+        ));
         assert!(parts[0].map.measures.is_empty());
     }
 
@@ -1690,10 +1875,14 @@ mod tests {
             xml.as_bytes(),
             "sha256:notation-graph",
             "score-clock",
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(graphs.len(), 1);
         assert_eq!(graphs[0].map.status, MeasureMapStatus::Supported);
-        assert_eq!(graphs[0].map.measures[0].end, RationalBeat::new(4, 1).unwrap());
+        assert_eq!(
+            graphs[0].map.measures[0].end,
+            RationalBeat::new(4, 1).unwrap()
+        );
         assert_eq!(graphs[0].barline_events.len(), 3);
         let middle = &graphs[0].barline_events[0];
         assert_eq!(middle.source_id.as_deref(), Some("mid-1"));
@@ -1701,21 +1890,48 @@ mod tests {
         assert_eq!(middle.measure_offset, RationalBeat::new(2, 1).unwrap());
         assert_eq!(middle.score_offset, RationalBeat::new(2, 1).unwrap());
         assert_eq!(middle.bar_style.as_deref(), Some("dashed"));
-        assert_eq!(graphs[0].non_controlling_measure_indices, Vec::<usize>::new());
+        assert_eq!(
+            graphs[0].non_controlling_measure_indices,
+            Vec::<usize>::new()
+        );
 
         let right = &graphs[0].barline_events[1];
         assert_eq!(right.location, MusicXmlBarlineLocationV1::Right);
         assert_eq!(right.score_offset, RationalBeat::new(4, 1).unwrap());
-        assert_eq!(right.ending.as_ref().and_then(|value| value.number.as_deref()), Some("1"));
-        assert_eq!(right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("backward"));
-        assert_eq!(right.repeat.as_ref().and_then(|value| value.times.as_deref()), Some("2"));
+        assert_eq!(
+            right
+                .ending
+                .as_ref()
+                .and_then(|value| value.number.as_deref()),
+            Some("1")
+        );
+        assert_eq!(
+            right
+                .repeat
+                .as_ref()
+                .and_then(|value| value.direction.as_deref()),
+            Some("backward")
+        );
+        assert_eq!(
+            right
+                .repeat
+                .as_ref()
+                .and_then(|value| value.times.as_deref()),
+            Some("2")
+        );
         assert_eq!(right.divisions_override.as_deref(), Some("4"));
         assert_eq!(
-            right.segno.as_ref().and_then(|value| value.identifier.as_deref()),
+            right
+                .segno
+                .as_ref()
+                .and_then(|value| value.identifier.as_deref()),
             Some("S1")
         );
         assert_eq!(
-            right.coda.as_ref().and_then(|value| value.identifier.as_deref()),
+            right
+                .coda
+                .as_ref()
+                .and_then(|value| value.identifier.as_deref()),
             Some("C1")
         );
         assert_eq!(right.fermatas.len(), 1);
@@ -1726,13 +1942,26 @@ mod tests {
         assert_eq!(right.annotations.len(), 2);
         assert_eq!(right.annotations[0].element, "footnote");
         assert_eq!(right.annotations[0].text.as_deref(), Some("closing note"));
-        assert!(right.unrecognized_attributes.contains(&("custom".into(), "x".into())));
+        assert!(
+            right
+                .unrecognized_attributes
+                .contains(&("custom".into(), "x".into()))
+        );
         assert_eq!(right.unrecognized_children.len(), 1);
         assert_eq!(right.unrecognized_children[0].element, "future-marker");
-        assert_eq!(right.unrecognized_children[0].text.as_deref(), Some("future payload"));
+        assert_eq!(
+            right.unrecognized_children[0].text.as_deref(),
+            Some("future payload")
+        );
         let second_right = &graphs[0].barline_events[2];
         assert_eq!(second_right.score_offset, RationalBeat::new(5, 1).unwrap());
-        assert_eq!(second_right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("forward"));
+        assert_eq!(
+            second_right
+                .repeat
+                .as_ref()
+                .and_then(|value| value.direction.as_deref()),
+            Some("forward")
+        );
     }
 
     #[test]
@@ -1744,8 +1973,11 @@ mod tests {
             <barline location="right" id="b2"><repeat direction="backward"/></barline>
         </measure></part></score-partwise>"#;
         let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:duplicate-boundaries", "score-clock"
-        ).unwrap();
+            xml.as_bytes(),
+            "sha256:duplicate-boundaries",
+            "score-clock",
+        )
+        .unwrap();
         assert_eq!(graph[0].barline_events.len(), 2);
         assert_eq!(
             graph[0].barline_events[0].score_offset,
@@ -1767,9 +1999,9 @@ mod tests {
         </measure></part></score-partwise>"#;
         let map = parse(xml);
         assert!(matches!(map.status, MeasureMapStatus::Unknown { .. }));
-        let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:middle-bar", "score-clock"
-        ).unwrap();
+        let graph =
+            parse_musicxml_part_notation_graph(xml.as_bytes(), "sha256:middle-bar", "score-clock")
+                .unwrap();
         assert_eq!(graph[0].map.status, MeasureMapStatus::Supported);
         assert_eq!(graph[0].barline_events.len(), 1);
     }
@@ -1784,27 +2016,51 @@ mod tests {
             <barline location="right"><repeat direction="backward" times="2"/></barline>
         </measure></part></score-partwise>"#;
         let graphs = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:sealed-graph", "score-clock"
-        ).unwrap();
+            xml.as_bytes(),
+            "sha256:sealed-graph",
+            "score-clock",
+        )
+        .unwrap();
         let digest = musicxml_notation_graph_commitment(&graphs[0]).unwrap();
         assert_eq!(digest.len(), 64);
-        assert!(validate_musicxml_notation_graph_replay(
-            xml.as_bytes(), "sha256:sealed-graph", "score-clock", &graphs
-        ).unwrap());
+        assert!(
+            validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:sealed-graph",
+                "score-clock",
+                &graphs
+            )
+            .unwrap()
+        );
 
         let mut tampered = graphs.clone();
         tampered[0].barline_events[0].score_offset = RationalBeat::new(3, 1).unwrap();
-        assert!(!validate_musicxml_notation_graph_replay(
-            xml.as_bytes(), "sha256:sealed-graph", "score-clock", &tampered
-        ).unwrap());
+        assert!(
+            !validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:sealed-graph",
+                "score-clock",
+                &tampered
+            )
+            .unwrap()
+        );
 
         let mut tampered_repeat = graphs.clone();
-        tampered_repeat[0].barline_events[1].repeat.as_mut().unwrap().times = Some("3".into());
-        assert!(!validate_musicxml_notation_graph_replay(
-            xml.as_bytes(), "sha256:sealed-graph", "score-clock", &tampered_repeat
-        ).unwrap());
+        tampered_repeat[0].barline_events[1]
+            .repeat
+            .as_mut()
+            .unwrap()
+            .times = Some("3".into());
+        assert!(
+            !validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:sealed-graph",
+                "score-clock",
+                &tampered_repeat
+            )
+            .unwrap()
+        );
     }
-
 
     #[test]
     fn map_only_api_withholds_unknown_barline_extensions() {
@@ -1815,14 +2071,13 @@ mod tests {
         </measure></part></score-partwise>"#;
         let map = parse(xml);
         assert!(matches!(map.status, MeasureMapStatus::Unknown { .. }));
-        let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:extension", "score-clock"
-        ).unwrap();
+        let graph =
+            parse_musicxml_part_notation_graph(xml.as_bytes(), "sha256:extension", "score-clock")
+                .unwrap();
         assert_eq!(graph[0].map.status, MeasureMapStatus::Supported);
         assert_eq!(graph[0].barline_events[0].unrecognized_attributes.len(), 1);
         assert_eq!(graph[0].barline_events[0].unrecognized_children.len(), 1);
     }
-
 
     #[test]
     fn signpost_presence_is_preserved_even_without_an_identifier() {
@@ -1832,15 +2087,17 @@ mod tests {
             <barline location="right"><segno/><coda/></barline>
         </measure></part></score-partwise>"#;
         let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:anonymous-signposts", "score-clock"
-        ).unwrap();
+            xml.as_bytes(),
+            "sha256:anonymous-signposts",
+            "score-clock",
+        )
+        .unwrap();
         let event = &graph[0].barline_events[0];
         assert!(event.segno.is_some());
         assert!(event.coda.is_some());
         assert_eq!(event.segno.as_ref().unwrap().identifier, None);
         assert_eq!(event.coda.as_ref().unwrap().identifier, None);
     }
-
 
     #[test]
     fn repeat_after_jump_and_unknown_repeat_attributes_are_preserved() {
@@ -1851,9 +2108,9 @@ mod tests {
                 <repeat direction="backward" times="2" after-jump="yes" future-mode="x"/>
             </barline>
         </measure></part></score-partwise>"#;
-        let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:after-jump", "score-clock"
-        ).unwrap();
+        let graph =
+            parse_musicxml_part_notation_graph(xml.as_bytes(), "sha256:after-jump", "score-clock")
+                .unwrap();
         let repeat = graph[0].barline_events[0].repeat.as_ref().unwrap();
         assert_eq!(repeat.after_jump.as_deref(), Some("yes"));
         assert_eq!(
@@ -1872,17 +2129,25 @@ mod tests {
             </note>
         </measure></part></score-partwise>"#;
         let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:sound-controls", "score-clock"
-        ).unwrap();
+            xml.as_bytes(),
+            "sha256:sound-controls",
+            "score-clock",
+        )
+        .unwrap();
         assert_eq!(graph[0].playback_controls.len(), 3);
-        assert_eq!(graph[0].playback_controls[0].element, "measure/direction/sound");
-        assert!(graph[0].playback_controls[0].attributes.iter().any(
-            |(name, value)| name == "dacapo" && value == "yes"
-        ));
+        assert_eq!(
+            graph[0].playback_controls[0].element,
+            "measure/direction/sound"
+        );
+        assert!(
+            graph[0].playback_controls[0]
+                .attributes
+                .iter()
+                .any(|(name, value)| name == "dacapo" && value == "yes")
+        );
         assert_eq!(graph[0].playback_controls[1].element, "measure/note");
         assert_eq!(graph[0].playback_controls[2].element, "measure/note/lyric");
     }
-
 
     #[test]
     fn graph_preserves_source_measure_numbers_and_locator_attributes() {
@@ -1896,16 +2161,329 @@ mod tests {
             </measure>
         </part></score-partwise>"#;
         let graph = parse_musicxml_part_notation_graph(
-            xml.as_bytes(), "sha256:measure-locators", "score-clock"
-        ).unwrap();
+            xml.as_bytes(),
+            "sha256:measure-locators",
+            "score-clock",
+        )
+        .unwrap();
         assert_eq!(graph[0].measure_locators.len(), 2);
         assert_eq!(graph[0].measure_locators[0].number.as_deref(), Some("0"));
-        assert_eq!(graph[0].measure_locators[0].source_id.as_deref(), Some("pickup-id"));
-        assert_eq!(graph[0].measure_locators[0].display_text.as_deref(), Some("Pickup"));
+        assert_eq!(
+            graph[0].measure_locators[0].source_id.as_deref(),
+            Some("pickup-id")
+        );
+        assert_eq!(
+            graph[0].measure_locators[0].display_text.as_deref(),
+            Some("Pickup")
+        );
         assert!(graph[0].measure_locators[0].implicit);
         assert_eq!(graph[0].measure_locators[1].number.as_deref(), Some("A"));
-        assert_eq!(graph[0].measure_locators[1].source_id.as_deref(), Some("irregular-id"));
+        assert_eq!(
+            graph[0].measure_locators[1].source_id.as_deref(),
+            Some("irregular-id")
+        );
         assert!(graph[0].measure_locators[1].non_controlling);
     }
 
+    #[test]
+    fn per_part_graph_commits_exact_notation_events_and_replay_rejects_tampering() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>12</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff><type>eighth</type><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><tie type="start"/><notations><tied type="start"/><tuplet type="start" number="1"/></notations></note>
+            <note><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+            <attributes><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>36</duration><voice>2</voice><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:notation-events",
+            "score-clock",
+        )
+        .unwrap();
+        let graph = &graphs[0];
+        assert_eq!(graph.map.status, MeasureMapStatus::Supported);
+        assert_eq!(
+            graph.notation_events.status,
+            crate::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Supported
+        );
+        assert_eq!(graph.notation_events.note_events.len(), 3);
+        assert_eq!(
+            graph.notation_events.note_events[1].score_offset,
+            RationalBeat::new(1, 3).unwrap()
+        );
+        assert!(matches!(
+            &graph.notation_events.note_events[1].kind,
+            crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
+        ));
+        assert!(matches!(
+            &graph.notation_events.note_events[2].kind,
+            crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Unpitched { .. }
+        ));
+        assert_eq!(graph.notation_events.attribute_events.len(), 3);
+        let digest = musicxml_notation_graph_commitment(graph).unwrap();
+        assert_eq!(digest.len(), 64);
+        assert!(
+            validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:notation-events",
+                "score-clock",
+                &graphs,
+            )
+            .unwrap()
+        );
+
+        let mut tampered = graphs.clone();
+        tampered[0].notation_events.note_events[0].score_offset = RationalBeat::new(1, 1).unwrap();
+        assert!(
+            !validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:notation-events",
+                "score-clock",
+                &tampered,
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn legacy_graph_without_notation_event_layer_keeps_old_serialized_shape() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:legacy-graph",
+            "score-clock",
+        )
+        .unwrap()
+        .remove(0);
+        graph.notation_events = crate::musicxml_notation_events::legacy_missing_notation_events();
+        graph.part_metadata_layer_present = false;
+        graph.part_metadata = None;
+        let json = serde_json::to_value(&graph).unwrap();
+        assert!(
+            json.get("notation_events").is_none(),
+            "legacy sentinel must be skipped so old graph commitments remain stable"
+        );
+        let round_trip: MusicXmlPartNotationGraphV1 = serde_json::from_value(json).unwrap();
+        assert!(
+            crate::musicxml_notation_events::is_legacy_missing_notation_events(
+                &round_trip.notation_events
+            )
+        );
+        assert!(
+            validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:legacy-graph",
+                "score-clock",
+                &[round_trip.clone()],
+            )
+            .unwrap()
+        );
+        let mut tampered = round_trip;
+        tampered.measure_locators[0].number = Some("tampered".into());
+        assert!(
+            !validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:legacy-graph",
+                "score-clock",
+                &[tampered],
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn unresolvable_notation_events_are_unknown_without_partial_event_leakage() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration></note>
+                <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:midmeasure-meter",
+            "score-clock",
+        )
+        .unwrap()
+        .remove(0);
+        assert!(matches!(graph.map.status, MeasureMapStatus::Unknown { .. }));
+        assert!(matches!(
+            graph.notation_events.status,
+            crate::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
+        assert!(graph.notation_events.note_events.is_empty());
+        assert!(graph.notation_events.attribute_events.is_empty());
+    }
+
+    #[test]
+    fn graph_preserves_part_list_instrument_identity_and_binds_it_to_notes() {
+        let xml = r#"<score-partwise>
+            <part-list>
+                <score-part id="P1">
+                    <part-name>Violin I</part-name>
+                    <part-abbreviation>Vln. I</part-abbreviation>
+                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
+                    <midi-instrument id="P1-I1">
+                        <midi-channel>1</midi-channel><midi-program>41</midi-program>
+                    </midi-instrument>
+                </score-part>
+            </part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><instrument id="P1-I1"/><voice>1</voice><staff>1</staff></note>
+            </measure></part>
+        </score-partwise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:part-metadata",
+            "score-clock",
+        )
+        .unwrap();
+        let graph = &graphs[0];
+        let metadata = graph.part_metadata.as_ref().unwrap();
+        assert_eq!(metadata.source_part_id, "P1");
+        assert_eq!(metadata.part_name.as_deref(), Some("Violin I"));
+        assert_eq!(metadata.part_abbreviation.as_deref(), Some("Vln. I"));
+        assert_eq!(metadata.score_instrument_ids, vec!["P1-I1"]);
+        assert_eq!(
+            graph.notation_events.note_events[0].instrument_ids,
+            vec!["P1-I1"]
+        );
+        let digest = musicxml_notation_graph_commitment(graph).unwrap();
+        assert_eq!(digest.len(), 64);
+        assert!(
+            validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:part-metadata",
+                "score-clock",
+                &graphs
+            )
+            .unwrap()
+        );
+
+        let mut tampered = graphs.clone();
+        tampered[0].part_metadata.as_mut().unwrap().part_name = Some("Viola".into());
+        assert!(
+            !validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:part-metadata",
+                "score-clock",
+                &tampered
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn graph_without_part_list_explicitly_has_no_part_metadata() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:no-part-list",
+            "score-clock",
+        )
+        .unwrap()
+        .remove(0);
+        assert!(graph.part_metadata.is_none());
+    }
+
+    #[test]
+    fn graph_replay_preserves_mir018_receipts_created_before_part_metadata_layer() {
+        let xml = r#"<score-partwise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name>
+                <score-instrument id="P1-I1"><instrument-name>Flute</instrument-name></score-instrument>
+            </score-part></part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:mir018-before-part-metadata",
+            "score-clock",
+        )
+        .unwrap()
+        .remove(0);
+        assert!(graph.part_metadata.is_some());
+        graph.part_metadata = None;
+        graph.part_metadata_layer_present = false;
+        assert!(
+            validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:mir018-before-part-metadata",
+                "score-clock",
+                &[graph.clone()],
+            )
+            .unwrap()
+        );
+        let json = serde_json::to_value(&graph).unwrap();
+        assert!(json.get("part_metadata_layer_present").is_none());
+        assert!(json.get("part_metadata").is_none());
+    }
+
+    #[test]
+    fn new_graph_replay_rejects_removed_part_metadata_even_when_set_to_none() {
+        let xml = r#"<score-partwise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name>
+                <score-instrument id="P1-I1"><instrument-name>Flute</instrument-name></score-instrument>
+            </score-part></part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:new-part-metadata",
+            "score-clock",
+        )
+        .unwrap()
+        .remove(0);
+        assert!(graph.part_metadata_layer_present);
+        assert!(graph.part_metadata.is_some());
+        graph.part_metadata = None;
+        assert!(
+            !validate_musicxml_notation_graph_replay(
+                xml.as_bytes(),
+                "sha256:new-part-metadata",
+                "score-clock",
+                &[graph],
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn foreign_namespace_core_name_collision_is_not_used_as_score_structure() {
+        let xml = r#"<score-partwise xmlns:ext="urn:example:extension"><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <ext:note><ext:pitch><ext:step>D</ext:step><ext:octave>5</ext:octave></ext:pitch><ext:duration>16</ext:duration></ext:note>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        assert_eq!(
+            parse_musicxml_part_notation_graph(
+                xml.as_bytes(),
+                "sha256:foreign-core-name",
+                "score-clock"
+            ),
+            Err(MusicXmlMeasureAdapterError::ForeignNamespaceCoreElement {
+                element: "note".into(),
+                namespace: "urn:example:extension".into(),
+            })
+        );
+        let map =
+            parse_musicxml_measure_map(xml.as_bytes(), "sha256:foreign-core-name", "score-clock")
+                .unwrap();
+        assert!(matches!(map.status, MeasureMapStatus::Unsupported { .. }));
+        assert!(map.measures.is_empty());
+    }
 }

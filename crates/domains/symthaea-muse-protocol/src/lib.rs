@@ -223,6 +223,52 @@ pub struct ImportedNotationStructureSummary {
     pub measure_count: usize,
     pub barline_event_count: usize,
     pub non_controlling_measure_count: usize,
+    /// Counts for the MusicXML notation-event layer; zero/None for formats
+    /// which do not supply this representation.
+    #[serde(default)]
+    pub notation_event_count: usize,
+    #[serde(default)]
+    pub notation_auxiliary_event_count: usize,
+    #[serde(default)]
+    pub notation_attribute_event_count: usize,
+    #[serde(default)]
+    pub notation_cursor_move_count: usize,
+    #[serde(default)]
+    pub unpitched_event_count: usize,
+    #[serde(default)]
+    pub cue_note_count: usize,
+    #[serde(default)]
+    pub chord_member_count: usize,
+    #[serde(default)]
+    pub time_modification_count: usize,
+    #[serde(default)]
+    pub notation_supported_part_count: usize,
+    #[serde(default)]
+    pub notation_unknown_part_count: usize,
+    #[serde(default)]
+    pub rest_event_count: usize,
+    #[serde(default)]
+    pub grace_note_count: usize,
+    #[serde(default)]
+    pub tuplet_notation_count: usize,
+    #[serde(default)]
+    pub sound_tie_count: usize,
+    #[serde(default)]
+    pub visual_tie_count: usize,
+    #[serde(default)]
+    pub voice_assignment_count: usize,
+    #[serde(default)]
+    pub staff_assignment_count: usize,
+    /// Score-part declarations outside the MusicXML part bodies.
+    #[serde(default)]
+    pub part_metadata_count: usize,
+    #[serde(default)]
+    pub score_instrument_count: usize,
+    #[serde(default)]
+    pub midi_instrument_count: usize,
+    /// Note <instrument> references with no matching score-instrument ID.
+    #[serde(default)]
+    pub unresolved_note_instrument_reference_count: usize,
     pub unavailable_part_ids: Vec<String>,
     pub explanation: Option<String>,
 }
