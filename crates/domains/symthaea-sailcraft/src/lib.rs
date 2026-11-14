@@ -11,7 +11,15 @@
 //! direction the wind comes FROM. Current direction is the direction the
 //! current flows TOWARD. Polar angles are absolute true-wind angles (TWA).
 
-#![forbid(unsafe_code)]
+#forbid(unsafe_code)
+
+pub mod robust;
+
+pub use robust::{
+    CurrentUncertainty, DirectionInterval, PolarErrorBound, RobustCourseCandidate,
+    RobustPlanStatus, RobustRouteEvaluation, RobustRouteRequest, ScalarInterval,
+    WindUncertainty, evaluate_robust_route_candidates,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceState {
@@ -270,10 +278,6 @@ fn bracket(values: &[f64], query: f64) -> Option<(usize, f64)> {
 
 fn lerp(a: f64, b: f64, fraction: f64) -> f64 {
     a + (b - a) * fraction
-}
-
-fn normalize_bearing(degrees: f64) -> f64 {
-    degrees.rem_euclid(360.0)
 }
 
 fn signed_angle_deg(from_bearing: f64, to_bearing: f64) -> f64 {
