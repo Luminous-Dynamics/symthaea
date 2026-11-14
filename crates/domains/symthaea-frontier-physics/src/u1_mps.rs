@@ -2010,9 +2010,17 @@ impl U1TwoSiteHamiltonian {
             + h33 * h33
             + (h11 * h11 + h22 * h22 + 2.0 * coupling.norm_sqr()))
             .sqrt();
-        let exponential_growth = (dt.abs() * hamiltonian_norm.max(projected_norm)).exp();
+        // Duhamel's bound for H = H_projected + Delta, with H_projected
+        // Hermitian and ||Delta||_2 <= ||Delta||_F:
+        // ||exp(-i H dt)-exp(-i H_projected dt)||
+        //   <= |dt| ||Delta|| exp(|dt| ||Delta||).
+        // This remains conservative even when the supplied H is only
+        // approximately Hermitian or U(1)-conserving.
+        let projection_residual = self.projection_residual_frobenius;
+        let exponential_growth = (dt.abs() * projection_residual).exp();
         let projection_operator_error_upper_bound =
-            dt.abs() * self.projection_residual_frobenius * exponential_growth;
+            dt.abs() * projection_residual * exponential_growth;
+        let _ = (hamiltonian_norm, projected_norm);
         gate.with_hamiltonian_projection_error(projection_operator_error_upper_bound)
     }
 }
@@ -2866,9 +2874,17 @@ fn gate_quality_error_bounds_from_residuals(
             "pre-gate norm in canonical error ledger",
         ));
     }
+    // U1TwoSiteGate stores the maximum absolute entry of U†U-I.
+    // For a 4x4 matrix, ||R||_2 <= ||R||_F <= 4 * max_ij |R_ij|.
+    // Use this operator-norm bound before converting it into a bound on ||U||.
+    let unitarity_operator_residual_upper = 4.0 * unitarity_residual;
+    // There are exactly ten matrix entries coupling distinct excitation sectors.
+    // Their Frobenius norm, and hence operator norm, is bounded by sqrt(10)*max.
     let off_sector_operator_error = 10.0_f64.sqrt() * charge_residual;
-    let gate_operator_norm_upper = (1.0 + unitarity_residual).sqrt();
-    let block_unitarity_residual = unitarity_residual
+    let gate_operator_norm_upper = (1.0 + unitarity_operator_residual_upper).sqrt();
+    // Let D = G - E be the block-diagonal part of G, with E its off-sector part.
+    // ||D†D-I|| <= ||G†G-I|| + 2||G||||E|| + ||E||².
+    let block_unitarity_residual = unitarity_operator_residual_upper
         + 2.0 * gate_operator_norm_upper * off_sector_operator_error
         + off_sector_operator_error * off_sector_operator_error;
     if !block_unitarity_residual.is_finite() || block_unitarity_residual >= 1.0 {
