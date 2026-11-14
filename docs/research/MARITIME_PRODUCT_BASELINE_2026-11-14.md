@@ -285,3 +285,72 @@ We should not claim "better than SOTA" until we beat named baselines on equivale
 4. **Both:** compare complete experiment cost, including failed runs and required high-fidelity / physical validation. A design selected cheaply but requiring more expensive validation is not necessarily the better research strategy.
 
 All numeric literature values above are external reference results with their own model, cycle, assumptions and validation boundaries. They are not Symthaea achievements or expected outcomes.
+
+
+## 10. Waterjet-specific cavitation test method — ITTC correction
+
+The resistance/propulsion CFD benchmark guidance cited above is not a substitute for the ITTC's waterjet-specific cavitation procedure. Add the following procedure to the PWC evidence plan:
+
+- **ITTC 7.5-02-03-03.8, Revision 01 (effective 2024): Modelling the Behaviour of Cavitation in Waterjets.** Official procedure: https://www.ittc.info/media/11826/75-02-03-038.pdf
+- It distinguishes three complementary test families:
+  1. **Self-propulsion / towing-tank tests:** measure hull–waterjet interaction, flow rate, thrust and effective system power. The procedure explicitly cautions that ordinary self-propulsion tests are generally not appropriate to evaluate cavitation because facilities may not achieve depressurization/cavitation similarity, and model pumps may be surrogates rather than geometrically scaled production pumps.
+  2. **Waterjet-system tests:** test the actual inlet and pump without the full ship hull. Representative incoming boundary-layer flow should be considered; define the operating cases from ship speed (including accelerating cases), loading and inlet velocity ratio (IVR), and vary the cavitation parameters. Record the boundary-layer and operating conditions.
+  3. **Pump-loop tests:** isolate pump hydraulic behaviour and cavitation performance without the hull/intake distortion. Measure the actual pump inflow, shaft rate, static and total pressure, flow, torque and thrust as applicable. The procedure describes a 3% reduction in total-head rise as a common cavitation-breakdown criterion.
+- Keep cavitation inception, performance breakdown and erosion separate. The procedure says quantitative erosion prediction for complex waterjet geometries remains immature; it does not itself provide a complete underwater-radiated-noise qualification method.
+- Model-scale transfer is not automatic. The procedure identifies Reynolds number, geometry/roughness, manufacturing tolerances, turbulence, water quality, nucleation and incoming-boundary-layer similarity as relevant scale effects. A pump-only result cannot validate installed hull–intake behaviour, and a towing-tank propulsion result cannot be promoted to cavitation validation without the appropriate pressure/similarity and viewing method.
+
+**PWC application boundary:** these procedures are directly relevant to waterjet test-method design, but do not supply PWC-specific calibration data or prove that a particular facility can accommodate the required pump, pressure, optical or full-scale instrumentation. Adapt the method to the PWC operating envelope and exact hardware; retain an explicit applicability review.
+
+**Discriminating experimental sequence:**
+
+1. Freeze the exact PWC-SIT geometry, loading, speed/acceleration schedule and pump operating map.
+2. Measure baseline installed resistance/trim/attitude and thrust/power over straight-line and turning cases.
+3. Use a waterjet-system rig with representative inlet boundary-layer profiles and IVR sweeps to isolate inlet distortion.
+4. Use a pump-loop/cavitation facility for cavitation inception and head/thrust breakdown where the facility can reproduce the required pressure and scaling conditions.
+5. Correlate the decomposed measurements; do not tune the model and claim validation on the same held-out case.
+6. Carry model/full-scale mismatch as an uncertainty term until a defensible scale-effect argument and full-scale observations exist.
+
+This resolves an important test-design ambiguity: one experiment cannot simultaneously isolate pump physics, installed hull interaction and full-scale cavitation.
+
+### 10.1 South African physical-test partner leads
+
+These are facility/research leads for capability discussions, not confirmed partners or proof that a specific test can be run there.
+
+- **Stellenbosch University, Towing Tank:** the university describes a 90 m tank, 4.2 m breadth and 2 m depth, maximum trolley operating velocity of 7 m/s (8.2 m/s absolute maximum), and instrumentation for trolley velocity, model drag and bow/stern trim. Research team capabilities include CFD, turbomachinery, shape optimisation, measurement, digital twins and underwater acoustics. Facility page: https://www.su.ac.za/en/faculties/engineering/departments/mechanical-mechatronic-engineering/research/naval-architecture-design/facilities-and-experiments ; research chair: https://www.su.ac.za/en/faculties/engineering/departments/mechanical-mechatronic-engineering/research/naval-architecture-design
+- **CSIR Coastal Engineering and Port Infrastructure, Stellenbosch:** publicly describes physical/numerical modelling of port layout and ship manoeuvring, marine surveys and a large hydraulic modelling facility. Capability page: https://wwwprod.csir.co.za/coastal-engineering-and-port-infrastructure
+
+Before selecting a facility, request its capability statement for: waterjet/pump installation, depressurization and cavitation number range, water quality control, optical access/PIV/LDV, boundary-layer conditioning, load/torque/pressure metrology, sample rates/time synchronization, model dimensions, uncertainty procedures, staff availability, cost, IP/data terms and safety/ethics permissions. A towing tank and a cavitation tunnel are complementary, not interchangeable.
+
+## 11. Tug EMS: deeper audit of the 2026 TD3 comparator
+
+The TD3 study is a strong benchmark anchor, but a more exact reading narrows what its results establish.
+
+**Primary reference:** Li, Long and Tian, *Research on Energy Management Optimization for Hybrid-Powered Port Tugboat Systems Based on a Dual-Delay Deep Deterministic Policy Gradient Algorithm*, Energies 19(4), 905, published 9 February 2026. https://www.mdpi.com/1996-1073/19/4/905
+
+Reported evidence and conditions:
+
+- The primary benchmark is a 3,600 s, seven-phase port duty cycle: departure, approach, push, standby, tow, return and berth standby. Its model includes a peak required power above 2,600 kW.
+- The headline algorithm comparison uses the same simulation platform and duty cycle, with initial SOC 0.6 and initial battery temperature 25 °C. TD3 reports 18.5% lower methanol use than rule-based, 10.2% lower than ECMS and 7.3% lower than DDPG; its reported gap to the offline DP reference is below 2.5%.
+- The HIL evaluation uses that same typical duty cycle and initial SOC. The reported upper/lower-level communication and processing delay averages about 3 ms and does not exceed 5 ms; HIL methanol consumption is reported as 0.6% above pure simulation and overall difference as below 1.8%. This is meaningful controller execution evidence, but it is not a vessel trial or validation of real hydrodynamic disturbances.
+- The paper's generalization test applies trained controllers to one unseen sequence with higher peak loads and initial SOC 0.5. This is useful, but it is not a broad holdout across ports, vessels, seasons, crews, weather, job classes or long-horizon fleet operation.
+- Battery constraints include an SOC range, current limits and temperature bounds. High-rate discharge and deep cycling are penalized as an indirect aging mitigation; this is not equivalent to a validated calendar/cycle-life or replacement-cost model.
+- The paper reports subsystem validation evidence, including engine-map and battery tests, but its system-level duty-cycle/HIL results remain tied to the declared simulation and hardware setup. Data availability says data are within the article, with additional inquiries to the corresponding author; do not assume an openly downloadable raw operational-fleet dataset.
+
+**Benchmark challenge for our programme:** reproduce the stated TD3 comparison as closely as the disclosed methods permit, then go beyond it using preregistered group holdouts and more demanding deployment tests:
+
+1. Hold out complete vessel/port/job blocks and, where data allow, season or operating regime; never split adjacent samples from one mission across train and test.
+2. Test forecast uncertainty and decision-time leakage, not just a single altered duty cycle.
+3. Perturb plant maps and operating conditions: battery temperature/resistance/capacity, motor/inverter efficiency, APU ramp/minimum-load/start behaviour, auxiliary loads, sea/current/wind loads and sensor bias/dropout.
+4. Inject equipment faults and degraded availability: battery derating, generator unavailable, propulsion-unit derating, shore-power interruption, delayed/stale messages and reserve-critical emergency work.
+5. Compare tuned rule-based, ECMS, DDPG, TD3, deployable MPC/robust MPC and a clearly labelled offline DP oracle under the same frozen plant, constraints and energy boundary.
+6. Report constraint violations and safe-fallback activation separately from energy savings. Include worst-case/maximum execution time, deadline misses, memory/compute load, action saturation and recovery behaviour.
+7. Use a degradation model with independently identified parameters and uncertainty; do not equate throughput penalties with battery-life validation.
+8. Score completed assist jobs, force/power response, reserve, dispatch availability and lifecycle resource cost. A controller that saves fuel by failing or postponing difficult jobs is not an improvement.
+
+**Proposed stretch objective:** find a robust, interpretable MPC-plus-learning supervisory controller that matches TD3 energy performance within a preregistered non-inferiority margin while improving held-out mission regret, constraint/fault outcomes, worst-case compute or degradation-adjusted cost. This is a research target, not a demonstrated result. Do not assume the hybrid controller will win before the matched experiment.
+
+## 12. Standards and digital-thread status note
+
+ISO confirms **ISO 23247-5:2026** (Digital thread for digital twin) was published in June 2026. It describes connectivity, management and maintenance of manufacturing digital twins across design, planning, production and testing. Official source: https://www.iso.org/standard/87425.html
+
+Do not assert the publication status or normative requirements of ISO 23247-6:2026 from the Part 5 record. Verify Part 6 independently before citing it as published or using it as a conformance basis. In any case, these documents guide manufacturing digital-thread composition; they do not certify marine design, model validity or vessel safety.
