@@ -1,0 +1,314 @@
+{
+  "schema": "luminous.airroad.structured_mimo_generator_support.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_hard_structural_support_outer_cover",
+  "claim_class": "deterministic_hard_set_outer_approximation",
+  "ambient": {
+    "matrix_rows": 2,
+    "matrix_cols": 2,
+    "scalar_field": "complex",
+    "real_dimension": 8,
+    "vectorization_order": [
+      "Re00",
+      "Re01",
+      "Re10",
+      "Re11",
+      "Im00",
+      "Im01",
+      "Im10",
+      "Im11"
+    ],
+    "full_dimensional_simplex_vertex_count": 9
+  },
+  "structural_contract": {
+    "contract_id": "synthetic-real-diagonal-support-contract-001",
+    "authority_class": "declared_hard_structural_constraint",
+    "scope": "all_admissible_matrices_not_just_sampled_observations",
+    "source_identity": "sha256:two-port-diagonal-structure-v0.1",
+    "model_identity": "sha256:structured-generator-model-v0.1",
+    "topology_identity": "sha256:structured-generator-topology-v0.1",
+    "calibration_nuisance_id": "structured-generator-calibration-common-001",
+    "coordinate_frequency_bindings": [
+      {
+        "frequency_id": "f0",
+        "calibration_nuisance_id": "structured-generator-calibration-common-001"
+      },
+      {
+        "frequency_id": "f1",
+        "calibration_nuisance_id": "structured-generator-calibration-common-001"
+      }
+    ],
+    "exact_form": "Delta(alpha,beta) = diag(alpha,beta), alpha^2 + beta^2 <= 1",
+    "hard_constraints": [
+      {
+        "id": "real-offdiagonal-01",
+        "coordinate_index": 1,
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "real-offdiagonal-10",
+        "coordinate_index": 2,
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "imaginary-00",
+        "coordinate_index": 4,
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "imaginary-01",
+        "coordinate_index": 5,
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "imaginary-10",
+        "coordinate_index": 6,
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "imaginary-11",
+        "coordinate_index": 7,
+        "value": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    ]
+  },
+  "support_basis": {
+    "support_dimension": 2,
+    "basis_vectors": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "expected_gram": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "expected_rank": 2
+  },
+  "simplex": {
+    "coordinate_dimension": 2,
+    "normals": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "-3",
+          "denominator": "5"
+        },
+        {
+          "numerator": "4",
+          "denominator": "5"
+        }
+      ],
+      [
+        {
+          "numerator": "-3",
+          "denominator": "5"
+        },
+        {
+          "numerator": "-4",
+          "denominator": "5"
+        }
+      ]
+    ],
+    "inequalities": [
+      "n1 dot q <= 1",
+      "n2 dot q <= 1",
+      "n3 dot q <= 1"
+    ],
+    "vertices": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-2",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "-5",
+          "denominator": "3"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "expected_maximum_vertex_norm_squared": {
+      "numerator": "5",
+      "denominator": "1"
+    },
+    "expected_vertex_count": 3,
+    "expected_full_ambient_vertex_baseline": 9
+  },
+  "negative_controls": [
+    {
+      "id": "allowed-offdiagonal-real-generator",
+      "expected": "reject-support-proof"
+    },
+    {
+      "id": "allowed-imaginary-generator",
+      "expected": "reject-support-proof"
+    },
+    {
+      "id": "linearly-dependent-support-basis",
+      "expected": "reject-rank"
+    },
+    {
+      "id": "basis-gram-not-identity",
+      "expected": "reject-orthonormality"
+    },
+    {
+      "id": "nonunit-simplex-normal",
+      "expected": "reject-containment-proof"
+    },
+    {
+      "id": "missing-simplex-vertex",
+      "expected": "reject-containment"
+    },
+    {
+      "id": "reversed-halfspace",
+      "expected": "reject-containment"
+    },
+    {
+      "id": "covariance-rank-used-as-hard-support-proof",
+      "expected": "reject-evidence-class"
+    },
+    {
+      "id": "split-calibration-coordinate",
+      "expected": "reject-dependency"
+    },
+    {
+      "id": "three-vertices-claimed-for-full-eight-dimensional-ball",
+      "expected": "reject-claim-class"
+    }
+  ],
+  "claim_ceiling": [
+    "The three-vertex triangle contains the unit disk only in the declared two-dimensional real-diagonal support subspace.",
+    "It does not enclose the full eight-dimensional ambient complex matrix unit ball.",
+    "The synthetic structural contract is stipulated and has not been qualified on a physical AIRROAD plant."
+  ]
+}
