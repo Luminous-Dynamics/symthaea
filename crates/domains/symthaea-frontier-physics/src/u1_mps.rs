@@ -37,6 +37,42 @@ pub struct U1MpsTensor {
     data: Vec<Complex64>,
 }
 
+
+/// Per-charge block shape implied by the U(1) selection rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct U1MpsChargeBlockShape {
+    pub charge: i32,
+    pub row_count: usize,
+    pub column_count: usize,
+    pub value_count: usize,
+}
+
+/// Audit of dense tensor storage against the ideal symmetry-packed layout.
+///
+/// This is measurement only: the production tensor remains dense. The ideal
+/// packed-value byte count assumes forbidden-sector entries are exactly zero;
+/// any observed forbidden nonzero values are reported separately.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1MpsStorageAudit {
+    pub left_dimension: usize,
+    pub physical_dimension: usize,
+    pub right_dimension: usize,
+    pub dense_entry_count: usize,
+    pub symmetry_allowed_entry_count: usize,
+    pub structurally_forbidden_entry_count: usize,
+    pub structurally_forbidden_zero_count: usize,
+    pub forbidden_nonzero_entry_count: usize,
+    pub forbidden_nonzero_l2_weight: f64,
+    pub non_finite_entry_count: usize,
+    pub dense_payload_bytes: usize,
+    pub ideal_packed_value_bytes: usize,
+    pub ideal_value_payload_savings_bytes: usize,
+    pub ideal_value_payload_savings_fraction: f64,
+    pub charge_blocks: Vec<U1MpsChargeBlockShape>,
+}
+
+
+
 /// Validation or numerical failure in a complex U(1) MPS.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum U1MpsError {
@@ -388,6 +424,126 @@ impl U1MpsTensor {
             left_charges,
             right_charges,
             data,
+        })
+    }
+
+
+    /// Quantify the structural-zero cost implied by this tensor's charge labels.
+    ///
+    /// The ideal packed byte count stores each allowed charge block densely and
+    /// assumes forbidden entries are zero. Tolerated forbidden nonzeros are
+    /// counted and their squared weight is reported explicitly.
+    pub fn storage_audit(&self) -> Result<U1MpsStorageAudit, U1MpsError> {
+        let dense_entry_count = self.data.len();
+        let mut charges = std::collections::BTreeSet::new();
+        for left_charge in &self.left_charges {
+            charges.insert(*left_charge);
+            charges.insert(
+                left_charge
+                    .checked_add(1)
+                    .ok_or(U1MpsError::DimensionOverflow)?,
+            );
+        }
+
+        let mut charge_blocks = Vec::new();
+        let mut symmetry_allowed_entry_count = 0_usize;
+        for charge in charges {
+            let mut row_count = 0_usize;
+            for left_charge in &self.left_charges {
+                for physical in 0..2 {
+                    if *left_charge + physical as i32 == charge {
+                        row_count = row_count
+                            .checked_add(1)
+                            .ok_or(U1MpsError::DimensionOverflow)?;
+                    }
+                }
+            }
+            let column_count = self
+                .right_charges
+                .iter()
+                .filter(|right_charge| **right_charge == charge)
+                .count();
+            if row_count == 0 || column_count == 0 {
+                continue;
+            }
+            let value_count = row_count
+                .checked_mul(column_count)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            symmetry_allowed_entry_count = symmetry_allowed_entry_count
+                .checked_add(value_count)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            charge_blocks.push(U1MpsChargeBlockShape {
+                charge,
+                row_count,
+                column_count,
+                value_count,
+            });
+        }
+
+        if symmetry_allowed_entry_count > dense_entry_count {
+            return Err(U1MpsError::NonFiniteContraction(
+                "U(1) storage-layout entry count",
+            ));
+        }
+        let structurally_forbidden_entry_count =
+            dense_entry_count - symmetry_allowed_entry_count;
+        let mut forbidden_nonzero_entry_count = 0_usize;
+        let mut forbidden_nonzero_l2_weight = 0.0;
+        let mut non_finite_entry_count = 0_usize;
+        for left in 0..self.left_dimension() {
+            for physical in 0..2 {
+                for right in 0..self.right_dimension() {
+                    let value = self.get(left, physical, right);
+                    if !value.re.is_finite() || !value.im.is_finite() {
+                        non_finite_entry_count += 1;
+                        continue;
+                    }
+                    if self.right_charges[right] != self.left_charges[left] + physical as i32
+                        && value.norm_sqr() > 0.0
+                    {
+                        forbidden_nonzero_entry_count += 1;
+                        forbidden_nonzero_l2_weight += value.norm_sqr();
+                    }
+                }
+            }
+        }
+        if !forbidden_nonzero_l2_weight.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "forbidden-sector storage audit weight",
+            ));
+        }
+        let structurally_forbidden_zero_count =
+            structurally_forbidden_entry_count.saturating_sub(forbidden_nonzero_entry_count);
+        let dense_payload_bytes = dense_entry_count
+            .checked_mul(core::mem::size_of::<Complex64>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let ideal_packed_value_bytes = symmetry_allowed_entry_count
+            .checked_mul(core::mem::size_of::<Complex64>())
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let ideal_value_payload_savings_bytes =
+            dense_payload_bytes.saturating_sub(ideal_packed_value_bytes);
+        let ideal_value_payload_savings_fraction = if dense_payload_bytes == 0 {
+            0.0
+        } else {
+            ideal_value_payload_savings_bytes as f64 / dense_payload_bytes as f64
+        };
+
+        Ok(U1MpsStorageAudit {
+            left_dimension: self.left_dimension(),
+            physical_dimension: 2,
+            right_dimension: self.right_dimension(),
+            dense_entry_count,
+            symmetry_allowed_entry_count,
+            structurally_forbidden_entry_count,
+            structurally_forbidden_zero_count,
+            forbidden_nonzero_entry_count,
+            forbidden_nonzero_l2_weight,
+            non_finite_entry_count,
+            dense_payload_bytes,
+            ideal_packed_value_bytes,
+            ideal_value_payload_savings_bytes,
+            ideal_value_payload_savings_fraction,
+            charge_blocks,
         })
     }
 
@@ -3702,7 +3858,7 @@ impl U1TeBDStrangStepper {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
+        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsStorageAudit, U1MpsTensor, U1MpsTruncationLedger,
         U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
         U1TeBDStepResult, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
         U1TwoSiteState,
@@ -5711,4 +5867,57 @@ mod tests {
         ));
         assert_eq!(state.to_dense(8).unwrap(), before);
     }
+
+    #[test]
+    fn storage_audit_measures_product_state_structural_zero_overhead() {
+        let state = ComplexU1Mps::product_state(&[true, false, true]).unwrap();
+        for tensor in state.tensors() {
+            let audit: U1MpsStorageAudit = tensor.storage_audit().unwrap();
+            assert_eq!(audit.dense_entry_count, 2);
+            assert_eq!(audit.symmetry_allowed_entry_count, 1);
+            assert_eq!(audit.structurally_forbidden_entry_count, 1);
+            assert_eq!(audit.structurally_forbidden_zero_count, 1);
+            assert_eq!(audit.forbidden_nonzero_entry_count, 0);
+            assert_eq!(audit.ideal_packed_value_bytes * 2, audit.dense_payload_bytes);
+            assert!((audit.ideal_value_payload_savings_fraction - 0.5).abs() <= f64::EPSILON);
+        }
+    }
+
+    #[test]
+    fn storage_audit_reports_tolerated_forbidden_nonzero_weight() {
+        let tensor = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(1.0e-13, 0.0),
+            ],
+        )
+        .unwrap();
+        let audit = tensor.storage_audit().unwrap();
+        assert_eq!(audit.dense_entry_count, 2);
+        assert_eq!(audit.symmetry_allowed_entry_count, 1);
+        assert_eq!(audit.forbidden_nonzero_entry_count, 1);
+        assert_eq!(audit.structurally_forbidden_zero_count, 0);
+        assert!((audit.forbidden_nonzero_l2_weight - 1.0e-26).abs() <= 1.0e-40);
+    }
+
+    #[test]
+    fn storage_audit_charge_blocks_sum_to_allowed_layout_entries() {
+        let state = canonical_w_state();
+        for tensor in state.tensors() {
+            let audit = tensor.storage_audit().unwrap();
+            assert_eq!(
+                audit.charge_blocks.iter().map(|block| block.value_count).sum::<usize>(),
+                audit.symmetry_allowed_entry_count
+            );
+            assert_eq!(
+                audit.dense_entry_count,
+                audit.symmetry_allowed_entry_count + audit.structurally_forbidden_entry_count
+            );
+            assert!(audit.ideal_value_payload_savings_fraction >= 0.0);
+            assert!(audit.ideal_value_payload_savings_fraction <= 1.0);
+        }
+    }
+
 }
