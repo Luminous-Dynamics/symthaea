@@ -69,6 +69,17 @@ pub(super) struct EquivalenceAnalysisResult {
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
+pub(super) struct DesignSourceBinding {
+    pub(super) role: String,
+    pub(super) source_kind: String,
+    pub(super) source_id: String,
+    pub(super) artifact_sha256: String,
+    pub(super) method_receipt: Option<ScopeEvidence>,
+    pub(super) samples: Vec<SampleIdentity>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub(super) struct EquivalenceDesignReceipt {
     pub(super) design_id: String,
     pub(super) plan_sha256: String,
@@ -117,6 +128,8 @@ pub(super) struct EquivalenceDesignReceipt {
     sample_manifest_sha256: String,
     baseline_method_receipt: ScopeEvidence,
     candidate_method_receipt: ScopeEvidence,
+    #[serde(default)]
+    pub(super) additional_source_bindings: Vec<DesignSourceBinding>,
     pub(super) analysis_result: EquivalenceAnalysisResult,
 }
 
@@ -422,6 +435,124 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
 
     let baseline_receipt = &receipt.baseline_method_receipt;
     let candidate_receipt = &receipt.candidate_method_receipt;
+    let expected_auxiliary_roles: &[(&str, &str)] =
+        match receipt.endpoint_transform_id.as_deref() {
+            None => &[],
+            Some("unit_preserving_strength_projection_v1") => &[],
+            Some("aged_strength_retention_ratio_v1") => &[
+                ("baseline_unaged_strength", "observation"),
+                ("candidate_unaged_strength", "observation"),
+                ("baseline_aged_strength::conditioning", "conditioning_method"),
+                ("baseline_aged_strength::exposure", "exposure_record"),
+                ("candidate_aged_strength::conditioning", "conditioning_method"),
+                ("candidate_aged_strength::exposure", "exposure_record"),
+            ],
+            Some("predeclared_failure_mode_fraction_v1") => {
+                return blocked("cluster-aware proportion-equivalence analysis is not yet qualified; failure-mode fraction remains blocked");
+            }
+            Some(_) => return rejected("endpoint transform is not registered for design source bindings"),
+        };
+    if receipt.additional_source_bindings.len() != expected_auxiliary_roles.len() {
+        return if expected_auxiliary_roles.is_empty() {
+            rejected("direct endpoint design must not contain unregistered auxiliary sources")
+        } else {
+            blocked("design receipt is missing required auxiliary source bindings")
+        };
+    }
+
+    let mut auxiliary_roles = HashSet::new();
+    let mut auxiliary_ids = HashSet::new();
+    let mut auxiliary_digests = HashSet::new();
+    let mut auxiliary_specimens = HashSet::new();
+    for binding in &receipt.additional_source_bindings {
+        if !nonempty(&binding.role) || !nonempty(&binding.source_id) {
+            return blocked("auxiliary source role or receipt identity is missing");
+        }
+        let Some((_, expected_kind)) = expected_auxiliary_roles
+            .iter()
+            .find(|(role, _)| *role == binding.role)
+        else {
+            return rejected("auxiliary source role is not registered for this endpoint transform");
+        };
+        if !auxiliary_roles.insert(binding.role.as_str()) {
+            return rejected("auxiliary source role is duplicated");
+        }
+        if binding.source_kind != *expected_kind {
+            return rejected("auxiliary source kind does not match its registered role");
+        }
+        if !sha256_shape(&binding.artifact_sha256) {
+            return blocked("auxiliary source artifact digest is missing or malformed");
+        }
+        if !auxiliary_ids.insert(binding.source_id.as_str())
+            || !auxiliary_digests.insert(binding.artifact_sha256.as_str())
+        {
+            return rejected("auxiliary source receipt or artifact is reused");
+        }
+        if !unique_samples(&binding.samples) {
+            return blocked("auxiliary source specimen/cluster mapping is incomplete");
+        }
+        for sample in &binding.samples {
+            if baseline_specimens.contains(sample.specimen_id.as_str())
+                || candidate_specimens.contains(sample.specimen_id.as_str())
+                || !auxiliary_specimens.insert(sample.specimen_id.as_str())
+            {
+                return rejected("auxiliary source specimen overlaps another design cohort or source");
+            }
+        }
+
+        match (binding.source_kind.as_str(), binding.method_receipt.as_ref()) {
+            ("observation", Some(method_receipt)) => {
+                if method_receipt.id != binding.source_id
+                    || method_receipt.raw_data_sha256.as_deref() != Some(binding.artifact_sha256.as_str())
+                    || method_receipt.endpoint != observation_endpoint
+                    || method_receipt.method_id != baseline_receipt.method_id
+                    || method_receipt.edition != baseline_receipt.edition
+                    || method_receipt.evidence_kind != baseline_receipt.evidence_kind
+                    || method_receipt.material_pair_class != baseline_receipt.material_pair_class
+                    || method_receipt.geometry != baseline_receipt.geometry
+                    || method_receipt.protocol_id != baseline_receipt.protocol_id
+                    || method_receipt.protocol_sha256 != baseline_receipt.protocol_sha256
+                    || !same_members(
+                        &method_receipt.specimen_ids,
+                        &binding.samples.iter().map(|s| s.specimen_id.clone()).collect::<Vec<_>>(),
+                    )
+                {
+                    return rejected("auxiliary observation receipt does not match its exact source manifest or method scope");
+                }
+                match decide(method_receipt).disposition {
+                    ClaimDisposition::Supported => {}
+                    ClaimDisposition::Blocked => return blocked("auxiliary observation receipt is not method-qualified"),
+                    ClaimDisposition::Rejected => return rejected("auxiliary observation receipt exceeds its method claim scope"),
+                }
+            }
+            ("conditioning_method", Some(method_receipt)) => {
+                if method_receipt.id != binding.source_id
+                    || method_receipt.raw_data_sha256.as_deref() != Some(binding.artifact_sha256.as_str())
+                    || method_receipt.evidence_kind != "conditioning_practice"
+                    || method_receipt.requested_claim != "conditioning_protocol_reference"
+                    || !same_members(
+                        &method_receipt.specimen_ids,
+                        &binding.samples.iter().map(|s| s.specimen_id.clone()).collect::<Vec<_>>(),
+                    )
+                {
+                    return rejected("conditioning method receipt does not match its exact exposure cohort");
+                }
+                match decide(method_receipt).disposition {
+                    ClaimDisposition::Supported => {}
+                    ClaimDisposition::Blocked => return blocked("conditioning method receipt is not qualified"),
+                    ClaimDisposition::Rejected => return rejected("conditioning method receipt exceeds its registered scope"),
+                }
+            }
+            ("exposure_record", None) => {}
+            _ => return rejected("auxiliary source kind and method receipt presence are inconsistent"),
+        }
+    }
+    if expected_auxiliary_roles
+        .iter()
+        .any(|(role, _)| !auxiliary_roles.contains(role))
+    {
+        return blocked("one or more required auxiliary source roles are missing");
+    }
     for observation in [baseline_receipt, candidate_receipt] {
         match decide(observation).disposition {
             ClaimDisposition::Supported => {}
