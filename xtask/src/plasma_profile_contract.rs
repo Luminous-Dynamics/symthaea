@@ -408,7 +408,7 @@ fn audit_profile(case: &Case) -> Decision {
                         return rejected("baseline and candidate use overlapping specimen identities");
                     }
                 }
-                (None, None) if !claim.required => {},
+                (None, None) if !claim.required || !role.required => {},
                 (None, None) => return blocked("required role is absent from both transfer cohorts"),
                 _ => return rejected("baseline and candidate do not supply the same profile claim/role set"),
             }
