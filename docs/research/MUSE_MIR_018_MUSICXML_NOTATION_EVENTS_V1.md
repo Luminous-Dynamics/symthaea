@@ -58,9 +58,9 @@ Chord members share their immediately preceding base note's onset and do not adv
 The graph now also carries the matching MusicXML `<score-part>` declaration, when present:
 - exact part ID, part name and abbreviation;
 - declared `score-instrument` IDs;
-- the entire source `score-part` subtree, including `midi-instrument`, device, channel, bank, program, volume, pan and future extension declarations.
+- the entire source `score-part` subtree, including `midi-instrument`, device, channel, bank, program, volume, pan and future extension declarations. The recursive counter handles initial `midi-instrument` elements nested inside `score-instrument` as well as sibling declarations.
 
-Note-level `<instrument id>` references remain on their events. The Studio summary counts part metadata, declared score instruments and MIDI instrument setups, and reports note instrument references that do not bind to a declared score-instrument ID. Missing part-list entries remain absent/unknown; no instrument is inferred from pitch or staff.
+Note-level `<instrument id>` references remain on their events. Mid-score MIDI instrument/device changes inside `<sound>` are retained as positioned auxiliary source events. The Studio summary counts part metadata, declared score instruments and MIDI instrument setups, and reports note instrument references that do not bind to a declared score-instrument ID. Missing part-list entries remain absent/unknown; no instrument is inferred from pitch or staff.
 
 ### Score-order attributes and cursor movement
 
