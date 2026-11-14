@@ -968,4 +968,39 @@ mod tests {
         assert!((a.cumulative_observed_information_gain_bits
             - b.cumulative_observed_information_gain_bits).abs() < 1e-12);
     }
+
+    #[test]
+    fn bijective_outcome_relabeling_preserves_information_metrics_and_decision() {
+        let original = scenario();
+        let mut relabeled = scenario();
+        for probe in &mut relabeled.probes {
+            for outcome in probe.outcomes.values_mut() {
+                *outcome = format!("renamed::{outcome}");
+            }
+        }
+
+        let trace = SequentialExperimentTrace {
+            trials: vec![
+                ExperimentTrial::qualified("inspect-memory", "healthy"),
+                ExperimentTrial::qualified("inspect-model", "corrupt"),
+            ],
+            terminal: ExperimentTerminalDecision::Stop { target_class: "model-corruption".into() },
+        };
+        let mut relabeled_trace = trace.clone();
+        for trial in &mut relabeled_trace.trials {
+            trial.observed_outcome = format!("renamed::{}", trial.observed_outcome);
+        }
+
+        let oracle = ExperimentOracle::new("model-fault");
+        let a = evaluate_sequential_experiment(&original, &oracle, &trace);
+        let b = evaluate_sequential_experiment(&relabeled, &oracle, &relabeled_trace);
+
+        assert_eq!(a.qualification, b.qualification);
+        assert_eq!(a.remaining_hypotheses, b.remaining_hypotheses);
+        assert_eq!(a.remaining_target_classes, b.remaining_target_classes);
+        assert!((a.cumulative_expected_information_gain_bits
+            - b.cumulative_expected_information_gain_bits).abs() < 1e-12);
+        assert!((a.cumulative_observed_information_gain_bits
+            - b.cumulative_observed_information_gain_bits).abs() < 1e-12);
+    }
 }
