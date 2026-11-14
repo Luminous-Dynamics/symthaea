@@ -1,0 +1,575 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-cavitation-conditioned-coherence-v0.1.0.schema.json",
+  "title": "Marine cavitation-conditioned vibration coherence join v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "intermittency_report_case_id",
+    "intermittency_report_sha256",
+    "intermittency_disposition",
+    "vessel_id",
+    "propeller_revision",
+    "operating_condition_id",
+    "operating_point_receipt_sha256",
+    "service_fingerprint_sha256",
+    "environment_fingerprint_sha256",
+    "timebase_binding_receipt_sha256",
+    "synchronization_receipt_sha256",
+    "shared_timebase_id",
+    "hydrophone_instrument_id",
+    "hydrophone_channel_id",
+    "hydrophone_calibration_certificate_sha256",
+    "vibration_instrument_id",
+    "vibration_channel_id",
+    "vibration_reference_location",
+    "vibration_reference_orientation",
+    "vibration_calibration_certificate_sha256",
+    "maximum_sync_alignment_uncertainty_s",
+    "frequency_match_tolerance_fraction",
+    "coherence_estimator_fingerprint_sha256",
+    "cross_spectrum_convention",
+    "minimum_windows_per_state_per_run",
+    "minimum_independent_runs",
+    "windows"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "intermittency_report_case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intermittency_report_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "intermittency_disposition": {
+      "enum": [
+        "DISTRIBUTIONAL_SUMMARY_ONLY",
+        "INCOMPLETE",
+        "INVALID",
+        "INCOMPARABLE"
+      ]
+    },
+    "vessel_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "propeller_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_condition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_point_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "timebase_binding_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "synchronization_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "shared_timebase_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hydrophone_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hydrophone_channel_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hydrophone_calibration_certificate_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "vibration_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vibration_channel_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vibration_reference_location": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vibration_reference_orientation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vibration_calibration_certificate_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "maximum_sync_alignment_uncertainty_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "frequency_match_tolerance_fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "coherence_estimator_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "cross_spectrum_convention": {
+      "type": "string",
+      "minLength": 1
+    },
+    "minimum_windows_per_state_per_run": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_independent_runs": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/joinedWindow"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "joinedWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "window_id",
+        "start_time_s",
+        "end_time_s",
+        "acoustic_trace_sha256",
+        "cavitation_observation_sha256",
+        "cavitation_annotation_raw",
+        "cavitation_state_for_conditioning",
+        "acoustic_cavitation_alignment_offset_s",
+        "acoustic_cavitation_alignment_expanded_uncertainty_s",
+        "acoustic_cavitation_alignment_eligible",
+        "timebase_receipt_sha256",
+        "acoustic_cavitation_sync_receipt_sha256",
+        "operating_point_receipt_sha256",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "hydrophone_instrument_id",
+        "hydrophone_calibration_certificate_sha256",
+        "coherence"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_time_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cavitation_observation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cavitation_annotation_raw": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "cavitation_state_for_conditioning": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "acoustic_cavitation_alignment_offset_s": {
+          "type": "number"
+        },
+        "acoustic_cavitation_alignment_expanded_uncertainty_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "acoustic_cavitation_alignment_eligible": {
+          "type": "boolean"
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "acoustic_cavitation_sync_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hydrophone_calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "coherence": {
+          "$ref": "#/$defs/coherenceWindow"
+        }
+      }
+    },
+    "coherenceWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "report_sha256",
+        "evidence_kind",
+        "disposition",
+        "source_dataset_id",
+        "source_data_sha256",
+        "vessel_id",
+        "propeller_revision",
+        "operating_condition_id",
+        "operating_point_receipt_sha256",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "timebase_binding_receipt_sha256",
+        "synchronization_receipt_sha256",
+        "shared_timebase_id",
+        "pressure_instrument_id",
+        "pressure_channel_id",
+        "pressure_calibration_certificate_sha256",
+        "pressure_raw_trace_sha256",
+        "vibration_instrument_id",
+        "vibration_channel_id",
+        "vibration_calibration_certificate_sha256",
+        "vibration_reference_location",
+        "vibration_reference_orientation",
+        "vibration_raw_trace_sha256",
+        "pressure_window_start_s",
+        "pressure_window_end_s",
+        "sample_rate_hz",
+        "sample_count",
+        "estimator_fingerprint_sha256",
+        "cross_spectrum_convention",
+        "bands"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_kind": {
+          "enum": [
+            "synthetic",
+            "measured"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "COHERENCE_ESTIMATE_ONLY",
+            "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED",
+            "UNCERTAINTY_UNRESOLVED",
+            "INVALID",
+            "INCOMPLETE"
+          ]
+        },
+        "source_dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "timebase_binding_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "synchronization_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "shared_timebase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pressure_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pressure_channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pressure_calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "pressure_raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "vibration_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vibration_channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vibration_calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "vibration_reference_location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vibration_reference_orientation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vibration_raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "pressure_window_start_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pressure_window_end_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "estimator_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cross_spectrum_convention": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/coherenceBand"
+          }
+        }
+      }
+    },
+    "coherenceBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "frequency_hz",
+        "pressure_psd_pa2_per_hz",
+        "coherence_magnitude_squared",
+        "coherence_lower_bound",
+        "coherence_upper_bound",
+        "vibration_reference_coherent_pressure_psd_pa2_per_hz",
+        "vibration_reference_coherent_pressure_psd_lower_bound",
+        "vibration_reference_coherent_pressure_psd_upper_bound",
+        "non_coherent_residual_pressure_psd_pa2_per_hz",
+        "non_coherent_residual_pressure_psd_lower_bound",
+        "non_coherent_residual_pressure_psd_upper_bound",
+        "uncertainty_status",
+        "marginal_uncertainty_coverage_level",
+        "phase_status"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pressure_psd_pa2_per_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "coherence_magnitude_squared": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "coherence_lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "coherence_upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "vibration_reference_coherent_pressure_psd_pa2_per_hz": {
+          "type": "number",
+          "minimum": 0
+        },
+        "vibration_reference_coherent_pressure_psd_lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "vibration_reference_coherent_pressure_psd_upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "non_coherent_residual_pressure_psd_pa2_per_hz": {
+          "type": "number",
+          "minimum": 0
+        },
+        "non_coherent_residual_pressure_psd_lower_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "non_coherent_residual_pressure_psd_upper_bound": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "uncertainty_status": {
+          "enum": [
+            "marginal_interval_envelope_available",
+            "coherent_residual_interval_unresolved"
+          ]
+        },
+        "marginal_uncertainty_coverage_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "phase_status": {
+          "enum": [
+            "phase_resolved_within_declared_limit",
+            "phase_unresolved"
+          ]
+        }
+      }
+    }
+  }
+}
