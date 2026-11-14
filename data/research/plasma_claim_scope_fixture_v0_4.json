@@ -1133,7 +1133,7 @@
     {
       "id": "iso10365-unsupported-claim-map",
       "method_id": "ISO_10365",
-      "edition": "ISO_10365",
+      "edition": "ISO 10365:2022",
       "evidence_kind": "classification_practice",
       "material_pair_class": "bonded_assembly_any_adherends",
       "geometry": "failure_surface_classification",
