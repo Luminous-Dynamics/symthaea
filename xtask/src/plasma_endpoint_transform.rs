@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::plasma_claim_scope::{decide, Disposition as ScopeDisposition, ScopeEvidence};
@@ -626,6 +626,101 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
         DesignDisposition::Rejected => return rejected("equivalence-design receipt contradicts the endpoint transformation or observations"),
     }
 
+    let expected_auxiliary_roles: &[&str] = match graph.transform_id.as_str() {
+        "unit_preserving_strength_projection_v1" => &[],
+        "aged_strength_retention_ratio_v1" => &[
+            "baseline_unaged_strength",
+            "candidate_unaged_strength",
+            "baseline_aged_strength::conditioning",
+            "baseline_aged_strength::exposure",
+            "candidate_aged_strength::conditioning",
+            "candidate_aged_strength::exposure",
+        ],
+        "predeclared_failure_mode_fraction_v1" => {
+            return blocked("cluster-aware proportion-equivalence analysis is not yet qualified");
+        }
+        _ => unreachable!("transform registry checked above"),
+    };
+    if graph.design_receipt.additional_source_bindings.len() != expected_auxiliary_roles.len() {
+        return if expected_auxiliary_roles.is_empty() {
+            rejected("direct endpoint design must not contain auxiliary source bindings")
+        } else {
+            blocked("design receipt is missing one or more endpoint graph auxiliary source bindings")
+        };
+    }
+    let mut bound_roles = HashSet::new();
+    for binding in &graph.design_receipt.additional_source_bindings {
+        if !expected_auxiliary_roles.contains(&binding.role.as_str())
+            || !bound_roles.insert(binding.role.as_str())
+        {
+            return rejected("design receipt contains a duplicate or unregistered auxiliary source role");
+        }
+        let (node_role, source_kind) = match binding.role.as_str() {
+            "baseline_unaged_strength" => ("baseline_unaged_strength", "observation"),
+            "candidate_unaged_strength" => ("candidate_unaged_strength", "observation"),
+            "baseline_aged_strength::conditioning" => ("baseline_aged_strength", "conditioning_method"),
+            "candidate_aged_strength::conditioning" => ("candidate_aged_strength", "conditioning_method"),
+            "baseline_aged_strength::exposure" => ("baseline_aged_strength", "exposure_record"),
+            "candidate_aged_strength::exposure" => ("candidate_aged_strength", "exposure_record"),
+            _ => unreachable!("auxiliary role registry checked above"),
+        };
+        if binding.source_kind != source_kind || binding.cohort_role != node_role {
+            return rejected("design auxiliary binding has the wrong source kind or cohort role");
+        }
+        let Some(node) = nodes.iter().find(|node| node.role == node_role) else {
+            return blocked("design auxiliary source references a missing graph observation role");
+        };
+        let expected_samples = &node.specimen_clusters;
+        if !same_specimen_cluster_manifest(&binding.samples, expected_samples) {
+            return rejected("design auxiliary source specimen/cluster mapping differs from the endpoint graph");
+        }
+        match binding.source_kind.as_str() {
+            "observation" => {
+                let Some(method_receipt) = binding.method_receipt.as_ref() else {
+                    return blocked("auxiliary strength observation has no method-qualified receipt");
+                };
+                let Some(raw_digest) = node.receipt.raw_data_sha256.as_deref() else {
+                    return blocked("auxiliary strength observation raw-data digest is missing");
+                };
+                if binding.source_id != node.receipt.id
+                    || binding.artifact_sha256 != raw_digest
+                    || !same_scope_evidence(method_receipt, &node.receipt)
+                {
+                    return rejected("unaged observation binding is not the exact method-qualified graph source");
+                }
+            }
+            "conditioning_method" => {
+                let Some(exposure) = node.aging_exposure.as_ref() else {
+                    return blocked("aged graph node has no exposure record for its conditioning method binding");
+                };
+                let Some(method_receipt) = binding.method_receipt.as_ref() else {
+                    return blocked("conditioning source has no method-qualified receipt");
+                };
+                if binding.source_id != method_receipt.id
+                    || binding.artifact_sha256 != method_receipt.raw_data_sha256.as_deref().unwrap_or("")
+                    || !same_scope_evidence(method_receipt, &exposure.conditioning_method_receipt)
+                {
+                    return rejected("conditioning source binding differs from the graph's exact conditioning-method receipt");
+                }
+            }
+            "exposure_record" => {
+                let Some(exposure) = node.aging_exposure.as_ref() else {
+                    return blocked("aged graph node has no exposure record");
+                };
+                if binding.method_receipt.is_some()
+                    || binding.source_id != exposure.exposure_receipt_id
+                    || binding.artifact_sha256 != exposure.exposure_receipt_sha256
+                {
+                    return rejected("exposure source binding differs from the graph's exact exposure receipt");
+                }
+            }
+            _ => unreachable!("source kind registry checked above"),
+        }
+    }
+    if expected_auxiliary_roles.iter().any(|role| !bound_roles.contains(role)) {
+        return blocked("one or more required endpoint source roles are not bound by the design receipt");
+    }
+
     let analysis = &graph.analysis;
     if !nonempty(&analysis.result_id)
         || !nonempty(&analysis.graph_id)
@@ -709,6 +804,42 @@ fn analysis_design_id_mismatch(
         || analysis.analysis_profile != design.analysis_profile
         || analysis.design_id != design.analysis_result.design_id
         || analysis.plan_sha256 != design.analysis_result.plan_sha256
+}
+
+fn same_scope_evidence(left: &ScopeEvidence, right: &ScopeEvidence) -> bool {
+    left.id == right.id
+        && left.method_id == right.method_id
+        && left.edition == right.edition
+        && left.evidence_kind == right.evidence_kind
+        && left.material_pair_class == right.material_pair_class
+        && left.geometry == right.geometry
+        && left.endpoint == right.endpoint
+        && left.requested_claim == right.requested_claim
+        && left.protocol_id == right.protocol_id
+        && left.protocol_sha256 == right.protocol_sha256
+        && left.raw_data_sha256 == right.raw_data_sha256
+        && left.suitability_review_sha256 == right.suitability_review_sha256
+        && left.specimen_ids == right.specimen_ids
+}
+
+fn same_specimen_cluster_manifest(
+    left: &[crate::plasma_equivalence_design::SampleIdentity],
+    right: &[SpecimenCluster],
+) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let left_map: HashMap<&str, &str> = left
+        .iter()
+        .map(|sample| (sample.specimen_id.as_str(), sample.cluster_id.as_str()))
+        .collect();
+    let right_map: HashMap<&str, &str> = right
+        .iter()
+        .map(|sample| (sample.specimen_id.as_str(), sample.cluster_id.as_str()))
+        .collect();
+    left_map.len() == left.len()
+        && right_map.len() == right.len()
+        && left_map == right_map
 }
 
 fn expected_analysis_profile(graph: &EndpointGraph) -> &'static str {
