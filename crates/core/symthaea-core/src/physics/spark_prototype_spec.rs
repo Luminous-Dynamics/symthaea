@@ -245,17 +245,18 @@ impl PrototypeSpecification {
         let efficiency = 35.0;
 
         let summary = format!(
-            "Spark Engine {} - {:.1} kW thermal fusion power unit using {:?} fuel. \
-             Designed for {:.0} year operational lifetime with self-healing HEA shell \
-             and liquid metal core. {}",
+            "CONCEPT SCREEN ONLY: Spark Engine {} - {:.1} kW modelled thermal-power assumption using {:?} fuel. \
+             Illustrative service-life target: {:.0} years (not qualified). Model-feasibility flag: {}. \
+             PHYSICAL VALIDATION, NET ENERGY, SAFETY, MANUFACTURING READINESS AND REGULATORY ACCEPTANCE \
+             ARE NOT ESTABLISHED BY THIS OUTPUT.",
             model.full_name(),
             thermal_power,
             result.conditions.reaction,
             result.conditions.target_lifetime_years,
             if result.feasible {
-                "DESIGN VALIDATED"
+                "PASSED — MODEL SCREEN ONLY; NOT PHYSICALLY VALIDATED"
             } else {
-                "DESIGN REQUIRES REVISION"
+                "FAILED — MODEL SCREEN ONLY; REQUIRES REVIEW"
             }
         );
 
@@ -619,13 +620,14 @@ impl PrototypeSpecification {
         // Header
         output.push_str(&"═".repeat(70));
         output.push('\n');
-        output.push_str("  SPARK ENGINE PROTOTYPE SPECIFICATION\n");
+        output.push_str("  CONCEPT SCREENING REPORT — NOT FOR FABRICATION OR OPERATION\n");
         output.push_str(&format!(
             "  Model: {}  Rev: {}  Date: {}\n",
             self.model.full_name(),
             self.revision,
             self.date
         ));
+        output.push_str("  All outputs are conceptual model results, not measured or qualified performance.\n");
         output.push_str(&"═".repeat(70));
         output.push_str("\n\n");
 
@@ -637,7 +639,7 @@ impl PrototypeSpecification {
         output.push_str("\n\n");
 
         // Performance
-        output.push_str("PERFORMANCE SPECIFICATIONS\n");
+        output.push_str("MODEL ASSUMPTIONS — NOT MEASURED PERFORMANCE\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
         output.push_str(&format!(
@@ -667,7 +669,7 @@ impl PrototypeSpecification {
         output.push('\n');
 
         // Dimensions
-        output.push_str("DIMENSIONAL SPECIFICATIONS\n");
+        output.push_str("ILLUSTRATIVE GEOMETRY — NOT FOR FABRICATION\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
         output.push_str(&format!(
@@ -683,7 +685,7 @@ impl PrototypeSpecification {
         output.push('\n');
 
         // BOM
-        output.push_str("BILL OF MATERIALS\n");
+        output.push_str("ILLUSTRATIVE MATERIAL ESTIMATES — NOT FOR PROCUREMENT\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
         output.push_str(&format!(
@@ -718,38 +720,30 @@ impl PrototypeSpecification {
         output.push('\n');
 
         // Safety
-        output.push_str("SAFETY ANALYSIS\n");
+        output.push_str("UNQUALIFIED HAZARD FLAGS — NOT A SAFETY CASE\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
-        for entry in &self.safety {
-            output.push_str(&format!(
-                "[{}] {}: {}\n",
-                entry.residual_risk.as_str(),
-                entry.category,
-                entry.hazard
-            ));
-            output.push_str(&format!("    Mitigation: {}\n", entry.mitigation));
-        }
+        output.push_str(
+            "No independent hazard analysis, radiation-safety assessment, pressure-boundary review, or safety authorization is established by this model.\\n",
+        );
         output.push('\n');
 
         // Manufacturing
-        output.push_str("MANUFACTURING PROCESS\n");
+        output.push_str("MANUFACTURING QUALIFICATION — NOT PROVIDED\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
-        for note in &self.manufacturing {
-            output.push_str(&format!("Step {}: {}\n", note.step, note.process));
-            output.push_str(&format!("  {}\n", note.description));
-        }
+        output.push_str(
+            "No fabrication or construction procedure is supplied. Manufacturing readiness requires separate qualified engineering, materials/process evidence, inspection planning, and independent review.\\n",
+        );
         output.push('\n');
 
         // Regulatory
-        output.push_str("REGULATORY COMPLIANCE\n");
+        output.push_str("REGULATORY REVIEW REQUIRED — NO COMPLIANCE DETERMINATION\n");
         output.push_str(&"─".repeat(70));
         output.push('\n');
-        for note in &self.regulatory_notes {
-            output.push_str(&format!("• {note}\n"));
-        }
-
+        output.push_str(
+            "Applicable jurisdiction, licensing, safeguards, radiation protection, environmental review, and export-control requirements require determination by qualified authorities.\\n",
+        );
         output.push('\n');
         output.push_str(&"═".repeat(70));
         output.push_str("\n  END OF SPECIFICATION\n");
@@ -801,7 +795,11 @@ mod tests {
 
         let output = spec.to_string();
         assert!(output.contains("SPARK ENGINE"));
-        assert!(output.contains("BILL OF MATERIALS"));
+        assert!(output.contains("CONCEPT SCREENING REPORT"));
+        assert!(output.contains("NOT PHYSICALLY VALIDATED"));
+        assert!(output.contains("NOT A SAFETY CASE"));
+        assert!(!output.contains("DESIGN VALIDATED"));
+        assert!(!output.contains("Step 1:"));
 
         // Print first 2000 chars for inspection
         println!("{}", &output[..output.len().min(2000)]);
