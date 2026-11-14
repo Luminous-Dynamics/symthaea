@@ -26,12 +26,21 @@ const MAX_SOURCE_TREE_NODES: usize = 500_000;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlSourceNodeV1 {
     pub element: String,
-    pub attributes: Vec<(String, String)>,
+    /// Namespace URI of the element; local names alone are not globally unique.
+    pub namespace_uri: Option<String>,
+    pub attributes: Vec<MusicXmlSourceAttributeV1>,
     pub text: Option<String>,
     pub children: Vec<MusicXmlSourceNodeV1>,
     /// Ordered mixed content (text and child elements) so extensions such as
     /// lyrics, words and unknown annotation markup do not lose text position.
     pub content: Vec<MusicXmlSourceContentV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MusicXmlSourceAttributeV1 {
+    pub name: String,
+    pub namespace_uri: Option<String>,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -120,6 +129,11 @@ pub struct MusicXmlNotationEventV1 {
     pub source_measure_number: Option<String>,
     pub part_id: String,
     pub score_offset: RationalBeat,
+    /// Original MusicXML note-level performance attributes. They remain
+    /// source strings in divisions, separate from the notated score cursor.
+    pub time_only: Option<String>,
+    pub attack_divisions: Option<String>,
+    pub release_divisions: Option<String>,
     /// None for grace notes without a performed duration.
     pub performed_duration: Option<RationalBeat>,
     pub kind: MusicXmlNotationEventKindV1,
@@ -571,6 +585,9 @@ fn parse_part_events(
                     source_measure_number: measure_number.clone(),
                     part_id: part_id.to_string(),
                     score_offset,
+                    time_only: element.attribute("time-only").map(str::to_string),
+                    attack_divisions: element.attribute("attack").map(str::to_string),
+                    release_divisions: element.attribute("release").map(str::to_string),
                     performed_duration,
                     kind,
                     is_grace,
@@ -841,7 +858,8 @@ fn source_node(
     }
     Ok(MusicXmlSourceNodeV1 {
         element: node.tag_name().name().to_string(),
-        attributes: attributes(node),
+        namespace_uri: node.tag_name().namespace().map(str::to_string),
+        attributes: source_attributes(node),
         text: node
             .text()
             .map(|value| value.trim().to_string())
@@ -849,6 +867,16 @@ fn source_node(
         children,
         content,
     })
+}
+
+fn source_attributes(node: roxmltree::Node<'_, '_>) -> Vec<MusicXmlSourceAttributeV1> {
+    node.attributes()
+        .map(|attribute| MusicXmlSourceAttributeV1 {
+            name: attribute.name().to_string(),
+            namespace_uri: attribute.namespace().map(str::to_string),
+            value: attribute.value().to_string(),
+        })
+        .collect()
 }
 
 fn attributes(node: roxmltree::Node<'_, '_>) -> Vec<(String, String)> {
@@ -1013,12 +1041,12 @@ mod tests {
         assert_eq!(ratio.normal_dot_count, 1);
         assert_eq!(events.note_events[0].tuplet_notations.len(), 1);
         assert_eq!(
-            events.note_events[0].tuplet_notations[0].attributes,
-            vec![
-                ("type".into(), "start".into()),
-                ("number".into(), "1".into()),
-                ("bracket".into(), "no".into())
-            ]
+            events.note_events[0].tuplet_notations[0]
+                .attributes
+                .iter()
+                .map(|attribute| (attribute.name.as_str(), attribute.value.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("type", "start"), ("number", "1"), ("bracket", "no")]
         );
         assert_eq!(events.note_events[2].dot_count, 1);
     }
@@ -1099,11 +1127,14 @@ mod tests {
         assert_eq!(events.note_events[0].source_order, 2);
         assert_eq!(events.note_events[1].source_order, 3);
         let first = &events.note_events[0].source_note;
-        assert_eq!(first.attributes, vec![
-            ("id".into(), "n-1".into()),
-            ("time-only".into(), "2".into()),
-            ("attack".into(), "1".into())
-        ]);
+        assert_eq!(
+            first.attributes.iter()
+                .map(|attribute| (attribute.name.as_str(), attribute.value.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("id", "n-1"), ("time-only", "2"), ("attack", "1")]
+        );
+        assert_eq!(events.note_events[0].time_only.as_deref(), Some("2"));
+        assert_eq!(events.note_events[0].attack_divisions.as_deref(), Some("1"));
         assert!(first.children.iter().any(|node| node.element == "future-symbol"));
         assert_eq!(
             first.children.iter().find(|node| node.element == "future-symbol")
@@ -1305,6 +1336,41 @@ mod tests {
         );
         assert!(matches!(events.status, MusicXmlNotationEventsStatusV1::Unknown { .. }));
         assert!(events.note_events.is_empty());
+    }
+
+
+    #[test]
+    fn opaque_source_tree_preserves_element_and_attribute_namespace_uris() {
+        let xml = r#"<score-partwise xmlns:ext="urn:example:extension-a" xmlns:other="urn:example:extension-b"><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note id="n1" ext:state="held" other:state="released" attack="-2" release="3" time-only="1">
+                <pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+                <ext:articulation ext:kind="ornamental"><ext:label>first</ext:label></ext:articulation>
+                <other:articulation other:kind="editorial"><other:label>second</other:label></other:articulation>
+            </note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        let note = &events.note_events[0];
+        assert_eq!(note.time_only.as_deref(), Some("1"));
+        assert_eq!(note.attack_divisions.as_deref(), Some("-2"));
+        assert_eq!(note.release_divisions.as_deref(), Some("3"));
+        let node = &note.source_note;
+        assert_eq!(
+            node.attributes.iter()
+                .filter(|attribute| attribute.name == "state")
+                .map(|attribute| attribute.namespace_uri.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            vec!["urn:example:extension-a", "urn:example:extension-b"]
+        );
+        let elements: Vec<_> = node.children.iter()
+            .filter(|child| child.element == "articulation")
+            .collect();
+        assert_eq!(elements.len(), 2);
+        assert_eq!(
+            elements.iter().map(|child| child.namespace_uri.as_deref().unwrap()).collect::<Vec<_>>(),
+            vec!["urn:example:extension-a", "urn:example:extension-b"]
+        );
     }
 
 }
