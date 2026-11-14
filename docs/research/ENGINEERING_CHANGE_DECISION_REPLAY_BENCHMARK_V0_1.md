@@ -193,3 +193,37 @@ Until these exist, only synthetic structural/predicate checks may be reported. N
 - Siemens, **Teamcenter 2606** (2026-06-12); Aras, **InnovatorEdge AI 2.4** (2026-11-10); PTC Windchill 13.1.2; IBM DOORS Next 7.3 documentation. Treat statements as publicly documented features, not performance proofs.
 
 **Claim ceiling:** This is a benchmark design and preregistration. It is not evidence that Symthaea is currently better than Siemens, Aras, PTC, IBM, TEMPO or any SOTA system. Superiority can only be claimed after matched, independently adjudicated, reproducible results.
+
+
+## 12. Existing-owner integration map — avoid parallel infrastructure
+
+The benchmark is a **consumer and evaluator**, not a new temporal database, receipt protocol, causal clock or authorization service. Before adding implementation code, join the following existing work rather than recreating it:
+
+| Existing owner | Owns / qualifies | This benchmark consumes | Must not duplicate |
+|---|---|---|---|
+| Symthaea #10543 ENG-DESIGN-CHANGE-QUAL-001 | Engineering change tasks, claim–evidence applicability gold labels, obligations, hard gates and cost/impact scoring | Pair-level task universe, disposition vocabulary and blinded gold/adjudication boundary | A second engineering impact graph, delta ontology or ETK authority |
+| Symthaea #10600 KNOW-LIFE-001 | Lifecycle-faithful as-of evidence projection, supersession/retraction/conflict and target-time query semantics | Exact version, valid-time, provenance-family, lifecycle and rights outcomes | Another source event log, claim lifecycle vocabulary or provenance-family registry |
+| Symthaea #10816 KNOW-RETRIEVE-002 | Plan-to-authorized-execution joins, tool execution receipts, artifact/span identity, index/materialization and query-visible frontier, rights and temporal retrieval coverage | The exact process-visible evidence and query/index state at K | Another retrieval runner, ToolExecutionReceipt, index watermark or authorization service |
+| Symthaea #11241 SYM-FIN-TIME-001 | Shared bitemporal availability semantics for financial research and quant evaluation | Candidate reusable time semantics / metamorphic tests after code-level compatibility review | A second generic bitemporal verifier or financial-domain schema transplanted without review |
+| Mycelix #2631 EPI-008 | Typed temporal assertions and EvidenceFrontierV1, source-set/frontier binding | Exact frontier and frozen source-set commitments | A second evidence-frontier or corpus ledger |
+| Mycelix #5843 PULSE-MULTICONDUCTOR-EVIDENCE-001 | Per-conductor order, explicit cross-conductor causal edges, partial-order causal history and independent verifier | Verified causal-history receipt and concurrency/incomparability outcomes | A new vector clock, event log or scalar global sequence |
+| Mycelix #5923 EMSR-PROV-003 | Time-qualified dependency hypergraph closure and source/dependency completeness | Dependency/source completeness result | A second dependency-completeness graph |
+| Mycelix #5395 / #6105 | Exact GS1 normative artifact intake, EPCIS conformance and supply-chain profile/corpus ownership | Version-pinned EPCIS semantics and supply-chain scenarios | A parallel GS1 validator, EPCIS server benchmark or supply-chain event schema |
+| Symthaea #10314 | Generic parameterized Draft 2020-12 JSON Schema CLI and locked validator environment | Structural validation of V1.1 schema and fixture with the existing `--schema` / `--instance` interface | A second schema-audit harness |
+
+### Integration sequence
+
+1. **Schema first:** invoke #10314's generic validator on the V1.1 schema and synthetic example after the PR dependency is available in a compatible workspace. Structural validity must be reported separately from semantic validity.
+2. **Pure semantic join:** build the smallest evaluator-only function over frozen input records that checks T/K ordering, exact source/version/digest references, event/record/publication/ingestion/materialization/context distinction, rights at both relevant times, and required/observed causal frontier. Return explicit PASS, FAIL or INDETERMINATE with stable reason codes.
+3. **Consume receipts:** resolve #10816's execution and index-visibility receipts, #10600 lifecycle projections, and Mycelix #2631/#5843/#5923 outputs by exact identity/digest. If any required owner output is unavailable, preserve INDETERMINATE; do not synthesize replacement authority.
+4. **Pair-level engineering adjudication:** join the temporal result to #10543's claim–evidence pair and disposition without changing the engineering gold vocabulary. Temporal admissibility and engineering applicability remain distinct axes.
+5. **Offline mutation qualification:** run all structural vectors through #10314 and all semantic vectors through the owner-composed evaluator. Preserve minimized failing fixtures and exact verifier-build identity.
+6. **Only then score candidates:** use blinded independent assessors and frozen baselines. No candidate execution is required to qualify the structural and semantic evaluator against synthetic controls.
+
+### Explicit gap and current status
+
+The issue bodies establish intended contracts, not proof that every implementation path is complete or composable. The current evidence does not yet show a single end-to-end evaluator that resolves V1.1 temporal references and joins #10816 query visibility with Mycelix's causal-frontier/dependency receipts for the engineering claim–evidence pair.
+
+The immediate implementation question is therefore **an owner-to-type-to-consumer compatibility audit**, not a new system proposal. The audit must inspect exact current code/tests and identify the narrowest adapter or missing check. If #11241's verifier is reusable, adopt it only after confirming its semantics match the engineering profile; if #10816 already exposes the visibility receipt needed, consume it unchanged.
+
+As of this preregistration update, #10314 remains an open draft dependency, no V1.1 Draft 2020-12 engine run is claimed, no end-to-end semantic evaluator is qualified, and no assessor labels/vendor trials/physical evidence exist.
