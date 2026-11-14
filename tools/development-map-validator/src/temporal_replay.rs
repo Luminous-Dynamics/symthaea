@@ -190,7 +190,7 @@ fn actor_availability<'a>(body: &'a LedgerEventBody, actor_id: &str) -> Option<&
 fn validate_body(
     event: &LedgerEvent,
     index: usize,
-    prior_events: &HashMap<String, LedgerEvent>,
+    prior_events: &BTreeMap<String, LedgerEvent>,
     diagnostics: &mut Vec<ReplayDiagnostic>,
 ) {
     let body = &event.body;
@@ -317,7 +317,7 @@ pub fn validate_ledger(ledger: &EventLedger) -> LedgerValidationReport {
         diagnostics.push(diagnostic("D2-LEDGER-002", "repository_full_name", "repository_full_name must be a compact owner/repository identity"));
     }
 
-    let mut prior_events: HashMap<String, LedgerEvent> = HashMap::new();
+    let mut prior_events: BTreeMap<String, LedgerEvent> = BTreeMap::new();
     let mut previous_hash = GENESIS_HASH.to_owned();
     let mut previous_recorded: Option<DateTime<FixedOffset>> = None;
     for (index, event) in ledger.events.iter().enumerate() {
@@ -363,7 +363,7 @@ pub fn validate_ledger(ledger: &EventLedger) -> LedgerValidationReport {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ReplayAccumulator {
     facts: BTreeMap<String, FactProjection>,
     proposals: Vec<ProposalProjection>,
@@ -473,46 +473,210 @@ fn validate_query(
     ))
 }
 
-/// Clean replay reference: starts from the genesis state and consumes the whole ledger.
-pub fn replay_ledger(ledger: &EventLedger, query: &ReplayQuery) -> Result<ReplayProjection, String> {
-    replay_incremental(ledger, &[], query)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplayCursor {
+    schema_version: String,
+    ledger_id: String,
+    repository_full_name: String,
+    query: ReplayQuery,
+    processed_sequence: u64,
+    head_hash: String,
+    last_recorded_at: Option<String>,
+    prior_events: BTreeMap<String, LedgerEvent>,
+    state: ReplayAccumulator,
+    checkpoint_hash: String,
 }
 
-/// Append a suffix to a prefix cursor. The prefix state is retained; only the suffix
-/// is applied after it. DynaMapBench compares this result with a clean rebuild.
+#[derive(Serialize)]
+struct CursorHashMaterial<'a> {
+    schema_version: &'a str,
+    ledger_id: &'a str,
+    repository_full_name: &'a str,
+    query: &'a ReplayQuery,
+    processed_sequence: u64,
+    head_hash: &'a str,
+    last_recorded_at: &'a Option<String>,
+    prior_events: &'a BTreeMap<String, LedgerEvent>,
+    state: &'a ReplayAccumulator,
+}
+
+fn calculate_cursor_hash(cursor: &ReplayCursor) -> Result<String, String> {
+    let material = CursorHashMaterial {
+        schema_version: &cursor.schema_version,
+        ledger_id: &cursor.ledger_id,
+        repository_full_name: &cursor.repository_full_name,
+        query: &cursor.query,
+        processed_sequence: cursor.processed_sequence,
+        head_hash: &cursor.head_hash,
+        last_recorded_at: &cursor.last_recorded_at,
+        prior_events: &cursor.prior_events,
+        state: &cursor.state,
+    };
+    Ok(sha256_hex(&serde_json::to_vec(&material).map_err(|error| error.to_string())?))
+}
+
+fn seal_cursor(cursor: &mut ReplayCursor) -> Result<(), String> {
+    cursor.checkpoint_hash = calculate_cursor_hash(cursor)?;
+    Ok(())
+}
+
+fn validate_cursor_checkpoint(cursor: &ReplayCursor) -> Result<(), String> {
+    if cursor.schema_version != LEDGER_SCHEMA_VERSION {
+        return Err("unsupported replay cursor schema version".to_owned());
+    }
+    if cursor.processed_sequence != cursor.prior_events.len() as u64 {
+        return Err("replay cursor sequence does not match its prior-event index".to_owned());
+    }
+    if cursor.checkpoint_hash != calculate_cursor_hash(cursor)? {
+        return Err("replay cursor checkpoint hash mismatch".to_owned());
+    }
+    let expected_head = cursor.prior_events.values().last()
+        .map(|event| event.event_hash.as_str())
+        .unwrap_or(GENESIS_HASH);
+    if cursor.head_hash != expected_head {
+        return Err("replay cursor head hash does not match its prior-event index".to_owned());
+    }
+    Ok(())
+}
+
+impl ReplayCursor {
+    pub fn projection(&self) -> ReplayProjection {
+        ReplayProjection {
+            schema_version: self.schema_version.clone(),
+            ledger_id: self.ledger_id.clone(),
+            query: self.query.clone(),
+            facts: self.state.facts.values().cloned().collect(),
+            proposals: self.state.proposals.clone(),
+            included_event_ids: self.state.included.clone(),
+            excluded_events: self.state.excluded.clone(),
+            verified_ledger_head_hash: self.head_hash.clone(),
+            claim_ceiling: "Temporal replay and internal hash-chain/checkpoint validation only. Source authenticity, actor-availability proof authenticity, Git object identity, authority, execution, CI, and downstream correctness are not independently qualified.".to_owned(),
+        }
+    }
+}
+
+fn empty_cursor(ledger: &EventLedger, query: &ReplayQuery) -> Result<ReplayCursor, String> {
+    validate_query(ledger, query)?;
+    let mut cursor = ReplayCursor {
+        schema_version: LEDGER_SCHEMA_VERSION.to_owned(),
+        ledger_id: ledger.ledger_id.clone(),
+        repository_full_name: ledger.repository_full_name.clone(),
+        query: query.clone(),
+        processed_sequence: 0,
+        head_hash: GENESIS_HASH.to_owned(),
+        last_recorded_at: None,
+        prior_events: BTreeMap::new(),
+        state: ReplayAccumulator::new(),
+        checkpoint_hash: String::new(),
+    };
+    seal_cursor(&mut cursor)?;
+    Ok(cursor)
+}
+
+/// Build a validated checkpoint by replaying a known prefix from genesis.
+pub fn start_replay_cursor(prefix: &EventLedger, query: &ReplayQuery) -> Result<ReplayCursor, String> {
+    let validation = validate_ledger(prefix);
+    if !validation.valid {
+        let errors = validation.diagnostics.iter()
+            .map(|item| format!("{} {}: {}", item.code, item.path, item.message))
+            .collect::<Vec<_>>().join("; ");
+        return Err(format!("invalid temporal ledger prefix: {errors}"));
+    }
+    let mut cursor = empty_cursor(prefix, query)?;
+    cursor = resume_replay_cursor(cursor, &prefix.events)?;
+    Ok(cursor)
+}
+
+/// Validate a saved checkpoint and apply only the new append-only suffix.
+pub fn resume_replay_cursor(
+    mut cursor: ReplayCursor,
+    appended: &[LedgerEvent],
+) -> Result<ReplayCursor, String> {
+    validate_cursor_checkpoint(&cursor)?;
+    let (knowledge, valid_at, ledger_cutoff) = validate_query(
+        &EventLedger {
+            schema_version: cursor.schema_version.clone(),
+            ledger_id: cursor.ledger_id.clone(),
+            repository_full_name: cursor.repository_full_name.clone(),
+            events: Vec::new(),
+        },
+        &cursor.query,
+    )?;
+
+    for (index, event) in appended.iter().enumerate() {
+        let path = format!("appended_events[{index}]");
+        let expected_sequence = cursor.processed_sequence + 1;
+        if event.sequence != expected_sequence {
+            return Err(format!("{path}.sequence: expected {expected_sequence}, found {}", event.sequence));
+        }
+        if event.event_id.trim().is_empty() || cursor.prior_events.contains_key(&event.event_id) {
+            return Err(format!("{path}.event_id: empty or duplicate event ID"));
+        }
+        if event.previous_hash != cursor.head_hash {
+            return Err(format!("{path}.previous_hash: does not match the cursor head"));
+        }
+        if !valid_sha256(&event.previous_hash) || !valid_sha256(&event.event_hash) {
+            return Err(format!("{path}: event hashes must be SHA-256 digests"));
+        }
+        let expected_hash = calculate_event_hash(&cursor.ledger_id, event)?;
+        if event.event_hash != expected_hash {
+            return Err(format!("{path}.event_hash: content hash mismatch"));
+        }
+
+        let mut body_diagnostics = Vec::new();
+        validate_body(event, index + cursor.processed_sequence as usize, &cursor.prior_events, &mut body_diagnostics);
+        if !body_diagnostics.is_empty() {
+            return Err(body_diagnostics.iter()
+                .map(|item| format!("{} {}: {}", item.code, item.path, item.message))
+                .collect::<Vec<_>>().join("; "));
+        }
+
+        let recorded = parse_time(&event.body.recorded_at)?;
+        if cursor.last_recorded_at.as_deref().map(parse_time).transpose()?.is_some_and(|last| recorded < last) {
+            return Err(format!("{path}.body.recorded_at: append timestamp moved backwards"));
+        }
+
+        cursor.state.append(event, &cursor.query, &knowledge, &valid_at, ledger_cutoff.as_ref())?;
+        cursor.processed_sequence = expected_sequence;
+        cursor.head_hash = event.event_hash.clone();
+        cursor.last_recorded_at = Some(event.body.recorded_at.clone());
+        cursor.prior_events.insert(event.event_id.clone(), event.clone());
+    }
+    seal_cursor(&mut cursor)?;
+    Ok(cursor)
+}
+
+/// Clean replay reference: start at genesis and consume the entire ledger.
+pub fn replay_ledger(ledger: &EventLedger, query: &ReplayQuery) -> Result<ReplayProjection, String> {
+    let mut cursor = empty_cursor(ledger, query)?;
+    cursor = resume_replay_cursor(cursor, &ledger.events)?;
+    let validation = validate_ledger(ledger);
+    if !validation.valid {
+        return Err("invalid temporal ledger".to_owned());
+    }
+    Ok(cursor.projection())
+}
+
+/// Start from a validated prefix checkpoint, then consume only the supplied suffix.
 pub fn replay_incremental(
     prefix: &EventLedger,
     appended: &[LedgerEvent],
     query: &ReplayQuery,
 ) -> Result<ReplayProjection, String> {
-    let mut combined = prefix.clone();
-    combined.events.extend(appended.iter().cloned());
-    let validation = validate_ledger(&combined);
-    if !validation.valid {
-        let errors = validation.diagnostics.iter()
-            .map(|item| format!("{} {}: {}", item.code, item.path, item.message))
-            .collect::<Vec<_>>().join("; ");
-        return Err(format!("invalid temporal ledger: {errors}"));
-    }
-    let (knowledge, valid_at, ledger_cutoff) = validate_query(&combined, query)?;
-    let mut state = ReplayAccumulator::new();
-    for event in &prefix.events {
-        state.append(event, query, &knowledge, &valid_at, ledger_cutoff.as_ref())?;
-    }
-    for event in appended {
-        state.append(event, query, &knowledge, &valid_at, ledger_cutoff.as_ref())?;
-    }
-    Ok(ReplayProjection {
-        schema_version: LEDGER_SCHEMA_VERSION.to_owned(),
-        ledger_id: combined.ledger_id,
-        query: query.clone(),
-        facts: state.facts.into_values().collect(),
-        proposals: state.proposals,
-        included_event_ids: state.included,
-        excluded_events: state.excluded,
-        verified_ledger_head_hash: validation.verified_head_hash,
-        claim_ceiling: "Temporal replay and internal hash-chain validation only. Source authenticity, actor-availability proof authenticity, Git object identity, authority, execution, CI, and downstream correctness are not independently qualified.".to_owned(),
-    })
+    let cursor = start_replay_cursor(prefix, query)?;
+    let cursor = resume_replay_cursor(cursor, appended)?;
+    Ok(cursor.projection())
+}
+
+pub fn serialize_replay_cursor(cursor: &ReplayCursor) -> Result<String, String> {
+    validate_cursor_checkpoint(cursor)?;
+    serde_json::to_string_pretty(cursor).map_err(|error| error.to_string())
+}
+
+pub fn deserialize_replay_cursor(input: &str) -> Result<ReplayCursor, String> {
+    let cursor: ReplayCursor = serde_json::from_str(input).map_err(|error| error.to_string())?;
+    validate_cursor_checkpoint(&cursor)?;
+    Ok(cursor)
 }
 
 pub fn validate_temporal_ledger_json(input: &str) -> Result<LedgerValidationReport, String> {
