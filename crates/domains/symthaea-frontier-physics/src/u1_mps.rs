@@ -5859,10 +5859,14 @@ mod tests {
             let bond = (case_index * 7 + 3) % (site_count - 1);
             let gauge_bond = (case_index * 5 + 1) % (site_count - 1);
             let dense = deterministic_fixed_charge_dense(site_count, total_charge, &mut seed);
-            let mut input =
-                ComplexU1Mps::from_dense_fixed_charge(&dense, site_count, total_charge, 1.0e-12)
-                    .unwrap();
-            input = apply_nonunitary_virtual_gauge_rescaling(&input, gauge_bond, &mut seed);
+            let input = ComplexU1Mps::from_dense_fixed_charge(
+                &dense,
+                site_count,
+                total_charge,
+                1.0e-12,
+            )
+            .map(|state| apply_nonunitary_virtual_gauge_rescaling(&state, gauge_bond, &mut seed))
+            .unwrap();
 
             let gauged_dense = input.to_dense(10).unwrap();
             let gauge_state_error = dense
