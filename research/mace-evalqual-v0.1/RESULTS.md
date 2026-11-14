@@ -211,3 +211,8 @@ Added `ObservedHead` and `AcceptObserved` to the public checkpoint verifier. It 
 ## 14 November 2026 — signed checkpoint and observed-head join
 
 The public `checkpoints` package now exposes `AcceptObserved` in addition to `AcceptNext`. The new API requires the observed database identity, journal sequence and head digest to match the signed checkpoint before it advances the monotonic state. Four focused tests cover successful binding and rejection of a mismatched database, sequence or head. The test count for the checkpoint package is now 21, including the optional OpenSSL 3.5.5 interoperability test. The caller still supplies and securely persists the trusted cursor outside the destination DB/admin domain.
+
+
+## 14 November 2026 — reject sequence-only checkpoint advancement
+
+Tightened `AcceptNext`: a new checkpoint must advance both `JournalSequence` and `JournalHeadSHA256`. A signed checkpoint that increments the sequence while repeating the prior head is now rejected as `ErrNoProgress`. Added a regression test for this condition. The checkpoint package now has 22 tests (including optional OpenSSL interoperability); local companion inventory will be refreshed in the next source-package snapshot.
