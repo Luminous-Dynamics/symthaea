@@ -77,3 +77,6 @@ Therefore v1 is a signature/monotonic-cursor building block, not an E3/E4 witnes
 The public branch now includes `checkpoints/`, a standard-library Go implementation of the v1 signing preimage, Ed25519 verifier, envelope digest, bootstrap and next-checkpoint consumer state machine. Its tests validate the published vector and exercise signature tampering, identity mismatch, exact replay, rollback, fork, gap, broken predecessor, no-progress journal head, issue-time rollback and corrupt trusted state. The verifier contains a `Sign` helper for deterministic tests and controlled witness implementations; it is not a deployed signer service and must not be used as a production key-management system.
 
 The repository's public test script includes the package in `go test ./...` and checks all three public CLIs. TLC remains a separate, conditional verification tier and is explicitly reported as not run unless a pinned JAR is supplied.
+
+
+The public verifier now has an optional cross-implementation test that verifies the same published signing preimage and Ed25519 signature with OpenSSL's CLI. This is independent crypto-provider interoperability evidence, not an independent implementation of the checkpoint state machine. The test skips explicitly where OpenSSL is absent; the mandatory Go vector test still runs.
