@@ -1402,4 +1402,32 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn foreign_namespace_core_name_collisions_remain_opaque_extensions() {
+        let xml = r#"<score-partwise xmlns:ext="urn:example:extension"><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <ext:attributes><ext:divisions>99</ext:divisions></ext:attributes>
+            <ext:note><ext:pitch><ext:step>D</ext:step><ext:octave>5</ext:octave></ext:pitch><ext:duration>16</ext:duration></ext:note>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events.len(), 1);
+        assert_eq!(
+            events.note_events[0].performed_duration,
+            Some(RationalBeat::new(4, 1).unwrap())
+        );
+        assert_eq!(events.auxiliary_events.len(), 2);
+        assert_eq!(events.auxiliary_events[0].source.element, "attributes");
+        assert_eq!(
+            events.auxiliary_events[0].source.namespace_uri.as_deref(),
+            Some("urn:example:extension")
+        );
+        assert_eq!(events.auxiliary_events[1].source.element, "note");
+        assert_eq!(
+            events.auxiliary_events[1].source.namespace_uri.as_deref(),
+            Some("urn:example:extension")
+        );
+    }
 }
