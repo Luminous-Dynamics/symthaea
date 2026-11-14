@@ -514,7 +514,10 @@ mod tests {
                 evidence_ref: Some("fixture:price".to_owned()),
             },
         ];
-        assert!(matches!(evaluate_handoff(&brief, &observations), ReleaseDisposition::Invalid { .. }));
+        assert!(matches!(
+            evaluate_handoff(&brief, &observations),
+            ReleaseDisposition::Invalid { .. }
+        ));
     }
 
     #[test]
