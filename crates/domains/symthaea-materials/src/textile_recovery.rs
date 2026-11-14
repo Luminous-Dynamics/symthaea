@@ -269,6 +269,8 @@ pub struct FibreLengthEvidence {
     pub method_ref: String,
     /// Versioned sampling plan for the exact output-lot sample (location, extraction and conditioning).
     pub sampling_plan_ref: String,
+    /// SHA-256 of the exact sampling-plan bytes.
+    pub sampling_plan_sha256: String,
     /// Measured sample mass in milligrams taken from the accepted output lot.
     pub sample_mass_mg: u64,
     /// Number of independently measured subsamples/replicates represented by this distribution.
@@ -685,6 +687,7 @@ fn fibre_length_binds_to_trial(
 fn fibre_length_protocol_valid(evidence: &FibreLengthEvidence) -> bool {
     nonempty(&evidence.method_ref)
         && nonempty(&evidence.sampling_plan_ref)
+        && valid_sha256(&evidence.sampling_plan_sha256)
         && evidence.sample_mass_mg > 0
         && evidence.replicate_count > 0
         && evidence.measurement_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
@@ -1239,6 +1242,7 @@ mod tests {
         FibreLengthEvidence {
             method_ref,
             sampling_plan_ref: "FIBRE-SAMPLING-PLAN-V1".to_owned(),
+            sampling_plan_sha256: "b".repeat(64),
             sample_mass_mg: 25_000,
             replicate_count: 3,
             measurement_uncertainty_ppm: 20_000,
