@@ -74,7 +74,10 @@
       "official benchmark split membership",
       "acoustic audio and performance recordings"
     ],
-    "sha_semantics": "git_blob_sha1 fields are Git object IDs, not SHA-256 file digests. No raw artifact bytes were acquired or SHA-256 hashed by this metadata inventory."
+    "sha_semantics": "git_blob_sha1 fields are Git object IDs, not SHA-256 file digests. No raw artifact bytes were acquired or SHA-256 hashed by this metadata inventory.",
+    "raw_artifact_bytes_acquired": false,
+    "raw_artifact_sha256_verified": false,
+    "acquisition_note": "The inventory was generated from the upstream Git tree API and TSV metadata. No binary/source artifact bytes were downloaded into the MUSE repository; Git blob SHA-1 and size are metadata only."
   },
   "cardinality_expectations": {
     "unique_score_ids": 122,
