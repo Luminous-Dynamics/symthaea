@@ -133,6 +133,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -455,6 +475,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -505,6 +545,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -827,6 +887,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -1420,6 +1500,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -2288,6 +2388,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -2610,6 +2730,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -2925,6 +3065,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -3247,6 +3407,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -3569,6 +3749,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -3891,6 +4091,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -4213,6 +4433,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -4535,6 +4775,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -5405,6 +5665,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -6544,6 +6824,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -7687,6 +7987,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -8009,6 +8329,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -8324,6 +8664,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -8646,6 +9006,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -8968,6 +9348,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -9836,6 +10236,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -10158,6 +10578,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -10784,6 +11224,26 @@
         "independence_group": "BASE-QUAL-2026-GROUP-A",
         "qualified_endpoints": [
           "initial_lap_shear_mpa"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -10834,6 +11294,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     },
@@ -11156,6 +11636,26 @@
           "initial_lap_shear_mpa",
           "aged_strength_retention",
           "failure_mode_fraction"
+        ],
+        "method_scope_receipts": [
+          {
+            "id": "BASELINE-PP-A-D3163-METHOD-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "BASELINE-PP-A-D3163-PROTOCOL",
+            "protocol_sha256": "abababababababababababababababababababababababababababababababab",
+            "raw_data_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "BASE-QUAL-S1",
+              "BASE-QUAL-S2"
+            ]
+          }
         ]
       }
     }
