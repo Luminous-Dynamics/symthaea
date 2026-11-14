@@ -231,8 +231,11 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     if !matches!(receipt.independent_unit.as_str(), "material_lot" | "adhesive_batch" | "plasma_head" | "production_day" | "production_line" | "manufacturing_site" | "paired_cluster") {
         return blocked("independent experimental unit is unknown or unregistered");
     }
-    if receipt.grouping_scheme == "paired_by_cluster" && receipt.independent_unit != "paired_cluster" {
-        return rejected("paired-by-cluster design must declare paired_cluster as its independent unit");
+    if receipt.grouping_scheme == "paired_by_cluster"
+        && (receipt.independent_unit != "paired_cluster"
+            || receipt.planned_min_baseline_clusters != receipt.planned_min_candidate_clusters)
+    {
+        return rejected("paired-by-cluster design must declare paired_cluster and equal paired-cluster minima");
     }
     if receipt.grouping_scheme == "independent_arms" && receipt.independent_unit == "paired_cluster" {
         return rejected("independent-arm design cannot declare a paired-cluster independent unit");
