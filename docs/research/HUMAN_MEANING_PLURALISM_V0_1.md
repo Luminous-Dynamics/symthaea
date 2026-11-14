@@ -143,8 +143,8 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 | Sol-Atlas ingestion/catalog integration | Not implemented by this RFC |
 | Symtropy simulation runner | Not implemented by this RFC |
 | Symthaea evaluation runner | Not implemented by this RFC |
-| Symthaea `xtask hmp-record-audit` | Implemented on this research branch; record/provenance/permission semantics and negative-control tests are authored; Cargo tests not yet run |
-| Symthaea `xtask hmp-bench-audit` | Implemented on this research branch; validates 14 synthetic cases across all nine HMP-Bench tracks, including operation-scoped rights; Cargo tests not yet run |
+| Symthaea `xtask hmp-record-audit` | Implemented on this research branch; record/provenance/permission semantics, including reference-only citation constraints, are covered by authored negative-control tests; Cargo tests not yet run |
+| Symthaea `xtask hmp-bench-audit` | Implemented on this research branch; validates 14 synthetic cases across all nine HMP-Bench tracks, including operation-scoped rights and authority references; 17 Rust unit tests are authored; Cargo tests not yet run |
 | Human/community validation | Not performed |
 | SOTA comparison | Not performed |
 
