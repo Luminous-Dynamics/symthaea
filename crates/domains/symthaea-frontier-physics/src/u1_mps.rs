@@ -4828,4 +4828,137 @@ mod tests {
         assert!((dense[2].im + 1.0_f64.sin()).abs() <= 1.0e-12);
         assert!(gate.unitarity_residual() <= 1.0e-12);
     }
+
+    fn adaptive_policy(target_trotter_error: f64) -> U1TeBDAdaptivePolicy {
+        U1TeBDAdaptivePolicy {
+            target_trotter_error,
+            target_compression_error: 1.0e-9,
+            minimum_time_step: 1.0e-3,
+            maximum_time_step: 1.0,
+            safety_factor: 0.9,
+            minimum_step_scale: 0.5,
+            maximum_step_scale: 2.0,
+        }
+    }
+
+    #[test]
+    fn adaptive_strang_accepts_zero_hamiltonian_with_zero_estimated_error() {
+        let zero_hamiltonian =
+            U1TwoSiteHamiltonian::new(0.0, 0.0, 0.0, complex_zero()).unwrap();
+        let stepper = U1TeBDStrangStepper::new(
+            2,
+            vec![U1TeBDHamiltonianTerm {
+                bond_index: 0,
+                hamiltonian: zero_hamiltonian,
+            }],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.1,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+                adaptive_policy(1.0e-9),
+            )
+            .unwrap();
+
+        assert!(result.accepted);
+        assert!(result.accepted_state.is_some());
+        assert_eq!(result.accepted_time_advance, Some(0.1));
+        assert!(result.coarse_fine_state_distance <= 1.0e-12);
+        assert!(result.trotter_error_estimate_upper <= 1.0e-12);
+        assert!(result.all_global_compression_bounds_qualified);
+        assert_eq!(result.method_order, 2);
+    }
+
+    #[test]
+    fn adaptive_strang_rejects_step_when_trotter_budget_is_too_small() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.8,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 3,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-11,
+                },
+                adaptive_policy(1.0e-18),
+            )
+            .unwrap();
+
+        assert!(!result.accepted);
+        assert!(result.accepted_state.is_none());
+        assert!(result.accepted_time_advance.is_none());
+        assert!(result.coarse_fine_state_distance > 0.0);
+        assert!(result.trotter_error_estimate_upper > 1.0e-18);
+        assert!(result.recommended_next_time_step < result.attempted_time_step);
+        assert!(result.all_global_compression_bounds_qualified);
+    }
+
+    #[test]
+    fn adaptive_strang_reports_compression_uncertainty_separately_from_trotter_error() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .attempt_adaptive_step(
+                &input,
+                0.35,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-11,
+                },
+                U1TeBDAdaptivePolicy {
+                    target_trotter_error: 1.0,
+                    target_compression_error: 1.0,
+                    minimum_time_step: 1.0e-3,
+                    maximum_time_step: 1.0,
+                    safety_factor: 0.9,
+                    minimum_step_scale: 0.5,
+                    maximum_step_scale: 2.0,
+                },
+            )
+            .unwrap();
+
+        assert!(result.all_global_compression_bounds_qualified);
+        assert!(result.fine_path_compression_error_upper_bound.is_finite());
+        assert!(result.coarse_path_compression_error_upper_bound.is_finite());
+        assert!(result.compression_uncertainty_upper_bound >= 0.0);
+        assert!(result.total_error_estimate_upper >= result.trotter_error_estimate_upper);
+    }
+
+    #[test]
+    fn adaptive_strang_rejects_invalid_error_budgets_and_time_step_ranges() {
+        let stepper = three_site_hopping_stepper();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let truncation = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 3,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-11,
+        };
+        let mut invalid = adaptive_policy(1.0e-6);
+        invalid.safety_factor = 1.1;
+        assert!(matches!(
+            stepper.attempt_adaptive_step(&input, 0.1, truncation, invalid),
+            Err(U1MpsError::InvalidAdaptivePolicy(_))
+        ));
+
+        assert!(matches!(
+            stepper.attempt_adaptive_step(
+                &input,
+                1.1,
+                truncation,
+                adaptive_policy(1.0e-6)
+            ),
+            Err(U1MpsError::InvalidAdaptiveTimeStep(1.1))
+        ));
+    }
+
 }
