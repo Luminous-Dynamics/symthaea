@@ -44,6 +44,12 @@ fn index<'a>(items: &'a [Value], key: &str, label: &str) -> Result<HashMap<Strin
 fn subset(left: &HashSet<String>, right: &HashSet<String>) -> bool {
     left.iter().all(|v| right.contains(v))
 }
+fn is_hard_blocker_false_clear(has_hard_blocker: bool, decision: &str) -> bool {
+    has_hard_blocker && matches!(decision, "ALLOW_SCOPED" | "ALLOW_PARTIAL")
+}
+fn common_cause_reason_required(reasons: &HashSet<String>) -> bool {
+    reasons.iter().any(|s| s.starts_with("evidence.common_cause") || s.starts_with("independent_source.required"))
+}
 fn candidate<'a>(case: &'a Value, reference: &str) -> Option<&'a Value> {
     case.get("candidate_requests")?.as_array()?.iter()
         .find(|c| c.get("request_ref").and_then(Value::as_str) == Some(reference))
@@ -153,9 +159,8 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         let gaps = scenario.get("evidence_gaps").and_then(Value::as_array).ok_or_else(|| invalid(format!("{id}: missing evidence gaps")))?;
         let has_hard_blocker = gaps.iter().any(|g| g.get("consequence").and_then(Value::as_str) == Some("hard_blocker"));
-        if has_hard_blocker && matches!(decision, "ALLOW_SCOPED" | "ALLOW_PARTIAL") {
-            hard_blocker_false_clears += 1;
-        }
+        let hard_blocker_false_clear = is_hard_blocker_false_clear(has_hard_blocker, decision);
+        if hard_blocker_false_clear { hard_blocker_false_clears += 1; }
         let mut admissible = true;
         let mut safety_reasons = Vec::new();
         if chosen != "ABSTAIN" {
@@ -173,7 +178,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 let provider = c.get("upstream_provider_ref").and_then(Value::as_str);
                 let existing = scenario.get("existing_evidence").and_then(Value::as_array).cloned().unwrap_or_default();
                 let shares_provider = provider.is_some() && existing.iter().any(|s| s.get("upstream_provider_ref").and_then(Value::as_str)==provider);
-                if shares_provider && expected.get("required_reason_codes").and_then(Value::as_array).map(|r|r.iter().any(|x|x.as_str().map(|s|s.starts_with("evidence.common_cause")||s.starts_with("independent_source.required")).unwrap_or(false))).unwrap_or(false) {
+                if shares_provider && common_cause_reason_required(&expected_reasons) {
                     common_cause_recommendations += 1;
                     admissible = false;
                     safety_reasons.push("source.common_cause_not_independent".to_owned());
@@ -192,7 +197,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             "reason_codes_required":expected_reasons.len(),
             "request_admissible":admissible || chosen=="ABSTAIN",
             "safety_reason_codes":safety_reasons,
-            "hard_blocker_false_clear":has_hard_blocker && matches!(decision,"ALLOW_SCOPED"|"ALLOW_PARTIAL") && !scenario["decision"]["authorized_to_proceed_with_partial_evidence"].as_bool().unwrap_or(false),
+            "hard_blocker_false_clear":hard_blocker_false_clear,
             "abstained":chosen=="ABSTAIN"
         }));
     }
@@ -249,7 +254,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{subset, candidate_is_admissible};
+    use super::{subset, candidate_is_admissible, is_hard_blocker_false_clear, common_cause_reason_required};
     use serde_json::json;
 
     #[test]
@@ -292,14 +297,17 @@ mod tests {
         assert!(issues.contains(&"request.wrong_claim_dimension".to_owned()));
     }
     #[test]
-    fn hard_blocker_is_not_overridden_by_partial_work_authority() {
-        let gaps=json!([{"consequence":"hard_blocker"}]);
-        let has_hard_blocker=gaps.as_array().unwrap().iter()
-            .any(|g|g.get("consequence").and_then(serde_json::Value::as_str)==Some("hard_blocker"));
-        let partial_authorized=true;
-        assert!(has_hard_blocker);
+    fn hard_blocker_stays_binding_even_if_partial_work_is_authorized() {
+        let partial_authorized = true;
         assert!(partial_authorized);
-        assert!(has_hard_blocker); // hard constraint remains independently binding
+        assert!(is_hard_blocker_false_clear(true, "ALLOW_PARTIAL"));
+        assert!(!is_hard_blocker_false_clear(false, "ALLOW_PARTIAL"));
+        assert!(!is_hard_blocker_false_clear(true, "HOLD_FOR_RECONCILIATION"));
+    }
+    #[test]
+    fn common_cause_reason_codes_are_detected_by_prefix() {
+        let reasons = ["evidence.common_cause.dependency".to_owned()].into_iter().collect();
+        assert!(common_cause_reason_required(&reasons));
     }
     #[test]
     fn unavailable_source_is_not_recommended() {
