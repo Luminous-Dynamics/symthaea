@@ -23,9 +23,9 @@ The starter library contains 17 JSON presets: five functional/hybrid starting po
 Two isolated, dependency-free Rust crates have been added to the Symthaea public research branch:
 
 - `tools/atelier-brief-core/`: validates decoded design-brief identity, revision and digest shape; IDs; objective bounds; selected hard-constraint contradictions; suggestion decision provenance; and fail-closed handoff status.
-- `tools/atelier-wardrobe-core/`: exact subset-search oracle up to 18 optional choices, protected-item preservation, explicit no-additions/made-to-order policies, and a Pareto frontier over acquisition, new manufacture, cost, effort and choice count.
+- `tools/atelier-wardrobe-core/`: exact subset-search oracle up to 18 optional choices, protected-item preservation, explicit no-additions/made-to-order policies, and single-currency cost arithmetic (mixed currencies fail), and a Pareto frontier over acquisition, new manufacture, cost, effort and choice count.
 
-The crates author 20 unit tests in total. They do not parse JSON, generate patterns, evaluate aesthetics, simulate material behavior, verify external evidence, reimplement Symtropy's Pareto engine, or authorize production.
+The crates author 23 unit tests in total (11 brief-core and 12 wardrobe-core). They do not parse JSON, generate patterns, evaluate aesthetics, simulate material behavior, verify external evidence, reimplement Symtropy's Pareto engine, or authorize production.
 
 ## Validation and CI
 
