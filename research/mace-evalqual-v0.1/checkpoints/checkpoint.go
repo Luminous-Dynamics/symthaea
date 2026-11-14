@@ -304,7 +304,7 @@ func AcceptNext(s SignedCheckpoint, publicKey ed25519.PublicKey, current Trusted
 	if c.PreviousCheckpointSHA256 != current.CheckpointDigestSHA256 {
 		return TrustedState{}, 0, ErrBrokenChain
 	}
-	if c.JournalSequence <= current.JournalSequence {
+	if c.JournalSequence <= current.JournalSequence || c.JournalHeadSHA256 == current.JournalHeadSHA256 {
 		return TrustedState{}, 0, ErrNoProgress
 	}
 	if c.IssuedAtUnix < current.IssuedAtUnix {
