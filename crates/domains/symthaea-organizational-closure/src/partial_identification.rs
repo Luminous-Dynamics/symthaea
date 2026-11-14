@@ -871,7 +871,7 @@ pub fn evaluate_partial_identification(
             | PartialIdentificationFindingCode::TooManySelectedExperiments
     )) {
         return PartialIdentificationReport {
-            qualification: PartialIdentificationQualification::Inconclusive,
+            qualification: PartialIdentificationQualification::NotQualified,
             decision_quality: None,
             exact_identified_bounds: None,
             declared_bounds: trace.declared_bounds,
