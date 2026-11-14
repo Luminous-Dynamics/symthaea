@@ -28,19 +28,19 @@ The output evaluator should compare symbolic and acoustic properties separately.
 
 - Pair identity, dataset revision, benchmark track, base/transformed samples, common source lineage and matching split.
 - Base/transformed source bytes, instructions and EVAL-037 validity-envelope commitments.
-- Transform family, immutable transform version, implementation digest, parameter digest and transform receipt digest.
+- Transform family, immutable transform version, implementation digest, parameter digest and transform receipt digest. A new typed transform receipt binds the pair identity, source lineage/split, actual input/output digest declarations, base/transformed instruction commitments and transform implementation/version/parameters; its domain-separated digest is checked against the pair.
 - Four relation classes: Invariant, Equivariant, NonInvariant and AbstainExpected.
 - Invariant pairs require exact instruction and envelope commitment equality, plus an explicit property mapping.
 - Equivariant pairs require a property mapping and bind both transformed task commitments.
 - NonInvariant and AbstainExpected pairs require an explicit reason.
 - Domain-separated pair digest.
-- Sixteen authored Rust tests cover invariant success/drift, equivariant map requirements, non-invariant/abstention reason, lineage/split substitution, mutable versions, duplicate sample identity and digest sensitivity.
+- Nineteen authored Rust tests cover invariant success/drift, equivariant map requirements, non-invariant/abstention reason, lineage/split substitution, mutable versions, duplicate sample identity and digest sensitivity.
 - Four metadata-only fixtures cover gain invariance, transposition equivariance, fixed-A440 non-invariance and target-crop abstention. Unit tests include known-answer invariant and transposition-equivalent observations, a wrong-transposition negative control, preservation failure and non-invariant no-score behavior.
 - Dedicated Rust 1.96 isolated harness and exact-head workflow.
 
 ## What is not implemented
 
-The pair contract does not execute transforms, verify transform receipts against local bytes or run an editor. The first observation evaluator now compares independently produced operation/preservation reports using numeric affine, categorical and boolean property maps; it calculates per-property residuals, requires exact coverage of every observed property by the map, validates canonical category mappings, binds observations and mappings, replay-verifies the assessment commitment, and prevents a relation pass when either side failed its operation or preservation gate. The evaluator still does not compare raw waveforms or produce perceptual judgments. The fixture contains declarations and synthetic digests only. No audio assets or real editing results are included.
+The pair contract does not execute transforms or run an editor. The typed receipt verifier checks field correspondence and content commitments, but does not itself hash the files; actual-byte hashing remains the responsibility of the materializer/transform executor. The first observation evaluator now compares independently produced operation/preservation reports using numeric affine, categorical and boolean property maps; it calculates per-property residuals, requires exact coverage of every observed property by the map, validates canonical category mappings, binds observations and mappings, replay-verifies the assessment commitment, and prevents a relation pass when either side failed its operation or preservation gate. The evaluator still does not compare raw waveforms or produce perceptual judgments. The fixture contains declarations and synthetic digests only. No audio assets or real editing results are included.
 
 ## Evaluation protocol enabled
 
