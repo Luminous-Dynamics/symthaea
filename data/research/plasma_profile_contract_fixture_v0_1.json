@@ -1629,6 +1629,234 @@
       ],
       "expected_disposition": "REJECTED",
       "rationale": "The method receipt endpoint must match the exact claim role."
+    },
+    {
+      "id": "strength-method-mislabeled-as-failure-pattern",
+      "profile": {
+        "content": {
+          "profile_id": "PP-SINGLE-LAP-BASE",
+          "material_pair_class": "rigid_plastic_pair",
+          "joint_geometry": "single_lap",
+          "intended_use": "polymer adhesive bonding",
+          "claim_requirements": [
+            {
+              "claim_id": "joint_strength",
+              "claim_family": "failure_pattern",
+              "required": true,
+              "roles": [
+                {
+                  "role_id": "joint_measurement",
+                  "required": true,
+                  "method_id": "ASTM_D3163",
+                  "edition": "D3163-01R23",
+                  "evidence_kind": "measurement",
+                  "material_pair_class": "rigid_plastic_pair",
+                  "geometry": "single_lap",
+                  "endpoint": "apparent_shear_strength",
+                  "requested_claim": "comparative_screening"
+                }
+              ]
+            },
+            {
+              "claim_id": "failure_pattern",
+              "claim_family": "failure_pattern",
+              "required": false,
+              "roles": [
+                {
+                  "role_id": "failure_pattern",
+                  "required": true,
+                  "method_id": "ISO_10365",
+                  "edition": "ISO 10365:2022",
+                  "evidence_kind": "classification_practice",
+                  "material_pair_class": "bonded_assembly",
+                  "geometry": "failure_surface_classification",
+                  "endpoint": "bonded_assembly_failure_pattern_designation",
+                  "requested_claim": "failure_mode_classification_reference"
+                }
+              ]
+            }
+          ]
+        },
+        "profile_sha256": "cbd50479340b1d61ec5d0eb8e07009725b839a04bb88b408932eb862c6966efd"
+      },
+      "evidence": [
+        {
+          "claim_id": "joint_strength",
+          "role_id": "joint_measurement",
+          "evidence": {
+            "id": "PP-INITIAL",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-PP-INITIAL",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000007530",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000007531",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "S1",
+              "S2"
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D3163 joint-strength evidence cannot be repackaged as a failure-pattern classification claim."
+    },
+    {
+      "id": "d5573-role-on-non-smc-profile",
+      "profile": {
+        "content": {
+          "profile_id": "PP-SINGLE-LAP-BASE",
+          "material_pair_class": "rigid_plastic_pair",
+          "joint_geometry": "single_lap",
+          "intended_use": "polymer adhesive bonding",
+          "claim_requirements": [
+            {
+              "claim_id": "joint_strength",
+              "claim_family": "joint_strength",
+              "required": true,
+              "roles": [
+                {
+                  "role_id": "joint_measurement",
+                  "required": true,
+                  "method_id": "ASTM_D3163",
+                  "edition": "D3163-01R23",
+                  "evidence_kind": "measurement",
+                  "material_pair_class": "rigid_plastic_pair",
+                  "geometry": "single_lap",
+                  "endpoint": "apparent_shear_strength",
+                  "requested_claim": "comparative_screening"
+                }
+              ]
+            },
+            {
+              "claim_id": "failure_pattern",
+              "claim_family": "failure_pattern",
+              "required": false,
+              "roles": [
+                {
+                  "role_id": "failure_pattern",
+                  "required": true,
+                  "method_id": "ASTM_D5573",
+                  "edition": "D5573-99R19",
+                  "evidence_kind": "classification_practice",
+                  "material_pair_class": "frp_smc_joint",
+                  "geometry": "failure_surface_classification",
+                  "endpoint": "frp_joint_failure_mode_classification",
+                  "requested_claim": "failure_mode_classification_reference"
+                }
+              ]
+            }
+          ]
+        },
+        "profile_sha256": "2a7b2beec35c120ea10a547f021c0805fb1f011f4efd733d0f7b7fb6eda87521"
+      },
+      "evidence": [
+        {
+          "claim_id": "joint_strength",
+          "role_id": "joint_measurement",
+          "evidence": {
+            "id": "PP-INITIAL",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-PP-INITIAL",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000007530",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000007531",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "S1",
+              "S2"
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "An optional D5573 role cannot be declared for a rigid-plastic PP profile, even when no outcome has yet been supplied."
+    },
+    {
+      "id": "unregistered-aggregate-quality-family",
+      "profile": {
+        "content": {
+          "profile_id": "PP-SINGLE-LAP-BASE",
+          "material_pair_class": "rigid_plastic_pair",
+          "joint_geometry": "single_lap",
+          "intended_use": "polymer adhesive bonding",
+          "claim_requirements": [
+            {
+              "claim_id": "joint_strength",
+              "claim_family": "quality_score",
+              "required": true,
+              "roles": [
+                {
+                  "role_id": "joint_measurement",
+                  "required": true,
+                  "method_id": "ASTM_D3163",
+                  "edition": "D3163-01R23",
+                  "evidence_kind": "measurement",
+                  "material_pair_class": "rigid_plastic_pair",
+                  "geometry": "single_lap",
+                  "endpoint": "apparent_shear_strength",
+                  "requested_claim": "comparative_screening"
+                }
+              ]
+            },
+            {
+              "claim_id": "failure_pattern",
+              "claim_family": "failure_pattern",
+              "required": false,
+              "roles": [
+                {
+                  "role_id": "failure_pattern",
+                  "required": true,
+                  "method_id": "ISO_10365",
+                  "edition": "ISO 10365:2022",
+                  "evidence_kind": "classification_practice",
+                  "material_pair_class": "bonded_assembly",
+                  "geometry": "failure_surface_classification",
+                  "endpoint": "bonded_assembly_failure_pattern_designation",
+                  "requested_claim": "failure_mode_classification_reference"
+                }
+              ]
+            }
+          ]
+        },
+        "profile_sha256": "29b7976946163dc27f8f1cc4633534fa184e1ff3d42276263b956a58aa260564"
+      },
+      "evidence": [
+        {
+          "claim_id": "joint_strength",
+          "role_id": "joint_measurement",
+          "evidence": {
+            "id": "PP-INITIAL",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-PP-INITIAL",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000007530",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000007531",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "S1",
+              "S2"
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A generic quality-score family cannot bypass the typed claim-family registry."
     }
   ]
 }
