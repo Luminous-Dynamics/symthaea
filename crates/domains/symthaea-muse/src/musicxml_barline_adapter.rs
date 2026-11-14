@@ -10,7 +10,8 @@
 
 use crate::evidence_digest::canonical_json_sha256;
 use crate::musicxml_notation_events::{
-    legacy_missing_notation_events, parse_musicxml_part_notation_events,
+    legacy_missing_notation_events, parse_musicxml_part_metadata,
+    parse_musicxml_part_notation_events, MusicXmlPartMetadataV1,
     MusicXmlPartNotationEventsV1,
 };
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,7 @@ pub enum MusicXmlMeasureAdapterError {
     PartCanonicalizationMismatch,
     SamePartCompared,
     DuplicatePartId { id: String },
+    PartMetadata(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -452,6 +454,10 @@ pub struct MusicXmlPartNotationGraphV1 {
         skip_serializing_if = "crate::musicxml_notation_events::is_legacy_missing_notation_events"
     )]
     pub notation_events: MusicXmlPartNotationEventsV1,
+    /// Optional score-part declaration outside the <part> body. None means
+    /// the source omitted a matching part-list entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_metadata: Option<MusicXmlPartMetadataV1>,
 }
 
 /// Parse score-partwise into exact per-part measure maps plus typed barline
@@ -499,6 +505,8 @@ pub fn parse_musicxml_part_notation_graph(
             });
         }
         let measure_locators = parse_measure_locators_for_part(part);
+        let part_metadata = parse_musicxml_part_metadata(root, part_id)
+            .map_err(MusicXmlMeasureAdapterError::PartMetadata)?;
         let parsed = parse_part(part)?;
         match parsed {
             Some(measures) if !measures.is_empty() => {
@@ -546,6 +554,7 @@ pub fn parse_musicxml_part_notation_graph(
                     barline_events,
                     playback_controls,
                     notation_events,
+                    part_metadata,
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
@@ -564,6 +573,7 @@ pub fn parse_musicxml_part_notation_graph(
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
                 notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
+                part_metadata,
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
                 part_id: part_id.to_string(),
