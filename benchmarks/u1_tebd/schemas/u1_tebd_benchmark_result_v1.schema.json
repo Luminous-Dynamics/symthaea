@@ -69,7 +69,8 @@
             "enum": [
               "quimb.CircuitMPS",
               "ITensorMPS",
-              "symthaea-frontier-physics::U1TeBDStrangStepper"
+              "symthaea-frontier-physics::U1TeBDStrangStepper",
+              "quimb.CircuitMPSLazy"
             ]
           },
           "case_id": {
