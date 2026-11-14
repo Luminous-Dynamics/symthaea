@@ -695,6 +695,21 @@ mod tests {
     }
 
     #[test]
+    fn risk_budget_is_enforced_independently_of_cost_budget() {
+        let mut scenario = scenario();
+        scenario.budget.max_cost_units = 10;
+        scenario.budget.max_risk_units = 0;
+        let oracle = ExperimentOracle::new("memory-fault");
+        let trace = SequentialExperimentTrace {
+            trials: vec![ExperimentTrial::qualified("inspect-memory", "stale")],
+            terminal: ExperimentTerminalDecision::Stop { target_class: "memory-staleness".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::NotQualified);
+        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::RiskBudgetExceeded));
+    }
+
+    #[test]
     fn models_in_the_same_target_class_do_not_need_to_be_distinguished() {
         let scenario = SequentialExperimentScenario {
             hypotheses: vec![
