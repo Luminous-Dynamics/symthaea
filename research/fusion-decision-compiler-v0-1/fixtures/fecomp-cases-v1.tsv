@@ -25,3 +25,4 @@ solver-stale-geometry|REJECT|solver_geometry_mismatch
 unsupported-observable|BLOCKED|unsupported_observable
 boundary-evidence-missing|REJECT|service_boundary_unresolved
 boundary-evidence-wrong-scope|REJECT|service_boundary_scope
+unsupported-model-use|BLOCKED|unsupported_model_use
