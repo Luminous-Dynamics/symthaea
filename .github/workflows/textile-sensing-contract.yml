@@ -2,11 +2,12 @@ name: Textile Sensing Contract
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/textile-sensing-evidence-v0-1]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-materials/**"
       - "tools/textile-dataset-intake/**"
+      - "tools/textile-fibre-metrology/**"
       - "docs/research/TEXTILE_SORT_FUSION_001.md"
       - "docs/research/fixtures/textile_sort_fusion_v0_1/**"
       - ".github/workflows/textile-sensing-contract.yml"
@@ -65,7 +66,8 @@ jobs:
             ~/.cargo/git
             target
             tools/textile-dataset-intake/target
-          key: textile-sensing-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'tools/textile-dataset-intake/Cargo.toml') }}
+            tools/textile-fibre-metrology/target
+          key: textile-sensing-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'tools/textile-dataset-intake/Cargo.toml', 'tools/textile-fibre-metrology/Cargo.toml') }}
           restore-keys: |
             textile-sensing-${{ runner.os }}-
 
@@ -86,6 +88,15 @@ jobs:
 
       - name: Run Clippy with warnings denied for textile intake
         run: cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test textile fibre metrology contract
+        run: cargo test --manifest-path tools/textile-fibre-metrology/Cargo.toml -- --nocapture
+
+      - name: Check textile fibre metrology formatting
+        run: cargo fmt --manifest-path tools/textile-fibre-metrology/Cargo.toml --all -- --check
+
+      - name: Run Clippy with warnings denied for fibre metrology
+        run: cargo clippy --manifest-path tools/textile-fibre-metrology/Cargo.toml --all-targets -- -D warnings
 
       - name: Emit exact-subject qualification receipt
         shell: bash
@@ -109,9 +120,12 @@ jobs:
               "cargo clippy -p symthaea-materials --all-targets -- -D warnings",
               "cargo test --manifest-path tools/textile-dataset-intake/Cargo.toml -- --nocapture",
               "cargo fmt --manifest-path tools/textile-dataset-intake/Cargo.toml --all -- --check",
-              "cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings"
+              "cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings",
+              "cargo test --manifest-path tools/textile-fibre-metrology/Cargo.toml -- --nocapture",
+              "cargo fmt --manifest-path tools/textile-fibre-metrology/Cargo.toml --all -- --check",
+              "cargo clippy --manifest-path tools/textile-fibre-metrology/Cargo.toml --all-targets -- -D warnings"
             ],
-            "claim_ceiling": "synthetic_contract_and_local_file_integrity_tests_only"
+            "claim_ceiling": "synthetic_contracts_local_file_integrity_and_fibre_metrology_arithmetic_only"
           }
           EOF
           sha256sum artifacts/textile-sensing/receipt.json \
