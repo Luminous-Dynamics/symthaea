@@ -573,7 +573,7 @@ pub fn assess_paired_textile_observations(
 pub enum SplitGroupKind {
     /// TexSortML-style frames grouped by physical garment identity.
     GarmentIdentity,
-    /// NIR-SORT-style replicate spectra grouped by physical specimen identity.
+    /// NIR-SORT replicates and OpenTextile-NIR pixels/patches grouped by physical sample identity.
     PhysicalSpecimen,
 }
 
@@ -1015,6 +1015,31 @@ mod tests {
     }
 
     #[test]
+    fn hyperspectral_pixels_and_tiles_from_one_physical_sample_cannot_cross_partitions() {
+        let rows = vec![
+            SplitAssignment {
+                row_id: "OTNIR-SAMPLE-01-TILE-001".into(),
+                group_id: "OTNIR-SAMPLE-01".into(),
+                group_kind: SplitGroupKind::PhysicalSpecimen,
+                partition: DataPartition::Train,
+            },
+            SplitAssignment {
+                row_id: "OTNIR-SAMPLE-01-TILE-002".into(),
+                group_id: "OTNIR-SAMPLE-01".into(),
+                group_kind: SplitGroupKind::PhysicalSpecimen,
+                partition: DataPartition::Test,
+            },
+        ];
+        assert!(matches!(
+            validate_grouped_splits(&rows),
+            Err(SplitError::GroupLeakage {
+                group_kind: SplitGroupKind::PhysicalSpecimen,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn grouped_split_accepts_multiple_frames_or_replicates_in_one_partition() {
         let rows = vec![
             SplitAssignment {
@@ -1094,6 +1119,10 @@ mod tests {
                 grouped_split_accepts_multiple_frames_or_replicates_in_one_partition();
                 ("valid_split", None)
             }
+            "SORT-016-OPENTEXTILE-HSI-PIXEL-LEAKAGE" => {
+                hyperspectral_pixels_and_tiles_from_one_physical_sample_cannot_cross_partitions();
+                ("group_leakage", Some("GroupLeakage:PhysicalSpecimen"))
+            }
             other => panic!("unknown textile sensing corpus case: {other}"),
         }
     }
@@ -1168,7 +1197,7 @@ mod tests {
             );
         }
 
-        assert_eq!(seen.len(), 15);
+        assert_eq!(seen.len(), 16);
         assert!(
             corpus["claim_ceiling"]
                 .as_str()
