@@ -4,6 +4,17 @@ Status: research and measurement contract. This document is not a synthesis reci
 
 Parent: [CAPACITOR-DEVICE-DISCOVERY-001 #11841](https://github.com/Luminous-Dynamics/symthaea/issues/11841).
 
+
+### Raw-data reproducibility and trace-evidence receipt — 14 November 2026
+
+Two additional research contracts now extend the benchmark without confusing published material datasets with physical module evidence:
+
+- [EDLC-OPEN-DATA-REPRO-001 #12004](https://github.com/Luminous-Dynamics/symthaea/issues/12004) and [EDLC_EXTERNAL_RAW_DATA_REPRODUCTION_V0_1.md](EDLC_EXTERNAL_RAW_DATA_REPRODUCTION_V0_1.md) define rights-aware reproduction of public CV/GCD/EIS/ageing data. The DataverseNO dataset DOI 10.18710/F4NFMJ (version 1.0, CC0 1.0) lists 26 public files. Three source file IDs and repository MD5 values are registered; local raw-byte download and SHA-256 verification remain pending. The Zenodo TiO2-ALD flexible-supercapacitor dataset is a 10,000-cycle ageing candidate, but its explicit licence was not established and redistribution remains blocked.
+- [EDLC-TRACE-EVIDENCE-RECEIPT-001 #12005](https://github.com/Luminous-Dynamics/symthaea/issues/12005) adds a strict receipt schema, nine-artifact synthetic package, and Rust auditor. The CLI is `edlc-trace-evidence-audit`; **20 unit tests are authored**. It checks relative-path confinement, byte length, SHA-256, CSV structure, device/instrument/calibration/protocol/environment cross-links and open-circuit source-current semantics. See [EDLC_TRACE_EVIDENCE_RECEIPT_V0_1.md](EDLC_TRACE_EVIDENCE_RECEIPT_V0_1.md).
+
+Independent runner-free verification has re-fetched all nine positive receipt artifacts plus two negative/control files from the branch. Their byte lengths and all eleven SHA-256 digests match the manifest/test constants. This is reproducible byte-integrity evidence only. It does not authenticate the creator, physical device, calibration certificate or lab procedure. No external research CSV has been downloaded or reproduced in this increment, and no physical device evidence has been admitted.
+
+
 ## Purpose and claim boundary
 
 Qualify complete electrochemical capacitor devices and modules from immutable material, electrode, electrolyte, process, assembly and test identities. Begin with an EDLC reference. Keep aqueous zinc-ion hybrid supercapacitors as a separate, higher-risk research lane.
