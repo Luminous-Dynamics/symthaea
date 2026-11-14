@@ -17,7 +17,11 @@
     ],
     "current_state_of_E1": "stale",
     "decision_time_state_of_E1": "admissible",
-    "invariant": "A later invalidation does not erase or rewrite the decision-time evidence manifest."
+    "invariant": "A later invalidation does not erase or rewrite the decision-time evidence manifest.",
+    "admissible_actor_authority_evidence": "dtea:evidence:authority-1",
+    "actor_authority_disposition": "source_declares_authorized",
+    "actor_authority_scope": "release:staging",
+    "actor_authority_policy_version": "release-policy-v3"
   },
   "negative_controls": [
     {
@@ -59,6 +63,36 @@
       "id": "DTEA-NC-08",
       "mutation": "Change actor scope without a corresponding authorization evidence record.",
       "expected": "indeterminate_or_reject_scope"
+    },
+    {
+      "id": "DTEA-NC-09",
+      "mutation": "Change actor_authority.actor_id while leaving decision.actor_id unchanged.",
+      "expected": "reject_actor_authority_subject_mismatch"
+    },
+    {
+      "id": "DTEA-NC-10",
+      "mutation": "Change actor_authority.authority_scope while leaving decision.authority_scope unchanged.",
+      "expected": "reject_authority_scope_mismatch"
+    },
+    {
+      "id": "DTEA-NC-11",
+      "mutation": "Move authority available_to_actor_at after knowledge_cutoff_at.",
+      "expected": "reject_late_authority_evidence"
+    },
+    {
+      "id": "DTEA-NC-12",
+      "mutation": "Set authority valid_through before decision_at.",
+      "expected": "reject_expired_authority_at_decision"
+    },
+    {
+      "id": "DTEA-NC-13",
+      "mutation": "Point actor_authority.evidence_id to a non-evidence or missing node.",
+      "expected": "reject_unresolved_authority_reference"
+    },
+    {
+      "id": "DTEA-NC-14",
+      "mutation": "Change authority policy_version without changing the decision policy_version.",
+      "expected": "reject_authority_policy_mismatch"
     }
   ],
   "metrics": [
@@ -67,7 +101,10 @@
     "availability-time reconstruction accuracy",
     "valid-time vs observation-time confusion",
     "historical decision-record integrity after correction",
-    "correct abstention/defer rate"
+    "correct abstention/defer rate",
+    "actor/scope/policy authority-reference exactness",
+    "decision-time authority-window admissibility",
+    "late-arriving or expired authority evidence rejection"
   ],
-  "claim_ceiling": "Synthetic known-answer case only. No general decision correctness, institutional governance, compliance or real-world assurance claim."
+  "claim_ceiling": "Synthetic known-answer case only. No general decision correctness, institutional governance, compliance or real-world assurance claim. Authority is synthetic and source-declared; fixture does not authenticate actor rights or owner-native Mycelix authority."
 }
