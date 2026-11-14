@@ -1555,6 +1555,46 @@ fn validate_federation_snapshot(
     }
 }
 
+
+fn validate_federation_manifest_contract(
+    value: &Value,
+    path: &str,
+    report: &mut ValidationReport,
+) {
+    let Some(contract) = object(value, path, report) else {
+        return;
+    };
+    check_allowed_keys(
+        contract,
+        &["schema_version", "schema_path", "schema_blob_oid", "schema_artifact_commit_sha"],
+        path,
+        report,
+    );
+    if field(value, "schema_version", path, report).and_then(Value::as_str) != Some("0.1.1") {
+        report.error(
+            "EGDDM-FEDERATION-040",
+            format!("{path}.schema_version"),
+            "manifest_contract schema_version must be 0.1.1",
+        );
+    }
+    if let Some(schema_path) = field(value, "schema_path", path, report) {
+        string(schema_path, &format!("{path}.schema_path"), report);
+    }
+    for key in ["schema_blob_oid", "schema_artifact_commit_sha"] {
+        if let Some(oid) = field(value, key, path, report)
+            .and_then(|v| string(v, &format!("{path}.{key}"), report))
+        {
+            if oid.len() != 40 || !hex_string(oid) {
+                report.error(
+                    "EGDDM-FEDERATION-041",
+                    format!("{path}.{key}"),
+                    "manifest schema pin must be a 40-character Git object OID",
+                );
+            }
+        }
+    }
+}
+
 fn validate_federation_contract(
     value: &Value,
     path: &str,
@@ -2102,14 +2142,23 @@ pub fn validate_federation_value(value: &Value) -> ValidationReport {
         root,
         &[
             "schema_version", "federation_id", "observed_at", "hub",
-            "shared_contract", "members", "relationships", "join_policy",
-            "limitations",
+            "shared_contract", "manifest_contract", "members", "relationships",
+            "join_policy", "limitations",
         ],
         "$",
         &mut report,
     );
-    if field(value, "schema_version", "$", &mut report).and_then(Value::as_str) != Some("0.1.0") {
-        report.error("EGDDM-FEDERATION-020", "$.schema_version", "only federation schema_version 0.1.0 is supported");
+    let federation_version = field(value, "schema_version", "$", &mut report)
+        .and_then(Value::as_str);
+    if !matches!(federation_version, Some("0.1.0" | "0.1.1")) {
+        report.error("EGDDM-FEDERATION-020", "$.schema_version", "supported federation schema versions are 0.1.0 and 0.1.1");
+    }
+    if federation_version == Some("0.1.1") {
+        if let Some(contract) = field(value, "manifest_contract", "$", &mut report) {
+            validate_federation_manifest_contract(contract, "$.manifest_contract", &mut report);
+        }
+    } else if value.get("manifest_contract").is_some() {
+        report.error("EGDDM-FEDERATION-042", "$.manifest_contract", "manifest_contract is introduced in federation schema_version 0.1.1");
     }
     if let Some(id) = field(value, "federation_id", "$", &mut report) {
         string(id, "$.federation_id", &mut report);
@@ -2903,6 +2952,66 @@ mod tests {
     fn four_project_federation_manifest_satisfies_local_contract() {
         let report = validate_federation_json(FEDERATION_FIXTURE).expect("federation JSON");
         assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    const FEDERATION_V011_FIXTURE: &str = include_str!(
+        "../../../docs/development-map/federation-v0.1.1.json"
+    );
+
+    #[test]
+    fn federation_v011_manifest_satisfies_local_contract() {
+        let report = validate_federation_json(FEDERATION_V011_FIXTURE).expect("v0.1.1 federation JSON");
+        assert!(report.is_valid(), "{:#?}", report.diagnostics);
+    }
+
+    #[test]
+    fn federation_v011_independent_relationship_requires_two_sided_receipt() {
+        let mut value: Value = serde_json::from_str(FEDERATION_V011_FIXTURE).expect("v0.1.1 federation JSON");
+        let relationship = value["relationships"]
+            .as_array_mut().expect("relationships")
+            .iter_mut()
+            .find(|item| item["relation"] == "shared_schema_candidate")
+            .expect("shared schema candidate");
+        relationship["status"] = Value::String("independently_qualified".to_owned());
+        relationship["authority"] = Value::String("independently_adjudicated".to_owned());
+        relationship["contract_binding"]["status"] =
+            Value::String("independently_conformance_tested".to_owned());
+        relationship["compatibility_receipt"] = Value::Null;
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-037"));
+    }
+
+    #[test]
+    fn federation_v011_receipt_must_match_both_pinned_member_snapshots() {
+        let mut value: Value = serde_json::from_str(FEDERATION_V011_FIXTURE).expect("v0.1.1 federation JSON");
+        let relationship = value["relationships"]
+            .as_array_mut().expect("relationships")
+            .iter_mut()
+            .find(|item| item["relation"] == "shared_schema_candidate")
+            .expect("shared schema candidate");
+        relationship["status"] = Value::String("independently_qualified".to_owned());
+        relationship["authority"] = Value::String("independently_adjudicated".to_owned());
+        relationship["contract_binding"]["status"] =
+            Value::String("independently_conformance_tested".to_owned());
+        relationship["compatibility_receipt"] = serde_json::json!({
+            "receipt_id":"synthetic:receipt",
+            "receipt_sha256":"a".repeat(64),
+            "verifier_build_sha256":"b".repeat(64),
+            "source_project_id":"mycelix",
+            "source_revision":"6089a68430a501c51934c2c4107061c2a2cb5565",
+            "source_tree_oid":"79283620f83cdfa155fc86a2362335390628913d",
+            "target_project_id":"symthaea",
+            "target_revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "target_tree_oid":"74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
+            "contract_id":"EGDDM-SNAPSHOT",
+            "contract_version":"0.1.0",
+            "contract_blob_oid":"f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+            "configuration_world_digest":"c".repeat(64),
+            "outcome":"passed",
+            "tested_at":"2026-11-14T12:00:00Z"
+        });
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-034"));
     }
 
     #[test]
