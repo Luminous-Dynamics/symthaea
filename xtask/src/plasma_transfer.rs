@@ -3,6 +3,7 @@
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use crate::plasma_evidence_composition::{audit_transfer_bridge, Disposition as CompositionDisposition};
+use crate::plasma_claim_scope::{decide as decide_claim_scope, Disposition as ClaimScopeDisposition, ScopeEvidence};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
@@ -165,6 +166,48 @@ fn validate_baseline_qualification(case: &Value, baseline: &serde_json::Map<Stri
     let Some(qualified_endpoints) = string_list(receipt.get("qualified_endpoints")) else { return Disposition::Blocked; };
     if !unique_nonempty(&qualified_endpoints) { return Disposition::Rejected; }
     if required_endpoints.iter().any(|endpoint| !qualified_endpoints.contains(endpoint)) { return Disposition::Blocked; }
+
+    let Some(material_scopes) = fixture.get("material_scope_map").and_then(Value::as_object) else {
+        return Disposition::Blocked;
+    };
+    let Some(grade) = baseline.get("substrate_grade").and_then(Value::as_str) else {
+        return Disposition::Blocked;
+    };
+    let Some(scope) = material_scopes.get(grade).and_then(Value::as_object) else {
+        return Disposition::Blocked;
+    };
+    let (Some(material_pair_class), Some(geometry)) = (
+        scope.get("material_pair_class").and_then(Value::as_str),
+        scope.get("geometry").and_then(Value::as_str),
+    ) else {
+        return Disposition::Blocked;
+    };
+    let Some(method_receipts) = receipt.get("method_scope_receipts").and_then(Value::as_array) else {
+        return Disposition::Blocked;
+    };
+    let mut saw_strength = false;
+    for value in method_receipts {
+        let Ok(observation) = serde_json::from_value::<ScopeEvidence>(value.clone()) else {
+            return Disposition::Blocked;
+        };
+        if observation.endpoint == "apparent_shear_strength" {
+            if saw_strength { return Disposition::Rejected; }
+            saw_strength = true;
+            if observation.material_pair_class != material_pair_class || observation.geometry != geometry
+                || !same_members(&specimen_ids, &observation.specimen_ids)
+            {
+                return Disposition::Rejected;
+            }
+            match decide_claim_scope(&observation).disposition {
+                ClaimScopeDisposition::Supported => {}
+                ClaimScopeDisposition::Blocked => return Disposition::Blocked,
+                ClaimScopeDisposition::Rejected => return Disposition::Rejected,
+            }
+        }
+    }
+    if !saw_strength {
+        return Disposition::Blocked;
+    }
     Disposition::Pass
 }
 
