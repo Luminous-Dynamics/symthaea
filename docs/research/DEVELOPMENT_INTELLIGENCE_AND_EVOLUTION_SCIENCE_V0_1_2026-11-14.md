@@ -271,3 +271,8 @@ The immediate retrieval strategy is a conditional ranker, not one global graph s
 
 
 The source-tree composition API is also exposed as a JSON request and CLI mode so the next benchmark harness can consume frozen tree inventories and precomputed projections as data. This remains an offline composition step; a future tree collector must independently authenticate the Git tree response, detect truncated inventories, and preserve the exact commit/tree OIDs before it may label a request complete.
+
+
+## DynaMapBench protocol
+
+The detailed versioned benchmark design is maintained in [DynaMapBench Protocol V0.1](DYNAMAPBENCH_PROTOCOL_V0_1_2026-11-14.md). It keeps structural fidelity, temporal admissibility, fixed-budget retrieval, impact/planning, causal attribution, paired act/defer competence and federation conformance as separate lanes. All targets remain prospective; the protocol requires exact benchmark artifact identities, frozen repositories, leakage-resistant splits, matched budgets, per-task reporting, paired ablations, uncertainty intervals and independent adjudication. No overall aggregate score may conceal a critical safety or authority error.
