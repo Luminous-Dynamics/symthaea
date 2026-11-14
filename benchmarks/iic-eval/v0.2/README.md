@@ -33,7 +33,8 @@ The input corpus and known-answer oracle are separate files. The oracle is a pro
 - False mandatory promotion; false prohibition; condition/exception loss.
 - Source-span fidelity; source version binding; derivation-chain completeness.
 - Unsupported inference and contradiction detection.
-- Correct abstention and clarification-question quality.
+- Correct abstention and clarification-question quality, measured separately by exact-text precision/recall against the development oracle.
+- Prohibited-inference acknowledgement coverage, kept separate from proof that the candidate actually avoided the inference.
 - Exact required-question recall/precision and prohibited-inference acknowledgement coverage (lexical development proxies; paraphrase equivalence still requires human adjudication).
 - Change-impact precision/recall and unaffected-control stability.
 - Expert review time and correction effort.
@@ -64,3 +65,12 @@ See [Decision-time evidence coverage research](./DECISION_TIME_COVERAGE.md) for 
 
 
 See [Institutional assurance differentiation and competitive qualification](../../../docs/research/INSTITUTIONAL_ASSURANCE_DIFFERENTIATION_2026-11-14.md) for the updated Polarion/DOORS/Jama and Addepar/Masttro/AtlasFive capability map, product boundary, benchmark programme and commercial wedge.
+
+
+## Clarification and prohibited-inference scoring
+
+The evaluator now compares each case's `unresolved_questions` to the oracle's `required_questions`, and each result's `prohibited_inference_flags` to the oracle's `prohibited_inferences`. It reports precision/recall/F1 separately at case and corpus level.
+
+These are **exact-text lexical metrics**, not semantic equivalence. A valid paraphrase may be counted as missing until two human adjudicators agree on equivalence. A system's self-reported prohibited-inference flags are acknowledgement evidence only; they do not prove that its candidate requirements avoided the prohibited inference.
+
+See `examples/submission-template.json` for all 40 case IDs. The evaluator rejects a corpus with fewer than 40 development cases.
