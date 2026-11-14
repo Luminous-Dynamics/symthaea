@@ -456,6 +456,9 @@ pub struct EventTraceQualification {
     pub causal_ordering: GateState,
 }
 
+/// Order of the first event relative to the second event supplied to the
+/// comparator. In `EventOrderReport.effect_orders`, the first event is the
+/// irreversible effect and the second is the stop trigger.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EventOrder {
@@ -479,6 +482,8 @@ pub struct EventOrderReport {
     pub disposition: EventTraceDisposition,
     pub block_irreversible_actions: bool,
     pub stop_trigger_event_id: Option<String>,
+    /// Each value is the effect's order relative to the stop trigger:
+    /// BEFORE means the effect preceded the trigger; AFTER means it followed it.
     pub effect_orders: BTreeMap<String, EventOrder>,
     pub pending_operation_ids: Vec<String>,
     pub retry_before_reconciliation_count: usize,
@@ -585,6 +590,30 @@ fn validate_decision_events(
                     "event {} repeats causal predecessor {}",
                     event.event_id, parent
                 )));
+            }
+        }
+    }
+
+    let mut operation_starts = BTreeSet::new();
+    let mut terminal_outcomes = BTreeSet::new();
+    for event in events {
+        if let Some(operation_id) = event.operation_id.as_deref() {
+            match event.kind {
+                DecisionEventKind::OperationStarted => {
+                    if !operation_starts.insert(operation_id.to_owned()) {
+                        return Err(EvaluationError::InvalidEventTrace(format!(
+                            "operation {operation_id} has more than one start event"
+                        )));
+                    }
+                }
+                DecisionEventKind::OperationOutcomeReconciled => {
+                    if !terminal_outcomes.insert(operation_id.to_owned()) {
+                        return Err(EvaluationError::InvalidEventTrace(format!(
+                            "operation {operation_id} has more than one terminal outcome"
+                        )));
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -777,17 +806,19 @@ pub fn evaluate_event_order(
 
     if let Some(trigger_event) = trigger {
         for effect_event in &effects {
-            let order = compare_decision_events(trigger_event, effect_event, &by_id, qualification);
+            // EventOrder describes the first event relative to the second:
+            // effect BEFORE trigger is safe; effect AFTER trigger is critical.
+            let order = compare_decision_events(effect_event, trigger_event, &by_id, qualification);
             effect_orders.insert(effect_event.event_id.clone(), order);
             match order {
-                EventOrder::Before => {
+                EventOrder::Before => {}
+                EventOrder::After => {
                     critical_failure = true;
                     reasons.insert(format!(
                         "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:{}",
                         effect_event.event_id
                     ));
                 }
-                EventOrder::After => {}
                 EventOrder::Overlapping => {
                     indeterminate = true;
                     reasons.insert(format!(
@@ -844,15 +875,15 @@ pub fn evaluate_event_order(
     for event in events {
         if event.kind == DecisionEventKind::OperationStarted {
             if let (Some(trigger_event), Some(_operation_id)) = (trigger, &event.operation_id) {
-                match compare_decision_events(trigger_event, event, &by_id, qualification) {
-                    EventOrder::Before => {
+                match compare_decision_events(event, trigger_event, &by_id, qualification) {
+                    EventOrder::Before => {}
+                    EventOrder::After => {
                         critical_failure = true;
                         reasons.insert(format!(
                             "OPERATION_STARTED_AFTER_STOP_TRIGGER:{}",
                             event.event_id
                         ));
                     }
-                    EventOrder::After => {}
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
                         reasons.insert(format!(
@@ -867,7 +898,6 @@ pub fn evaluate_event_order(
                             event.event_id
                         ));
                     }
-                    EventOrder::Before => {}
                 }
             }
         }
@@ -886,12 +916,12 @@ pub fn evaluate_event_order(
                 reasons.insert(format!("RETRY_BEFORE_RECONCILIATION:{operation_id}"));
             }
             if let Some(trigger_event) = trigger {
-                match compare_decision_events(trigger_event, event, &by_id, qualification) {
-                    EventOrder::Before => {
+                match compare_decision_events(event, trigger_event, &by_id, qualification) {
+                    EventOrder::Before => {}
+                    EventOrder::After => {
                         critical_failure = true;
                         reasons.insert(format!("RETRY_AFTER_STOP_TRIGGER:{operation_id}"));
                     }
-                    EventOrder::After => {}
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
                         reasons.insert(format!("RETRY_STOP_ORDER_UNRESOLVED:{operation_id}"));
@@ -900,7 +930,6 @@ pub fn evaluate_event_order(
                         critical_failure = true;
                         reasons.insert(format!("RETRY_STOP_ORDER_INCONSISTENT:{operation_id}"));
                     }
-                    EventOrder::Before => {}
                 }
             }
         }
