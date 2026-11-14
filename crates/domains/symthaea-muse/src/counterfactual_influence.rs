@@ -1198,7 +1198,7 @@ fn validate_input(
     let expected_baseline_ids: std::collections::BTreeSet<usize> =
         (0..input.expected_score_event_count).collect();
     let expected_counterfactual_ids: std::collections::BTreeSet<usize> =
-        match input.intervention {
+        match &input.intervention {
             EventIntervention::Remove => (0..input.expected_score_event_count)
                 .filter(|index| *index != excluded_index)
                 .collect(),
@@ -1227,7 +1227,7 @@ fn validate_input(
         .filter(|row| row.source_event_id == input.source_event_id)
         .collect();
 
-    match input.intervention {
+    match &input.intervention {
         EventIntervention::Remove => {
             if baseline_target_rows.is_empty() || !counterfactual_target_rows.is_empty() {
                 return Err(CounterfactualInfluenceError::InvalidIntervention);
@@ -1274,7 +1274,7 @@ fn validate_input(
             validate_transpose_lineage(
                 &baseline_target_rows.into_iter().cloned().collect::<Vec<_>>(),
                 &counterfactual_target_rows.into_iter().cloned().collect::<Vec<_>>(),
-                semitones,
+                *semitones,
             )?;
             validate_protected_transpose_events(
                 baseline_rows,
@@ -1285,7 +1285,7 @@ fn validate_input(
                 expected_transposed_primary_pitches(
                     input.expected_primary_midi_by_score_index,
                     excluded_index,
-                    semitones,
+                    *semitones,
                 )?;
             if input.counterfactual_expected_primary_midi_by_score_index
                 != expected_counterfactual.as_slice()
@@ -1955,10 +1955,12 @@ mod tests {
             source_event_id: "score_event_index:0",
             intervention: EventIntervention::Remove,
             source_score_bytes: SCORE_BYTES,
+            counterfactual_score_bytes: SCORE_BYTES,
             performed_event_map_bytes: &anchor.map_bytes,
             counterfactual_performed_event_map_bytes: &counterfactual.map_bytes,
             expected_score_event_count: 2,
             expected_primary_midi_by_score_index: &[60, 64],
+            counterfactual_expected_primary_midi_by_score_index: &[60, 64],
             baseline_schedule_bytes: &baseline_midi,
             counterfactual_schedule_bytes: &counterfactual_midi,
             baseline_renderer_evidence: &anchor_evidence,
