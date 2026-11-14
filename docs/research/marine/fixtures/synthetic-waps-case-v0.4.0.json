@@ -1,0 +1,942 @@
+{
+  "schema_version": "0.4.0",
+  "case_id": "SYNTHETIC-WAPS-CASE-0001",
+  "record_status": "synthetic",
+  "comparison": {
+    "comparison_group_id": "SYNTHETIC-GROUP-0001",
+    "candidate_id": "SYNTHETIC-WIND-ASSIST-01",
+    "role": "candidate",
+    "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+    "paired_case_id": "SYNTHETIC-CONVENTIONAL-BASELINE-0001",
+    "matching_deviations": [],
+    "service_fingerprint_profile": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1"
+  },
+  "service": {
+    "cargo_class": "container",
+    "functional_unit": "TEU-nautical-mile",
+    "service_contract_id": "SYNTHETIC-CONTAINER-SERVICE-0001",
+    "annual_delivered_work": {
+      "value": 5000000000,
+      "unit": "TEU-nautical_mile",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "annual_delivered_cargo_mass": {
+      "value": 8000000,
+      "unit": "tonne",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "annual_delivered_teu": {
+      "value": 500000,
+      "unit": "TEU",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "required_arrival_window_hours": {
+      "value": 24,
+      "unit": "h",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "arrival_policy": "windowed",
+    "service_availability_target": {
+      "value": 0.97,
+      "unit": "1",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "notes": [
+      "Synthetic one-route architecture comparison fixture; not an operational profile."
+    ]
+  },
+  "vessel": {
+    "vessel_class": "container_ship",
+    "configuration": {
+      "id": "SYNTHETIC-CONTAINER-VESSEL",
+      "revision": "0.0.1-synthetic",
+      "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "loading_condition": "synthetic design load case",
+    "principal_dimensions": {
+      "length_overall": {
+        "value": 300,
+        "unit": "m",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "length_between_perpendiculars": {
+        "value": 285,
+        "unit": "m",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "beam": {
+        "value": 45,
+        "unit": "m",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "design_draft": {
+        "value": 14,
+        "unit": "m",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "air_draft": {
+        "value": 55,
+        "unit": "m",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "displacement": {
+        "value": 120000,
+        "unit": "tonne",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "deadweight": {
+        "value": 90000,
+        "unit": "tonne",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "cargo_capacity": {
+        "value": 15000,
+        "unit": "TEU",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "cargo_volume": {
+        "value": null,
+        "unit": "m3",
+        "unknown_reason": "Not specified in synthetic smoke fixture.",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "explicitly unknown in schema fixture",
+          "limitations": [
+            "No source input is available; this must not be interpreted as zero."
+          ],
+          "rights_status": "not_applicable"
+        }
+      }
+    },
+    "stability_report_id": "unknown",
+    "structural_report_id": "unknown"
+  },
+  "route": {
+    "route_id": "SYNTHETIC-ROUTE-001",
+    "route_revision": "0.0.1-synthetic",
+    "segments": [
+      {
+        "segment_id": "SEG-001",
+        "distance": {
+          "value": 8000,
+          "unit": "nautical_mile",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        },
+        "speed_policy": "fixed nominal speed with arrival-window check",
+        "target_speed": {
+          "value": 18,
+          "unit": "knot",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        },
+        "arrival_time_window": {
+          "value": 24,
+          "unit": "h",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        },
+        "port_or_waypoint_id": "SYNTHETIC-PORT-PAIR-001"
+      }
+    ],
+    "route_data_provenance": {
+      "class": "synthetic",
+      "source_id": "SYNTHETIC-ROUTE-001",
+      "method": "hand-authored illustrative route",
+      "limitations": [
+        "No real port, route, weather, bathymetry or operator data."
+      ],
+      "rights_status": "not_applicable"
+    }
+  },
+  "environment": {
+    "profile_id": "SYNTHETIC-METOCEAN-001",
+    "profile_revision": "0.0.1-synthetic",
+    "time_basis": "synthetic",
+    "wind_reference_height": {
+      "value": 10,
+      "unit": "m",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "wind_series_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "wave_series_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "current_series_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "water_depth_series_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "provenance": {
+      "class": "synthetic",
+      "source_id": "SYNTHETIC-METOCEAN-001",
+      "method": "synthetic hash placeholders; no time-series bytes attached",
+      "limitations": [
+        "Hashes are identifiers for this fixture only, not evidence of existing trace files."
+      ],
+      "rights_status": "not_applicable"
+    },
+    "out_of_domain_policy": "unknown"
+  },
+  "architecture": {
+    "hull_propulsor": {
+      "hull_configuration": {
+        "id": "SYNTHETIC-HULL-001",
+        "revision": "0.0.1-synthetic",
+        "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "propulsor_family": "fixed_pitch_open_propeller",
+      "propulsor_configuration": {
+        "id": "SYNTHETIC-PROPELLER-001",
+        "revision": "0.0.1-synthetic",
+        "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "propeller_diameter": {
+        "value": 8,
+        "unit": "m",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "shaft_rpm_map_id": "SYNTHETIC-RPM-MAP-UNKNOWN",
+      "wake_or_inflow_map_id": "SYNTHETIC-WAKE-MAP-UNKNOWN",
+      "resistance_model_id": "SYNTHETIC-RESISTANCE-MODEL-UNVALIDATED",
+      "propulsion_model_id": "SYNTHETIC-PROPULSION-MODEL-UNVALIDATED"
+    },
+    "powertrain": {
+      "topology": "mechanical_with_pto_pti",
+      "shaft_boundary_id": "SYNTHETIC-SHAFT-BOUNDARY",
+      "electrical_boundary_id": "SYNTHETIC-ELECTRICAL-BOUNDARY",
+      "stages": [
+        {
+          "stage_id": "MAIN-ENGINE-001",
+          "role": "prime_mover",
+          "configuration": {
+            "id": "SYNTHETIC-MAIN-ENGINE",
+            "revision": "0.0.1-synthetic",
+            "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "model_id": "SYNTHETIC-DIESEL-MODEL-UNVALIDATED",
+          "rated_power": {
+            "value": 45000,
+            "unit": "kW",
+            "provenance": {
+              "class": "synthetic",
+              "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+              "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+              "limitations": [
+                "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+              ],
+              "rights_status": "not_applicable"
+            },
+            "uncertainty": {
+              "kind": "unknown",
+              "reason": "Synthetic fixture has no empirical uncertainty distribution."
+            }
+          },
+          "efficiency_map_id": "SYNTHETIC-EFFICIENCY-MAP-UNKNOWN"
+        },
+        {
+          "stage_id": "SHAFT-GENERATOR-001",
+          "role": "shaft_generator",
+          "configuration": {
+            "id": "SYNTHETIC-SHAFT-GENERATOR",
+            "revision": "0.0.1-synthetic",
+            "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "model_id": "SYNTHETIC-PTO-MODEL-UNVALIDATED",
+          "rated_power": {
+            "value": 1500,
+            "unit": "kW",
+            "provenance": {
+              "class": "synthetic",
+              "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+              "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+              "limitations": [
+                "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+              ],
+              "rights_status": "not_applicable"
+            },
+            "uncertainty": {
+              "kind": "unknown",
+              "reason": "Synthetic fixture has no empirical uncertainty distribution."
+            }
+          },
+          "efficiency_map_id": "SYNTHETIC-PTO-EFFICIENCY-UNKNOWN"
+        }
+      ],
+      "pt_count": {
+        "value": 1,
+        "unit": "count",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      },
+      "pti_count": {
+        "value": 1,
+        "unit": "count",
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+          "limitations": [
+            "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no empirical uncertainty distribution."
+        }
+      }
+    },
+    "energy_sources": [
+      {
+        "source_id": "DIESEL-001",
+        "source_type": "marine_diesel",
+        "pathway_id": "SYNTHETIC-MDO-PATHWAY",
+        "well_to_wake_factor": {
+          "value": null,
+          "unit": "gCO2e/MJ",
+          "unknown_reason": "No lifecycle fuel dataset in schema smoke fixture.",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "explicitly unknown in schema fixture",
+            "limitations": [
+              "No source input is available; this must not be interpreted as zero."
+            ],
+            "rights_status": "not_applicable"
+          }
+        },
+        "lower_heating_value": {
+          "value": 42700000,
+          "unit": "J/kg",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "illustrative nominal placeholder",
+          "limitations": [
+            "Not a sourced fuel property; use an admitted source in any real case."
+          ],
+          "rights_status": "not_applicable"
+        }
+      }
+    ],
+    "wind_devices": [
+      {
+        "device_id": "ROTOR-PAIR-001",
+        "technology": "flettner_rotor",
+        "configuration": {
+          "id": "SYNTHETIC-ROTOR-PAIR",
+          "revision": "0.0.1-synthetic",
+          "configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "count": 2,
+        "control_model_id": "SYNTHETIC-ROTOR-CONTROL-UNKNOWN",
+        "operating_envelope_id": "SYNTHETIC-ROTOR-ENVELOPE-UNKNOWN",
+        "auxiliary_power": {
+          "value": 20,
+          "unit": "kW",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        },
+        "force_moment_map_id": "SYNTHETIC-FORCE-MOMENT-MAP-UNKNOWN",
+        "retraction_time": {
+          "value": 30,
+          "unit": "min",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        },
+        "deck_or_cargo_interference_report_id": "unknown",
+        "availability_fraction": {
+          "value": 0.9,
+          "unit": "1",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+            "limitations": [
+              "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "Synthetic fixture has no empirical uncertainty distribution."
+          }
+        }
+      }
+    ],
+    "storage": [],
+    "waste_heat_recovery": []
+  },
+  "economics": {
+    "currency": "USD",
+    "base_year": 2026,
+    "lifecycle_years": 25,
+    "discount_rate": {
+      "value": 0.07,
+      "unit": "1",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "hand-authored deterministic schema smoke fixture; not a ship design or measurement",
+        "limitations": [
+          "Illustrative synthetic value only; must not be used for design sizing, cost, performance or safety claims."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "Synthetic fixture has no empirical uncertainty distribution."
+      }
+    },
+    "capital_cost": {
+      "value": null,
+      "unit": "USD",
+      "unknown_reason": "Not estimated in synthetic schema smoke fixture.",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "explicitly unknown in schema fixture",
+        "limitations": [
+          "No source input is available; this must not be interpreted as zero."
+        ],
+        "rights_status": "not_applicable"
+      }
+    },
+    "annual_operating_cost": {
+      "value": null,
+      "unit": "USD/year",
+      "unknown_reason": "Not estimated in synthetic schema smoke fixture.",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "explicitly unknown in schema fixture",
+        "limitations": [
+          "No source input is available; this must not be interpreted as zero."
+        ],
+        "rights_status": "not_applicable"
+      }
+    },
+    "boundary_note": "Synthetic contract smoke test only; no cost comparison has been calculated.",
+    "replacement_and_decommissioning_note": "Unknown and explicitly unmodelled.",
+    "provenance": {
+      "class": "synthetic",
+      "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+      "method": "hand-authored fixture",
+      "limitations": [
+        "No economic assumptions may be inferred from this fixture."
+      ],
+      "rights_status": "not_applicable"
+    }
+  },
+  "evidence": {
+    "data_class": "synthetic_only",
+    "model_identities": [
+      {
+        "model_id": "SYNTHETIC-ENERGY-CHAIN-001",
+        "revision": "0.0.1",
+        "validation_stage": "unknown",
+        "applicability_domain": "none; schema fixture only",
+        "limitations": [
+          "No model execution, physical validation or prediction is represented."
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "title": "Synthetic WAPS schema smoke fixture",
+        "publisher": "Luminous Dynamics research fixture",
+        "publication_date": "2026-11-10",
+        "evidence_class": "synthetic",
+        "limitations": [
+          "No physical ship or empirical measurement; not a design proposal."
+        ],
+        "rights_status": "not_applicable"
+      }
+    ],
+    "claim_ceiling": "Schema smoke fixture only. No vessel, propulsion performance, energy, economic, emissions, safety or regulatory claim."
+  },
+  "hard_gates": [
+    {
+      "gate_id": "HULL-STABILITY",
+      "status": "unknown",
+      "scope_note": "No naval-architecture model or stability data are represented.",
+      "evidence_ids": []
+    },
+    {
+      "gate_id": "WAPS-STRUCTURAL-INTEGRATION",
+      "status": "unknown",
+      "scope_note": "No supporting-structure calculation or approval evidence is represented.",
+      "evidence_ids": []
+    },
+    {
+      "gate_id": "WAPS-OPERATIONAL-SAFETY",
+      "status": "unknown",
+      "scope_note": "No operational hazard analysis, manoeuvrability or crew procedure evidence is represented.",
+      "evidence_ids": []
+    }
+  ],
+  "candidate_metrics": [],
+  "notes": [
+    "This fixture is intentionally synthetic. All hashes and quantitative placeholders are not operational evidence."
+  ],
+  "trial_evidence": {
+    "trial_id": "SYNTHETIC-TRIAL-0001",
+    "protocol_id": "SYNTHETIC-TRIAL-PROTOCOL",
+    "protocol_revision": "0.0.1",
+    "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+    "baseline_case_id": "SYNTHETIC-WAPS-BASELINE-0001",
+    "candidate_case_id": "SYNTHETIC-WAPS-CASE-0001",
+    "disposition": "raw",
+    "validation_stage": "synthetic_only",
+    "time_sync_method": "synthetic GNSS-disciplined reference clock",
+    "time_alignment_uncertainty": {
+      "value": 0.002,
+      "unit": "s",
+      "provenance": {
+        "class": "synthetic",
+        "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "method": "synthetic fixture only",
+        "limitations": [
+          "No real clock or acquisition system is represented."
+        ],
+        "rights_status": "not_applicable"
+      },
+      "uncertainty": {
+        "kind": "unknown",
+        "reason": "No physical synchronization uncertainty exists in a synthetic fixture."
+      }
+    },
+    "channels": [
+      {
+        "channel_id": "SYNTHETIC-WIND-SPEED-CHANNEL",
+        "physical_quantity": "wind_speed",
+        "unit": "m/s",
+        "instrument_identity": {
+          "id": "SYNTHETIC-WIND-SENSOR",
+          "revision": "0.1"
+        },
+        "measurement_location": "synthetic mast reference point",
+        "sample_rate_hz": {
+          "value": 1,
+          "unit": "Hz",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "synthetic fixture only",
+            "limitations": [
+              "Illustrative sampling rate, not a proposed instrumentation specification."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical sampling clock is represented."
+          }
+        },
+        "calibration_record_id": "SYNTHETIC-CALIBRATION-0001",
+        "calibration_status": "in_tolerance",
+        "timebase_id": "SYNTHETIC-TIMEBASE-0001",
+        "time_alignment_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "synthetic fixture only",
+            "limitations": [
+              "No physical clock is represented."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical time alignment is represented."
+          }
+        },
+        "sample_window_start": "2026-11-10T12:00:00Z",
+        "sample_window_end": "2026-11-10T12:01:00Z",
+        "expected_sample_count": 60,
+        "observed_sample_count": 60,
+        "missing_sample_count": 0,
+        "raw_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no measured wind-speed uncertainty."
+        },
+        "provenance": {
+          "class": "synthetic",
+          "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+          "method": "hand-authored schema v0.2.0 smoke fixture",
+          "limitations": [
+            "No vessel, sensor or physical measurement exists."
+          ],
+          "rights_status": "not_applicable"
+        },
+        "limitations": [
+          "Software contract fixture only."
+        ],
+        "sample_rate_basis": "nominal"
+      }
+    ],
+    "raw_dataset_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "calibration_set_id": "SYNTHETIC-CALIBRATION-SET-0001",
+    "calibration_records": [
+      {
+        "calibration_record_id": "SYNTHETIC-CALIBRATION-0001",
+        "revision": "0.0.1",
+        "instrument_identity": {
+          "id": "SYNTHETIC-WIND-SENSOR",
+          "revision": "0.1"
+        },
+        "physical_quantity": "wind_speed",
+        "unit": "m/s",
+        "range_min": 0,
+        "range_max": 60,
+        "uncertainty": {
+          "kind": "unknown",
+          "reason": "Synthetic fixture has no calibration certificate or physical uncertainty."
+        },
+        "calibration_date": "2026-11-01T00:00:00Z",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2027-11-01T00:00:00Z",
+        "disposition": "in_tolerance",
+        "calibration_provider": "synthetic fixture generator",
+        "traceability_reference": "not_applicable_synthetic",
+        "limitations": [
+          "This is a synthetic registry record, not evidence of actual calibration."
+        ],
+        "calibration_method": "Synthetic reference calibration procedure",
+        "evidence_source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "rights_status": "not_applicable",
+        "certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "reviewer_id": "SYNTHETIC-REVIEWER-0001"
+      }
+    ],
+    "timebases": [
+      {
+        "timebase_id": "SYNTHETIC-TIMEBASE-0001",
+        "revision": "0.0.1",
+        "clock_source": "synthetic GNSS-disciplined clock",
+        "synchronization_method": "synthetic",
+        "reference_clock_id": "SYNTHETIC-UTC-REFERENCE",
+        "offset_seconds": 0,
+        "drift_ppm": 0,
+        "synchronization_uncertainty": {
+          "value": 0.002,
+          "unit": "s",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "synthetic fixture only",
+            "limitations": [
+              "No physical clock is represented."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical clock is represented."
+          }
+        },
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2027-11-01T00:00:00Z",
+        "evidence_source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+        "limitations": [
+          "Synthetic timebase record; not a real timing qualification."
+        ],
+        "rights_status": "not_applicable",
+        "reference_epoch": "2026-11-10T12:00:00Z",
+        "drift_uncertainty_ppm": {
+          "value": 0,
+          "unit": "ppm",
+          "provenance": {
+            "class": "synthetic",
+            "source_id": "SYNTHETIC-WAPS-FIXTURE-ONLY",
+            "method": "synthetic fixture residual clock drift uncertainty",
+            "limitations": [
+              "Zero is a fixture value only and does not represent a physical clock qualification."
+            ],
+            "rights_status": "not_applicable"
+          },
+          "uncertainty": {
+            "kind": "unknown",
+            "reason": "No physical clock or residual drift uncertainty exists in a synthetic fixture."
+          }
+        },
+        "drift_semantics": "residual_rate_uncertainty_after_correction"
+      }
+    ],
+    "sample_completeness_policy": {
+      "policy_id": "SYNTHETIC-SAMPLE-POLICY-0001",
+      "revision": "0.0.1",
+      "minimum_observed_fraction": 0.99,
+      "method": "observed_sample_count / expected_sample_count",
+      "limitations": [
+        "Synthetic threshold for schema testing only; no real trial requirement is implied."
+      ],
+      "window_semantics": "start_inclusive_end_exclusive",
+      "rate_count_tolerance_samples": 1
+    },
+    "limitations": [
+      "Synthetic trial fixture only; no physical measurement or qualification."
+    ]
+  }
+}

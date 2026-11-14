@@ -1,0 +1,60 @@
+{
+  "vector_version": "1",
+  "profile": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1",
+  "description": "Synthetic known-answer test vector; no vessel or physical service is represented.",
+  "payload": {
+    "annual_delivered_cargo_mass": {
+      "unit": "tonne",
+      "value": 8000000
+    },
+    "annual_delivered_teu": {
+      "unit": "TEU",
+      "value": 500000
+    },
+    "annual_delivered_work": {
+      "unit": "TEU-nautical_mile",
+      "value": 5000000000
+    },
+    "arrival_policy": "windowed",
+    "cargo_class": "container",
+    "fingerprint_profile": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1",
+    "functional_unit": "TEU-nautical-mile",
+    "loading_condition": "synthetic design load case",
+    "required_arrival_window_hours": {
+      "unit": "h",
+      "value": 24
+    },
+    "route_id": "SYNTHETIC-ROUTE-001",
+    "route_revision": "0.0.1-synthetic",
+    "segments": [
+      {
+        "arrival_time_window": {
+          "unit": "h",
+          "value": 24
+        },
+        "distance": {
+          "unit": "nautical_mile",
+          "value": 8000
+        },
+        "port_or_waypoint_id": "SYNTHETIC-PORT-PAIR-001",
+        "segment_id": "SEG-001",
+        "speed_policy": "fixed nominal speed with arrival-window check",
+        "target_speed": {
+          "unit": "knot",
+          "value": 18
+        }
+      }
+    ],
+    "service_availability_target": {
+      "unit": "1",
+      "value": 0.97
+    },
+    "service_contract_id": "SYNTHETIC-CONTAINER-SERVICE-0001"
+  },
+  "canonical_json": "{\"annual_delivered_cargo_mass\":{\"unit\":\"tonne\",\"value\":8000000},\"annual_delivered_teu\":{\"unit\":\"TEU\",\"value\":500000},\"annual_delivered_work\":{\"unit\":\"TEU-nautical_mile\",\"value\":5000000000},\"arrival_policy\":\"windowed\",\"cargo_class\":\"container\",\"fingerprint_profile\":\"marine-service-payload-v1+symthaea-canonical-json-sha256-v1\",\"functional_unit\":\"TEU-nautical-mile\",\"loading_condition\":\"synthetic design load case\",\"required_arrival_window_hours\":{\"unit\":\"h\",\"value\":24},\"route_id\":\"SYNTHETIC-ROUTE-001\",\"route_revision\":\"0.0.1-synthetic\",\"segments\":[{\"arrival_time_window\":{\"unit\":\"h\",\"value\":24},\"distance\":{\"unit\":\"nautical_mile\",\"value\":8000},\"port_or_waypoint_id\":\"SYNTHETIC-PORT-PAIR-001\",\"segment_id\":\"SEG-001\",\"speed_policy\":\"fixed nominal speed with arrival-window check\",\"target_speed\":{\"unit\":\"knot\",\"value\":18}}],\"service_availability_target\":{\"unit\":\"1\",\"value\":0.97},\"service_contract_id\":\"SYNTHETIC-CONTAINER-SERVICE-0001\"}",
+  "sha256": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+  "numeric_cases": {
+    "integer_5000000000": "5000000000",
+    "decimal_0_97": "0.97"
+  }
+}

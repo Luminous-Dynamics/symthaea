@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.1.0",
+  "join_id": "SYNTHETIC-HULL-STATE-JOIN-0001",
+  "record_status": "synthetic",
+  "claim_mode": "contextual_linkage_only",
+  "vessel_identity": {
+    "id": "SYNTHETIC-CARGO-001",
+    "revision": "A"
+  },
+  "service_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "acoustic_link": {
+    "record_id": "SYNTHETIC-ACOUSTIC-TRIAL-0001",
+    "raw_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "measurement_start": "2026-10-15T10:00:00Z",
+    "measurement_end": "2026-10-15T10:01:00Z"
+  },
+  "hull_inspection_link": {
+    "record_id": "SYNTHETIC-BIOFOULING-EVIDENCE-0001",
+    "inspection_id": "SYNTHETIC-INSPECTION-001",
+    "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "inspection_date": "2026-10-15T10:00:00Z"
+  },
+  "cleaning_link": {
+    "cleaning_id": "SYNTHETIC-CLEANING-001",
+    "start": "2026-10-16T08:00:00Z",
+    "end": "2026-10-16T12:00:00Z"
+  },
+  "performance_links": {
+    "before_observation_id": "BEFORE-001",
+    "before_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "after_observation_id": "AFTER-001",
+    "after_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "time_alignment_policy": {
+    "max_acoustic_inspection_separation_seconds": 3600,
+    "acoustic_must_precede_cleaning": true,
+    "post_observation_must_follow_cleaning": true
+  },
+  "limitations": [
+    "Synthetic linkage only; no source trace is authenticated by this manifest.",
+    "A context join does not calculate causal fuel savings, acoustic reduction, organism release or ecological benefit."
+  ]
+}

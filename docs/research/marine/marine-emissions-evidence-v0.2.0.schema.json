@@ -1,0 +1,594 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-emissions-evidence:0.2.0",
+  "title": "Luminous Marine Gas-Resolved Emissions Evidence v0.2.0",
+  "description": "Adds matched service/voyage and WAPS operating context to v0.1.0 CH4/N2O evidence without changing the legacy contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "vessel_configuration_id",
+    "engine",
+    "measurement_method",
+    "method_revision",
+    "source_resolution_ids",
+    "measurement_window",
+    "expected_gases",
+    "gas_observations",
+    "unmeasured_gases",
+    "limitations",
+    "measurement_context"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "test_bed",
+        "onboard_trial",
+        "operational_monitoring",
+        "reduced_from_raw"
+      ]
+    },
+    "vessel_configuration_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine_id",
+        "engine_revision",
+        "rated_power_kw",
+        "fuel_type",
+        "average_load_percent"
+      ],
+      "properties": {
+        "engine_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "engine_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rated_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fuel_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "average_load_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "measurement_method": {
+      "enum": [
+        "test_bed_measurement",
+        "onboard_measurement",
+        "engine_load_monitoring",
+        "cems"
+      ]
+    },
+    "method_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_resolution_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "MEPC.414(84)",
+          "MEPC.415(84)",
+          "MEPC.416(84)"
+        ]
+      }
+    },
+    "measurement_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "timebase_id",
+        "sample_rate_hz",
+        "expected_sample_count",
+        "observed_sample_count",
+        "missing_sample_count",
+        "minimum_observed_fraction",
+        "window_semantics",
+        "rate_count_tolerance_samples"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected_sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_observed_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "time_alignment_uncertainty_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "window_semantics": {
+          "const": "start_inclusive_end_exclusive"
+        },
+        "rate_count_tolerance_samples": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "expected_gases": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "CH4",
+          "N2O"
+        ]
+      }
+    },
+    "gas_observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/gas_observation"
+      }
+    },
+    "unmeasured_gases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gas",
+          "reason"
+        ],
+        "properties": {
+          "gas": {
+            "enum": [
+              "CH4",
+              "N2O"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "measurement_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_fingerprint",
+        "case_id",
+        "voyage_id",
+        "route_segment_id",
+        "propulsion_mode",
+        "loading_condition",
+        "vessel_speed_through_water_kn",
+        "wind_assist_installation",
+        "wind_device_states",
+        "conditions_source_id"
+      ],
+      "properties": {
+        "service_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "voyage_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propulsion_mode": {
+          "enum": [
+            "direct_mechanical",
+            "pto_pti",
+            "hybrid_electric",
+            "battery_assist",
+            "other"
+          ]
+        },
+        "loading_condition": {
+          "enum": [
+            "ballast",
+            "partial",
+            "design",
+            "full",
+            "other",
+            "unknown"
+          ]
+        },
+        "vessel_speed_through_water_kn": {
+          "type": "number",
+          "minimum": 0
+        },
+        "true_wind_speed_kn": {
+          "type": "number",
+          "minimum": 0
+        },
+        "true_wind_from_bow_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "apparent_wind_speed_kn": {
+          "type": "number",
+          "minimum": 0
+        },
+        "apparent_wind_from_bow_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "significant_wave_height_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wave_from_bow_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "current_speed_kn": {
+          "type": "number",
+          "minimum": 0
+        },
+        "current_from_bow_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "wind_assist_installation": {
+          "enum": [
+            "installed",
+            "not_installed",
+            "unknown"
+          ]
+        },
+        "wind_device_states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/wind_device_state"
+          }
+        },
+        "conditions_source_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "wind_assist_installation": {
+                "const": "installed"
+              }
+            },
+            "required": [
+              "wind_assist_installation"
+            ]
+          },
+          "then": {
+            "required": [
+              "true_wind_speed_kn",
+              "true_wind_from_bow_deg",
+              "apparent_wind_speed_kn",
+              "apparent_wind_from_bow_deg"
+            ],
+            "properties": {
+              "wind_device_states": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "wind_assist_installation": {
+                "const": "not_installed"
+              }
+            },
+            "required": [
+              "wind_assist_installation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "wind_device_states": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "gas_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "gas",
+        "mass_rate_kg_per_hour",
+        "uncertainty",
+        "evidence"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gas": {
+          "enum": [
+            "CH4",
+            "N2O"
+          ]
+        },
+        "mass_rate_kg_per_hour": {
+          "type": "number",
+          "minimum": 0
+        },
+        "uncertainty": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "standard_uncertainty_kg_per_hour",
+                "coverage_factor"
+              ],
+              "properties": {
+                "status": {
+                  "const": "quantified"
+                },
+                "standard_uncertainty_kg_per_hour": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "coverage_factor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "reason"
+              ],
+              "properties": {
+                "status": {
+                  "const": "unknown"
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        },
+        "evidence": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "instrument_id",
+                "calibration_record_id",
+                "calibration_status",
+                "timebase_id",
+                "trace_sha256",
+                "rights_status"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "measured"
+                },
+                "instrument_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "calibration_record_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "calibration_status": {
+                  "enum": [
+                    "in_tolerance",
+                    "out_of_tolerance",
+                    "stale",
+                    "unknown"
+                  ]
+                },
+                "timebase_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "trace_sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "rights_status": {
+                  "enum": [
+                    "public",
+                    "permissioned",
+                    "restricted",
+                    "unknown"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "engine_load_trace_sha256",
+                "calculation_method_id",
+                "model_id",
+                "input_source_id",
+                "rights_status"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "engine_load_calculated"
+                },
+                "engine_load_trace_sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "calculation_method_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "model_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "input_source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rights_status": {
+                  "enum": [
+                    "public",
+                    "permissioned",
+                    "restricted",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "wind_device_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "device_family",
+        "configuration_revision",
+        "commanded_state",
+        "achieved_state"
+      ],
+      "properties": {
+        "device_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device_family": {
+          "enum": [
+            "rotor_sail",
+            "suction_wing",
+            "rigid_wing",
+            "soft_sail",
+            "kite",
+            "wind_turbine",
+            "other"
+          ]
+        },
+        "configuration_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commanded_state": {
+          "enum": [
+            "active",
+            "feathered",
+            "stowed",
+            "retracted",
+            "unavailable",
+            "faulted",
+            "unknown"
+          ]
+        },
+        "achieved_state": {
+          "enum": [
+            "active",
+            "feathered",
+            "stowed",
+            "retracted",
+            "unavailable",
+            "faulted",
+            "unknown"
+          ]
+        }
+      }
+    }
+  }
+}

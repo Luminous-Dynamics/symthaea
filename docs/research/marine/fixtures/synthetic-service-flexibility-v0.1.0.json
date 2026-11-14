@@ -1,0 +1,117 @@
+{
+  "schema_version": "0.1.0",
+  "study_id": "SYNTHETIC-SERVICE-FLEXIBILITY-0001",
+  "data_class": "synthetic",
+  "service": {
+    "service_fingerprint": "a5a0a5a0b5b5c6c6d7d7e8e8f9f9010101121212232323233434343456565656",
+    "service_contract_id": "SYNTHETIC-CARGO-CONTRACT-001",
+    "functional_unit": "tonne-nautical_mile",
+    "cargo_class": "synthetic-general-cargo",
+    "annual_delivered_work": 1000000,
+    "port_calls": [
+      {
+        "port_call_id": "PORT-A",
+        "earliest_arrival": "2026-12-10T06:00:00Z",
+        "target_arrival": "2026-12-10T09:00:00Z",
+        "latest_arrival": "2026-12-10T12:00:00Z",
+        "minimum_turnaround_seconds": 7200,
+        "latest_departure": "2026-12-10T18:00:00Z"
+      },
+      {
+        "port_call_id": "PORT-B",
+        "earliest_arrival": "2026-12-12T06:00:00Z",
+        "target_arrival": "2026-12-12T09:00:00Z",
+        "latest_arrival": "2026-12-12T13:00:00Z",
+        "minimum_turnaround_seconds": 7200,
+        "latest_departure": "2026-12-12T20:00:00Z"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "case_id": "SYNTHETIC-FIXED-BASELINE",
+      "role": "baseline",
+      "policy_family": "fixed_schedule",
+      "service_fingerprint": "a5a0a5a0b5b5c6c6d7d7e8e8f9f9010101121212232323233434343456565656",
+      "storage": {
+        "technology": "none",
+        "usable_energy_kwh": 0,
+        "mass_kg": 0,
+        "volume_m3": 0
+      },
+      "energy_evidence": {
+        "status": "not_supplied",
+        "reason": "Synthetic schedule-only fixture; no fuel or shaft-energy observations."
+      },
+      "port_calls": [
+        {
+          "port_call_id": "PORT-A",
+          "planned_arrival": "2026-12-10T09:00:00Z",
+          "planned_departure": "2026-12-10T11:00:00Z"
+        },
+        {
+          "port_call_id": "PORT-B",
+          "planned_arrival": "2026-12-12T09:00:00Z",
+          "planned_departure": "2026-12-12T11:00:00Z"
+        }
+      ]
+    },
+    {
+      "case_id": "SYNTHETIC-SCHEDULE-FLEX",
+      "role": "candidate",
+      "policy_family": "schedule_flexible",
+      "service_fingerprint": "a5a0a5a0b5b5c6c6d7d7e8e8f9f9010101121212232323233434343456565656",
+      "storage": {
+        "technology": "none",
+        "usable_energy_kwh": 0,
+        "mass_kg": 0,
+        "volume_m3": 0
+      },
+      "energy_evidence": {
+        "status": "not_supplied",
+        "reason": "Synthetic schedule-only fixture; no fuel or shaft-energy observations."
+      },
+      "port_calls": [
+        {
+          "port_call_id": "PORT-A",
+          "planned_arrival": "2026-12-10T11:00:00Z",
+          "planned_departure": "2026-12-10T13:00:00Z"
+        },
+        {
+          "port_call_id": "PORT-B",
+          "planned_arrival": "2026-12-12T11:30:00Z",
+          "planned_departure": "2026-12-12T13:30:00Z"
+        }
+      ]
+    },
+    {
+      "case_id": "SYNTHETIC-BATTERY-ONLY",
+      "role": "candidate",
+      "policy_family": "battery_storage",
+      "service_fingerprint": "a5a0a5a0b5b5c6c6d7d7e8e8f9f9010101121212232323233434343456565656",
+      "storage": {
+        "technology": "lithium_ion",
+        "usable_energy_kwh": 1600,
+        "mass_kg": 18000,
+        "volume_m3": 24
+      },
+      "energy_evidence": {
+        "status": "not_supplied",
+        "reason": "Synthetic battery metadata; no energy outcome."
+      },
+      "port_calls": [
+        {
+          "port_call_id": "PORT-A",
+          "planned_arrival": "2026-12-10T09:00:00Z",
+          "planned_departure": "2026-12-10T11:00:00Z"
+        },
+        {
+          "port_call_id": "PORT-B",
+          "planned_arrival": "2026-12-12T09:00:00Z",
+          "planned_departure": "2026-12-12T11:00:00Z"
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic temporal-window arithmetic only. No conversion from time slack to energy and no vessel fuel, safety or service-performance claim."
+}

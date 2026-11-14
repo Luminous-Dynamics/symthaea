@@ -1,0 +1,806 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "MARINE-PERFORMANCE-DRIFT-SYNTHETIC-0001",
+  "corpus_status": "synthetic",
+  "generated_at_utc": "2026-11-14T20:55:00Z",
+  "cases": [
+    {
+      "case_id": "STABLE-REFERENCE-001",
+      "scenario_class": "stable_reference",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-TUG-001",
+          "revision": "A"
+        },
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "propulsion_family": "azimuth_tug",
+        "coating_revision": "COAT-A"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-TUG",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:09:59Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1000,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-02T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-02T08:00:00Z",
+            "available_at_utc": "2026-01-02T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1005,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "NO_DRIFT_DETECTED",
+        "primary_cause": "none",
+        "attribution_supported": false,
+        "label_available_at_utc": "2026-01-02T08:10:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input."
+      ]
+    },
+    {
+      "case_id": "WEATHER-SHIFT-001",
+      "scenario_class": "weather_shift",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-TUG-001",
+          "revision": "A"
+        },
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "propulsion_family": "azimuth_tug",
+        "coating_revision": "COAT-A"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-TUG",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:09:59Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1000,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-02T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-02T08:00:00Z",
+            "available_at_utc": "2026-01-02T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "environment": {
+              "wind_speed_mps": 12,
+              "significant_wave_height_m": 2.2,
+              "current_speed_mps": 1.1,
+              "water_density_kg_m3": 1020,
+              "draft_m": 4,
+              "trim_deg": 0.5
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1240,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "WX-OBS-02",
+                "kind": "weather_observation",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-02T07:50:00Z",
+                "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              },
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1235,
+            "lower_bound_kw": 1200,
+            "upper_bound_kw": 1270
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "NO_DRIFT_DETECTED",
+        "primary_cause": "weather_or_environment",
+        "attribution_supported": true,
+        "label_available_at_utc": "2026-01-02T08:10:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input."
+      ]
+    },
+    {
+      "case_id": "FOULING-DRIFT-001",
+      "scenario_class": "fouling_drift",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-TUG-001",
+          "revision": "A"
+        },
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "propulsion_family": "azimuth_tug",
+        "coating_revision": "COAT-A"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-TUG",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:09:59Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1000,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-02T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-02T08:00:00Z",
+            "available_at_utc": "2026-01-02T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1120,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "HULL-INSP-02",
+                "kind": "hull_inspection",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-02T08:05:00Z",
+                "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              },
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "DRIFT_DETECTED",
+        "primary_cause": "biofouling",
+        "attribution_supported": true,
+        "label_available_at_utc": "2026-01-02T08:05:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input."
+      ]
+    },
+    {
+      "case_id": "POST-CLEAN-RECOVERY-001",
+      "scenario_class": "post_cleaning_recovery",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-TUG-001",
+          "revision": "A"
+        },
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "propulsion_family": "azimuth_tug",
+        "coating_revision": "COAT-A"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-TUG",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1120,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "HULL-INSP-01",
+                "kind": "hull_inspection",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T08:05:00Z",
+                "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-03T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-03T08:00:00Z",
+            "available_at_utc": "2026-01-03T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1005,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CLEAN-01",
+                "kind": "cleaning_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-02T15:00:00Z",
+                "evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              },
+              {
+                "evidence_id": "HULL-INSP-03",
+                "kind": "hull_inspection",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-03T08:05:00Z",
+                "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+              },
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "NO_DRIFT_DETECTED",
+        "primary_cause": "biofouling_cleaned",
+        "attribution_supported": true,
+        "label_available_at_utc": "2026-01-03T08:05:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input."
+      ]
+    },
+    {
+      "case_id": "PROPULSOR-DAMAGE-001",
+      "scenario_class": "propulsor_damage",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-PWC-001",
+          "revision": "B"
+        },
+        "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "propulsion_family": "waterjet_pwc",
+        "coating_revision": "COAT-WJ-A"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-PWC",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 45,
+              "shaft_rpm": 6000,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-PWC",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 45,
+            "lower_bound_kw": 43,
+            "upper_bound_kw": 47
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-02T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-02T08:00:00Z",
+            "available_at_utc": "2026-01-02T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 56,
+              "shaft_rpm": 6000,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "PUMP-INSP-02",
+                "kind": "propulsor_inspection",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-02T08:05:00Z",
+                "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              },
+              {
+                "evidence_id": "CAL-PWC",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 45,
+            "lower_bound_kw": 43,
+            "upper_bound_kw": 47
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "DRIFT_DETECTED",
+        "primary_cause": "propulsor_damage_or_blockage",
+        "attribution_supported": true,
+        "label_available_at_utc": "2026-01-02T08:05:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input."
+      ]
+    },
+    {
+      "case_id": "SENSOR-DRIFT-001",
+      "scenario_class": "sensor_drift",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-PWC-001",
+          "revision": "B"
+        },
+        "configuration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "propulsion_family": "waterjet_pwc",
+        "coating_revision": "COAT-WJ-A"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-PWC",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 45,
+              "shaft_rpm": 6000,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-PWC",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 45,
+            "lower_bound_kw": 43,
+            "upper_bound_kw": 47
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-02T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-02T08:00:00Z",
+            "available_at_utc": "2026-01-02T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 56,
+              "shaft_rpm": 6000,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "invalid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-PWC-EXPIRED",
+                "kind": "calibration_record",
+                "status": "revoked",
+                "available_at_utc": "2026-01-02T07:55:00Z",
+                "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 45,
+            "lower_bound_kw": 43,
+            "upper_bound_kw": 47
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "INDETERMINATE",
+        "primary_cause": "sensor_or_calibration",
+        "attribution_supported": false,
+        "label_available_at_utc": "2026-01-02T08:10:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input."
+      ]
+    },
+    {
+      "case_id": "MIXED-UNIDENTIFIED-001",
+      "scenario_class": "mixed_or_unidentified",
+      "vessel": {
+        "identity": {
+          "id": "SYNTH-TUG-002",
+          "revision": "C"
+        },
+        "configuration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "propulsion_family": "vsp_tug",
+        "coating_revision": "COAT-C"
+      },
+      "reference_model": {
+        "model_id": "synthetic-reference-model-TUG2",
+        "model_version": "0.1.0",
+        "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "trained_through_utc": "2025-12-31T23:59:59Z"
+      },
+      "decision_points": [
+        {
+          "decision_time_utc": "2026-01-01T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-01T08:00:00Z",
+            "available_at_utc": "2026-01-01T08:09:59Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "environment": {
+              "wind_speed_mps": 2,
+              "significant_wave_height_m": 0.3,
+              "current_speed_mps": 0.2,
+              "water_density_kg_m3": 1025,
+              "draft_m": 4,
+              "trim_deg": 0.2
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1000,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": [
+              {
+                "evidence_id": "CAL-BASE",
+                "kind": "calibration_record",
+                "status": "confirmed",
+                "available_at_utc": "2026-01-01T07:00:00Z",
+                "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+              }
+            ]
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1000,
+            "lower_bound_kw": 980,
+            "upper_bound_kw": 1020
+          }
+        },
+        {
+          "decision_time_utc": "2026-01-02T08:10:00Z",
+          "feature_snapshot": {
+            "observed_at_utc": "2026-01-02T08:00:00Z",
+            "available_at_utc": "2026-01-02T08:10:00Z",
+            "mission_fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "condition_fingerprint_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "environment": {
+              "wind_speed_mps": 12,
+              "significant_wave_height_m": 2.2,
+              "current_speed_mps": 1.1,
+              "water_density_kg_m3": 1020,
+              "draft_m": 4,
+              "trim_deg": 0.5
+            },
+            "measurements": {
+              "speed_through_water_mps": 5,
+              "shaft_power_kw": 1390,
+              "shaft_rpm": 120,
+              "fuel_flow_kg_per_h": 180,
+              "battery_dc_power_kw": null
+            },
+            "calibration_status": "valid",
+            "evidence": []
+          },
+          "reference_prediction": {
+            "predicted_shaft_power_kw": 1250,
+            "lower_bound_kw": 1200,
+            "upper_bound_kw": 1300
+          }
+        }
+      ],
+      "challenge_truth": {
+        "expected_disposition": "INDETERMINATE",
+        "primary_cause": "mixed",
+        "attribution_supported": false,
+        "label_available_at_utc": "2026-01-04T08:10:00Z"
+      },
+      "limitations": [
+        "Synthetic trace only; not physical hydrodynamics or an organism diagnosis.",
+        "Challenge truth is evaluator-only and must not be exposed to candidate model input.",
+        "Multiple simultaneous causes; no single attribution is permitted."
+      ]
+    }
+  ],
+  "limitations": [
+    "Entire corpus is synthetic and is only a semantic/time-causality harness.",
+    "Candidate input must exclude challenge_truth completely; evaluator-only labels are not model features.",
+    "Every decision must check feature_snapshot.available_at_utc and all evidence available_at_utc against decision_time_utc.",
+    "Reference predictions are illustrative known-answer values, not qualified hydrodynamic models.",
+    "No case establishes organism identity, vessel performance, cleaning efficacy or operational permission."
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "schema_version": "0.1.0",
+  "ledger_id": "SYNTHETIC-MARINE-ENERGY-LEDGER-0001",
+  "record_status": "synthetic",
+  "accounting_basis": "research_source_input_boundary_v1",
+  "vessel_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+  "reporting_window": {
+    "start": "2026-11-01T00:00:00Z",
+    "end": "2026-11-01T01:00:00Z",
+    "timebase_id": "SYNTHETIC-TIMEBASE-001"
+  },
+  "evidence_source_ids": [
+    "SYNTHETIC-ONLY"
+  ],
+  "energy_sources": [
+    {
+      "source_id": "FUEL-MAIN",
+      "measurement_id": "FUEL-METER-001",
+      "source_type": "fuel_consumption",
+      "flow_role": "primary_input",
+      "consumer_boundary": "main propulsion prime movers",
+      "energy": {
+        "value_micro_gj": 100000000,
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "SYNTHETIC-LHV-V1",
+      "parent_source_ids": [],
+      "limitations": [
+        "Synthetic known-answer input."
+      ]
+    },
+    {
+      "source_id": "SHORE-POWER",
+      "measurement_id": "SHORE-METER-001",
+      "source_type": "shore_electricity",
+      "flow_role": "substitute_input",
+      "consumer_boundary": "shore connection at vessel inlet",
+      "energy": {
+        "value_micro_gj": 2000000,
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "SYNTHETIC-SHORE-METER-V1",
+      "parent_source_ids": [],
+      "limitations": [
+        "Synthetic known-answer input."
+      ]
+    },
+    {
+      "source_id": "WIND-ASSIST",
+      "measurement_id": "WAPS-METHOD-001",
+      "source_type": "wind_assistance",
+      "flow_role": "substitute_input",
+      "consumer_boundary": "proposed wind energy used onboard; method not yet available",
+      "energy": {
+        "value_micro_gj": null,
+        "unknown_reason": "No applicable WAPS implementing-act standard/certification method in this synthetic record.",
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "NOT_DETERMINED",
+      "parent_source_ids": [],
+      "limitations": [
+        "Must remain unknown; do not coerce to zero."
+      ]
+    },
+    {
+      "source_id": "GEN-OUTPUT",
+      "measurement_id": "GEN-METER-001",
+      "source_type": "generator_output",
+      "flow_role": "conversion_output",
+      "consumer_boundary": "generator electrical bus output",
+      "energy": {
+        "value_micro_gj": 40000000,
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "SYNTHETIC-GEN-METER-V1",
+      "parent_source_ids": [
+        "FUEL-MAIN"
+      ],
+      "limitations": [
+        "Downstream output; not added to source-input total."
+      ]
+    },
+    {
+      "source_id": "BATTERY-DISCHARGE",
+      "measurement_id": "BMS-OUT-001",
+      "source_type": "battery_discharge",
+      "flow_role": "conversion_output",
+      "consumer_boundary": "battery DC output",
+      "energy": {
+        "value_micro_gj": 5000000,
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "SYNTHETIC-BMS-V1",
+      "parent_source_ids": [
+        "SHORE-POWER"
+      ],
+      "limitations": [
+        "Downstream conversion output; not added to source-input total."
+      ]
+    },
+    {
+      "source_id": "SHAFT-OUTPUT",
+      "measurement_id": "SHAFT-METER-001",
+      "source_type": "shaft_output",
+      "flow_role": "conversion_output",
+      "consumer_boundary": "main propulsion shaft",
+      "energy": {
+        "value_micro_gj": 80000000,
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "SYNTHETIC-SHAFT-METER-V1",
+      "parent_source_ids": [
+        "FUEL-MAIN"
+      ],
+      "limitations": [
+        "Useful mechanical output; not an additional source input."
+      ]
+    },
+    {
+      "source_id": "CONVERSION-LOSS",
+      "measurement_id": "LOSS-ESTIMATE-001",
+      "source_type": "conversion_loss",
+      "flow_role": "loss",
+      "consumer_boundary": "declared conversion path",
+      "energy": {
+        "value_micro_gj": 5000000,
+        "evidence_source_id": "SYNTHETIC-ONLY"
+      },
+      "method_id": "SYNTHETIC-LOSS-MODEL-V1",
+      "parent_source_ids": [
+        "FUEL-MAIN"
+      ],
+      "limitations": [
+        "Loss evidence; not added to source-input total."
+      ]
+    }
+  ],
+  "limitations": [
+    "Synthetic data only. Known source subtotal is 102 GJ; total is incomplete because wind energy is undetermined."
+  ]
+}
