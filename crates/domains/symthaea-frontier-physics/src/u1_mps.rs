@@ -3051,6 +3051,192 @@ impl U1TwoSiteState {
     /// This policy does not renormalize. Its local error is a two-site tensor
     /// Frobenius residual; a canonical-gauge exterior receipt is required to
     /// convert it into a global state-vector bound.
+
+
+    fn assemble_truncated_from_exact(
+        &self,
+        exact: &U1TwoSiteSplitDiagnostics,
+        singular_values: &[f64],
+        retained: &[usize],
+        tolerance: f64,
+    ) -> Result<U1TwoSiteTruncationDiagnostics, U1MpsError> {
+        let full_rank = exact.retained_singular_values;
+        if singular_values.len() != full_rank
+            || retained.is_empty()
+            || retained.iter().any(|index| *index >= full_rank)
+        {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+
+        let mut retained_mask = vec![false; full_rank];
+        for &index in retained {
+            if retained_mask[index] {
+                return Err(U1MpsError::TwoSiteShapeMismatch);
+            }
+            retained_mask[index] = true;
+        }
+        let total_schmidt_weight = singular_values
+            .iter()
+            .map(|value| value * value)
+            .sum::<f64>();
+        let retained_schmidt_weight = retained
+            .iter()
+            .map(|index| singular_values[*index] * singular_values[*index])
+            .sum::<f64>();
+        let discarded_weight = singular_values
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !retained_mask[*index])
+            .map(|(_, value)| value * value)
+            .sum::<f64>();
+        if !total_schmidt_weight.is_finite()
+            || total_schmidt_weight <= 0.0
+            || !retained_schmidt_weight.is_finite()
+            || retained_schmidt_weight <= 0.0
+            || !discarded_weight.is_finite()
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive truncation Schmidt weights",
+            ));
+        }
+
+        let retained_rank = retained.len();
+        let left_entries = exact
+            .left_tensor
+            .left_dimension()
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(retained_rank))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let right_entries = retained_rank
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(exact.right_tensor.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut left_data = vec![Complex64::new(0.0, 0.0); left_entries];
+        let mut right_data = vec![Complex64::new(0.0, 0.0); right_entries];
+        let mut retained_middle_charges = Vec::with_capacity(retained_rank);
+
+        for (new_middle, old_middle) in retained.iter().copied().enumerate() {
+            retained_middle_charges
+                .push(exact.left_tensor.right_charges()[old_middle]);
+            for left in 0..exact.left_tensor.left_dimension() {
+                for first_physical in 0..2 {
+                    let index = (left * 2 + first_physical) * retained_rank + new_middle;
+                    left_data[index] =
+                        exact.left_tensor.get(left, first_physical, old_middle);
+                }
+            }
+            for second_physical in 0..2 {
+                for right in 0..exact.right_tensor.right_dimension() {
+                    let index = (new_middle * 2 + second_physical)
+                        * exact.right_tensor.right_dimension()
+                        + right;
+                    right_data[index] =
+                        exact.right_tensor.get(old_middle, second_physical, right);
+                }
+            }
+        }
+
+        let left_tensor = U1MpsTensor::new(
+            exact.left_tensor.left_charges().to_vec(),
+            retained_middle_charges.clone(),
+            left_data,
+        )?;
+        let right_tensor = U1MpsTensor::new(
+            retained_middle_charges.clone(),
+            exact.right_tensor.right_charges().to_vec(),
+            right_data,
+        )?;
+
+        let state_entries = self
+            .left_dimension()
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(self.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut retained_state_data =
+            vec![Complex64::new(0.0, 0.0); state_entries];
+        let mut reconstruction_max_residual: f64 = 0.0;
+        let mut reconstruction_squared = 0.0;
+        for left in 0..self.left_dimension() {
+            for first_physical in 0..2 {
+                for second_physical in 0..2 {
+                    let pair = first_physical * 2 + second_physical;
+                    for right in 0..self.right_dimension() {
+                        let mut value = Complex64::new(0.0, 0.0);
+                        for middle in 0..retained_rank {
+                            value += left_tensor.get(left, first_physical, middle)
+                                * right_tensor.get(middle, second_physical, right);
+                        }
+                        let index = (left * 4 + pair) * self.right_dimension() + right;
+                        retained_state_data[index] = value;
+                        let residual = (value - self.get(left, pair, right)).norm();
+                        reconstruction_max_residual =
+                            reconstruction_max_residual.max(residual);
+                        reconstruction_squared += residual * residual;
+                    }
+                }
+            }
+        }
+        if !reconstruction_max_residual.is_finite() || !reconstruction_squared.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive truncation reconstruction",
+            ));
+        }
+        let _retained_state = U1TwoSiteState::new(
+            self.left_charges.clone(),
+            self.right_charges.clone(),
+            retained_state_data,
+            tolerance,
+        )?;
+
+        let mut retained_rank_by_charge = Vec::new();
+        for charge in retained_middle_charges.iter().copied() {
+            if !retained_rank_by_charge
+                .iter()
+                .any(|(existing, _)| *existing == charge)
+            {
+                let count = retained_middle_charges
+                    .iter()
+                    .filter(|candidate| **candidate == charge)
+                    .count();
+                retained_rank_by_charge.push((charge, count));
+            }
+        }
+
+        let relative_discarded_weight = discarded_weight / total_schmidt_weight;
+        let renormalization_factor_to_restore_original_norm =
+            (total_schmidt_weight / retained_schmidt_weight).sqrt();
+        if !relative_discarded_weight.is_finite()
+            || !renormalization_factor_to_restore_original_norm.is_finite()
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive truncation normalization diagnostics",
+            ));
+        }
+
+        Ok(U1TwoSiteTruncationDiagnostics {
+            left_tensor,
+            right_tensor,
+            retained_rank_by_charge,
+            total_singular_value_count: full_rank,
+            retained_singular_value_count: retained_rank,
+            cutoff_discarded_singular_value_count: 0,
+            bond_cap_discarded_singular_value_count: full_rank - retained_rank,
+            total_schmidt_weight,
+            retained_schmidt_weight,
+            cutoff_discarded_weight: 0.0,
+            bond_cap_discarded_weight: discarded_weight,
+            discarded_weight,
+            relative_discarded_weight,
+            pre_truncation_norm_squared: total_schmidt_weight,
+            post_truncation_norm_squared: retained_schmidt_weight,
+            renormalization_factor_to_restore_original_norm,
+            bond_cap_binding: retained_rank < full_rank,
+            reconstruction_max_residual,
+            reconstruction_l2_residual: reconstruction_squared.sqrt(),
+        })
+    }
+
+
     pub fn split_with_error_budget(
         &self,
         policy: U1TwoSiteErrorBudgetPolicy,
@@ -3064,6 +3250,8 @@ impl U1TwoSiteState {
             return Err(U1MpsError::InvalidErrorBudget);
         }
 
+        // One exact factorization supplies both the Schmidt spectrum and every
+        // candidate compressed tensor. Candidate ranks reuse these factors.
         let exact = self.split_exact(policy.tolerance)?;
         let full_rank = exact.retained_singular_values;
         let mut singular_values = Vec::with_capacity(full_rank);
@@ -3082,44 +3270,35 @@ impl U1TwoSiteState {
             }
             singular_values.push(singular_value);
         }
-        singular_values.sort_by(|left, right| right.total_cmp(left));
 
+        let mut ordered_indices = (0..full_rank).collect::<Vec<_>>();
+        ordered_indices.sort_by(|left, right| {
+            singular_values[*right]
+                .total_cmp(&singular_values[*left])
+                .then_with(|| left.cmp(right))
+        });
         let max_rank = policy.max_bond_dimension.min(full_rank);
         let ideal_minimum_rank = (1..=full_rank)
             .find(|rank| {
-                singular_values[*rank..]
+                ordered_indices[*rank..]
                     .iter()
-                    .map(|value| value * value)
+                    .map(|index| singular_values[*index] * singular_values[*index])
                     .sum::<f64>()
                     .sqrt()
                     <= policy.maximum_local_l2_error
             })
             .unwrap_or(full_rank);
 
-        if ideal_minimum_rank > max_rank {
-            let best = self.split_truncated(U1TwoSiteTruncationPolicy {
-                max_bond_dimension: max_rank,
-                relative_singular_value_cutoff: 0.0,
-                tolerance: policy.tolerance,
-            })?;
-            return Err(U1MpsError::TruncationBudgetInfeasible {
-                requested_l2_error: policy.maximum_local_l2_error,
-                achievable_l2_error: best.reconstruction_l2_residual,
-                max_bond_dimension: max_rank,
-            });
-        }
-
         let mut best_residual = f64::INFINITY;
-        let mut svd_factorization_passes = 1_usize;
-        for retained_rank in ideal_minimum_rank..=max_rank {
-            let truncation = self.split_truncated(U1TwoSiteTruncationPolicy {
-                max_bond_dimension: retained_rank,
-                relative_singular_value_cutoff: 0.0,
-                tolerance: policy.tolerance,
-            })?;
-            svd_factorization_passes = svd_factorization_passes
-                .checked_add(1)
-                .ok_or(U1MpsError::DimensionOverflow)?;
+        for retained_rank in ideal_minimum_rank.min(max_rank)..=max_rank {
+            let mut retained = ordered_indices[..retained_rank].to_vec();
+            retained.sort_unstable();
+            let truncation = self.assemble_truncated_from_exact(
+                &exact,
+                &singular_values,
+                &retained,
+                policy.tolerance,
+            )?;
             let achieved = truncation.reconstruction_l2_residual;
             if !achieved.is_finite() {
                 return Err(U1MpsError::NonFiniteContraction(
@@ -3129,16 +3308,14 @@ impl U1TwoSiteState {
             best_residual = best_residual.min(achieved);
             if achieved <= policy.maximum_local_l2_error {
                 return Ok(U1TwoSiteBudgetedSplitDiagnostics {
-                    selected_bond_dimension: truncation.retained_singular_value_count,
-                    minimum_required_bond_dimension: truncation.retained_singular_value_count,
-                    cap_headroom: policy
-                        .max_bond_dimension
-                        .saturating_sub(truncation.retained_singular_value_count),
-                    svd_factorization_passes,
+                    truncation,
                     requested_local_l2_error: policy.maximum_local_l2_error,
                     achieved_local_l2_error: achieved,
+                    minimum_required_bond_dimension: retained_rank,
+                    selected_bond_dimension: retained_rank,
+                    cap_headroom: policy.max_bond_dimension.saturating_sub(retained_rank),
+                    svd_factorization_passes: 1,
                     budget_satisfied: true,
-                    truncation,
                 });
             }
         }
