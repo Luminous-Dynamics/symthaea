@@ -574,9 +574,11 @@ mod tests {
     #[test]
     fn separates_normal_dev_build_and_target_dependencies() {
         let projection = project_cargo_manifest(PACKAGE_MANIFEST, anchor()).expect("projection");
-        assert!(projection.dependencies.iter().any(|dependency| {
-            dependency.alias == "serde" && dependency.kind == "normal" && dependency.workspace_inherited
-        }));
+        let serde = projection.dependencies.iter().find(|dependency| dependency.alias == "serde").expect("serde");
+        assert_eq!(serde.kind, "normal");
+        assert!(serde.workspace_inherited);
+        assert_eq!(serde.optional, None);
+        assert_eq!(serde.default_features, None);
         assert!(projection.dependencies.iter().any(|dependency| {
             dependency.alias == "tempfile" && dependency.kind == "dev"
         }));
