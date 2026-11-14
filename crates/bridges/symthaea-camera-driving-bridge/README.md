@@ -109,6 +109,33 @@ The HDC artifact format is an 8-byte unsigned little-endian dimension followed b
 
 Only delivered frames are passed through this bridge. Missing/dropped/stale observation events must remain in the episode stream and denominator; they are not replaced or synthesized by the CLI. A successful bridge receipt does not authorize a controller or actuator.
 
+## Camera-policy checkpoint compatibility
+
+A fused HDC vector has the same dimensionality as the existing proprioceptive encoder, but equal dimension does not mean equal input semantics. A legacy state-only controller checkpoint must not be presumed compatible with camera-conditioned input.
+
+The bridge now provides a separate CameraDrivingPolicyManifest and a strict compatibility gate. The manifest binds the exact checkpoint-byte SHA-256, architecture identity, canonical fused-input schema, steering/throttle/brake output schema, VisionConfig, vehicle-encoder seed, camera calibration, renderer revision, visual fusion weight, HDC dimension, frame/delivery envelope, training corpus and split manifests, privilege disclosure, and qualified scope.
+
+Before a separately trained controller is allowed to consume a fused input, the caller must validate the artifact and exact bridge receipt:
+
+```rust
+use symthaea_camera_driving_bridge::policy_compatibility::CameraDrivingPolicyManifest;
+
+let compatibility = manifest.validate_for(
+    &checkpoint_bytes,
+    &fused_driving_input,
+    &qualified_scope_sha256,
+)?;
+assert_eq!(compatibility.compatibility, "INPUT_AND_ARTIFACT_COMPATIBLE_ONLY");
+```
+
+The gate also verifies the bridge receipt commitment, fused HDC vector digest, camera/renderer identity, calibration, fusion weight, HDC dimension, capture-to-delivery timing and frozen VisionManifold learning. A mismatch requires a new manifest/retraining or a separately reviewed exact compatibility proof; it is not silently accepted.
+
+The manifest reports training-data privilege explicitly (no privileged inputs, privileged expert, ground-truth perception, mixed declared, or unknown). Unknown privilege is rejected by this compatibility gate. A disclosed privileged profile is still not comparable to a non-privileged benchmark row without a separate matched-access analysis.
+
+This gate does not load or invoke VehicleController, emit steering/throttle/brake commands, prove perception accuracy or closed-loop driving competence, authenticate the manifest issuer, or grant real-world driving authority. The receipt states compatibility only.
+
+The schema is schemas/camera-conditioned-policy-manifest-v1.schema.json. Legacy vehicle checkpoints remain usable in their original proprioceptive-only path; they do not pass the camera-conditioned compatibility gate by default.
+
 ## Claim ceiling
 
 Passing tests establish deterministic fusion and receipt construction over finite supplied frames and vehicle states. They do not establish visual semantic accuracy, depth estimation, a trained camera-conditioned policy, closed-loop driving performance, causality, operational timing, world-model validity or physical safety.
