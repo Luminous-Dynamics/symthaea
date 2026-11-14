@@ -234,7 +234,8 @@
     "preregistered_frequency": {
       "numerator": "3",
       "denominator": "1"
-    }
+    },
+    "holdout_sensor_error_id": "holdout-sensor-error-001"
   },
   "calibration": {
     "nuisance_id": "calibration-common-real-crossport-001",
@@ -284,7 +285,8 @@
     "preregistered_imaginary_upper": {
       "numerator": "1",
       "denominator": "20"
-    }
+    },
+    "pre_registered_before_holdout": true
   },
   "expected": {
     "delta_at_training": [
