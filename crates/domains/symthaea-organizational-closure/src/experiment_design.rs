@@ -767,6 +767,79 @@ mod tests {
     }
 
     #[test]
+    fn rejected_delivery_never_updates_hypotheses() {
+        let mut scenario = scenario();
+        scenario.budget.max_trials = 1;
+        let oracle = ExperimentOracle::new("memory-fault");
+        let mut trial = ExperimentTrial::qualified("inspect-model", "healthy");
+        trial.delivery = ExperimentEvidenceStatus::Rejected;
+        let trace = SequentialExperimentTrace {
+            trials: vec![trial],
+            terminal: ExperimentTerminalDecision::Abstain { reason: "delivery was rejected".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::NotQualified);
+        assert_eq!(report.remaining_hypotheses.len(), 3);
+        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::DeliveryRejected));
+    }
+
+    #[test]
+    fn qualified_model_mismatch_is_not_misreported_as_an_uninformative_probe() {
+        let mut scenario = scenario();
+        scenario.probes.push(ExperimentProbe::new("no-op", 0, 0, [
+            (HypothesisId::from("model-fault"), "same".into()),
+            (HypothesisId::from("memory-fault"), "same".into()),
+            (HypothesisId::from("dependency-fault"), "same".into()),
+        ].into()));
+        let oracle = ExperimentOracle::new("memory-fault");
+        let trace = SequentialExperimentTrace {
+            trials: vec![ExperimentTrial::qualified("no-op", "outside-model")],
+            terminal: ExperimentTerminalDecision::Abstain { reason: "candidate model incomplete".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
+        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::ObservationContradictsFrozenModel));
+        assert!(!report.findings.iter().any(|f| f.code == ExperimentFindingCode::UninformativeProbe));
+    }
+
+    #[test]
+    fn malformed_probe_response_table_is_inconclusive_not_a_score() {
+        let mut scenario = scenario();
+        scenario.probes[0].outcomes.remove(&HypothesisId::from("dependency-fault"));
+        let oracle = ExperimentOracle::new("memory-fault");
+        let trace = SequentialExperimentTrace {
+            trials: vec![],
+            terminal: ExperimentTerminalDecision::Abstain { reason: "invalid scenario".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
+        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::MissingProbeResponse));
+    }
+
+    #[test]
+    fn unnecessary_probe_after_target_class_identification_is_rejected() {
+        let scenario = SequentialExperimentScenario {
+            hypotheses: vec![
+                MechanismHypothesis::new("implementation-a", "same-class", 1),
+                MechanismHypothesis::new("implementation-b", "same-class", 1),
+            ],
+            probes: vec![ExperimentProbe::new("gratuitous-inspection", 1, 1, [
+                (HypothesisId::from("implementation-a"), "a".into()),
+                (HypothesisId::from("implementation-b"), "b".into()),
+            ].into())],
+            budget: ExperimentBudget { max_cost_units: 2, max_risk_units: 2, max_trials: 1 },
+        };
+        let oracle = ExperimentOracle::new("implementation-a");
+        let trace = SequentialExperimentTrace {
+            trials: vec![ExperimentTrial::qualified("gratuitous-inspection", "a")],
+            terminal: ExperimentTerminalDecision::Stop { target_class: "same-class".into() },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::NotQualified);
+        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::ProbeSelectedAfterIdentification));
+    }
+
+    #[test]
     fn oracle_regret_is_positive_for_a_less_efficient_probe_choice() {
         let scenario = scenario();
         let oracle = ExperimentOracle::new("model-fault");
