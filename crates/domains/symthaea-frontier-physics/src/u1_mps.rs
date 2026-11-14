@@ -4030,10 +4030,10 @@ impl U1TeBDStrangStepper {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
-        U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy,
+        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpoOperator, U1MpoTensor, U1MpsError,
+        U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate, U1TeBDGateReceipt,
+        U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStrangStepper, U1TwoSiteGate,
+        U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
@@ -5735,6 +5735,145 @@ mod tests {
             receipt.hamiltonian_projection_operator_error_upper_bound.is_finite()
                 && receipt.hamiltonian_projection_error_upper_bound.is_finite()
         }));
+    }
+
+    fn identity_u1_mpo(site_count: usize) -> U1MpoOperator {
+        let mut tensors = Vec::with_capacity(site_count);
+        for _ in 0..site_count {
+            let mut data = vec![complex_zero(); 4];
+            data[0] = Complex64::new(1.0, 0.0);
+            data[3] = Complex64::new(1.0, 0.0);
+            tensors.push(U1MpoTensor::new(vec![0], vec![0], data).unwrap());
+        }
+        U1MpoOperator::new(tensors, 1.0e-12).unwrap()
+    }
+
+    fn two_site_hopping_u1_mpo(coupling: f64) -> U1MpoOperator {
+        let mut first = vec![complex_zero(); 8];
+        first[4] = Complex64::new(coupling, 0.0); // sigma+ in flux +1 channel
+        first[3] = Complex64::new(coupling, 0.0); // sigma- in flux -1 channel
+        let first = U1MpoTensor::new(vec![0], vec![1, -1], first).unwrap();
+
+        let mut second = vec![complex_zero(); 8];
+        second[1] = Complex64::new(1.0, 0.0); // sigma- closes flux +1
+        second[6] = Complex64::new(1.0, 0.0); // sigma+ closes flux -1
+        let second = U1MpoTensor::new(vec![1, -1], vec![0], second).unwrap();
+        U1MpoOperator::new(vec![first, second], 1.0e-12).unwrap()
+    }
+
+    #[test]
+    fn identity_u1_mpo_preserves_entangled_state_and_matches_dense_identity() {
+        let inverse_root_three = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![complex_zero(); 8];
+        dense[1] = Complex64::new(inverse_root_three, 0.0);
+        dense[2] = Complex64::new(inverse_root_three, 0.0);
+        dense[4] = Complex64::new(inverse_root_three, 0.0);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
+        let identity = identity_u1_mpo(3);
+
+        let evolved = identity.apply(&state).unwrap();
+        assert_eq!(evolved.total_charge(), state.total_charge());
+        assert!(evolved.selection_rule_residual() <= 1.0e-12);
+        let actual = evolved.to_dense(4).unwrap();
+        for (left, right) in actual.iter().zip(dense.iter()) {
+            assert!((*left - *right).norm() <= 1.0e-12);
+        }
+
+        let expectation = identity.expectation_value(&state).unwrap();
+        assert!((expectation - Complex64::new(1.0, 0.0)).norm() <= 1.0e-12);
+        let dense_operator = identity.to_dense(4).unwrap();
+        for row in 0..8 {
+            for column in 0..8 {
+                let expected = if row == column {
+                    Complex64::new(1.0, 0.0)
+                } else {
+                    complex_zero()
+                };
+                assert!((dense_operator[row * 8 + column] - expected).norm() <= 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn two_site_hopping_mpo_matches_dense_operator_and_expectation_value() {
+        let coupling = 0.7;
+        let hopping = two_site_hopping_u1_mpo(coupling);
+        let mut dense_operator = vec![complex_zero(); 16];
+        dense_operator[2 * 4 + 1] = Complex64::new(coupling, 0.0);
+        dense_operator[1 * 4 + 2] = Complex64::new(coupling, 0.0);
+        let actual_operator = hopping.to_dense(4).unwrap();
+        for (actual, expected) in actual_operator.iter().zip(dense_operator.iter()) {
+            assert!((*actual - *expected).norm() <= 1.0e-12);
+        }
+
+        let inverse_root_two = 1.0 / 2.0_f64.sqrt();
+        let mut dense_state = vec![complex_zero(); 4];
+        dense_state[1] = Complex64::new(inverse_root_two, 0.0);
+        dense_state[2] = Complex64::new(inverse_root_two, 0.0);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense_state, 2, 1, 1.0e-12).unwrap();
+
+        let expectation = hopping.expectation_value(&state).unwrap();
+        assert!((expectation - Complex64::new(coupling, 0.0)).norm() <= 1.0e-12);
+        let applied = hopping.apply(&state).unwrap();
+        assert_eq!(applied.total_charge(), 1);
+        let dense_applied = applied.to_dense(4).unwrap();
+        assert!((dense_applied[1] - Complex64::new(coupling * inverse_root_two, 0.0)).norm() <= 1.0e-12);
+        assert!((dense_applied[2] - Complex64::new(coupling * inverse_root_two, 0.0)).norm() <= 1.0e-12);
+    }
+
+    #[test]
+    fn mpo_constructor_rejects_bad_flux_boundaries_bonds_and_local_selection_rules() {
+        let mut identity_data = vec![complex_zero(); 4];
+        identity_data[0] = Complex64::new(1.0, 0.0);
+        identity_data[3] = Complex64::new(1.0, 0.0);
+
+        let bad_left = U1MpoTensor::new(vec![1], vec![0], identity_data.clone()).unwrap();
+        assert!(matches!(
+            U1MpoOperator::new(vec![bad_left], 1.0e-12),
+            Err(U1MpsError::MpoLeftBoundary { .. })
+        ));
+
+        let left = U1MpoTensor::new(vec![0], vec![0], identity_data.clone()).unwrap();
+        let right = U1MpoTensor::new(vec![1], vec![0], identity_data.clone()).unwrap();
+        assert!(matches!(
+            U1MpoOperator::new(vec![left, right], 1.0e-12),
+            Err(U1MpsError::MpoBondFluxMismatch { bond: 0 })
+        ));
+
+        let mut forbidden_data = vec![complex_zero(); 4];
+        forbidden_data[2] = Complex64::new(0.1, 0.0);
+        let forbidden = U1MpoTensor::new(vec![0], vec![0], forbidden_data).unwrap();
+        assert!(matches!(
+            U1MpoOperator::new(vec![forbidden], 1.0e-12),
+            Err(U1MpsError::MpoChargeSelectionRule {
+                site: 0,
+                left_flux: 0,
+                output_physical: 1,
+                input_physical: 0,
+                right_flux: 0,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn mpo_application_rejects_mismatched_site_count_and_dense_limit() {
+        let identity = identity_u1_mpo(3);
+        let state = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        assert!(matches!(
+            identity.apply(&state),
+            Err(U1MpsError::MpoSiteCountMismatch {
+                mpo_sites: 3,
+                mps_sites: 2
+            })
+        ));
+        assert!(matches!(
+            identity.to_dense(2),
+            Err(U1MpsError::DenseExpansionTooLarge {
+                sites: 3,
+                maximum_sites: 2
+            })
+        ));
     }
 
     #[test]
