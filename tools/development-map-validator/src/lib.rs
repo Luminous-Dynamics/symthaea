@@ -588,13 +588,39 @@ fn validate_decision_evidence_list(
             }
         }
 
-        for key in ["valid_from", "valid_through"] {
-            if let Some(value) = entry.get(key) {
-                if let Some(value) = optional_string(value, &format!("{entry_path}.{key}"), report) {
-                    if DateTime::parse_from_rfc3339(&value).is_err() {
-                        report.error("EGDDM-TIME-001", format!("{entry_path}.{key}"), "timestamp must be valid RFC 3339");
-                    }
-                }
+        let valid_from = entry
+            .get("valid_from")
+            .filter(|value| !value.is_null())
+            .and_then(|value| parse_rfc3339(value, &format!("{entry_path}.valid_from"), report));
+        let valid_through = entry
+            .get("valid_through")
+            .filter(|value| !value.is_null())
+            .and_then(|value| parse_rfc3339(value, &format!("{entry_path}.valid_through"), report));
+
+        if let (Some(valid_from), Some(valid_through)) = (valid_from.as_ref(), valid_through.as_ref()) {
+            if valid_from > valid_through {
+                report.error(
+                    "DTEA-EVIDENCE-009",
+                    &entry_path,
+                    "evidence validity interval must satisfy valid_from <= valid_through",
+                );
+            }
+        }
+
+        if expect_admissible {
+            if valid_from.as_ref().is_some_and(|valid_from| valid_from > decision_at) {
+                report.error(
+                    "DTEA-EVIDENCE-010",
+                    format!("{entry_path}.valid_from"),
+                    "consulted evidence is not yet effective at the decision time",
+                );
+            }
+            if valid_through.as_ref().is_some_and(|valid_through| valid_through < decision_at) {
+                report.error(
+                    "DTEA-EVIDENCE-011",
+                    format!("{entry_path}.valid_through"),
+                    "consulted evidence expired before the decision time",
+                );
             }
         }
 
@@ -3793,6 +3819,49 @@ mod tests {
         value["events"][1]["kind"] = Value::String("source_changed".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-018"));
+    }
+
+    #[test]
+    fn consulted_evidence_cannot_become_effective_after_the_decision() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] =
+            Value::String("2026-11-14T10:01:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-010"));
+    }
+
+    #[test]
+    fn consulted_evidence_cannot_expire_before_the_decision() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_through"] =
+            Value::String("2026-11-14T09:59:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-011"));
+    }
+
+    #[test]
+    fn consulted_evidence_rejects_reversed_validity_intervals() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] =
+            Value::String("2026-11-14T11:00:00Z".to_owned());
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_through"] =
+            Value::String("2026-11-14T09:00:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-009"));
+    }
+
+    #[test]
+    fn evidence_validity_bounds_are_inclusive_at_the_decision_time() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] =
+            Value::String("2026-11-14T10:00:00Z".to_owned());
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_through"] =
+            Value::String("2026-11-14T10:00:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(!report.diagnostics.iter().any(|d| matches!(
+            d.code,
+            "DTEA-EVIDENCE-009" | "DTEA-EVIDENCE-010" | "DTEA-EVIDENCE-011"
+        )));
     }
 
     #[test]
