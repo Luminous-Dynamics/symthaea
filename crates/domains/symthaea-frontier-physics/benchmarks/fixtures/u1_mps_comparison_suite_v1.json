@@ -21,8 +21,11 @@
       ],
       "special_cases": [
         "auto-mps swaps and splits two-qubit gates",
-        "lazy/permutation MPS ordering must be included as separate baselines"
-      ]
+        "lazy/permutation MPS ordering must be included as separate baselines",
+        "CircuitMPSLazy supports delayed compression schedules; record compress_every and compression method separately.",
+        "CircuitPermMPS lazily tracks qubit/site ordering; record the logical-to-physical permutation and include the ordering-management cost."
+      ],
+      "fidelity_and_error_semantics": "CircuitMPS fidelity_estimate and error_estimate are norm-based estimates tied to truncation. They are internal controls, not the independent oracle; use dense-state L2 and infidelity for N<=12."
     },
     "itensor": {
       "docs": "https://docs.itensor.org/ITensorMPS/stable/tutorials/QN_DMRG.html",
@@ -37,7 +40,8 @@
         "dtype",
         "backend"
       ],
-      "limitation": "ITensor QN support is Abelian; compare only a matching U(1) sector."
+      "limitation": "ITensor QN support is Abelian, which matches U(1). Its current GPU documentation cautions that QN block-sparse GPU operations are less mature than dense GPU operations and may not work or may be slower; report CPU and GPU comparisons separately.",
+      "gpu_docs": "https://docs.itensor.org/ITensors/stable/RunningOnGPUs.html"
     },
     "qiskit_aer": {
       "docs": "https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.AerSimulator.html",
@@ -51,10 +55,14 @@
         "precision",
         "device"
       ],
-      "fairness": "Threshold is based on discarded squared Schmidt coefficients; report independent state L2 and infidelity rather than treating the threshold itself as L2."
+      "fairness": "Threshold is based on discarded squared Schmidt coefficients; report independent state L2 and infidelity rather than treating the threshold itself as L2.",
+      "truncation_semantics": "matrix_product_state_truncation_threshold discards the smallest Schmidt coefficients whose summed squares fall below the configured threshold. mps_log_data reports bond dimensions and discarded values. This is not a global state-L2 certificate."
     },
     "cutensornet": {
-      "docs": "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
+      "docs": [
+        "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
+        "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/examples/mps.html"
+      ],
       "modes": [
         "gate-split SVD",
         "MPS factorization API (preview)"
@@ -64,9 +72,15 @@
         "absolute/relative/discarded-weight truncation",
         "SVD algorithm",
         "GPU architecture",
-        "precision"
+        "precision",
+        "SVD_S_NORMALIZATION"
       ],
-      "limitation": "Do not compare distributed SVD as distributed MPS gate execution; documented distributed decomposition support and gate-split support are distinct."
+      "limitation": "Do not compare distributed SVD as distributed MPS gate execution; documented distributed decomposition support and gate-split support are distinct.",
+      "special_cases": [
+        "ProjectionMPS insertion exposes absolute/relative/discarded-weight cutoffs, SVD normalization and per-insertion SVD_MAX_EXTENT.",
+        "Keep normalization-preserving and no-renormalization runs in separate result tables.",
+        "Distributed tensor SVD in decomposition APIs is not the same as distributed gateSplit; gateSplit currently does not support distributed tensors."
+      ]
     },
     "tdvp": {
       "docs": "https://tensornetwork.org/mps/algorithms/timeevo/tdvp.html",
@@ -356,7 +370,13 @@
       "maximum_density_error",
       "charge_drift"
     ],
-    "compare_cost_only_after_accuracy_match": true
+    "compare_cost_only_after_accuracy_match": true,
+    "dense_statevector_is_ground_truth_for_sites_lte_12": true,
+    "quimb_norm_estimate_not_ground_truth": true,
+    "aer_discarded_weight_not_global_l2": true,
+    "cutensornet_svd_normalization_must_be_logged": true,
+    "itensor_qn_gpu_cpu_runs_separated": true,
+    "cutoff_semantics_must_be_translated_to_measured_output_error": true
   },
   "qualification_targets": {
     "exact_dense_l2_max_n12": 1e-10,
