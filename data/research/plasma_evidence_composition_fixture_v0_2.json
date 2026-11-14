@@ -98,7 +98,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -177,7 +182,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "valid-rigid-plastic-d3163-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -281,7 +295,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -360,7 +379,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "valid-frp-to-frp-d5868-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -464,7 +492,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -543,7 +576,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "contact-angle-cannot-supply-lap-shear-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -647,7 +689,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -726,7 +773,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "lap-shear-cannot-support-service-life-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -830,7 +886,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -909,7 +970,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "unrecognized-test-edition-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -1013,7 +1083,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -1092,7 +1167,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "method-material-pair-mismatch-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -1196,7 +1280,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -1275,7 +1364,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "wrong-specimen-geometry-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -1379,7 +1477,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -1458,7 +1561,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "missing-protocol-digest-blocks-transfer-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -1562,7 +1674,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -1641,7 +1758,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "bridge-specimens-do-not-match-receipt-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -1745,7 +1871,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -1824,7 +1955,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "baseline-candidate-specimens-overlap-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -1929,7 +2069,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -2008,7 +2153,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "missing-required-endpoint-receipt-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -2112,7 +2266,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -2191,7 +2350,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "same-observation-reused-for-baseline-and-candidate-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -2295,7 +2463,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -2374,7 +2547,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "protocol-mismatch-rejects-comparison-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -2478,7 +2660,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -2557,7 +2744,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         },
         {
@@ -2643,7 +2839,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -2722,7 +2923,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "endpoint-claim-cannot-be-reused-as-failure-mode-failure_mode_fraction-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
@@ -2826,7 +3036,12 @@
               "target_power": 0.8,
               "target_precision_half_width": 2.5,
               "method_ref": "symthaea-statistics:power-planning-reference-v1",
-              "claim_ceiling": "planning_only"
+              "claim_ceiling": "planning_only",
+              "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+              "effect_under_alternative": 1,
+              "variance_low": 0.5,
+              "variance_central": 1,
+              "variance_high": 1.5
             },
             "baseline_samples": [
               {
@@ -2905,7 +3120,16 @@
               "ci_lower": -2,
               "ci_upper": 2,
               "outcome": "EQUIVALENCE_ESTABLISHED"
-            }
+            },
+            "assumptions_sha256": "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5",
+            "effect_under_alternative": 1,
+            "variance_low": 0.5,
+            "variance_central": 1,
+            "variance_high": 1.5,
+            "randomization_plan_ref": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN-RANDOMIZATION",
+            "analysis_plan_ref": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN-ANALYSIS",
+            "exclusion_protocol_ref": "frp-pair-class-change-rejects-transfer-apparent_shear_strength-EQUIV-DESIGN-EXCLUSIONS",
+            "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01"
           }
         }
       ],
