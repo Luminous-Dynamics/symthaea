@@ -1192,6 +1192,27 @@ mod tests {
     }
 
     #[test]
+    fn invalid_parent_coherence_report_remains_invalid_in_join() {
+        let mut input = case();
+        input.windows[0].coherence.disposition = "INVALID".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn resolved_parent_report_requires_all_marginal_bounds() {
+        let mut input = case();
+        input.windows[0].coherence.bands[0].coherence_lower_bound = None;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn uncertainty_unresolved_parent_report_must_have_matching_band_status() {
+        let mut input = case();
+        input.windows[0].coherence.disposition = "UNCERTAINTY_UNRESOLVED".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
     fn coherent_plus_residual_pressure_psd_must_recompose_total() {
         let mut input = case();
         input.windows[0].coherence.bands[0].non_coherent_residual_pressure_psd_pa2_per_hz = 0.8;
