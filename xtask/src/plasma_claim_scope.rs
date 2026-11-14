@@ -444,6 +444,31 @@ mod tests {
     }
 
     #[test]
+    fn barrier_and_thin_film_methods_are_registered_with_exact_ceilings() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        for id in ["astm-d882-thin-film-tensile-in-scope", "iso-15106-5-wvtr-in-scope", "iso-15105-2-gas-transmission-in-scope"] {
+            let case = fixture.cases.iter().find(|case| case.id == id).expect("case exists");
+            assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported, "{id}");
+        }
+    }
+
+    #[test]
+    fn thick_film_is_not_admitted_under_d882() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let case = fixture.cases.iter().find(|case| case.id == "astm-d882-thick-sheet-scope-blocked").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn barrier_metrics_do_not_imply_shelf_life_or_safety() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        for id in ["astm-d882-product-safety-overclaim", "iso-15105-2-shelf-life-overclaim"] {
+            let case = fixture.cases.iter().find(|case| case.id == id).expect("case exists");
+            assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Rejected, "{id}");
+        }
+    }
+
+    #[test]
     fn evidence_kind_mismatch_is_rejected() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
         let case = fixture.cases.iter().find(|case| case.id == "astm-d3163-evidence-kind-mismatch").expect("case exists");
