@@ -1,0 +1,159 @@
+{
+  "schema_version": "luminous.engineering-lifecycle-competitor-register.v0.1",
+  "snapshot_date": "2026-11-13",
+  "purpose": "Public-source capability register for planning a matched engineering-change impact and evidence-applicability benchmark. Vendor statements are not independently reproduced performance results.",
+  "claim_status": "vendor_documentation_only_no_luminous_comparison",
+  "vendors": [
+    {
+      "id": "siemens-teamcenter",
+      "vendor": "Siemens Digital Industries Software",
+      "products": [
+        "Teamcenter 2606",
+        "Teamcenter X",
+        "Teamcenter Copilot",
+        "AI BOM agent"
+      ],
+      "source_revision_or_date": "Teamcenter 2606 announcement 2026-06-12; Teamcenter X engineering-change workflow post 2026-08-11",
+      "capabilities": [
+        "BOM-aware AI agent for multi-step change workflows with human oversight",
+        "AI-assisted MBSE requirement checks and parameter linking",
+        "AI-generated test-case recommendations and verification-coverage assistance",
+        "change recommendations and rules-based workflow routing",
+        "large-scale digital-thread visualization and impact analysis",
+        "change requests linked to impacted products, documents, requirements, approvals and release"
+      ],
+      "benchmark_relevance": "Direct candidate for engineering-change, requirements, BOM-impact and workflow-orchestration comparison.",
+      "prerequisites_or_known_boundaries": [
+        "Exact Teamcenter edition, deployment, product configuration, model, Copilot/agent versions and licensing must be recorded.",
+        "Public vendor documentation does not provide independent accuracy, false-negative, stale-evidence, cost-per-accepted-decision or matched 24-case results.",
+        "The public feature description does not establish independent claim-evidence applicability adjudication or independent effect reconstruction."
+      ],
+      "evidence_class": "vendor_documentation_and_announcement",
+      "sources": [
+        "https://blogs.sw.siemens.com/teamcenter/new-in-teamcenter/",
+        "https://blogs.sw.siemens.com/teamcenter/teamcenter-2606/",
+        "https://blogs.sw.siemens.com/teamcenter/engineering-change-workflow/"
+      ],
+      "eligibility": "conditional_vendor_arm_no_access_or_run_claimed"
+    },
+    {
+      "id": "aras-innovator-edge",
+      "vendor": "Aras",
+      "products": [
+        "Aras Innovator UCM",
+        "InnovatorEdge AI Impact Analysis Agent",
+        "InnovatorEdge AI platform 2.4 (released 2026-11-10; platform version, not Impact Analysis Agent version)"
+      ],
+      "source_revision_or_date": "Impact Analysis AI Agent v1.0.0 general availability announced 2026-03-23; v1.0.1 release notes 2026-08-18; InnovatorEdge AI platform 2.4 release notes 2026-11-10",
+      "capabilities": [
+        "five AI specialist agents analyze change-request context, product structure and historical change orders",
+        "a recommendation validator consolidates the affected-item recommendation set",
+        "recommendations carry suggested Revise/Release/Obsolete action and rationale",
+        "human reviews and selectively applies affected-item relationships",
+        "applied rationale is written into the change record; the change request remains in Draft and normal UCM approval continues",
+        "multiple MCP Server profiles per tenant, each with independent endpoint URL, Access Point, published-tool selection and enabled/disabled state",
+        "Edge AI MCP Server calls use End User authentication under the signed-in user's Innovator permissions",
+        "beta Invoke Innovator Method Tool is available for external AI clients when exposed by Edge API and requires per-call user confirmation"
+      ],
+      "benchmark_relevance": "Most directly documented AI change-impact comparator; a mandatory target for the industrial-change pilot if a licensed, representative environment can be accessed.",
+      "prerequisites_or_known_boundaries": [
+        "The change request needs substantive title/reason/description; product structure relationships must be complete.",
+        "Custom item types without a present/unique item_number may be skipped or misidentified.",
+        "Only Draft-state change requests are presented for analysis.",
+        "The agent can write affected-item relationships in one operation after user approval; it does not itself promote the change request through lifecycle approval.",
+        "Customer-specific deployment and configuration are described as a separately contracted professional-services engagement.",
+        "Five specialist agents and a recommendation validator are not five independent human reviewers or five independent failure domains.",
+        "Public documentation does not report independent gold-set accuracy, critical impact recall, evidence-applicability confusion matrix, human time or cost per accepted result.",
+        "The configured account needs read/update access to Change Requests and read access to Affected Items (Parts, CADs and Documents); record the effective principal and permissions at analysis and apply time.",
+        "The optional Analysis Instructions field is free text intended to focus/constrain one session; it is task context, not an authority, approval or declassification grant.",
+        "Benchmark only the selected relationships the user explicitly applies; verify the Change Request remains Draft and record the observed effects rather than assuming undocumented transactional or permission semantics.",
+        "Distinguish Impact Analysis AI Agent v1.0.1 from InnovatorEdge AI platform 2.4; do not label the agent itself v2.4.",
+        "Record every MCP profile endpoint, Access Point, tool-set revision/digest, enabled state, user/CIAM role, authentication mode and current Innovator permission snapshot in a licensed trial.",
+        "The administrator guide says Claude caches its connector tool list and does not re-read it on every call; test whether stale cached tools are rejected at effect entry after a profile/tool/permission change.",
+        "Test cross-profile endpoint/tool substitution and beta method invocation without explicit per-call confirmation. The guide describes configuration controls, not a reproduced attack or proof of a runtime flaw."
+      ],
+      "evidence_class": "vendor_release_notes_and_user_documentation",
+      "sources": [
+        "https://docs.aras.com/aras-innovatoredge-ai-book/aras-innovatoredge-ai-agents-release-notes",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/impact-analysis-ai-agent-user-guide",
+        "https://docs.aras.com/unified-change-management-beta",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/edge-ai-release-notes",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/innovatoredge-ai-administrator-guide"
+      ],
+      "eligibility": "conditional_vendor_arm_no_access_or_run_claimed"
+    },
+    {
+      "id": "ptc-windchill",
+      "vendor": "PTC",
+      "products": [
+        "Windchill PDMLink 13.1.2",
+        "Windchill Requirements Management"
+      ],
+      "source_revision_or_date": "Windchill Help Center 13.1.2.0 documentation snapshot accessed 2026-11-13",
+      "capabilities": [
+        "change impact analysis collects affected local and external objects",
+        "upstream and downstream linked-object collection for parts and remote requirements",
+        "change requests, notices, implementation plans, affected objects and change review roles",
+        "trace links connect external requirements to parts and other traceable objects"
+      ],
+      "benchmark_relevance": "Strong conventional PLM/requirements traceability baseline; compare the vendor-native change workflow and linked-object impact set, not just the underlying graph traversal.",
+      "prerequisites_or_known_boundaries": [
+        "Exact Windchill modules, versions, integrations, configuration and supported remote object types must be pinned.",
+        "A collected affected-object relationship is not automatically an independently adjudicated evidence-applicability disposition.",
+        "Public documentation does not provide matched 24-case accuracy, stale-evidence false-current rate or total fully burdened cost."
+      ],
+      "evidence_class": "vendor_product_documentation",
+      "sources": [
+        "https://support.ptc.com/help/windchill/r13.1.2.0/en/Windchill_Help_Center/reqmgmt/RMChangeImpact.html",
+        "https://support.ptc.com/help/windchill/r2027.0.0.0/en/Windchill_Help_Center/reqmgmt/RMTraceabilityAbout.html",
+        "https://www.ptc.com/community/windchill/8/tutorials/codebase/wt/helpfiles/help_en/tutorials/pdm/R7PDMChProc/index.htm"
+      ],
+      "eligibility": "conditional_vendor_arm_no_access_or_run_claimed"
+    },
+    {
+      "id": "ibm-doors-next",
+      "vendor": "IBM",
+      "products": [
+        "Engineering Requirements Management DOORS Next 7.2"
+      ],
+      "source_revision_or_date": "IBM documentation for DOORS Next 7.2.0 accessed 2026-11-13",
+      "capabilities": [
+        "requirement traceability through links, tags, attributes, filtering, workflows and dashboards",
+        "links between requirements and other requirements, development artifacts and test artifacts",
+        "change-over-time traceability and impact-analysis support"
+      ],
+      "benchmark_relevance": "Requirements-management adjunct baseline; not a stand-alone PLM or full engineering-change execution baseline. Can be paired with a named PLM system where that integration is available.",
+      "prerequisites_or_known_boundaries": [
+        "Exact DOORS Next release, modules, integrations and external PLM pairing must be declared.",
+        "Do not score it as a complete change-management system when only the requirements-traceability component is provisioned.",
+        "Public documentation does not establish claim-evidence applicability adjudication across physical tests, as-built articles, calibration or manufacturing evidence."
+      ],
+      "evidence_class": "vendor_product_documentation",
+      "sources": [
+        "https://www.ibm.com/docs/en/engineering-lifecycle-management-suite/doors-next/7.2.0?topic=requirements-managing"
+      ],
+      "eligibility": "conditional_adjunct_not_standalone_plm_arm"
+    }
+  ],
+  "cross_vendor_findings": [
+    "Commercial PLM vendors already provide mature change records, product structures, linked-object impact, workflow routing, review and audit trail capabilities.",
+    "AI-assisted change-impact recommendations are now a documented commercial capability, not a unique Luminous category.",
+    "The Aras Impact Analysis AI Agent is a direct comparator and must be included before making a broad claim that Luminous is ahead of industry AI-assisted change impact.",
+    "Public materials reviewed do not establish whether these products provide the exact ten-state claim-evidence applicability contract owned by Symthaea #10581; absence from public documentation is not proof that the feature is absent.",
+    "No vendor access, tenant, license, implementation, benchmark task, price quote or performance result was obtained in this research pass.",
+    "Aras InnovatorEdge AI platform 2.4 documents profile-scoped MCP endpoints and tool sets, plus beta method invocation with per-call confirmation; the security boundary now includes stale client tool discovery and current effect-entry authorization.",
+    "A cached client tool list is not a server authorization decision. A trial must test current server-side effect enforcement after profile disablement, tool removal, Access Point change and user permission revocation."
+  ],
+  "differentiation_hypothesis": [
+    "Move beyond an affected-item list to claim–evidence pair decisions with scoped preservation witnesses, exact recalculation, review, retest, physical evidence, external approval, unknown and unsupported states.",
+    "Measure both critical under-impact and unnecessary over-requalification; do not reward either preserve-everything or requalify-everything.",
+    "Independently reconstruct why each affected claim/evidence decision is valid, using evidence manifests and owner-qualified semantics rather than only a model-generated rationale.",
+    "Preserve the system of record and professional approval authority; the agent proposes applicability obligations but does not approve, release, sign or actuate.",
+    "Operate across vendor boundaries while retaining exact source identity, version, evidence provenance and unsupported semantics.",
+    "Compete on total cost per independently accepted engineering-change assessment, including human review, integration, rework and verification.",
+    "Treat tool discovery and cached tool inventories as untrusted proposals; independently verify current endpoint/profile/tool/identity/permission at effect entry and reconstruct the resulting effect."
+  ],
+  "benchmark_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
+  "gold_protocol_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
+  "claim_ceiling": "Documented capability map only. No vendor system was accessed, run, independently graded, priced or compared on the 24-case corpus. No Luminous superiority or SOTA claim."
+}
