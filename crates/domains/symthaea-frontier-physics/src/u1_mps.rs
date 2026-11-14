@@ -636,14 +636,13 @@ fn left_canonicalize_site(
 
         let row_count = block.nrows();
         let column_count = block.ncols();
-        let decomposition =
-            block
-                .clone()
-                .try_svd(true, true, tolerance, max_iterations)
-                .ok_or(U1MpsError::SvdFailed {
-                    rows: row_count,
-                    columns: column_count,
-                })?;
+        let decomposition = block
+            .clone()
+            .try_svd(true, true, tolerance, max_iterations)
+            .ok_or(U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            })?;
         let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
             rows: row_count,
             columns: column_count,
@@ -834,14 +833,13 @@ fn right_canonicalize_site(
 
         let row_count = block.nrows();
         let column_count = block.ncols();
-        let decomposition =
-            block
-                .clone()
-                .try_svd(true, true, tolerance, max_iterations)
-                .ok_or(U1MpsError::SvdFailed {
-                    rows: row_count,
-                    columns: column_count,
-                })?;
+        let decomposition = block
+            .clone()
+            .try_svd(true, true, tolerance, max_iterations)
+            .ok_or(U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            })?;
         let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
             rows: row_count,
             columns: column_count,
