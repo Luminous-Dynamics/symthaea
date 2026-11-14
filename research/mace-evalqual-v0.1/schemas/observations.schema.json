@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-evalqual-observations-v1.json",
+  "title": "MACE Evaluator Qualification Observations v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "corpus_sha256", "manifest_sha256", "results"],
+  "properties": {
+    "schema_version": {"const": "mace-evalqual/v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "corpus_sha256": {"$ref": "#/$defs/sha256"},
+    "manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "results": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["fixture_id", "observed"],
+        "properties": {
+          "fixture_id": {"type": "string", "minLength": 1},
+          "observed": {"$ref": "#/$defs/resultVector"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "status": {"type": "string", "enum": ["pass", "fail", "indeterminate"]},
+    "effectStatus": {"type": "string", "enum": ["pass", "fail", "indeterminate", "not_applicable"]},
+    "resultVector": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task_result", "effect_assurance_result", "benchmark_integrity_result"],
+      "properties": {
+        "task_result": {"$ref": "#/$defs/status"},
+        "effect_assurance_result": {"$ref": "#/$defs/effectStatus"},
+        "benchmark_integrity_result": {"$ref": "#/$defs/status"}
+      }
+    }
+  }
+}

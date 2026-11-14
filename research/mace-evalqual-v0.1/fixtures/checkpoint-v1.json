@@ -1,0 +1,17 @@
+{
+  "purpose": "synthetic public test vector only; any key material used to generate it is test-only and must never be reused",
+  "checkpoint": {
+    "schema_version": "mace-checkpoint/v1",
+    "key_id": "witness-test-key",
+    "database_id": "test-ledger-01",
+    "checkpoint_sequence": 1,
+    "journal_sequence": 7,
+    "journal_head_sha256": "1dde6c3136c9d033991b21a2f3a4684ffdd3e340debf9b9745793355b9500ccd",
+    "issued_at_unix": 1794672000
+  },
+  "public_key_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+  "signing_bytes_hex": "4c554d494e4f55532d4d4143452d434845434b504f494e5400763100000000126d6163652d636865636b706f696e742f7631000000107769746e6573732d746573742d6b65790000000e746573742d6c65646765722d3031000000000000000100000000000000071dde6c3136c9d033991b21a2f3a4684ffdd3e340debf9b9745793355b9500ccd00000000006af88580",
+  "signature_hex": "59ef67bdc5427d60aa46b5855c682d6c5a21293d0f958092a3da436420cdb13dbc85aa84097d4d4f146a93bb5021f53358636fd4ad7ae59f8e36ee7f9d40590c",
+  "signature_base64": "We9nvcVCfWCqRrWFXGgtbFohKT0PlYCSo9pDZCDNsT28haqECX1NTxRqk7tQIfUzWGNv1K165Z+ONu5/nUBZDA==",
+  "envelope_digest_sha256": "4c5650c54577f810427fdfe0fede6b3ddd402e5c0bd323e35e29ea24a444e2fd"
+}
