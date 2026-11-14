@@ -110,6 +110,31 @@
       "id": "DTEA-NC-16",
       "mutation": "Change the authority evidence node actor/scope/policy or validity while leaving the decision projection unchanged.",
       "expected": "reject_owner_record_projection_mismatch"
+    },
+    {
+      "id": "DTEA-NC-17",
+      "mutation": "Move consulted E1 valid_from after decision_at while keeping the evidence actor-available beforehand.",
+      "expected": "reject_evidence_not_yet_effective_at_decision"
+    },
+    {
+      "id": "DTEA-NC-18",
+      "mutation": "Move consulted E1 valid_through before decision_at while keeping actor availability before decision.",
+      "expected": "reject_expired_evidence_at_decision"
+    },
+    {
+      "id": "DTEA-NC-19",
+      "mutation": "Set consulted E1 valid_from after valid_through.",
+      "expected": "reject_reversed_evidence_validity_interval"
+    },
+    {
+      "id": "DTEA-NC-20",
+      "mutation": "Mark consulted E1 validity_completeness incomplete while retaining admissible disposition.",
+      "expected": "reject_incomplete_validity_as_decision_support"
+    },
+    {
+      "id": "DTEA-NC-21",
+      "mutation": "Remove validity_completeness from a consulted evidence item.",
+      "expected": "reject_missing_validity_completeness"
     }
   ],
   "metrics": [
@@ -121,7 +146,9 @@
     "correct abstention/defer rate",
     "actor/scope/policy authority-reference exactness",
     "decision-time authority-window admissibility",
-    "late-arriving or expired authority evidence rejection"
+    "late-arriving or expired authority evidence rejection",
+    "effective-time validity-window consistency",
+    "explicit completeness of evidence applicability intervals"
   ],
   "claim_ceiling": "Synthetic known-answer case only. The authority evidence is a synthetic, source-declared Mycelix-shaped reference, not a real owner-native grant or cryptographically authenticated record. No general decision correctness, institutional governance, compliance or real-world assurance claim."
 }
