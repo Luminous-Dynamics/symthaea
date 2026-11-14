@@ -1,0 +1,41 @@
+name: AIRROAD MIMO Adaptive Excitation Decision Tree Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_ADAPTIVE_EXCITATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-adaptive-excitation-v0.1.json"
+      - "tools/airroad-mimo-adaptive-excitation-qualifier/verify_adaptive_decision_tree.py"
+      - ".github/workflows/airroad-mimo-adaptive-decision-tree-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-adaptive-excitation-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_ADAPTIVE_EXCITATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-adaptive-excitation-v0.1.json"
+      - "tools/airroad-mimo-adaptive-excitation-qualifier/verify_adaptive_decision_tree.py"
+      - ".github/workflows/airroad-mimo-adaptive-decision-tree-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-adaptive-decision-tree-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute adaptive decision-tree oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-adaptive-excitation-qualifier/verify_adaptive_decision_tree.py
+          python3 tools/airroad-mimo-adaptive-excitation-qualifier/verify_adaptive_decision_tree.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-adaptive-excitation-v0.1.json > /dev/null
