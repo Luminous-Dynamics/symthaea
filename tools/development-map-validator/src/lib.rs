@@ -2985,7 +2985,7 @@ fn validate_retrieval_case_value(value: &Value) -> ValidationReport {
             check_allowed_keys(
                 case,
                 &[
-                    "case_id", "case_kind", "repository_id", "counterfactual_pair_of",
+                    "case_id", "case_kind", "repository_id", "repository_revision", "repository_tree_oid", "counterfactual_pair_of",
                     "query", "configuration_world", "token_budget", "line_budget",
                     "changed_entities", "candidate_regions", "expected_disposition", "notes",
                 ],
@@ -3009,6 +3009,18 @@ fn validate_retrieval_case_value(value: &Value) -> ValidationReport {
             for key in ["repository_id", "query"] {
                 if let Some(item) = field(case_value, key, &path, &mut report) {
                     string(item, &format!("{path}.{key}"), &mut report);
+                }
+            }
+
+            let case_revision = field(case_value, "repository_revision", &path, &mut report)
+                .and_then(|v| string(v, &format!("{path}.repository_revision"), &mut report));
+            let case_tree = field(case_value, "repository_tree_oid", &path, &mut report)
+                .and_then(|v| string(v, &format!("{path}.repository_tree_oid"), &mut report));
+            for (key, value) in [("repository_revision", case_revision), ("repository_tree_oid", case_tree)] {
+                if let Some(value) = value {
+                    if value.len() != 40 || !hex_string(value) {
+                        report.error("DYNRETR-SNAPSHOT-002", format!("{path}.{key}"), "case snapshot identity must be a 40-character Git OID");
+                    }
                 }
             }
             if let Some(pair) = case.get("counterfactual_pair_of") {
@@ -3083,22 +3095,43 @@ fn validate_retrieval_case_value(value: &Value) -> ValidationReport {
                     if let Some(authority) = field(region_value, "authority", &region_path, &mut report) {
                         enum_value(authority, &format!("{region_path}.authority"), AUTHORITIES, &mut report);
                     }
-                    if let Some(revision) = field(region_value, "source_revision", &region_path, &mut report)
-                        .and_then(|v| string(v, &format!("{region_path}.source_revision"), &mut report))
-                    {
+                    let region_revision = field(region_value, "source_revision", &region_path, &mut report)
+                        .and_then(|v| string(v, &format!("{region_path}.source_revision"), &mut report));
+                    if let Some(revision) = region_revision {
                         if revision.len() != 40 || !hex_string(revision) {
                             report.error("DYNRETR-REVISION-001", format!("{region_path}.source_revision"), "region revision must be a 40-character Git OID");
                         }
                     }
-                    if let Some(availability) = field(region_value, "availability", &region_path, &mut report) {
-                        enum_value(availability, &format!("{region_path}.availability"), &[
+                    let availability = field(region_value, "availability", &region_path, &mut report)
+                        .and_then(|v| enum_value(v, &format!("{region_path}.availability"), &[
                             "available", "inactive_configuration", "stale_revision", "missing", "unauthorized", "unknown",
-                        ], &mut report);
-                    }
-                    for key in ["configuration_requirements", "lexical_terms"] {
-                        if let Some(items) = field(region_value, key, &region_path, &mut report) {
-                            validate_plan_string_array(items, &format!("{region_path}.{key}"), &mut report);
+                        ], &mut report));
+                    match (availability.as_deref(), region_revision, case_revision) {
+                        (Some("available" | "inactive_configuration"), Some(region_rev), Some(case_rev)) if region_rev != case_rev => {
+                            report.error("DYNRETR-SNAPSHOT-003", format!("{region_path}.source_revision"), "available/inactive evidence must belong to the case's exact pinned repository revision");
                         }
+                        (Some("stale_revision"), Some(region_rev), Some(case_rev)) if region_rev == case_rev => {
+                            report.error("DYNRETR-SNAPSHOT-004", format!("{region_path}.source_revision"), "stale_revision evidence must differ from the case's pinned repository revision");
+                        }
+                        _ => {}
+                    }
+                    let requirements = region_value.get("configuration_requirements")
+                        .map(|items| validate_plan_string_array(items, &format!("{region_path}.configuration_requirements"), &mut report))
+                        .unwrap_or_default();
+                    if let Some(lexical) = field(region_value, "lexical_terms", &region_path, &mut report) {
+                        validate_plan_string_array(lexical, &format!("{region_path}.lexical_terms"), &mut report);
+                    }
+                    let active_features = case_value.get("configuration_world")
+                        .and_then(|world| world.get("features"))
+                        .and_then(Value::as_array)
+                        .map(|items| items.iter().filter_map(Value::as_str).collect::<HashSet<_>>())
+                        .unwrap_or_default();
+                    let requirements_satisfied = requirements.iter().all(|requirement| active_features.contains(requirement.as_str()));
+                    if availability.as_deref() == Some("inactive_configuration") && (requirements.is_empty() || requirements_satisfied) {
+                        report.error("DYNRETR-WORLD-002", format!("{region_path}.configuration_requirements"), "inactive_configuration region must require at least one feature absent from the case world");
+                    }
+                    if availability.as_deref() == Some("available") && !requirements_satisfied {
+                        report.error("DYNRETR-WORLD-003", format!("{region_path}.configuration_requirements"), "available region has configuration requirements not satisfied by the case world");
                     }
                 }
             }
