@@ -66,3 +66,10 @@ Compose with:
 - MACE #11920 / PR #11965 for independent benchmark/effect/observer qualification.
 
 Do not infer end-to-end exactly-once behavior from this test service. The target is a narrower property: within the declared service transaction boundary, an exact idempotency key reaches one terminal state, and uncertain outcomes cannot be converted into a blind replay.
+
+
+## Concurrent history qualification
+
+The JSONL reference now has a history-based linearizability test. It records invocation and return order for concurrent `Append`, `Fence` and `Lookup` operations, then backtracks over candidate sequential histories while preserving real-time precedence. The observed outcomes must match the reference state machine, including changed-intent conflicts and late-dispatch rejection. Each generated history is followed by close/reopen reconciliation.
+
+This is bounded executable conformance evidence for the local single-writer journal, not a proof of every schedule or of a distributed destination. It complements, rather than replaces, process-crash, observer-independence and native-database transaction qualification.
