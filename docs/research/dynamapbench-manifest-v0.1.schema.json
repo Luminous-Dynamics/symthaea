@@ -8,6 +8,7 @@
     "schema_version",
     "benchmark_id",
     "release",
+    "split_policy",
     "corpus_artifact",
     "evaluator",
     "cases"
@@ -67,6 +68,27 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/case"
+      }
+    },
+    "split_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_family_holdout",
+        "temporal_holdout",
+        "test_after"
+      ],
+      "properties": {
+        "repository_family_holdout": {
+          "const": true
+        },
+        "temporal_holdout": {
+          "const": true
+        },
+        "test_after": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     }
   },
@@ -181,6 +203,7 @@
         "lane",
         "task_family",
         "split",
+        "case_time",
         "repository",
         "source_objects",
         "decision_cutoff",
@@ -378,6 +401,10 @@
               }
             }
           }
+        },
+        "case_time": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     }

@@ -435,11 +435,40 @@ fn check_gold(
     }
 }
 
+
+fn check_split_policy(
+    root: &Map<String, Value>,
+    report: &mut DynaMapBenchManifestReport,
+) -> Option<DateTime<chrono::FixedOffset>> {
+    let value = required_value(root, "split_policy", "$", report)?;
+    let path = "$.split_policy";
+    let policy = object(value, path, report)?;
+    allowed_keys(policy, &["repository_family_holdout", "temporal_holdout", "test_after"], path, report);
+    for key in ["repository_family_holdout", "temporal_holdout"] {
+        match policy.get(key).and_then(Value::as_bool) {
+            Some(true) => {}
+            Some(false) => report.error("DMB-SPLIT-002", format!("{path}.{key}"), "DynaMapBench v0.1 requires this split control"),
+            None => report.error("DMB-SPLIT-003", format!("{path}.{key}"), "required boolean true is missing"),
+        }
+    }
+    match required_string(policy, "test_after", path, report) {
+        Some(value) => match parse_time(value) {
+            Some(value) => Some(value),
+            None => {
+                report.error("DMB-TIME-005", format!("{path}.test_after"), "expected RFC3339 timestamp");
+                None
+            }
+        },
+        None => None,
+    }
+}
+
 fn validate_case(
     case_value: &Value,
     index: usize,
     ids: &mut BTreeSet<String>,
     families: &mut BTreeMap<String, String>,
+    temporal_split_after: Option<&DateTime<chrono::FixedOffset>>,
     report: &mut DynaMapBenchManifestReport,
 ) {
     let path = format!("cases[{index}]");
@@ -449,7 +478,7 @@ fn validate_case(
     allowed_keys(
         case,
         &[
-            "case_id", "lane", "task_family", "split", "repository", "source_objects",
+            "case_id", "lane", "task_family", "split", "case_time", "repository", "source_objects",
             "decision_cutoff", "available_inputs", "forbidden_inputs", "budget", "harness", "gold",
         ],
         &path,
@@ -467,6 +496,23 @@ fn validate_case(
     }
     required_string(case, "task_family", &path, report);
     let split = required_string(case, "split", &path, report);
+    let case_time = required_string(case, "case_time", &path, report).and_then(|value| {
+        match parse_time(value) {
+            Some(time) => Some(time),
+            None => {
+                report.error("DMB-TIME-005", format!("{path}.case_time"), "expected RFC3339 timestamp");
+                None
+            }
+        }
+    });
+    if let (Some(split), Some(case_time), Some(test_after)) = (split, case_time.as_ref(), temporal_split_after) {
+        if ["train", "dev"].contains(&split) && case_time > test_after {
+            report.error("DMB-LEAKAGE-002", format!("{path}.case_time"), "train/dev case time is after the temporal test boundary");
+        }
+        if split == "test" && case_time <= test_after {
+            report.error("DMB-LEAKAGE-003", format!("{path}.case_time"), "test case time is not after the temporal test boundary");
+        }
+    }
     if let Some(split) = split {
         if !["train", "dev", "test"].contains(&split) {
             report.error("DMB-SPLIT-001", format!("{path}.split"), "split must be train, dev or test");
@@ -502,7 +548,7 @@ pub fn validate_dynamapbench_manifest_json(
     let Some(root) = object(&document, "$", &mut report) else {
         return Ok(report);
     };
-    allowed_keys(root, &["schema_version", "benchmark_id", "release", "corpus_artifact", "evaluator", "cases"], "$", &mut report);
+    allowed_keys(root, &["schema_version", "benchmark_id", "release", "split_policy", "corpus_artifact", "evaluator", "cases"], "$", &mut report);
     if required_string(root, "schema_version", "$", &mut report) != Some("0.1.0") {
         report.error("DMB-SCHEMA-001", "$.schema_version", "expected schema_version 0.1.0");
     }
@@ -510,6 +556,7 @@ pub fn validate_dynamapbench_manifest_json(
         report.error("DMB-IDENTITY-001", "$.benchmark_id", "expected benchmark_id DynaMapBench");
     }
     required_string(root, "release", "$", &mut report);
+    let temporal_split_after = check_split_policy(root, &mut report);
 
     for key in ["corpus_artifact", "evaluator"] {
         if let Some(value) = required_value(root, key, "$", &mut report) {
@@ -547,7 +594,7 @@ pub fn validate_dynamapbench_manifest_json(
     let mut ids = BTreeSet::new();
     let mut families = BTreeMap::new();
     for (index, case) in cases.iter().enumerate() {
-        validate_case(case, index, &mut ids, &mut families, &mut report);
+        validate_case(case, index, &mut ids, &mut families, temporal_split_after.as_ref(), &mut report);
     }
     report.sort();
     Ok(report)
@@ -561,6 +608,7 @@ mod tests {
     fn case(case_id: &str, family: &str, split: &str) -> Value {
         json!({
             "case_id": case_id,
+            "case_time": if split == "test" { "2026-02-02T00:00:00Z" } else { "2026-01-01T00:00:00Z" },
             "lane": "D3",
             "task_family": "trace2code",
             "split": split,
@@ -610,10 +658,36 @@ mod tests {
             "schema_version":"0.1.0",
             "benchmark_id":"DynaMapBench",
             "release":"v0.1-test",
+            "split_policy":{"repository_family_holdout":true,"temporal_holdout":true,"test_after":"2026-01-31T00:00:00Z"},
             "corpus_artifact":{"uri":"https://example.invalid/corpus.tar","sha256":"3".repeat(64)},
             "evaluator":{"name":"dynamapbench-evaluator","version":"0.1.0","sha256":"4".repeat(64)},
             "cases":cases
         }).to_string()
+    }
+
+
+    #[test]
+    fn rejects_test_case_not_after_temporal_holdout_boundary() {
+        let mut c = case("case-1","family-a","test");
+        c["case_time"] = json!("2026-01-15T00:00:00Z");
+        let report = validate_dynamapbench_manifest_json(&manifest(vec![c])).expect("report");
+        assert!(report.diagnostics.iter().any(|d| d.code == "DMB-LEAKAGE-003"));
+    }
+
+    #[test]
+    fn rejects_train_case_after_temporal_holdout_boundary() {
+        let mut c = case("case-1","family-a","train");
+        c["case_time"] = json!("2026-02-15T00:00:00Z");
+        let report = validate_dynamapbench_manifest_json(&manifest(vec![c])).expect("report");
+        assert!(report.diagnostics.iter().any(|d| d.code == "DMB-LEAKAGE-002"));
+    }
+
+    #[test]
+    fn requires_repository_and_temporal_holdout_policies() {
+        let mut doc: Value = serde_json::from_str(&manifest(vec![case("case-1","family-a","test")])).expect("fixture");
+        doc["split_policy"]["temporal_holdout"] = json!(false);
+        let report = validate_dynamapbench_manifest_json(&doc.to_string()).expect("report");
+        assert!(report.diagnostics.iter().any(|d| d.code == "DMB-SPLIT-002"));
     }
 
     #[test]

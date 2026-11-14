@@ -240,7 +240,7 @@ On 2026-11-14, the standalone development-map-validator received a DTEA hardenin
 - Equality at the start/end boundary is accepted under closed-interval semantics.
 - An explicit validity_completeness declaration distinguishes a known open interval edge (complete with a null bound) from incomplete applicability (incomplete).
 - Incomplete effective-time applicability cannot justify consulted evidence; it can remain explicitly excluded.
-- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and ten cover Rust syntax extraction, bringing the standalone crate total to **103 authored tests** after 24 tree-composition/inventory tests (including serialized-request round-trip and recursive-tree capture controls). The public DTEA expected-results fixture contains **21 negative controls**.
+- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and ten cover Rust syntax extraction, bringing the standalone crate total to **123 authored tests** (59 validator, 10 Cargo, 10 Rust syntax, 24 tree inventory/composition, 20 DynaMapBench manifest). The public DTEA expected-results fixture contains **21 negative controls**.
 
 These are source changes and authored checks. The tests have not been compiled or executed. Exact-head CI workflows were observed as skipped, not passed. Full JSON Schema 2020-12 validation, runtime replay, independent benchmark qualification and #10064 isolation qualification remain outstanding. No real Mycelix authorization record is authenticated by the synthetic DTEA fixture.
 
@@ -281,3 +281,6 @@ The detailed versioned benchmark design is maintained in [DynaMapBench Protocol 
 
 
 D1 now has a saved-response tree inventory parser as well as the pure composer. The parser requires a capture envelope attesting `recursive_requested=true`, validates the exact recursive-tree root and API truncation flag before emitting a pinned inventory. The commit-to-tree relation, response authenticity and any source content hash verification remain collector/transport responsibilities; the parser does not perform network access.
+
+
+The DynaMapBench manifest validator now checks both repository-family isolation and a declared temporal train/test boundary (train/dev at or before the boundary, test strictly after), separately from each case's decision-time evidence cutoff.

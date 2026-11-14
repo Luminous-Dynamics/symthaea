@@ -252,3 +252,6 @@ The boolean records caller attestation of the request parameter. The saved respo
 ## 11. Machine-readable corpus manifest
 
 DynaMapBench v0.1 has an initial JSON Schema at `dynamapbench-manifest-v0.1.schema.json`, a valid illustrative manifest fixture at `../development-map/fixtures/dynamapbench-manifest-v0.1.json`, and a data-only Rust validator exposed through `dynamapbench-manifest <manifest.json>`. The validator enforces unique case IDs, repository-family split isolation, exact Git OID formats, per-case source object identity, evidence availability at/before decision cutoff, future-evidence negative controls, distinct natural/counterfactual no-gold dispositions, source-anchored gold spans, two-review independent adjudication and positive token/line/tool/time budgets. A structural manifest pass does not authenticate the corpus artifact, Git objects, evaluator binary or source content. It does not execute agents or repository code.
+
+
+The manifest validator requires both repository-family and temporal holdout declarations. Each case pins its event/case time; train/dev cases must be at or before the declared test boundary, while test cases must be after it. This split-time boundary is distinct from the per-case decision cutoff that determines what evidence could have been available to the decision-maker.

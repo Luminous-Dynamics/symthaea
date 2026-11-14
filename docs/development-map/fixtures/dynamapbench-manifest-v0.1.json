@@ -72,7 +72,13 @@
           }
         ],
         "forbidden_spans": []
-      }
+      },
+      "case_time": "2026-02-02T00:00:00Z"
     }
-  ]
+  ],
+  "split_policy": {
+    "repository_family_holdout": true,
+    "temporal_holdout": true,
+    "test_after": "2026-01-31T00:00:00Z"
+  }
 }
