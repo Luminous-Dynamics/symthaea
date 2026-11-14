@@ -1,0 +1,781 @@
+{
+  "schema": "luminous.airroad.iqc_bilinear_generator_outer_product.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_bilinear_outer_product_conformance",
+  "claim_class": "deterministic_hard_set_outer_approximation",
+  "product_order": "A_then_B",
+  "scalar_interval": {
+    "interval_id": "frequency-interval-0-1",
+    "A": {
+      "lower_knot": "frequency-0",
+      "upper_knot": "frequency-1",
+      "lower_side": "plus",
+      "upper_side": "minus",
+      "generators": [
+        {
+          "id": "A-k0-plus-a",
+          "side": "lower",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "id": "A-k1-minus-a",
+          "side": "upper",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        }
+      ]
+    },
+    "B": {
+      "lower_knot": "frequency-0",
+      "upper_knot": "frequency-1",
+      "lower_side": "plus",
+      "upper_side": "minus",
+      "generators": [
+        {
+          "id": "B-k0-plus-a",
+          "side": "lower",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        },
+        {
+          "id": "B-k1-minus-a",
+          "side": "upper",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ]
+    },
+    "expected": {
+      "pairwise_products": [
+        {
+          "a_id": "A-k0-plus-a",
+          "b_id": "B-k0-plus-a",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        },
+        {
+          "a_id": "A-k0-plus-a",
+          "b_id": "B-k1-minus-a",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "a_id": "A-k1-minus-a",
+          "b_id": "B-k0-plus-a",
+          "value": {
+            "numerator": "9",
+            "denominator": "1"
+          }
+        },
+        {
+          "a_id": "A-k1-minus-a",
+          "b_id": "B-k1-minus-a",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        }
+      ],
+      "hull_lower": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "hull_upper": {
+        "numerator": "9",
+        "denominator": "1"
+      },
+      "aligned_only_products": [
+        {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "3",
+          "denominator": "1"
+        }
+      ],
+      "aligned_only_hull_lower": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "aligned_only_hull_upper": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "midpoint_lambda": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "midpoint_A": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "midpoint_B": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "midpoint_product": {
+        "numerator": "4",
+        "denominator": "1"
+      },
+      "midpoint_convex_weights": [
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      ],
+      "polynomial_coefficients_power_order": [
+        {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-4",
+          "denominator": "1"
+        }
+      ]
+    }
+  },
+  "matrix_interval": {
+    "interval_id": "matrix-frequency-interval-0-1",
+    "A": {
+      "lower_knot": "frequency-0",
+      "upper_knot": "frequency-1",
+      "lower_side": "plus",
+      "upper_side": "minus",
+      "lower_generators": [
+        {
+          "id": "Amat-k0",
+          "matrix": [
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        }
+      ],
+      "upper_generators": [
+        {
+          "id": "Amat-k1",
+          "matrix": [
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "B": {
+      "lower_knot": "frequency-0",
+      "upper_knot": "frequency-1",
+      "lower_side": "plus",
+      "upper_side": "minus",
+      "lower_generators": [
+        {
+          "id": "Bmat-k0",
+          "matrix": [
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        }
+      ],
+      "upper_generators": [
+        {
+          "id": "Bmat-k1",
+          "matrix": [
+            [
+              {
+                "numerator": "2",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "ordered_products": [
+        {
+          "a_id": "Amat-k0",
+          "b_id": "Bmat-k0",
+          "matrix": [
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        },
+        {
+          "a_id": "Amat-k0",
+          "b_id": "Bmat-k1",
+          "matrix": [
+            [
+              {
+                "numerator": "2",
+                "denominator": "1"
+              },
+              {
+                "numerator": "0",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        },
+        {
+          "a_id": "Amat-k1",
+          "b_id": "Bmat-k0",
+          "matrix": [
+            [
+              {
+                "numerator": "2",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "1",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        },
+        {
+          "a_id": "Amat-k1",
+          "b_id": "Bmat-k1",
+          "matrix": [
+            [
+              {
+                "numerator": "2",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ],
+            [
+              {
+                "numerator": "0",
+                "denominator": "1"
+              },
+              {
+                "numerator": "1",
+                "denominator": "1"
+              }
+            ]
+          ]
+        }
+      ],
+      "midpoint_lambda": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "midpoint_A": [
+        [
+          {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "midpoint_B": [
+        [
+          {
+            "numerator": "3",
+            "denominator": "2"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "midpoint_product": [
+        [
+          {
+            "numerator": "7",
+            "denominator": "4"
+          },
+          {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        ],
+        [
+          {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "midpoint_convex_weights": [
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      ],
+      "reverse_A1B0": [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "reverse_B0A1": [
+        [
+          {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        ]
+      ]
+    }
+  },
+  "multi_generator_interval": {
+    "interval_id": "multi-generator-interval-0-1",
+    "lambda": {
+      "numerator": "2",
+      "denominator": "5"
+    },
+    "A_lower": [
+      {
+        "id": "a0-1",
+        "value": {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "a0-2",
+        "value": {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      }
+    ],
+    "A_upper": [
+      {
+        "id": "a1-1",
+        "value": {
+          "numerator": "3",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "a1-2",
+        "value": {
+          "numerator": "4",
+          "denominator": "1"
+        }
+      }
+    ],
+    "B_lower": [
+      {
+        "id": "b0-1",
+        "value": {
+          "numerator": "3",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "b0-2",
+        "value": {
+          "numerator": "4",
+          "denominator": "1"
+        }
+      }
+    ],
+    "B_upper": [
+      {
+        "id": "b1-1",
+        "value": {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      },
+      {
+        "id": "b1-2",
+        "value": {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      }
+    ],
+    "convex_weights": {
+      "A_lower": [
+        {
+          "numerator": "1",
+          "denominator": "3"
+        },
+        {
+          "numerator": "2",
+          "denominator": "3"
+        }
+      ],
+      "A_upper": [
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "3",
+          "denominator": "4"
+        }
+      ],
+      "B_lower": [
+        {
+          "numerator": "2",
+          "denominator": "5"
+        },
+        {
+          "numerator": "3",
+          "denominator": "5"
+        }
+      ],
+      "B_upper": [
+        {
+          "numerator": "3",
+          "denominator": "5"
+        },
+        {
+          "numerator": "2",
+          "denominator": "5"
+        }
+      ]
+    }
+  },
+  "one_sided_shared_knot": {
+    "left_interval": {
+      "interval_id": "I0",
+      "knot_frequency": "frequency-1",
+      "side": "minus",
+      "A_generators": [
+        {
+          "id": "A-k1-minus",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        }
+      ],
+      "B_generators": [
+        {
+          "id": "B-k1-minus",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ],
+      "product_generators": [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "9",
+          "denominator": "1"
+        }
+      ]
+    },
+    "right_interval": {
+      "interval_id": "I1",
+      "knot_frequency": "frequency-1",
+      "side": "plus",
+      "A_generators": [
+        {
+          "id": "A-k1-plus",
+          "value": {
+            "numerator": "4",
+            "denominator": "1"
+          }
+        }
+      ],
+      "B_generators": [
+        {
+          "id": "B-k1-plus",
+          "value": {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        }
+      ],
+      "A_upper_generators": [
+        {
+          "id": "A-k2-minus",
+          "value": {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        }
+      ],
+      "B_upper_generators": [
+        {
+          "id": "B-k2-minus",
+          "value": {
+            "numerator": "4",
+            "denominator": "1"
+          }
+        }
+      ],
+      "product_generators": [
+        {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        {
+          "numerator": "8",
+          "denominator": "1"
+        },
+        {
+          "numerator": "16",
+          "denominator": "1"
+        }
+      ]
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "same-side-only-pairing",
+      "expected": "reject-outer-cover"
+    },
+    {
+      "id": "missing-cross-pair",
+      "expected": "reject-completeness"
+    },
+    {
+      "id": "collapse-left-right-knot-identities",
+      "expected": "reject-one-sided-semantics"
+    },
+    {
+      "id": "reverse-matrix-product-order",
+      "expected": "reject-known-answer"
+    },
+    {
+      "id": "claim-inner-approximation",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "stale-source-generator-id",
+      "expected": "reject-provenance"
+    },
+    {
+      "id": "sampled-grid-instead-of-exact-convex-product-proof",
+      "expected": "reject-proof-method"
+    },
+    {
+      "id": "duplicate-interval-id",
+      "expected": "reject-identity"
+    },
+    {
+      "id": "matrix-dimension-mismatch",
+      "expected": "reject-dimension"
+    }
+  ],
+  "claim_ceiling": [
+    "Exact endpoint Cartesian product containment for the synthetic scalar and noncommuting 2x2 fixtures.",
+    "One-sided interval identity semantics are synthetic and not a full plant/controller factor construction.",
+    "No full Gamma_M set, IQC SDP, controller synthesis or robust stability claim is established."
+  ]
+}
