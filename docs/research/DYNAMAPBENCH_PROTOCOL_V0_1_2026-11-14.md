@@ -228,3 +228,21 @@ The first credible result is not a top leaderboard score. It is a reproducible b
 ## Source tree inventory collector
 
 The validator now includes a non-networking parser for saved GitHub recursive-tree API responses. `tree-inventory <github-tree.json> <repository> <revision> <tree-oid>` checks that the response root SHA equals the exact tree OID supplied from the pinned commit object, validates each returned path/mode/type/object ID, rejects duplicate paths, and maps the API `truncated` flag to `partial` or `complete`. It does not make requests, authenticate the downloaded JSON or commit signature, prove the caller's commit-to-tree binding, or hash file contents. A non-truncated response is only as trustworthy as the API response and pinning procedure that supplied it.
+
+
+A tree capture envelope has the form:
+
+```json
+{
+  "recursive_requested": true,
+  "response": {
+    "sha": "<exact-root-tree-oid>",
+    "truncated": false,
+    "tree": [
+      {"path": "src/lib.rs", "mode": "100644", "type": "blob", "sha": "<blob-oid>"}
+    ]
+  }
+}
+```
+
+The boolean records caller attestation of the request parameter. The saved response itself cannot prove that parameter was sent. The capture process must separately retain the exact commit object and its declared tree OID; the parser checks consistency but does not verify transport authenticity or commit signatures.

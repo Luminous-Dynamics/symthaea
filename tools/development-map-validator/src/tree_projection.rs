@@ -107,6 +107,13 @@ pub struct GitHubTreeApiResponse {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct GitHubTreeApiCapture {
+    /// Caller attests that the request included the recursive=1 query parameter.
+    pub recursive_requested: bool,
+    pub response: GitHubTreeApiResponse,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct RepositoryTreeInventory {
     pub source: RepositoryTreeAnchor,
     /// Complete only when the API response explicitly reports truncated=false.
@@ -129,8 +136,12 @@ pub fn collect_github_tree_inventory_json(
     source: RepositoryTreeAnchor,
 ) -> Result<RepositoryTreeInventory, String> {
     validate_repository_anchor(&source)?;
-    let response: GitHubTreeApiResponse = serde_json::from_str(raw_json)
-        .map_err(|error| format!("GitHub tree API JSON parse error: {error}"))?;
+    let capture: GitHubTreeApiCapture = serde_json::from_str(raw_json)
+        .map_err(|error| format!("GitHub tree API capture JSON parse error: {error}"))?;
+    if !capture.recursive_requested {
+        return Err("tree inventory capture must attest recursive_requested=true".to_owned());
+    }
+    let response = capture.response;
     if response.sha != source.tree_oid {
         return Err(format!(
             "recursive tree root mismatch: expected {}, response returned {}",
@@ -459,9 +470,12 @@ mod tests {
 
     fn api_tree_json(root: &str, truncated: bool, entries: serde_json::Value) -> String {
         serde_json::json!({
-            "sha": root,
-            "truncated": truncated,
-            "tree": entries
+            "recursive_requested": true,
+            "response": {
+                "sha": root,
+                "truncated": truncated,
+                "tree": entries
+            }
         }).to_string()
     }
 
@@ -524,10 +538,26 @@ mod tests {
 
     #[test]
     fn rejects_missing_or_nonboolean_truncation_flag() {
-        let missing = serde_json::json!({"sha":"b".repeat(40),"tree":[]}).to_string();
+        let missing = serde_json::json!({
+            "recursive_requested": true,
+            "response": {"sha":"b".repeat(40),"tree":[]}
+        }).to_string();
         assert!(collect_github_tree_inventory_json(&missing, source_anchor()).is_err());
-        let invalid = serde_json::json!({"sha":"b".repeat(40),"truncated":"false","tree":[]}).to_string();
+        let invalid = serde_json::json!({
+            "recursive_requested": true,
+            "response": {"sha":"b".repeat(40),"truncated":"false","tree":[]}
+        }).to_string();
         assert!(collect_github_tree_inventory_json(&invalid, source_anchor()).is_err());
+    }
+
+    #[test]
+    fn rejects_capture_without_recursive_query_attestation() {
+        let input = serde_json::json!({
+            "recursive_requested": false,
+            "response": {"sha":"b".repeat(40),"truncated":false,"tree":[]}
+        }).to_string();
+        let error = collect_github_tree_inventory_json(&input, source_anchor()).expect_err("nonrecursive capture");
+        assert!(error.contains("recursive_requested=true"));
     }
 
     #[test]
