@@ -29,9 +29,9 @@ Three independent dependency-free Rust crates are present:
 - `tools/atelier-brief-core/`: brief identity/revision/digest shape, unique IDs, objective bounds, selected hard-constraint contradictions, suggestion-decision provenance and fail-closed handoff.
 - `tools/atelier-brief-core/src/preset_stack.rs`: conflict-aware preset composition with explicit user override semantics.
 - `tools/atelier-wardrobe-core/`: exact subset search up to 18 optional choices, protected-item preservation, independent borrowing/rental/second-hand/purchase/made-to-order policy flags, single-currency cost arithmetic and Pareto outputs.
-- `tools/atelier-sewing-plan-core/`: validates sewing-plan identities, source digests, part/edge/interface references, operation dependencies, acyclic ordering and declared machine-operation support.
+- `tools/atelier-sewing-plan-core/`: validates sewing-plan identities, source digests, part/edge/interface references, operation dependencies and acyclic ordering; enforces machine-profile operation support, explicit join interfaces and part membership, and human-review/evidence gates for irreversible operations and unqualified declarations.
 
-Authored unit tests: 11 brief-core + 10 preset-composer + 13 wardrobe-core + 12 sewing-plan-core = **46 tests**. They have not been compiled or executed locally; the authoring environment has no Rust toolchain.
+Authored unit tests: 11 brief-core + 10 preset-composer + 13 wardrobe-core + 18 sewing-plan-core = **52 tests** across the three Atelier crates. The existing apparel schema/semantic harness adds 22 more, for **74 authored Rust tests total**. They have not been compiled or executed locally; the authoring environment has no Rust toolchain.
 
 ## JSON contracts and exact-head harness
 
