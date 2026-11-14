@@ -66,6 +66,10 @@ struct Decision {
     reason: &'static str,
 }
 
+fn nonempty(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
 fn unique_nonempty(values: &[String]) -> bool {
     let mut seen = HashSet::new();
     values
