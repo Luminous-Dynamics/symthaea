@@ -91,6 +91,13 @@ fn time_is_not_after(
     matches!((candidate, boundary), (Some(candidate), Some(boundary)) if candidate <= boundary)
 }
 
+fn training_cutoff_precedes_observation(
+    cutoff: Option<&DateTime<Utc>>,
+    observed: Option<&DateTime<Utc>>,
+) -> bool {
+    matches!((cutoff, observed), (Some(cutoff), Some(observed)) if cutoff < observed)
+}
+
 fn interval_is_ordered(prediction: &Value) -> bool {
     let mean = prediction
         .get("predicted_shaft_power_kw")
@@ -153,11 +160,6 @@ fn validate_schema(schema: &Value, corpus: &Value, findings: &mut Findings) {
 
 fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
     let case_path = format!("/cases/{index}");
-    let case_id = case
-        .get("case_id")
-        .and_then(Value::as_str)
-        .unwrap_or("<missing-case-id>");
-
     let Some(decision_points) = case.get("decision_points").and_then(Value::as_array) else {
         findings.push(
             format!("{case_path}/decision_points"),
@@ -254,7 +256,7 @@ fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
         }
 
         if let (Some(cutoff), Some(observed)) = (model_cutoff.as_ref(), observed.as_ref()) {
-            if cutoff >= observed {
+            if !training_cutoff_precedes_observation(Some(cutoff), Some(observed)) {
                 findings.push(
                     format!("{case_path}/reference_model/trained_through_utc"),
                     "INVALID",
@@ -319,13 +321,13 @@ fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
 
                 if item.get("kind").and_then(Value::as_str) == Some("calibration_record") {
                     match item.get("status").and_then(Value::as_str).unwrap_or("unknown") {
-                        "confirmed" | "negative" => {}
-                        "revoked" => findings.push(
+                        "confirmed" => {}
+                        "negative" | "revoked" => findings.push(
                             format!("{evidence_path}/status"),
                             "BLOCKED",
-                            "calibration evidence is revoked",
+                            "calibration evidence is negative or revoked",
                         ),
-                        "incomplete" | "unknown" | _ => findings.push(
+                        _ => findings.push(
                             format!("{evidence_path}/status"),
                             "INCOMPLETE",
                             "calibration evidence is incomplete or unknown",
@@ -359,7 +361,6 @@ fn check_case(case: &Value, index: usize, findings: &mut Findings) -> usize {
         );
     }
 
-    let _ = case_id;
     decision_points.len()
 }
 
@@ -517,9 +518,12 @@ mod tests {
 
     #[test]
     fn model_cutoff_must_precede_scored_observation() {
-        let cutoff = parse_time(Some("2026-01-01T08:00:00Z")).unwrap();
-        let observed = parse_time(Some("2026-01-01T08:00:00Z")).unwrap();
-        assert!(cutoff >= observed);
+        let earlier = parse_time(Some("2025-12-31T23:59:59Z")).unwrap();
+        let equal = parse_time(Some("2026-01-01T08:00:00Z")).unwrap();
+        let later = parse_time(Some("2026-01-01T08:00:01Z")).unwrap();
+        assert!(training_cutoff_precedes_observation(Some(&earlier), Some(&equal)));
+        assert!(!training_cutoff_precedes_observation(Some(&equal), Some(&equal)));
+        assert!(!training_cutoff_precedes_observation(Some(&later), Some(&equal)));
     }
 
     #[test]
@@ -556,5 +560,19 @@ mod tests {
         let mut unknown = Findings::default();
         unknown.push("/calibration_status", "INCOMPLETE", "unknown calibration");
         assert_eq!(unknown.disposition(), "INCOMPLETE");
+    }
+
+    #[test]
+    fn synthetic_corpus_never_qualifies_as_physical_evidence() {
+        let corpus = json!({
+            "schema_version": "0.1.0",
+            "corpus_status": "synthetic",
+            "generated_at_utc": "2026-11-14T00:00:00Z",
+            "cases": []
+        });
+        let mut findings = Findings::default();
+        let (case_count, decision_count, scenario_count) = check_corpus(&corpus, &mut findings);
+        assert_eq!((case_count, decision_count, scenario_count), (0, 0, 0));
+        assert_eq!(findings.disposition(), "INCOMPLETE");
     }
 }
