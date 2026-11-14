@@ -233,3 +233,62 @@ Add the following to the previously defined claim-scope and transfer metrics:
 | Physical replication | Record bondline thickness, actual substrate temperature, treatment-to-bond delay and all degraded/invalid specimens |
 
 We should not promise “85–95% coverage” as a universal target from 10 coupons. The target is meaningful only when the independent-group count, calibration method, holdout design and interval width support it.
+
+
+## Additional 2026 frontier — debond-on-demand and interface-first reversibility
+
+### The field's missing benchmark layer
+
+A November 2026 systematic review, *Debonding-on-demand adhesives for circular automotive manufacturing: Triggering mechanisms, joint performance, and process integration*, surveys thermal, electrical, photothermal/UV, magnetic and hybrid triggers. Its abstract reports over 40 primary studies and identifies the absence of a standardised debond-on-demand test protocol, long-term durability evidence and comprehensive lifecycle assessment as unresolved field-wide gaps.
+
+Source: https://www.sciencedirect.com/science/article/pii/S0143749626002149
+
+This is an opportunity for Luminous to define a **service–release–recovery benchmark**, not to claim a new debonding chemistry. Its matched lifecycle should report:
+- service strength and fatigue / creep retention before any trigger;
+- ageing under application-relevant humidity, thermal cycling, fluids and mechanical load;
+- trigger energy, peak temperature, spatial selectivity and time-to-release;
+- unintended release probability for neighbouring joints and untriggered controls;
+- residual adhesive coverage, substrate damage, recovered-substrate properties and contamination;
+- rebond strength and durability after recovery;
+- full process energy, consumables, safety controls, yield and cost per accepted reuse cycle.
+
+A trigger that releases easily but weakens during service is not a good joint. A joint that survives service but cannot release without damaging the substrate is not a circular system. Measure both sides of the trade-off.
+
+### Interface-first reversible adhesion
+
+An October 2026 ACS Polymers Au paper, *Building Up Debondable Adhesion with Commercial Adhesives through Surface Modification of Substrate with Vitrimers*, reports a different architecture: place a nanometre-scale dynamic vitrimer layer at the adherend surface, rather than reformulating the whole adhesive. It demonstrates PET surfaces with diketoenamine-based covalent adaptable networks and a conventional commercial epoxy adhesive, with debonding triggered thermally at 50 °C or by acid-catalysed hydrolysis.
+
+DOI: https://doi.org/10.1021/acspolymersau.6c00122
+
+This is not yet a plasma-compatible result and does not qualify a production joint. It does suggest an application architecture worth comparing:
+1. conventional substrate + conventional adhesive;
+2. plasma-prepared substrate + conventional adhesive;
+3. dynamic/reversible interlayer + conventional adhesive;
+4. plasma-prepared dynamic interlayer + conventional adhesive, only after chemical/thermal compatibility screening.
+
+The fourth arm must not be assumed beneficial. Plasma may modify, damage, over-oxidise or otherwise change the dynamic layer. Any combination needs direct surface chemistry, adhesion, ageing, release and rebond evidence. Keep the materials chemistry owned by the relevant supplier/research partner; Luminous supplies the evidence and lifecycle qualification layer.
+
+### Do not let synthetic augmentation masquerade as physical replication
+
+A 2026 review of machine learning for adhesion assessment and prediction describes studies that combine a small physical design with synthetic data augmentation. One highlighted example begins with nine physical design conditions and expands to 100 rows using 91 generated points; very high reported ANN validation metrics are therefore not equivalent to validation on 91 additional independent physical experiments.
+
+Source: https://www.tandfonline.com/doi/full/10.1080/01694243.2026.2687662
+
+Synthetic augmentation can help explore a fitted response surface or test code paths. It must be recorded as a derived artifact with lineage to its source specimens, and it must never increase the reported count of independent physical clusters, calibration groups or held-out test units. Model comparisons must include the unaugmented physical-only result.
+
+## Circular-joining benchmark extension
+
+The following are prospective targets to preregister for a single selected trigger/material/joint system; they are not current Luminous results or universal standards:
+
+| Metric | Required reporting / prospective target |
+|---|---|
+| Service acceptance | Meet the same predeclared strength, fatigue and creep criteria as a non-reversible control |
+| Trigger specificity | Zero release in known-truth untriggered and neighbour-joint negative controls |
+| Release completeness | Measure residual bonded area and full distribution; set threshold before testing |
+| Collateral damage | No unacceptable substrate, coating, interlayer or neighbouring-joint damage |
+| Recovered material | Meet predeclared material-specific reuse requirements, not merely visual separation |
+| Rebond performance | Meet a predeclared fraction of original service strength and durability after each reuse cycle |
+| Lifecycle | Energy, emissions, yield, material recovery, waste, repair time and cost per accepted reuse cycle |
+| Reuse count | Test repeated cycles; report degradation and uncertainty, not only first release/rebond |
+
+The right product-level objective is cost and impact per accepted service-and-recovery outcome, not minimum debond temperature or maximum initial lap-shear strength alone.
