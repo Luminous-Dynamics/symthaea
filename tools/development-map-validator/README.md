@@ -80,9 +80,12 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). One hundred and twenty-three Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases, 10 Rust-syntax cases and 24 tree-inventory/tree-composition cases and 20 DynaMapBench manifest cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). One hundred and twenty-five Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases, 10 Rust-syntax cases and 24 tree-inventory/tree-composition cases and 22 DynaMapBench manifest cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
 
 
 ## DynaMapBench manifest validation
 
 The machine-readable contract is [`docs/research/dynamapbench-manifest-v0.1.schema.json`](../../docs/research/dynamapbench-manifest-v0.1.schema.json), with a valid illustrative fixture at [`docs/development-map/fixtures/dynamapbench-manifest-v0.1.json`](../../docs/development-map/fixtures/dynamapbench-manifest-v0.1.json). The CLI and library check repository-family and temporal train/test split isolation, exact commit/tree/blob identity formats, unique case/source IDs, available-evidence timestamps not later than the decision cutoff, future controls later than the cutoff, separate natural and counterfactual no-gold dispositions, source-anchored gold spans, at least two reviews for independently adjudicated labels, and positive fixed budgets. They do not download or authenticate the corpus, verify source object existence, authenticate evaluator binaries, or run the benchmark.
+
+
+DynaMapBench gold validation also rejects inclusive line-range overlap between relevant and forbidden spans (`DMB-GOLD-008`). Adjacent ranges are allowed. This prevents contradictory labels from contaminating retrieval precision/recall and selective-abstention scoring. Two negative/positive boundary test definitions cover the rule; they remain unexecuted.

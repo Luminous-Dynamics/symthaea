@@ -255,3 +255,8 @@ DynaMapBench v0.1 has an initial JSON Schema at `dynamapbench-manifest-v0.1.sche
 
 
 The manifest validator requires both repository-family and temporal holdout declarations. Each case pins its event/case time; train/dev cases must be at or before the declared test boundary, while test cases must be after it. This split-time boundary is distinct from the per-case decision cutoff that determines what evidence could have been available to the decision-maker.
+
+
+## Gold-label contradiction control (2026-11-14)
+
+DynaMapBench manifest validation now rejects inclusive line-range overlap between a case's `relevant_spans` and `forbidden_spans` when they refer to the same source path (`DMB-GOLD-008`). Line intervals are treated as closed intervals: `[a,b]` overlaps `[c,d]` iff `a <= d && c <= b`. Adjacent spans such as 1–4 and 5–7 are non-overlapping. This prevents a single source line from being simultaneously scored as relevant and forbidden, which would otherwise make precision, recall and abstention metrics dependent on arbitrary evaluator ordering. The validator still cannot determine whether either label is semantically correct; independent adjudication and disagreement reporting remain mandatory.

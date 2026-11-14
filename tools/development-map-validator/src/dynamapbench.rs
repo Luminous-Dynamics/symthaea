@@ -354,16 +354,16 @@ fn validate_spans(
     path: &str,
     source_paths: &BTreeSet<String>,
     report: &mut DynaMapBenchManifestReport,
-) -> usize {
+) -> Vec<(String, u64, u64)> {
     let field_path = format!("{path}.{key}");
     let Some(value) = required_value(gold, key, path, report) else {
-        return 0;
+        return Vec::new();
     };
     let Some(spans) = value.as_array() else {
         report.error("DMB-TYPE-002", &field_path, "expected an array");
-        return 0;
+        return Vec::new();
     };
-    let mut count = 0;
+    let mut valid_spans = Vec::new();
     for (index, span_value) in spans.iter().enumerate() {
         let span_path = format!("{field_path}[{index}]");
         let Some(span) = object(span_value, &span_path, report) else {
@@ -378,13 +378,15 @@ fn validate_spans(
         }
         let start = span.get("start_line").and_then(Value::as_u64);
         let end = span.get("end_line").and_then(Value::as_u64);
-        match (start, end) {
-            (Some(start), Some(end)) if start > 0 && start <= end => {}
+        match (source_path, start, end) {
+            (Some(source_path), Some(start), Some(end)) if start > 0 && start <= end => {
+                valid_spans.push((source_path.to_owned(), start, end));
+            }
+            (_, Some(start), Some(end)) if start > 0 && start <= end => {}
             _ => report.error("DMB-SPAN-002", &span_path, "line range must satisfy 1 <= start_line <= end_line"),
         }
-        count += 1;
     }
-    count
+    valid_spans
 }
 
 fn check_gold(
@@ -427,10 +429,26 @@ fn check_gold(
         }
     }
     let relevant = validate_spans(gold, "relevant_spans", &gold_path, source_paths, report);
-    validate_spans(gold, "forbidden_spans", &gold_path, source_paths, report);
+    let forbidden = validate_spans(gold, "forbidden_spans", &gold_path, source_paths, report);
+    for (relevant_path, relevant_start, relevant_end) in &relevant {
+        for (forbidden_path, forbidden_start, forbidden_end) in &forbidden {
+            if relevant_path == forbidden_path
+                && relevant_start <= forbidden_end
+                && forbidden_start <= relevant_end
+            {
+                report.error(
+                    "DMB-GOLD-008",
+                    &gold_path,
+                    format!(
+                        "relevant and forbidden gold spans overlap at {relevant_path}:{relevant_start}-{relevant_end} and {forbidden_start}-{forbidden_end}"
+                    ),
+                );
+            }
+        }
+    }
     match disposition {
-        Some("positive") if relevant == 0 => report.error("DMB-GOLD-006", format!("{gold_path}.relevant_spans"), "positive case requires at least one relevant span"),
-        Some("natural_no_gold" | "counterfactual_no_gold") if relevant != 0 => report.error("DMB-GOLD-007", format!("{gold_path}.relevant_spans"), "no-gold case must not carry positive relevant spans"),
+        Some("positive") if relevant.is_empty() => report.error("DMB-GOLD-006", format!("{gold_path}.relevant_spans"), "positive case requires at least one relevant span"),
+        Some("natural_no_gold" | "counterfactual_no_gold") if !relevant.is_empty() => report.error("DMB-GOLD-007", format!("{gold_path}.relevant_spans"), "no-gold case must not carry positive relevant spans"),
         _ => {}
     }
 }
@@ -803,6 +821,27 @@ mod tests {
         c["gold"]["relevant_spans"][0]["path"] = json!("src/other.rs");
         let report = validate_dynamapbench_manifest_json(&manifest(vec![c])).expect("report");
         assert!(report.diagnostics.iter().any(|d| d.code == "DMB-SPAN-001"));
+    }
+
+
+    #[test]
+    fn rejects_overlapping_relevant_and_forbidden_gold_spans() {
+        let mut c = case("case-1", "family-a", "test");
+        c["gold"]["forbidden_spans"] = json!([
+            {"path":"src/lib.rs","start_line":4,"end_line":7}
+        ]);
+        let report = validate_dynamapbench_manifest_json(&manifest(vec![c])).expect("report");
+        assert!(report.diagnostics.iter().any(|d| d.code == "DMB-GOLD-008"));
+    }
+
+    #[test]
+    fn allows_adjacent_non_overlapping_relevant_and_forbidden_gold_spans() {
+        let mut c = case("case-1", "family-a", "test");
+        c["gold"]["forbidden_spans"] = json!([
+            {"path":"src/lib.rs","start_line":5,"end_line":7}
+        ]);
+        let report = validate_dynamapbench_manifest_json(&manifest(vec![c])).expect("report");
+        assert!(!report.diagnostics.iter().any(|d| d.code == "DMB-GOLD-008"));
     }
 
     #[test]
