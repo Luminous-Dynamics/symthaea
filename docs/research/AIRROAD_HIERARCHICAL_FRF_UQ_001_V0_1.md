@@ -27,6 +27,8 @@ Their estimator for the covariance of the mean FRF vector is
 
 The estimator can be obtained from repeated periods without a parametric noise model. Its statistical interpretation still depends on the repeated-period assumptions; sample covariance is not a deterministic all-realizations bound.
 
+**Source-scope caveat:** the paper introduces this covariance construction in a SISO exposition. V0.1 is a two-frequency real-valued exact fixture, not a reproduction of a MIMO covariance estimator. AIRROAD's MIMO extension must first freeze the vectorization order across frequency, input/output channel and complex real/imaginary components, then preserve the full Hermitian covariance (and assess pseudo-covariance when circular/proper complex noise is not justified).
+
 Primary source details: arXiv:2611.10226, Section II-E, equations (33)–(38), and Section IV, equations (60)–(63).
 
 ## 2. Hierarchical uncertainty model
