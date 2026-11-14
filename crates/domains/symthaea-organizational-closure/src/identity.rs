@@ -440,7 +440,7 @@ pub fn evaluate_operational_continuity(
                         return ContinuityReport {
                             qualification: ContinuityQualification::Inconclusive,
                             mode: policy.mode,
-                            related_state_pairs: relation.into_iter().collect(),
+                            related_state_pairs: relation.iter().cloned().collect(),
                             related_initial_pairs: Vec::new(),
                             refinement_iterations: iterations,
                             transition_match_checks: checks,
@@ -484,7 +484,7 @@ pub fn evaluate_operational_continuity(
                             return ContinuityReport {
                                 qualification: ContinuityQualification::Inconclusive,
                                 mode: policy.mode,
-                                related_state_pairs: relation.into_iter().collect(),
+                                related_state_pairs: relation.iter().cloned().collect(),
                                 related_initial_pairs: Vec::new(),
                                 refinement_iterations: iterations,
                                 transition_match_checks: checks,
@@ -521,12 +521,17 @@ pub fn evaluate_operational_continuity(
 
     let mut initial_pairs = Vec::new();
     for baseline_initial in &baseline.initial_states {
-        let matching = candidate
-            .initial_states
-            .iter()
-            .find(|candidate_initial| relation.contains(&(baseline_initial.clone(), (*candidate_initial).clone())));
+        let matching = candidate.initial_states.iter().find(|candidate_initial| {
+            relation.contains(&(
+                baseline_initial.clone(),
+                candidate_initial.as_str().to_owned(),
+            ))
+        });
         if let Some(candidate_initial) = matching {
-            initial_pairs.push((baseline_initial.clone(), candidate_initial.clone()));
+            initial_pairs.push((
+                baseline_initial.clone(),
+                candidate_initial.as_str().to_owned(),
+            ));
         } else {
             push_finding(
                 &mut findings,
@@ -543,7 +548,7 @@ pub fn evaluate_operational_continuity(
             if !baseline
                 .initial_states
                 .iter()
-                .any(|baseline_initial| relation.contains(&(baseline_initial.clone(), candidate_initial.clone())))
+                .any(|baseline_initial| relation.contains(&(baseline_initial.clone(), candidate_initial.as_str().to_owned())))
             {
                 push_finding(
                     &mut findings,
@@ -565,7 +570,7 @@ pub fn evaluate_operational_continuity(
     ContinuityReport {
         qualification,
         mode: policy.mode,
-        related_state_pairs: relation.into_iter().collect(),
+        related_state_pairs: relation.iter().cloned().collect(),
         related_initial_pairs: initial_pairs,
         refinement_iterations: iterations,
         transition_match_checks: checks,
