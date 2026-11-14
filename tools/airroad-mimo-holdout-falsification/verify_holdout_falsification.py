@@ -523,7 +523,7 @@ def main() -> None:
     assert not contains(combined_real, actual_holdout[0])
 
     required_real = candidate_a["minimum_real_error_halfwidth_to_rescue"]
-    assert required_real == q(data["expected"]["min_measurement_error_halfwidth_to_rescue"])
+    assert required_real == q(data["expected"]["min_measurement_error_halfwidth_to_rescue_A"])
     assert required_real > Fraction(92, 100)
     assert candidate_b["joint_shared_calibration_interval"] is not None
     assert candidate_b["imaginary_measurement_error_pass"] is True
