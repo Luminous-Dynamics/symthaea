@@ -24,6 +24,7 @@ pub mod assay;
 pub mod identity;
 pub mod viability;
 pub mod reconfiguration;
+pub mod semantic_continuity;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
@@ -33,6 +34,13 @@ pub use identity::{
     ContinuityFinding, ContinuityFindingCode, ContinuityPolicy, ContinuityQualification,
     ContinuityReport, RelationMode, StateId, StateProfile, Transition, TransitionSystem,
     evaluate_operational_continuity,
+};
+pub use semantic_continuity::{
+    AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
+    EffectReversibility, EvidenceRef, EvidenceStatus, GrantStatus, LineageStep,
+    SemanticContinuityPolicy, SemanticContinuityReport, SemanticFinding,
+    SemanticFindingCode, SemanticPlane, SemanticTransition, SemanticTransitionKey,
+    SubstrateDependency, evaluate_semantic_continuity,
 };
 pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
