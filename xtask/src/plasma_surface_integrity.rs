@@ -292,6 +292,22 @@ fn audit_constraint(
     if !matches!(analysis.grouping_scheme.as_str(), "independent_arms" | "paired_by_cluster") {
         return Err(Decision::rejected("unsupported independent-unit grouping scheme"));
     }
+    let expected_analysis_profile = match analysis.grouping_scheme.as_str() {
+        "independent_arms" => "independent_cluster_ratio_interval_v1",
+        "paired_by_cluster" => "paired_cluster_ratio_interval_v1",
+        _ => unreachable!("grouping scheme checked above"),
+    };
+    if analysis.analysis_profile != expected_analysis_profile {
+        return Err(Decision::rejected("analysis profile is not registered for the declared independent-unit grouping"));
+    }
+    if analysis.minimum_confidence_level < substrate.minimum_confidence_level {
+        return Err(Decision::blocked("analysis design minimum confidence is below the frozen application requirement"));
+    }
+    if constraint.baseline_method_receipt.method_id == "ASTM_D882"
+        && substrate.thickness_mm >= 1.0
+    {
+        return Err(Decision::blocked("ASTM D882-26 is limited to plastic films and thin sheeting below 1.0 mm; select the appropriate method for thicker stock"));
+    }
     if !matches!(
         analysis.independent_unit.as_str(),
         "material_lot" | "film_roll" | "production_day" | "production_line" | "manufacturing_site"
@@ -410,6 +426,7 @@ fn audit_case(case: &SurfaceIntegrityCase) -> Decision {
     }
     if !exposure.gas_purity_pct.is_finite()
         || !(0.0..=100.0).contains(&exposure.gas_purity_pct)
+        || exposure.gas_purity_pct == 0.0
         || !exposure.delivered_power_w.is_finite()
         || exposure.delivered_power_w <= 0.0
         || !exposure.gas_flow_l_min.is_finite()
