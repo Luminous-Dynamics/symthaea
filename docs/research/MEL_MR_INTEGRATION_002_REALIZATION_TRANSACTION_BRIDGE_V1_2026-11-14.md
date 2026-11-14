@@ -221,3 +221,82 @@ Exact-head formatting, compilation, unit tests, fixture replay and Clippy must b
 This contract, when implemented and qualified, can establish that a particular realization attempt was capability-qualified, its exact output bytes were observed, its costs/outcomes were accounted for, and its required independent evidence gates were replayably satisfied.
 
 It cannot by itself establish musical beauty, universal cultural validity, human preference, legal authorship, consent, consciousness, provider honesty, or state-of-the-art superiority. Those require separate evidence programmes and explicit claim scopes.
+
+
+## 13. Current ecosystem implications (14 November 2026 snapshot)
+
+This section is a deployment-design snapshot, not a claim of integration or qualification with any named vendor. Product capabilities, availability, pricing and terms can change; an adapter must pin the exact endpoint/product/model/version and re-check the applicable terms before use.
+
+### 13.1 Generators and studios are already converging
+
+- **Suno Studio 2.0** documents a chat bar for generating audio/MIDI clips and arranging, MIDI piano-roll editing, a built-in wavetable synthesizer, track effects, automation and custom chat-designed plugins. Its current documentation says Studio 2.0 is a Premier-tier product and does not support VST or Audio Units plugins. This means conversational generation, MIDI, effects and automation are not differentiators by themselves.
+  - Official source: https://help.suno.com/en/articles/13670529
+  - Product launch notes: https://suno.com/blog/studio-2
+
+- **Moises Studio** documents simultaneous shared browser sessions, multitrack recording, AI-generated complementary parts, recorded/generated-to-MIDI transcription, agentic editing with visible and reversible steps, stem separation across 30+ instrument/vocal categories, MIDI/MusicXML export and DAWproject session export. Moises also states that user uploads are not used to train its models. These are real product capabilities and trust commitments; Melothaea should compete through interoperable verification and independently replayable evidence rather than pretending collaboration, reversibility or export are absent elsewhere.
+  - Official source: https://moises.ai/newsroom/product-announcements/moises-launches-studio-collaborative-workspace/
+
+- **Google Lyria RealTime** documents a persistent bidirectional WebSocket music stream with weighted prompts and controls including guidance, BPM, density, brightness, scale, bass/drum muting, generation mode and seed. The documented output is raw stereo PCM; the model is labelled experimental. Its documentation notes that BPM/scale changes require a context reset and abrupt prompt changes can need gradual weighting/cross-fading. These are useful creative controls, but they are not a claim of exact note-event editing or deterministic symbolic preservation.
+  - Official source: https://ai.google.dev/gemini-api/docs/realtime-music-generation
+
+### 13.2 Adapter classification
+
+| System class | Useful role | Evidence and control boundary |
+|---|---|---|
+| Local symbolic/MIDI editors and renderers | Exact note/event edits, lineage, score-preserving transforms | Candidate control may be precise; still require independent rendering and acoustic verification |
+| Lyria-like streaming generators | Improvisation, rapid texture/arrangement proposals, live performance candidates | Audio-stream output and high-level controls; exact note identity and stem isolation are unavailable unless independently produced |
+| Suno-like generative studios | Rapid song/clip ideas, generated stems/MIDI and creative exploration | Treat exported artifacts and available project metadata as untrusted inputs; do not assume a public machine API from UI feature documentation |
+| Moises-like collaborative studios | Stem workflows, co-editing, arrangement, external DAW handoff | Integrate at explicit import/export/project boundaries unless a supported API and terms authorize deeper integration |
+| Independent DAWs/renderers | Final production, high-fidelity playback and user-owned session continuity | Maintain portable project state; bind each render to exact project, plugin, renderer and asset versions |
+
+A capability manifest must say which controls are exact, bounded, advisory, best-effort, unavailable or merely observed after generation. Do not convert a high-level prompt or a UI action into an exact symbolic guarantee.
+
+### 13.3 Product position: a portable evidence layer, not a closed DAW
+
+The product should be able to work with a musician's current studio rather than demand that the musician migrate their entire workflow. Prioritize:
+
+1. A portable musical-session/intent sidecar bound to source files, project revision, contribution permissions, target obligations and protected invariants.
+2. Non-destructive candidate branches with aligned A/B preview, symbolic/audio change summaries and explicit musician commit.
+3. A versioned evidence receipt that follows exported/imported audio, MIDI and project handoffs where the receiving format permits it; retain an external signed sidecar when it does not.
+4. Capability-aware routing across local symbolic tools, streaming generators and external studios, with no silent downgrade from exact control to prompt-only steering.
+5. Per-candidate provenance, renderer/acoustic checks and purpose-specific rights decisions that survive movement between tools.
+
+This positions Melothaea as the **trust, intent and verification layer across the music-production stack**, while leaving generation and final rendering replaceable.
+
+## 14. Public benchmark calendar and matched-scope strategy
+
+The following dates and scopes were checked against the organisers' public pages on 14 November 2026.
+
+- **ICASSP 2027 Audio Editing Challenge / MMAE:** the official page says the public development test set has 2,000 examples and 17,741 atomic rubrics. The hidden challenge set and submission SDK were released 10 November 2026, with separate 500-example Single Model and Agent tracks; registration closed 8 October; submissions close 25 November and final rankings are scheduled for 8 December. Agent components must have publicly released model versions/weights before 1 November. If already enrolled, use the official SDK and report the hidden track independently. Otherwise, reproduce the public development baseline and publish a clearly labelled non-challenge result; do not imply hidden-test access or eligibility.
+  - Official source: https://audio-editing-challenge.github.io/
+  - Official leaderboard/protocol: https://audio-editing-challenge.github.io/leaderboard/
+
+- **SMEBench:** the 27 October 2026 preprint describes a balanced 3,600-example synthetic test set and a separate 416-example real-audio complement. Its authors report that metric choice can materially change system rankings. Keep synthetic and real-audio results separate; report source preservation, target agreement and textual compatibility as distinct axes, and first qualify the reference/operation rather than treating every paired waveform as infallible.
+  - Paper: https://arxiv.org/abs/2610.36715
+
+- **XACLE 2027:** the challenge explicitly targets audio-text evaluation generalization to unseen audio-generation systems. Its public schedule lists test release on 19 November 2026 and submission on 3 December. This is an evaluator-generalization challenge, not a music-editing leaderboard; use it to test whether Melothaea's semantic/audio evaluator survives a backend it did not train on.
+  - Official source: https://xacle.org/2027/
+
+- **MIREX 2026 CMI-RewardBench:** the published core result reports 73.9% pairwise human-preference agreement for the leading listed system on 249 core pairs. This is a useful adjacent evaluator-quality reference, not an edit-success score and not statistically interchangeable with MMAE or SMEBench.
+  - Official task/results: https://www.music-ir.org/mirex/wiki/2026%3AMusic_Evaluation_via_CMI-RewardBench
+
+### 14.1 Qualification targets (proposals, not results)
+
+| Track | Reproduction / reference | Melothaea qualification target |
+|---|---|---|
+| MMAE Agent, same 2,000-example public scope | Reproduce the published baseline: IFR 44.06%, CR 74.63%, EMR 7.45% | First gate: IFR ≥44.06%, CR ≥76.63%, EMR ≥12%; stretch: IFR ≥50%, CR ≥80%, EMR ≥15% |
+| MMAE hidden Agent track | Official 500-example track with private rubrics and frozen model release eligibility | Only report if enrolled and eligible; target top-quartile or better with full reproducibility evidence, not a proxy score on development data |
+| SMEBench synthetic | 3,600 paired synthetic cases | ≥95% target-property success on supported held-out operations, with preservation and text compatibility reported separately |
+| SMEBench real-audio complement | 416 real-audio cases | Separate operation-stratified report; no claim of real-audio generalization from synthetic results alone |
+| Hard integrity/protected-content controls | Frozen byte, lineage, rights, stale-receipt and protected-invariant negatives | Zero observed false Accepts; additionally publish confidence bounds. For example, 0/3,000 independent negatives gives an approximate 95% upper bound of 0.1% (rule-of-three approximation) |
+| Counterfactual probing | Exhaustive-render oracle on a bounded development subset | Pair recall ≥0.95, precision ≥0.80 at ≤30% of exhaustive render cost; prospective until measured |
+| Human validity calibration | Blinded, signed multi-reference adjudication | ≥90% acceptance of independently validated legitimate alternatives and ≤1% acceptance of invalid references, with panel disagreement and confidence intervals reported |
+| Cross-backend/renderer generalization | Held-out renderer, soundfont, backend version and audio modality | No silent capability downgrade; report absolute scores and per-domain degradation, with a proposed stretch ceiling of 5 percentage points on matched supported tasks |
+| Reciprocal interaction | RMI-Bench: contingent interaction versus yoked replay, fixed-response and imitation controls | Demonstrate significant partner-intervention contingency and low false contingency under yokes; zero unapproved commits; evaluate human agency/ownership separately from artifact preference |
+| Efficiency | Full regeneration, greedy repair, fixed-probe and single-backend baselines at matched hard-gate success | ≥30% lower render/compute cost per verified acceptance without increasing false acceptance, collateral changes or hidden abstentions |
+
+The numerical thresholds above are research targets. Their use in a public claim requires frozen datasets, matched task scope, versioned model/backend configurations, pre-registered evaluators, confidence intervals and independent reproduction.
+
+### 14.2 Reporting rule
+
+Publish a capability × operation × modality × renderer matrix. Report failures, partial outputs, unknown outcomes, abstentions and budget exhaustion in the denominator. A single aggregate score must not conceal a backend that performs well on easy generation but cannot execute a hard preservation obligation.
