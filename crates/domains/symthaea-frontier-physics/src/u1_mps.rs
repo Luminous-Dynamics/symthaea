@@ -954,6 +954,166 @@ fn right_canonicalize_site(
 }
 
 impl ComplexU1Mps {
+
+    /// Stable norm of the difference between two same-sector MPS.
+    ///
+    /// The two networks are embedded into a direct-sum virtual space. The
+    /// subtraction is applied at the first site, then the two paths propagate
+    /// in block-diagonal form and are recombined only at the right boundary.
+    /// This computes ||A-B||² without subtracting nearly equal O(1) norm and
+    /// overlap scalars.
+    fn difference_norm_squared(
+        &self,
+        other: &Self,
+        tolerance: f64,
+    ) -> Result<f64, U1MpsError> {
+        if self.site_count() != other.site_count() || self.total_charge != other.total_charge {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let site_count = self.site_count();
+        let mut difference_tensors = Vec::with_capacity(site_count);
+
+        if site_count == 1 {
+            let left = &self.tensors[0];
+            let right = &other.tensors[0];
+            if left.left_charges != right.left_charges
+                || left.right_charges != right.right_charges
+            {
+                return Err(U1MpsError::TwoSiteBondMismatch);
+            }
+            let data = (0..left.left_dimension())
+                .flat_map(|left_index| {
+                    (0..2).flat_map(move |physical| {
+                        (0..left.right_dimension()).map(move |right_index| {
+                            left.get(left_index, physical, right_index)
+                                - right.get(left_index, physical, right_index)
+                        })
+                    })
+                })
+                .collect();
+            difference_tensors.push(U1MpsTensor::new(
+                left.left_charges.clone(),
+                left.right_charges.clone(),
+                data,
+            )?);
+        } else {
+            // First site: share the charge-zero left boundary and branch into
+            // the A and -B right virtual spaces.
+            let first_a = &self.tensors[0];
+            let first_b = &other.tensors[0];
+            let first_right_dimension = first_a
+                .right_dimension()
+                .checked_add(first_b.right_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let first_entries = 2_usize
+                .checked_mul(first_right_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut first_data = vec![Complex64::new(0.0, 0.0); first_entries];
+            for physical in 0..2 {
+                for right in 0..first_a.right_dimension() {
+                    first_data[physical * first_right_dimension + right] =
+                        first_a.get(0, physical, right);
+                }
+                for right in 0..first_b.right_dimension() {
+                    first_data[physical * first_right_dimension
+                        + first_a.right_dimension()
+                        + right] = -first_b.get(0, physical, right);
+                }
+            }
+            let mut first_right_charges = first_a.right_charges.clone();
+            first_right_charges.extend_from_slice(&first_b.right_charges);
+            difference_tensors.push(U1MpsTensor::new(
+                first_a.left_charges.clone(),
+                first_right_charges,
+                first_data,
+            )?);
+
+            // Middle sites: propagate A and B in separate diagonal blocks.
+            for site in 1..(site_count - 1) {
+                let tensor_a = &self.tensors[site];
+                let tensor_b = &other.tensors[site];
+                let left_dimension = tensor_a
+                    .left_dimension()
+                    .checked_add(tensor_b.left_dimension())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let right_dimension = tensor_a
+                    .right_dimension()
+                    .checked_add(tensor_b.right_dimension())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let entries = left_dimension
+                    .checked_mul(2)
+                    .and_then(|value| value.checked_mul(right_dimension))
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let mut data = vec![Complex64::new(0.0, 0.0); entries];
+
+                for left in 0..tensor_a.left_dimension() {
+                    for physical in 0..2 {
+                        for right in 0..tensor_a.right_dimension() {
+                            let index = (left * 2 + physical) * right_dimension + right;
+                            data[index] = tensor_a.get(left, physical, right);
+                        }
+                    }
+                }
+                for left in 0..tensor_b.left_dimension() {
+                    for physical in 0..2 {
+                        for right in 0..tensor_b.right_dimension() {
+                            let index = ((tensor_a.left_dimension() + left) * 2 + physical)
+                                * right_dimension
+                                + tensor_a.right_dimension()
+                                + right;
+                            data[index] = tensor_b.get(left, physical, right);
+                        }
+                    }
+                }
+
+                let mut left_charges = tensor_a.left_charges.clone();
+                left_charges.extend_from_slice(&tensor_b.left_charges);
+                let mut right_charges = tensor_a.right_charges.clone();
+                right_charges.extend_from_slice(&tensor_b.right_charges);
+                difference_tensors.push(U1MpsTensor::new(left_charges, right_charges, data)?);
+            }
+
+            // Final site: add the two branch amplitudes at the common
+            // total-charge right boundary.
+            let final_a = self.tensors.last().expect("nonempty MPS");
+            let final_b = other.tensors.last().expect("nonempty MPS");
+            let final_left_dimension = final_a
+                .left_dimension()
+                .checked_add(final_b.left_dimension())
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let final_entries = final_left_dimension
+                .checked_mul(2)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut final_data = vec![Complex64::new(0.0, 0.0); final_entries];
+            for left in 0..final_a.left_dimension() {
+                for physical in 0..2 {
+                    final_data[left * 2 + physical] = final_a.get(left, physical, 0);
+                }
+            }
+            for left in 0..final_b.left_dimension() {
+                for physical in 0..2 {
+                    final_data[(final_a.left_dimension() + left) * 2 + physical] =
+                        final_b.get(left, physical, 0);
+                }
+            }
+            let mut final_left_charges = final_a.left_charges.clone();
+            final_left_charges.extend_from_slice(&final_b.left_charges);
+            difference_tensors.push(U1MpsTensor::new(
+                final_left_charges,
+                final_a.right_charges.clone(),
+                final_data,
+            )?);
+        }
+
+        let difference = Self::new(difference_tensors, self.total_charge, tolerance)?;
+        difference.norm_squared(tolerance)
+    }
+
+
     /// Validate a complete open-boundary MPS and its charge-selection rules.
     pub fn new(
         tensors: Vec<U1MpsTensor>,
@@ -1091,20 +1251,12 @@ impl ComplexU1Mps {
         // Validate a candidate first. On any failure the original MPS is unchanged.
         let candidate = Self::new(tensors, self.total_charge, tolerance)?;
         let output_norm_squared = candidate.norm_squared(tolerance)?;
-        let overlap = self.inner_product(&candidate)?;
         let scale = input_norm_squared.max(output_norm_squared).max(1.0);
-        let imaginary_overlap_residual = overlap.im.abs();
-        let difference_squared = input_norm_squared + output_norm_squared - 2.0 * overlap.re;
-        if imaginary_overlap_residual > tolerance * scale {
-            return Err(U1MpsError::ComplexNormResidual {
-                imaginary_part: imaginary_overlap_residual,
-                tolerance: tolerance * scale,
-            });
-        }
-        if difference_squared < -tolerance * scale {
+        let difference_squared = self.difference_norm_squared(&candidate, tolerance)?;
+        if difference_squared < 0.0 {
             return Err(U1MpsError::NegativeNormSquared(difference_squared));
         }
-        let state_reconstruction_l2_residual = difference_squared.max(0.0).sqrt();
+        let state_reconstruction_l2_residual = difference_squared.sqrt();
         let relative_norm_drift = (output_norm_squared - input_norm_squared).abs() / scale;
 
         let mut left_isometry_residuals = Vec::with_capacity(bond);
@@ -4003,10 +4155,10 @@ mod tests {
             state.canonicalize_for_bond(3, 1.0e-10),
             Err(U1MpsError::TwoSiteShapeMismatch)
         );
-        assert_eq!(
+        assert!(matches!(
             state.canonicalize_for_bond(0, f64::NAN),
-            Err(U1MpsError::InvalidTolerance(f64::NAN))
-        );
+            Err(U1MpsError::InvalidTolerance(value)) if value.is_nan()
+        ));
         let after = state.to_dense(8).unwrap();
         for (actual, expected) in after.iter().zip(before.iter()) {
             assert!((*actual - *expected).norm() <= 1.0e-14);
