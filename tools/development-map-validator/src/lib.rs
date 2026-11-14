@@ -998,8 +998,13 @@ fn validate_event(
     let occurred_at = event
         .get("occurred_at")
         .and_then(|value| optional_string(value, &format!("{path}.occurred_at"), report));
+    if let Some(occurred_at) = occurred_at.as_deref() {
+        if DateTime::parse_from_rfc3339(occurred_at).is_err() {
+            report.error("EGDDM-TIME-001", format!("{path}.occurred_at"), "timestamp must be valid RFC 3339");
+        }
+    }
     if let Some(observed_at) = field(value, "observed_at", &path, report) {
-        string(observed_at, &format!("{path}.observed_at"), report);
+        parse_rfc3339(observed_at, &format!("{path}.observed_at"), report);
     }
 
     if let Some(revision) = field(value, "effective_revision", &path, report)
@@ -1117,9 +1122,17 @@ fn validate_event(
                             let scope = payload.get("authority_scope").and_then(Value::as_str);
                             let policy = payload.get("policy_version").and_then(Value::as_str);
                             for (key, actual) in [
+                                ("owner_repository", payload.get("owner_repository").and_then(Value::as_str)),
+                                ("owner_record_ref", payload.get("owner_record_ref").and_then(Value::as_str)),
+                                ("owner_record_type", payload.get("owner_record_type").and_then(Value::as_str)),
                                 ("actor_id", actor),
                                 ("authority_scope", scope),
                                 ("policy_version", policy),
+                                ("source_observed_at", payload.get("source_observed_at").and_then(Value::as_str)),
+                                ("available_to_actor_at", payload.get("available_to_actor_at").and_then(Value::as_str)),
+                                ("valid_from", payload.get("valid_from").and_then(Value::as_str)),
+                                ("valid_through", payload.get("valid_through").and_then(Value::as_str)),
+                                ("owner_record_disposition", payload.get("owner_record_disposition").and_then(Value::as_str)),
                             ] {
                                 if actual != node.attributes.get(key).and_then(Value::as_str) {
                                     report.error(
@@ -1137,6 +1150,18 @@ fn validate_event(
                                     "DTEA-AUTH-019",
                                     format!("{path}.payload.available_to_actor_at"),
                                     "authority evidence cannot be available to the actor before the event was observed",
+                                );
+                            }
+                            let source_observed = payload.get("source_observed_at")
+                                .and_then(Value::as_str)
+                                .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                            let event_occurred = occurred_at.as_deref()
+                                .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                            if source_observed.as_ref().is_none_or(|source| event_occurred.as_ref() != Some(source)) {
+                                report.error(
+                                    "DTEA-AUTH-021",
+                                    format!("{path}.occurred_at"),
+                                    "authority evidence event occurred_at must match the referenced owner's source_observed_at",
                                 );
                             }
                         }
@@ -2295,6 +2320,23 @@ mod tests {
             Value::String("release-policy-v2".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-008"));
+    }
+
+    #[test]
+    fn authority_recorded_event_must_match_owner_evidence_node() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][1]["payload"]["owner_record_ref"] =
+            Value::String("synthetic://mycelix/authority-grant/OTHER".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-018"));
+    }
+
+    #[test]
+    fn decision_cannot_reference_authority_without_recorded_event() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][1]["kind"] = Value::String("source_changed".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-AUTH-018"));
     }
 
     #[test]
