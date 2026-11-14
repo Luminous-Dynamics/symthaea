@@ -421,5 +421,6 @@
       "numerator": "3",
       "denominator": "1"
     }
-  }
+  },
+  "calibration_nuisance_id": "calibration-common-real-crossport-001"
 }
