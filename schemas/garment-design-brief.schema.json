@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/atelier/garment-design-brief/0.1.0",
+  "title": "Luminous Atelier Garment Design Brief",
+  "description": "User-authored intent and constraints for a garment design. This is a design brief, not a pattern, fit guarantee, physical test, or manufacturing authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "brief_id", "garment", "intent", "hard_constraints", "objectives", "tradeoff_policy", "privacy"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "brief_id": {"type": "string", "pattern": "^GDB-[A-Z0-9][A-Z0-9-]{2,63}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 160},
+    "created_at": {"type": "string", "format": "date-time"},
+    "garment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["family", "intended_use"],
+      "properties": {
+        "family": {"enum": ["top", "bottom", "outerwear", "dress", "one_piece", "underwear", "sportswear", "workwear", "adaptive", "accessory", "footwear", "other"]},
+        "subtype": {"type": "string", "maxLength": 100},
+        "intended_use": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 120}},
+        "service_profile": {"enum": ["everyday", "work_cycles", "sports_sessions", "events", "performance_runs", "travel_days", "care_or_display_years", "user_defined"]}
+      }
+    },
+    "intent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["description"],
+      "properties": {
+        "description": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "style_tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 80}},
+        "silhouette": {"type": "string", "maxLength": 160},
+        "color_direction": {"type": "array", "items": {"type": "string", "maxLength": 80}},
+        "avoid": {"type": "array", "uniqueItems": true, "items": {"type": "string", "maxLength": 160}},
+        "reference_assets": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["asset_ref", "rights_status"],
+            "properties": {
+              "asset_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+              "sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+              "rights_status": {"enum": ["user_owned", "licensed", "public_domain", "permission_granted", "unknown", "withheld"]},
+              "attribution": {"type": "string", "maxLength": 500}
+            }
+          }
+        }
+      }
+    },
+    "fit": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "basis": {"enum": ["manual_measurement_profile", "existing_pattern", "size_table", "synthetic_manikin", "local_body_model", "not_selected"]},
+        "profile_ref": {"type": "string", "maxLength": 512},
+        "fit_intent": {"enum": ["close", "regular", "relaxed", "oversized", "draped", "compression", "user_defined"]},
+        "ease_preferences": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["region", "preference"],
+            "properties": {
+              "region": {"type": "string", "minLength": 1, "maxLength": 100},
+              "preference": {"enum": ["close", "neutral", "roomy", "free_movement", "user_defined"]},
+              "ease_mm": {"type": "number", "minimum": -100, "maximum": 500},
+              "confidence": {"enum": ["user_preference", "measured", "estimated", "unknown"]}
+            }
+          }
+        },
+        "postures": {"type": "array", "uniqueItems": true, "items": {"enum": ["standing", "sitting", "wheelchair_seated", "bending", "reaching", "walking", "running", "cycling", "overhead_work", "user_defined"]}},
+        "movement_requirements": {"type": "array", "items": {"type": "string", "maxLength": 240}}
+      }
+    },
+    "component_choices": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["component", "choice", "source", "locked"],
+        "properties": {
+          "component": {"type": "string", "minLength": 1, "maxLength": 100},
+          "choice": {"type": "string", "minLength": 1, "maxLength": 500},
+          "source": {"enum": ["user", "preset", "assistant_suggestion", "imported_design"]},
+          "locked": {"type": "boolean"},
+          "revision_ref": {"type": "string", "maxLength": 512}
+        }
+      }
+    },
+    "hard_constraints": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "path", "operator", "value", "acceptance_basis"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,80}$"},
+          "path": {"type": "string", "minLength": 1, "maxLength": 200},
+          "operator": {"enum": ["eq", "neq", "lt", "lte", "gt", "gte", "in", "not_in", "contains", "not_contains"]},
+          "value": {},
+          "unit": {"type": "string", "maxLength": 40},
+          "acceptance_basis": {"enum": ["user_confirmation", "structural_rule", "supplier_evidence", "measured_test", "physical_trial", "not_yet_defined"]},
+          "failure_policy": {"enum": ["reject_candidate", "request_user_decision", "abstain"]}
+        }
+      }
+    },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "metric", "direction", "weight"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,80}$"},
+          "metric": {"enum": ["comfort_preference", "appearance_preference", "durability", "affordability", "breathability", "thermal_suitability", "moisture_management", "repairability", "modularity", "local_availability", "manufacturing_simplicity", "material_efficiency", "environmental_impact", "sensory_accessibility", "fit_preference", "design_novelty", "user_defined"]},
+          "label": {"type": "string", "maxLength": 120},
+          "direction": {"enum": ["minimize", "maximize", "target", "prefer"]},
+          "weight": {"type": "integer", "minimum": 0, "maximum": 100},
+          "target": {"type": ["number", "string"]},
+          "unit": {"type": "string", "maxLength": 40},
+          "measurement_basis": {"enum": ["user_preference", "measured", "model_estimate", "supplier_declaration", "not_defined"]}
+        }
+      }
+    },
+    "material_preferences": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["preference", "status"],
+        "properties": {
+          "preference": {"type": "string", "minLength": 1, "maxLength": 300},
+          "status": {"enum": ["required", "preferred", "avoided", "open"]},
+          "material_lot_ref": {"type": "string", "maxLength": 512},
+          "evidence_state": {"enum": ["measured", "supplier_declared", "modelled", "unknown", "not_applicable"]}
+        }
+      }
+    },
+    "accessibility": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "need", "verification_state"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1, "maxLength": 80},
+              "need": {"type": "string", "minLength": 1, "maxLength": 500},
+              "verification_state": {"enum": ["user_confirmed", "pattern_check", "physical_trial", "unknown"]}
+            }
+          }
+        }
+      }
+    },
+    "manufacturing": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "preferred_route": {"enum": ["home_sewing", "local_maker", "tailor", "cut_make_trim", "industrial_knit", "made_to_order_factory", "unknown"]},
+        "country_code": {"type": "string", "pattern": "^[A-Z]{2}$"},
+        "budget": {
+          "type": "object", "additionalProperties": false,
+          "required": ["amount", "currency", "basis"],
+          "properties": {
+            "amount": {"type": "number", "minimum": 0},
+            "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+            "basis": {"enum": ["materials_only", "finished_garment", "labor_and_materials", "total_landed_cost"]}
+          }
+        },
+        "available_equipment": {"type": "array", "uniqueItems": true, "items": {"type": "string", "maxLength": 120}},
+        "allowed_operations": {"type": "array", "uniqueItems": true, "items": {"type": "string", "maxLength": 120}}
+      }
+    },
+    "circularity": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "repairability_preference": {"enum": ["low", "medium", "high", "highest_priority", "not_selected"]},
+        "replaceable_components": {"type": "array", "uniqueItems": true, "items": {"type": "string", "maxLength": 120}},
+        "disassembly_preference": {"enum": ["easy", "tool_assisted", "specialist", "not_selected"]},
+        "care_constraints": {"type": "array", "uniqueItems": true, "items": {"type": "string", "maxLength": 160}}
+      }
+    },
+    "tradeoff_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["show_pareto_alternatives", "hard_constraints_are_non_compensatory", "require_approval_for_locked_feature_changes", "require_approval_for_material_substitution"],
+      "properties": {
+        "show_pareto_alternatives": {"type": "boolean"},
+        "hard_constraints_are_non_compensatory": {"const": true},
+        "require_approval_for_locked_feature_changes": {"const": true},
+        "require_approval_for_material_substitution": {"const": true}
+      }
+    },
+    "privacy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body_profile_storage", "raw_scan_policy", "design_sharing", "training_use"],
+      "properties": {
+        "body_profile_storage": {"enum": ["local_only", "user_authorized_remote", "no_profile"]},
+        "raw_scan_policy": {"enum": ["not_used", "local_only", "explicit_per_use_authorization"]},
+        "design_sharing": {"enum": ["private", "explicit_share_only", "public_only_by_user_action"]},
+        "training_use": {"enum": ["never", "separate_explicit_opt_in"]}
+      }
+    },
+    "evidence_policy": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "unknowns_must_remain_explicit": {"const": true},
+        "simulation_is_not_physical_test": {"const": true},
+        "supplier_declaration_is_not_measurement": {"const": true}
+      }
+    }
+  }
+}
