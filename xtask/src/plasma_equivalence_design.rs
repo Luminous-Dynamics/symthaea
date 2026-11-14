@@ -202,6 +202,14 @@ fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     if !matches!(receipt.grouping_scheme.as_str(), "independent_arms" | "paired_by_cluster") {
         return rejected("grouping scheme is unsupported by this audit profile");
     }
+    let expected_analysis_profile = match receipt.grouping_scheme.as_str() {
+        "independent_arms" => "two_sample_tost_v1",
+        "paired_by_cluster" => "paired_tost_v1",
+        _ => unreachable!("grouping scheme checked above"),
+    };
+    if receipt.analysis_profile != expected_analysis_profile {
+        return rejected("analysis profile is not registered for the declared independent-unit design");
+    }
     if !matches!(receipt.independent_unit.as_str(), "material_lot" | "adhesive_batch" | "plasma_head" | "production_day" | "production_line" | "manufacturing_site" | "paired_cluster") {
         return blocked("independent experimental unit is unknown or unregistered");
     }
@@ -242,7 +250,8 @@ fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         || !receipt.max_cluster_attrition_rate.is_finite()
         || !(0.0..1.0).contains(&receipt.max_cluster_attrition_rate)
         || !receipt.target_power.is_finite()
-        || !(0.0..1.0).contains(&receipt.target_power)
+        || receipt.target_power <= 0.0
+        || receipt.target_power >= 1.0
         || !receipt.target_precision_half_width.is_finite()
         || receipt.target_precision_half_width <= 0.0
     {
@@ -379,7 +388,9 @@ fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     {
         return rejected("method receipt specimen identities do not exactly match the analysis sample manifests");
     }
-    if baseline_receipt.method_id != candidate_receipt.method_id
+    if baseline_receipt.id == candidate_receipt.id
+        || baseline_receipt.raw_data_sha256 == candidate_receipt.raw_data_sha256
+        || baseline_receipt.method_id != candidate_receipt.method_id
         || baseline_receipt.edition != candidate_receipt.edition
         || baseline_receipt.protocol_id != candidate_receipt.protocol_id
         || baseline_receipt.protocol_sha256 != candidate_receipt.protocol_sha256
@@ -418,6 +429,8 @@ fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         return rejected("reported equivalence outcome does not match the declared interval and equivalence margins");
     }
 
+    // Included + excluded totals remain available for the attrition contract;
+    // only the included samples and clusters feed the analysis-result counts.
     let _ = (baseline_total, candidate_total, baseline_cluster_total, candidate_cluster_total);
     Decision {
         disposition: Disposition::Pass,
