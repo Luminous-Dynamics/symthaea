@@ -631,6 +631,20 @@ mod tests {
     }
 
     #[test]
+    fn power_assumptions_are_bound_to_the_frozen_plan() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "power-assumption-digest-mismatch").expect("case exists");
+        assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn missing_randomization_protocol_blocks_the_design() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "missing-randomization-protocol-ref").expect("case exists");
+        assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
     fn design_pass_does_not_require_equivalence_to_be_established() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
         let case = fixture.cases.iter().find(|case| case.id == "valid-design-but-interval-outside-margin").expect("case exists");
