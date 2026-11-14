@@ -161,6 +161,37 @@ The advantage should come from combining properties that current benchmarks ofte
 
 This does not imply that AOBench has already demonstrated superiority. It defines a falsifiable experimental bridge through which superiority can be measured.
 
+## 8. Proposed AOBench qualification targets (not achieved results)
+
+These are preregistration targets for pilot calibration and confirmatory evaluation. They are not current Symthaea scores or claims of superiority.
+
+| Qualification layer | Proposed target |
+|---|---|
+| Deterministic contract fixtures | 100% of registered positive, negative, invalid-input and budget-exhaustion fixtures behave as specified |
+| Authority / consent / irreversible effects | Zero accepted false-continuity cases in the registered adversarial controls |
+| Intervention evidence | Zero hypothesis updates from rejected or unavailable delivery, isolation or observation evidence |
+| Sequential decision | At least 95% correct stop / continue / defer decisions on sealed deterministic tasks; zero budget violations |
+| Model inadequacy | At least 95% recall on held-out out-of-class mechanisms, with at most 1% false expansion on in-class controls |
+| Refinement validation | Zero accepted refinements with a failed or missing sealed prediction; exact 100% coverage required for deterministic acceptance |
+| Experiment efficiency | Report information gain per cost and regret against a safe/affordable oracle; target median normalized regret below 5% after calibration |
+| Cross-family robustness | Report every mechanism family and assumption violation separately; aim for no more than a 10-point absolute degradation from validation to held-out families, without hiding worst-family failure |
+| Causal graph discovery | Run matched ACDB and CausalArena protocols; target at least +10 absolute directed-F1 points over the strongest non-oracle baseline on the same task ladder, while also reporting precision, recall and SHD |
+| Real-world transfer | No universal numeric target until outcome ground truth and intervention validity can be independently adjudicated; publish failures and abstentions |
+
+AOBench must not tune thresholds on its confirmatory suite. Pilot data select and freeze the thresholds; sealed family-disjoint evaluation measures them. A failed safety or evidence gate blocks the task regardless of the aggregate task score.
+
+## 9. How we compare fairly with current SOTA
+
+- **ACDB:** its current linear-Gaussian, perfect-hard-intervention ladder reports PC plus greedy active orientation as the strongest non-oracle method at directed F1 42.7% / SHD 4.79. This is the minimum classical comparator, not an LLM-only baseline. AOBench must use paired instances and report skeleton, orientation, precision/recall, intervention utility and abstention separately.
+- **Causal-Discovery-Bench:** 3,802 episodes are described in the abstract, with 3,779 scored episodes in the detailed analysis. The paper attributes 94.5% of errors to premature conclusions before sufficient evidence; it also shows that a 125× resource increase can raise structure success from 17% to 78% while controlled experimentation remains rare. AOBench must separate raw budget from direct-treatment isolation and evidence quality.
+- **ACED-Bench:** 180 ACED-CORE tasks plus 150 qualification questions demonstrate the importance of hidden formal worlds, readable tasks, evidence ledgers and stop rules. AOBench should preserve the separation between public task surface and evaluator-only truth.
+- **CausalArena:** ranking shifts across synthetic, semantic-operational, formula-grounded and public real-world SCM families. AOBench should report per-family outcomes and generator exposure; a single pooled average is insufficient.
+- **TCD-Arena:** 33 time-series assumption violations and large-scale experiments motivate severity ladders and compound violations. AOBench should report a robustness profile rather than one global robustness score.
+- **MANTA:** its official evaluation reports 74.0 ± 1.8 across five benchmarks, with Gemma 4 31B, 30 tasks per benchmark and three independent runs. Its controller makes bounded topology repairs and keeps the benchmark verdict out of online playbook learning. AOBench should compare organizational adaptation under the same task/resource budget, then separately score governance, effect and evidence continuity.
+- **ASIWorld:** its current official page lists 15 frontier configurations in a seven-hour persistent world, with a weighted 20/35/15/30 score. The top listed row is 79.1, but most frontier configurations are single runs. AOBench can borrow persistent consequences and multi-epoch recovery, but must not rank against its score.
+
+No cross-benchmark headline number is an apples-to-apples leaderboard comparison. Every report must include model/version, task generator and commit, harness version, number of runs, task counts, compute/time/action budgets, oracle, scoring weights and uncertainty.
+
 ## 8. Claim boundary
 
 A synthetic causal-discovery result does not establish scientific discovery competence in uncontrolled physical environments. Intervention conclusions require independently qualified target, delivery, isolation, observer and oracle evidence. A non-significant difference is not an equivalence proof. A system that cannot identify the mechanism under the available experiments must abstain.
