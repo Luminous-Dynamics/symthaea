@@ -280,6 +280,12 @@ fn validate_body(
                         if target.body.scope.configuration_world_digest != body.scope.configuration_world_digest {
                             diagnostics.push(diagnostic("D2-TARGET-004", format!("{path}.target_event_id"), "target and transition must belong to the same configuration world"));
                         }
+                        if prior_events.values().any(|prior| {
+                            prior.body.target_event_id.as_deref() == Some(target_id)
+                                && matches!(prior.body.operation, EventOperation::Invalidate | EventOperation::Supersede)
+                        }) {
+                            diagnostics.push(diagnostic("D2-TARGET-007", format!("{path}.target_event_id"), "an assertion may receive only one terminal lifecycle transition"));
+                        }
                         for transition_actor in &body.actor_availability {
                             match actor_availability(&target.body, &transition_actor.actor_id) {
                                 Some(target_actor) => {
@@ -848,5 +854,41 @@ mod tests {
         let mut query = query("2026-11-14T12:00:00Z", "2026-11-14T12:00:00Z", None);
         query.repository_full_name = "other/repository".to_owned();
         assert!(replay_ledger(&ledger, &query).is_err());
+    }
+    #[test] fn serialized_checkpoint_can_resume_only_the_suffix() {
+        let ledger = sample_ledger();
+        let prefix = EventLedger {
+            schema_version: ledger.schema_version.clone(),
+            ledger_id: ledger.ledger_id.clone(),
+            repository_full_name: ledger.repository_full_name.clone(),
+            events: ledger.events[..2].to_vec(),
+        };
+        let query = query("2026-11-14T11:00:00Z", "2026-11-14T10:00:00Z", None);
+        let cursor = start_replay_cursor(&prefix, &query).expect("prefix cursor");
+        let saved = serialize_replay_cursor(&cursor).expect("serialize cursor");
+        let restored = deserialize_replay_cursor(&saved).expect("restore cursor");
+        let resumed = resume_replay_cursor(restored, &ledger.events[2..]).expect("resume suffix");
+        let clean = replay_ledger(&ledger, &query).expect("clean replay");
+        assert_eq!(serde_json::to_value(clean).unwrap(), serde_json::to_value(resumed.projection()).unwrap());
+    }
+    #[test] fn tampered_checkpoint_is_rejected() {
+        let ledger = sample_ledger();
+        let query = query("2026-11-14T11:00:00Z", "2026-11-14T10:00:00Z", None);
+        let cursor = start_replay_cursor(&ledger, &query).expect("cursor");
+        let mut saved: Value = serde_json::from_str(&serialize_replay_cursor(&cursor).unwrap()).unwrap();
+        saved["state"]["facts"] = serde_json::json!({});
+        assert!(deserialize_replay_cursor(&saved.to_string()).is_err());
+    }
+    #[test] fn duplicate_terminal_transitions_are_rejected() {
+        let mut ledger = sample_ledger();
+        let mut second = ledger.events[2].clone();
+        second.event_id = "event-005".to_owned();
+        second.body.operation = EventOperation::Supersede;
+        second.body.recorded_at = "2026-11-14T10:40:00Z".to_owned();
+        second.body.observed_at = "2026-11-14T10:39:00Z".to_owned();
+        second.body.actor_availability[0].available_at = "2026-11-14T10:45:00Z".to_owned();
+        ledger.events.push(second);
+        reseal(&mut ledger);
+        assert!(validate_ledger(&ledger).diagnostics.iter().any(|d| d.code == "D2-TARGET-007"));
     }
 }
