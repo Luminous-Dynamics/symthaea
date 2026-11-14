@@ -10,12 +10,11 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 4. [Assay adequacy and model-relative identifiability](EXPERIMENTAL_ASSAY_ADEQUACY_2026-11-14.md) — deterministic finite-model distinguishability and its current limits.
 5. [Finite viability-localized model](FINITE_VIABILITY_MODEL_2026-11-14.md) — AP1–AP4-style finite witnesses and local-to-global obstruction experiments.
 6. [Boundary, substrate and authority research PR #12032](https://github.com/Luminous-Dynamics/symthaea/pull/12032) and [tracking issue #12031](https://github.com/Luminous-Dynamics/symthaea/issues/12031) — separates productive organization, boundary enforcement, exogenous resource flows and delegated authority.
-7. [Stochastic assay qualification issue #12048](https://github.com/Luminous-Dynamics/symthaea/issues/12048) — repeated response distributions, effect thresholds, uncertainty and multiplicity control.
+7. [Stochastic categorical assay implementation](STOCHASTIC_ASSAY_2026-11-14.md) and [tracking issue #12048](https://github.com/Luminous-Dynamics/symthaea/issues/12048) — repeated response distributions, exact permutation tests and Holm correction.
 8. [AOBENCH-004 synthetic-organism adapter](https://github.com/Luminous-Dynamics/symthaea/issues/12023) — project the existing synthetic-organism viability environment into AOBench without duplicating its simulator.
 9. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
 10. [MEL-AUTO-001 runtime regeneration qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10098).
 
-6. [Stochastic categorical assay evaluation](STOCHASTIC_ASSAY_2026-11-14.md) — exact permutation tests, Holm correction and statistical assumptions.
 
 ## Current implementation
 
@@ -40,7 +39,8 @@ The finite viability module checks explicit finite witnesses inspired by the 202
 - The runtime verifier previously passed exact-package format, locked all-target compile, 10 deterministic tests and strict Clippy on the exact commit recorded in [PR #12010](https://github.com/Luminous-Dynamics/symthaea/pull/12010).
 - PR #12010's newer tip had a queued AOBench Runtime Qualification workflow when last checked; previous green results must not be attributed to that newer SHA.
 - The finite viability module and deterministic controls are committed on the AOBench finite-model branch and opened for review in [draft PR #12047](https://github.com/Luminous-Dynamics/symthaea/pull/12047).
-- The current finite-model PR head's focused AOBench workflow is queued; broad CI and governance runs were skipped. No new compiler pass is claimed.
+- The stochastic categorical evaluator and its seven deterministic tests are committed on the AOBench statistical-assay branch; exact-head qualification is required before compiler-qualified status.
+- The finite-model PR's focused AOBench workflow was queued at its last check; broad CI and governance runs were skipped. No new compiler pass is claimed.
 - This environment has no Rust compiler, so local format/check/test/Clippy execution was unavailable.
 - Benchmark targets remain proposals until pilot calibration, statistical qualification and confirmatory measurement.
 
