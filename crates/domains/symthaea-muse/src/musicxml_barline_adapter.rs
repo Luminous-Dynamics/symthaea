@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Conservative MusicXML adapter for the explicit barline evaluation contract.
 //!
-//! Only score-partwise measure containers are handled in V1. A measure span
-//! is normalized from its explicit content cursor and, where present, its
-//! own declared time signature. This is not a MIDI meter-to-barline inference
-//! path. The global-map helper requires part reconciliation; separate APIs
-//! preserve polymetric per-part maps and the complete typed barline graph.
+//! Both score-partwise and score-timewise source layouts are normalized into
+//! the same per-part measure input model without serializing or reparsing the
+//! XML. A measure span is normalized from its explicit content cursor and,
+//! where present, its own declared time signature. This is not a MIDI
+//! meter-to-barline inference path. The global-map helper requires part
+//! reconciliation; separate APIs preserve polymetric per-part maps and the
+//! complete typed barline graph.
 
 use crate::evidence_digest::canonical_json_sha256;
 use crate::musicxml_notation_events::{
@@ -211,7 +213,7 @@ struct ParsedMeasure {
     has_unmodelled_barline_events: bool,
 }
 
-/// Parse explicit MusicXML partwise measures into a common score-clock map.
+/// Parse explicit MusicXML partwise or timewise measures into a common score-clock map.
 ///
 /// The caller must supply an immutable source identifier (preferably the
 /// source artifact SHA-256) and a score-clock identifier shared with the
@@ -364,7 +366,7 @@ pub struct MusicXmlPartMeasureMapV1 {
     pub map: MeasureMap,
 }
 
-/// Parse every MusicXML score-partwise part into its own exact measure map.
+/// Parse every MusicXML part into its own exact measure map, regardless of root layout.
 ///
 /// Unlike parse_musicxml_measure_map, this API preserves polymetric structure
 /// instead of trying to collapse all part barlines into one global lattice.
@@ -602,7 +604,7 @@ pub struct MusicXmlPartNotationGraphV1 {
     pub part_metadata_layer_present: bool,
 }
 
-/// Parse score-partwise into exact per-part measure maps plus typed barline
+/// Parse score-partwise or score-timewise into exact per-part maps plus typed barline
 /// events. Middle bars, repeats and endings are preserved here instead of
 /// forcing the measure-only APIs to silently discard them.
 pub fn parse_musicxml_part_notation_graph(
@@ -2421,6 +2423,8 @@ mod tests {
                 <direction><sound tempo="108"/></direction>
                 <note id="p1-n1"><pitch><step>C</step><alter>0</alter><octave>5</octave></pitch><duration>8</duration><type>half</type><voice>1</voice><staff>1</staff><instrument id="P1-I1"/></note>
                 <note id="p1-n2"><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+                <backup><duration>16</duration></backup>
+                <note id="p1-n3"><pitch><step>G</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><staff>2</staff></note>
                 <barline location="right"><bar-style>light-heavy</bar-style></barline>
             </measure></part>
             <part id="P2"><measure number="1" id="p2-m1">
@@ -2447,6 +2451,8 @@ mod tests {
                     <direction><sound tempo="108"/></direction>
                     <note id="p1-n1"><pitch><step>C</step><alter>0</alter><octave>5</octave></pitch><duration>8</duration><type>half</type><voice>1</voice><staff>1</staff><instrument id="P1-I1"/></note>
                     <note id="p1-n2"><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+                    <backup><duration>16</duration></backup>
+                    <note id="p1-n3"><pitch><step>G</step><octave>3</octave></pitch><duration>16</duration><voice>2</voice><staff>2</staff></note>
                     <barline location="right"><bar-style>light-heavy</bar-style></barline>
                 </part>
             </measure>
@@ -2494,7 +2500,7 @@ mod tests {
             </measure>
             <measure number="A" id="irregular" non-controlling="yes" text="A">
                 <part id="P1"><note><rest/><duration>16</duration></note></part>
-                <part id="P2"><note><rest/><duration>8</duration></note></part>
+                <part id="P2"><attributes><time><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>8</duration></note></part>
             </measure>
         </score-timewise>"#;
         let graphs = parse_musicxml_part_notation_graph(
@@ -2628,6 +2634,28 @@ mod tests {
             parse_musicxml_part_notation_graph(changed.as_bytes(), "timewise-replay", "score-clock"),
             Err(MusicXmlMeasureAdapterError::UnknownTimewisePart { .. })
         ));
+    }
+
+
+    #[test]
+    fn legacy_partwise_graph_replay_accepts_previous_canonicalization_versions() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "legacy-partwise-version", "score-clock"
+        ).unwrap().remove(0);
+        graph.map.canonicalization_version =
+            LEGACY_MUSICXML_BARLINE_CANONICALIZATION_V1.into();
+        graph.notation_events.canonicalization_version =
+            crate::musicxml_notation_events::LEGACY_MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into();
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "legacy-partwise-version",
+            "score-clock",
+            &[graph],
+        ).unwrap());
     }
 
 }
