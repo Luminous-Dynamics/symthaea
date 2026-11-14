@@ -209,6 +209,8 @@ pub enum RightsPolicyIssueV1 {
     MissingNoticeStatement { component_id: String },
     MissingShareAlikeScope { component_id: String },
     CommercialEvaluationWithoutCommercialContext,
+    RedistributionPurposeWithoutDistribution,
+    PublicReleasePurposeFlagMismatch,
     PublicReleaseRequiresDistribution,
     SerializationError,
     ReceiptMismatch,
@@ -436,6 +438,16 @@ pub fn evaluate_music_rights_use_v1(
     }
     if request.purpose == RightsPurposeV1::CommercialEvaluation && !request.commercial_context {
         structural.push(RightsPolicyIssueV1::CommercialEvaluationWithoutCommercialContext);
+    }
+    if matches!(
+        request.purpose,
+        RightsPurposeV1::Redistribution | RightsPurposeV1::PublicRelease
+    ) && !request.distribute_output
+    {
+        structural.push(RightsPolicyIssueV1::RedistributionPurposeWithoutDistribution);
+    }
+    if request.purpose == RightsPurposeV1::PublicRelease && !request.public_release {
+        structural.push(RightsPolicyIssueV1::PublicReleasePurposeFlagMismatch);
     }
     if request.public_release && !request.distribute_output {
         structural.push(RightsPolicyIssueV1::PublicReleaseRequiresDistribution);
@@ -857,6 +869,49 @@ mod tests {
             &RightsPolicyIssueV1::InvalidHumanReviewRecord {
                 component_id: "invalid-review".to_owned()
             }
+        ));
+    }
+
+    #[test]
+    fn commercial_context_requires_commercial_permission_even_for_generic_evaluation() {
+        let mut permissions = permissive_permissions();
+        permissions.commercial_use = RightsPermissionV1::Denied;
+        let rights = bundle(vec![component("recording", "CC-BY-NC-SA-4.0", permissions)]);
+        let mut use_request = request(RightsPurposeV1::Evaluation);
+        use_request.commercial_context = true;
+        let receipt = evaluate_music_rights_use_v1(&rights, &use_request).unwrap();
+        assert_eq!(receipt.status, RightsDecisionStatusV1::Denied);
+        assert!(receipt.reasons.iter().any(|reason| {
+            reason.purpose == Some(RightsPurposeV1::CommercialEvaluation)
+                && reason.code == RightsDecisionReasonCodeV1::PermissionDenied
+        }));
+    }
+
+    #[test]
+    fn redistribution_purpose_requires_distribution_flag() {
+        let rights = bundle(vec![component(
+            "audio",
+            "CC-BY-4.0",
+            permissive_permissions(),
+        )]);
+        assert!(matches!(
+            evaluate_music_rights_use_v1(&rights, &request(RightsPurposeV1::Redistribution)),
+            Err(issues) if issues.contains(&RightsPolicyIssueV1::RedistributionPurposeWithoutDistribution)
+        ));
+    }
+
+    #[test]
+    fn public_release_purpose_requires_matching_release_flag() {
+        let rights = bundle(vec![component(
+            "audio",
+            "CC-BY-4.0",
+            permissive_permissions(),
+        )]);
+        let mut use_request = request(RightsPurposeV1::PublicRelease);
+        use_request.distribute_output = true;
+        assert!(matches!(
+            evaluate_music_rights_use_v1(&rights, &use_request),
+            Err(issues) if issues.contains(&RightsPolicyIssueV1::PublicReleasePurposeFlagMismatch)
         ));
     }
 
