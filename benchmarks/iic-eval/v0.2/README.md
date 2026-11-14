@@ -52,3 +52,8 @@ These thresholds are hypotheses to preregister before holdout evaluation, not cl
 ## Claim ceiling
 
 This seed does not establish semantic correctness, requirement completeness, legal meaning, institutional authority, multilingual competence, safety certification, standards conformance, or production readiness. The current files are intended to expose failure modes and guide an independently reviewed evaluator.
+
+
+## Decision-time evidence coverage
+
+Case IIC-010 asks for two views with different effective times but the same later knowledge time. The oracle maps each temporal query to the candidate versions required to reconstruct it. The evaluator reports the proportion of temporal query slices for which all required candidate references were recovered. This adapts temporal coverage from retrieval benchmarks to decision reconstruction: retrieving a current source is insufficient if an earlier decision-time rule is missing.
