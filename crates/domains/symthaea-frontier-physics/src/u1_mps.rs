@@ -491,34 +491,6 @@ impl U1CanonicalGaugeReceipt {
     }
 
     pub fn bond(&self) -> usize { self.bond }
-    fn state_fingerprint(&self) -> u128 {
-        // FNV-1a 128-bit fingerprint over dimensions, charge labels and exact
-        // IEEE-754 tensor bits. This binds a continuation ledger to the exact
-        // MPS value without retaining a second full state in memory.
-        // It is an integrity/misuse check, not a cryptographic authenticator.
-        let mut hash = 0x6c62272e07bb014262b821756295c58du128;
-        const PRIME: u128 = 0x0000000001000000000000000000013b;
-        let mut mix = |value: u64| {
-            for byte in value.to_le_bytes() {
-                hash ^= u128::from(byte);
-                hash = hash.wrapping_mul(PRIME);
-            }
-        };
-        mix(self.total_charge as u64);
-        mix(self.tensors.len() as u64);
-        for tensor in &self.tensors {
-            mix(tensor.left_dimension() as u64);
-            mix(tensor.right_dimension() as u64);
-            for charge in &tensor.left_charges { mix(*charge as u64); }
-            for charge in &tensor.right_charges { mix(*charge as u64); }
-            for value in &tensor.data {
-                mix(value.re.to_bits());
-                mix(value.im.to_bits());
-            }
-        }
-        hash
-    }
-
     pub fn site_count(&self) -> usize { self.site_count }
     pub fn total_charge(&self) -> i32 { self.total_charge }
     pub fn left_isometry_residuals(&self) -> &[(usize, f64)] { &self.left_isometry_residuals }
@@ -545,7 +517,7 @@ impl U1CanonicalGaugeReceipt {
     pub fn relative_norm_drift(&self) -> f64 { self.relative_norm_drift }
     pub fn is_qualified(&self) -> bool { self.qualified }
 
-    pub fn qualifies(&self, tolerance: f64) -> bool {(&self, tolerance: f64) -> bool {
+    pub fn qualifies(&self, tolerance: f64) -> bool {
         tolerance.is_finite()
             && tolerance > 0.0
             && self.site_count >= 2
@@ -1071,6 +1043,34 @@ fn right_canonicalize_site(
 }
 
 impl ComplexU1Mps {
+    fn state_fingerprint(&self) -> u128 {
+        // FNV-1a 128-bit fingerprint over dimensions, charge labels and exact
+        // IEEE-754 tensor bits. This binds a continuation ledger to the exact
+        // MPS value without retaining a second full state in memory.
+        // It is an integrity/misuse check, not a cryptographic authenticator.
+        let mut hash = 0x6c62272e07bb014262b821756295c58du128;
+        const PRIME: u128 = 0x0000000001000000000000000000013b;
+        let mut mix = |value: u64| {
+            for byte in value.to_le_bytes() {
+                hash ^= u128::from(byte);
+                hash = hash.wrapping_mul(PRIME);
+            }
+        };
+        mix(self.total_charge as u64);
+        mix(self.tensors.len() as u64);
+        for tensor in &self.tensors {
+            mix(tensor.left_dimension() as u64);
+            mix(tensor.right_dimension() as u64);
+            for charge in &tensor.left_charges { mix(*charge as u64); }
+            for charge in &tensor.right_charges { mix(*charge as u64); }
+            for value in &tensor.data {
+                mix(value.re.to_bits());
+                mix(value.im.to_bits());
+            }
+        }
+        hash
+    }
+
     /// Stable norm of the difference between two same-sector MPS.
     ///
     /// The two networks are embedded into a direct-sum virtual space. The
