@@ -3019,8 +3019,18 @@ impl U1TwoSiteState {
             singular_values.push(singular_value);
             total_weight += singular_value * singular_value;
         }
+        if !total_weight.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "error-budget Schmidt weight",
+            ));
+        }
         let input_norm = total_weight.sqrt();
-        if !input_norm.is_finite() || input_norm <= 0.0 {
+        if !input_norm.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "error-budget input norm",
+            ));
+        }
+        if input_norm <= 0.0 {
             return Err(U1MpsError::ZeroDenseState);
         }
 
@@ -5986,6 +5996,31 @@ mod tests {
                 Err(U1MpsError::InvalidErrorBudget { .. })
             ));
         }
+    }
+
+
+    #[test]
+    fn error_budget_rejects_overflowed_schmidt_weight_as_nonfinite_not_zero() {
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0e200, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        assert!(matches!(
+            state.split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: 0.0,
+                tolerance: 1.0e-12,
+            }),
+            Err(U1MpsError::NonFiniteContraction("error-budget Schmidt weight"))
+        ));
     }
 
 }
