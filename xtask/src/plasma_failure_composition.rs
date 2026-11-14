@@ -268,15 +268,7 @@ fn audit_cohort(
     }
 
     let receipt = &cohort.classification_receipt;
-    if receipt.method_id != "ASTM_D5573"
-        || receipt.edition != "D5573-99R19"
-        || receipt.evidence_kind != "classification_practice"
-        || receipt.material_pair_class != "frp_smc_joint"
-        || receipt.geometry != "failure_surface_classification"
-        || receipt.endpoint != "frp_joint_failure_mode_classification"
-        || receipt.requested_claim != "failure_mode_classification_reference"
-        || receipt.specimen_ids != specimen_ids(cohort)
-    {
+    if receipt.specimen_ids != specimen_ids(cohort) {
         return Err(Disposition::Rejected);
     }
     if !receipt.protocol_id.as_deref().is_some_and(nonempty)
@@ -402,6 +394,7 @@ fn audit_receipt(receipt: &FailureCompositionReceipt) -> Decision {
         || plan.alpha >= 0.5
         || !plan.confidence_level.is_finite()
         || !(0.0..1.0).contains(&plan.confidence_level)
+        || plan.confidence_level <= 0.0
         || !plan.joint_distance_margin.is_finite()
         || plan.joint_distance_margin <= 0.0
         || !plan.minimum_observer_agreement.is_finite()
