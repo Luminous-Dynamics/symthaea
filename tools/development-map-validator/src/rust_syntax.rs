@@ -95,7 +95,7 @@ impl Extractor {
         &mut self,
         kind: &str,
         name: Option<String>,
-        visibility: &Visibility,
+        visibility: Option<&Visibility>,
         attributes: &[Attribute],
         declaration: Option<String>,
     ) {
@@ -104,7 +104,7 @@ impl Extractor {
             kind: kind.to_owned(),
             name,
             module_path: self.module_path.clone(),
-            visibility: visibility_text(visibility),
+            visibility: visibility.map(visibility_text).unwrap_or_else(|| "not_explicit".to_owned()),
             attributes: attributes_text(attributes),
             declaration,
         });
@@ -116,7 +116,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             if node.content.is_some() { "inline_module" } else { "module_declaration" },
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(node.ident.to_token_stream().to_string()),
         );
@@ -131,7 +131,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "use_declaration",
             None,
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(node.tree.to_token_stream().to_string()),
         );
@@ -142,7 +142,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "function",
             Some(node.sig.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(node.sig.to_token_stream().to_string()),
         );
@@ -153,7 +153,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "struct",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
         );
@@ -164,7 +164,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "enum",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
         );
@@ -175,7 +175,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "union",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
         );
@@ -186,7 +186,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "trait",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
         );
@@ -197,7 +197,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "type_alias",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{} {}", node.ident, node.generics.to_token_stream())),
         );
@@ -208,7 +208,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "constant",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{}: {}", node.ident, node.ty.to_token_stream())),
         );
@@ -219,7 +219,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "static",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(format!("{}: {}", node.ident, node.ty.to_token_stream())),
         );
@@ -230,7 +230,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "extern_crate",
             Some(node.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(node.to_token_stream().to_string()),
         );
@@ -241,7 +241,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "macro_syntax",
             node.ident.as_ref().map(ToString::to_string),
-            &Visibility::Inherited,
+            None,
             &node.attrs,
             Some(node.mac.path.to_token_stream().to_string()),
         );
@@ -260,7 +260,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "impl_block",
             None,
-            &Visibility::Inherited,
+            None,
             &node.attrs,
             declaration,
         );
@@ -271,7 +271,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "impl_method",
             Some(node.sig.ident.to_string()),
-            &node.vis,
+            Some(&node.vis),
             &node.attrs,
             Some(node.sig.to_token_stream().to_string()),
         );
@@ -282,7 +282,7 @@ impl<'ast> Visit<'ast> for Extractor {
         self.push(
             "trait_method",
             Some(node.sig.ident.to_string()),
-            &Visibility::Inherited,
+            None,
             &node.attrs,
             Some(node.sig.to_token_stream().to_string()),
         );
@@ -313,9 +313,9 @@ pub fn project_rust_file(
     let mut limitations = vec![
         "Syntax-extracted declarations are not compiler-resolved symbols or dependency edges.".to_owned(),
         "Out-of-line module declarations are recorded but their source files are not followed.".to_owned(),
-        "Macro invocations and macro definitions are recorded as opaque syntax; no expansion is performed.".to_owned(),
+        "Item-position macro invocations and macro definitions are recorded as opaque syntax; macros inside function bodies are not inventoried or expanded.".to_owned(),
         "cfg and cfg_attr expressions are preserved as attributes and are not evaluated into configuration worlds.".to_owned(),
-        "Imports are recorded as syntax; names, paths and visibility are not resolved.".to_owned(),
+        "Imports are recorded as syntax; names and target paths are not resolved. Field and variant-level inventories are not yet emitted.".to_owned(),
         "The supplied Git source anchor is recorded but is not authenticated by this parser.".to_owned(),
     ];
     limitations.sort();
