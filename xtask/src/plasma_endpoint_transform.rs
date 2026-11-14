@@ -1001,6 +1001,36 @@ mod tests {
     }
 
     #[test]
+    fn aged_retention_design_receipt_binds_all_four_cohorts_and_sidecars() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-aged-retention-four-cohort-graph").expect("case exists");
+        let result = audit_graph(&case.graph);
+        assert_eq!(result.disposition, Disposition::Pass);
+        assert_eq!(case.graph.design_receipt.additional_source_bindings.len(), 6);
+        assert_eq!(case.graph.analysis.source_receipt_ids.len(), 8);
+    }
+
+    #[test]
+    fn missing_unaged_design_source_binding_blocks_graph() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-aged-retention-four-cohort-graph").expect("case exists");
+        let mut graph = case.graph.clone();
+        graph.design_receipt.additional_source_bindings.retain(|binding| binding.role != "baseline_unaged_strength");
+        assert_eq!(audit_graph(&graph).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn auxiliary_source_manifest_substitution_is_rejected() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-aged-retention-four-cohort-graph").expect("case exists");
+        let mut graph = case.graph.clone();
+        graph.design_receipt.additional_source_bindings.iter_mut()
+            .find(|binding| binding.role == "baseline_unaged_strength")
+            .expect("unaged binding").samples[0].cluster_id = "UNRELATED-LOT".to_owned();
+        assert_eq!(audit_graph(&graph).disposition, Disposition::Rejected);
+    }
+
+    #[test]
     fn aged_retention_binds_conditioning_and_exposure_receipts() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
         let case = fixture.cases.iter().find(|case| case.id == "valid-aged-retention-four-cohort-graph").expect("case exists");
