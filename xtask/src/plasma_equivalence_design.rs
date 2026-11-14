@@ -515,6 +515,13 @@ pub(super) fn validate_transfer_binding(
     if decision.disposition != Disposition::Pass {
         return decision;
     }
+    if decision.equivalence != "EQUIVALENCE_ESTABLISHED" {
+        return Decision {
+            disposition: Disposition::Blocked,
+            equivalence: decision.equivalence,
+            reason: "the design/result record is structurally valid, but its interval does not establish equivalence for transfer",
+        };
+    }
     let Some(case_id) = receipt.transfer_case_id.as_deref() else {
         return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks transfer-case identity" };
     };
@@ -702,6 +709,31 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
         let case = fixture.cases.iter().find(|case| case.id == "power-assumption-digest-mismatch").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn transfer_binding_blocks_a_valid_design_without_equivalence() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-design-but-interval-outside-margin").expect("case exists");
+        let mut receipt = case.receipt.clone();
+        receipt.transfer_case_id = Some("TRANSFER-1".to_owned());
+        receipt.transfer_bridge_id = Some("TRANSFER-1::substrate_lot".to_owned());
+        receipt.baseline_profile_sha256 = Some("11".repeat(32));
+        receipt.candidate_profile_sha256 = Some("22".repeat(32));
+        receipt.bridge_dimension_keys = Some(vec!["substrate_lot".to_owned()]);
+        let decision = validate_transfer_binding(
+            &receipt,
+            "TRANSFER-1",
+            "TRANSFER-1::substrate_lot",
+            &"11".repeat(32),
+            &"22".repeat(32),
+            &["substrate_lot".to_owned()],
+            &receipt.endpoint_id,
+            &receipt.baseline_method_receipt,
+            &receipt.candidate_method_receipt,
+        );
+        assert_eq!(decision.disposition, Disposition::Blocked);
+        assert_eq!(decision.equivalence, "EQUIVALENCE_NOT_ESTABLISHED");
     }
 
     #[test]
