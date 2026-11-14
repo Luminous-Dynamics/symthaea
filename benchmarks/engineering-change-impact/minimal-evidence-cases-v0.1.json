@@ -459,13 +459,13 @@
               ]
             }
           ],
-          "selected": [
-            "E-TORQUE-A",
-            "E-TORQUE-B"
-          ],
           "expected_action": "revalidate",
           "target_configuration": "ACT-9",
-          "source_inventory_state": "complete_frozen"
+          "source_inventory_state": "complete_frozen",
+          "candidate_visible_evidence_ids": [
+            "E-TORQUE-A",
+            "E-TORQUE-B"
+          ]
         },
         {
           "world_id": "SUBSTITUTED",
@@ -491,13 +491,13 @@
               ]
             }
           ],
-          "selected": [
-            "E-TORQUE-A",
-            "E-TORQUE-C"
-          ],
           "expected_action": "revalidate",
           "target_configuration": "ACT-9",
-          "source_inventory_state": "complete_frozen"
+          "source_inventory_state": "complete_frozen",
+          "candidate_visible_evidence_ids": [
+            "E-TORQUE-A",
+            "E-TORQUE-C"
+          ]
         }
       ],
       "expected": {
