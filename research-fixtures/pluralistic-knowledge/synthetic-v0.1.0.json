@@ -1,0 +1,73 @@
+{
+  "record_id": "hmp-demo-synthetic-001",
+  "schema_version": "0.1.0",
+  "claim": {
+    "text": "In this fictional training example, a community charter describes an annual gathering as a shared meal.",
+    "claim_type": "synthetic_example",
+    "scope": "Fictional schema fixture only; not a statement about any real community, religion, culture or ritual.",
+    "original_language_text": null,
+    "translation_note": null
+  },
+  "attribution": {
+    "voice_type": "fictional_example",
+    "scope_type": "fictional_example",
+    "speaker_reference": null,
+    "attribution_note": "Synthetic example authored only to exercise the schema.",
+    "not_universal": true
+  },
+  "context": {
+    "time_scope": "Not applicable; fictional",
+    "place_scope": "Not applicable; fictional",
+    "language": "en",
+    "setting": "Synthetic training fixture",
+    "context_note": "Contains no empirical cultural or religious claim."
+  },
+  "epistemic": {
+    "status": "synthetic_only",
+    "uncertainty_note": "Illustrative data only; do not cite as evidence.",
+    "evidence_limitations": [
+      "No real-world source or community is represented."
+    ]
+  },
+  "provenance": {
+    "sources": [
+      {
+        "source_id": "hmp-synthetic-fixture-authoring",
+        "source_kind": "synthetic_fixture",
+        "source_reference": "HMP-001 schema validation fixture v0.1.0",
+        "citation_note": "Synthetic content authored for schema validation; no external cultural claim."
+      }
+    ],
+    "source_digest": null
+  },
+  "rights": {
+    "access_class": "public_source",
+    "permission_status": "granted",
+    "permission_basis": "Project-authored synthetic fixture; no third-party or community material.",
+    "authority_reference": null,
+    "permission_reference": "HMP-001 synthetic fixture authorship",
+    "permitted_uses": [
+      "read",
+      "display",
+      "cite",
+      "index",
+      "retrieve",
+      "summarize",
+      "translate",
+      "adapt",
+      "train",
+      "redistribute",
+      "export",
+      "preserve"
+    ],
+    "prohibited_uses": [],
+    "review_after": null
+  },
+  "interpretations": [],
+  "review": {
+    "status": "synthetic_fixture",
+    "reviewed_at": null,
+    "review_note": "Synthetic schema test only; not reviewed as a factual cultural description.",
+    "correction_reference": null
+  }
+}
