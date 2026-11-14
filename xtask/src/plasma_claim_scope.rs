@@ -342,6 +342,13 @@ mod tests {
     }
 
     #[test]
+    fn evidence_kind_mismatch_is_rejected() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let case = fixture.cases.iter().find(|case| case.id == "astm-d3163-evidence-kind-mismatch").expect("case exists");
+        assert_eq!(decide(case).disposition, Disposition::Rejected);
+    }
+
+    #[test]
     fn explicit_design_and_lifetime_escalations_are_rejected() {
         assert!(is_known_overclaim("design_allowable"));
         assert!(is_known_overclaim("service_lifetime"));
