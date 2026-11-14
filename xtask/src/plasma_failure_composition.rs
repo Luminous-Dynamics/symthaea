@@ -614,10 +614,10 @@ mod tests {
 
     #[test]
     fn magnified_classification_does_not_claim_d5573_visual_scope() {
-        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
-        let mut case = fixture.cases.iter().find(|case| case.id == "valid-independent-arm-failure-composition").expect("case exists").receipt;
-        case.baseline.specimens[0].observation_mode = "magnified_imaging".to_owned();
-        assert_eq!(audit_receipt(&case).disposition, Disposition::Rejected);
+        let mut fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let case = fixture.cases.iter_mut().find(|case| case.id == "valid-independent-arm-failure-composition").expect("case exists");
+        case.receipt.baseline.specimens[0].observation_mode = "magnified_imaging".to_owned();
+        assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Rejected);
     }
 
     #[test]
