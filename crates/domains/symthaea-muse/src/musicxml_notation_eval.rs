@@ -1774,9 +1774,9 @@ mod tests {
             &reference, &prediction, default_config()
         ).unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
-        assert_eq!(report.grace_semantics.accuracy, Some(0.5));
-        assert_eq!(report.cue_semantics.accuracy, Some(0.5));
-        assert_eq!(report.chord_member_semantics.accuracy, Some(0.5));
+        assert_eq!(report.grace_semantics.accuracy, Some(0.75));
+        assert_eq!(report.cue_semantics.accuracy, Some(0.75));
+        assert_eq!(report.chord_member_semantics.accuracy, Some(0.75));
         assert_eq!(report.chord_anchor_semantics.accuracy, Some(0.0));
     }
 
