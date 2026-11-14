@@ -3042,6 +3042,9 @@ impl U1TwoSiteState {
     /// Select the smallest global bond dimension that satisfies an absolute
     /// local two-site L2 projection budget.
     ///
+    /// The exact charge-block factorization is performed once. Candidate ranks
+    /// are assembled from the same factors, so adaptive rank search does not
+    /// trigger repeated SVDs.
     /// The method first estimates the minimum rank from the exact charge-block
     /// Schmidt spectrum, then validates the *measured reconstruction residual*
     /// using the ordinary truncation path. If finite-precision factorization
