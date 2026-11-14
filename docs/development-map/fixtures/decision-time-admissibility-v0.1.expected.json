@@ -1,0 +1,154 @@
+{
+  "fixture_id": "synthetic:dtea-decision-time-admissibility-v0.1",
+  "status": "design_only_public_known_answer",
+  "expected_decision": {
+    "decision_id": "dtea:decision:approve",
+    "decision_at": "2026-11-14T10:00:00Z",
+    "knowledge_cutoff_at": "2026-11-14T10:00:00Z",
+    "outcome": "approved",
+    "admissible_consulted_evidence": [
+      "dtea:evidence:E1"
+    ],
+    "rejected_as_late_evidence": [
+      "dtea:evidence:E2"
+    ],
+    "later_correction_events": [
+      "event-006"
+    ],
+    "current_state_of_E1": "stale",
+    "decision_time_state_of_E1": "admissible",
+    "invariant": "A later invalidation does not erase or rewrite the decision-time evidence manifest.",
+    "admissible_actor_authority_evidence": "dtea:evidence:authority-1",
+    "actor_authority_disposition": "source_declares_authorized",
+    "actor_authority_scope": "release:staging",
+    "actor_authority_policy_version": "release-policy-v3",
+    "authority_evidence_event": "event-002",
+    "authority_evidence_source_observed_at": "2026-11-14T08:55:00Z",
+    "authority_evidence_available_to_actor_at": "2026-11-14T09:00:00Z",
+    "authority_validity_window": [
+      "2026-11-01T00:00:00Z",
+      "2026-11-14T17:00:00Z"
+    ]
+  },
+  "negative_controls": [
+    {
+      "id": "DTEA-NC-01",
+      "mutation": "Move E2 into consulted_evidence without changing its availability time.",
+      "expected": "reject_future_evidence_as_decision_basis"
+    },
+    {
+      "id": "DTEA-NC-02",
+      "mutation": "Backdate E2 available_to_actor_at while source_observed_at remains after the decision.",
+      "expected": "reject_availability_before_observation"
+    },
+    {
+      "id": "DTEA-NC-03",
+      "mutation": "Move knowledge_cutoff_at after decision_at.",
+      "expected": "reject_future_knowledge_cutoff"
+    },
+    {
+      "id": "DTEA-NC-04",
+      "mutation": "Change E1's current lifecycle to current but retain event-005 invalidation.",
+      "expected": "reject_current_state_inconsistent_with_invalidation"
+    },
+    {
+      "id": "DTEA-NC-05",
+      "mutation": "Delete event-005 after E1 was marked stale.",
+      "expected": "reject_unexplained_stale_evidence"
+    },
+    {
+      "id": "DTEA-NC-06",
+      "mutation": "Cite a missing evidence ID.",
+      "expected": "reject_unknown_evidence_reference"
+    },
+    {
+      "id": "DTEA-NC-07",
+      "mutation": "Mark E2 admissible despite late availability.",
+      "expected": "reject_admissibility_time_mismatch"
+    },
+    {
+      "id": "DTEA-NC-08",
+      "mutation": "Change actor scope without a corresponding authorization evidence record.",
+      "expected": "indeterminate_or_reject_scope"
+    },
+    {
+      "id": "DTEA-NC-09",
+      "mutation": "Change actor_authority.actor_id while leaving decision.actor_id unchanged.",
+      "expected": "reject_actor_authority_subject_mismatch"
+    },
+    {
+      "id": "DTEA-NC-10",
+      "mutation": "Change actor_authority.authority_scope while leaving decision.authority_scope unchanged.",
+      "expected": "reject_authority_scope_mismatch"
+    },
+    {
+      "id": "DTEA-NC-11",
+      "mutation": "Move authority available_to_actor_at after knowledge_cutoff_at.",
+      "expected": "reject_late_authority_evidence"
+    },
+    {
+      "id": "DTEA-NC-12",
+      "mutation": "Set authority valid_through before decision_at.",
+      "expected": "reject_expired_authority_at_decision"
+    },
+    {
+      "id": "DTEA-NC-13",
+      "mutation": "Point actor_authority.evidence_id to a non-evidence or missing node.",
+      "expected": "reject_unresolved_authority_reference"
+    },
+    {
+      "id": "DTEA-NC-14",
+      "mutation": "Backdate authority source_observed_at after available_to_actor_at or after the authority-evidence-recorded event.",
+      "expected": "reject_authority_observed_after_availability"
+    },
+    {
+      "id": "DTEA-NC-15",
+      "mutation": "Remove the authority_evidence_recorded event while retaining the decision's actor_authority reference.",
+      "expected": "reject_unrecorded_authority_evidence"
+    },
+    {
+      "id": "DTEA-NC-16",
+      "mutation": "Change the authority evidence node actor/scope/policy or validity while leaving the decision projection unchanged.",
+      "expected": "reject_owner_record_projection_mismatch"
+    },
+    {
+      "id": "DTEA-NC-17",
+      "mutation": "Move consulted E1 valid_from after decision_at while keeping the evidence actor-available beforehand.",
+      "expected": "reject_evidence_not_yet_effective_at_decision"
+    },
+    {
+      "id": "DTEA-NC-18",
+      "mutation": "Move consulted E1 valid_through before decision_at while keeping actor availability before decision.",
+      "expected": "reject_expired_evidence_at_decision"
+    },
+    {
+      "id": "DTEA-NC-19",
+      "mutation": "Set consulted E1 valid_from after valid_through.",
+      "expected": "reject_reversed_evidence_validity_interval"
+    },
+    {
+      "id": "DTEA-NC-20",
+      "mutation": "Mark consulted E1 validity_completeness incomplete while retaining admissible disposition.",
+      "expected": "reject_incomplete_validity_as_decision_support"
+    },
+    {
+      "id": "DTEA-NC-21",
+      "mutation": "Remove validity_completeness from a consulted evidence item.",
+      "expected": "reject_missing_validity_completeness"
+    }
+  ],
+  "metrics": [
+    "decision-time admissibility precision and recall",
+    "future-evidence leakage rate",
+    "availability-time reconstruction accuracy",
+    "valid-time vs observation-time confusion",
+    "historical decision-record integrity after correction",
+    "correct abstention/defer rate",
+    "actor/scope/policy authority-reference exactness",
+    "decision-time authority-window admissibility",
+    "late-arriving or expired authority evidence rejection",
+    "effective-time validity-window consistency",
+    "explicit completeness of evidence applicability intervals"
+  ],
+  "claim_ceiling": "Synthetic known-answer case only. The authority evidence is a synthetic, source-declared Mycelix-shaped reference, not a real owner-native grant or cryptographically authenticated record. No general decision correctness, institutional governance, compliance or real-world assurance claim."
+}

@@ -1,0 +1,425 @@
+{
+  "schema_version": "0.1.0",
+  "federation_id": "luminous-dynamics:egddm-federation:2026-11-14",
+  "observed_at": "2026-11-14T11:32:00.000Z",
+  "hub": {
+    "repository_full_name": "Luminous-Dynamics/symthaea",
+    "default_branch": "main",
+    "subject_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+    "subject_tree_oid": "74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
+    "self_map_id": "symthaea:readme-and-active-workstream-projection:2026-11-14",
+    "self_map_path": "docs/development-map/readme-and-workstreams-v0.1.json",
+    "self_map_blob_oid": "28eaf7bfd352d21c12fd073d81208c36646f5793"
+  },
+  "shared_contract": {
+    "schema_version": "0.1.0",
+    "schema_path": "docs/research/development-map-v0.1.schema.json",
+    "schema_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+    "schema_artifact_commit_sha": "0e198b7d1ff254c6675f5ccb1dcae9113e71d656",
+    "status": "schema_shape_checked",
+    "claim_ceiling": "Provisional draft. Selected structural checks were applied to four maps; decision-time actor-authority projection and federation consumers are still uncompiled/unexecuted. Full Draft 2020-12 meta-validation, consumer integration and independent review remain pending."
+  },
+  "members": [
+    {
+      "project_id": "symthaea",
+      "repository_full_name": "Luminous-Dynamics/symthaea",
+      "visibility": "public",
+      "default_branch": "main",
+      "role_summaries": [
+        "cognitive architecture and reasoning research",
+        "engineering intelligence and development-planning research"
+      ],
+      "map": {
+        "map_id": "symthaea:readme-and-active-workstream-projection:2026-11-14",
+        "path": "docs/development-map/readme-and-workstreams-v0.1.json",
+        "blob_oid": "28eaf7bfd352d21c12fd073d81208c36646f5793",
+        "artifact_branch": "research/dynamic-development-maps-v0-1-2026-11-14",
+        "artifact_commit_sha": "861e3573154263dbe3714393b2b109582115a1ea",
+        "artifact_tree_oid": "373eb5123c271851ebc9bfa56124f21d7882943f",
+        "artifact_url": "https://github.com/Luminous-Dynamics/symthaea/blob/861e3573154263dbe3714393b2b109582115a1ea/docs/development-map/readme-and-workstreams-v0.1.json",
+        "subject_snapshot": {
+          "revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+          "tree_digest": "74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
+          "tree_digest_algorithm": "git_tree_oid_sha1",
+          "observed_at": "2026-11-14T07:07:00.000Z",
+          "configuration_world": {
+            "map_kind": "read_only_source_projection",
+            "source_scope": "README.md and selected public issues"
+          }
+        },
+        "authority_summary": "mixed_source_authority_projection",
+        "node_count": 13,
+        "edge_count": 18,
+        "claim_ceiling": "Bounded README and selected public issue projection; source-declared/proposed claims, not a full code inventory or qualification."
+      }
+    },
+    {
+      "project_id": "mycelix",
+      "repository_full_name": "Luminous-Dynamics/mycelix",
+      "visibility": "public",
+      "default_branch": "main",
+      "role_summaries": [
+        "civic infrastructure and governance domain clusters",
+        "identity, finance, commons and application maturity projections"
+      ],
+      "map": {
+        "map_id": "mycelix:source-declared-maturity-projection:2026-11-14",
+        "path": "docs/development-map/source-declared-maturity-v0.1.json",
+        "blob_oid": "2a0cebe44d67cc88a03bce3da2c3dc303f3757b6",
+        "artifact_branch": "research/source-attributed-development-map-v0-1-2026-11-14",
+        "artifact_commit_sha": "e2f1635cf3e240e4136d26238f4e2d674295e184",
+        "artifact_tree_oid": "2ea130cb1a40c20550dc80965ad0466081dcecca",
+        "artifact_url": "https://github.com/Luminous-Dynamics/mycelix/blob/e2f1635cf3e240e4136d26238f4e2d674295e184/docs/development-map/source-declared-maturity-v0.1.json",
+        "subject_snapshot": {
+          "revision": "6089a68430a501c51934c2c4107061c2a2cb5565",
+          "tree_digest": "79283620f83cdfa155fc86a2362335390628913d",
+          "tree_digest_algorithm": "git_tree_oid_sha1",
+          "observed_at": "2026-11-14T07:01:41.552Z",
+          "configuration_world": {
+            "map_kind": "source_declared_readme_projection",
+            "scope": "README.md only"
+          }
+        },
+        "authority_summary": "source_declared_projection",
+        "node_count": 17,
+        "edge_count": 14,
+        "claim_ceiling": "README-only maturity projection. Build, unit-test, multi-agent, UI and deployment remain source-declared and independently unverified."
+      }
+    },
+    {
+      "project_id": "symtropy",
+      "repository_full_name": "Luminous-Dynamics/symtropy",
+      "visibility": "public",
+      "default_branch": "main",
+      "role_summaries": [
+        "N-dimensional geometric and rigid-body physics",
+        "state/metric coupling and physical simulation research"
+      ],
+      "map": {
+        "map_id": "symtropy:readme-architecture-projection:2026-11-14",
+        "path": "docs/development-map/source-declared-architecture-v0.1.json",
+        "blob_oid": "830c82392ac69a9dcb212eb3f3012e277e83d5ae",
+        "artifact_branch": "research/source-attributed-development-map-v0-1-2026-11-14",
+        "artifact_commit_sha": "15431e3621c24c99f24cc828f822fcb6fa8e1bf4",
+        "artifact_tree_oid": "f83c2df1e775f29803d183c0f0d899c56985c6c8",
+        "artifact_url": "https://github.com/Luminous-Dynamics/symtropy/blob/15431e3621c24c99f24cc828f822fcb6fa8e1bf4/docs/development-map/source-declared-architecture-v0.1.json",
+        "subject_snapshot": {
+          "revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+          "tree_digest": "4aa895fb1a0c47cd678e4ade9684327c2c7f50ac",
+          "tree_digest_algorithm": "git_tree_oid_sha1",
+          "observed_at": "2026-11-14T09:00:00.000Z",
+          "configuration_world": {
+            "map_kind": "read_only_source_projection",
+            "source_scope": [
+              "README.md",
+              "docs/tech/ARCHITECTURE.md"
+            ]
+          }
+        },
+        "authority_summary": "source_declared_projection",
+        "node_count": 20,
+        "edge_count": 29,
+        "claim_ceiling": "README and architecture projection. Tests, experiments, performance, physical validity and cross-project compatibility not independently verified."
+      }
+    },
+    {
+      "project_id": "sol-atlas",
+      "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+      "visibility": "public",
+      "default_branch": "main",
+      "role_summaries": [
+        "planetary energy and infrastructure visualization",
+        "spatial evidence, sensor and decision-reliance projections"
+      ],
+      "map": {
+        "map_id": "sol-atlas:source-declared-demo-decision-evidence-projection:2026-11-14",
+        "path": "docs/development-map/source-declared-demo-architecture-v0.1.json",
+        "blob_oid": "8ee5d0fad8e95b4c747efc5c197c7e8d300200e3",
+        "artifact_branch": "research/source-attributed-development-map-v0-1-2026-11-14",
+        "artifact_commit_sha": "1abbf5a938689e0d2e52e899c6d20bb09000fb75",
+        "artifact_tree_oid": "38d8f61aee585a58fde82359eb953bbb15060135",
+        "artifact_url": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/blob/1abbf5a938689e0d2e52e899c6d20bb09000fb75/docs/development-map/source-declared-demo-architecture-v0.1.json",
+        "subject_snapshot": {
+          "revision": "1af10d891410cce31c1d4037e7c7129c16db5834",
+          "tree_digest": "513c8e2b65e68c730d092efe12f9452b3414785e",
+          "tree_digest_algorithm": "git_tree_oid_sha1",
+          "observed_at": "2026-11-14T09:45:00.000Z",
+          "configuration_world": {
+            "map_kind": "read_only_source_projection",
+            "source_scope": [
+              "DEMO.md",
+              "Cargo.toml",
+              "sol-atlas-core/src/lib.rs",
+              "src/app.rs",
+              "src/data/static_data.rs",
+              "src/data/holochain.rs",
+              "src/state/data_state.rs",
+              "src/components/reactor_twin_demo.rs",
+              "src/vitality/mod.rs",
+              "docs/research/IEAC_DECISION_RELIANCE_CONTINUITY_V0.1.md",
+              "docs/industry/IEAC_TUF_CHANNEL_FRESHNESS_V0.1.md",
+              "research/earth-observability/EARTH_OBSERVABILITY_DETECTION_TO_DECISION_V0_1.md"
+            ]
+          }
+        },
+        "authority_summary": "source_declared_projection",
+        "node_count": 41,
+        "edge_count": 51,
+        "claim_ceiling": "Bounded source projection. Decision reliance not exact-head qualified; TUF adapter is not a verifier; Earth-observability likelihood adapter not implemented."
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "from_project_id": "symtropy",
+      "relation": "source_declared_integration",
+      "to_project_id": "symthaea",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/symtropy",
+          "path": "README.md",
+          "blob_oid": "2305f295cae5c868465aef7f190a9d56e3a85596",
+          "line_start": 15,
+          "line_end": 22
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "Symtropy README describes Symthaea in its adoption story; no exact API/schema or end-to-end runtime receipt is pinned."
+      ]
+    },
+    {
+      "from_project_id": "symtropy",
+      "relation": "source_declared_integration",
+      "to_project_id": "mycelix",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/symtropy",
+          "path": "README.md",
+          "blob_oid": "2305f295cae5c868465aef7f190a9d56e3a85596",
+          "line_start": 15,
+          "line_end": 22
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "Symtropy README describes Mycelix identity, vault, economy and governance integrations; no exact API/schema or end-to-end runtime receipt is pinned."
+      ]
+    },
+    {
+      "from_project_id": "symtropy",
+      "relation": "source_declared_integration",
+      "to_project_id": "sol-atlas",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/symtropy",
+          "path": "README.md",
+          "blob_oid": "2305f295cae5c868465aef7f190a9d56e3a85596",
+          "line_start": 159,
+          "line_end": 168
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "The Sol Atlas relationship is a named feature flag only; no versioned compatibility or runtime was verified."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "declares_role_for",
+      "to_project_id": "symtropy",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "research/earth-observability/EARTH_OBSERVABILITY_DETECTION_TO_DECISION_V0_1.md",
+          "blob_oid": "65a9d33974894873d5cffbd87614dd3d5ad105ab",
+          "line_start": 4,
+          "line_end": 9
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "Physical likelihood and calibration role is declared; adapter and physical-likelihood qualification are not implemented."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "declares_role_for",
+      "to_project_id": "symthaea",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "research/earth-observability/EARTH_OBSERVABILITY_DETECTION_TO_DECISION_V0_1.md",
+          "blob_oid": "65a9d33974894873d5cffbd87614dd3d5ad105ab",
+          "line_start": 4,
+          "line_end": 9
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "Decision-analysis role is declared; this is not proof of adapter compatibility."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "declares_role_for",
+      "to_project_id": "mycelix",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "research/earth-observability/EARTH_OBSERVABILITY_DETECTION_TO_DECISION_V0_1.md",
+          "blob_oid": "65a9d33974894873d5cffbd87614dd3d5ad105ab",
+          "line_start": 4,
+          "line_end": 9
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "Authority, rights and custody role is declared; no authority or custody state was checked or changed."
+      ]
+    },
+    {
+      "from_project_id": "mycelix",
+      "relation": "shared_schema_candidate",
+      "to_project_id": "symthaea",
+      "status": "contract_versioned_unqualified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/mycelix",
+          "path": "docs/development-map/source-declared-maturity-v0.1.json",
+          "blob_oid": "2a0cebe44d67cc88a03bce3da2c3dc303f3757b6",
+          "line_start": 2,
+          "line_end": 2
+        }
+      ],
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+        "status": "declared"
+      },
+      "claim_limitations": [
+        "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
+      ]
+    },
+    {
+      "from_project_id": "symtropy",
+      "relation": "shared_schema_candidate",
+      "to_project_id": "symthaea",
+      "status": "contract_versioned_unqualified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/symtropy",
+          "path": "docs/development-map/source-declared-architecture-v0.1.json",
+          "blob_oid": "830c82392ac69a9dcb212eb3f3012e277e83d5ae",
+          "line_start": 2,
+          "line_end": 2
+        }
+      ],
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+        "status": "declared"
+      },
+      "claim_limitations": [
+        "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "shared_schema_candidate",
+      "to_project_id": "symthaea",
+      "status": "contract_versioned_unqualified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "docs/development-map/source-declared-demo-architecture-v0.1.json",
+          "blob_oid": "8ee5d0fad8e95b4c747efc5c197c7e8d300200e3",
+          "line_start": 2,
+          "line_end": 2
+        }
+      ],
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+        "status": "declared"
+      },
+      "claim_limitations": [
+        "Map declares schema_version 0.1.0 and passed selected structural shape checks; full Draft 2020-12 meta-validation, executable consumers and independent qualification remain pending."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "source_declared_integration",
+      "to_project_id": "symtropy",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "DEMO.md",
+          "blob_oid": "ae87d09a4c47992df40b707a74f9fef419c39c93",
+          "line_start": 61,
+          "line_end": 70
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "DEMO.md describes a Bevy renderer embedded in Symtropy; exact crate/version compatibility, build receipt and runtime integration are not pinned."
+      ]
+    },
+    {
+      "from_project_id": "sol-atlas",
+      "relation": "source_declared_integration",
+      "to_project_id": "mycelix",
+      "status": "source_declared_unverified",
+      "authority": "source_declared",
+      "source_refs": [
+        {
+          "repository_full_name": "Luminous-Dynamics/sol-atlas-leptos",
+          "path": "DEMO.md",
+          "blob_oid": "ae87d09a4c47992df40b707a74f9fef419c39c93",
+          "line_start": 57,
+          "line_end": 70
+        }
+      ],
+      "contract_binding": null,
+      "claim_limitations": [
+        "DEMO.md describes a Mycelix Holochain DHT bridge and simulated P2P trading; no DNA/zome/schema version, conductor run or runtime transaction receipt is pinned."
+      ]
+    }
+  ],
+  "join_policy": {
+    "map_identity": "Pin repository_full_name, subject revision, subject tree OID, map path, Git blob OID, artifact commit and artifact tree. A moving branch name is descriptive only; use the exact artifact commit for replay.",
+    "cross_project_join": "Join facts only through exact, versioned owner-published interface/schema identifiers and digests. Require both owner maps to reference the same contract and a two-sided conformance receipt before upgrading a source-declared relationship. Missing or unmatched contract bindings remain unjoined/unknown.",
+    "authority_non_transfer": "Each repository remains authoritative only for its owner-native domains. A map or federation edge cannot grant governance, identity, financial, deployment, sensor, physical-actuation or release authority to another project.",
+    "claim_promotion": "Preserve source authority and claim state exactly. Source-declared, proposed, stale, unknown, contested and unqualified claims are never promoted by federation membership, map presence, graph connectivity or another project's statement.",
+    "staleness": "Recompute when the subject repository revision/tree, source artifact blob, extractor/schema version or referenced owner contract changes. Distinguish a changed map artifact from a changed subject repository; retain historical pins and mark only applicable projections stale."
+  },
+  "limitations": [
+    "Federation is a directory of pinned maps, not a merged graph, common event store, common trust root or cross-project authority system.",
+    "All four member maps are bounded projections; none is a complete source-level model of its repository.",
+    "Project roles and integration relationships are source-declared summaries, not versioned API compatibility or operational evidence.",
+    "The shared v0.1 schema remains provisional and has not received full JSON Schema 2020-12 meta-validation or independent consumer qualification.",
+    "Node and edge counts describe exact pinned map artifacts, not project completeness or maturity.",
+    "Symthaea uses README and selected public issue context; Mycelix is README-only; Symtropy uses README and architecture docs; Sol Atlas uses DEMO/Cargo/source/research docs because no root README exists.",
+    "No builds, tests, Holochain operations, TUF verification, physics simulations, sensor calibration, EVSI calculations or deployments were executed."
+  ]
+}

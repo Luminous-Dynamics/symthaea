@@ -1,0 +1,580 @@
+{
+  "schema_version": "0.1.0",
+  "map_id": "luminous-dynamics:federated-development-map-index:2026-11-14",
+  "repository": {
+    "canonical_name": "Luminous-Dynamics/symthaea",
+    "visibility": "public",
+    "default_branch": "main"
+  },
+  "snapshot": {
+    "revision": "1768a6592ac044738cf14fbe6d33bf9638d401aa",
+    "tree_digest": "1c97e7655b71d7e128e8ad6a148163ce867d1ca1",
+    "tree_digest_algorithm": "git_tree_oid_sha1",
+    "observed_at": "2026-11-14T09:20:00.000Z",
+    "parent_snapshot": null,
+    "source_event_high_watermark": null,
+    "configuration_world": {
+      "map_kind": "federated_reference_index",
+      "project_count": 4,
+      "source_project_maps_are_draft": true
+    }
+  },
+  "extractor": {
+    "name": "manual-readonly-ecosystem-index",
+    "version": "0.1.0",
+    "build_digest": null
+  },
+  "nodes": [
+    {
+      "id": "ecosystem:root",
+      "type": "project",
+      "claim_state": "observed",
+      "label": "Luminous Dynamics — federated development-map index",
+      "attributes": {
+        "scope": "Four public project-local EGDDM snapshots",
+        "principle": "Each repository retains its own authoritative local map; this index stores exact references and explicit source-declared integration edges only.",
+        "private_repositories_included": false
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/research/dynamic-development-maps-v0-1-2026-11-14/docs/research/DYNAMIC_DEVELOPMENT_MAPS_V0_1_2026-11-14.md",
+            "digest": "a858c8ff37785047cc5d94cb7182f5e8f100c454"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "1768a6592ac044738cf14fbe6d33bf9638d401aa",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:project:symthaea",
+      "type": "project",
+      "claim_state": "observed",
+      "label": "Symthaea",
+      "attributes": {
+        "repository": "Luminous-Dynamics/symthaea",
+        "role": "cognitive architecture and development intelligence",
+        "map_path": "docs/development-map/readme-and-workstreams-v0.1.json",
+        "map_blob_sha": "28eaf7bfd352d21c12fd073d81208c36646f5793",
+        "mapped_source_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "mapped_source_tree": "74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
+        "map_branch": "research/dynamic-development-maps-v0-1-2026-11-14",
+        "map_branch_head_sha": "1768a6592ac044738cf14fbe6d33bf9638d401aa",
+        "review_status": "draft_open",
+        "authority": "local_repository_map_is_authoritative"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/research/dynamic-development-maps-v0-1-2026-11-14/docs/development-map/readme-and-workstreams-v0.1.json",
+            "digest": "28eaf7bfd352d21c12fd073d81208c36646f5793"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": [
+          "Map artifact is on an open draft PR branch; it is not merged or independently qualified.",
+          "This index does not ingest underlying project source or promote any local claim."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:project:mycelix",
+      "type": "project",
+      "claim_state": "observed",
+      "label": "Mycelix",
+      "attributes": {
+        "repository": "Luminous-Dynamics/mycelix",
+        "role": "civic infrastructure and governance",
+        "map_path": "docs/development-map/source-declared-maturity-v0.1.json",
+        "map_blob_sha": "2a0cebe44d67cc88a03bce3da2c3dc303f3757b6",
+        "mapped_source_revision": "6089a68430a501c51934c2c4107061c2a2cb5565",
+        "mapped_source_tree": "79283620f83cdfa155fc86a2362335390628913d",
+        "map_branch": "research/source-attributed-development-map-v0-1-2026-11-14",
+        "map_branch_head_sha": "e2f1635cf3e240e4136d26238f4e2d674295e184",
+        "review_status": "draft_open",
+        "authority": "local_repository_map_is_authoritative"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/mycelix/blob/research/source-attributed-development-map-v0-1-2026-11-14/docs/development-map/source-declared-maturity-v0.1.json",
+            "digest": "2a0cebe44d67cc88a03bce3da2c3dc303f3757b6"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "6089a68430a501c51934c2c4107061c2a2cb5565",
+        "valid_for_world": null,
+        "limitations": [
+          "Map artifact is on an open draft PR branch; it is not merged or independently qualified.",
+          "This index does not ingest underlying project source or promote any local claim."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:project:symtropy",
+      "type": "project",
+      "claim_state": "observed",
+      "label": "Symtropy",
+      "attributes": {
+        "repository": "Luminous-Dynamics/symtropy",
+        "role": "N-dimensional state-coupled physics",
+        "map_path": "docs/development-map/source-declared-architecture-v0.1.json",
+        "map_blob_sha": "830c82392ac69a9dcb212eb3f3012e277e83d5ae",
+        "mapped_source_revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+        "mapped_source_tree": "4aa895fb1a0c47cd678e4ade9684327c2c7f50ac",
+        "map_branch": "research/source-attributed-development-map-v0-1-2026-11-14",
+        "map_branch_head_sha": "15431e3621c24c99f24cc828f822fcb6fa8e1bf4",
+        "review_status": "draft_open",
+        "authority": "local_repository_map_is_authoritative"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symtropy/blob/research/source-attributed-development-map-v0-1-2026-11-14/docs/development-map/source-declared-architecture-v0.1.json",
+            "digest": "830c82392ac69a9dcb212eb3f3012e277e83d5ae"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+        "valid_for_world": null,
+        "limitations": [
+          "Map artifact is on an open draft PR branch; it is not merged or independently qualified.",
+          "This index does not ingest underlying project source or promote any local claim."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:project:sol-atlas",
+      "type": "project",
+      "claim_state": "observed",
+      "label": "Sol Atlas",
+      "attributes": {
+        "repository": "Luminous-Dynamics/sol-atlas-leptos",
+        "role": "planetary energy-transition visualization",
+        "map_path": "docs/development-map/source-declared-demo-architecture-v0.1.json",
+        "map_blob_sha": "b6da5fe463cd21450f2c325a22f61af8839c1ad2",
+        "mapped_source_revision": "1af10d891410cce31c1d4037e7c7129c16db5834",
+        "mapped_source_tree": "513c8e2b65e68c730d092efe12f9452b3414785e",
+        "map_branch": "research/source-attributed-development-map-v0-1-2026-11-14",
+        "map_branch_head_sha": "f1991407f4540326f613d78d554de6de6d85b6b1",
+        "review_status": "draft_open",
+        "authority": "local_repository_map_is_authoritative"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/blob/research/source-attributed-development-map-v0-1-2026-11-14/docs/development-map/source-declared-demo-architecture-v0.1.json",
+            "digest": "b6da5fe463cd21450f2c325a22f61af8839c1ad2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "1af10d891410cce31c1d4037e7c7129c16db5834",
+        "valid_for_world": null,
+        "limitations": [
+          "Map artifact is on an open draft PR branch; it is not merged or independently qualified.",
+          "This index does not ingest underlying project source or promote any local claim."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "ecosystem:edge:001",
+      "from": "ecosystem:root",
+      "relation": "contains",
+      "to": "ecosystem:project:symthaea",
+      "attributes": {
+        "map_reference": true
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symthaea/blob/research/dynamic-development-maps-v0-1-2026-11-14/docs/development-map/readme-and-workstreams-v0.1.json",
+            "digest": "28eaf7bfd352d21c12fd073d81208c36646f5793"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:002",
+      "from": "ecosystem:root",
+      "relation": "contains",
+      "to": "ecosystem:project:mycelix",
+      "attributes": {
+        "map_reference": true
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/mycelix/blob/research/source-attributed-development-map-v0-1-2026-11-14/docs/development-map/source-declared-maturity-v0.1.json",
+            "digest": "2a0cebe44d67cc88a03bce3da2c3dc303f3757b6"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "6089a68430a501c51934c2c4107061c2a2cb5565",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:003",
+      "from": "ecosystem:root",
+      "relation": "contains",
+      "to": "ecosystem:project:symtropy",
+      "attributes": {
+        "map_reference": true
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symtropy/blob/research/source-attributed-development-map-v0-1-2026-11-14/docs/development-map/source-declared-architecture-v0.1.json",
+            "digest": "830c82392ac69a9dcb212eb3f3012e277e83d5ae"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:004",
+      "from": "ecosystem:root",
+      "relation": "contains",
+      "to": "ecosystem:project:sol-atlas",
+      "attributes": {
+        "map_reference": true
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/blob/research/source-attributed-development-map-v0-1-2026-11-14/docs/development-map/source-declared-demo-architecture-v0.1.json",
+            "digest": "b6da5fe463cd21450f2c325a22f61af8839c1ad2"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "1af10d891410cce31c1d4037e7c7129c16db5834",
+        "valid_for_world": null,
+        "limitations": []
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:005",
+      "from": "ecosystem:project:symtropy",
+      "relation": "compatible_with",
+      "to": "ecosystem:project:symthaea",
+      "attributes": {
+        "relationship_status": "source_declared_only",
+        "claim": "Symtropy README describes the Symthaea cognitive-loop integration."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symtropy/blob/README.md",
+            "digest": "2305f295cae5c868465aef7f190a9d56e3a85596"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+        "valid_for_world": null,
+        "limitations": [
+          "Project README/demo declares this integration; no exact versioned interface or runtime receipt is part of the index."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:006",
+      "from": "ecosystem:project:symtropy",
+      "relation": "compatible_with",
+      "to": "ecosystem:project:mycelix",
+      "attributes": {
+        "relationship_status": "source_declared_only",
+        "claim": "Symtropy README describes Mycelix DID, vault, governance and economy integration."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symtropy/blob/README.md",
+            "digest": "2305f295cae5c868465aef7f190a9d56e3a85596"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+        "valid_for_world": null,
+        "limitations": [
+          "Project README/demo declares this integration; no exact versioned interface or runtime receipt is part of the index."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:007",
+      "from": "ecosystem:project:symtropy",
+      "relation": "compatible_with",
+      "to": "ecosystem:project:sol-atlas",
+      "attributes": {
+        "relationship_status": "source_declared_only",
+        "claim": "Symtropy README names the atlas feature flag / Sol Atlas globe view."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/symtropy/blob/README.md",
+            "digest": "2305f295cae5c868465aef7f190a9d56e3a85596"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "aea5d824b31dd949c7b24680d27c9041d025db85",
+        "valid_for_world": null,
+        "limitations": [
+          "Project README/demo declares this integration; no exact versioned interface or runtime receipt is part of the index."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:008",
+      "from": "ecosystem:project:sol-atlas",
+      "relation": "compatible_with",
+      "to": "ecosystem:project:symtropy",
+      "attributes": {
+        "relationship_status": "source_declared_only",
+        "claim": "Sol Atlas DEMO.md describes a Bevy renderer embedded in Symtropy."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/blob/DEMO.md",
+            "digest": "ae87d09a4c47992df40b707a74f9fef419c39c93"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "1af10d891410cce31c1d4037e7c7129c16db5834",
+        "valid_for_world": null,
+        "limitations": [
+          "Project README/demo declares this integration; no exact versioned interface or runtime receipt is part of the index."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    },
+    {
+      "id": "ecosystem:edge:009",
+      "from": "ecosystem:project:sol-atlas",
+      "relation": "compatible_with",
+      "to": "ecosystem:project:mycelix",
+      "attributes": {
+        "relationship_status": "source_declared_only",
+        "claim": "Sol Atlas DEMO.md describes a Mycelix Holochain data bridge."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "repository_file",
+            "uri": "https://github.com/Luminous-Dynamics/sol-atlas-leptos/blob/DEMO.md",
+            "digest": "ae87d09a4c47992df40b707a74f9fef419c39c93"
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-readonly-ecosystem-index",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:20:00.000Z",
+        "valid_for_revision": "1af10d891410cce31c1d4037e7c7129c16db5834",
+        "valid_for_world": null,
+        "limitations": [
+          "Project README/demo declares this integration; no exact versioned interface or runtime receipt is part of the index."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current as of the pinned review snapshot; refresh when a project map head changes."
+      }
+    }
+  ],
+  "limitations": [
+    "This is a pointer/index graph, not a merged graph of all project internals.",
+    "Each project-local map is independently owned and remains the authoritative map for its repository.",
+    "All four map artifacts are on open draft PR branches and are not merged or independently qualified.",
+    "Cross-project compatibility edges are based only on README/DEMO source declarations and are not validated interface or runtime compatibility.",
+    "The index covers four public repositories only; no private repositories or private source are included.",
+    "Refresh every map reference when its source revision, branch head, blob digest or review status changes."
+  ]
+}

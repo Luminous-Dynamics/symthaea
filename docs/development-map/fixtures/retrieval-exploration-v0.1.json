@@ -1,0 +1,594 @@
+{
+  "document_type": "retrieval_exploration_benchmark_case",
+  "schema_version": "0.1.0",
+  "benchmark_id": "DYNRETR-001",
+  "task_id": "DYNRETR-SYN-BATCH-001",
+  "status": "public_synthetic_known_answer",
+  "observed_at": "2026-11-14T12:25:00Z",
+  "evaluation_contract": {
+    "tokenizer_id": "synthetic-token-estimate-v0.1",
+    "token_budget": 1200,
+    "line_budget": 90,
+    "region_unit": "mixed",
+    "ranking_direction": "lower_rank_is_better",
+    "no_gold_policy": "explicit_abstain"
+  },
+  "repository_snapshot": {
+    "repository_id": "synthetic:multi-repository-retrieval-corpus",
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree_oid": "cccccccccccccccccccccccccccccccccccccccc",
+    "configuration_world": {
+      "corpus": "synthetic; no production source copied"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "DYNRETR-SYN-001",
+      "case_kind": "positive_context_retrieval",
+      "repository_id": "synthetic/receipt-api",
+      "query": "Find the exact receipt verification contract, the type constraints it relies on, and the test that demonstrates rejection of an invalid receipt.",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": [
+          "receipt-v2"
+        ]
+      },
+      "token_budget": 1200,
+      "line_budget": 90,
+      "changed_entities": [
+        "Receipt::verify"
+      ],
+      "candidate_regions": [
+        {
+          "region_id": "r1",
+          "path": "src/receipt.rs",
+          "line_start": 40,
+          "line_end": 68,
+          "token_estimate": 360,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [
+            "receipt-v2"
+          ],
+          "lexical_terms": [
+            "Receipt",
+            "verify",
+            "digest",
+            "receipt contract"
+          ]
+        },
+        {
+          "region_id": "r2",
+          "path": "src/types.rs",
+          "line_start": 12,
+          "line_end": 34,
+          "token_estimate": 220,
+          "authority": "source_declared",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "Digest",
+            "Receipt",
+            "type",
+            "sha256"
+          ]
+        },
+        {
+          "region_id": "r3",
+          "path": "tests/receipt_contract.rs",
+          "line_start": 20,
+          "line_end": 44,
+          "token_estimate": 260,
+          "authority": "runtime_observed",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "reject",
+            "invalid",
+            "test"
+          ]
+        },
+        {
+          "region_id": "r4",
+          "path": "Cargo.toml",
+          "line_start": 30,
+          "line_end": 42,
+          "token_estimate": 120,
+          "authority": "manifest_resolved",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "features",
+            "receipt-v2"
+          ]
+        },
+        {
+          "region_id": "r5",
+          "path": "src/ui.rs",
+          "line_start": 100,
+          "line_end": 140,
+          "token_estimate": 280,
+          "authority": "source_declared",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "verify",
+            "display",
+            "status"
+          ]
+        }
+      ],
+      "expected_disposition": "retrieve",
+      "notes": "The smallest sufficient context is the verifier implementation + type constraints + contract test. Cargo feature evidence is useful but not mandatory if the query is limited to the active world.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "case_id": "DYNRETR-SYN-002",
+      "case_kind": "natural_no_gold",
+      "repository_id": "synthetic/receipt-api",
+      "query": "Find the protobuf v1-to-v2 migration adapter and its compatibility test.",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": [
+          "receipt-v2"
+        ]
+      },
+      "token_budget": 800,
+      "line_budget": 60,
+      "changed_entities": [],
+      "candidate_regions": [
+        {
+          "region_id": "r6",
+          "path": "src/receipt.rs",
+          "line_start": 40,
+          "line_end": 68,
+          "token_estimate": 360,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "verify",
+            "version",
+            "adapter"
+          ]
+        },
+        {
+          "region_id": "r7",
+          "path": "docs/receipt.md",
+          "line_start": 1,
+          "line_end": 28,
+          "token_estimate": 210,
+          "authority": "source_declared",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "version",
+            "contract",
+            "compatibility"
+          ]
+        },
+        {
+          "region_id": "r8",
+          "path": "tests/receipt_contract.rs",
+          "line_start": 20,
+          "line_end": 44,
+          "token_estimate": 260,
+          "authority": "runtime_observed",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "compatibility",
+            "receipt",
+            "test"
+          ]
+        }
+      ],
+      "expected_disposition": "abstain",
+      "notes": "Repository contains receipt contract/version material but no protobuf migration adapter or protobuf compatibility test. Similar words are not sufficient evidence.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "case_id": "DYNRETR-SYN-003",
+      "case_kind": "wrong_repository_counterfactual",
+      "repository_id": "synthetic/ui-renderer",
+      "counterfactual_pair_of": "DYNRETR-SYN-002",
+      "query": "Find the protobuf v1-to-v2 migration adapter and its compatibility test.",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": []
+      },
+      "token_budget": 800,
+      "line_budget": 60,
+      "changed_entities": [],
+      "candidate_regions": [
+        {
+          "region_id": "r9",
+          "path": "src/render.rs",
+          "line_start": 10,
+          "line_end": 45,
+          "token_estimate": 280,
+          "authority": "syntax_extracted",
+          "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "protobuf",
+            "render",
+            "adapter"
+          ]
+        },
+        {
+          "region_id": "r10",
+          "path": "tests/render.rs",
+          "line_start": 1,
+          "line_end": 30,
+          "token_estimate": 180,
+          "authority": "runtime_observed",
+          "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "protobuf",
+            "test",
+            "compatibility"
+          ]
+        }
+      ],
+      "expected_disposition": "abstain",
+      "notes": "Counterfactual repository has coincidental protobuf terms, but not the requested migration contract. Score separately from natural no-gold.",
+      "repository_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repository_tree_oid": "dddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "case_id": "DYNRETR-SYN-004",
+      "case_kind": "configuration_world_mismatch",
+      "repository_id": "synthetic/payment-workspace",
+      "query": "Under the default Linux workspace configuration, find the active receipt verifier and the test that exercises it.",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": []
+      },
+      "token_budget": 900,
+      "line_budget": 70,
+      "changed_entities": [
+        "Receipt::verify"
+      ],
+      "candidate_regions": [
+        {
+          "region_id": "r11",
+          "path": "crates/core/src/receipt.rs",
+          "line_start": 15,
+          "line_end": 42,
+          "token_estimate": 260,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "Receipt",
+            "verify",
+            "digest"
+          ]
+        },
+        {
+          "region_id": "r12",
+          "path": "crates/payments-v2/src/receipt.rs",
+          "line_start": 1,
+          "line_end": 52,
+          "token_estimate": 400,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "inactive_configuration",
+          "configuration_requirements": [
+            "payments-v2"
+          ],
+          "lexical_terms": [
+            "Receipt",
+            "verify",
+            "digest"
+          ]
+        },
+        {
+          "region_id": "r13",
+          "path": "crates/core/tests/receipt.rs",
+          "line_start": 1,
+          "line_end": 25,
+          "token_estimate": 190,
+          "authority": "runtime_observed",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "verify",
+            "test"
+          ]
+        }
+      ],
+      "expected_disposition": "retrieve",
+      "notes": "The feature-gated payments-v2 region is a hard negative for this world even though it is lexically attractive.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "case_id": "DYNRETR-SYN-005",
+      "case_kind": "temporal_revision_mismatch",
+      "repository_id": "synthetic/receipt-api",
+      "query": "At the current revision, which implementation validates receipt digest length?",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": [
+          "receipt-v2"
+        ]
+      },
+      "token_budget": 900,
+      "line_budget": 70,
+      "changed_entities": [
+        "Receipt::validate_digest"
+      ],
+      "candidate_regions": [
+        {
+          "region_id": "r14",
+          "path": "src/receipt.rs",
+          "line_start": 70,
+          "line_end": 96,
+          "token_estimate": 230,
+          "authority": "syntax_extracted",
+          "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "digest",
+            "length",
+            "validate"
+          ]
+        },
+        {
+          "region_id": "r15",
+          "path": "src/receipt.rs",
+          "line_start": 50,
+          "line_end": 72,
+          "token_estimate": 210,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "stale_revision",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "digest",
+            "length",
+            "validate"
+          ]
+        },
+        {
+          "region_id": "r16",
+          "path": "tests/receipt_digest.rs",
+          "line_start": 8,
+          "line_end": 32,
+          "token_estimate": 200,
+          "authority": "runtime_observed",
+          "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "digest",
+            "length",
+            "reject",
+            "test"
+          ]
+        }
+      ],
+      "expected_disposition": "retrieve",
+      "notes": "The old revision region may explain history but must not be returned as current implementation evidence.",
+      "repository_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repository_tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "case_id": "DYNRETR-SYN-006",
+      "case_kind": "nonlocal_change_impact",
+      "repository_id": "synthetic/receipt-api",
+      "query": "A change to Receipt::verify may break which non-local tests and feature declarations?",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": [
+          "receipt-v2"
+        ]
+      },
+      "token_budget": 1100,
+      "line_budget": 85,
+      "changed_entities": [
+        "Receipt::verify"
+      ],
+      "candidate_regions": [
+        {
+          "region_id": "r17",
+          "path": "src/receipt.rs",
+          "line_start": 40,
+          "line_end": 68,
+          "token_estimate": 360,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [
+            "receipt-v2"
+          ],
+          "lexical_terms": [
+            "Receipt",
+            "verify"
+          ]
+        },
+        {
+          "region_id": "r18",
+          "path": "tests/receipt_contract.rs",
+          "line_start": 20,
+          "line_end": 44,
+          "token_estimate": 260,
+          "authority": "runtime_observed",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "verify",
+            "contract"
+          ]
+        },
+        {
+          "region_id": "r19",
+          "path": "crates/client/src/submit.rs",
+          "line_start": 80,
+          "line_end": 106,
+          "token_estimate": 230,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "Receipt",
+            "verify",
+            "submit"
+          ]
+        },
+        {
+          "region_id": "r20",
+          "path": "Cargo.toml",
+          "line_start": 30,
+          "line_end": 42,
+          "token_estimate": 120,
+          "authority": "manifest_resolved",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "feature",
+            "receipt-v2"
+          ]
+        },
+        {
+          "region_id": "r21",
+          "path": "docs/ui_receipt.md",
+          "line_start": 1,
+          "line_end": 30,
+          "token_estimate": 210,
+          "authority": "source_declared",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "receipt",
+            "verify",
+            "display"
+          ]
+        }
+      ],
+      "expected_disposition": "retrieve",
+      "notes": "The correct set includes caller, test and feature declaration; pure lexical ranking may over-select the unrelated UI documentation.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "case_id": "DYNRETR-SYN-007",
+      "case_kind": "lexical_decoy",
+      "repository_id": "synthetic/receipt-api",
+      "query": "Find the cryptographic receipt verification primitive and the invariant test; ignore UI labels that merely say 'verified'.",
+      "configuration_world": {
+        "target": "x86_64-unknown-linux-gnu",
+        "features": [
+          "receipt-v2"
+        ]
+      },
+      "token_budget": 950,
+      "line_budget": 75,
+      "changed_entities": [
+        "Receipt::verify"
+      ],
+      "candidate_regions": [
+        {
+          "region_id": "r22",
+          "path": "src/crypto/verify.rs",
+          "line_start": 5,
+          "line_end": 45,
+          "token_estimate": 340,
+          "authority": "syntax_extracted",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "crypto",
+            "digest",
+            "verify",
+            "receipt"
+          ]
+        },
+        {
+          "region_id": "r23",
+          "path": "tests/crypto_invariants.rs",
+          "line_start": 8,
+          "line_end": 35,
+          "token_estimate": 240,
+          "authority": "runtime_observed",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "invariant",
+            "verify",
+            "receipt",
+            "test"
+          ]
+        },
+        {
+          "region_id": "r24",
+          "path": "src/ui/badges.rs",
+          "line_start": 2,
+          "line_end": 40,
+          "token_estimate": 260,
+          "authority": "source_declared",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "verified",
+            "receipt",
+            "status",
+            "label"
+          ]
+        },
+        {
+          "region_id": "r25",
+          "path": "docs/changelog.md",
+          "line_start": 100,
+          "line_end": 132,
+          "token_estimate": 220,
+          "authority": "source_declared",
+          "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "availability": "available",
+          "configuration_requirements": [],
+          "lexical_terms": [
+            "verified",
+            "receipt",
+            "status"
+          ]
+        }
+      ],
+      "expected_disposition": "retrieve",
+      "notes": "The UI and changelog are lexical decoys; the primitive and invariant test are the gold context.",
+      "repository_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "repository_tree_oid": "cccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "claim_ceiling": "Seven public synthetic known-answer retrieval tasks only. Token estimates and line ranges are authored scenario metadata, not measured tokenizer costs or source-code benchmark results. No retriever performance, downstream repair effect or SOTA claim is established."
+}

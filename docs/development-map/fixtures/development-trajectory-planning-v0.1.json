@@ -1,0 +1,357 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "DYNPLAN-001",
+  "task_id": "DYNPLAN-SYN-001",
+  "status": "public_synthetic_known_answer",
+  "observed_at": "2026-11-14T10:35:00Z",
+  "scenario_clock": "synthetic UTC planning episode",
+  "objective": {
+    "id": "objective:cross-project-map-consumer",
+    "description": "Propose a read-only consumer that can join the Mycelix development map into Symthaea EGDDM without promoting source-declared claims or transferring authority.",
+    "required_capability": "two-sided, versioned schema/contract conformance for cross-project map consumption",
+    "acceptance_evidence": [
+      "exact owner-published contract identifier, version and schema blob digest",
+      "two-sided owner acknowledgement or equivalent source-backed contract identity",
+      "independent conformance fixtures for supported map producers and the read-only consumer",
+      "explicit unknown/stale/contested handling with authority non-transfer"
+    ]
+  },
+  "resource_budget": {
+    "unit": "abstract engineering effort units",
+    "total": 4,
+    "time_budget_hours": 8,
+    "execution_authority": "none",
+    "mutation_authority": "none"
+  },
+  "federation_snapshot": {
+    "manifest_repository": "Luminous-Dynamics/symthaea",
+    "manifest_path": "docs/development-map/federation-v0.1.json",
+    "manifest_artifact_branch": "research/dynamic-development-maps-v0-1-2026-11-14",
+    "manifest_blob_oid": "93cd3c54bd8eeac5379318605a9bd9f13bcfff92",
+    "shared_schema": {
+      "contract_id": "EGDDM-SNAPSHOT",
+      "version": "0.1.0",
+      "schema_path": "docs/research/development-map-v0.1.schema.json",
+      "schema_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+      "status": "schema_shape_checked_not_fully_qualified"
+    },
+    "members": [
+      {
+        "project_id": "symthaea",
+        "repository": "Luminous-Dynamics/symthaea",
+        "subject_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "map_path": "docs/development-map/readme-and-workstreams-v0.1.json",
+        "map_blob_oid": "28eaf7bfd352d21c12fd073d81208c36646f5793"
+      },
+      {
+        "project_id": "mycelix",
+        "repository": "Luminous-Dynamics/mycelix",
+        "subject_revision": "6089a68430a501c51934c2c4107061c2a2cb5565",
+        "map_path": "docs/development-map/source-declared-maturity-v0.1.json",
+        "map_blob_oid": "2a0cebe44d67cc88a03bce3da2c3dc303f3757b6"
+      }
+    ],
+    "cross_project_contract": {
+      "relation": "shared_schema_candidate",
+      "status": "contract_versioned_unqualified",
+      "contract_binding": {
+        "contract_id": "EGDDM-SNAPSHOT",
+        "version": "0.1.0",
+        "contract_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+        "status": "declared"
+      },
+      "two_sided_owner_conformance": "missing",
+      "independent_consumer_conformance": "missing",
+      "critical_unknowns": [
+        "whether each owner explicitly accepts this exact schema blob as its producer contract",
+        "whether the consuming implementation handles each producer's actual required/optional fields and semantic invariants",
+        "whether provenance and lifecycle semantics are preserved rather than coerced",
+        "whether source-declared maturity can be misrepresented as compiler/runtime/independent evidence"
+      ]
+    }
+  },
+  "hard_constraints": [
+    {
+      "id": "HC-01",
+      "rule": "No production consumer implementation may be proposed as immediately feasible until exact two-sided contract conformance is established.",
+      "failure": "plan_infeasible"
+    },
+    {
+      "id": "HC-02",
+      "rule": "No map or federation edge may grant authority or promote a source-declared claim.",
+      "failure": "plan_infeasible"
+    },
+    {
+      "id": "HC-03",
+      "rule": "No repository code/build/test execution is authorized in this synthetic task.",
+      "failure": "plan_infeasible"
+    },
+    {
+      "id": "HC-04",
+      "rule": "All planned work must fit the resource budget or be explicitly conditional/deferred.",
+      "failure": "plan_infeasible"
+    }
+  ],
+  "evidence_state": [
+    {
+      "id": "evidence:exact-map-pins",
+      "status": "source_declared_and_git-tree-pin-checked",
+      "scope": "four exact artifact commit trees were fetched and each member map path/blob pair matched",
+      "limitation": "does not prove schema semantics or runtime interoperability"
+    },
+    {
+      "id": "evidence:shared-schema-version",
+      "status": "source_declared",
+      "scope": "all four local maps declare schema_version 0.1.0",
+      "limitation": "same version string does not prove same schema blob or semantic conformance"
+    },
+    {
+      "id": "evidence:two-sided-contract",
+      "status": "missing",
+      "scope": "no independently reviewed owner-to-owner contract conformance receipt in this fixture"
+    },
+    {
+      "id": "evidence:consumer-test",
+      "status": "missing",
+      "scope": "no executable read-only consumer conformance result"
+    }
+  ],
+  "actions": [
+    {
+      "id": "action:audit-exact-pins",
+      "kind": "evidence_acquisition",
+      "description": "Reconfirm exact map blob, source revision/tree, shared schema blob and artifact commit pins for Symthaea and Mycelix.",
+      "cost": {
+        "min": 0.5,
+        "expected": 0.7,
+        "max": 1
+      },
+      "duration_hours": {
+        "min": 1,
+        "max": 2
+      },
+      "prerequisites": [],
+      "resolves": [
+        "evidence:exact-map-pins"
+      ],
+      "produces": [
+        "pin-audit-receipt"
+      ],
+      "risk": "low",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "all four identity dimensions resolve exactly; mismatches remain explicit"
+    },
+    {
+      "id": "action:owner-contract-review",
+      "kind": "owner_review",
+      "description": "Request and record explicit two-sided owner review of the exact schema blob, required fields, semantic invariants, provenance authority levels and source-declared maturity limitations.",
+      "cost": {
+        "min": 1,
+        "expected": 1.5,
+        "max": 2
+      },
+      "duration_hours": {
+        "min": 2,
+        "max": 4
+      },
+      "prerequisites": [
+        "action:audit-exact-pins"
+      ],
+      "resolves": [
+        "evidence:two-sided-contract"
+      ],
+      "produces": [
+        "owner-contract-review-reference"
+      ],
+      "risk": "low",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "both owners reference the same exact contract ID/version/blob; disagreement or no response remains unknown"
+    },
+    {
+      "id": "action:consumer-conformance-fixtures",
+      "kind": "validation_design",
+      "description": "Author producer/consumer fixture pairs and negative controls for source-declared authority, missing fields, stale maps and claim-promotion attacks.",
+      "cost": {
+        "min": 0.7,
+        "expected": 1,
+        "max": 1.3
+      },
+      "duration_hours": {
+        "min": 2,
+        "max": 3
+      },
+      "prerequisites": [
+        "action:owner-contract-review"
+      ],
+      "resolves": [
+        "evidence:consumer-test"
+      ],
+      "produces": [
+        "read-only-consumer-conformance-corpus"
+      ],
+      "risk": "low",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "fixtures cover all agreed contract semantics; test execution remains separately gated"
+    },
+    {
+      "id": "action:implement-consumer-now",
+      "kind": "implementation_proposal",
+      "description": "Immediately implement a cross-project consumer using only schema_version 0.1.0 equality.",
+      "cost": {
+        "min": 1.5,
+        "expected": 2,
+        "max": 2.5
+      },
+      "duration_hours": {
+        "min": 4,
+        "max": 6
+      },
+      "prerequisites": [
+        "evidence:two-sided-contract",
+        "evidence:consumer-test"
+      ],
+      "resolves": [],
+      "produces": [
+        "consumer-code"
+      ],
+      "risk": "high",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "not eligible while prerequisites are missing"
+    },
+    {
+      "id": "action:broad-source-scan",
+      "kind": "analysis",
+      "description": "Run a broad source inventory over both repositories without first resolving the exact owner contract.",
+      "cost": {
+        "min": 5,
+        "expected": 6,
+        "max": 8
+      },
+      "duration_hours": {
+        "min": 10,
+        "max": 14
+      },
+      "prerequisites": [],
+      "resolves": [],
+      "produces": [
+        "large-source-inventory"
+      ],
+      "risk": "medium",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "does not satisfy the two-sided contract prerequisite"
+    },
+    {
+      "id": "action:unrelated-physics-benchmark",
+      "kind": "benchmark_proposal",
+      "description": "Run an unrelated Symtropy physics performance benchmark.",
+      "cost": {
+        "min": 3.5,
+        "expected": 4.5,
+        "max": 5.5
+      },
+      "duration_hours": {
+        "min": 6,
+        "max": 9
+      },
+      "prerequisites": [],
+      "resolves": [],
+      "produces": [
+        "physics-benchmark-result"
+      ],
+      "risk": "low",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "does not reduce uncertainty about the map contract"
+    },
+    {
+      "id": "action:defer-until-owner-evidence",
+      "kind": "defer",
+      "description": "Do not implement until the required owner contract evidence can be obtained.",
+      "cost": {
+        "min": 0,
+        "expected": 0.1,
+        "max": 0.2
+      },
+      "duration_hours": {
+        "min": 0,
+        "max": 0.5
+      },
+      "prerequisites": [],
+      "resolves": [],
+      "produces": [
+        "explicit-defer-record"
+      ],
+      "risk": "low",
+      "reversible": true,
+      "execution_authority_required": false,
+      "acceptance": "retains unknown contract status and identifies the missing owner evidence"
+    }
+  ],
+  "candidate_plans": [
+    {
+      "id": "plan:immediate-implementation",
+      "actions": [
+        "action:implement-consumer-now"
+      ],
+      "declared_cost": 2,
+      "claimed_benefit": "early integration",
+      "declared_status": "ready",
+      "plan_rationale": "schema versions match",
+      "claim_state": "proposed"
+    },
+    {
+      "id": "plan:evidence-first",
+      "actions": [
+        "action:audit-exact-pins",
+        "action:owner-contract-review",
+        "action:consumer-conformance-fixtures"
+      ],
+      "declared_cost": 3.2,
+      "claimed_benefit": "resolve critical contract uncertainty before implementation",
+      "declared_status": "conditional-feasible",
+      "plan_rationale": "spend budget on exact evidence and owner agreement first; only then open a separately gated implementation proposal",
+      "claim_state": "proposed",
+      "implementation_contingency": "implementation remains blocked until the two-sided contract and fixture evidence exist"
+    },
+    {
+      "id": "plan:broad-scan",
+      "actions": [
+        "action:broad-source-scan"
+      ],
+      "declared_cost": 6,
+      "claimed_benefit": "more source information",
+      "declared_status": "ready",
+      "plan_rationale": "more inventory should improve integration confidence",
+      "claim_state": "proposed"
+    },
+    {
+      "id": "plan:unrelated-benchmark",
+      "actions": [
+        "action:unrelated-physics-benchmark"
+      ],
+      "declared_cost": 4.5,
+      "claimed_benefit": "improved physics performance evidence",
+      "declared_status": "ready",
+      "plan_rationale": "collect more project evidence",
+      "claim_state": "proposed"
+    },
+    {
+      "id": "plan:defer",
+      "actions": [
+        "action:defer-until-owner-evidence"
+      ],
+      "declared_cost": 0.1,
+      "claimed_benefit": "avoid an unsupported implementation",
+      "declared_status": "defer",
+      "plan_rationale": "use when owner evidence cannot be obtained within the decision horizon",
+      "claim_state": "proposed"
+    }
+  ],
+  "claim_ceiling": "Synthetic planning case only. Costs are abstract fixture values, not real engineering estimates. No actual owner agreement, consumer implementation, build/test run or integration is asserted.",
+  "document_type": "development_trajectory_planning_case"
+}
