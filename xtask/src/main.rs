@@ -7,6 +7,7 @@ mod manifest;
 mod plasma_evidence_composition;
 mod plasma_claim_scope;
 mod plasma_equivalence_design;
+mod plasma_transfer;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -78,6 +79,11 @@ enum Commands {
     /// Audit preregistered cluster-aware equivalence designs and their linked results.
     PlasmaEquivalenceDesignAudit {
         #[arg(long, default_value = "data/research/plasma_equivalence_design_fixture_v0_1.json")]
+        fixture: PathBuf,
+    },
+    /// Audit bounded plasma qualification transfer with mandatory method/design evidence composition.
+    PlasmaTransferAudit {
+        #[arg(long, default_value = "data/research/plasma_transfer_fixture_v0_2.json")]
         fixture: PathBuf,
     },
     GenerateManifest {
@@ -159,6 +165,18 @@ fn main() -> anyhow::Result<()> {
                 root.join(fixture)
             };
             plasma_equivalence_design::run(&fixture_path)?;
+        }
+        Commands::PlasmaTransferAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() {
+                fixture
+            } else {
+                root.join(fixture)
+            };
+            plasma_transfer::run(&fixture_path)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
