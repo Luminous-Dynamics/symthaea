@@ -22,8 +22,8 @@ use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod assay;
 pub mod identity;
-pub mod viability;
 pub mod reconfiguration;
+pub mod viability;
 pub mod semantic_continuity;
 
 pub use assay::{
@@ -44,9 +44,8 @@ pub use semantic_continuity::{
 };
 pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
-    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode,
-    ReconfigurationPolicy, ReconfigurationQualification, ReconfigurationReport,
-    evaluate_reconfiguration,
+    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode, ReconfigurationPolicy,
+    ReconfigurationQualification, ReconfigurationReport, evaluate_reconfiguration,
 };
 
 macro_rules! string_id {
