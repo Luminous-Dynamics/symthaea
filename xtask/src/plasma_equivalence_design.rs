@@ -603,8 +603,12 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     }
 
     if receipt.endpoint_transform_id.as_deref() == Some("aged_strength_retention_ratio_v1") {
-        let baseline_unaged = cohort_sample_maps.get("baseline_unaged_strength").ok_or_else(|| blocked("baseline unaged source manifest is missing"))?;
-        let candidate_unaged = cohort_sample_maps.get("candidate_unaged_strength").ok_or_else(|| blocked("candidate unaged source manifest is missing"))?;
+        let Some(baseline_unaged) = cohort_sample_maps.get("baseline_unaged_strength") else {
+            return blocked("baseline unaged source manifest is missing");
+        };
+        let Some(candidate_unaged) = cohort_sample_maps.get("candidate_unaged_strength") else {
+            return blocked("candidate unaged source manifest is missing");
+        };
         let baseline_aged = &baseline_primary;
         let candidate_aged = &candidate_primary;
         let cohorts = [baseline_unaged, candidate_unaged, baseline_aged, candidate_aged];
