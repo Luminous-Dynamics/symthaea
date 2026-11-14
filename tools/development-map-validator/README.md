@@ -1,6 +1,6 @@
 # development-map-validator
 
-A dependency-light, read-only Rust validator for the EGDDM v0.1 snapshot contract.
+A dependency-light, read-only Rust validator for EGDDM v0.1 snapshots and project-federation manifests.
 
 ## Build and run
 
@@ -14,6 +14,14 @@ Run its tests:
 
 The crate has its own Cargo workspace so it is not implicitly pulled into Symthaea's large root workspace. It is not registered as a Symthaea workspace member.
 
+## Supported document types
+
+The CLI autodetects:
+- **Map snapshots**: graph identity, node/edge shape, provenance, lifecycle, event references, evidence invalidation, authority promotion and decision-time evidence availability.
+- **Federation manifests**: unique project/repository/map identities, exact map-blob and artifact-commit pins, source-repository references, relationship endpoints, shared-contract bindings, hub self-map identity and claim/authority consistency.
+
+For federation manifests, a successful structural check does **not** fetch member repositories or prove that the pinned Git objects exist. It checks the manifest's internal references and identity formats only. Fetch each map by its exact artifact commit and compare the resulting blob OID independently when constructing or refreshing a federation.
+
 ## What it checks
 
 - v0.1 top-level, node, edge, provenance, lifecycle and event field shape;
@@ -24,7 +32,11 @@ The crate has its own Cargo workspace so it is not implicitly pulled into Symtha
 - evidence invalidation/supersession consistency;
 - proposed development actions remain proposals;
 - passed_local / ci_passed / independently_qualified claims require the corresponding stronger evidence authority;
-- containment edges are acyclic.
+- containment edges are acyclic;
+- federation members, role edges and source references resolve within the manifest;
+- artifact URLs pin exact repository, commit and path rather than a moving branch;
+- the hub self-map binds to the exact member map and subject revision/tree;
+- an independently-qualified relationship requires independent authority and a conformance-tested contract binding.
 
 ## Explicit non-goals
 
@@ -34,4 +46,4 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored. Compilation and test execution remain pending the repository's qualified execution-isolation path; do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots and four-project federation manifests. Compilation and test execution remain pending the repository's qualified execution-isolation path; do not treat unexecuted tests as passing.
