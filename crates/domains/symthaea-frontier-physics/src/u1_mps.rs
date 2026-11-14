@@ -480,18 +480,25 @@ impl U1CanonicalGaugeReceipt {
             && self.bond < self.site_count - 1
             && self.qualified
             && self.maximum_left_isometry_residual.is_finite()
+            && self.maximum_left_isometry_residual >= 0.0
             && self.maximum_left_isometry_residual <= tolerance
             && self.maximum_right_isometry_residual.is_finite()
+            && self.maximum_right_isometry_residual >= 0.0
             && self.maximum_right_isometry_residual <= tolerance
             && self.factorization_max_residual.is_finite()
+            && self.factorization_max_residual >= 0.0
             && self.factorization_max_residual <= tolerance
             && self.factorization_l2_residual.is_finite()
+            && self.factorization_l2_residual >= 0.0
             && self.factorization_l2_residual <= tolerance
             && self.state_reconstruction_l2_residual.is_finite()
+            && self.state_reconstruction_l2_residual >= 0.0
             && self.state_reconstruction_l2_residual <= tolerance
             && self.relative_norm_drift.is_finite()
+            && self.relative_norm_drift >= 0.0
             && self.relative_norm_drift <= tolerance
             && self.selection_rule_residual.is_finite()
+            && self.selection_rule_residual >= 0.0
             && self.selection_rule_residual <= tolerance
             && self.left_exterior_operator_norm_upper_bound.is_finite()
             && self.left_exterior_operator_norm_upper_bound >= 1.0
@@ -504,7 +511,10 @@ impl U1CanonicalGaugeReceipt {
                 .iter()
                 .enumerate()
                 .all(|(index, (site, residual))| {
-                    *site == index && residual.is_finite() && *residual <= tolerance
+                    *site == index
+                        && residual.is_finite()
+                        && *residual >= 0.0
+                        && *residual <= tolerance
                 })
             && self.right_isometry_residuals.len()
                 == self.site_count.saturating_sub(self.bond + 2)
@@ -515,6 +525,7 @@ impl U1CanonicalGaugeReceipt {
                 .all(|(index, (site, residual))| {
                     *site == self.bond + 2 + index
                         && residual.is_finite()
+                        && *residual >= 0.0
                         && *residual <= tolerance
                 })
             && self.input_norm_squared.is_finite()
@@ -1250,6 +1261,9 @@ impl ComplexU1Mps {
         }
 
         let input_norm_squared = self.norm_squared(tolerance)?;
+        if input_norm_squared <= 0.0 {
+            return Err(U1MpsError::ZeroDenseState);
+        }
         let mut tensors = self.tensors.clone();
         let mut factorization_stats = CanonicalizationStats::default();
 
@@ -1274,13 +1288,16 @@ impl ComplexU1Mps {
         // Validate a candidate first. On any failure the original MPS is unchanged.
         let candidate = Self::new(tensors, self.total_charge, tolerance)?;
         let output_norm_squared = candidate.norm_squared(tolerance)?;
-        let scale = input_norm_squared.max(output_norm_squared).max(1.0);
         let difference_squared = self.difference_norm_squared(&candidate, tolerance)?;
         if difference_squared < 0.0 {
             return Err(U1MpsError::NegativeNormSquared(difference_squared));
         }
         let state_reconstruction_l2_residual = difference_squared.sqrt();
-        let relative_norm_drift = (output_norm_squared - input_norm_squared).abs() / scale;
+        // This is relative to the input norm even for subnormalized states.
+        // A max(..., 1) denominator would silently turn it into an absolute
+        // criterion for physically small states.
+        let relative_norm_drift =
+            (output_norm_squared - input_norm_squared).abs() / input_norm_squared;
 
         let mut left_isometry_residuals = Vec::with_capacity(bond);
         let mut right_isometry_residuals =
