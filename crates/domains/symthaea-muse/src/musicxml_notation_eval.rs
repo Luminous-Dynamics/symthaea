@@ -1267,6 +1267,53 @@ pub fn validate_musicxml_notation_evaluation_report(
 
 #[cfg(test)]
 mod tests {
+    fn brute_matching_size(
+        adjacency: &[Vec<usize>],
+        gold_index: usize,
+        used_predictions: &mut [bool],
+    ) -> usize {
+        if gold_index == adjacency.len() {
+            return 0;
+        }
+        let mut best = brute_matching_size(adjacency, gold_index + 1, used_predictions);
+        for prediction_index in adjacency[gold_index].iter().copied() {
+            if !used_predictions[prediction_index] {
+                used_predictions[prediction_index] = true;
+                best = best.max(
+                    1 + brute_matching_size(adjacency, gold_index + 1, used_predictions)
+                );
+                used_predictions[prediction_index] = false;
+            }
+        }
+        best
+    }
+
+    #[test]
+    fn hopcroft_karp_matches_exhaustive_oracle_for_every_three_by_three_graph() {
+        for mask in 0usize..(1usize << 9) {
+            let mut adjacency = vec![Vec::new(); 3];
+            for gold_index in 0..3 {
+                for prediction_index in 0..3 {
+                    let bit = gold_index * 3 + prediction_index;
+                    if mask & (1 << bit) != 0 {
+                        adjacency[gold_index].push(prediction_index);
+                    }
+                }
+            }
+            let (pair_gold, pair_prediction) = maximum_matching(&adjacency, 3);
+            let observed = pair_gold.iter().filter(|pair| pair.is_some()).count();
+            let mut used = [false; 3];
+            let expected = brute_matching_size(&adjacency, 0, &mut used);
+            assert_eq!(observed, expected, "adjacency={adjacency:?}");
+            for (gold_index, prediction_index) in pair_gold.iter().enumerate() {
+                if let Some(prediction_index) = prediction_index {
+                    assert_eq!(pair_prediction[*prediction_index], Some(gold_index));
+                }
+            }
+        }
+    }
+
+
     use super::*;
     use crate::musicxml_barline_adapter::parse_musicxml_part_notation_graph;
 
