@@ -453,8 +453,12 @@ impl U1CanonicalGaugeReceipt {
     pub fn qualifies(&self, tolerance: f64) -> bool {
         tolerance.is_finite()
             && tolerance > 0.0
+            && self.site_count >= 2
+            && self.bond < self.site_count - 1
             && self.qualified
+            && self.maximum_left_isometry_residual.is_finite()
             && self.maximum_left_isometry_residual <= tolerance
+            && self.maximum_right_isometry_residual.is_finite()
             && self.maximum_right_isometry_residual <= tolerance
             && self.factorization_max_residual.is_finite()
             && self.factorization_max_residual <= tolerance
@@ -470,23 +474,26 @@ impl U1CanonicalGaugeReceipt {
             && self.left_exterior_operator_norm_upper_bound >= 1.0
             && self.right_exterior_operator_norm_upper_bound.is_finite()
             && self.right_exterior_operator_norm_upper_bound >= 1.0
+            && self.exterior_operator_norm_product_upper_bound().is_finite()
+            && self.left_isometry_residuals.len() == self.bond
             && self
-                .exterior_operator_norm_product_upper_bound()
-                .is_finite()
-            && self.left_isometry_residuals.iter().all(|(site, residual)| {
-                *site < self.bond && residual.is_finite() && *residual <= tolerance
-            })
+                .left_isometry_residuals
+                .iter()
+                .enumerate()
+                .all(|(index, (site, residual))| {
+                    *site == index && residual.is_finite() && *residual <= tolerance
+                })
+            && self.right_isometry_residuals.len()
+                == self.site_count.saturating_sub(self.bond + 2)
             && self
                 .right_isometry_residuals
                 .iter()
-                .all(|(site, residual)| {
-                    *site > self.bond + 1
-                        && *site < self.site_count
+                .enumerate()
+                .all(|(index, (site, residual))| {
+                    *site == self.bond + 2 + index
                         && residual.is_finite()
                         && *residual <= tolerance
                 })
-            && self.left_isometry_residuals.len() == self.bond
-            && self.right_isometry_residuals.len() == self.site_count.saturating_sub(self.bond + 2)
             && self.input_norm_squared.is_finite()
             && self.input_norm_squared > 0.0
             && self.output_norm_squared.is_finite()
@@ -2620,6 +2627,92 @@ pub struct U1MpsTruncationLedger {
     pub global_state_error_bound_upper: Option<f64>,
 }
 
+fn gate_quality_error_bounds_from_residuals(
+    unitarity_residual: f64,
+    charge_residual: f64,
+    pre_gate_norm_squared: f64,
+) -> Result<(f64, f64), U1MpsError> {
+    if !pre_gate_norm_squared.is_finite() || pre_gate_norm_squared < 0.0 {
+        return Err(U1MpsError::NonFiniteContraction(
+            "pre-gate norm in canonical error ledger",
+        ));
+    }
+    let off_sector_operator_error = 10.0_f64.sqrt() * charge_residual;
+    let gate_operator_norm_upper = (1.0 + unitarity_residual).sqrt();
+    let block_unitarity_residual = unitarity_residual
+        + 2.0 * gate_operator_norm_upper * off_sector_operator_error
+        + off_sector_operator_error * off_sector_operator_error;
+    if !block_unitarity_residual.is_finite() || block_unitarity_residual >= 1.0 {
+        return Err(U1MpsError::GateUnitarityResidual {
+            residual: block_unitarity_residual,
+            tolerance: 1.0,
+        });
+    }
+    let polar_distance = ((1.0 + block_unitarity_residual).sqrt() - 1.0)
+        .max(1.0 - (1.0 - block_unitarity_residual).sqrt());
+    let quality_error =
+        (off_sector_operator_error + polar_distance) * pre_gate_norm_squared.sqrt();
+    if !gate_operator_norm_upper.is_finite() || !quality_error.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "gate quality operator bound",
+        ));
+    }
+    Ok((gate_operator_norm_upper, quality_error))
+}
+
+fn gate_quality_error_bounds(
+    gate: &U1TwoSiteGate,
+    pre_gate_norm_squared: f64,
+) -> Result<(f64, f64), U1MpsError> {
+    if !pre_gate_norm_squared.is_finite() || pre_gate_norm_squared < 0.0 {
+        return Err(U1MpsError::NonFiniteContraction(
+            "pre-gate norm in canonical error ledger",
+        ));
+    }
+
+    let unitarity_residual = gate.unitarity_residual();
+    let charge_residual = gate.charge_conservation_residual();
+    if !unitarity_residual.is_finite()
+        || !(0.0..1.0).contains(&unitarity_residual)
+        || !charge_residual.is_finite()
+        || charge_residual < 0.0
+    {
+        return Err(U1MpsError::NonFiniteContraction(
+            "gate quality residual in canonical error ledger",
+        ));
+    }
+
+    // Remove the ten off-sector entries first. The remaining block-diagonal
+    // matrix is then projected independently onto the three U(1) unitary
+    // blocks using the polar decomposition. The Frobenius residuals bound the
+    // corresponding spectral norms.
+    let off_sector_operator_error = 10.0_f64.sqrt() * charge_residual;
+    let full_gate_operator_norm = (1.0 + unitarity_residual).sqrt();
+    let block_unitarity_residual = unitarity_residual
+        + 2.0 * full_gate_operator_norm * off_sector_operator_error
+        + off_sector_operator_error * off_sector_operator_error;
+    if !block_unitarity_residual.is_finite() || block_unitarity_residual >= 1.0 {
+        return Err(U1MpsError::GateUnitarityResidual {
+            residual: block_unitarity_residual,
+            tolerance: 1.0,
+        });
+    }
+
+    let block_polar_distance = ((1.0 + block_unitarity_residual).sqrt() - 1.0)
+        .max(1.0 - (1.0 - block_unitarity_residual).sqrt());
+    let charge_preserving_unitary_distance =
+        off_sector_operator_error + block_polar_distance;
+    let gate_quality_error =
+        charge_preserving_unitary_distance * pre_gate_norm_squared.sqrt();
+    if !gate_quality_error.is_finite() || !full_gate_operator_norm.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction(
+            "gate quality operator bound",
+        ));
+    }
+    Ok((full_gate_operator_norm, gate_quality_error))
+}
+
+
 impl U1MpsTruncationLedger {
     fn record_local(
         &mut self,
@@ -2715,7 +2808,7 @@ impl U1MpsTruncationLedger {
             receipt,
             unitarity_residual,
             charge_residual,
-            receipt.input_norm_squared,
+            receipt.output_norm_squared,
             tolerance,
         )
     }
@@ -2733,11 +2826,6 @@ impl U1MpsTruncationLedger {
         let prior_qualified = self.global_state_error_bound_qualified;
         let prior_bound = self.global_state_error_bound_upper;
 
-        if !pre_gate_norm_squared.is_finite() || pre_gate_norm_squared < 0.0 {
-            return Err(U1MpsError::NonFiniteContraction(
-                "pre-gate norm in canonical error ledger",
-            ));
-        }
         if !gate_unitarity_residual.is_finite()
             || !(0.0..1.0).contains(&gate_unitarity_residual)
             || !gate_charge_residual.is_finite()
@@ -2750,7 +2838,22 @@ impl U1MpsTruncationLedger {
             ));
         }
 
-        self.record_local(diagnostics)?;
+        let (gate_operator_norm_upper, gate_quality_error) =
+            gate_quality_error_bounds_from_residuals(
+                gate_unitarity_residual,
+                gate_charge_residual,
+                pre_gate_norm_squared,
+            )?;
+        if !receipt.qualifies(tolerance) {
+            self.record_local(diagnostics)?;
+            self.canonical_gauge_receipt_count = self
+                .canonical_gauge_receipt_count
+                .checked_add(1)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+            return Ok(());
+        }
         self.canonical_gauge_receipt_count = self
             .canonical_gauge_receipt_count
             .checked_add(1)
@@ -2762,23 +2865,17 @@ impl U1MpsTruncationLedger {
             return Ok(());
         }
 
-        // If ||G†G-I||₂ <= delta, the polar-unitary correction is bounded by
-        // max(sqrt(1+delta)-1, 1-sqrt(1-delta)). The supplied Frobenius
-        // residual upper-bounds the spectral norm residual.
-        let delta = gate_unitarity_residual;
-        let unitary_distance_upper = ((1.0 + delta).sqrt() - 1.0).max(1.0 - (1.0 - delta).sqrt());
-        // Ten charge-off-diagonal entries exist in a 4x4 two-qubit gate.
-        // sqrt(10) times their maximum magnitude bounds their Frobenius norm.
-        let charge_distance_upper = 10.0_f64.sqrt() * gate_charge_residual;
-        let gate_quality_error =
-            (unitary_distance_upper + charge_distance_upper) * pre_gate_norm_squared.sqrt();
         let projection_error = diagnostics.discarded_weight.sqrt()
             * receipt.exterior_operator_norm_product_upper_bound();
         let canonicalization_error = receipt.state_reconstruction_l2_residual;
-        let contribution = canonicalization_error + gate_quality_error + projection_error;
+        // Canonicalization and prior-state errors occur before G and must be
+        // propagated by the certified operator-norm bound of the actual gate.
+        let contribution = canonicalization_error * gate_operator_norm_upper
+            + gate_quality_error
+            + projection_error;
         if !contribution.is_finite()
-            || !unitary_distance_upper.is_finite()
-            || !charge_distance_upper.is_finite()
+            || !gate_operator_norm_upper.is_finite()
+            || !gate_quality_error.is_finite()
         {
             return Err(U1MpsError::NonFiniteContraction(
                 "canonical-gauge global truncation contribution",
@@ -2789,7 +2886,7 @@ impl U1MpsTruncationLedger {
             Some(contribution)
         } else if prior_qualified {
             prior_bound
-                .map(|bound| bound + contribution)
+                .map(|bound| bound * gate_operator_norm_upper + contribution)
                 .filter(|bound| bound.is_finite())
         } else {
             None
@@ -2798,7 +2895,8 @@ impl U1MpsTruncationLedger {
         if let Some(bound) = next_bound {
             self.global_state_error_bound_qualified = true;
             self.global_state_error_bound_upper = Some(bound);
-            self.cumulative_canonicalization_l2_error_bound += canonicalization_error;
+            self.cumulative_canonicalization_l2_error_bound +=
+                canonicalization_error * gate_operator_norm_upper;
             self.cumulative_gate_quality_l2_error_bound += gate_quality_error;
             self.cumulative_projection_l2_error_bound += projection_error;
         } else {
@@ -2851,6 +2949,8 @@ pub struct U1TeBDGateReceipt {
     pub truncation: U1TwoSiteTruncationDiagnostics,
     pub local_projection_error_upper_bound: f64,
     pub global_l2_error_contribution: Option<f64>,
+    pub global_l2_error_bound_after_gate: Option<f64>,
+    pub global_projection_error_upper_bound: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2966,25 +3066,23 @@ impl U1TeBDLayer {
             let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
             let truncation = evolved_pair.split_truncated(policy)?;
             let prior_global_bound = truncation_ledger.global_state_error_bound_upper;
+            let (gate_operator_norm_upper, gate_quality_error_upper_bound) =
+                gate_quality_error_bounds(&entry.gate, gauge_receipt.output_norm_squared)?;
+            let global_projection_error_upper_bound = truncation.discarded_weight.sqrt()
+                * gauge_receipt.exterior_operator_norm_product_upper_bound();
             truncation_ledger.record_with_canonical_gauge_and_gate(
                 &truncation,
                 &gauge_receipt,
                 &entry.gate,
                 policy.tolerance,
             )?;
-            let global_l2_error_contribution = match (
-                prior_global_bound,
-                truncation_ledger.global_state_error_bound_upper,
-            ) {
-                (Some(before), Some(after)) => Some(after - before),
-                (None, Some(after)) => Some(after),
-                _ => None,
-            };
-            let delta = entry.gate.unitarity_residual();
-            let gate_quality_error_upper_bound = (((1.0 + delta).sqrt() - 1.0)
-                .max(1.0 - (1.0 - delta).sqrt())
-                + 10.0_f64.sqrt() * entry.gate.charge_conservation_residual())
-                * gauge_receipt.input_norm_squared.sqrt();
+            let propagated_prior_bound =
+                prior_global_bound.unwrap_or(0.0) * gate_operator_norm_upper;
+            let global_l2_error_contribution = truncation_ledger
+                .global_state_error_bound_upper
+                .map(|after| after - propagated_prior_bound);
+            let global_l2_error_bound_after_gate =
+                truncation_ledger.global_state_error_bound_upper;
             let local_projection_error_upper_bound = truncation.discarded_weight.sqrt();
             state.tensors[bond] = truncation.left_tensor.clone();
             state.tensors[bond + 1] = truncation.right_tensor.clone();
@@ -2999,6 +3097,8 @@ impl U1TeBDLayer {
                 truncation: truncation.clone(),
                 local_projection_error_upper_bound,
                 global_l2_error_contribution,
+                global_l2_error_bound_after_gate,
+                global_projection_error_upper_bound,
             });
             gate_truncations.push(truncation);
         }
