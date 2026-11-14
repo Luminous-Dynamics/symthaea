@@ -87,6 +87,37 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def validate_product_provenance(
+    interval_id: str,
+    a_generators: list[dict[str, Any]],
+    b_generators: list[dict[str, Any]],
+    witnesses: list[dict[str, Any]],
+) -> None:
+    expected_pairs = {
+        (a_generator["id"], b_generator["id"])
+        for a_generator in a_generators
+        for b_generator in b_generators
+    }
+    observed_pairs: list[tuple[str, str]] = []
+    for witness in witnesses:
+        if witness.get("interval_id") != interval_id:
+            raise ValueError("product witness is bound to a stale interval ID")
+        if witness.get("product_order") != "A_then_B":
+            raise ValueError("product witness has a reversed or unknown multiplication order")
+        observed_pairs.append((witness.get("a_id", ""), witness.get("b_id", "")))
+    if len(observed_pairs) != len(set(observed_pairs)):
+        raise ValueError("duplicate product witness pair")
+    if set(observed_pairs) != expected_pairs:
+        raise ValueError("product witnesses do not contain the full Cartesian source-pair set")
+
+
+def validate_unique_interval_ids(interval_ids: list[str]) -> None:
+    if not interval_ids or any(not item for item in interval_ids):
+        raise ValueError("interval IDs must be nonempty")
+    if len(interval_ids) != len(set(interval_ids)):
+        raise ValueError("interval IDs must be unique")
+
+
 def scalar_interval_products(interval: dict[str, Any]) -> list[dict[str, Any]]:
     a_generators = interval["A"]["generators"]
     b_generators = interval["B"]["generators"]
@@ -101,6 +132,7 @@ def scalar_interval_products(interval: dict[str, Any]) -> list[dict[str, Any]]:
                 "product_order": "A_then_B",
                 "value": q(a_generator["value"]) * q(b_generator["value"]),
             })
+    validate_product_provenance(interval_id, a_generators, b_generators, products)
     return products
 
 
@@ -337,15 +369,19 @@ def verify_one_sided_knot(data: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("left/right endpoint frequency IDs differ")
     if left["side"] != "minus" or right["side"] != "plus":
         raise ValueError("one-sided product endpoints were relabelled")
+    left_a = left["A_lower_generators"] + left["A_generators"]
+    left_b = left["B_lower_generators"] + left["B_generators"]
+    right_a = right["A_generators"] + right["A_upper_generators"]
+    right_b = right["B_generators"] + right["B_upper_generators"]
     left_products = sorted({
         q(a["value"]) * q(b["value"])
-        for a in left["A_generators"]
-        for b in left["B_generators"]
+        for a in left_a
+        for b in left_b
     })
     right_products = sorted({
         q(a["value"]) * q(b["value"])
-        for a in right["A_generators"] + right["A_upper_generators"]
-        for b in right["B_generators"] + right["B_upper_generators"]
+        for a in right_a
+        for b in right_b
     })
     expected_left = sorted(q(value) for value in left["product_generators"])
     expected_right = sorted(q(value) for value in right["product_generators"])
@@ -418,10 +454,50 @@ def run_negative_controls(data: dict[str, Any], scalar: dict[str, Any],
     require(stale_witness != product_witness,
             "stale generator ID control is ineffective")
 
-    intervals = [data["scalar_interval"]["interval_id"],
-                 data["matrix_interval"]["interval_id"]]
-    require(len(intervals) == len(set(intervals)),
-            "interval IDs must be unique")
+    intervals = [
+        data["scalar_interval"]["interval_id"],
+        data["matrix_interval"]["interval_id"],
+        data["one_sided_shared_knot"]["left_interval"]["interval_id"],
+        data["one_sided_shared_knot"]["right_interval"]["interval_id"],
+        data["multi_generator_interval"]["interval_id"],
+    ]
+    validate_unique_interval_ids(intervals)
+
+    # An omitted cross product and a stale source ID fail the same provenance validator.
+    scalar_interval = data["scalar_interval"]
+    all_products = scalar_interval_products(scalar_interval)
+    try:
+        validate_product_provenance(
+            scalar_interval["interval_id"],
+            scalar_interval["A"]["generators"],
+            scalar_interval["B"]["generators"],
+            all_products[:-1],
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("missing Cartesian cross-product witness was accepted")
+
+    stale_products = [dict(item) for item in all_products]
+    stale_products[0]["a_id"] = "stale-A-generator"
+    try:
+        validate_product_provenance(
+            scalar_interval["interval_id"],
+            scalar_interval["A"]["generators"],
+            scalar_interval["B"]["generators"],
+            stale_products,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("stale generator ID witness was accepted")
+
+    try:
+        validate_unique_interval_ids(["I0", "I1", "I0"])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("duplicate interval ID was accepted")
 
     bad_matrix = [[Fraction(1), Fraction(0), Fraction(0)]]
     try:
