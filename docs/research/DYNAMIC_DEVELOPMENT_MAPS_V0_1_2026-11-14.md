@@ -506,3 +506,10 @@ The field should be challenged through matched, reproducible experiments—not m
 ### Development Intelligence and Evolution Science — 2026-11-14
 
 The EGDDM architecture is now paired with [DEVELOPMENT_INTELLIGENCE_AND_EVOLUTION_SCIENCE_V0_1_2026-11-14.md](DEVELOPMENT_INTELLIGENCE_AND_EVOLUTION_SCIENCE_V0_1_2026-11-14.md). DIES is an integration and evaluation discipline, not a new graph engine, event store, scheduler, evidence ledger or authority service. It composes existing owners for structure (#10173), temporal decisions (#12017/#12042), retrieval (#12080), planning (#12071), causal debugging/evolutionary attribution (#10366/#10717/#12067), decision quality/evidence acquisition (#12039/#12046), and independent qualification (#11772). Its benchmark design adds paired should-act/should-defer controls, map metamorphic/noninterference properties and independently measured development outcomes. All proposed targets remain prospective.
+
+
+### D1 Cargo manifest projection — 2026-11-14
+
+A pure Rust library module was added at `tools/development-map-validator/src/cargo_manifest.rs`, exposed from the standalone crate. It accepts Cargo.toml bytes and an exact repository/revision/tree/path/blob anchor, then returns a Serde-serializable projection labelled `manifest_declared`. It preserves workspace member patterns, package metadata and inheritance declarations, normal/dev/build and target-specific dependency declarations, feature expressions, explicit targets, and build-script declarations. Inherited dependency defaults remain null/unknown unless locally explicit.
+
+Two synthetic manifest fixtures and ten unit-test definitions were added. The parser does not execute Cargo, expand workspace globs, resolve workspace inheritance, evaluate feature combinations, infer implicit targets, inspect or execute build scripts, expand procedural macros, or produce compiler-resolved edges. It is a library API; the CLI integration and schema for serialized projections remain future work. The full crate now contains 69 authored Rust test definitions. None has been compiled or run.
