@@ -20,7 +20,7 @@
         "model_id": "synthetic-reference-model-TUG",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
@@ -129,7 +129,7 @@
         "model_id": "synthetic-reference-model-TUG",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
@@ -245,7 +245,7 @@
         "model_id": "synthetic-reference-model-TUG",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
@@ -361,7 +361,7 @@
         "model_id": "synthetic-reference-model-TUG",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
@@ -484,7 +484,7 @@
         "model_id": "synthetic-reference-model-PWC",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
@@ -600,7 +600,7 @@
         "model_id": "synthetic-reference-model-PWC",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
@@ -709,7 +709,7 @@
         "model_id": "synthetic-reference-model-TUG2",
         "model_version": "0.1.0",
         "model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        "trained_through_utc": "2026-01-01T08:00:00Z"
+        "trained_through_utc": "2025-12-31T23:59:59Z"
       },
       "decision_points": [
         {
