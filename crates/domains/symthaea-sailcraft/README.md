@@ -8,7 +8,7 @@
 
 This crate is a small, deterministic route-candidate kernel. It consumes a declared craft-specific polar surface and qualified wind/current/waypoint-bearing inputs. It calculates:
 
-- whether the direct waypoint bearing lies inside the supplied craft-specific no-go sector;
+- whether the direct waypoint bearing lies inside the supplied craft-specific no-go sector (the no-go boundary is inclusive);
 - the best port- and starboard-tack course candidate under the supplied polar surface;
 - predicted boat speed and ground velocity made good (VMG), including the supplied current vector.
 
