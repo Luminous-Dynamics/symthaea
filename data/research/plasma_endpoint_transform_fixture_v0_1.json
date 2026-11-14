@@ -4095,6 +4095,380 @@
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
       "rationale": "The conditioning method receipt must bind the exact exposure protocol digest."
+    },
+    {
+      "id": "valid-frp-d5868-direct-strength",
+      "graph": {
+        "graph_id": "VALID-FRP-D5868-DIRECT-STRENGTH",
+        "output_endpoint": "initial_lap_shear_mpa",
+        "transform_id": "unit_preserving_strength_projection_v1",
+        "transform_version": "v1",
+        "transform_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_strength",
+            "receipt": {
+              "id": "baseline_strength-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002000",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-DIRECT-01-B-S1",
+                "GRAPH-DIRECT-01-B-S2",
+                "GRAPH-DIRECT-01-B-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-DIRECT-01-B-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-B-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-B-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_strength",
+            "receipt": {
+              "id": "candidate_strength-RECEIPT",
+              "method_id": "ASTM_D5868",
+              "edition": "D5868-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002001",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-DIRECT-01-C-S1",
+                "GRAPH-DIRECT-01-C-S2",
+                "GRAPH-DIRECT-01-C-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-DIRECT-01-C-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-C-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-C-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": null
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "VALID-FRP-D5868-DIRECT-STRENGTH-RESULT",
+          "result_sha256": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+          "graph_id": "VALID-FRP-D5868-DIRECT-STRENGTH",
+          "design_id": "VALID-FRP-D5868-DIRECT-STRENGTH-DESIGN",
+          "design_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "plan_sha256": "b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4",
+          "transform_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "graph_sha256": "b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "MPa",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_strength-RECEIPT",
+            "candidate_strength-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002000",
+            "0000000000000000000000000000000000000000000000000000000000002001"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "comparative_joint_strength_observation_only"
+        },
+        "formula_id": "identity_strength_unit_projection_v1"
+      },
+      "expected_disposition": "PASS",
+      "expected_outcome": "EQUIVALENCE_ESTABLISHED",
+      "rationale": "FRP-to-FRP direct strength is supported by matching D5868-01R23 joint-strength observation receipts."
+    },
+    {
+      "id": "d5573-general-frp-scope-not-admitted",
+      "graph": {
+        "graph_id": "D5573-GENERAL-FRP-SCOPE-NOT-ADMITTED",
+        "output_endpoint": "failure_mode_fraction",
+        "transform_id": "predeclared_failure_mode_fraction_v1",
+        "transform_version": "v1",
+        "transform_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_failure_classification",
+            "receipt": {
+              "id": "baseline_failure_classification-RECEIPT",
+              "method_id": "ASTM_D5573",
+              "edition": "D5573-99R19",
+              "evidence_kind": "classification_practice",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "failure_surface_classification",
+              "endpoint": "frp_joint_failure_mode_classification",
+              "requested_claim": "failure_mode_classification_reference",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002012",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-FAILURE-01-FB-S1",
+                "GRAPH-FAILURE-01-FB-S2",
+                "GRAPH-FAILURE-01-FB-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-FAILURE-01-FB-S1",
+                "cluster_id": "FRP-B1"
+              },
+              {
+                "specimen_id": "GRAPH-FAILURE-01-FB-S2",
+                "cluster_id": "FRP-B2"
+              },
+              {
+                "specimen_id": "GRAPH-FAILURE-01-FB-S3",
+                "cluster_id": "FRP-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_failure_classification",
+            "receipt": {
+              "id": "candidate_failure_classification-RECEIPT",
+              "method_id": "ASTM_D5573",
+              "edition": "D5573-99R19",
+              "evidence_kind": "classification_practice",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "failure_surface_classification",
+              "endpoint": "frp_joint_failure_mode_classification",
+              "requested_claim": "failure_mode_classification_reference",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002013",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-FAILURE-01-FC-S1",
+                "GRAPH-FAILURE-01-FC-S2",
+                "GRAPH-FAILURE-01-FC-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-FAILURE-01-FC-S1",
+                "cluster_id": "FRP-C1"
+              },
+              {
+                "specimen_id": "GRAPH-FAILURE-01-FC-S2",
+                "cluster_id": "FRP-C2"
+              },
+              {
+                "specimen_id": "GRAPH-FAILURE-01-FC-S3",
+                "cluster_id": "FRP-C3"
+              }
+            ],
+            "aging_exposure": null
+          }
+        ],
+        "classification_taxonomy_id": "ASTM_D5573_FAILURE_TAXONOMY_2026",
+        "classification_taxonomy_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "target_failure_modes": [
+          "adhesive_failure"
+        ],
+        "analysis": {
+          "result_id": "D5573-GENERAL-FRP-SCOPE-NOT-ADMITTED-RESULT",
+          "result_sha256": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+          "graph_id": "D5573-GENERAL-FRP-SCOPE-NOT-ADMITTED",
+          "design_id": "D5573-GENERAL-FRP-SCOPE-NOT-ADMITTED-DESIGN",
+          "design_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "plan_sha256": "b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4",
+          "transform_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "graph_sha256": "b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5",
+          "analysis_profile": "clustered_two_proportion_equivalence_pending_v1",
+          "analysis_method_ref": "symthaea-statistics:two-proportion-score-interval",
+          "quantity_unit": "proportion",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_failure_classification-RECEIPT",
+            "candidate_failure_classification-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002012",
+            "0000000000000000000000000000000000000000000000000000000000002013"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "failure_mode_fraction_observation_only_not_acceptability"
+        },
+        "formula_id": "target_modes_over_classified_specimens_v1"
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "D5573 generalization beyond its registered SMC FRP scope remains blocked."
+    },
+    {
+      "id": "d5656-constitutive-response-not-joint-strength",
+      "graph": {
+        "graph_id": "D5656-CONSTITUTIVE-RESPONSE-NOT-JOINT-STRENGTH",
+        "output_endpoint": "initial_lap_shear_mpa",
+        "transform_id": "unit_preserving_strength_projection_v1",
+        "transform_version": "v1",
+        "transform_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_strength",
+            "receipt": {
+              "id": "baseline_strength-RECEIPT",
+              "method_id": "ASTM_D5656_D5656M",
+              "edition": "D5656/D5656M-26",
+              "evidence_kind": "measurement",
+              "material_pair_class": "aluminum_thick_adherend_joint",
+              "geometry": "thick_adherend_lap",
+              "endpoint": "adhesive_shear_stress_strain_response",
+              "requested_claim": "adhesive_constitutive_response_observation",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002000",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-DIRECT-01-B-S1",
+                "GRAPH-DIRECT-01-B-S2",
+                "GRAPH-DIRECT-01-B-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-DIRECT-01-B-S1",
+                "cluster_id": "LOT-B1"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-B-S2",
+                "cluster_id": "LOT-B2"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-B-S3",
+                "cluster_id": "LOT-B3"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_strength",
+            "receipt": {
+              "id": "candidate_strength-RECEIPT",
+              "method_id": "ASTM_D5656_D5656M",
+              "edition": "D5656/D5656M-26",
+              "evidence_kind": "measurement",
+              "material_pair_class": "aluminum_thick_adherend_joint",
+              "geometry": "thick_adherend_lap",
+              "endpoint": "adhesive_shear_stress_strain_response",
+              "requested_claim": "adhesive_constitutive_response_observation",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002001",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "GRAPH-DIRECT-01-C-S1",
+                "GRAPH-DIRECT-01-C-S2",
+                "GRAPH-DIRECT-01-C-S3"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "GRAPH-DIRECT-01-C-S1",
+                "cluster_id": "LOT-C1"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-C-S2",
+                "cluster_id": "LOT-C2"
+              },
+              {
+                "specimen_id": "GRAPH-DIRECT-01-C-S3",
+                "cluster_id": "LOT-C3"
+              }
+            ],
+            "aging_exposure": null
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "D5656-CONSTITUTIVE-RESPONSE-NOT-JOINT-STRENGTH-RESULT",
+          "result_sha256": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+          "graph_id": "D5656-CONSTITUTIVE-RESPONSE-NOT-JOINT-STRENGTH",
+          "design_id": "D5656-CONSTITUTIVE-RESPONSE-NOT-JOINT-STRENGTH-DESIGN",
+          "design_sha256": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+          "plan_sha256": "b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4",
+          "transform_sha256": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+          "graph_sha256": "b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "MPa",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_strength-RECEIPT",
+            "candidate_strength-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002000",
+            "0000000000000000000000000000000000000000000000000000000000002001"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "comparative_joint_strength_observation_only"
+        },
+        "formula_id": "identity_strength_unit_projection_v1"
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "D5656 constitutive response cannot replace direct joint-level apparent-shear strength evidence."
     }
   ]
 }
