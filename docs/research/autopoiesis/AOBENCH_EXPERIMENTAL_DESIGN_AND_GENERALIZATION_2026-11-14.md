@@ -14,6 +14,7 @@ Recent 2026 benchmarks make this distinction concrete:
 |---|---|---|
 | Causal-Discovery-Bench | 3,802 episodes, 13 models, 40 metrics in seven families; authors attribute 94.5% of recorded errors to experimental design | Experiment selection, controls, sample adequacy and stopping need separate scores |
 | ACED-Bench | ACED-CORE: 180 tasks; ACED-QUAL: 150 questions; hidden probabilistic causal worlds | Separate readable task description from hidden causal ground truth; measure evidence acquisition and answer commitment |
+| CausalIDView | One SCM realization and target CATE held fixed across four observation regimes (back-door, front-door, IV, proximal); released Figure 2 scaffold has 40 paired worlds | Score regime-aware claims, matched-view invariance, Stay/Move response and point-versus-partial identification; do not treat each view as an unrelated test set |
 | ACDB | Budgeted intervention ladder; PC + greedy active orientation reports directed F1 42.7% / SHD 4.79, ahead of raw LLM intervention baselines in its current calibrated version | Classical causal methods are mandatory matched baselines; report precision/recall and calibration floors |
 | CausalArena | Synthetic, semantic-operational, formula-grounded and public real-world SCM families; rankings shift across families and protocols | Use mechanism-family holdouts and external validity, not random-seed splits alone |
 | TCD-Arena | ICLR 2026; around 30 million attempts over 33 assumption violations | Stress assumption violations systematically; report robustness profiles, not only idealized synthetic averages |
@@ -23,6 +24,8 @@ Recent 2026 benchmarks make this distinction concrete:
 | ASIWorld | Persistent survival world; couples world state and execution records with outcomes, progression and cost | Add durable consequences, execution overhead, resource depletion and multi-epoch recovery |
 
 These results are complementary, not directly rankable. The benchmarks differ in task, model, budget, environment, oracle and metric. AOBench must not treat their headline scores as one common leaderboard.
+
+CausalIDView adds a particularly important axis: the *observation contract*. Its public scaffold uses the same world and query IDs across four regimes, exposes only regime-specific columns to the estimator, and withholds query potential outcomes. AOBench-015 reproduces that integrity gate and extends it with evidence-qualified view changes, hidden-information stress, model adequacy and decision-relevant effect bounds.
 
 The current official comparator protocols are especially instructive:
 
