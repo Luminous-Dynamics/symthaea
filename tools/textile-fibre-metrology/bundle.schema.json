@@ -1,0 +1,425 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/textile-fibre-metrology/v0.1/bundle.json",
+  "title": "Textile fibre metrology input bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "method",
+    "distribution",
+    "receiver_criterion"
+  ],
+  "properties": {
+    "method": {
+      "$ref": "#/$defs/method"
+    },
+    "distribution": {
+      "$ref": "#/$defs/distribution"
+    },
+    "receiver_criterion": {
+      "$ref": "#/$defs/criterion"
+    }
+  },
+  "$defs": {
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "material": {
+      "enum": [
+        "cotton",
+        "polyester",
+        "regenerated_cellulose",
+        "wool",
+        "polyamide",
+        "elastane",
+        "mixed",
+        "unknown"
+      ]
+    },
+    "state": {
+      "enum": [
+        "pre_process_reference_fibre",
+        "loose_virgin_fibre",
+        "loose_recovered_fibre",
+        "recovered_after_opening",
+        "yarn_extracted_fibre"
+      ]
+    },
+    "basis": {
+      "enum": [
+        "mass_weighted",
+        "number_weighted"
+      ]
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_id",
+        "version",
+        "citation",
+        "allowed_materials",
+        "allowed_process_states",
+        "supported_weighting_bases",
+        "minimum_independent_subsamples",
+        "minimum_acquisitions",
+        "resolution_um",
+        "calibration_required",
+        "local_validation_required_states"
+      ],
+      "properties": {
+        "method_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "citation": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "allowed_materials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/material"
+          }
+        },
+        "allowed_process_states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/state"
+          }
+        },
+        "supported_weighting_bases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/basis"
+          }
+        },
+        "minimum_independent_subsamples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_acquisitions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "resolution_um": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "calibration_required": {
+          "type": "boolean"
+        },
+        "local_validation_required_states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/state"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "sha256"
+      ],
+      "properties": {
+        "evidence_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calibration_id",
+        "sha256",
+        "instrument_id",
+        "method_id",
+        "method_version",
+        "valid_from_ns",
+        "valid_until_ns"
+      ],
+      "properties": {
+        "calibration_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "instrument_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "method_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "method_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "valid_from_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "samplePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_subsample_ids",
+        "acquisition_ids",
+        "sampling_frame",
+        "conditioning_ref",
+        "sampled_mass_mg"
+      ],
+      "properties": {
+        "independent_subsample_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "acquisition_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmpty"
+          }
+        },
+        "sampling_frame": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "conditioning_ref": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "sampled_mass_mg": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "tail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundary_um",
+        "fraction_ppm",
+        "expanded_uncertainty_ppm"
+      ],
+      "properties": {
+        "boundary_um": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fraction_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "expanded_uncertainty_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "bin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lower_bound_um",
+        "upper_bound_um",
+        "fraction_ppm",
+        "expanded_uncertainty_ppm"
+      ],
+      "properties": {
+        "lower_bound_um": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "upper_bound_um": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fraction_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "expanded_uncertainty_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_id",
+        "measured_lot_id",
+        "parent_lot_id",
+        "physical_subject_id",
+        "source_process_trial_id",
+        "method_id",
+        "method_version",
+        "material_class",
+        "process_state",
+        "weighting_basis",
+        "observed_at_ns",
+        "instrument_id",
+        "calibration",
+        "local_scope_validation",
+        "sample_plan",
+        "underflow",
+        "bins",
+        "overflow",
+        "unclassified_fraction_ppm",
+        "total_expanded_uncertainty_ppm",
+        "measurement_evidence"
+      ],
+      "properties": {
+        "measurement_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "measured_lot_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "parent_lot_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "physical_subject_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_process_trial_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "method_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "method_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "material_class": {
+          "$ref": "#/$defs/material"
+        },
+        "process_state": {
+          "$ref": "#/$defs/state"
+        },
+        "weighting_basis": {
+          "$ref": "#/$defs/basis"
+        },
+        "observed_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "instrument_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "calibration": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/calibration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local_scope_validation": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/evidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sample_plan": {
+          "$ref": "#/$defs/samplePlan"
+        },
+        "underflow": {
+          "$ref": "#/$defs/tail"
+        },
+        "bins": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/bin"
+          }
+        },
+        "overflow": {
+          "$ref": "#/$defs/tail"
+        },
+        "unclassified_fraction_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "total_expanded_uncertainty_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "measurement_evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification_id",
+        "specification_version",
+        "minimum_fibre_length_um",
+        "minimum_qualifying_fraction_ppm",
+        "maximum_expanded_uncertainty_ppm"
+      ],
+      "properties": {
+        "specification_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "specification_version": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "minimum_fibre_length_um": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_qualifying_fraction_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "maximum_expanded_uncertainty_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      }
+    }
+  }
+}
