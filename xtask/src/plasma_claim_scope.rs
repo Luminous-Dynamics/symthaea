@@ -428,6 +428,22 @@ mod tests {
     }
 
     #[test]
+    fn iso_10365_classifies_general_bonded_assembly_failure_patterns() {
+        let fixture: Fixture = read_fixture(Path::new("data/research/plasma_claim_scope_fixture_v0_4.json")).expect("fixture loads");
+        let case = fixture.cases.iter().find(|case| case.id == "iso10365-pp-joint-pattern-classification").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported);
+    }
+
+    #[test]
+    fn iso_10365_classification_cannot_establish_acceptability_or_strength() {
+        let fixture: Fixture = read_fixture(Path::new("data/research/plasma_claim_scope_fixture_v0_4.json")).expect("fixture loads");
+        let acceptance = fixture.cases.iter().find(|case| case.id == "iso10365-failure-acceptability-overclaim").expect("case exists");
+        let strength = fixture.cases.iter().find(|case| case.id == "iso10365-strength-endpoint-substitution").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(acceptance)).disposition, Disposition::Rejected);
+        assert_eq!(decide(&ScopeEvidence::from(strength)).disposition, Disposition::Rejected);
+    }
+
+    #[test]
     fn evidence_kind_mismatch_is_rejected() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
         let case = fixture.cases.iter().find(|case| case.id == "astm-d3163-evidence-kind-mismatch").expect("case exists");
