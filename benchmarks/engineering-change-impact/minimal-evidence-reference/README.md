@@ -6,7 +6,7 @@ From the repository root, run:
 
     cargo test --manifest-path benchmarks/engineering-change-impact/minimal-evidence-reference/Cargo.toml
 
-The tests independently compute:
+The tests independently recompute the canonical source-inventory and candidate-visible manifest SHA-256 commitments, plus the irrelevant-injection batch digest. They compute:
 - candidate-visible admissible provenance roots per mandatory predicate;
 - all sufficient independent-root sets in each evaluator-frozen source inventory;
 - source-scope and provenance unknown states;
