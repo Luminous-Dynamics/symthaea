@@ -2784,6 +2784,9 @@ impl U1MpsTruncationLedger {
         let prior_count = self.gate_count;
         let prior_qualified = self.global_state_error_bound_qualified;
         let prior_bound = self.global_state_error_bound_upper;
+        let prior_canonicalization_error = self.cumulative_canonicalization_l2_error_bound;
+        let prior_gate_quality_error = self.cumulative_gate_quality_l2_error_bound;
+        let prior_projection_error = self.cumulative_projection_l2_error_bound;
 
         if !gate_unitarity_residual.is_finite()
             || !(0.0..1.0).contains(&gate_unitarity_residual)
@@ -2850,10 +2853,13 @@ impl U1MpsTruncationLedger {
         if let Some(bound) = next_bound {
             self.global_state_error_bound_qualified = true;
             self.global_state_error_bound_upper = Some(bound);
-            self.cumulative_canonicalization_l2_error_bound +=
-                canonicalization_error * gate_operator_norm_upper;
-            self.cumulative_gate_quality_l2_error_bound += gate_quality_error;
-            self.cumulative_projection_l2_error_bound += projection_error;
+            self.cumulative_canonicalization_l2_error_bound =
+                prior_canonicalization_error * gate_operator_norm_upper
+                    + canonicalization_error * gate_operator_norm_upper;
+            self.cumulative_gate_quality_l2_error_bound =
+                prior_gate_quality_error * gate_operator_norm_upper + gate_quality_error;
+            self.cumulative_projection_l2_error_bound =
+                prior_projection_error * gate_operator_norm_upper + projection_error;
         } else {
             self.global_state_error_bound_qualified = false;
             self.global_state_error_bound_upper = None;
@@ -4503,6 +4509,10 @@ mod tests {
             .global_state_error_bound_upper
             .unwrap();
         assert!(bound + 1.0e-12 >= actual_error);
+        let component_sum = result.truncation_ledger.cumulative_canonicalization_l2_error_bound
+            + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+            + result.truncation_ledger.cumulative_projection_l2_error_bound;
+        assert!((component_sum - bound).abs() <= 1.0e-12);
     }
 
     #[test]
