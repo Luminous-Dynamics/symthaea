@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/temporal-replay-query-v0.1.schema.json",
+  "title": "EGDDM temporal replay query v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "repository_full_name",
+    "configuration_world_digest",
+    "actor_id",
+    "knowledge_cutoff_at",
+    "valid_at",
+    "ledger_recorded_cutoff_at"
+  ],
+  "properties": {
+    "repository_full_name": {
+      "type": "string",
+      "pattern": "^[^/\\\\s]+/[^/\\\\s]+$"
+    },
+    "configuration_world_digest": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "actor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "knowledge_cutoff_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ledger_recorded_cutoff_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}
