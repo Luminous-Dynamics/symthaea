@@ -10,12 +10,13 @@
     "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "tree_digest": "cccccccccccccccccccccccccccccccccccccccc",
     "tree_digest_algorithm": "git_tree_oid_sha1",
-    "observed_at": "2026-11-14T08:50:00Z",
+    "observed_at": "2026-11-14T12:00:00Z",
     "parent_snapshot": null,
     "source_event_high_watermark": "event-007",
     "configuration_world": {
       "map_kind": "synthetic_decision_time_fixture",
-      "target": "x86_64-unknown-linux-gnu"
+      "target": "x86_64-unknown-linux-gnu",
+      "synthetic_clock": "UTC fixture timeline; not the session wall clock"
     }
   },
   "extractor": {
@@ -771,7 +772,7 @@
           "version": "0.1.0",
           "digest": null
         },
-        "observed_at": "2026-11-14T08:50:00Z",
+        "observed_at": "2026-11-14T12:00:00Z",
         "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "valid_for_world": "synthetic-linux-default",
         "limitations": [
@@ -791,6 +792,7 @@
     "The later correction changes current evidence applicability but must not rewrite the original decision's cited evidence.",
     "The DTEA decision now references a synthetic Mycelix-shaped authority grant, with actor, scope, policy, recorded/available time and effective validity interval.",
     "The authority item is deliberately source_declared and uses a synthetic URI. This fixture does not import or authenticate a real Mycelix authority record, verify a trust root/signature, or grant any release authority.",
-    "The benchmark projection tests whether the decision packet's declared authority evidence matches the actor/scope/policy and time window; owner-native authority semantics remain owned by Mycelix."
+    "The benchmark projection tests whether the decision packet's declared authority evidence matches the actor/scope/policy and time window; owner-native authority semantics remain owned by Mycelix.",
+    "All timestamps in this fixture belong to a synthetic UTC scenario clock. They are not observations of real-world events or the current session clock."
   ]
 }
