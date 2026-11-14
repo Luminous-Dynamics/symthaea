@@ -149,6 +149,21 @@ The latest increment connects local gates to an actual nearest-neighbour Hamilto
 
 The dense three-site one-excitation test checks the exact hopping-chain solution and a roughly fourfold reduction in global error when the time step is halved. A separate multi-step test checks that the global ledger is carried forward instead of being reset. These are authored acceptance tests until the consolidated exact-head runner passes.
 
+
+## Dense-oracle certificate falsification grid
+
+The canonical-gauge branch now includes a deterministic 48-case falsification grid for the *composed* global state-error receipt.
+
+Each case varies:
+- chain length \(N=3,\ldots,8\) and a nontrivial fixed-charge sector;
+- active nearest-neighbour bond and an independently selected virtual bond;
+- a seeded complex state, a seeded U(1)-preserving two-site Hamiltonian exponential, and a global bond cap/cutoff;
+- a deliberately non-unitary diagonal virtual-gauge rescaling \(X\) at one internal bond, with the adjacent tensors transformed as \(A\mapsto AX\) and \(B\mapsto X^{-1}B\). This must leave the represented physical state unchanged while making the tensor gauge noncanonical.
+
+The exact gate action is independently applied to the dense vector. The test then requires the MPS layer's canonical receipt to qualify and its global L2 error upper bound to dominate the measured dense-vector discrepancy. It also checks charge preservation, selection-rule residuals, receipt existence and that the grid actually exercised nontrivial gauges and compression.
+
+This test is intentionally a falsification test, not a performance claim. It exercises only small systems where dense exact evolution is tractable. It does not certify Trotter/time-discretization error, and it does not replace the separate matched Quimb/ITensor benchmark.
+
 ## Explicit limitations
 
 This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
