@@ -511,7 +511,8 @@ fn validate_decision_evidence_list(
             entry_object,
             &[
                 "evidence_id", "available_to_actor_at", "source_observed_at",
-                "valid_from", "valid_through", "admissibility", "reason",
+                "validity_completeness", "valid_from", "valid_through",
+                "admissibility", "reason",
             ],
             &entry_path,
             report,
@@ -588,14 +589,41 @@ fn validate_decision_evidence_list(
             }
         }
 
-        let valid_from = entry
-            .get("valid_from")
-            .filter(|value| !value.is_null())
-            .and_then(|value| parse_rfc3339(value, &format!("{entry_path}.valid_from"), report));
-        let valid_through = entry
-            .get("valid_through")
-            .filter(|value| !value.is_null())
-            .and_then(|value| parse_rfc3339(value, &format!("{entry_path}.valid_through"), report));
+        let validity_completeness = field(entry, "validity_completeness", &entry_path, report)
+            .and_then(|value| enum_value(
+                value,
+                &format!("{entry_path}.validity_completeness"),
+                &["complete", "incomplete"],
+                report,
+            ));
+
+        // Both bound keys are explicit. When completeness is "complete", a
+        // null bound means a known open interval edge; when "incomplete", a
+        // null bound means the applicability window is not fully established.
+        let valid_from = field(entry, "valid_from", &entry_path, report)
+            .and_then(|value| {
+                if value.is_null() {
+                    None
+                } else {
+                    parse_rfc3339(value, &format!("{entry_path}.valid_from"), report)
+                }
+            });
+        let valid_through = field(entry, "valid_through", &entry_path, report)
+            .and_then(|value| {
+                if value.is_null() {
+                    None
+                } else {
+                    parse_rfc3339(value, &format!("{entry_path}.valid_through"), report)
+                }
+            });
+
+        if expect_admissible && validity_completeness.as_deref() == Some("incomplete") {
+            report.error(
+                "DTEA-EVIDENCE-012",
+                format!("{entry_path}.validity_completeness"),
+                "evidence with incomplete effective-time applicability cannot support a justified decision",
+            );
+        }
 
         if let (Some(valid_from), Some(valid_through)) = (valid_from.as_ref(), valid_through.as_ref()) {
             if valid_from > valid_through {
@@ -3851,16 +3879,80 @@ mod tests {
     }
 
     #[test]
-    fn evidence_validity_bounds_are_inclusive_at_the_decision_time() {
+    fn consulted_evidence_requires_explicit_validity_completeness() {
         let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
-        value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] =
-            Value::String("2026-11-14T10:00:00Z".to_owned());
+        value["events"][3]["payload"]["consulted_evidence"][0]
+            .as_object_mut().expect("consulted evidence object")
+            .remove("validity_completeness");
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| {
+            d.code == "EGDDM-REQUIRED-001"
+                && d.path.ends_with(".validity_completeness")
+        }));
+    }
+
+    #[test]
+    fn incomplete_validity_cannot_support_consulted_evidence() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["validity_completeness"] =
+            Value::String("incomplete".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-012"));
+    }
+
+    #[test]
+    fn incomplete_validity_can_be_retained_as_explicitly_excluded_evidence() {
+        let value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        let report = validate_value(&value);
+        assert!(!report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-012"));
+    }
+
+    #[test]
+    fn complete_validity_accepts_explicit_open_interval_edges() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] = Value::Null;
         value["events"][3]["payload"]["consulted_evidence"][0]["valid_through"] =
-            Value::String("2026-11-14T10:00:00Z".to_owned());
+            Value::String("2026-11-14T11:50:00Z".to_owned());
         let report = validate_value(&value);
         assert!(!report.diagnostics.iter().any(|d| matches!(
             d.code,
-            "DTEA-EVIDENCE-009" | "DTEA-EVIDENCE-010" | "DTEA-EVIDENCE-011"
+            "DTEA-EVIDENCE-009" | "DTEA-EVIDENCE-010"
+                | "DTEA-EVIDENCE-011" | "DTEA-EVIDENCE-012"
+        )));
+    }
+
+    #[test]
+    fn evidence_validity_bounds_are_inclusive_at_the_decision_time() {
+        for (valid_from, valid_through) in [
+            ("2026-11-14T10:00:00Z", "2026-11-14T11:00:00Z"),
+            ("2026-11-14T09:00:00Z", "2026-11-14T10:00:00Z"),
+        ] {
+            let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+            value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] =
+                Value::String(valid_from.to_owned());
+            value["events"][3]["payload"]["consulted_evidence"][0]["valid_through"] =
+                Value::String(valid_through.to_owned());
+            let report = validate_value(&value);
+            assert!(!report.diagnostics.iter().any(|d| matches!(
+                d.code,
+                "DTEA-EVIDENCE-009" | "DTEA-EVIDENCE-010"
+                    | "DTEA-EVIDENCE-011" | "DTEA-EVIDENCE-012"
+            )));
+        }
+    }
+
+    #[test]
+    fn evidence_validity_comparison_normalizes_timezone_offsets() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_from"] =
+            Value::String("2026-11-14T12:00:00+02:00".to_owned());
+        value["events"][3]["payload"]["consulted_evidence"][0]["valid_through"] =
+            Value::String("2026-11-14T12:30:00+02:00".to_owned());
+        let report = validate_value(&value);
+        assert!(!report.diagnostics.iter().any(|d| matches!(
+            d.code,
+            "DTEA-EVIDENCE-009" | "DTEA-EVIDENCE-010"
+                | "DTEA-EVIDENCE-011" | "DTEA-EVIDENCE-012"
         )));
     }
 
