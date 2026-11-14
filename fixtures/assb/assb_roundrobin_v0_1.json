@@ -1,0 +1,400 @@
+{
+  "campaign_id": "ASSB-ROUNDROBIN-001",
+  "evidence": [
+    {
+      "evidence_id": "SYNTHETIC-CAL-A",
+      "source_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-A-1",
+      "source_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-A-2",
+      "source_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-A-3",
+      "source_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-CAL-B",
+      "source_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-B-1",
+      "source_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-B-2",
+      "source_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-B-3",
+      "source_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-CAL-C",
+      "source_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-C-1",
+      "source_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-C-2",
+      "source_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "SYNTHETIC-EVIDENCE-C-3",
+      "source_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "rights_ref": "SYNTHETIC-RIGHTS-ONLY",
+      "metrology_ref": null
+    }
+  ],
+  "laboratories": [
+    {
+      "lab_id": "LAB-A",
+      "blinded_lab_code": "BLIND-LAB-01",
+      "authority_ref": "SYNTHETIC-AUTH-A"
+    },
+    {
+      "lab_id": "LAB-B",
+      "blinded_lab_code": "BLIND-LAB-02",
+      "authority_ref": "SYNTHETIC-AUTH-B"
+    },
+    {
+      "lab_id": "LAB-C",
+      "blinded_lab_code": "BLIND-LAB-03",
+      "authority_ref": "SYNTHETIC-AUTH-C"
+    }
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "FIX-A",
+      "lab_id": "LAB-A",
+      "revision": "fixture-r1",
+      "measurement_method": "calibrated-load-cell",
+      "instrument_ref": "LOADCELL-FIX-A",
+      "calibration_evidence_id": "SYNTHETIC-CAL-A",
+      "pressure_range_min_mpa": 0,
+      "pressure_range_max_mpa": 20,
+      "pressure_uncertainty_mpa": 0.05,
+      "pressure_homogeneity_percent": 3,
+      "setpoint_accuracy_mape_percent": 2.5,
+      "repeatability_cv_percent": 2
+    },
+    {
+      "fixture_id": "FIX-B",
+      "lab_id": "LAB-B",
+      "revision": "fixture-r1",
+      "measurement_method": "calibrated-load-cell",
+      "instrument_ref": "LOADCELL-FIX-B",
+      "calibration_evidence_id": "SYNTHETIC-CAL-B",
+      "pressure_range_min_mpa": 0,
+      "pressure_range_max_mpa": 20,
+      "pressure_uncertainty_mpa": 0.05,
+      "pressure_homogeneity_percent": 3,
+      "setpoint_accuracy_mape_percent": 2.5,
+      "repeatability_cv_percent": 2
+    },
+    {
+      "fixture_id": "FIX-C",
+      "lab_id": "LAB-C",
+      "revision": "fixture-r1",
+      "measurement_method": "calibrated-load-cell",
+      "instrument_ref": "LOADCELL-FIX-C",
+      "calibration_evidence_id": "SYNTHETIC-CAL-C",
+      "pressure_range_min_mpa": 0,
+      "pressure_range_max_mpa": 20,
+      "pressure_uncertainty_mpa": 0.05,
+      "pressure_homogeneity_percent": 3,
+      "setpoint_accuracy_mape_percent": 2.5,
+      "repeatability_cv_percent": 2
+    }
+  ],
+  "cells": [
+    {
+      "cell_id": "LAB-A-CELL-1",
+      "blinded_sample_code": "LAB-A-BLIND-1",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-A-CELL-2",
+      "blinded_sample_code": "LAB-A-BLIND-2",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-A-CELL-3",
+      "blinded_sample_code": "LAB-A-BLIND-3",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-B-CELL-1",
+      "blinded_sample_code": "LAB-B-BLIND-1",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-B-CELL-2",
+      "blinded_sample_code": "LAB-B-BLIND-2",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-B-CELL-3",
+      "blinded_sample_code": "LAB-B-BLIND-3",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-C-CELL-1",
+      "blinded_sample_code": "LAB-C-BLIND-1",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-C-CELL-2",
+      "blinded_sample_code": "LAB-C-BLIND-2",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    },
+    {
+      "cell_id": "LAB-C-CELL-3",
+      "blinded_sample_code": "LAB-C-BLIND-3",
+      "design_id": "ASSB-REF-A",
+      "design_revision": "r1",
+      "test_level": "full_cell",
+      "material_lot_id": "REF-LOT-01",
+      "process_revision": "PROCESS-r1"
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "LAB-A-OBS-1",
+      "cell_id": "LAB-A-CELL-1",
+      "lab_id": "LAB-A",
+      "fixture_id": "FIX-A",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.3,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-A-1"
+    },
+    {
+      "observation_id": "LAB-A-OBS-2",
+      "cell_id": "LAB-A-CELL-2",
+      "lab_id": "LAB-A",
+      "fixture_id": "FIX-A",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.31,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-A-2"
+    },
+    {
+      "observation_id": "LAB-A-OBS-3",
+      "cell_id": "LAB-A-CELL-3",
+      "lab_id": "LAB-A",
+      "fixture_id": "FIX-A",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.29,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-A-3"
+    },
+    {
+      "observation_id": "LAB-B-OBS-1",
+      "cell_id": "LAB-B-CELL-1",
+      "lab_id": "LAB-B",
+      "fixture_id": "FIX-B",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.3,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-B-1"
+    },
+    {
+      "observation_id": "LAB-B-OBS-2",
+      "cell_id": "LAB-B-CELL-2",
+      "lab_id": "LAB-B",
+      "fixture_id": "FIX-B",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.31,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-B-2"
+    },
+    {
+      "observation_id": "LAB-B-OBS-3",
+      "cell_id": "LAB-B-CELL-3",
+      "lab_id": "LAB-B",
+      "fixture_id": "FIX-B",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.29,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-B-3"
+    },
+    {
+      "observation_id": "LAB-C-OBS-1",
+      "cell_id": "LAB-C-CELL-1",
+      "lab_id": "LAB-C",
+      "fixture_id": "FIX-C",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.3,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-C-1"
+    },
+    {
+      "observation_id": "LAB-C-OBS-2",
+      "cell_id": "LAB-C-CELL-2",
+      "lab_id": "LAB-C",
+      "fixture_id": "FIX-C",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.31,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-C-2"
+    },
+    {
+      "observation_id": "LAB-C-OBS-3",
+      "cell_id": "LAB-C-CELL-3",
+      "lab_id": "LAB-C",
+      "fixture_id": "FIX-C",
+      "replicate_group_id": "COMMON-ROUND-001",
+      "protocol_mode": "common_protocol",
+      "protocol_revision": "PROTOCOL-r1",
+      "condition_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "pressure_setpoint_mpa": 0.3,
+      "measured_operating_pressure_mpa": 0.29,
+      "exposure_cycles": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_id": "SYNTHETIC-EVIDENCE-C-3"
+    }
+  ]
+}

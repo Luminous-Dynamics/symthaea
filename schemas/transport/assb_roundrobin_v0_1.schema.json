@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/transport/assb_roundrobin_v0_1.schema.json",
+  "title": "ASSB round-robin manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "campaign_id",
+    "evidence",
+    "laboratories",
+    "fixtures",
+    "cells",
+    "observations"
+  ],
+  "properties": {
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_digest",
+          "evidence_class",
+          "admission",
+          "rights_ref",
+          "metrology_ref"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence_class": {
+            "enum": [
+              "physical_measurement",
+              "independent_laboratory",
+              "synthetic"
+            ]
+          },
+          "admission": {
+            "enum": [
+              "candidate",
+              "admitted_for_evaluation",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "rights_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metrology_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "laboratories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lab_id",
+          "blinded_lab_code",
+          "authority_ref"
+        ],
+        "properties": {
+          "lab_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blinded_lab_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "lab_id",
+          "revision",
+          "measurement_method",
+          "instrument_ref",
+          "calibration_evidence_id",
+          "pressure_range_min_mpa",
+          "pressure_range_max_mpa",
+          "pressure_uncertainty_mpa",
+          "pressure_homogeneity_percent",
+          "setpoint_accuracy_mape_percent",
+          "repeatability_cv_percent"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lab_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "measurement_method": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instrument_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "calibration_evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pressure_range_min_mpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "pressure_range_max_mpa": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "pressure_uncertainty_mpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "pressure_homogeneity_percent": {
+            "type": "number",
+            "minimum": 0
+          },
+          "setpoint_accuracy_mape_percent": {
+            "type": "number",
+            "minimum": 0
+          },
+          "repeatability_cv_percent": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cell_id",
+          "blinded_sample_code",
+          "design_id",
+          "design_revision",
+          "test_level",
+          "material_lot_id",
+          "process_revision"
+        ],
+        "properties": {
+          "cell_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blinded_sample_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "design_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "design_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "test_level": {
+            "enum": [
+              "full_cell",
+              "symmetric_cell",
+              "half_cell"
+            ]
+          },
+          "material_lot_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "process_revision": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "cell_id",
+          "lab_id",
+          "fixture_id",
+          "replicate_group_id",
+          "protocol_mode",
+          "protocol_revision",
+          "condition_digest",
+          "pressure_setpoint_mpa",
+          "measured_operating_pressure_mpa",
+          "exposure_cycles",
+          "outcome_status",
+          "event_cycle",
+          "raw_data_digest",
+          "evidence_id"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cell_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lab_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "replicate_group_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protocol_mode": {
+            "enum": [
+              "common_protocol",
+              "lab_native",
+              "protocol_deviation"
+            ]
+          },
+          "protocol_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "condition_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "pressure_setpoint_mpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "measured_operating_pressure_mpa": {
+            "type": "number",
+            "minimum": 0
+          },
+          "exposure_cycles": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outcome_status": {
+            "enum": [
+              "observed_eol",
+              "right_censored",
+              "failed",
+              "invalid",
+              "incomplete",
+              "synthetic_outcome"
+            ]
+          },
+          "event_cycle": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "raw_data_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
