@@ -126,7 +126,7 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 
 1. Publish the four RFCs and shared schema/fixture; obtain independent review.
 2. Use the initial Rust semantic audit (`cargo run -p xtask -- hmp-record-audit`) and its negative-control tests; add a standards-compliant JSON Schema 2020-12 validator before claiming full schema validation.
-3. Create hand-authored synthetic benchmark cases.
+3. Extend the six-case synthetic adversarial starter set and add blinded human-reviewed items only after permissions and review are in place.
 4. Curate a small public-source pilot with explicit reuse rights and expert/community review; keep restricted content outside the public corpus.
 5. Run matched model baselines and publish per-track metrics.
 6. Only after review, integrate Mycelix permission enforcement, Sol-Atlas records, Symtropy experiment receipts and Symthaea retrieval/synthesis.
@@ -138,11 +138,12 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 | Shared programme contract | Proposed in this document |
 | JSON Schema | Included as a draft |
 | Synthetic example fixture | Included; not a real cultural record |
+| HMP-Bench synthetic adversarial starter set | Six fictional edge-case fixtures across ATTR, PLURAL, UNCERTAINTY, PHILO, RIGHTS and CORRECT; not a validated benchmark |
 | Mycelix runtime permission enforcement | Not implemented by this RFC |
 | Sol-Atlas ingestion/catalog integration | Not implemented by this RFC |
 | Symtropy simulation runner | Not implemented by this RFC |
 | Symthaea evaluation runner | Not implemented by this RFC |
-| Symthaea `xtask hmp-record-audit` | Implemented on this research branch; Cargo tests not yet run |
+| Symthaea `xtask hmp-record-audit` | Implemented on this research branch; seven record/schema tests plus one benchmark-fixture integrity test are authored; Cargo tests not yet run |
 | Human/community validation | Not performed |
 | SOTA comparison | Not performed |
 
