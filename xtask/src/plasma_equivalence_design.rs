@@ -70,9 +70,17 @@ pub(super) struct EquivalenceAnalysisResult {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub(super) struct EquivalenceDesignReceipt {
-    design_id: String,
+    pub(super) design_id: String,
     plan_sha256: String,
-    endpoint_id: String,
+    pub(super) endpoint_id: String,
+    #[serde(default)]
+    pub(super) endpoint_transform_id: Option<String>,
+    #[serde(default)]
+    pub(super) observation_endpoint_id: Option<String>,
+    #[serde(default)]
+    pub(super) endpoint_transform_sha256: Option<String>,
+    #[serde(default)]
+    pub(super) receipt_sha256: Option<String>,
     estimand: String,
     quantity_unit: String,
     analysis_profile: String,
@@ -421,11 +429,30 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
             ClaimDisposition::Rejected => return rejected("method-qualified observation receipt is outside the registered scope"),
         }
     }
-    if baseline_receipt.endpoint != receipt.endpoint_id
-        || candidate_receipt.endpoint != receipt.endpoint_id
+    let observation_endpoint = match (
+        receipt.endpoint_transform_id.as_deref(),
+        receipt.observation_endpoint_id.as_deref(),
+    ) {
+        (None, None) => receipt.endpoint_id.as_str(),
+        (Some(transform), Some(observation)) => {
+            let supported = matches!(
+                (transform, receipt.endpoint_id.as_str(), observation),
+                ("unit_preserving_strength_projection_v1", "initial_lap_shear_mpa", "apparent_shear_strength")
+                    | ("aged_strength_retention_ratio_v1", "aged_strength_retention", "apparent_shear_strength")
+                    | ("predeclared_failure_mode_fraction_v1", "failure_mode_fraction", "frp_joint_failure_mode_classification")
+            );
+            if !supported {
+                return rejected("endpoint transformation/output/observation mapping is not in the registered S0 design ontology");
+            }
+            observation
+        }
+        _ => return blocked("endpoint transform and raw observation endpoint must be declared together"),
+    };
+    if baseline_receipt.endpoint != observation_endpoint
+        || candidate_receipt.endpoint != observation_endpoint
         || baseline_receipt.endpoint != candidate_receipt.endpoint
     {
-        return rejected("design endpoint does not match both method-qualified observation receipts");
+        return rejected("design output endpoint is not supported by the exact raw method-observation endpoint");
     }
     if specimen_set_from_strings(&baseline_receipt.specimen_ids) != baseline_specimens
         || specimen_set_from_strings(&candidate_receipt.specimen_ids) != candidate_specimens
