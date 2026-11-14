@@ -353,6 +353,7 @@
             "clock_qualification": "pass"
           },
           "causal_predecessors": [
+            "outcome-applied",
             "stop",
             "effect"
           ]
@@ -371,7 +372,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING:effect"
         ]
       },
-      "event_trace_sha256": "ee04272c91589981e3e9d1a4a5ad0d5b54817daf31aaea1c4e9e0c07cb038f23"
+      "event_trace_sha256": "c85ad1f4c93544c0455425c32236116211333c6606127c9fb0bf4c7b2f76ce81"
     },
     {
       "id": "EO-UNK-002",
@@ -1039,6 +1040,7 @@
             "clock_qualification": "pass"
           },
           "causal_predecessors": [
+            "outcome-applied",
             "stop"
           ]
         }
@@ -1056,7 +1058,7 @@
           "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT:effect"
         ]
       },
-      "event_trace_sha256": "ab08a98043147dca732866807a2fb286489c7b0a622108a8de5e7fa80fa780d7"
+      "event_trace_sha256": "cfa69214211d12e629d5729067225b61fad0f7157eb913051d848df53bf59291"
     },
     {
       "id": "EO-NEG-004",
