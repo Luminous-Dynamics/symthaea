@@ -298,7 +298,7 @@ fn read_fixture(path: &Path) -> anyhow::Result<Fixture> {
 
 pub fn run(path: &Path) -> anyhow::Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-claim-scope-fixture-v0.2" {
+    if fixture.schema_version != "plasma-claim-scope-fixture-v0.3" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -359,12 +359,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_claim_scope_fixture_v0_2.json");
+        include_str!("../../data/research/plasma_claim_scope_fixture_v0_3.json");
 
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
-        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.2");
+        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.3");
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
@@ -406,6 +406,24 @@ mod tests {
             assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported, "{id}");
             assert_ne!(case.evidence_kind, "measurement");
         }
+    }
+
+    #[test]
+    fn thick_adherend_response_does_not_establish_substrate_adhesion() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let valid = fixture.cases.iter().find(|case| case.id == "astm-d5656-thick-adherend-response").expect("case exists");
+        let overclaim = fixture.cases.iter().find(|case| case.id == "astm-d5656-substrate-adhesion-overclaim").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(valid)).disposition, Disposition::Supported);
+        assert_eq!(decide(&ScopeEvidence::from(overclaim)).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn failure_mode_classification_is_not_failure_acceptance() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let valid = fixture.cases.iter().find(|case| case.id == "astm-d5573-frp-smc-failure-classification").expect("case exists");
+        let overclaim = fixture.cases.iter().find(|case| case.id == "astm-d5573-failure-acceptability-overclaim").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(valid)).disposition, Disposition::Supported);
+        assert_eq!(decide(&ScopeEvidence::from(overclaim)).disposition, Disposition::Rejected);
     }
 
     #[test]
