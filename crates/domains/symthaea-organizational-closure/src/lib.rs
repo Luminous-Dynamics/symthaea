@@ -942,7 +942,12 @@ pub fn verify_trace(
         } else {
             let has_producer = verified_outputs
                 .keys()
-                .any(|version_id| version_id.component_id == *component_id);
+                .any(|version_id| &version_id.component_id == component_id);
+            let has_consumer = verified_outputs.keys().any(|version_id| {
+                &version_id.component_id == component_id
+                    && consumed_versions.contains(version_id)
+            });
+
             if !has_producer {
                 report.push(
                     FindingCode::MissingRegenerativeProducer,
@@ -950,7 +955,8 @@ pub fn verify_trace(
                     Some(component_id.clone()),
                     "no digest-verified runtime producer created this required component",
                 );
-            } else {
+            }
+            if !has_consumer {
                 report.push(
                     FindingCode::MissingRegenerativeConsumer,
                     None,
