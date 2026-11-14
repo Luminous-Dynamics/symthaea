@@ -1,0 +1,497 @@
+{
+  "schema": "luminous.airroad.mimo_cross_frequency_shared_uncertainty.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_joint_hard_set_with_statistical_companion",
+  "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+  "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+  "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+  "frequency_unit": "rad_per_second",
+  "port_order": [
+    "bus-a",
+    "bus-b"
+  ],
+  "nominal_frequency_matrices": [
+    {
+      "frequency_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "matrix": [
+        [
+          {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ]
+    },
+    {
+      "frequency_id": "omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "matrix": [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        ]
+      ]
+    }
+  ],
+  "shared_nuisance": {
+    "nuisance_id": "cal-chain-common-gain-001",
+    "acquisition_root_id": "acquisition-run-common-001",
+    "calibration_certificate_id": "cal-certificate-common-001",
+    "semantics": "deterministic_joint_hard_set",
+    "factor": "q=1+u",
+    "u_lower": {
+      "numerator": "-1",
+      "denominator": "10"
+    },
+    "u_upper": {
+      "numerator": "1",
+      "denominator": "10"
+    },
+    "q_lower": {
+      "numerator": "9",
+      "denominator": "10"
+    },
+    "q_upper": {
+      "numerator": "11",
+      "denominator": "10"
+    },
+    "applies_to_record_ids": [
+      "omega-1-G11",
+      "omega-1-G12",
+      "omega-1-G21",
+      "omega-1-G22",
+      "omega-2-G11",
+      "omega-2-G12",
+      "omega-2-G21",
+      "omega-2-G22"
+    ]
+  },
+  "observation_records": [
+    {
+      "record_id": "omega-1-G11",
+      "frequency_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "row": 0,
+      "column": 0,
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-a",
+      "nominal_value": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-1-G12",
+      "frequency_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "row": 0,
+      "column": 1,
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-b",
+      "nominal_value": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-1-G21",
+      "frequency_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "row": 1,
+      "column": 0,
+      "observed_port_id": "bus-b",
+      "driven_port_id": "bus-a",
+      "nominal_value": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-1-G22",
+      "frequency_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "row": 1,
+      "column": 1,
+      "observed_port_id": "bus-b",
+      "driven_port_id": "bus-b",
+      "nominal_value": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-2-G11",
+      "frequency_id": "omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "row": 0,
+      "column": 0,
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-a",
+      "nominal_value": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-2-G12",
+      "frequency_id": "omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "row": 0,
+      "column": 1,
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-b",
+      "nominal_value": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-2-G21",
+      "frequency_id": "omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "row": 1,
+      "column": 0,
+      "observed_port_id": "bus-b",
+      "driven_port_id": "bus-a",
+      "nominal_value": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    },
+    {
+      "record_id": "omega-2-G22",
+      "frequency_id": "omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "row": 1,
+      "column": 1,
+      "observed_port_id": "bus-b",
+      "driven_port_id": "bus-b",
+      "nominal_value": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "shared_nuisance_id": "cal-chain-common-gain-001",
+      "acquisition_root_id": "acquisition-run-common-001",
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
+    }
+  ],
+  "expected": {
+    "shared_joint_relation": "G(omega_2)-2*G(omega_1)=0",
+    "shared_joint_relation_matrix": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "marginal_matrices": {
+      "omega_1": {
+        "diagonal_lower": {
+          "numerator": "9",
+          "denominator": "10"
+        },
+        "diagonal_upper": {
+          "numerator": "11",
+          "denominator": "10"
+        },
+        "off_diagonal": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "omega_2": {
+        "diagonal_lower": {
+          "numerator": "9",
+          "denominator": "5"
+        },
+        "diagonal_upper": {
+          "numerator": "11",
+          "denominator": "5"
+        },
+        "off_diagonal": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    },
+    "independent_product_relation_interval": {
+      "lower": {
+        "numerator": "-2",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "2",
+        "denominator": "5"
+      }
+    },
+    "independent_product_strictly_larger": true
+  },
+  "statistical_companion": {
+    "semantics": "separate_statistical_covariance_model_not_a_hard_set",
+    "shared_latent": "q=1+xi",
+    "xi_mean": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "xi_variance": {
+      "numerator": "1",
+      "denominator": "100"
+    },
+    "shared_cross_frequency_covariance": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "100"
+        },
+        {
+          "numerator": "1",
+          "denominator": "50"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "50"
+        },
+        {
+          "numerator": "1",
+          "denominator": "25"
+        }
+      ]
+    ],
+    "independent_frequency_counterfactual_covariance": [
+      [
+        {
+          "numerator": "1",
+          "denominator": "100"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "25"
+        }
+      ]
+    ],
+    "expected_shared_cross_covariance": {
+      "numerator": "1",
+      "denominator": "50"
+    },
+    "expected_independent_cross_covariance": {
+      "numerator": "0",
+      "denominator": "1"
+    }
+  },
+  "counterfactuals": {
+    "independent_frequency_nuisances": {
+      "omega_1_nuisance_id": "cal-chain-independent-at-knot-1",
+      "omega_2_nuisance_id": "cal-chain-independent-at-knot-2"
+    },
+    "mismatched_record_nuisance_id": "different-calibration-chain",
+    "q_domain_includes_zero": {
+      "lower": {
+        "numerator": "-1",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    },
+    "incomplete_coverage_record_id": "omega-2-G22",
+    "wrong_frequency_unit": "Hz"
+  },
+  "negative_controls": [
+    {
+      "id": "same-nuisance-across-all-knots-and-matrix-elements",
+      "expected": "shared-relation-exact"
+    },
+    {
+      "id": "different-nuisance-at-second-frequency",
+      "expected": "reject-shared-claim"
+    },
+    {
+      "id": "incomplete-matrix-or-frequency-coverage",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "same-numeric-domain-but-distinct-nuisance-identities",
+      "expected": "not-shared"
+    },
+    {
+      "id": "independent-frequency-product",
+      "expected": "larger-set"
+    },
+    {
+      "id": "q-domain-includes-zero",
+      "expected": "reject-cancellation"
+    },
+    {
+      "id": "statistical-covariance-labelled-hard-set",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "shared-covariance-made-block-diagonal",
+      "expected": "reject-dependency-semantics"
+    },
+    {
+      "id": "frequency-unit-mismatch",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "stale-model-topology-or-calibration-identity",
+      "expected": "not-evaluable"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic two-frequency shared real calibration gain only.",
+    "The hard-set and statistical covariance companions are separate uncertainty classes.",
+    "No physical campaign calibration scope, continuous-frequency model bound or robust stability is established."
+  ],
+  "measurement_equation": "observed_matrix(omega_k)=q_shared*nominal_matrix(omega_k)"
+}

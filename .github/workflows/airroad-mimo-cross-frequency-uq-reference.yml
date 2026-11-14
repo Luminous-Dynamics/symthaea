@@ -1,0 +1,41 @@
+name: AIRROAD MIMO Cross-Frequency Uncertainty Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_CROSS_FREQUENCY_UQ_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-cross-frequency-uq-v0.1.json"
+      - "tools/airroad-mimo-cross-frequency-uq-qualifier/verify_cross_frequency_uq.py"
+      - ".github/workflows/airroad-mimo-cross-frequency-uq-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-cross-frequency-uq-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_CROSS_FREQUENCY_UQ_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-cross-frequency-uq-v0.1.json"
+      - "tools/airroad-mimo-cross-frequency-uq-qualifier/verify_cross_frequency_uq.py"
+      - ".github/workflows/airroad-mimo-cross-frequency-uq-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-cross-frequency-uq-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute cross-frequency uncertainty oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-cross-frequency-uq-qualifier/verify_cross_frequency_uq.py
+          python3 tools/airroad-mimo-cross-frequency-uq-qualifier/verify_cross_frequency_uq.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-cross-frequency-uq-v0.1.json > /dev/null
