@@ -1,0 +1,531 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pluralistic-knowledge-record-0.1.0.schema.json",
+  "title": "Pluralistic Knowledge Record",
+  "description": "A situated, source-attributed knowledge claim with explicit epistemic status and operation-specific rights. Schema validity is not authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_id",
+    "schema_version",
+    "claim",
+    "attribution",
+    "context",
+    "epistemic",
+    "provenance",
+    "rights",
+    "review"
+  ],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "pattern": "^hmp-[a-z0-9][a-z0-9._-]{2,127}$"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "claim_type",
+        "scope"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_type": {
+          "enum": [
+            "empirical",
+            "historical",
+            "doctrinal_theological",
+            "philosophical_metaphysical",
+            "normative",
+            "phenomenological",
+            "descriptive_practice",
+            "interpretive",
+            "synthetic_example",
+            "unknown"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_language_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "translation_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "voice_type",
+        "scope_type",
+        "attribution_note"
+      ],
+      "properties": {
+        "voice_type": {
+          "enum": [
+            "community_self_description",
+            "individual_testimony",
+            "practitioner_interpretation",
+            "scholarly_interpretation",
+            "archival_record",
+            "external_observation",
+            "model_generated_summary",
+            "fictional_example",
+            "unknown"
+          ]
+        },
+        "scope_type": {
+          "enum": [
+            "individual",
+            "subgroup",
+            "community",
+            "scholarly_field",
+            "archival_source",
+            "fictional_example",
+            "unknown"
+          ]
+        },
+        "speaker_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "attribution_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "not_universal": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time_scope",
+        "place_scope",
+        "language",
+        "setting"
+      ],
+      "properties": {
+        "time_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "place_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "setting": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "epistemic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "uncertainty_note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "supported_by_source",
+            "corroborated",
+            "contested",
+            "provisional",
+            "unverified",
+            "non_empirical_claim",
+            "synthetic_only",
+            "unknown"
+          ]
+        },
+        "uncertainty_note": {
+          "type": "string"
+        },
+        "evidence_limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sources"
+      ],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_id",
+              "source_kind",
+              "source_reference",
+              "citation_note"
+            ],
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_kind": {
+                "enum": [
+                  "primary_text",
+                  "published_research",
+                  "archival_record",
+                  "oral_history",
+                  "participant_account",
+                  "community_governance_record",
+                  "public_webpage",
+                  "synthetic_fixture",
+                  "other"
+                ]
+              },
+              "source_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "citation_note": {
+                "type": "string",
+                "minLength": 1
+              },
+              "published_or_recorded_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              }
+            }
+          }
+        },
+        "source_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "access_class",
+        "permission_status",
+        "permission_basis",
+        "permitted_uses",
+        "prohibited_uses"
+      ],
+      "properties": {
+        "access_class": {
+          "enum": [
+            "public_source",
+            "community_controlled",
+            "restricted",
+            "reference_only"
+          ]
+        },
+        "permission_status": {
+          "enum": [
+            "granted",
+            "pending",
+            "denied",
+            "withdrawn",
+            "not_requested"
+          ]
+        },
+        "permission_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permission_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "permitted_uses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "read",
+              "display",
+              "cite",
+              "index",
+              "retrieve",
+              "summarize",
+              "translate",
+              "adapt",
+              "train",
+              "redistribute",
+              "export",
+              "preserve"
+            ]
+          }
+        },
+        "prohibited_uses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "read",
+              "display",
+              "cite",
+              "index",
+              "retrieve",
+              "summarize",
+              "translate",
+              "adapt",
+              "train",
+              "redistribute",
+              "export",
+              "preserve"
+            ]
+          }
+        },
+        "review_after": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        }
+      }
+    },
+    "interpretations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "interpretation_id",
+          "text",
+          "attribution_note",
+          "status"
+        ],
+        "properties": {
+          "interpretation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attribution_note": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "supported",
+              "contested",
+              "provisional",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "review_note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "draft",
+            "source_checked",
+            "expert_reviewed",
+            "community_reviewed",
+            "contested",
+            "retracted",
+            "synthetic_fixture"
+          ]
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "review_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "correction_reference": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "access_class": {
+                "enum": [
+                  "community_controlled",
+                  "restricted"
+                ]
+              }
+            },
+            "required": [
+              "access_class"
+            ]
+          }
+        },
+        "required": [
+          "rights"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "authority_reference": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "authority_reference"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "access_class": {
+                "enum": [
+                  "community_controlled",
+                  "restricted"
+                ]
+              },
+              "permission_status": {
+                "const": "granted"
+              }
+            },
+            "required": [
+              "access_class",
+              "permission_status"
+            ]
+          }
+        },
+        "required": [
+          "rights"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "permission_reference": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "permission_reference"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "permission_status": {
+                "enum": [
+                  "pending",
+                  "denied",
+                  "withdrawn",
+                  "not_requested"
+                ]
+              }
+            },
+            "required": [
+              "permission_status"
+            ]
+          }
+        },
+        "required": [
+          "rights"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "permitted_uses": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
