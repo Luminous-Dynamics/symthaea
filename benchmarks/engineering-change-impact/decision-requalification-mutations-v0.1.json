@@ -1,7 +1,7 @@
 {
   "schema_version": "engineering-decision-requalification-mutations-v0.1",
   "status": "preregistered_controls_not_results",
-  "control_count": 18,
+  "control_count": 20,
   "controls": [
     {
       "id": "RQ-CTRL-NEG-001",
@@ -128,6 +128,20 @@
       "mutation": "promote unknown owner qualification to qualified",
       "expected_result": "indeterminate",
       "reason": "candidate cannot self-certify event authenticity or scope"
+    },
+    {
+      "id": "RQ-CTRL-NEG-016",
+      "case_id": "RQ-UNK-002",
+      "mutation": "omit a relevant trust revocation from candidate-visible K1 event materialization while retaining it in the complete owner event inventory",
+      "expected_result": "indeterminate",
+      "reason": "the candidate cannot claim no change when a relevant owner event has not been materialized"
+    },
+    {
+      "id": "RQ-CTRL-NEG-017",
+      "case_id": "RQ-NEG-006",
+      "mutation": "omit a pre-K0 known revocation from the K0 candidate-visible event snapshot",
+      "expected_result": "indeterminate",
+      "reason": "historical support cannot be asserted when a relevant known event is missing from the K0 candidate snapshot"
     }
   ]
 }
