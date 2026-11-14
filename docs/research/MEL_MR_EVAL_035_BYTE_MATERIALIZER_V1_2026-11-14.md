@@ -39,6 +39,20 @@ The path walk rejects observed symlinks and canonical escapes, but this is not a
 
 No real benchmark assets are committed or fetched by this PR. The synthetic artifact-map fixture is a schema/contract fixture only; its referenced paths are not present and it is not materializable.
 
+
+## External dataset rights and target-validity warning
+
+The SMEBench paper's Licensing and Ethics appendix states that SME-Bench is licensed CC BY-NC-SA 4.0 and that component resources remain subject to their original terms, including MidiCaps (CC BY-SA 4.0), MoisesDB (CC BY-NC-SA 4.0), Arachno SoundFont (CC BY-NC-SA 4.0), GeneralUser GS and FluidR3-GM (CC BY 4.0), TimGM6mb (public domain), and General Montage (CC BY 3.0). A manifest rights-evidence hash only proves byte correspondence. It does not grant permission or decide whether an evaluation by a commercial entity qualifies as non-commercial. Do not admit SMEBench assets for product/commercial work until the required per-component purpose review is complete; see [MEL-MR-RIGHTS-001 / #12029](https://github.com/Luminous-Dynamics/symthaea/issues/12029).
+
+The paper's human target-validation study included 236 ratings from 17 participants. It reports mean target quality 4.23/5, source alignment 4.65/5 and instruction alignment 3.99/5; three of twelve edit operations did not reliably exceed the midpoint for instruction alignment. It also notes that its MIDI and SoundFont coverage is predominantly Western-centric. Consequently:
+- keep each operation's target-validity evidence separate;
+- report the 416-pair real-audio complement separately from the MIDI-synthesized test set;
+- treat paired targets as controlled reference examples, not exhaustive definitions of all valid musical realizations;
+- do not infer broad cultural generalization from this benchmark;
+- do not equate byte-level license-evidence verification with rights clearance.
+
+Source: https://arxiv.org/abs/2610.36715 (Sections 3–4 and Licensing and Ethics appendix).
+
 ## Benchmark implications
 
 Keep these evaluation tracks separate:
