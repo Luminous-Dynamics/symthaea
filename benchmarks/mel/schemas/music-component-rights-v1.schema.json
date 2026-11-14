@@ -102,7 +102,8 @@
             },
             "retrieved_at_utc": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
             }
           }
         },
@@ -197,7 +198,8 @@
             },
             "reviewed_at_utc": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
             },
             "rationale": {
               "type": "string",
