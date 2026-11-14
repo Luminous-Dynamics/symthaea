@@ -67,7 +67,7 @@ enum Commands {
     },
     /// Audit that engineering claims do not exceed the scope of their test method and evidence.
     PlasmaClaimScopeAudit {
-        #[arg(long, default_value = "data/research/plasma_claim_scope_fixture_v0_2.json")]
+        #[arg(long, default_value = "data/research/plasma_claim_scope_fixture_v0_3.json")]
         fixture: PathBuf,
     },
     /// Audit method-qualified endpoint evidence used by qualification transfer.
