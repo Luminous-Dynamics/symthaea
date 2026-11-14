@@ -313,6 +313,27 @@ Report confidence intervals, per-relation/task-family breakdowns, cost, latency,
 - Measure actual acceptance, regressions, review time and resource consumption.
 - Retain failed hypotheses and forecast calibration.
 
+### Runner-independent temporal fixture increment — 2026-11-14
+
+A first public known-answer fixture was added at:
+
+- `docs/development-map/fixtures/temporal-evidence-invalidation-v0.1.map.json`
+- `docs/development-map/fixtures/temporal-evidence-invalidation-v0.1.expected.json`
+
+It models a synthetic contract-v1 → contract-v2 evolution:
+- 8 graph nodes and 7 edges;
+- 9 append-only events across three synthetic revisions;
+- evidence E1 passes at revision A, becomes stale after the contract changes at B, and remains historically present;
+- evidence E2 passes at revision C under the new v2 contract and exact declared configuration world;
+- a proposed v3 action remains a proposal and cannot mutate the observed C snapshot;
+- 7 authored negative controls cover false-current promotion, skipped-as-pass, world mismatch, proposal-as-observation, history erasure, path-only identity and evaluator-scope mismatch.
+
+The provisional snapshot schema now accepts an optional event slice with separate event time and observation time, effective revision, targets, typed state effect, provenance and validity scope.
+
+**Structural checks performed on the fetched branch artifacts:** JSON parse for map/expected/schema; all local schema references resolve; 8 unique node IDs; 7 edge endpoints resolve; 9 event target sets resolve; event kinds/node kinds/edge relations occur in the schema enumerations; E1 is stale, E2 current, and v3 remains proposed. This is an authored structural consistency check, **not** full JSON Schema meta-validation, Rust validation, event replay execution, benchmark qualification or CI.
+
+The fixture is public and deliberately not a sealed benchmark. Its identifiers are synthetic placeholders, not real Git object hashes or cryptographic attestations.
+
 ## 8. Runner-independent work and safety boundary
 
 Safe now: architecture and schema authoring, static parsing of repository metadata/source, public Git-history analysis, manual source-anchored capability inventories, benchmark protocol, synthetic fixtures, static consistency checks and read-only map generation.
