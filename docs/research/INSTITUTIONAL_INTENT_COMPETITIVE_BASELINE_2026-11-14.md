@@ -233,3 +233,62 @@ This is the downstream domain test for one of the commercial profiles discussed 
 The v0.1 validator only checks structural consistency of the supplied manifest. It cannot establish that a requirement is complete, true, feasible, legally valid, safe, authorised, or an accurate interpretation of customer intent.
 
 A future benchmark may support narrow claims such as “reduced review time for source-grounded acceptance baselines on this preregistered corpus without increasing critical defects.” It cannot support a universal claim to outperform requirements engineering, family-office systems, systems engineering or human experts.
+
+
+## 7. November 14, 2026 competitor-capability refresh
+
+The current product comparison reinforces the integration-first boundary. Product capability descriptions below are vendor-published claims, not independent performance tests.
+
+| Product/category | Publicly described capability | Strategic implication |
+|---|---|---|
+| Siemens Polarion ALM | LiveDocs paragraph-level identity and traceability, stateful workflows, audit trails, electronic signatures, historical-state browsing, ReqIF exchange and change-impact analysis across requirements and tests. | Do not compete on ordinary requirements lifecycle management, baselines, audit history, document collaboration or traceability UI. Integrate with it. |
+| Jama Connect Advisor | AI-assisted analysis against INCOSE and EARS guidance; reviewable recommendations. | Do not claim a unique ability to inspect requirement quality or flag natural-language issues. |
+| Jama Connect Test Case Generation | AI creates structured, traceable, reviewable test-case drafts from requirements; Jama states a typical expectation of about 80% complete draft, refined by humans, and explicitly says it does not guarantee complete coverage or replace verification engineers. | Benchmark accepted verification coverage and human correction cost, not draft-generation speed. A benchmark must count missing tests and false assurances, not only output volume. |
+| Addepar | Consolidated portfolio visibility across complex legal entities and ownership structures; proprietary private-market datasets and position-level reporting. | Do not build a replacement portfolio aggregation, performance or investment analytics platform. Consume domain-owned records and references. |
+| Masttro | Wealth visibility, global entity/asset mapping, direct custodian feeds, alternatives, document automation, cash management and portfolio reporting. Its public pages vary in feed-count claims; do not hard-code a vendor marketing number into benchmark ground truth. | Do not position the product as another all-asset family-office dashboard. Focus on cross-provider claim correctness, authority and continuity. |
+| Citi Institute family-office AI research | Reports preference for ready-made tools, with some offices requiring 80%+ efficiency gains before accepting custom AI builds; recommends modular task-specific tools where suitable. | Ship one bounded paid workflow with measurable labour/risk reduction; do not sell an all-at-once replacement platform. |
+
+### Official vendor / research references checked 2026-11-14
+
+- Siemens Polarion ALM: https://www.siemens.com/en-gb/products/polarion/application-lifecycle-management-alm/
+- Siemens Polarion requirements: https://www.siemens.com/en-gb/products/polarion/requirements/
+- Jama Connect Advisor: https://help.jamasoftware.com/ah/en/jama-connect-advisor-.html
+- Jama Test Case Generation (updated 2026-04-22): https://support.jamasoftware.com/hc/en-us/articles/45294879572365-Test-Case-Generation
+- Addepar investor / platform overview: https://addepar.com/investors
+- Masttro wealth platform: https://masttro.com/masttro-wealth-platform
+- Citi Institute, AI in the Family Office (2026): https://www.citigroup.com/rcs/citigpa/storage/public/ai_in_the_family_office.pdf
+
+## 8. Where the proposed system can outperform — a testable claim
+
+The objective is not to beat Polarion at requirements lifecycle control, Jama at test-case drafting, Addepar at investment reporting or Masttro at custodian aggregation. The testable objective is to outperform a matched workflow on a narrower cross-system task:
+
+**Given a brief and a portfolio of heterogeneous source records, produce an auditable, claim-scoped, authority-aware and time-correct decision packet; preserve unknown and contested evidence; identify which downstream requirements and decisions are invalidated by a correction; and avoid unauthorized or duplicate side effects.**
+
+Candidate differentiators to measure:
+
+1. **Claim-specific authority rather than global trust ranking.** A source can be competent for custody but not title, or for schedule listing but not current insurance coverage.
+2. **Bitemporal evidence rather than a last-updated field.** Preserve both effective time and knowledge time; answer what was true at a time and what the institution knew at that time.
+3. **Unknown-outcome reconciliation rather than retry optimism.** A timeout after possible side effect blocks blind mutation until reconciled.
+4. **Change-impact closure across product boundaries.** A changed source or authority invalidates only the dependent claims, tests and qualifications, and names the owner responsible for re-evaluation.
+5. **Evidence-minimal integration rather than data centralisation.** Keep authoritative content in its owner system; exchange references and scoped attestations.
+6. **Abstention with a reason and next observation.** Distinguish missing, stale, contested, unavailable, unsupported and out-of-scope; recommend the minimum observation needed to resolve the decision.
+
+The resulting interface should complement existing ALM, ERP, family-office, registry, custodian, collection and EAM tools instead of asking institutions to migrate their system of record.
+
+## 9. Benchmark ladder and SOTA discipline
+
+For the requirements-intake task, run at least these matched arms: expert analyst; general-purpose LLM one-shot; LLM with structured extraction and equal reviewer time; configured incumbent ALM workflow; proposed compiler with owner-native routing. For the institutional asset task, use the manual, family-office, EAM/CMMS, collection-management, authoritative source-system, hybrid-assurance and Mycelix owner-native arms defined by IPB-S6.
+
+Report per-domain and per-failure-mode results. Do not collapse them into one score.
+
+Prospective targets (not results):
+
+- P0: 100% accepted items source-linked or tied to an approved derivation; zero unapproved modality promotion; zero false-clear on frozen authority/privacy/safety hard negatives; zero blind repeat mutation after unknown outcome.
+- P1: >=98% recall on labelled high-consequence hazards while retaining zero false-clear on frozen hard negatives; >=95% held-out must-have/claim-dimension recall; >=30% lower expert reconstruction/review time without increased critical defects.
+- P2: >=200 held-out cases, at least four domain/asset classes, two or more jurisdiction profiles, three source-system families/adapters, two independently implemented evaluators and one external replication.
+
+The 2026 LLM requirements-quality study tested ten off-the-shelf models over two requirement sets and one hundred runs; its best-performing evaluated model detected a median 47% of expert-identified issues and false-flagged 11%. This is a specific study result, not a universal model score, but it demonstrates why a confident natural-language score cannot stand in for expert necessity/correctness judgment. Reference: https://arxiv.org/abs/2609.03230
+
+The current ISO publication status is also important: ISO/IEC/IEEE 29148:2018 remains the published edition; the 2026 Edition 3 DIS is in the enquiry/ballot process and is not yet the published replacement. References: https://www.iso.org/standard/72089.html and https://www.iso.org/standard/94091.html
+
+No standards-conformance or SOTA-superiority claim follows from these design targets.
