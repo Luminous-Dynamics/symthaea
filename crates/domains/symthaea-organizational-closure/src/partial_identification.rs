@@ -1104,13 +1104,20 @@ mod tests {
 
     fn scenario() -> (PartialIdentificationScenario, PartialIdentificationOracle) {
         let graph = CausalGraphDescriptor {
-            variables: ["treatment", "outcome", "confounder"].into_iter().map(str::to_owned).collect(),
+            variables: ["treatment", "mediator", "outcome"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
             directed_edges: [
-                DirectedCausalEdge { cause: "treatment".into(), effect: "outcome".into() },
-                DirectedCausalEdge { cause: "confounder".into(), effect: "treatment".into() },
-                DirectedCausalEdge { cause: "confounder".into(), effect: "outcome".into() },
-            ].into(),
-            bidirected_edges: BTreeSet::new(),
+                DirectedCausalEdge { cause: "treatment".into(), effect: "mediator".into() },
+                DirectedCausalEdge { cause: "mediator".into(), effect: "outcome".into() },
+            ]
+            .into(),
+            bidirected_edges: [BidirectedCausalEdge {
+                left: "treatment".into(),
+                right: "mediator".into(),
+            }]
+            .into(),
         };
         let scenario = PartialIdentificationScenario {
             graph,
@@ -1122,20 +1129,48 @@ mod tests {
             },
             initial_bounds: EffectInterval::new(-2, 3),
             experiments: vec![
-                PartialIdentificationExperiment::new("probe-a", "treatment", 1, 1),
-                PartialIdentificationExperiment::new("probe-b", "confounder", 1, 1),
+                PartialIdentificationExperiment::new("probe-a", "mediator", 1, 1)
+                    .measuring(["outcome".to_owned()]),
+                PartialIdentificationExperiment::new("probe-b", "treatment", 1, 1)
+                    .measuring(["outcome".to_owned()]),
+                PartialIdentificationExperiment::new("probe-c", "treatment", 1, 1)
+                    .measuring(["mediator".to_owned(), "outcome".to_owned()]),
             ],
             budget: ExperimentBudget { max_cost_units: 2, max_risk_units: 2, max_trials: 2 },
         };
         let oracle = PartialIdentificationOracle {
             actual_world_id: "world-2".into(),
             admissible_worlds: vec![
-                AdmissibleCausalWorld { world_id: "world-1".into(), target_effect: -2,
-                    outcomes: [("probe-a".into(), "a".into()), ("probe-b".into(), "x".into())].into() },
-                AdmissibleCausalWorld { world_id: "world-2".into(), target_effect: 0,
-                    outcomes: [("probe-a".into(), "a".into()), ("probe-b".into(), "y".into())].into() },
-                AdmissibleCausalWorld { world_id: "world-3".into(), target_effect: 3,
-                    outcomes: [("probe-a".into(), "b".into()), ("probe-b".into(), "y".into())].into() },
+                AdmissibleCausalWorld {
+                    world_id: "world-1".into(),
+                    target_effect: -2,
+                    outcomes: [
+                        ("probe-a".into(), "constant".into()),
+                        ("probe-b".into(), "low".into()),
+                        ("probe-c".into(), "w1".into()),
+                    ]
+                    .into(),
+                },
+                AdmissibleCausalWorld {
+                    world_id: "world-2".into(),
+                    target_effect: 0,
+                    outcomes: [
+                        ("probe-a".into(), "constant".into()),
+                        ("probe-b".into(), "low".into()),
+                        ("probe-c".into(), "w2".into()),
+                    ]
+                    .into(),
+                },
+                AdmissibleCausalWorld {
+                    world_id: "world-3".into(),
+                    target_effect: 3,
+                    outcomes: [
+                        ("probe-a".into(), "constant".into()),
+                        ("probe-b".into(), "high".into()),
+                        ("probe-c".into(), "w3".into()),
+                    ]
+                    .into(),
+                },
             ],
         };
         (scenario, oracle)
@@ -1149,7 +1184,7 @@ mod tests {
     fn exact_bounds_and_max_potency_are_recomputed_from_admissible_worlds() {
         let (scenario, oracle) = scenario();
         let trace = PartialIdentificationTrace {
-            trials: vec![trial("probe-a", "a"), trial("probe-b", "y")],
+            trials: vec![trial("probe-a", "constant"), trial("probe-c", "w2")],
             declared_bounds: EffectInterval::new(0, 0),
             decision: RobustDecision::DoNotAct,
         };
@@ -1160,6 +1195,10 @@ mod tests {
         assert_eq!(report.exact_identified_bounds, Some(EffectInterval::new(0, 0)));
         assert_eq!(report.guaranteed_potency, Some(5));
         assert_eq!(report.optimal_guaranteed_potency, Some(5));
+        assert_eq!(report.path_interception_candidate_count, 1);
+        assert_eq!(report.path_interception_confirmed_count, 1);
+        assert_eq!(report.path_interception_disagreement_count, 0);
+        assert_eq!(report.zero_potency_experiment_count, 1);
         assert_eq!(report.decision_quality, Some(DecisionQuality::RobustlyCorrect));
         assert!(report.robust_decision());
     }
@@ -1168,7 +1207,7 @@ mod tests {
     fn batch_with_lower_worst_case_potency_reports_oracle_regret() {
         let (scenario, oracle) = scenario();
         let trace = PartialIdentificationTrace {
-            trials: vec![trial("probe-a", "a")],
+            trials: vec![trial("probe-b", "low")],
             declared_bounds: EffectInterval::new(-2, 0),
             decision: RobustDecision::DoNotAct,
         };
@@ -1184,7 +1223,7 @@ mod tests {
     fn false_narrowing_of_effect_bounds_is_rejected() {
         let (scenario, oracle) = scenario();
         let trace = PartialIdentificationTrace {
-            trials: vec![trial("probe-a", "a")],
+            trials: vec![trial("probe-b", "low")],
             declared_bounds: EffectInterval::new(-1, -1),
             decision: RobustDecision::DoNotAct,
         };
@@ -1199,7 +1238,7 @@ mod tests {
     fn conservative_defer_is_safe_but_scored_separately() {
         let (scenario, oracle) = scenario();
         let trace = PartialIdentificationTrace {
-            trials: vec![trial("probe-a", "a")],
+            trials: vec![trial("probe-b", "low")],
             declared_bounds: EffectInterval::new(-2, 1),
             decision: RobustDecision::Defer,
         };
@@ -1213,7 +1252,7 @@ mod tests {
     #[test]
     fn unavailable_intervention_evidence_does_not_tighten_bounds() {
         let (scenario, oracle) = scenario();
-        let mut observation = trial("probe-a", "a");
+        let mut observation = trial("probe-a", "constant");
         observation.delivery = ExperimentEvidenceStatus::Unavailable;
         let trace = PartialIdentificationTrace {
             trials: vec![observation],
@@ -1231,7 +1270,7 @@ mod tests {
     fn actual_world_observation_must_match_the_independent_oracle() {
         let (scenario, oracle) = scenario();
         let trace = PartialIdentificationTrace {
-            trials: vec![trial("probe-a", "observer-corruption")],
+            trials: vec![trial("probe-b", "observer-corruption")],
             declared_bounds: EffectInterval::new(-2, 0),
             decision: RobustDecision::DoNotAct,
         };
@@ -1271,6 +1310,29 @@ mod tests {
         );
         assert_eq!(report.qualification, PartialIdentificationQualification::Inconclusive);
         assert!(report.findings.iter().any(|f| f.code == PartialIdentificationFindingCode::EnumerationBudgetExceeded));
+    }
+
+    #[test]
+    fn path_pruning_certificate_is_rejected_when_the_finite_oracle_disagrees() {
+        let (scenario, mut oracle) = scenario();
+        oracle.admissible_worlds[0].outcomes.insert("probe-a".into(), "a".into());
+        oracle.admissible_worlds[1].outcomes.insert("probe-a".into(), "b".into());
+        oracle.admissible_worlds[2].outcomes.insert("probe-a".into(), "c".into());
+        let trace = PartialIdentificationTrace {
+            trials: vec![trial("probe-a", "b")],
+            declared_bounds: EffectInterval::new(0, 0),
+            decision: RobustDecision::DoNotAct,
+        };
+        let report = evaluate_partial_identification(
+            &scenario, &oracle, &trace, &PartialIdentificationPolicy::default(),
+        );
+        assert_eq!(report.path_interception_candidate_count, 1);
+        assert_eq!(report.path_interception_confirmed_count, 0);
+        assert_eq!(report.path_interception_disagreement_count, 1);
+        assert!(report.findings.iter().any(|f| {
+            f.code == PartialIdentificationFindingCode::GraphPruningCertificateDisagreement
+        }));
+        assert_eq!(report.qualification, PartialIdentificationQualification::Qualified);
     }
 
     #[test]
