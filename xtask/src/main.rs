@@ -7,6 +7,7 @@ mod electrochemical_capacitor;
 mod edlc_standby_service;
 mod edlc_mission_readiness;
 mod edlc_sequential_reserve;
+mod edlc_trace_evidence;
 mod manifest;
 mod rhn_sweep;
 
@@ -74,6 +75,8 @@ enum Commands {
     EdlcMissionReadinessAudit,
     /// Audit sequential EDLC reserve service, inter-call recovery and false-ready outcomes.
     EdlcSequentialReserveAudit,
+    /// Verify EDLC raw trace evidence receipt, artifact digests and provenance cross-links.
+    EdlcTraceEvidenceAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -145,6 +148,13 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
             edlc_sequential_reserve::audit(&root)?;
+        }
+        Commands::EdlcTraceEvidenceAudit => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            edlc_trace_evidence::audit(&root)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
