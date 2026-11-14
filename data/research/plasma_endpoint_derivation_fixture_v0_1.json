@@ -1,0 +1,3953 @@
+{
+  "schema_version": "plasma-endpoint-derivation-fixture-v0.1",
+  "cases": [
+    {
+      "id": "valid-direct-lap-shear",
+      "payload": {
+        "kind": "direct_observation",
+        "receipt": {
+          "endpoint_id": "apparent_shear_strength",
+          "quantity_unit": "MPa",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dc1",
+          "value": 12.4,
+          "scope_evidence": {
+            "id": "DIRECT-D3163",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-ASTM_D3163",
+            "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dc0",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "DIRECT-1",
+              "DIRECT-2"
+            ]
+          }
+        }
+      },
+      "expected_disposition": "PASS",
+      "expected_outcome": "DIRECT_OBSERVATION_VALID",
+      "rationale": "Direct joint-strength observation has the exact D3163 method and endpoint scope."
+    },
+    {
+      "id": "direct-endpoint-substituted",
+      "payload": {
+        "kind": "direct_observation",
+        "receipt": {
+          "endpoint_id": "apparent_shear_strength",
+          "quantity_unit": "MPa",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dc2",
+          "value": 12.4,
+          "scope_evidence": {
+            "id": "DIRECT-D3163",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "water_contact_angle",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PROTO-ASTM_D3163",
+            "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dc0",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "DIRECT-1",
+              "DIRECT-2"
+            ]
+          }
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Direct endpoint cannot be relabelled when the method receipt reports another endpoint."
+    },
+    {
+      "id": "valid-aged-strength-retention",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005dd3",
+        "design_id": "RET-VALID-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005dd4",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005dc3",
+          "initial": {
+            "receipt_id": "RET-VALID-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dc4",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dc5",
+            "scope_evidence": {
+              "id": "RET-VALID-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dc6",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-VALID-BASE-I-1",
+                "RET-VALID-BASE-I-2",
+                "RET-VALID-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-VALID-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-VALID-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-VALID-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-VALID-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dc7",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dc8",
+            "scope_evidence": {
+              "id": "RET-VALID-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dc9",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-VALID-BASE-A-1",
+                "RET-VALID-BASE-A-2",
+                "RET-VALID-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-VALID-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-VALID-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-VALID-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-VALID-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dca",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-VALID-BASE-A-1",
+                "RET-VALID-BASE-A-2",
+                "RET-VALID-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005dcb",
+          "initial": {
+            "receipt_id": "RET-VALID-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dcc",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dcd",
+            "scope_evidence": {
+              "id": "RET-VALID-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dce",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-VALID-CAND-I-1",
+                "RET-VALID-CAND-I-2",
+                "RET-VALID-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-VALID-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-VALID-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-VALID-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-VALID-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dcf",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dd0",
+            "scope_evidence": {
+              "id": "RET-VALID-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dd1",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-VALID-CAND-A-1",
+                "RET-VALID-CAND-A-2",
+                "RET-VALID-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-VALID-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-VALID-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-VALID-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-VALID-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dd2",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-VALID-CAND-A-1",
+                "RET-VALID-CAND-A-2",
+                "RET-VALID-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-VALID-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dd5",
+          "design_id": "RET-VALID-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005dd4",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005dd3",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dd6",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "PASS",
+      "expected_outcome": "EQUIVALENCE_ESTABLISHED",
+      "rationale": "Ratio-of-means retention uses distinct destructive initial/aged specimens, matched lot clusters, D1151 conditioning and D3163 strength evidence."
+    },
+    {
+      "id": "initial-aged-destructive-specimen-overlap",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005de7",
+        "design_id": "RET-SAME-SPECIMEN-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005de8",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005dd7",
+          "initial": {
+            "receipt_id": "RET-SAME-SPECIMEN-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dd8",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dd9",
+            "scope_evidence": {
+              "id": "RET-SAME-SPECIMEN-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dda",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-SAME-SPECIMEN-BASE-I-1",
+                "RET-SAME-SPECIMEN-BASE-I-2",
+                "RET-SAME-SPECIMEN-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-SAME-SPECIMEN-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005ddb",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ddc",
+            "scope_evidence": {
+              "id": "RET-SAME-SPECIMEN-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ddd",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-SAME-SPECIMEN-BASE-A-1",
+                "RET-SAME-SPECIMEN-BASE-A-2",
+                "RET-SAME-SPECIMEN-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-SAME-SPECIMEN-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dde",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-SAME-SPECIMEN-BASE-A-1",
+                "RET-SAME-SPECIMEN-BASE-A-2",
+                "RET-SAME-SPECIMEN-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005ddf",
+          "initial": {
+            "receipt_id": "RET-SAME-SPECIMEN-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005de0",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005de1",
+            "scope_evidence": {
+              "id": "RET-SAME-SPECIMEN-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005de2",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-SAME-SPECIMEN-CAND-I-1",
+                "RET-SAME-SPECIMEN-CAND-I-2",
+                "RET-SAME-SPECIMEN-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-SAME-SPECIMEN-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005de3",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005de4",
+            "scope_evidence": {
+              "id": "RET-SAME-SPECIMEN-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005de5",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-SAME-SPECIMEN-CAND-I-1",
+                "RET-SAME-SPECIMEN-CAND-I-2",
+                "RET-SAME-SPECIMEN-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-SAME-SPECIMEN-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-SAME-SPECIMEN-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005de6",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-SAME-SPECIMEN-CAND-I-1",
+                "RET-SAME-SPECIMEN-CAND-I-2",
+                "RET-SAME-SPECIMEN-CAND-I-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-SAME-SPECIMEN-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005de9",
+          "design_id": "RET-SAME-SPECIMEN-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005de8",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005de7",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dea",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Initial and aged D3163 specimens overlap despite destructive testing; the cohort identities are invalid."
+    },
+    {
+      "id": "retention-formula-substitution",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "mean_of_ratios_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005dfb",
+        "design_id": "RET-WRONG-FORMULA-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005dfc",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005deb",
+          "initial": {
+            "receipt_id": "RET-WRONG-FORMULA-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dec",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ded",
+            "scope_evidence": {
+              "id": "RET-WRONG-FORMULA-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dee",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-WRONG-FORMULA-BASE-I-1",
+                "RET-WRONG-FORMULA-BASE-I-2",
+                "RET-WRONG-FORMULA-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-WRONG-FORMULA-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-WRONG-FORMULA-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005def",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005df0",
+            "scope_evidence": {
+              "id": "RET-WRONG-FORMULA-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005df1",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-WRONG-FORMULA-BASE-A-1",
+                "RET-WRONG-FORMULA-BASE-A-2",
+                "RET-WRONG-FORMULA-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-WRONG-FORMULA-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-WRONG-FORMULA-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005df2",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-WRONG-FORMULA-BASE-A-1",
+                "RET-WRONG-FORMULA-BASE-A-2",
+                "RET-WRONG-FORMULA-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005df3",
+          "initial": {
+            "receipt_id": "RET-WRONG-FORMULA-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005df4",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005df5",
+            "scope_evidence": {
+              "id": "RET-WRONG-FORMULA-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005df6",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-WRONG-FORMULA-CAND-I-1",
+                "RET-WRONG-FORMULA-CAND-I-2",
+                "RET-WRONG-FORMULA-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-WRONG-FORMULA-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-WRONG-FORMULA-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005df7",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005df8",
+            "scope_evidence": {
+              "id": "RET-WRONG-FORMULA-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005df9",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-WRONG-FORMULA-CAND-A-1",
+                "RET-WRONG-FORMULA-CAND-A-2",
+                "RET-WRONG-FORMULA-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-WRONG-FORMULA-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-WRONG-FORMULA-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-WRONG-FORMULA-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005dfa",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-WRONG-FORMULA-CAND-A-1",
+                "RET-WRONG-FORMULA-CAND-A-2",
+                "RET-WRONG-FORMULA-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-WRONG-FORMULA-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005dfd",
+          "design_id": "RET-WRONG-FORMULA-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005dfc",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005dfb",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005dfe",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "A ratio-of-means result cannot be silently relabelled as a mean of specimen ratios."
+    },
+    {
+      "id": "aged-conditioning-receipt-missing",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e0f",
+        "design_id": "RET-MISSING-CONDITION-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e10",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005dff",
+          "initial": {
+            "receipt_id": "RET-MISSING-CONDITION-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e00",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e01",
+            "scope_evidence": {
+              "id": "RET-MISSING-CONDITION-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e02",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-CONDITION-BASE-I-1",
+                "RET-MISSING-CONDITION-BASE-I-2",
+                "RET-MISSING-CONDITION-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-CONDITION-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-MISSING-CONDITION-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e03",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e04",
+            "scope_evidence": {
+              "id": "RET-MISSING-CONDITION-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e05",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-CONDITION-BASE-A-1",
+                "RET-MISSING-CONDITION-BASE-A-2",
+                "RET-MISSING-CONDITION-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-CONDITION-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": null
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e07",
+          "initial": {
+            "receipt_id": "RET-MISSING-CONDITION-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e08",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e09",
+            "scope_evidence": {
+              "id": "RET-MISSING-CONDITION-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e0a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-CONDITION-CAND-I-1",
+                "RET-MISSING-CONDITION-CAND-I-2",
+                "RET-MISSING-CONDITION-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-CONDITION-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-MISSING-CONDITION-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e0b",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e0c",
+            "scope_evidence": {
+              "id": "RET-MISSING-CONDITION-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e0d",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-CONDITION-CAND-A-1",
+                "RET-MISSING-CONDITION-CAND-A-2",
+                "RET-MISSING-CONDITION-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-CONDITION-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-CONDITION-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-MISSING-CONDITION-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e0e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-CONDITION-CAND-A-1",
+                "RET-MISSING-CONDITION-CAND-A-2",
+                "RET-MISSING-CONDITION-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-MISSING-CONDITION-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e11",
+          "design_id": "RET-MISSING-CONDITION-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e10",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e0f",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e12",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Aged strength evidence lacks the conditioning practice receipt and exposure lineage."
+    },
+    {
+      "id": "aged-retention-too-few-independent-lots",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e23",
+        "design_id": "RET-INSUFFICIENT-CLUSTERS-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e24",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 4,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e13",
+          "initial": {
+            "receipt_id": "RET-INSUFFICIENT-CLUSTERS-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e14",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e15",
+            "scope_evidence": {
+              "id": "RET-INSUFFICIENT-CLUSTERS-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e16",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-INSUFFICIENT-CLUSTERS-BASE-I-1",
+                "RET-INSUFFICIENT-CLUSTERS-BASE-I-2",
+                "RET-INSUFFICIENT-CLUSTERS-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-INSUFFICIENT-CLUSTERS-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e17",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e18",
+            "scope_evidence": {
+              "id": "RET-INSUFFICIENT-CLUSTERS-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e19",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-INSUFFICIENT-CLUSTERS-BASE-A-1",
+                "RET-INSUFFICIENT-CLUSTERS-BASE-A-2",
+                "RET-INSUFFICIENT-CLUSTERS-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-INSUFFICIENT-CLUSTERS-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e1a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-INSUFFICIENT-CLUSTERS-BASE-A-1",
+                "RET-INSUFFICIENT-CLUSTERS-BASE-A-2",
+                "RET-INSUFFICIENT-CLUSTERS-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e1b",
+          "initial": {
+            "receipt_id": "RET-INSUFFICIENT-CLUSTERS-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e1c",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e1d",
+            "scope_evidence": {
+              "id": "RET-INSUFFICIENT-CLUSTERS-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e1e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-INSUFFICIENT-CLUSTERS-CAND-I-1",
+                "RET-INSUFFICIENT-CLUSTERS-CAND-I-2",
+                "RET-INSUFFICIENT-CLUSTERS-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-INSUFFICIENT-CLUSTERS-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e1f",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e20",
+            "scope_evidence": {
+              "id": "RET-INSUFFICIENT-CLUSTERS-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e21",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-INSUFFICIENT-CLUSTERS-CAND-A-1",
+                "RET-INSUFFICIENT-CLUSTERS-CAND-A-2",
+                "RET-INSUFFICIENT-CLUSTERS-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-INSUFFICIENT-CLUSTERS-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-INSUFFICIENT-CLUSTERS-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e22",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-INSUFFICIENT-CLUSTERS-CAND-A-1",
+                "RET-INSUFFICIENT-CLUSTERS-CAND-A-2",
+                "RET-INSUFFICIENT-CLUSTERS-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-INSUFFICIENT-CLUSTERS-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e25",
+          "design_id": "RET-INSUFFICIENT-CLUSTERS-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e24",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e23",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e26",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Many coupons cannot compensate for fewer independent manufacturing lots than the frozen minimum."
+    },
+    {
+      "id": "aged-retention-material-scope-mismatch",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e37",
+        "design_id": "RET-PROFILE-MISMATCH-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e38",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e27",
+          "initial": {
+            "receipt_id": "RET-PROFILE-MISMATCH-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e28",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e29",
+            "scope_evidence": {
+              "id": "RET-PROFILE-MISMATCH-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e2a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-PROFILE-MISMATCH-BASE-I-1",
+                "RET-PROFILE-MISMATCH-BASE-I-2",
+                "RET-PROFILE-MISMATCH-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-PROFILE-MISMATCH-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e2b",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e2c",
+            "scope_evidence": {
+              "id": "RET-PROFILE-MISMATCH-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e2d",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-PROFILE-MISMATCH-BASE-A-1",
+                "RET-PROFILE-MISMATCH-BASE-A-2",
+                "RET-PROFILE-MISMATCH-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-PROFILE-MISMATCH-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e2e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-PROFILE-MISMATCH-BASE-A-1",
+                "RET-PROFILE-MISMATCH-BASE-A-2",
+                "RET-PROFILE-MISMATCH-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e27",
+          "initial": {
+            "receipt_id": "RET-PROFILE-MISMATCH-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e30",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e31",
+            "scope_evidence": {
+              "id": "RET-PROFILE-MISMATCH-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e32",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-PROFILE-MISMATCH-CAND-I-1",
+                "RET-PROFILE-MISMATCH-CAND-I-2",
+                "RET-PROFILE-MISMATCH-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-PROFILE-MISMATCH-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e33",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e34",
+            "scope_evidence": {
+              "id": "RET-PROFILE-MISMATCH-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "frp_to_frp",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e35",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-PROFILE-MISMATCH-CAND-A-1",
+                "RET-PROFILE-MISMATCH-CAND-A-2",
+                "RET-PROFILE-MISMATCH-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-PROFILE-MISMATCH-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-PROFILE-MISMATCH-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e36",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-PROFILE-MISMATCH-CAND-A-1",
+                "RET-PROFILE-MISMATCH-CAND-A-2",
+                "RET-PROFILE-MISMATCH-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-PROFILE-MISMATCH-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e39",
+          "design_id": "RET-PROFILE-MISMATCH-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e38",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e37",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e3a",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Candidate aged observations are outside the same exact material-pair method scope."
+    },
+    {
+      "id": "aged-retention-result-arithmetic-mismatch",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e4b",
+        "design_id": "RET-RESULT-MISMATCH-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e4c",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e3b",
+          "initial": {
+            "receipt_id": "RET-RESULT-MISMATCH-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e3c",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e3d",
+            "scope_evidence": {
+              "id": "RET-RESULT-MISMATCH-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e3e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-RESULT-MISMATCH-BASE-I-1",
+                "RET-RESULT-MISMATCH-BASE-I-2",
+                "RET-RESULT-MISMATCH-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-RESULT-MISMATCH-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e3f",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e40",
+            "scope_evidence": {
+              "id": "RET-RESULT-MISMATCH-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e41",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-RESULT-MISMATCH-BASE-A-1",
+                "RET-RESULT-MISMATCH-BASE-A-2",
+                "RET-RESULT-MISMATCH-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-RESULT-MISMATCH-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e42",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-RESULT-MISMATCH-BASE-A-1",
+                "RET-RESULT-MISMATCH-BASE-A-2",
+                "RET-RESULT-MISMATCH-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e43",
+          "initial": {
+            "receipt_id": "RET-RESULT-MISMATCH-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e44",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e45",
+            "scope_evidence": {
+              "id": "RET-RESULT-MISMATCH-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e46",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-RESULT-MISMATCH-CAND-I-1",
+                "RET-RESULT-MISMATCH-CAND-I-2",
+                "RET-RESULT-MISMATCH-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-RESULT-MISMATCH-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e47",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e48",
+            "scope_evidence": {
+              "id": "RET-RESULT-MISMATCH-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e49",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-RESULT-MISMATCH-CAND-A-1",
+                "RET-RESULT-MISMATCH-CAND-A-2",
+                "RET-RESULT-MISMATCH-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-RESULT-MISMATCH-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-RESULT-MISMATCH-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e4a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-RESULT-MISMATCH-CAND-A-1",
+                "RET-RESULT-MISMATCH-CAND-A-2",
+                "RET-RESULT-MISMATCH-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-RESULT-MISMATCH-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e4d",
+          "design_id": "RET-RESULT-MISMATCH-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e4c",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e4b",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e4e",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.95,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The reported ratio does not reconcile to the referenced initial and aged means."
+    },
+    {
+      "id": "aged-retention-plan-digest-missing",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e5f",
+        "design_id": "RET-MISSING-PLAN-DESIGN",
+        "plan_sha256": "",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e4f",
+          "initial": {
+            "receipt_id": "RET-MISSING-PLAN-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e50",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e51",
+            "scope_evidence": {
+              "id": "RET-MISSING-PLAN-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e52",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-PLAN-BASE-I-1",
+                "RET-MISSING-PLAN-BASE-I-2",
+                "RET-MISSING-PLAN-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-PLAN-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-MISSING-PLAN-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e53",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e54",
+            "scope_evidence": {
+              "id": "RET-MISSING-PLAN-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e55",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-PLAN-BASE-A-1",
+                "RET-MISSING-PLAN-BASE-A-2",
+                "RET-MISSING-PLAN-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-PLAN-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-MISSING-PLAN-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e56",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-PLAN-BASE-A-1",
+                "RET-MISSING-PLAN-BASE-A-2",
+                "RET-MISSING-PLAN-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e57",
+          "initial": {
+            "receipt_id": "RET-MISSING-PLAN-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e58",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e59",
+            "scope_evidence": {
+              "id": "RET-MISSING-PLAN-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e5a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-PLAN-CAND-I-1",
+                "RET-MISSING-PLAN-CAND-I-2",
+                "RET-MISSING-PLAN-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-PLAN-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-MISSING-PLAN-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e5b",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e5c",
+            "scope_evidence": {
+              "id": "RET-MISSING-PLAN-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e5d",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-PLAN-CAND-A-1",
+                "RET-MISSING-PLAN-CAND-A-2",
+                "RET-MISSING-PLAN-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-MISSING-PLAN-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-MISSING-PLAN-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-MISSING-PLAN-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e5e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-MISSING-PLAN-CAND-A-1",
+                "RET-MISSING-PLAN-CAND-A-2",
+                "RET-MISSING-PLAN-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-MISSING-PLAN-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e61",
+          "design_id": "RET-MISSING-PLAN-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e60",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e5f",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e62",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Derived result is not bound to an immutable preregistered plan digest."
+    },
+    {
+      "id": "aged-retention-zero-denominator",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e73",
+        "design_id": "RET-NONPOSITIVE-DENOMINATOR-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e74",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e63",
+          "initial": {
+            "receipt_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e64",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e65",
+            "scope_evidence": {
+              "id": "RET-NONPOSITIVE-DENOMINATOR-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e66",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-I-1",
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-I-2",
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 0,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e67",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e68",
+            "scope_evidence": {
+              "id": "RET-NONPOSITIVE-DENOMINATOR-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e69",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-A-1",
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-A-2",
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-NONPOSITIVE-DENOMINATOR-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e6a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-A-1",
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-A-2",
+                "RET-NONPOSITIVE-DENOMINATOR-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e6b",
+          "initial": {
+            "receipt_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e6c",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e6d",
+            "scope_evidence": {
+              "id": "RET-NONPOSITIVE-DENOMINATOR-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e6e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-I-1",
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-I-2",
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e6f",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e70",
+            "scope_evidence": {
+              "id": "RET-NONPOSITIVE-DENOMINATOR-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e71",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-A-1",
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-A-2",
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-A-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-NONPOSITIVE-DENOMINATOR-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-NONPOSITIVE-DENOMINATOR-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e72",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-A-1",
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-A-2",
+                "RET-NONPOSITIVE-DENOMINATOR-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-NONPOSITIVE-DENOMINATOR-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e75",
+          "design_id": "RET-NONPOSITIVE-DENOMINATOR-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e74",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e73",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e76",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "A zero initial mean makes the ratio-of-means undefined and must not be silently repaired."
+    },
+    {
+      "id": "aged-retention-initial-aged-cluster-map-mismatch",
+      "payload": {
+        "kind": "aged_strength_retention",
+        "endpoint_id": "aged_strength_retention",
+        "estimand": "candidate_minus_baseline_ratio_of_means",
+        "quantity_unit": "dimensionless",
+        "formula_id": "ratio_of_means_v1",
+        "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e87",
+        "design_id": "RET-CLUSTER-PAIR-MISMATCH-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e88",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e77",
+          "initial": {
+            "receipt_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e78",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e79",
+            "scope_evidence": {
+              "id": "RET-CLUSTER-PAIR-MISMATCH-BASE-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e7a",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-I-1",
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-I-2",
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-I-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-I-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-I-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e7b",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e7c",
+            "scope_evidence": {
+              "id": "RET-CLUSTER-PAIR-MISMATCH-BASE-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e7d",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-A-1",
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-A-2",
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-A-1",
+                "cluster_id": "B-LOT-1"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-A-2",
+                "cluster_id": "B-LOT-2"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-BASE-A-3",
+                "cluster_id": "B-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 8,
+            "conditioning_receipt": {
+              "id": "RET-CLUSTER-PAIR-MISMATCH-BASE-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e7e",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-A-1",
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-A-2",
+                "RET-CLUSTER-PAIR-MISMATCH-BASE-A-3"
+              ]
+            }
+          }
+        },
+        "candidate": {
+          "profile_sha256": "0000000000000000000000000000000000000000000000000000000000005e7f",
+          "initial": {
+            "receipt_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-INITIAL",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e80",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e81",
+            "scope_evidence": {
+              "id": "RET-CLUSTER-PAIR-MISMATCH-CAND-INITIAL-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e82",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-I-1",
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-I-2",
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-I-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-I-1",
+                "cluster_id": "C-LOT-1"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-I-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-I-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 10,
+            "conditioning_receipt": null
+          },
+          "aged": {
+            "receipt_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-AGED",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e83",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e84",
+            "scope_evidence": {
+              "id": "RET-CLUSTER-PAIR-MISMATCH-CAND-AGED-D3163",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PROTO-ASTM_D3163",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e85",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-A-1",
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-A-2",
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-A-3"
+              ]
+            },
+            "samples": [
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-A-1",
+                "cluster_id": "C-LOT-X"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-A-2",
+                "cluster_id": "C-LOT-2"
+              },
+              {
+                "specimen_id": "RET-CLUSTER-PAIR-MISMATCH-CAND-A-3",
+                "cluster_id": "C-LOT-3"
+              }
+            ],
+            "mean_strength_mpa": 7.8,
+            "conditioning_receipt": {
+              "id": "RET-CLUSTER-PAIR-MISMATCH-CAND-AGED-D1151",
+              "method_id": "ASTM_D1151",
+              "edition": "D1151-00R22",
+              "evidence_kind": "conditioning_practice",
+              "material_pair_class": "adhesive_bonded_specimens",
+              "geometry": "continuous_environmental_conditioning",
+              "endpoint": "moisture_temperature_exposure_protocol",
+              "requested_claim": "conditioning_protocol_reference",
+              "protocol_id": "PROTO-ASTM_D1151",
+              "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e86",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-A-1",
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-A-2",
+                "RET-CLUSTER-PAIR-MISMATCH-CAND-A-3"
+              ]
+            }
+          }
+        },
+        "result": {
+          "result_id": "RET-CLUSTER-PAIR-MISMATCH-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e89",
+          "design_id": "RET-CLUSTER-PAIR-MISMATCH-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e88",
+          "formula_sha256": "0000000000000000000000000000000000000000000000000000000000005e87",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e8a",
+          "baseline_retention": 0.8,
+          "candidate_retention": 0.78,
+          "candidate_minus_baseline": -0.02,
+          "ci_lower": -0.04,
+          "ci_upper": 0,
+          "margin_lower": -0.05,
+          "margin_upper": 0.05,
+          "outcome": "EQUIVALENCE_ESTABLISHED"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Initial and aged cohorts within an arm do not share the same preregistered lot-cluster pairing."
+    },
+    {
+      "id": "valid-failure-mode-fraction-includes-unknown",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e8d",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-VALID-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e8e",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-VALID-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e8b",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-VALID-B-1",
+            "FAIL-VALID-B-2",
+            "FAIL-VALID-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-VALID-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e8c",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-VALID-C-1",
+            "FAIL-VALID-C-2",
+            "FAIL-VALID-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-VALID-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-VALID-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-VALID-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-VALID-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-VALID-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-VALID-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-VALID-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e8f",
+          "design_id": "FAIL-VALID-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e8e",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e8d",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e90",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "PASS",
+      "expected_outcome": "EQUIVALENCE_ESTABLISHED",
+      "rationale": "The D5573 SMC classification fraction counts unknown/unclassifiable specimens in the explicit denominator."
+    },
+    {
+      "id": "unknown-failure-mode-omitted-from-denominator",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e93",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-UNKNOWN-OMITTED-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e94",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-UNKNOWN-OMITTED-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e91",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-UNKNOWN-OMITTED-B-1",
+            "FAIL-UNKNOWN-OMITTED-B-2",
+            "FAIL-UNKNOWN-OMITTED-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-UNKNOWN-OMITTED-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e92",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-UNKNOWN-OMITTED-C-1",
+            "FAIL-UNKNOWN-OMITTED-C-2",
+            "FAIL-UNKNOWN-OMITTED-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-UNKNOWN-OMITTED-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-OMITTED-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-OMITTED-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-UNKNOWN-OMITTED-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-OMITTED-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-OMITTED-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-UNKNOWN-OMITTED-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e95",
+          "design_id": "FAIL-UNKNOWN-OMITTED-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e94",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e93",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e96",
+          "baseline_numerator": 1,
+          "baseline_denominator": 2,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The reported denominator silently omits the unknown/unclassifiable specimen."
+    },
+    {
+      "id": "d5573-on-polypropylene-blocked",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e99",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-PP-SCOPE-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e9a",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-PP-SCOPE-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e97",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-PP-SCOPE-B-1",
+            "FAIL-PP-SCOPE-B-2",
+            "FAIL-PP-SCOPE-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-PP-SCOPE-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "rigid_plastic_pair",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e98",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-PP-SCOPE-C-1",
+            "FAIL-PP-SCOPE-C-2",
+            "FAIL-PP-SCOPE-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-PP-SCOPE-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-PP-SCOPE-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-PP-SCOPE-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-PP-SCOPE-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-PP-SCOPE-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-PP-SCOPE-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-PP-SCOPE-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005e9b",
+          "design_id": "FAIL-PP-SCOPE-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005e9a",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e99",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005e9c",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "D5573 was developed for the SMC FRP family and does not establish a failure-mode taxonomy for polypropylene joints."
+    },
+    {
+      "id": "failure-fraction-acceptability-escalation",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e9f",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-ACCEPTABILITY-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ea0",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-ACCEPTABILITY-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e9d",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-ACCEPTABILITY-B-1",
+            "FAIL-ACCEPTABILITY-B-2",
+            "FAIL-ACCEPTABILITY-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-ACCEPTABILITY-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005e9e",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-ACCEPTABILITY-C-1",
+            "FAIL-ACCEPTABILITY-C-2",
+            "FAIL-ACCEPTABILITY-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-ACCEPTABILITY-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-ACCEPTABILITY-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-ACCEPTABILITY-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-ACCEPTABILITY-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-ACCEPTABILITY-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-ACCEPTABILITY-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-ACCEPTABILITY-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005ea1",
+          "design_id": "FAIL-ACCEPTABILITY-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ea0",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005e9f",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ea2",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "failure_mode_acceptability"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "A descriptive classification fraction cannot establish failure-mode acceptability."
+    },
+    {
+      "id": "duplicate-failure-classification-specimen",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ea5",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-DUPLICATE-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ea6",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-DUPLICATE-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ea3",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-DUPLICATE-B-1",
+            "FAIL-DUPLICATE-B-2",
+            "FAIL-DUPLICATE-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-DUPLICATE-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ea4",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-DUPLICATE-C-1",
+            "FAIL-DUPLICATE-C-2",
+            "FAIL-DUPLICATE-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-DUPLICATE-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-DUPLICATE-B-1",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-DUPLICATE-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-DUPLICATE-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-DUPLICATE-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-DUPLICATE-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-DUPLICATE-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005ea7",
+          "design_id": "FAIL-DUPLICATE-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ea6",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ea5",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ea8",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "A single specimen cannot be counted twice in the failure-mode denominator."
+    },
+    {
+      "id": "multi-rater-disagreement-without-adjudication",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eab",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-RATER-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eac",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-RATER-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ea9",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-RATER-B-1",
+            "FAIL-RATER-B-2",
+            "FAIL-RATER-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-RATER-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005eaa",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-RATER-C-1",
+            "FAIL-RATER-C-2",
+            "FAIL-RATER-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-RATER-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-RATER-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-RATER-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-RATER-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 2,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-RATER-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-RATER-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-RATER-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005ead",
+          "design_id": "FAIL-RATER-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eac",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eab",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005eae",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Multiple raters without an adjudication receipt leave the specimen-level class unresolved."
+    },
+    {
+      "id": "failure-fraction-numerator-mismatch",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eb1",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-NUMERATOR-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eb2",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-NUMERATOR-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005eaf",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-NUMERATOR-B-1",
+            "FAIL-NUMERATOR-B-2",
+            "FAIL-NUMERATOR-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-NUMERATOR-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005eb0",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-NUMERATOR-C-1",
+            "FAIL-NUMERATOR-C-2",
+            "FAIL-NUMERATOR-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-NUMERATOR-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-NUMERATOR-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-NUMERATOR-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-NUMERATOR-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-NUMERATOR-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-NUMERATOR-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-NUMERATOR-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005eb3",
+          "design_id": "FAIL-NUMERATOR-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eb2",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eb1",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005eb4",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 3,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Numerator does not equal the number of classified specimens in the declared category."
+    },
+    {
+      "id": "failure-taxonomy-result-digest-mismatch",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eb7",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-TAXONOMY-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eb8",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-TAXONOMY-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005eb5",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-TAXONOMY-B-1",
+            "FAIL-TAXONOMY-B-2",
+            "FAIL-TAXONOMY-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-TAXONOMY-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005eb6",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-TAXONOMY-C-1",
+            "FAIL-TAXONOMY-C-2",
+            "FAIL-TAXONOMY-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-TAXONOMY-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TAXONOMY-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TAXONOMY-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-TAXONOMY-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TAXONOMY-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TAXONOMY-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-TAXONOMY-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005eb9",
+          "design_id": "FAIL-TAXONOMY-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005eb8",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ebb",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005eba",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The result points to a different taxonomy version/digest from the frozen classification plan."
+    },
+    {
+      "id": "failure-result-digest-missing",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ebe",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-MISSING-DIGEST-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ebf",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-MISSING-DIGEST-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ebc",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-MISSING-DIGEST-B-1",
+            "FAIL-MISSING-DIGEST-B-2",
+            "FAIL-MISSING-DIGEST-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-MISSING-DIGEST-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ebd",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-MISSING-DIGEST-C-1",
+            "FAIL-MISSING-DIGEST-C-2",
+            "FAIL-MISSING-DIGEST-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-MISSING-DIGEST-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-MISSING-DIGEST-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-MISSING-DIGEST-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-MISSING-DIGEST-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-MISSING-DIGEST-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-MISSING-DIGEST-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-MISSING-DIGEST-RESULT",
+          "result_sha256": "bad",
+          "design_id": "FAIL-MISSING-DIGEST-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ebf",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ebe",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ec1",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The aggregate result has no valid digest."
+    },
+    {
+      "id": "unknown-mixed-with-known-class-rejected",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ec4",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-UNKNOWN-MIXED-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ec5",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 3,
+        "baseline_scope_evidence": {
+          "id": "FAIL-UNKNOWN-MIXED-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ec2",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-UNKNOWN-MIXED-B-1",
+            "FAIL-UNKNOWN-MIXED-B-2",
+            "FAIL-UNKNOWN-MIXED-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-UNKNOWN-MIXED-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ec3",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-UNKNOWN-MIXED-C-1",
+            "FAIL-UNKNOWN-MIXED-C-2",
+            "FAIL-UNKNOWN-MIXED-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-UNKNOWN-MIXED-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-MIXED-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-MIXED-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable",
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-UNKNOWN-MIXED-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-MIXED-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-UNKNOWN-MIXED-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-UNKNOWN-MIXED-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005ec6",
+          "design_id": "FAIL-UNKNOWN-MIXED-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ec5",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005ec4",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ec7",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "An unclassifiable specimen cannot simultaneously count as a known failure category."
+    },
+    {
+      "id": "failure-mode-fraction-too-few-lots",
+      "payload": {
+        "kind": "failure_mode_fraction",
+        "endpoint_id": "failure_mode_fraction",
+        "estimand": "candidate_minus_baseline_specimen_fraction",
+        "quantity_unit": "fraction",
+        "taxonomy_id": "ASTM-D5573-SMC-TAXONOMY-v1",
+        "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eca",
+        "category_id": "adhesive_failure",
+        "denominator_policy": "all_tested_specimens_including_unknown",
+        "grouping_scheme": "independent_arms",
+        "design_id": "FAIL-TOO-FEW-LOTS-DESIGN",
+        "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ecb",
+        "frozen_at": 100,
+        "first_outcome_available_at": 200,
+        "minimum_independent_clusters": 4,
+        "baseline_scope_evidence": {
+          "id": "FAIL-TOO-FEW-LOTS-B-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ec8",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-TOO-FEW-LOTS-B-1",
+            "FAIL-TOO-FEW-LOTS-B-2",
+            "FAIL-TOO-FEW-LOTS-B-3"
+          ]
+        },
+        "candidate_scope_evidence": {
+          "id": "FAIL-TOO-FEW-LOTS-C-D5573",
+          "method_id": "ASTM_D5573",
+          "edition": "D5573-99R19",
+          "evidence_kind": "classification_practice",
+          "material_pair_class": "frp_smc_joint",
+          "geometry": "failure_surface_classification",
+          "endpoint": "frp_joint_failure_mode_classification",
+          "requested_claim": "failure_mode_classification_reference",
+          "protocol_id": "PROTO-ASTM_D5573",
+          "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000005ec9",
+          "suitability_review_sha256": null,
+          "specimen_ids": [
+            "FAIL-TOO-FEW-LOTS-C-1",
+            "FAIL-TOO-FEW-LOTS-C-2",
+            "FAIL-TOO-FEW-LOTS-C-3"
+          ]
+        },
+        "baseline": [
+          {
+            "specimen_id": "FAIL-TOO-FEW-LOTS-B-1",
+            "cluster_id": "B-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TOO-FEW-LOTS-B-2",
+            "cluster_id": "B-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TOO-FEW-LOTS-B-3",
+            "cluster_id": "B-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "candidate": [
+          {
+            "specimen_id": "FAIL-TOO-FEW-LOTS-C-1",
+            "cluster_id": "C-LOT-1",
+            "category_ids": [
+              "adhesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TOO-FEW-LOTS-C-2",
+            "cluster_id": "C-LOT-2",
+            "category_ids": [
+              "cohesive_failure"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          },
+          {
+            "specimen_id": "FAIL-TOO-FEW-LOTS-C-3",
+            "cluster_id": "C-LOT-3",
+            "category_ids": [
+              "unknown_unclassifiable"
+            ],
+            "rater_count": 1,
+            "adjudication_sha256": null
+          }
+        ],
+        "result": {
+          "result_id": "FAIL-TOO-FEW-LOTS-RESULT",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000005ecc",
+          "design_id": "FAIL-TOO-FEW-LOTS-DESIGN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000005ecb",
+          "taxonomy_sha256": "0000000000000000000000000000000000000000000000000000000000005eca",
+          "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000005ecd",
+          "baseline_numerator": 1,
+          "baseline_denominator": 3,
+          "candidate_numerator": 1,
+          "candidate_denominator": 3,
+          "baseline_fraction": 0.3333333333333333,
+          "candidate_fraction": 0.3333333333333333,
+          "candidate_minus_baseline": 0,
+          "ci_lower": -0.1,
+          "ci_upper": 0.1,
+          "margin_lower": -0.2,
+          "margin_upper": 0.2,
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "descriptive_fraction_only"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "The classified cohort has fewer independent lot clusters than the preregistered minimum."
+    }
+  ]
+}
