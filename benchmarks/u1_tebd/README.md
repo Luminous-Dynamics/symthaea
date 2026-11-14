@@ -1,6 +1,24 @@
 # U(1)-MPS cross-implementation baseline runners
 
-These scripts implement the same fixed-charge nearest-neighbour Hamiltonian and the same second-order even/odd/even Strang gate ordering in two independent MPS libraries.
+These runners implement the same fixed-charge nearest-neighbour Hamiltonian and the same second-order even/odd/even Strang gate ordering in three paths: the production Symthaea Rust implementation, Quimb CircuitMPS, and ITensorMPS.
+
+
+## Symthaea production Rust implementation
+
+The standalone Rust runner compiles the exact production `u1_mps.rs` source via a path module; it does not reimplement MPS or TEBD. This keeps the benchmark runnable even when unrelated root-workspace members prevent whole-workspace Cargo metadata resolution.
+
+From the repository root:
+
+```bash
+cargo fmt --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml -- --check
+cargo clippy --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml --all-targets -- -D warnings
+cargo run --release --manifest-path benchmarks/u1_tebd/external/symthaea/Cargo.toml -- \
+  --case u1-two-site-hopping-known-answer --track fixed_bond \
+  --warmups 5 --repeats 20 \
+  --output benchmarks/u1_tebd/results/symthaea-two-site.json
+```
+
+The runner times `U1TeBDStrangStepper::step` only. Gate-unitarity/charge residual checks and dense discrete/continuous oracles are measured outside the timed region. The receipt includes observed bond dimension, local and gauge-weighted global error bounds, whether the global bound was qualified, and both dense-oracle errors for the small cases. The global bound is not inferred from local discarded weight: it is emitted only when the production canonical-gauge receipts qualify.
 
 ## Quimb baseline
 
