@@ -1,7 +1,7 @@
 //! Exact small-instance oracle for user-declared wardrobe coverage tasks.
 //!
 //! The optimizer does not infer what a person should wear. Callers provide
-//! explicit needs, compatible garment/repair options, user costs and a policy.
+//! explicit needs, compatible garment/repair options, user costs in one declared currency and a policy.
 //! The result is a Pareto set; no universal style or sustainability score is
 //! computed. This crate does not verify garment condition, fit or safety.
 
@@ -51,13 +51,14 @@ pub struct WardrobeChoice {
     pub id: String,
     pub covers_need_ids: BTreeSet<String>,
     pub origin: ChoiceOrigin,
-    pub cost_cents: u64,
+    pub cost_minor_units: u64,
+    pub currency_code: String,
     pub effort_minutes: u64,
     pub usable: bool,
     pub must_keep: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WardrobePolicy {
     /// False forbids any new-to-wardrobe acquisition, including borrowing,
     /// renting and second-hand acquisition. Owned items, repairs and
@@ -67,13 +68,17 @@ pub struct WardrobePolicy {
     /// acquisition, but is not automatically counted as newly manufactured
     /// because its production timing is not established by this model.
     pub allow_made_to_order: bool,
+    /// ISO 4217-style uppercase currency code for every choice cost.
+    /// The caller is responsible for confirming the code is currently valid.
+    pub currency_code: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlanMetrics {
     pub added_items: u64,
     pub newly_manufactured_items: u64,
-    pub cost_cents: u64,
+    pub cost_minor_units: u64,
+    pub currency_code: String,
     pub effort_minutes: u64,
     pub selected_choices: u64,
 }
@@ -98,6 +103,8 @@ pub enum WardrobeError {
     TooManyOptionalChoices { actual: usize, maximum: usize },
     EmptyNeedId,
     EmptyChoiceId,
+    InvalidCurrencyCode(String),
+    MixedCurrencyCodes { choice_id: String, expected: String, actual: String },
     DuplicateNeedId(String),
     DuplicateChoiceId(String),
     UnknownNeedReference { choice_id: String, need_id: String },
@@ -110,13 +117,17 @@ pub enum WardrobeError {
 
 /// Enumerate every subset of at most 18 optional choices, preserve every
 /// `must_keep` choice, enforce user policy, and return the exact Pareto frontier
-/// over acquisition count, made-to-order count, cost, effort and choice count.
+/// over acquisition count, made-to-order count, cost in the declared currency, effort and choice count.
 /// Every metric is minimized. No weighted sum is imposed.
 pub fn search_exact(
     needs: &[WardrobeNeed],
     choices: &[WardrobeChoice],
     policy: WardrobePolicy,
 ) -> Result<ExactSearchResult, WardrobeError> {
+    if !is_currency_code_format(&policy.currency_code) {
+        return Err(WardrobeError::InvalidCurrencyCode(policy.currency_code.clone()));
+    }
+
     if needs.len() > MAX_NEEDS {
         return Err(WardrobeError::TooManyNeeds {
             actual: needs.len(),
@@ -141,6 +152,13 @@ pub fn search_exact(
     let mut optional: Vec<&WardrobeChoice> = Vec::new();
 
     for choice in choices {
+        if choice.currency_code != policy.currency_code {
+            return Err(WardrobeError::MixedCurrencyCodes {
+                choice_id: choice.id.clone(),
+                expected: policy.currency_code.clone(),
+                actual: choice.currency_code.clone(),
+            });
+        }
         if choice.id.trim().is_empty() {
             return Err(WardrobeError::EmptyChoiceId);
         }
@@ -192,7 +210,7 @@ pub fn search_exact(
         (1_u64 << needs.len()) - 1
     };
     let forced_mask = coverage_mask(&forced, &need_bits);
-    let forced_metrics = sum_metrics(&forced)?;
+    let forced_metrics = sum_metrics(&forced, &policy.currency_code)?;
     let subsets = 1_u64 << optional.len();
     let mut frontier: Vec<WardrobePlan> = Vec::new();
     let mut feasible_subsets = 0_u64;
@@ -296,11 +314,12 @@ fn choice_coverage_mask(
     })
 }
 
-fn sum_metrics(choices: &[&WardrobeChoice]) -> Result<PlanMetrics, WardrobeError> {
+fn sum_metrics(choices: &[&WardrobeChoice], currency_code: &str) -> Result<PlanMetrics, WardrobeError> {
     let mut metrics = PlanMetrics {
         added_items: 0,
         newly_manufactured_items: 0,
-        cost_cents: 0,
+        cost_minor_units: 0,
+        currency_code: currency_code.to_owned(),
         effort_minutes: 0,
         selected_choices: 0,
     };
@@ -322,8 +341,8 @@ fn add_choice_metrics(
         .newly_manufactured_items
         .checked_add(if choice.origin.newly_manufactured() { 1 } else { 0 })
         .ok_or(WardrobeError::ArithmeticOverflow)?;
-    metrics.cost_cents = metrics
-        .cost_cents
+    metrics.cost_minor_units = metrics
+        .cost_minor_units
         .checked_add(choice.cost_cents)
         .ok_or(WardrobeError::ArithmeticOverflow)?;
     metrics.effort_minutes = metrics
@@ -337,17 +356,21 @@ fn add_choice_metrics(
     Ok(())
 }
 
+fn is_currency_code_format(value: &str) -> bool {
+    value.len() == 3 && value.bytes().all(|byte| byte.is_ascii_uppercase())
+}
+
 fn dominates(left: &WardrobePlan, right: &WardrobePlan) -> bool {
     let a = &left.metrics;
     let b = &right.metrics;
     let no_worse = a.added_items <= b.added_items
         && a.newly_manufactured_items <= b.newly_manufactured_items
-        && a.cost_cents <= b.cost_cents
+        && a.cost_minor_units <= b.cost_minor_units
         && a.effort_minutes <= b.effort_minutes
         && a.selected_choices <= b.selected_choices;
     let strictly_better = a.added_items < b.added_items
         || a.newly_manufactured_items < b.newly_manufactured_items
-        || a.cost_cents < b.cost_cents
+        || a.cost_minor_units < b.cost_minor_units
         || a.effort_minutes < b.effort_minutes
         || a.selected_choices < b.selected_choices;
     no_worse && strictly_better
@@ -365,14 +388,14 @@ mod tests {
         id: &str,
         covers: &[&str],
         origin: ChoiceOrigin,
-        cost_cents: u64,
+        cost_minor_units: u64,
         effort_minutes: u64,
     ) -> WardrobeChoice {
         WardrobeChoice {
             id: id.to_owned(),
             covers_need_ids: covers.iter().map(|value| (*value).to_owned()).collect(),
             origin,
-            cost_cents,
+            cost_minor_units,
             effort_minutes,
             usable: true,
             must_keep: false,
@@ -389,7 +412,7 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false },
+            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 1);
@@ -404,7 +427,7 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false },
+            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
         );
         assert_eq!(
             result,
@@ -424,7 +447,7 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: true, allow_made_to_order: true },
+            WardrobePolicy { allow_additions: true, allow_made_to_order: true, currency_code: "ZAR".to_owned() },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 2);
@@ -442,7 +465,7 @@ mod tests {
         let result = search_exact(
             &needs,
             &[protected, formal],
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false },
+            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 1);
@@ -455,7 +478,7 @@ mod tests {
         let result = search_exact(
             &[need("office")],
             &[choice("shirt", &["wedding"], ChoiceOrigin::Owned, 0, 0)],
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false },
+            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
         );
         assert_eq!(
             result,
@@ -484,7 +507,7 @@ mod tests {
             search_exact(
                 &needs,
                 &choices,
-                WardrobePolicy { allow_additions: false, allow_made_to_order: false }
+                WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() }
             ),
             Err(WardrobeError::TooManyOptionalChoices { .. })
         ));
@@ -499,7 +522,7 @@ mod tests {
             search_exact(
                 &needs,
                 &[protected],
-                WardrobePolicy { allow_additions: false, allow_made_to_order: false }
+                WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() }
             ),
             Err(WardrobeError::ProtectedAdditionForbidden {
                 choice_id: "new-coat".to_owned(),
@@ -517,7 +540,7 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: true, allow_made_to_order: false },
+            WardrobePolicy { allow_additions: true, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 1);
@@ -533,7 +556,7 @@ mod tests {
             search_exact(
                 &needs,
                 &choices,
-                WardrobePolicy { allow_additions: false, allow_made_to_order: false }
+                WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() }
             ),
             Err(WardrobeError::NoFeasiblePlan {
                 uncovered_need_ids: vec!["rain".to_owned()],
@@ -542,12 +565,46 @@ mod tests {
     }
 
     #[test]
+    fn mixed_currency_choices_are_rejected() {
+        let needs = vec![need("work")];
+        let mut mixed = choice("shirt", &["work"], ChoiceOrigin::Owned, 2500, 10);
+        mixed.currency_code = "USD".to_owned();
+        assert!(matches!(
+            search_exact(
+                &needs,
+                &[mixed],
+                WardrobePolicy {
+                    allow_additions: false,
+                    allow_made_to_order: false,
+                    currency_code: "ZAR".to_owned(),
+                },
+            ),
+            Err(WardrobeError::MixedCurrencyCodes { .. })
+        ));
+    }
+
+    #[test]
+    fn malformed_currency_code_is_rejected() {
+        let result = search_exact(
+            &[need("work")],
+            &[],
+            WardrobePolicy {
+                allow_additions: false,
+                allow_made_to_order: false,
+                currency_code: "zar".to_owned(),
+            },
+        );
+        assert_eq!(result, Err(WardrobeError::InvalidCurrencyCode("zar".to_owned())));
+    }
+
+    #[test]
     fn empty_required_needs_still_preserve_protected_items() {
         let protected = WardrobeChoice {
             id: "archive-coat".to_owned(),
             covers_need_ids: BTreeSet::new(),
             origin: ChoiceOrigin::Owned,
-            cost_cents: 0,
+            cost_minor_units: 0,
+            currency_code: "ZAR".to_owned(),
             effort_minutes: 0,
             usable: false,
             must_keep: true,
@@ -555,7 +612,7 @@ mod tests {
         let result = search_exact(
             &[],
             &[protected],
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false },
+            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
         )
         .unwrap();
         assert_eq!(result.pareto_plans[0].selected_choice_ids, vec!["archive-coat"]);
