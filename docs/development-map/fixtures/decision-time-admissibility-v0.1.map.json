@@ -1,0 +1,800 @@
+{
+  "schema_version": "0.1.0",
+  "map_id": "synthetic:dtea-decision-time-admissibility-v0.1",
+  "repository": {
+    "canonical_name": "synthetic/dtea-release-case",
+    "visibility": "public",
+    "default_branch": "synthetic-main"
+  },
+  "snapshot": {
+    "revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "tree_digest": "cccccccccccccccccccccccccccccccccccccccc",
+    "tree_digest_algorithm": "git_tree_oid_sha1",
+    "observed_at": "2026-11-14T12:00:00Z",
+    "parent_snapshot": null,
+    "source_event_high_watermark": "event-007",
+    "configuration_world": {
+      "map_kind": "synthetic_decision_time_fixture",
+      "target": "x86_64-unknown-linux-gnu",
+      "synthetic_clock": "UTC fixture timeline; not the session wall clock"
+    }
+  },
+  "extractor": {
+    "name": "synthetic-dtea-fixture",
+    "version": "0.1.0",
+    "build_digest": null
+  },
+  "nodes": [
+    {
+      "id": "dtea:project",
+      "type": "project",
+      "label": "Synthetic release decision case",
+      "claim_state": "observed",
+      "attributes": {
+        "purpose": "test decision-time evidence admissibility"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/project",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:50:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:decision:approve",
+      "type": "decision",
+      "label": "Approve release at 10:00Z",
+      "claim_state": "observed",
+      "attributes": {
+        "outcome": "approved",
+        "decision_at": "2026-11-14T10:00:00Z",
+        "actor_id": "release-steward-1",
+        "authority_scope": "release:staging"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/decision/D1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T10:00:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:evidence:E1",
+      "type": "evidence",
+      "label": "CI evidence available before decision",
+      "claim_state": "observed",
+      "attributes": {
+        "kind": "workflow-result",
+        "result": "pass",
+        "source_observed_at": "2026-11-14T09:05:00Z",
+        "available_to_actor_at": "2026-11-14T09:05:00Z",
+        "valid_from": "2026-11-14T08:50:00Z",
+        "valid_through": "2026-11-14T11:50:00Z"
+      },
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:05:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "stale",
+        "supersedes": null,
+        "invalidated_by": "event-006",
+        "reason": "A post-decision correction invalidated this evidence for current decisions; historical decision record remains unchanged."
+      }
+    },
+    {
+      "id": "dtea:evidence:E2",
+      "type": "evidence",
+      "label": "Backdated test result arriving after decision",
+      "claim_state": "observed",
+      "attributes": {
+        "kind": "workflow-result",
+        "result": "pass",
+        "test_occurred_at": "2026-11-14T09:10:00Z",
+        "source_observed_at": "2026-11-14T11:30:00Z",
+        "available_to_actor_at": "2026-11-14T11:45:00Z"
+      },
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T11:30:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:evidence:E3",
+      "type": "evidence",
+      "label": "Post-decision correction",
+      "claim_state": "observed",
+      "attributes": {
+        "kind": "correction",
+        "corrects": "dtea:evidence:E1",
+        "source_observed_at": "2026-11-14T12:00:00Z",
+        "available_to_actor_at": "2026-11-14T12:00:00Z"
+      },
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E3",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T12:00:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:evidence:authority-1",
+      "type": "evidence",
+      "claim_state": "observed",
+      "label": "Synthetic owner-native authority grant reference",
+      "attributes": {
+        "kind": "authority-grant",
+        "owner_repository": "Luminous-Dynamics/mycelix",
+        "owner_record_ref": "synthetic://mycelix/authority-grant/AG-001",
+        "owner_record_type": "synthetic-authority-grant-fixture",
+        "actor_id": "release-steward-1",
+        "authority_scope": "release:staging",
+        "policy_version": "release-policy-v3",
+        "source_observed_at": "2026-11-14T08:55:00Z",
+        "available_to_actor_at": "2026-11-14T09:00:00Z",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_through": "2026-11-14T17:00:00Z",
+        "owner_record_disposition": "source_declares_authorized"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://mycelix/authority-grant/AG-001",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:55:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-release-authority-fixture",
+        "limitations": [
+          "Synthetic owner-record-shaped fixture. No Mycelix authority engine, cryptographic verifier, root policy or real actor permission was consulted."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current only within the synthetic fixture."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "dtea:edge:001",
+      "from": "dtea:project",
+      "relation": "contains",
+      "to": "dtea:decision:approve",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/project",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:50:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:edge:002",
+      "from": "dtea:project",
+      "relation": "contains",
+      "to": "dtea:evidence:E1",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/project",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:50:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:edge:003",
+      "from": "dtea:project",
+      "relation": "contains",
+      "to": "dtea:evidence:E2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/project",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:50:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:edge:004",
+      "from": "dtea:project",
+      "relation": "contains",
+      "to": "dtea:evidence:E3",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/project",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:50:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:edge:005",
+      "from": "dtea:decision:approve",
+      "relation": "observed_by",
+      "to": "dtea:evidence:E1",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/decision/D1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T10:00:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "dtea:edge:006",
+      "from": "dtea:decision:approve",
+      "relation": "requires",
+      "to": "dtea:evidence:authority-1",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/decision-authority-link",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:55:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-release-authority-fixture",
+        "limitations": [
+          "A structural link is not authority authentication."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Current only within the synthetic fixture."
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "event-001",
+      "kind": "repository_revision_observed",
+      "occurred_at": "2026-11-14T08:50:00Z",
+      "observed_at": "2026-11-14T08:50:00Z",
+      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prior_revision": null,
+      "targets": [
+        "dtea:project"
+      ],
+      "state_effect": "no_state_change",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/event-log",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T08:50:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "label": "pre-decision repository state"
+      }
+    },
+    {
+      "id": "event-002",
+      "kind": "authority_evidence_recorded",
+      "occurred_at": "2026-11-14T08:55:00Z",
+      "observed_at": "2026-11-14T09:00:00Z",
+      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prior_revision": null,
+      "targets": [
+        "dtea:evidence:authority-1"
+      ],
+      "state_effect": "observes",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://mycelix/authority-grant/AG-001",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:00:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-release-authority-fixture",
+        "limitations": [
+          "Synthetic authority record availability event; does not authenticate the underlying owner."
+        ]
+      },
+      "payload": {
+        "evidence_id": "dtea:evidence:authority-1",
+        "owner_repository": "Luminous-Dynamics/mycelix",
+        "actor_id": "release-steward-1",
+        "authority_scope": "release:staging",
+        "policy_version": "release-policy-v3",
+        "source_observed_at": "2026-11-14T08:55:00Z",
+        "available_to_actor_at": "2026-11-14T09:00:00Z",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_through": "2026-11-14T17:00:00Z",
+        "owner_record_disposition": "source_declares_authorized",
+        "owner_record_ref": "synthetic://mycelix/authority-grant/AG-001",
+        "owner_record_type": "synthetic-authority-grant-fixture"
+      }
+    },
+    {
+      "id": "event-003",
+      "kind": "test_evidence_recorded",
+      "occurred_at": "2026-11-14T09:05:00Z",
+      "observed_at": "2026-11-14T09:05:00Z",
+      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prior_revision": null,
+      "targets": [
+        "dtea:evidence:E1"
+      ],
+      "state_effect": "observes",
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T09:05:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "result": "pass",
+        "available_to_actor_at": "2026-11-14T09:05:00Z"
+      }
+    },
+    {
+      "id": "event-004",
+      "kind": "decision_recorded",
+      "occurred_at": "2026-11-14T10:00:00Z",
+      "observed_at": "2026-11-14T10:00:00Z",
+      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prior_revision": null,
+      "targets": [
+        "dtea:decision:approve"
+      ],
+      "state_effect": "introduces",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/decision/D1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T10:00:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "decision_at": "2026-11-14T10:00:00Z",
+        "knowledge_cutoff_at": "2026-11-14T10:00:00Z",
+        "actor_id": "release-steward-1",
+        "authority_scope": "release:staging",
+        "policy_version": "release-policy-v3",
+        "outcome": "approved",
+        "rationale_summary": "All evidence admissible at decision time met the declared release rule.",
+        "consulted_evidence": [
+          {
+            "evidence_id": "dtea:evidence:E1",
+            "available_to_actor_at": "2026-11-14T09:05:00Z",
+            "source_observed_at": "2026-11-14T09:05:00Z",
+            "valid_from": "2026-11-14T08:50:00Z",
+            "valid_through": "2026-11-14T11:50:00Z",
+            "admissibility": "admissible",
+            "reason": "Observed and authorized before the knowledge cutoff.",
+            "validity_completeness": "complete"
+          }
+        ],
+        "excluded_evidence": [
+          {
+            "evidence_id": "dtea:evidence:E2",
+            "available_to_actor_at": "2026-11-14T11:45:00Z",
+            "source_observed_at": "2026-11-14T11:30:00Z",
+            "valid_from": "2026-11-14T09:10:00Z",
+            "valid_through": null,
+            "admissibility": "inadmissible",
+            "reason": "The test result arrived after the decision even though the underlying test ran before it.",
+            "validity_completeness": "incomplete"
+          }
+        ],
+        "later_corrections": [
+          "event-006"
+        ],
+        "abstention_reason": null,
+        "actor_authority": {
+          "evidence_id": "dtea:evidence:authority-1",
+          "owner_repository": "Luminous-Dynamics/mycelix",
+          "owner_record_ref": "synthetic://mycelix/authority-grant/AG-001",
+          "owner_record_type": "synthetic-authority-grant-fixture",
+          "actor_id": "release-steward-1",
+          "authority_scope": "release:staging",
+          "policy_version": "release-policy-v3",
+          "source_observed_at": "2026-11-14T08:55:00Z",
+          "available_to_actor_at": "2026-11-14T09:00:00Z",
+          "valid_from": "2026-11-01T00:00:00Z",
+          "valid_through": "2026-11-14T17:00:00Z",
+          "owner_record_disposition": "source_declares_authorized",
+          "reason": "Synthetic owner-record declaration covers this actor, scope, policy and decision-time interval; it is not an authenticated Mycelix authority record."
+        }
+      }
+    },
+    {
+      "id": "event-005",
+      "kind": "test_evidence_recorded",
+      "occurred_at": "2026-11-14T09:10:00Z",
+      "observed_at": "2026-11-14T11:30:00Z",
+      "effective_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "prior_revision": null,
+      "targets": [
+        "dtea:evidence:E2"
+      ],
+      "state_effect": "observes",
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T11:30:00Z",
+        "valid_for_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "result": "pass",
+        "test_occurred_at": "2026-11-14T09:10:00Z",
+        "recorded_at": "2026-11-14T11:30:00Z"
+      }
+    },
+    {
+      "id": "event-006",
+      "kind": "evidence_invalidated",
+      "occurred_at": "2026-11-14T11:50:00Z",
+      "observed_at": "2026-11-14T12:00:00Z",
+      "effective_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "prior_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "targets": [
+        "dtea:evidence:E1"
+      ],
+      "state_effect": "invalidates",
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/evidence/E3",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T12:00:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "reason": "later correction supersedes the CI report"
+      }
+    },
+    {
+      "id": "event-007",
+      "kind": "repository_revision_observed",
+      "occurred_at": "2026-11-14T12:00:00Z",
+      "observed_at": "2026-11-14T12:00:00Z",
+      "effective_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "prior_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "targets": [
+        "dtea:project",
+        "dtea:evidence:E3"
+      ],
+      "state_effect": "no_state_change",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dtea/event-log",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "synthetic-dtea-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-14T12:00:00Z",
+        "valid_for_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "valid_for_world": "synthetic-linux-default",
+        "limitations": [
+          "Synthetic fixture only."
+        ]
+      },
+      "payload": {
+        "label": "post-decision correction received"
+      }
+    }
+  ],
+  "limitations": [
+    "Public synthetic known-answer fixture, not a sealed benchmark.",
+    "Hash-like identifiers are scenario placeholders, not actual Git object IDs or cryptographic digests.",
+    "No repository code, build, tests, CI workflow or deployment was executed.",
+    "The decision is reconstructed from a synthetic append-only event record; no real person or institution is represented.",
+    "The later correction changes current evidence applicability but must not rewrite the original decision's cited evidence.",
+    "The DTEA decision now references a synthetic Mycelix-shaped authority grant, with actor, scope, policy, recorded/available time and effective validity interval.",
+    "The authority item is deliberately source_declared and uses a synthetic URI. This fixture does not import or authenticate a real Mycelix authority record, verify a trust root/signature, or grant any release authority.",
+    "The benchmark projection tests whether the decision packet's declared authority evidence matches the actor/scope/policy and time window; owner-native authority semantics remain owned by Mycelix.",
+    "All timestamps in this fixture belong to a synthetic UTC scenario clock. They are not observations of real-world events or the current session clock."
+  ]
+}

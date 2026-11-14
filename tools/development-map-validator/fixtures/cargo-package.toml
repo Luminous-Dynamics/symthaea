@@ -1,0 +1,32 @@
+[package]
+name = "sample-engine"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+serde = { workspace = true }
+tokio = { version = "1", optional = true, default-features = false, features = ["rt", "macros"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+cc = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.29", features = ["socket"] }
+
+[features]
+default = ["serde"]
+network = ["dep:tokio"]
+
+[lib]
+name = "sample_engine"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "sample-cli"
+path = "src/main.rs"
+required-features = ["network"]
