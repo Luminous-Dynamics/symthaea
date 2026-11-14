@@ -59,6 +59,9 @@ fn audit_case(receipt: &Value, policy: &Value) -> Disposition {
         || !valid_sha256(receipt["source_sha256"].as_str().unwrap_or("")) {
         return Disposition::Rejected;
     }
+    if receipt["software_digest"].as_str() != policy["qualified_software_digest"].as_str() {
+        return Disposition::Blocked;
+    }
     if receipt["calibration_id"].as_str().is_none_or(str::is_empty)
         || receipt["calibration_current"].as_bool() != Some(true)
         || receipt["traceability_valid"].as_bool() != Some(true)
