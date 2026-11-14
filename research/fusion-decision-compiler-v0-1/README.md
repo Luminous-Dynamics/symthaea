@@ -15,7 +15,6 @@ It is an integration contract, not another fusion system code. It does not repla
 - Evidence-to-claim class and revision/scope binding.
 - Pairwise solver dependence classification across declared dataset, code and assumption groups; empty or missing dependency identities remain unknown.
 - Deterministic transitive invalidation of downstream dependency nodes.
-- Transitive dependency invalidation after upstream changes.
 - Fixed claim ceiling: eligible candidates are only eligible for further engineering review.
 
 ## Dispositions
@@ -49,7 +48,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. Rust unit tests exercise the typed contract.
+The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 25 rows: 5 expected review-eligible, 6 blocked, 6 indeterminate and 8 schema-rejected. The crate has 29 authored Rust unit tests, including one that applies all 25 corpus mutations to the actual compiler and checks each disposition. These are authored test cases, not executed test results.
 
 ## Claim ceiling
 
