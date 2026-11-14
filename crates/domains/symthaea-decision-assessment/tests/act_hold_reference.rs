@@ -55,6 +55,7 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
 
     let mut premature_effect_detected = false;
     let mut critical_premature = false;
+    let mut hold_side_critical_premature = false;
 
     if matches!(act.disposition, ActHoldDisposition::Act)
         && !matches!(act.authority, GateState::Pass)
@@ -67,6 +68,7 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
     if matches!(hold.disposition, ActHoldDisposition::Act) {
         reasons.insert("SHOULD_HOLD_SIDE_ACTED".to_owned());
         critical_premature = true;
+        hold_side_critical_premature = true;
     }
 
     match (trigger, terminal, effect) {
@@ -74,10 +76,12 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
             if effect_step > first {
                 premature_effect_detected = true;
                 critical_premature = true;
+                hold_side_critical_premature = true;
                 reasons.insert("IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned());
             } else if effect_step == first {
                 premature_effect_detected = true;
                 critical_premature = true;
+                hold_side_critical_premature = true;
                 reasons.insert("TRIGGER_EFFECT_ORDER_AMBIGUOUS".to_owned());
             }
             if last < first {
@@ -87,11 +91,13 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
         (Some(first), None, Some(effect_step)) if effect_step > first => {
             premature_effect_detected = true;
             critical_premature = true;
+            hold_side_critical_premature = true;
             reasons.insert("IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER".to_owned());
         }
         (Some(first), None, Some(effect_step)) if effect_step == first => {
             premature_effect_detected = true;
             critical_premature = true;
+            hold_side_critical_premature = true;
             reasons.insert("TRIGGER_EFFECT_ORDER_AMBIGUOUS".to_owned());
         }
         (Some(_), None, _) | (None, _, _) => {
@@ -115,7 +121,7 @@ fn reference_report(act: &ActHoldEpisode, hold: &ActHoldEpisode) -> Value {
     let hold_success = !matches!(hold.disposition, ActHoldDisposition::Act)
         && timing_known
         && latency.is_some()
-        && !critical_premature;
+        && !hold_side_critical_premature;
 
     json!({
         "paired_correct": act_success && hold_success,
