@@ -1168,6 +1168,14 @@ mod tests {
     fn coherence_uncertainty_unresolved_is_not_eligible() {
         let mut input = case();
         measured(&mut input);
+        let band = &mut input.windows[0].coherence.bands[0];
+        band.uncertainty_status = "coherent_residual_interval_unresolved".to_string();
+        band.coherence_lower_bound = None;
+        band.coherence_upper_bound = None;
+        band.vibration_reference_coherent_pressure_psd_lower_bound = None;
+        band.vibration_reference_coherent_pressure_psd_upper_bound = None;
+        band.non_coherent_residual_pressure_psd_lower_bound = None;
+        band.non_coherent_residual_pressure_psd_upper_bound = None;
         input.windows[0].coherence.disposition = "UNCERTAINTY_UNRESOLVED".to_string();
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
@@ -1288,6 +1296,12 @@ mod tests {
             input.windows.push(extra);
         }
         let report = audit(&input);
+        assert!(
+            !report.aggregate_band_reports.is_empty(),
+            "aggregate absent; reasons={:?}; runs={:?}",
+            report.reasons,
+            report.run_reports
+        );
         let band = &report.aggregate_band_reports[0];
         assert_eq!(band.independent_runs_with_both_cohorts, 2);
         // Aggregate present mean is the mean of the two run means, not all windows pooled.
