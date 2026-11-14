@@ -224,6 +224,14 @@ pub fn validate_plan(
                 Some(_) => {}
             }
         }
+        if interface.interface_kind == InterfaceKind::Seam
+            && interface.edge_refs.len() == 2
+            && interface.edge_refs[0].orientation != EdgeOrientation::Unknown
+            && interface.edge_refs[1].orientation != EdgeOrientation::Unknown
+            && interface.edge_refs[0].orientation == interface.edge_refs[1].orientation
+        {
+            issue(&mut issues, "seam_edge_orientations_not_opposed", format!("{path}.edge_refs"), "two mating seam edges must have opposite declared correspondence orientations");
+        }
         if interface_map.insert(interface.interface_id.as_str(), interface).is_some() {
             issue(&mut issues, "duplicate_interface_id", format!("{path}.interface_id"), "interface id is duplicated");
         }
@@ -586,6 +594,61 @@ mod tests {
         plan.interfaces[0].edge_refs.push(plan.interfaces[0].edge_refs[0].clone());
         let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
         assert!(report.issues.iter().any(|v| v.code == "duplicate_interface_edge"));
+    }
+
+    #[test]
+    fn irreversible_operation_without_human_review_is_rejected() {
+        let mut plan = base_plan();
+        plan.operations[0].requires_human_review = false;
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "irreversible_operation_without_review"));
+    }
+
+    #[test]
+    fn irreversible_operation_without_evidence_requirements_is_rejected() {
+        let mut plan = base_plan();
+        plan.operations[0].evidence_requirements.clear();
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "irreversible_operation_without_evidence"));
+    }
+
+    #[test]
+    fn synthetic_machine_profile_without_human_review_is_rejected() {
+        let mut plan = base_plan();
+        plan.operations[0].requires_human_review = false;
+        plan.operations[0].irreversible = false;
+        plan.operations[0].evidence_requirements.clear();
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "machine_profile_requires_review"));
+    }
+
+    #[test]
+    fn unknown_machine_profile_basis_blocks_automated_operation() {
+        let mut plan = base_plan();
+        plan.machine_profiles[0].profile_basis = MachineProfileBasis::Unknown;
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "unknown_machine_profile_basis"));
+    }
+
+    #[test]
+    fn join_operation_must_declare_interface_and_all_interface_parts() {
+        let mut plan = base_plan();
+        plan.operations[0].interface_refs.clear();
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "operation_without_interface"));
+
+        let mut plan = base_plan();
+        plan.operations[0].part_refs = vec!["front".to_owned()];
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "interface_part_not_declared"));
+    }
+
+    #[test]
+    fn seam_edges_with_same_orientation_are_rejected() {
+        let mut plan = base_plan();
+        plan.interfaces[0].edge_refs[1].orientation = EdgeOrientation::Forward;
+        let report = validate_plan(&plan, &"b".repeat(64), &"c".repeat(64));
+        assert!(report.issues.iter().any(|v| v.code == "seam_edge_orientations_not_opposed"));
     }
 
     #[test]
