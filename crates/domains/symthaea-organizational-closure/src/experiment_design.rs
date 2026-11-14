@@ -541,10 +541,10 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
             }
         }
         ExperimentTerminalDecision::Abstain { reason: _ } => {
-            if remaining_classes.len() <= 1 {
+            if remaining_classes.len() == 1 {
                 push_finding(&mut findings, ExperimentFindingCode::AbstainedAfterIdentification, None, None,
                     "agent abstained after a single target-equivalence class was identified");
-            } else {
+            } else if remaining_classes.len() > 1 {
                 let remaining_cost = scenario.budget.max_cost_units.saturating_sub(total_cost);
                 let remaining_risk = scenario.budget.max_risk_units.saturating_sub(total_risk);
                 let remaining_trials = scenario.budget.max_trials.saturating_sub(trace.trials.len());
@@ -690,6 +690,30 @@ mod tests {
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
         assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::CostBudgetExceeded));
+    }
+
+    #[test]
+    fn models_in_the_same_target_class_do_not_need_to_be_distinguished() {
+        let scenario = SequentialExperimentScenario {
+            hypotheses: vec![
+                MechanismHypothesis::new("implementation-a", "same-capability-class", 1),
+                MechanismHypothesis::new("implementation-b", "same-capability-class", 1),
+            ],
+            probes: vec![],
+            budget: ExperimentBudget { max_cost_units: 0, max_risk_units: 0, max_trials: 0 },
+        };
+        let oracle = ExperimentOracle::new("implementation-a");
+        let trace = SequentialExperimentTrace {
+            trials: vec![],
+            terminal: ExperimentTerminalDecision::Stop {
+                target_class: "same-capability-class".into(),
+            },
+        };
+        let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ExperimentQualification::Qualified);
+        assert!(report.correctly_identified_target_class());
+        assert_eq!(report.remaining_hypotheses.len(), 2);
+        assert_eq!(report.first_identified_after_trials, Some(0));
     }
 
     #[test]
