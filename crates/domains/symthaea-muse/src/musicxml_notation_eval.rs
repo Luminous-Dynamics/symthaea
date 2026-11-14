@@ -24,6 +24,8 @@ pub const MUSICXML_NOTATION_EVALUATION_SCHEMA_V1: &str =
     "muse-musicxml-notation-evaluation-v1";
 pub const MUSICXML_NOTATION_MAX_PART_EVENTS_V1: usize = 20_000;
 pub const MUSICXML_NOTATION_MAX_CANDIDATE_EDGES_V1: usize = 2_000_000;
+pub const MUSICXML_NOTATION_MAX_PART_BINDINGS_V1: usize = 512;
+pub const MUSICXML_NOTATION_MAX_DOCUMENT_EVENTS_V1: usize = 200_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlNotationPartBindingV1 {
@@ -146,6 +148,8 @@ pub enum MusicXmlNotationEvaluationErrorV1 {
     NotationCanonicalizationMismatch,
     InvalidGraph { part_id: String, reason: String },
     EventBudgetExceeded { part_id: String, count: usize, maximum: usize },
+    DocumentEventBudgetExceeded { count: usize, maximum: usize },
+    PartBindingBudgetExceeded { count: usize, maximum: usize },
     CandidateEdgeBudgetExceeded { count: usize, maximum: usize },
     ArithmeticOverflow,
     SerializationFailed,
@@ -250,6 +254,20 @@ fn error_summary(values: &[f64]) -> MusicXmlNotationErrorSummaryV1 {
             values.iter().copied().fold(0.0_f64, f64::max),
         ),
     }
+}
+
+fn position_within_measure(
+    position: RationalBeat,
+    measure: &crate::barline_eval::MeasureSpan,
+    allow_end: bool,
+) -> bool {
+    let after_start = position.compare_exact(measure.start) != Ordering::Less;
+    let before_end = if allow_end {
+        position.compare_exact(measure.end) != Ordering::Greater
+    } else {
+        position.compare_exact(measure.end) == Ordering::Less
+    };
+    after_start && before_end
 }
 
 fn validate_part_graph(
@@ -357,10 +375,15 @@ fn validate_part_graph(
         if event.part_id != graph.part_id
             || event.measure_index >= graph.map.measures.len()
             || !source_orders.insert(event.source_order)
+            || !position_within_measure(
+                event.score_offset,
+                &graph.map.measures[event.measure_index],
+                true,
+            )
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraph {
                 part_id: part_id.into(),
-                reason: "attribute event has wrong part, invalid measure locator or duplicate source order".into(),
+                reason: "attribute event has wrong part, invalid measure position or duplicate source order".into(),
             });
         }
     }
@@ -368,10 +391,15 @@ fn validate_part_graph(
         if event.part_id != graph.part_id
             || event.measure_index >= graph.map.measures.len()
             || !source_orders.insert(event.source_order)
+            || !position_within_measure(
+                event.score_offset,
+                &graph.map.measures[event.measure_index],
+                true,
+            )
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraph {
                 part_id: part_id.into(),
-                reason: "auxiliary event has wrong part, invalid measure locator or duplicate source order".into(),
+                reason: "auxiliary event has wrong part, invalid measure position or duplicate source order".into(),
             });
         }
     }
@@ -380,10 +408,20 @@ fn validate_part_graph(
             || event.measure_index >= graph.map.measures.len()
             || !source_orders.insert(event.source_order)
             || event.duration.numerator() <= 0
+            || !position_within_measure(
+                event.score_offset_before,
+                &graph.map.measures[event.measure_index],
+                true,
+            )
+            || !position_within_measure(
+                event.score_offset_after,
+                &graph.map.measures[event.measure_index],
+                true,
+            )
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraph {
                 part_id: part_id.into(),
-                reason: "cursor move has wrong part, invalid measure locator, duplicate source order or nonpositive duration".into(),
+                reason: "cursor move has wrong part, invalid measure position, duplicate source order or nonpositive duration".into(),
             });
         }
     }
@@ -1006,6 +1044,12 @@ pub fn evaluate_musicxml_notation_graphs(
     if bindings.is_empty() {
         return Err(MusicXmlNotationEvaluationErrorV1::EmptyPartBindings);
     }
+    if bindings.len() > MUSICXML_NOTATION_MAX_PART_BINDINGS_V1 {
+        return Err(MusicXmlNotationEvaluationErrorV1::PartBindingBudgetExceeded {
+            count: bindings.len(),
+            maximum: MUSICXML_NOTATION_MAX_PART_BINDINGS_V1,
+        });
+    }
 
     let reference_by_id: BTreeMap<_, _> =
         reference.iter().map(|graph| (graph.part_id.as_str(), graph)).collect();
@@ -1015,6 +1059,22 @@ pub fn evaluate_musicxml_notation_graphs(
         return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraph {
             part_id: "<document>".into(),
             reason: "duplicate part IDs in graph set".into(),
+        });
+    }
+    let total_document_events = reference.iter().chain(prediction.iter()).try_fold(
+        0usize,
+        |total, graph| {
+            let events = graph.notation_events.note_events.len()
+                .checked_add(graph.notation_events.attribute_events.len())?
+                .checked_add(graph.notation_events.auxiliary_events.len())?
+                .checked_add(graph.notation_events.cursor_moves.len())?;
+            total.checked_add(events)
+        },
+    ).ok_or(MusicXmlNotationEvaluationErrorV1::ArithmeticOverflow)?;
+    if total_document_events > MUSICXML_NOTATION_MAX_DOCUMENT_EVENTS_V1 {
+        return Err(MusicXmlNotationEvaluationErrorV1::DocumentEventBudgetExceeded {
+            count: total_document_events,
+            maximum: MUSICXML_NOTATION_MAX_DOCUMENT_EVENTS_V1,
         });
     }
 
