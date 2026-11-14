@@ -370,13 +370,12 @@ fn validate_profile_csv(
     for record in reader.records() {
         let record = record?;
         let elapsed = parse_csv_number(&record, time_index, "profile.elapsed_s")?;
-        let value = parse_csv_number(&record, value_index, value_column)?;
+        // Parse for finiteness but retain signed load values: regenerative and
+        // bidirectional profiles must not be clipped to discharge-only conventions.
+        let _ = parse_csv_number(&record, value_index, value_column)?;
         if elapsed < 0.0 {
             bail!("profile elapsed_s must be non-negative");
         }
-        // Signed load current is valid: regenerative and bidirectional profiles
-        // must not be silently clipped to a discharge-only convention.
-        let _profile_value = value;
         if previous_time.is_some_and(|previous| elapsed <= previous) {
             bail!("profile elapsed_s must increase strictly");
         }
@@ -426,7 +425,7 @@ fn validate_raw_trace(
         let event_id = record
             .get(event_index)
             .context("raw trace row is missing event_id")?;
-        if !expected_event_ids.contains(event_id) {
+        if !expected_event_ids.iter().any(|expected| *expected == event_id) {
             bail!("raw trace contains undeclared event_id {event_id}");
         }
         let elapsed = parse_csv_number(&record, elapsed_index, "raw_trace.elapsed_s")?;
@@ -941,7 +940,8 @@ mod tests {
     #[test]
     fn duplicate_artifact_paths_are_rejected() {
         let mut value = fixture_value();
-        value["artifacts"][1]["relative_path"] = value["artifacts"][0]["relative_path"].clone();
+        let duplicate_path = value["artifacts"][0]["relative_path"].clone();
+        value["artifacts"][1]["relative_path"] = duplicate_path;
         let error = audit_value(value).unwrap_err().to_string();
         assert!(error.contains("duplicate artifact path"));
     }
