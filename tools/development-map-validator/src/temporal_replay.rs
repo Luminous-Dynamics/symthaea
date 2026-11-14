@@ -530,7 +530,7 @@ fn validate_cursor_checkpoint(cursor: &ReplayCursor) -> Result<(), String> {
     if cursor.checkpoint_hash != calculate_cursor_hash(cursor)? {
         return Err("replay cursor checkpoint hash mismatch".to_owned());
     }
-    let expected_head = cursor.prior_events.values().last()
+    let expected_head = cursor.prior_events.values().max_by_key(|event| event.sequence)
         .map(|event| event.event_hash.as_str())
         .unwrap_or(GENESIS_HASH);
     if cursor.head_hash != expected_head {
@@ -648,13 +648,7 @@ pub fn resume_replay_cursor(
 
 /// Clean replay reference: start at genesis and consume the entire ledger.
 pub fn replay_ledger(ledger: &EventLedger, query: &ReplayQuery) -> Result<ReplayProjection, String> {
-    let mut cursor = empty_cursor(ledger, query)?;
-    cursor = resume_replay_cursor(cursor, &ledger.events)?;
-    let validation = validate_ledger(ledger);
-    if !validation.valid {
-        return Err("invalid temporal ledger".to_owned());
-    }
-    Ok(cursor.projection())
+    Ok(start_replay_cursor(ledger, query)?.projection())
 }
 
 /// Start from a validated prefix checkpoint, then consume only the supplied suffix.
