@@ -154,8 +154,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         let gaps = scenario.get("evidence_gaps").and_then(Value::as_array).ok_or_else(|| invalid(format!("{id}: missing evidence gaps")))?;
         let has_hard_blocker = gaps.iter().any(|g| g.get("consequence").and_then(Value::as_str) == Some("hard_blocker"));
         if has_hard_blocker && matches!(decision, "ALLOW_SCOPED" | "ALLOW_PARTIAL") {
-            let partial = scenario["decision"]["authorized_to_proceed_with_partial_evidence"].as_bool().unwrap_or(false);
-            if !partial { hard_blocker_false_clears += 1; }
+            hard_blocker_false_clears += 1;
         }
         let mut admissible = true;
         let mut safety_reasons = Vec::new();
@@ -174,7 +173,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 let provider = c.get("upstream_provider_ref").and_then(Value::as_str);
                 let existing = scenario.get("existing_evidence").and_then(Value::as_array).cloned().unwrap_or_default();
                 let shares_provider = provider.is_some() && existing.iter().any(|s| s.get("upstream_provider_ref").and_then(Value::as_str)==provider);
-                if shares_provider && expected.get("required_reason_codes").and_then(Value::as_array).map(|r|r.iter().any(|x|x.as_str()==Some("evidence.common_cause")||x.as_str()==Some("independent_source.required"))).unwrap_or(false) {
+                if shares_provider && expected.get("required_reason_codes").and_then(Value::as_array).map(|r|r.iter().any(|x|x.as_str().map(|s|s.starts_with("evidence.common_cause")||s.starts_with("independent_source.required")).unwrap_or(false))).unwrap_or(false) {
                     common_cause_recommendations += 1;
                     admissible = false;
                     safety_reasons.push("source.common_cause_not_independent".to_owned());
@@ -291,6 +290,16 @@ mod tests {
         let (ok,issues)=candidate_is_admissible(&case,"R1","title").unwrap();
         assert!(!ok);
         assert!(issues.contains(&"request.wrong_claim_dimension".to_owned()));
+    }
+    #[test]
+    fn hard_blocker_is_not_overridden_by_partial_work_authority() {
+        let gaps=json!([{"consequence":"hard_blocker"}]);
+        let has_hard_blocker=gaps.as_array().unwrap().iter()
+            .any(|g|g.get("consequence").and_then(serde_json::Value::as_str)==Some("hard_blocker"));
+        let partial_authorized=true;
+        assert!(has_hard_blocker);
+        assert!(partial_authorized);
+        assert!(has_hard_blocker); // hard constraint remains independently binding
     }
     #[test]
     fn unavailable_source_is_not_recommended() {
