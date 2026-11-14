@@ -434,17 +434,23 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         receipt.observation_endpoint_id.as_deref(),
     ) {
         (None, None) => receipt.endpoint_id.as_str(),
-        (Some(transform), Some(observation)) => {
-            let supported = matches!(
-                (transform, receipt.endpoint_id.as_str(), observation),
-                ("unit_preserving_strength_projection_v1", "initial_lap_shear_mpa", "apparent_shear_strength")
-                    | ("aged_strength_retention_ratio_v1", "aged_strength_retention", "apparent_shear_strength")
-                    | ("predeclared_failure_mode_fraction_v1", "failure_mode_fraction", "frp_joint_failure_mode_classification")
-            );
-            if !supported {
-                return rejected("endpoint transformation/output/observation mapping is not in the registered S0 design ontology");
-            }
+        (Some("unit_preserving_strength_projection_v1"), Some("apparent_shear_strength"))
+            if receipt.endpoint_id == "initial_lap_shear_mpa" =>
+        {
             observation
+        }
+        (Some("aged_strength_retention_ratio_v1"), Some("apparent_shear_strength"))
+            if receipt.endpoint_id == "aged_strength_retention" =>
+        {
+            observation
+        }
+        (Some("predeclared_failure_mode_fraction_v1"), Some("frp_joint_failure_mode_classification"))
+            if receipt.endpoint_id == "failure_mode_fraction" =>
+        {
+            return blocked("cluster-aware proportion-equivalence analysis is not yet qualified; failure-mode fraction remains blocked");
+        }
+        (Some(_), Some(_)) => {
+            return rejected("endpoint transformation/output/observation mapping is not in the registered S0 design ontology");
         }
         _ => return blocked("endpoint transform and raw observation endpoint must be declared together"),
     };
@@ -672,6 +678,21 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
         let case = fixture.cases.iter().find(|case| case.id == "missing-randomization-protocol-ref").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn failure_fraction_design_is_blocked_until_clustered_equivalence_is_qualified() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
+        let valid = fixture.cases.iter()
+            .find(|case| case.id == "valid-independent-lot-arms")
+            .expect("valid design case exists");
+        let mut receipt: EquivalenceDesignReceipt =
+            serde_json::from_value(serde_json::to_value(&valid.receipt).expect("serialize receipt"))
+                .expect("clone receipt");
+        receipt.endpoint_id = "failure_mode_fraction".to_owned();
+        receipt.endpoint_transform_id = Some("predeclared_failure_mode_fraction_v1".to_owned());
+        receipt.observation_endpoint_id = Some("frp_joint_failure_mode_classification".to_owned());
+        assert_eq!(audit_receipt(&receipt).disposition, Disposition::Blocked);
     }
 
     #[test]
