@@ -778,7 +778,7 @@ fn audit(case: &Case) -> AuditReport {
 
     let invalid_coherence_parent = reasons.iter().any(|reason| {
         reason.contains("parent coherence report is invalid")
-            || reason.contains("disposition conflicts with per-band phase status")
+            || reason.contains("disposition conflicts with per-band phase")
     });
     let frequency_incomparable = reasons.iter().any(|reason| reason.contains("frequency for band"));
     let unresolved_parent = reasons.iter().any(|reason| {
@@ -1267,7 +1267,7 @@ mod tests {
     #[test]
     fn coherent_plus_residual_pressure_psd_must_recompose_total() {
         let mut input = case();
-        input.windows[0].coherence.bands[0].non_coherent_residual_pressure_psd_pa2_per_hz = 0.8;
+        input.windows[0].coherence.bands[0].non_coherent_residual_pressure_psd_pa2_per_hz = 0.7;
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
@@ -1283,7 +1283,9 @@ mod tests {
         let mut input = case();
         measured(&mut input);
         for index in 0..20 {
-            input.windows.push(window(0, 100 + index, true, 1.0));
+            let mut extra = window(0, 100 + index, true, 1.0);
+            extra.coherence.evidence_kind = EvidenceKind::Measured;
+            input.windows.push(extra);
         }
         let report = audit(&input);
         let band = &report.aggregate_band_reports[0];
