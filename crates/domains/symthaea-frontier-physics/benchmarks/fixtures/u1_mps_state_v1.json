@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_goal_driven_error_budget_source_authored_runner_pending",
-  "execution_status": "U1 MPS exact/cutoff truncation plus goal-driven local error-budget selection and typed error-budget allocation are source-authored; exact-head Rust 1.96 validation pending.",
+  "execution_status": "U1 MPS goal-driven adaptive local error-budget compression, named error-channel budget planning, and observable-specific expectation error envelopes are source-authored; exact-head Rust 1.96 validation pending.",
   "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim. Goal-driven adaptive compression is local two-site error budgeting only; no globally optimal resource allocation or one-pass SVD performance claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -384,6 +384,37 @@
       "total_fraction_must_not_exceed": 1,
       "per_gate_compression_allocation": "equal compression allowance / planned gate count",
       "claim_boundary": "Equal-gate allocation baseline only. A globally optimal/sensitivity-weighted allocation is not claimed."
+    },
+    "observable_error_certificates": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "U1MpsObservableErrorTarget::compile_state_l2_error_budget(approximate_state_norm_upper_bound)",
+        "U1MpsObservableErrorTarget::certify(truncation_ledger, approximate_state_norm_squared)"
+      ],
+      "inequality": "|<A>_approx-<A>_exact| <= ||A||_op * delta_state_l2 * (||psi_approx|| + ||psi_exact||_upper)",
+      "inputs": [
+        "maximum_expectation_error",
+        "observable_operator_norm_upper_bound",
+        "exact_state_norm_upper_bound",
+        "approximate_state_norm_squared",
+        "qualified global state L2 error ledger"
+      ],
+      "output_receipts": [
+        "requested_expectation_error",
+        "observable_operator_norm_upper_bound",
+        "approximate_state_norm_upper_bound",
+        "exact_state_norm_upper_bound",
+        "global_state_l2_error_bound",
+        "compiled_state_l2_error_budget",
+        "expectation_error_upper_bound",
+        "budget_satisfied"
+      ],
+      "assumptions": [
+        "observable operator norm upper bound is supplied and valid",
+        "exact reference state norm upper bound is supplied and justified",
+        "global state L2 ledger is qualified; local Frobenius receipts alone are rejected"
+      ],
+      "claim_boundary": "Error envelope only; no arbitrary MPO observable contraction or automatic observable norm estimation is implemented."
     }
   },
   "known_answers": [
@@ -589,6 +620,20 @@
         "no local-to-global interpretation without canonical exterior operator bounds",
         "step-refinement evidence for the separate Trotter component"
       ]
+    },
+    {
+      "id": "MPS-10",
+      "name": "Observable-specific expectation-error certificates",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "Pauli operator norm 1 example",
+        "global state L2 bound propagated into expectation interval",
+        "observable target converted into sufficient state L2 budget",
+        "strict target marked unsatisfied without suppressing the upper bound",
+        "unqualified global ledger rejected",
+        "zero-norm observable recognized as state-error insensitive",
+        "operator/exact-state norm assumptions appear in receipt"
+      ]
     }
   ],
   "negative_controls": [
@@ -645,7 +690,11 @@
     "adaptive truncator silently exceeds the global bond cap",
     "adaptive truncator silently renormalizes the compressed state",
     "error-budget fractions overallocate more than the requested total",
-    "local two-site residual is reported as global state-vector error without canonical exterior receipts"
+    "local two-site residual is reported as global state-vector error without canonical exterior receipts",
+    "certify an observable interval from an unqualified local-only truncation ledger",
+    "assume approximate MPS norm is one after truncation without measuring it",
+    "claim an exact-state norm bound without a source/model assumption",
+    "use an invalid/underestimated observable operator norm bound"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -735,7 +784,14 @@
     "error_budget_hamiltonian_projection_allowance",
     "error_budget_compression_allowance",
     "error_budget_time_discretization_allowance",
-    "error_budget_reserved_allowance"
+    "error_budget_reserved_allowance",
+    "observable_operator_norm_upper_bound",
+    "observable_exact_state_norm_upper_bound",
+    "observable_approximate_state_norm_upper_bound",
+    "observable_expectation_error_upper_bound",
+    "observable_requested_expectation_error",
+    "observable_budget_satisfied",
+    "observable_compiled_state_l2_error_budget"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
