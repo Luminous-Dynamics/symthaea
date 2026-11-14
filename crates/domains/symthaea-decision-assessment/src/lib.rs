@@ -459,6 +459,12 @@ pub struct EventTraceQualification {
     /// This is not effect authority; it only establishes that the stop
     /// obligation was assessed before later action can be considered.
     pub stop_disposition: GateState,
+    /// Exact owner receipt for the stop-disposition assessment. When the state
+    /// is PASS and a discharge event is present, all three bindings are required.
+    pub stop_disposition_receipt_ref: Option<String>,
+    pub stop_disposition_receipt_sha256: Option<String>,
+    pub stop_disposition_trigger_event_id: Option<String>,
+    pub stop_disposition_event_id: Option<String>,
 }
 
 /// Order of the first event relative to the second event supplied to the
@@ -821,6 +827,32 @@ pub fn evaluate_event_order(
     if let Some(trigger_event) = trigger {
         match (discharge, qualification.stop_disposition) {
             (Some(discharge_event), GateState::Pass) => {
+                let receipt_ref_valid = qualification
+                    .stop_disposition_receipt_ref
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty());
+                let receipt_digest_valid = qualification
+                    .stop_disposition_receipt_sha256
+                    .as_deref()
+                    .is_some_and(is_sha256);
+                let trigger_binding_valid = qualification
+                    .stop_disposition_trigger_event_id
+                    .as_deref()
+                    == Some(trigger_event.event_id.as_str());
+                let discharge_binding_valid = qualification
+                    .stop_disposition_event_id
+                    .as_deref()
+                    == Some(discharge_event.event_id.as_str());
+
+                if !(receipt_ref_valid
+                    && receipt_digest_valid
+                    && trigger_binding_valid
+                    && discharge_binding_valid)
+                {
+                    critical_failure = true;
+                    reasons.insert("STOP_DISPOSITION_RECEIPT_BINDING_INVALID".to_owned());
+                }
+
                 match compare_decision_events(trigger_event, discharge_event, &by_id, qualification) {
                     EventOrder::Before => discharge_valid = true,
                     EventOrder::After => {
