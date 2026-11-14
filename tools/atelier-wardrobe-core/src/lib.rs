@@ -1,7 +1,8 @@
 //! Exact small-instance oracle for user-declared wardrobe coverage tasks.
 //!
 //! The optimizer does not infer what a person should wear. Callers provide
-//! explicit needs, compatible garment/repair options, user costs in one declared currency and a policy.
+//! explicit needs, compatible garment/repair options, user costs in one declared
+//! currency, and a policy.
 //! The result is a Pareto set; no universal style or sustainability score is
 //! computed. This crate does not verify garment condition, fit or safety.
 
@@ -117,7 +118,8 @@ pub enum WardrobeError {
 
 /// Enumerate every subset of at most 18 optional choices, preserve every
 /// `must_keep` choice, enforce user policy, and return the exact Pareto frontier
-/// over acquisition count, made-to-order count, cost in the declared currency, effort and choice count.
+/// over acquisition count, made-to-order count, cost in the declared currency,
+/// effort and choice count.
 /// Every metric is minimized. No weighted sum is imposed.
 pub fn search_exact(
     needs: &[WardrobeNeed],
@@ -314,7 +316,10 @@ fn choice_coverage_mask(
     })
 }
 
-fn sum_metrics(choices: &[&WardrobeChoice], currency_code: &str) -> Result<PlanMetrics, WardrobeError> {
+fn sum_metrics(
+    choices: &[&WardrobeChoice],
+    currency_code: &str,
+) -> Result<PlanMetrics, WardrobeError> {
     let mut metrics = PlanMetrics {
         added_items: 0,
         newly_manufactured_items: 0,
@@ -413,7 +418,11 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: false,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 1);
@@ -448,7 +457,11 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: true, allow_made_to_order: true, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: true,
+                allow_made_to_order: true,
+                currency_code: "ZAR".to_owned(),
+            },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 2);
@@ -508,7 +521,11 @@ mod tests {
             search_exact(
                 &needs,
                 &choices,
-                WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() }
+                WardrobePolicy {
+                    allow_additions: false,
+                    allow_made_to_order: false,
+                    currency_code: "ZAR".to_owned(),
+                }
             ),
             Err(WardrobeError::TooManyOptionalChoices { .. })
         ));
