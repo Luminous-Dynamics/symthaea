@@ -80,3 +80,8 @@ This is bounded executable conformance evidence for the local single-writer jour
 `modelcheck_test.go` exhaustively explores a finite two-intent abstraction of send, delayed delivery, destination serialization, receipt/business-row staging, atomic commit, rollback/crash and reconciliation. Its current state space is 68 reachable states / 200 transitions. The companion history checker validates concurrent `Append`, `Fence` and `Lookup` results against real-time precedence.
 
 These checks are deliberately bounded and independent of the storage implementation. They complement the concrete journal/SQLite tests; they do not prove the implementation, distributed liveness, multi-host safety or physical power-loss behavior.
+
+
+## Generated multi-key history check
+
+`linearizability_schedules_test.go` adds 256 deterministic six-operation histories across two keys and two intent values. The checker validates each observed append/fence/lookup result against the same sequential reference model and real-time ordering rules, then checks terminal status recovery after journal reopen. The test is intended to catch cross-key coupling and changed-intent races that a single-key race fixture can miss.
