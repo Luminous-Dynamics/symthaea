@@ -358,3 +358,92 @@ func TestJournalHeadMustChangeWhenSequenceAdvances(t *testing.T) {
 		t.Fatalf("expected repeated journal head to be rejected, got %v", err)
 	}
 }
+
+
+func TestPeerConsistencyAcceptsCompleteSignedBridge(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state1 := bootstrapTest(t, priv, pub)
+	cp2 := signCheckpoint(t, makeCheckpoint(2, 9, state1.CheckpointDigestSHA256, "head-9", 101), priv)
+	state2, _, err := AcceptNext(cp2, pub, state1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp3 := signCheckpoint(t, makeCheckpoint(3, 13, state2.CheckpointDigestSHA256, "head-13", 102), priv)
+	state3, _, err := AcceptNext(cp3, pub, state2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyPeerConsistency(state1, state3, []SignedCheckpoint{cp2, cp3}, pub); err != nil {
+		t.Fatalf("complete signed bridge rejected: %v", err)
+	}
+}
+
+func TestPeerConsistencyDetectsSameSequenceFork(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state1 := bootstrapTest(t, priv, pub)
+	fork := signCheckpoint(t, makeCheckpoint(1, 4, "", "forked-genesis", 100), priv)
+	forkState, err := Bootstrap(fork, pub, "witness-key-1", "payments-db-prod-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyPeerConsistency(state1, forkState, nil, pub); !errors.Is(err, ErrPeerFork) {
+		t.Fatalf("expected same-sequence peer fork, got %v", err)
+	}
+}
+
+func TestPeerConsistencyRequiresEveryInterveningCheckpoint(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state1 := bootstrapTest(t, priv, pub)
+	cp2 := signCheckpoint(t, makeCheckpoint(2, 9, state1.CheckpointDigestSHA256, "head-9", 101), priv)
+	state2, _, err := AcceptNext(cp2, pub, state1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyPeerConsistency(state1, state2, nil, pub); !errors.Is(err, ErrGap) {
+		t.Fatalf("expected missing bridge gap, got %v", err)
+	}
+}
+
+func TestPeerConsistencyRejectsBrokenBridge(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state1 := bootstrapTest(t, priv, pub)
+	broken := signCheckpoint(t, makeCheckpoint(2, 9, hashLabel("other predecessor"), "head-9", 101), priv)
+	fakePeer := TrustedState{
+		KeyID: state1.KeyID, DatabaseID: state1.DatabaseID, CheckpointSequence: 2,
+		JournalSequence: 9, JournalHeadSHA256: hashLabel("head-9"),
+		CheckpointDigestSHA256: hashLabel("fake peer digest"), IssuedAtUnix: 101,
+	}
+	if err := VerifyPeerConsistency(state1, fakePeer, []SignedCheckpoint{broken}, pub); !errors.Is(err, ErrBrokenChain) {
+		t.Fatalf("expected broken bridge rejection, got %v", err)
+	}
+}
+
+func TestPeerConsistencyRejectsIdentityMismatch(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state1 := bootstrapTest(t, priv, pub)
+	otherDB := state1
+	otherDB.DatabaseID = "other-database"
+	if err := VerifyPeerConsistency(state1, otherDB, nil, pub); !errors.Is(err, ErrWrongDatabase) {
+		t.Fatalf("expected database mismatch, got %v", err)
+	}
+	otherKey := state1
+	otherKey.KeyID = "other-key"
+	if err := VerifyPeerConsistency(state1, otherKey, nil, pub); !errors.Is(err, ErrWrongKey) {
+		t.Fatalf("expected key mismatch, got %v", err)
+	}
+}
+
+func TestPeerConsistencyRejectsPeerStateNotReachedByBridge(t *testing.T) {
+	pub, priv := testKeys(t)
+	_, state1 := bootstrapTest(t, priv, pub)
+	cp2 := signCheckpoint(t, makeCheckpoint(2, 9, state1.CheckpointDigestSHA256, "head-9", 101), priv)
+	state2, _, err := AcceptNext(cp2, pub, state1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forkedPeer := state2
+	forkedPeer.JournalHeadSHA256 = hashLabel("other-head")
+	if err := VerifyPeerConsistency(state1, forkedPeer, []SignedCheckpoint{cp2}, pub); !errors.Is(err, ErrPeerFork) {
+		t.Fatalf("expected peer target fork rejection, got %v", err)
+	}
+}
