@@ -18,7 +18,7 @@ const ENVELOPE_DOMAIN: &[u8] = b"luminous.mel.music-edit-validity-envelope.v1";
 #[serde(rename_all = "snake_case")]
 pub enum MusicEditValidityPropertyV1 {
     InstrumentIdentity, DrumKitIdentity, EventPresence, EventLineage, MelodyPitch,
-    Harmony, OnsetTicks, DurationTicks, Rhythm, Meter, Form, Tempo, VelocityContour,
+    Harmony, OnsetTicks, DurationTicks, DurationToInterOnsetRatio, Rhythm, Meter, Form, Tempo, VelocityContour,
     DynamicContour, TuningCents, TimbreFamily, StereoImage, GlobalLoudness,
     AudioArtifact, PhraseCoherence, Articulation,
 }
@@ -563,11 +563,31 @@ fn validate_operation_contract(
                     && constraint.maximum.is_some_and(|maximum| maximum >= 1.0 && maximum.fract() == 0.0)
                     && matches!(constraint.evidence, E::Symbolic | E::Combined)
             });
+            let has_score_relative_gate = envelope.requested_change.iter().any(|constraint| {
+                if constraint.property != P::DurationToInterOnsetRatio
+                    || constraint.scope != S::TargetPart
+                    || constraint.relation != R::WithinRange
+                    || constraint.unit.as_deref() != Some("ratio")
+                    || !matches!(constraint.evidence, E::Symbolic | E::Combined)
+                {
+                    return false;
+                }
+                match envelope.operation {
+                    O::Staccato => constraint.minimum.is_some_and(|minimum| minimum >= 0.0)
+                        && constraint.maximum.is_some_and(|maximum| maximum < 1.0),
+                    O::Legato => constraint.minimum.is_some_and(|minimum| minimum >= 1.0)
+                        && constraint.maximum.is_some_and(|maximum| maximum >= 1.0),
+                    _ => false,
+                }
+            });
             if !has_articulation {
                 issues.push(missing(P::Articulation));
             }
             if !has_duration_delta || !has_duration_range {
                 issues.push(missing(P::DurationTicks));
+            }
+            if !has_score_relative_gate {
+                issues.push(missing(P::DurationToInterOnsetRatio));
             }
             for property in [P::MelodyPitch, P::OnsetTicks] {
                 if !has_protected(envelope, property, S::TargetPart, R::NoChange) {
@@ -938,6 +958,19 @@ mod tests {
             rationale: "the rendered articulation should be audibly staccato".to_owned(),
         });
         envelope.requested_change.push(MusicEditValidityConstraintV1 {
+            constraint_id: "change.duration-ratio".to_owned(),
+            property: MusicEditValidityPropertyV1::DurationToInterOnsetRatio,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::WithinRange,
+            expected_value: None,
+            allowed_values: Vec::new(),
+            minimum: Some(0.25),
+            maximum: Some(0.65),
+            unit: Some("ratio".to_owned()),
+            evidence: MusicEditValidityEvidenceV1::Symbolic,
+            rationale: "staccato duration remains below the next onset".to_owned(),
+        });
+        envelope.requested_change.push(MusicEditValidityConstraintV1 {
             constraint_id: "change.duration-delta".to_owned(),
             property: MusicEditValidityPropertyV1::DurationTicks,
             scope: MusicEditValidityScopeV1::TargetPart,
@@ -972,6 +1005,97 @@ mod tests {
             &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
                 operation: MusicEditOperationV1::Staccato,
                 property: MusicEditValidityPropertyV1::Articulation,
+            }
+        ));
+    }
+
+
+    #[test]
+    fn legato_requires_duration_to_reach_or_overlap_the_next_onset() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::Legato;
+        envelope.requested_change.clear();
+        envelope.requested_change.extend([
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.articulation".to_owned(),
+                property: MusicEditValidityPropertyV1::Articulation,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::EqualTo,
+                expected_value: Some("legato".to_owned()),
+                allowed_values: Vec::new(),
+                minimum: None,
+                maximum: None,
+                unit: None,
+                evidence: MusicEditValidityEvidenceV1::Acoustic,
+                rationale: "the rendered notes should connect audibly".to_owned(),
+            },
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.duration-delta".to_owned(),
+                property: MusicEditValidityPropertyV1::DurationTicks,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::DifferentFrom,
+                expected_value: Some("source_event_duration".to_owned()),
+                allowed_values: Vec::new(),
+                minimum: None,
+                maximum: None,
+                unit: None,
+                evidence: MusicEditValidityEvidenceV1::Symbolic,
+                rationale: "duration changes relative to the source event".to_owned(),
+            },
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.duration-range".to_owned(),
+                property: MusicEditValidityPropertyV1::DurationTicks,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::WithinRange,
+                expected_value: None,
+                allowed_values: Vec::new(),
+                minimum: Some(1.0),
+                maximum: Some(480.0),
+                unit: Some("ticks".to_owned()),
+                evidence: MusicEditValidityEvidenceV1::Symbolic,
+                rationale: "duration must be a positive integer number of score ticks".to_owned(),
+            },
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.duration-ratio".to_owned(),
+                property: MusicEditValidityPropertyV1::DurationToInterOnsetRatio,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::WithinRange,
+                expected_value: None,
+                allowed_values: Vec::new(),
+                minimum: Some(1.0),
+                maximum: Some(1.25),
+                unit: Some("ratio".to_owned()),
+                evidence: MusicEditValidityEvidenceV1::Symbolic,
+                rationale: "legato duration reaches or overlaps the next onset".to_owned(),
+            },
+        ]);
+        envelope.protected_invariants = vec![
+            constraint(
+                "protect.onset",
+                MusicEditValidityPropertyV1::OnsetTicks,
+                MusicEditValidityScopeV1::TargetPart,
+                MusicEditValidityRelationV1::NoChange,
+            ),
+            constraint(
+                "protect.pitch",
+                MusicEditValidityPropertyV1::MelodyPitch,
+                MusicEditValidityScopeV1::TargetPart,
+                MusicEditValidityRelationV1::NoChange,
+            ),
+        ];
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+        let gate = envelope.requested_change.iter_mut().find(|c| {
+            c.property == MusicEditValidityPropertyV1::DurationToInterOnsetRatio
+        }).unwrap();
+        gate.minimum = Some(0.8);
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::Legato,
+                property: MusicEditValidityPropertyV1::DurationToInterOnsetRatio,
             }
         ));
     }
