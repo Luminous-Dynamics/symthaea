@@ -50,13 +50,24 @@ fn audit_case(case: &Value, fixture: &Value) -> Disposition {
     for key in all_keys {
         if !required_set.contains(key.as_str()) && baseline.get(key) != candidate.get(key) { return Disposition::Blocked; }
     }
-    if validate_baseline_qualification(case, baseline, &required_endpoints) != Disposition::Pass {
-        return validate_baseline_qualification(case, baseline, &required_endpoints);
+    let baseline_check = validate_baseline_qualification(case, baseline, &required_endpoints);
+    if baseline_check != Disposition::Pass { return baseline_check; }
+    let Some(scope) = fixture.get("qualification_scope").and_then(Value::as_object) else { return Disposition::Blocked; };
+    for factor in &required_factors {
+        let Some(factor_scope) = scope.get(factor) else { return Disposition::Blocked; };
+        let Some(baseline_value) = baseline.get(factor) else { return Disposition::Blocked; };
+        match scope_contains(baseline_value, factor_scope) {
+            Some(true) => {}
+            Some(false) => return Disposition::Rejected,
+            None => return Disposition::Blocked,
+        }
     }
+    let Some(baseline_receipt) = case.get("baseline_qualification").and_then(Value::as_object) else { return Disposition::Blocked; };
+    let Some(baseline_artifact) = baseline_receipt.get("artifact_sha256").and_then(Value::as_str) else { return Disposition::Blocked; };
+    let mut seen_hashes = HashSet::<String>::new();
+    if !seen_hashes.insert(baseline_artifact.to_ascii_lowercase()) { return Disposition::Rejected; }
     let bridges = case.get("bridges").and_then(Value::as_array).map(Vec::as_slice).unwrap_or(&[]);
     if changed.is_empty() { return if bridges.is_empty() { Disposition::Pass } else { Disposition::Rejected }; }
-
-    let Some(scope) = fixture.get("qualification_scope").and_then(Value::as_object) else { return Disposition::Blocked; };
     for factor in &changed {
         let Some(factor_scope) = scope.get(factor) else { return Disposition::Blocked; };
         let Some(candidate_value) = candidate.get(factor) else { return Disposition::Blocked; };
@@ -70,7 +81,6 @@ fn audit_case(case: &Value, fixture: &Value) -> Disposition {
     if !(0.0..=1.0).contains(&min_confidence) { return Disposition::Rejected; }
 
     let mut seen_sets = HashSet::<String>::new();
-    let mut seen_hashes = HashSet::<String>::new();
     let mut individual = HashSet::<String>::new();
     let mut joint = false;
     let mut full_set = changed.clone();
@@ -231,6 +241,14 @@ mod tests {
     #[test] fn duplicate_artifact_rejects() {
         let data = fixture();
         assert_eq!(audit_case(case(&data, "duplicate-bridge-artifact"), &data), Disposition::Rejected);
+    }
+    #[test] fn baseline_outside_scope_rejects() {
+        let data = fixture();
+        assert_eq!(audit_case(case(&data, "baseline-outside-qualified-scope"), &data), Disposition::Rejected);
+    }
+    #[test] fn bridge_cannot_reuse_baseline_receipt_artifact() {
+        let data = fixture();
+        assert_eq!(audit_case(case(&data, "bridge-reuses-baseline-qualification-artifact"), &data), Disposition::Rejected);
     }
     #[test] fn baseline_profile_hash_mismatch_rejects() {
         let data = fixture();
