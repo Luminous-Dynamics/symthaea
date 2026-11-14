@@ -85,7 +85,7 @@ pub struct MusicEditMetamorphicTransformReceiptV1 {
     pub transform_implementation_sha256: String,
     pub transform_version: String,
     pub transform_parameters_sha256: String,
-    /// SHA-256 of the canonical receipt commitment with this field empty.
+    /// SHA-256 of all canonical receipt fields other than this commitment field.
     pub receipt_sha256: String,
 }
 
@@ -149,6 +149,9 @@ pub fn verify_music_edit_metamorphic_transform_receipt_v1(
     receipt: &MusicEditMetamorphicTransformReceiptV1,
 ) -> Vec<MusicEditMetamorphicIssueV1> {
     let mut issues = Vec::new();
+    if !validate_music_edit_metamorphic_pair_v1(pair).is_empty() {
+        issues.push(MusicEditMetamorphicIssueV1::InvalidPair);
+    }
     if receipt.schema_version != MUSIC_EDIT_METAMORPHIC_TRANSFORM_RECEIPT_SCHEMA_V1 {
         issues.push(MusicEditMetamorphicIssueV1::WrongTransformReceiptSchema);
     }
@@ -446,6 +449,7 @@ pub enum MusicEditMetamorphicAssessmentIssueV1 {
     InvalidPropertyMapping,
     PropertyMappingDigestMismatch,
     InvalidNumericRule(String),
+    TransformReceiptRejected,
     NonIdentityRuleForInvariant(String),
     MissingCategoryMapping(String),
     UnmappedObservationProperty(String),
@@ -556,6 +560,7 @@ pub fn verify_music_edit_metamorphic_assessment_v1(
 
 pub fn evaluate_music_edit_metamorphic_pair_v1(
     pair: &MusicEditMetamorphicPairV1,
+    transform_receipt: &MusicEditMetamorphicTransformReceiptV1,
     mapping: &MusicEditMetamorphicPropertyMappingV1,
     base: &MusicEditMetamorphicObservationV1,
     transformed: &MusicEditMetamorphicObservationV1,
@@ -571,6 +576,9 @@ pub fn evaluate_music_edit_metamorphic_pair_v1(
     }
     let pair_sha256 = music_edit_metamorphic_pair_digest_v1(pair)
         .map_err(|_| vec![MusicEditMetamorphicAssessmentIssueV1::SerializationError])?;
+    if !verify_music_edit_metamorphic_transform_receipt_v1(pair, transform_receipt).is_empty() {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::TransformReceiptRejected);
+    }
     issues.extend(validate_metamorphic_observation_v1(pair, &pair_sha256, base, true));
     issues.extend(validate_metamorphic_observation_v1(pair, &pair_sha256, transformed, false));
 
@@ -817,6 +825,15 @@ mod tests {
         receipt
     }
 
+    fn pair_with_transform_receipt(
+        relation: MusicEditMetamorphicRelationV1,
+    ) -> (MusicEditMetamorphicPairV1, MusicEditMetamorphicTransformReceiptV1) {
+        let mut value = pair(relation);
+        let receipt = matching_transform_receipt(&value);
+        value.transform_receipt_sha256 = receipt.receipt_sha256.clone();
+        (value, receipt)
+    }
+
     fn observation(
         pair: &MusicEditMetamorphicPairV1,
         pair_sha: &str,
@@ -868,14 +885,14 @@ mod tests {
 
     #[test]
     fn invariant_evaluator_requires_both_edits_and_property_relations_to_pass() {
-        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let (mut pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Invariant);
         let map = mapping(1.0, 0.0, 0.0);
         pair.property_mapping_sha256 =
             Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
         let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
         let base = observation(&pair, &pair_sha, true, 64.0);
         let transformed = observation(&pair, &pair_sha, false, 64.0);
-        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed).unwrap();
         assert!(result.passed);
         assert!(result.relation_satisfied);
         assert!(verify_music_edit_metamorphic_assessment_v1(&result).is_ok());
@@ -886,7 +903,7 @@ mod tests {
 
     #[test]
     fn equivariant_evaluator_checks_declared_transposition_map() {
-        let mut pair = pair(MusicEditMetamorphicRelationV1::Equivariant);
+        let (mut pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Equivariant);
         let map = mapping(1.0, 3.0, 0.01);
         pair.property_mapping_sha256 =
             Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
@@ -900,7 +917,7 @@ mod tests {
 
     #[test]
     fn relation_can_fail_even_when_both_edits_pass_individually() {
-        let mut pair = pair(MusicEditMetamorphicRelationV1::Equivariant);
+        let (mut pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Equivariant);
         let map = mapping(1.0, 3.0, 0.01);
         pair.property_mapping_sha256 =
             Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
@@ -914,7 +931,7 @@ mod tests {
 
     #[test]
     fn failed_protected_content_gate_prevents_metamorphic_pass() {
-        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let (mut pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Invariant);
         let map = mapping(1.0, 0.0, 0.0);
         pair.property_mapping_sha256 =
             Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
@@ -987,8 +1004,24 @@ mod tests {
     }
 
     #[test]
+    fn evaluator_rejects_a_transform_receipt_from_another_output() {
+        let (mut pair, mut receipt) =
+            pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Invariant);
+        let map = mapping(1.0, 0.0, 0.0);
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        receipt.output_audio_sha256 = d(88);
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 64.0);
+        let transformed = observation(&pair, &pair_sha, false, 64.0);
+        assert!(evaluate_music_edit_metamorphic_pair_v1(
+            &pair, &receipt, &map, &base, &transformed
+        ).is_err());
+    }
+
+    #[test]
     fn noninvariant_pairs_are_not_scored_as_invariance() {
-        let pair = pair(MusicEditMetamorphicRelationV1::NonInvariant);
+        let (pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::NonInvariant);
         let map = mapping(1.0, 0.0, 0.0);
         let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
         let base = observation(&pair, &pair_sha, true, 440.0);
