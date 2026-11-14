@@ -24,6 +24,7 @@ struct SubstrateProfile {
     product_function: String,
     thickness_mm: f64,
     surface_finish: String,
+    supported_method_material_classes: Vec<String>,
     profile_sha256: String,
     constraint_plan_sha256: String,
     minimum_confidence_level: f64,
@@ -201,6 +202,14 @@ fn audit_method_pair(
 
     let baseline = &constraint.baseline_method_receipt;
     let treated = &constraint.treated_method_receipt;
+    if !unique_nonempty(&substrate.supported_method_material_classes) {
+        return Err(Decision::blocked("substrate profile lacks a unique list of supported method-material classes"));
+    }
+    if !substrate.supported_method_material_classes.contains(&baseline.material_pair_class)
+        || !substrate.supported_method_material_classes.contains(&treated.material_pair_class)
+    {
+        return Err(Decision::blocked("method receipt material class is not included in the substrate profile's declared applicability scope"));
+    }
     if baseline.endpoint != constraint.endpoint || treated.endpoint != constraint.endpoint {
         return Err(Decision::rejected("constraint endpoint does not match both baseline and treated method receipts"));
     }
@@ -398,8 +407,9 @@ fn audit_case(case: &SurfaceIntegrityCase) -> Decision {
     }
     if !sha256_shape(&substrate.profile_sha256)
         || !sha256_shape(&substrate.constraint_plan_sha256)
+        || !unique_nonempty(&substrate.supported_method_material_classes)
     {
-        return Decision::blocked("substrate or constraint-plan digest is missing or malformed");
+        return Decision::blocked("substrate profile, constraint-plan digest or supported method-material scope is missing or malformed");
     }
     if !substrate.thickness_mm.is_finite()
         || substrate.thickness_mm <= 0.0
@@ -563,6 +573,13 @@ mod tests {
     fn contact_angle_only_is_not_a_surface_integrity_pass() {
         let fixture = fixture();
         let case = fixture.cases.iter().find(|case| case.id == "contact-angle-only").expect("case exists");
+        assert_eq!(audit_case(case).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn valid_method_is_blocked_when_substrate_profile_does_not_admit_its_material_class() {
+        let fixture = fixture();
+        let case = fixture.cases.iter().find(|case| case.id == "profile-missing-tensile-method-class").expect("case exists");
         assert_eq!(audit_case(case).disposition, Disposition::Blocked);
     }
 
