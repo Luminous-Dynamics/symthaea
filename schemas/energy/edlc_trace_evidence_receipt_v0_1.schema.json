@@ -1,0 +1,451 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/energy/edlc_trace_evidence_receipt_v0_1.schema.json",
+  "title": "EDLC Trace Evidence Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "evidence_class",
+    "claim_ceiling",
+    "integrity_scope",
+    "provenance_limit",
+    "acquisition",
+    "device",
+    "instrument",
+    "protocol",
+    "environment",
+    "trace",
+    "events",
+    "artifacts",
+    "expected",
+    "negative_controls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "receipt_id": {
+      "const": "EDLC-TRACE-RECEIPT-KNOWN-ANSWER-001"
+    },
+    "evidence_class": {
+      "const": "synthetic_artifact_integrity"
+    },
+    "claim_ceiling": {
+      "const": "ARTIFACT_HASH_PATH_AND_STRUCTURAL_METADATA_INTEGRITY_ONLY_NOT_PHYSICAL_ORIGIN_AUTHENTICITY_OR_RELIABILITY"
+    },
+    "integrity_scope": {
+      "const": "sha256_byte_integrity_and_structural_metadata_only"
+    },
+    "provenance_limit": {
+      "const": "SHA256_MATCH_DOES_NOT_AUTHENTICATE_CREATOR_INSTRUMENT_CALIBRATION_OR_PHYSICAL_DEVICE"
+    },
+    "acquisition": {
+      "$ref": "#/$defs/acquisition"
+    },
+    "device": {
+      "$ref": "#/$defs/device"
+    },
+    "instrument": {
+      "$ref": "#/$defs/instrument"
+    },
+    "protocol": {
+      "$ref": "#/$defs/protocol"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "trace": {
+      "$ref": "#/$defs/trace"
+    },
+    "events": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "expected": {
+      "$ref": "#/$defs/expected"
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_unix_ms",
+        "end_unix_ms",
+        "sample_clock_reference"
+      ],
+      "properties": {
+        "start_unix_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_unix_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sample_clock_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manufacturer",
+        "model",
+        "physical_device_serial",
+        "lot_id",
+        "device_boundary",
+        "identity_artifact_id"
+      ],
+      "properties": {
+        "manufacturer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_device_serial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "device_boundary": {
+          "enum": [
+            "cell",
+            "complete_device",
+            "installed_system"
+          ]
+        },
+        "identity_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "model",
+        "serial",
+        "sample_rate_hz",
+        "timebase_reference",
+        "configuration_artifact_id",
+        "calibration_artifact_id",
+        "calibration_id"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "timebase_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "sequence_profile_id",
+        "standby_mode",
+        "device_boundary",
+        "artifact_id"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standby_mode": {
+          "enum": [
+            "open_circuit",
+            "regulated_voltage_hold"
+          ]
+        },
+        "device_boundary": {
+          "enum": [
+            "cell",
+            "complete_device",
+            "installed_system"
+          ]
+        },
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ambient_temperature_c",
+        "relative_humidity_percent",
+        "artifact_id"
+      ],
+      "properties": {
+        "ambient_temperature_c": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 200
+        },
+        "relative_humidity_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "expected_row_count",
+        "required_columns"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_row_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required_columns": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_index",
+        "event_id",
+        "load_profile_id",
+        "load_profile_artifact_id",
+        "readiness_probe_profile_id",
+        "readiness_probe_artifact_id"
+      ],
+      "properties": {
+        "event_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "load_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "load_profile_artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "readiness_probe_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "readiness_probe_artifact_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "event_index": {
+                "const": 1
+              }
+            },
+            "required": [
+              "event_index"
+            ]
+          },
+          "then": {
+            "properties": {
+              "readiness_probe_profile_id": {
+                "type": "null"
+              },
+              "readiness_probe_artifact_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "event_index": {
+                "minimum": 2
+              }
+            },
+            "required": [
+              "event_index"
+            ]
+          },
+          "then": {
+            "properties": {
+              "readiness_probe_profile_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "readiness_probe_artifact_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "role",
+        "relative_path",
+        "sha256",
+        "byte_length",
+        "media_type"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "raw_terminal_trace",
+            "device_identity_record",
+            "instrument_configuration",
+            "calibration_certificate",
+            "test_protocol",
+            "environment_log",
+            "load_profile",
+            "readiness_probe_profile"
+          ]
+        },
+        "relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "media_type": {
+          "enum": [
+            "text/csv",
+            "application/json"
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_count",
+        "raw_trace_rows"
+      ],
+      "properties": {
+        "artifact_count": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "raw_trace_rows": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
