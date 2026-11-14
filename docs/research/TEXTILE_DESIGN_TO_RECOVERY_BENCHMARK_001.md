@@ -28,6 +28,8 @@ The causal chain to measure is:
 
 A result at one stage cannot be promoted into a claim about a later stage. A camera classification does not prove fibre composition. A fibre-composition estimate does not prove recyclability. A high opening yield does not prove yarn quality. A yarn trial does not establish commercial acceptance.
 
+A separate **lot-lineage ledger** is now part of the chain. It binds every incoming lot, physical transformation, split/merge, residual, terminal output and receiver decision. This prevents an intermediate sorted lot from being counted again as final fibre output and prevents one lot from being consumed by two later routes without an explicit split.
+
 ## 2. What current research says — and does not say
 
 ### 2.1 Construction affects the quality of recycled fibre
@@ -162,6 +164,8 @@ For each output yarn route, measure:
 The receiver must record the exact specification version, pass/fail/conditional outcome and a distinct receiving-evidence reference. “Potentially spinnable” or “manufactured a sample” is not equivalent to commercial-grade acceptance.
 
 ## 6. Primary metrics
+
+Material-flow reporting must count terminal outputs only. Publish source input mass, accepted receiver mass, rejected mass, waste, awaiting-receiver mass and unaccounted process residual separately; retain parent/child lot identities across every sorting, split, merge and recovery event. Intermediate lot masses are not final recovery yield.
 
 Do not collapse these into one score. Report per stratum and with uncertainty intervals.
 
