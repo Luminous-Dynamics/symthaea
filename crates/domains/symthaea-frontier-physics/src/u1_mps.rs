@@ -2847,6 +2847,7 @@ pub struct U1MpsTruncationLedger {
     pub cumulative_local_l2_error_bound: f64,
     pub cumulative_canonicalization_l2_error_bound: f64,
     pub cumulative_gate_quality_l2_error_bound: f64,
+    pub cumulative_hamiltonian_projection_l2_error_bound: f64,
     pub cumulative_projection_l2_error_bound: f64,
     pub maximum_single_gate_relative_discarded_weight: f64,
     pub canonical_gauge_receipt_count: usize,
@@ -2957,7 +2958,8 @@ impl U1MpsTruncationLedger {
             receipt,
             0.0,
             0.0,
-            receipt.input_norm_squared,
+            0.0,
+            receipt.output_norm_squared,
             tolerance,
         )
     }
@@ -2994,6 +2996,7 @@ impl U1MpsTruncationLedger {
             receipt,
             unitarity_residual,
             charge_residual,
+            gate.hamiltonian_projection_error_operator_upper_bound(),
             receipt.output_norm_squared,
             tolerance,
         )
@@ -3005,6 +3008,7 @@ impl U1MpsTruncationLedger {
         receipt: &U1CanonicalGaugeReceipt,
         gate_unitarity_residual: f64,
         gate_charge_residual: f64,
+        hamiltonian_projection_operator_error_upper_bound: f64,
         pre_gate_norm_squared: f64,
         tolerance: f64,
     ) -> Result<(), U1MpsError> {
@@ -3013,6 +3017,8 @@ impl U1MpsTruncationLedger {
         let prior_bound = self.global_state_error_bound_upper;
         let prior_canonicalization_error = self.cumulative_canonicalization_l2_error_bound;
         let prior_gate_quality_error = self.cumulative_gate_quality_l2_error_bound;
+        let prior_hamiltonian_projection_error =
+            self.cumulative_hamiltonian_projection_l2_error_bound;
         let prior_projection_error = self.cumulative_projection_l2_error_bound;
 
         if !gate_unitarity_residual.is_finite()
@@ -3027,12 +3033,21 @@ impl U1MpsTruncationLedger {
             ));
         }
 
+        if !hamiltonian_projection_operator_error_upper_bound.is_finite()
+            || hamiltonian_projection_operator_error_upper_bound < 0.0
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian projection operator-error bound",
+            ));
+        }
         let (gate_operator_norm_upper, gate_quality_error) =
             gate_quality_error_bounds_from_residuals(
                 gate_unitarity_residual,
                 gate_charge_residual,
                 pre_gate_norm_squared,
             )?;
+        let hamiltonian_projection_error = hamiltonian_projection_operator_error_upper_bound
+            * pre_gate_norm_squared.sqrt();
         if !receipt.qualifies(tolerance) {
             self.record_local(diagnostics)?;
             self.canonical_gauge_receipt_count = self
@@ -3051,10 +3066,12 @@ impl U1MpsTruncationLedger {
         // propagated by the certified operator-norm bound of the actual gate.
         let contribution = canonicalization_error * gate_operator_norm_upper
             + gate_quality_error
+            + hamiltonian_projection_error
             + projection_error;
         if !contribution.is_finite()
             || !gate_operator_norm_upper.is_finite()
             || !gate_quality_error.is_finite()
+            || !hamiltonian_projection_error.is_finite()
         {
             return Err(U1MpsError::NonFiniteContraction(
                 "canonical-gauge global truncation contribution",
@@ -3085,6 +3102,9 @@ impl U1MpsTruncationLedger {
                     + canonicalization_error * gate_operator_norm_upper;
             self.cumulative_gate_quality_l2_error_bound =
                 prior_gate_quality_error * gate_operator_norm_upper + gate_quality_error;
+            self.cumulative_hamiltonian_projection_l2_error_bound =
+                prior_hamiltonian_projection_error * gate_operator_norm_upper
+                    + hamiltonian_projection_error;
             self.cumulative_projection_l2_error_bound =
                 prior_projection_error * gate_operator_norm_upper + projection_error;
         } else {
@@ -3139,6 +3159,8 @@ pub struct U1TeBDGateReceipt {
     pub global_l2_error_contribution: Option<f64>,
     pub global_l2_error_bound_after_gate: Option<f64>,
     pub global_projection_error_upper_bound: f64,
+    pub hamiltonian_projection_operator_error_upper_bound: f64,
+    pub hamiltonian_projection_error_upper_bound: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -3295,6 +3317,13 @@ impl U1TeBDLayer {
                 global_l2_error_contribution,
                 global_l2_error_bound_after_gate,
                 global_projection_error_upper_bound,
+                hamiltonian_projection_operator_error_upper_bound: entry
+                    .gate
+                    .hamiltonian_projection_error_operator_upper_bound(),
+                hamiltonian_projection_error_upper_bound: entry
+                    .gate
+                    .hamiltonian_projection_error_operator_upper_bound()
+                    * gauge_receipt.output_norm_squared.sqrt(),
             });
             gate_truncations.push(truncation);
         }
