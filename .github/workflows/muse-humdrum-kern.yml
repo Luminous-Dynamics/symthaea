@@ -1,0 +1,52 @@
+name: MUSE Humdrum Kern
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/muse-humdrum-kern.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/barline_eval.rs"
+      - "crates/domains/symthaea-muse/src/evidence_digest.rs"
+      - "crates/domains/symthaea-muse/src/humdrum_kern.rs"
+  push:
+    branches:
+      - "research/melothaea-humdrum-kern-v1"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/barline_eval.rs"
+      - "crates/domains/symthaea-muse/src/evidence_digest.rs"
+      - "crates/domains/symthaea-muse/src/humdrum_kern.rs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-humdrum-kern-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  humdrum-kern:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Test Humdrum kern parser
+        run: cargo test --locked -p symthaea-muse --features theory humdrum_kern::tests::
+
+      - name: Check Muse library with theory feature
+        run: cargo check --locked -p symthaea-muse --features theory --lib
