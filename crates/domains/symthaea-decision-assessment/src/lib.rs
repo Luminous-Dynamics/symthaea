@@ -1344,10 +1344,49 @@ mod tests {
 
     #[test]
     fn self_asserted_packet_hash_without_external_time_witness_is_indeterminate() {
-        let packet = sample_packet();
+        let mut packet = sample_packet();
+        packet["assessment_result"]["decision_support"] = json!("indeterminate");
         let report = run_without_commitment(&packet, &qualifications(&packet));
         assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
         assert!(report.reason_codes.contains(&"INDEPENDENT_COMMITMENT_WITNESS_MISSING".to_owned()));
+    }
+
+    #[test]
+    fn unknown_target_world_time_is_indeterminate() {
+        let mut packet = sample_packet();
+        packet["decision_episode"]["target_world_time"]["state"] = json!("unknown");
+        packet["decision_episode"]["target_world_time"].as_object_mut().unwrap().remove("instant");
+        packet["assessment_result"]["decision_support"] = json!("indeterminate");
+        reseal(&mut packet);
+        let report = run(&packet, &qualifications(&packet));
+        assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
+        assert!(report.reason_codes.contains(&"TARGET_WORLD_TIME_UNKNOWN".to_owned()));
+    }
+
+    #[test]
+    fn owner_claim_ceiling_cannot_be_widened_by_adapter() {
+        let packet = sample_packet();
+        let mut qualified = qualifications(&packet);
+        qualified.get_mut("evidence_use_validity").unwrap().claim_ceiling =
+            "engineering_release_approved".to_owned();
+        let report = run(&packet, &qualified);
+        assert_eq!(report.decision_support, DecisionSupport::NotSupportedAtK);
+        assert!(report.reason_codes.contains(&"OWNER_RECEIPT_IDENTITY_MISMATCH:evidence_use_validity".to_owned()));
+    }
+
+    #[test]
+    fn commitment_witness_integrity_unknown_is_indeterminate() {
+        let mut packet = sample_packet();
+        packet["assessment_result"]["decision_support"] = json!("indeterminate");
+        let mut witness = commitment_qualification(&packet);
+        witness.receipt_integrity = GateState::Indeterminate;
+        let report = evaluate_json(
+            serde_json::to_string(&packet).unwrap().as_bytes(),
+            &qualifications(&packet),
+            Some(&witness)
+        ).unwrap();
+        assert_eq!(report.decision_support, DecisionSupport::Indeterminate);
+        assert!(report.reason_codes.contains(&"COMMITMENT_WITNESS_RECEIPT_INTEGRITY_INDETERMINATE".to_owned()));
     }
 
     #[test]
@@ -1437,6 +1476,7 @@ mod tests {
         let report = run(&packet, &qualifications(&packet));
         assert_eq!(report.decision_support, DecisionSupport::NotSupportedAtK);
         assert!(report.reason_codes.contains(&"CRITICAL_DEFEATER_UNRESOLVED".to_owned()));
+        assert!(!report.reason_codes.contains(&"CANDIDATE_COMMITMENT_DIGEST_MISMATCH".to_owned()));
     }
 
     #[test]
