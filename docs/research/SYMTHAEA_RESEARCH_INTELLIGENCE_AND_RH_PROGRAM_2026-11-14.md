@@ -321,3 +321,102 @@ Stop or pivot when:
 - the claimed improvement disappears under matched budgets, holdouts or independent grading.
 
 The project succeeds when it produces more independently validated, useful discoveries per unit of total resources while becoming better calibrated about what it does not know—not when it produces more confident text, more agents, or more benchmark claims.
+
+
+## 9. Benchmark and industry comparison refresh — 2026-11-14
+
+This section makes the external comparison more precise. The figures below are snapshots of different benchmark constructs; they are not one common leaderboard and are not direct evidence of Symthaea capability.
+
+### 9.1 What current public systems actually measure
+
+| Benchmark | Latest relevant public snapshot | What it demonstrates | What it does not demonstrate |
+|---|---|---|---|
+| **AstaBench** | 2,400+ problems across 11 benchmark components; 57 agent configurations across 22 classes; leading overall score approximately 0.53 at roughly US$3.40/problem in the Stanford AI Index 2026 snapshot | Breadth across literature understanding, code/execution, data analysis and end-to-end discovery | A single continuous scientific campaign; a complete 57 × 11 evaluation matrix; universal expert-level research competence |
+| **FIRE-Bench** | 30 ML-paper rediscovery tasks; Claude Code Sonnet-4 at 46.7 ± 23.4 claim-level F1; Codex GPT-5-medium at 41.9 ± 25.4; three runs per task; benchmark reports 73.6% of errors in planning | Full-cycle rediscovery with a verifiable empirical claim target; very large run-to-run instability | Original scientific discovery, universal research ability, or a stable single-run score |
+| **Autonomous Science Bench 0.1** | Six laboratory-derived pilot tasks; ten configurations completed all six, three trials/task; GPT-6 Astra + Codex 72.2% at US$190.23 total; Opus 5.5 + Claude Code 66.7% at US$172.91 | Budgeted design–measure–learn campaigns with separate discovery and held-out-learning gates | A statistically decisive winner from a three-trial/task pilot; physical laboratory performance for replay/twin backends |
+| **ASI-Bench** | 60 tasks, B1–B4 methodological-guidance ladder; leaderboard updated 10 November 2026; leading reported aggregate 63.90 | Whether the system can choose methods as procedural guidance is withdrawn | Empirical truth, independent discovery, or proof validity |
+| **IdeaTaste** | More than 90,000 proposals; 96 populations across six models, four methods and four research areas; models average about 26% of human level on citation matching and 18% on idea matching | A major gap between recognizing research directions and constructing the concrete approaches later pursued by communities | Scientific truth or a fair penalty for a genuinely original result that has not yet appeared in a paper |
+| **TasteVal** | Eight private AI-R&D tasks; 24 recruited experts; Opus 5.5 reported 2.30× experimental-compute multiplier (95% CI 1.15–4.37) and 1.14× normalized final-performance multiplier (95% CI 1.01–1.31); one refusal was missing on one task | Experimental planning and interpretation can reduce experimental compute to reach a target | A 2.30× quality gain or an inclusive total-cost gain; researcher inference-token costs are excluded from the compute multiplier |
+| **Formal Conjectures** | 2,615 Lean 4 statements; 1,029 open research conjectures and 836 solved problems for autoformalization in the May 2026 paper snapshot | A path to zero-contamination formal research discovery and theorem-level evaluation | Proof search on one mutable snapshot as a stable, timeless leaderboard |
+| **smmercuri/zeta** | Kernel-checked RiemannHypothesisUpTo(T) reported through T = 100,000,300, covering 248,008,818 nontrivial zeros in the declared finite range | A rigorous bounded-height verification pipeline, with explicit kernel/native/Python trust layers | The universal Riemann Hypothesis |
+
+Primary sources:
+- AstaBench / Stanford AI Index: https://hai.stanford.edu/assets/files/ai_index_report_2026.pdf
+- AstaBench project: https://allenai.org/blog/astabench
+- FIRE-Bench leaderboard and task definitions: https://firebench.github.io/
+- FIRE-Bench paper: https://arxiv.org/abs/2602.02905
+- Autonomous Science Bench 0.1: https://www.autonomous-science-bench.ai/about and https://www.autonomous-science-bench.ai/leaderboard
+- ASI-Bench leaderboard: https://asibench.apexin.ai/
+- IdeaTaste paper and leaderboard: https://arxiv.org/abs/2611.03424 and https://cxcscmu.github.io/IdeaTaste/
+- TasteVal paper: https://arxiv.org/abs/2610.06824
+- Formal Conjectures: https://arxiv.org/abs/2605.13171 and https://github.com/google-deepmind/formal-conjectures
+- Bounded-height zeta verification and trust model: https://github.com/smmercuri/zeta
+
+### 9.2 The paradigm shift these results suggest
+
+The bottleneck is increasingly **research decision quality**, not simply code generation or search-result volume.
+
+- IdeaTaste suggests that broader retrieval and more generated proposals do not automatically yield concrete, feasible approaches.
+- TasteVal demonstrates why experiment efficiency and final scientific performance must be separate outcomes.
+- FIRE-Bench shows both a planning bottleneck and high variance. A single successful run is not a reliable research capability claim.
+- Autonomous Science Bench makes experiment selection, outcome interpretation, discovery and held-out learning jointly observable. Its six-task pilot is useful, but the current three-trial/task design cannot support strong claims from small score gaps.
+- AstaBench is a valuable broad compatibility suite, but its overall score is a macro aggregate across components rather than one end-to-end campaign success probability.
+- ASI-Bench adds an important methodological-autonomy axis. It should complement, not replace, outcome-based scientific validity.
+- Formal Conjectures and the zeta project demonstrate why exact theorem statements, frozen source versions, kernel acceptance and external trust boundaries matter.
+
+### 9.3 How Symthaea should compete
+
+Do not build one agent and tune it against one headline number. Run a preregistered, matched tournament with controlled factors:
+
+1. **Information mode:** fixed source packet; active literature retrieval; cost-matched random retrieval; theorem/citation graph; HDC-assisted retrieval.
+2. **Reasoning mode:** fixed model and prompt; model plus typed Research State; model plus counterfactual hypothesis set; full Symthaea research policy.
+3. **Execution mode:** fixed Coder; Symtropy replay; Symtropy digital twin; human-supervised physical campaign only where authorized.
+4. **Evaluation mode:** independent claim/source adjudication; hidden outcome oracle; kernel checker; blinded domain-expert review.
+
+Hold the model, task snapshot, tool access, context/token budget, retries, wall-time limit, total compute, evaluator and data cutoff constant when isolating a component. Test the interaction between base-model capability and active exploration rather than assuming retrieval helps every model equally.
+
+### 9.4 Scoreboard: separate quality, cost, reliability and integrity
+
+For each benchmark family, publish the full vector:
+
+- task-native result and per-task outcomes;
+- prospective prediction calibration;
+- discovery quality on measured items;
+- learning/generalization on held-out unmeasured items;
+- claim-level precision/recall and false-positive/false-negative rates where applicable;
+- correct abstention and non-identifiability recognition;
+- mean, median, worst-stratum and run-to-run dispersion;
+- total model tokens, tool calls, Coder tokens, CPU/GPU hours, peak memory, energy where measured, API/tool cost, human review time and retry cost;
+- independent source/statement/measurement verification;
+- rights, evaluator, security and authority violations as hard gates.
+
+A benchmark that omits model inference cost, human review, refusals or invalid attempts must be described with those omissions. Preserve every run and denominator. Do not convert a missing or refused run into a pass.
+
+### 9.5 Prospective stretch goals after baseline reproduction
+
+These are **targets, not achieved results**. Freeze the evaluation protocol and conduct a powered pilot before using them for promotion:
+
+| Track | First milestone | Stretch target |
+|---|---|---|
+| Broad workflow (AstaBench-compatible) | Reproduce the strongest comparable public baseline on the same benchmark revision | At least 10% relative score improvement at no greater fully inclusive cost, with the paired confidence interval excluding zero |
+| Empirical rediscovery (FIRE-Bench-compatible) | Reproduce claim-level scoring and three-run variance on a pinned 30-task subset | Mean F1 above 55 with materially lower run variance, without increasing unsupported-claim false positives |
+| Scientific campaigns (AS-Bench-compatible) | Pass both discovery and held-out-learning gates on a pinned replay campaign | At least 10% lower fully inclusive cost-to-target than the strongest matched baseline, with no reduction in either final gate |
+| Research taste (IdeaTaste-compatible) | Improve concrete-approach specificity and feasibility against a blinded human reference | Reach at least 30% of the human reference on idea matching while separately retaining reviewed, independently valuable novel discoveries |
+| Experimental taste (TasteVal-compatible) | Measure experimental-compute-to-target and normalized final score separately | Exceed the 2.30× reported compute multiplier on a genuinely comparable suite while maintaining final quality; also lower inclusive cost per confirmed improvement |
+| Methodological autonomy (ASI-Bench-compatible) | Demonstrate valid method selection at B3 and distraction resistance at B4 | Improve the matched B3/B4 results without degrading outcome validity or transfer |
+| Formal mathematics | Reproduce a frozen Formal Conjectures snapshot and bounded-height zeta baseline | More independently accepted hard-mode discoveries per total cost, with zero false theorem acceptances and positive transfer to unseen theorem families |
+
+The stretch targets are not comparable across different benchmark task sets. “SOTA” is claimed only on an exact task/split, benchmark version, model/harness, budget and evaluator match.
+
+### 9.6 Zeta verification: preserve the trust boundary
+
+The smmercuri/zeta project reports kernel, native-checker and Python results separately. For the 10^8 record it reports the Lean kernel theorem for the finite interval, but its large build pipeline may discard proof terms after checking and retain hashes/build logs. The README reports successful comparator checks at 10^4 and sharded comparator checks at 10^5 and 10^6; it warns that the global comparator is impractical beyond 10^4 under the current Lean literal-hashing issue.
+
+Therefore:
+- reproduce the small 10^4 configuration first;
+- distinguish a kernel build, native precheck and independent comparator run;
+- do not imply the 10^8 proof terms remain available for inspection if they were discarded;
+- do not imply a sampled/sharded independent comparator is the same as a complete global re-check;
+- do not promote any bounded-height result to full RH.
+
+This programme should outperform industry by being more reliable, more cost-efficient and more epistemically disciplined—not by claiming that different benchmark scores prove one system is generally superior.
