@@ -637,7 +637,8 @@
             "valid_from": "2026-11-14T08:50:00Z",
             "valid_through": "2026-11-14T11:50:00Z",
             "admissibility": "admissible",
-            "reason": "Observed and authorized before the knowledge cutoff."
+            "reason": "Observed and authorized before the knowledge cutoff.",
+            "validity_completeness": "complete"
           }
         ],
         "excluded_evidence": [
@@ -648,7 +649,8 @@
             "valid_from": "2026-11-14T09:10:00Z",
             "valid_through": null,
             "admissibility": "inadmissible",
-            "reason": "The test result arrived after the decision even though the underlying test ran before it."
+            "reason": "The test result arrived after the decision even though the underlying test ran before it.",
+            "validity_completeness": "incomplete"
           }
         ],
         "later_corrections": [
