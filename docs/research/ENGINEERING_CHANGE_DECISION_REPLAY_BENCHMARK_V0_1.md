@@ -227,3 +227,34 @@ The issue bodies establish intended contracts, not proof that every implementati
 The immediate implementation question is therefore **an owner-to-type-to-consumer compatibility audit**, not a new system proposal. The audit must inspect exact current code/tests and identify the narrowest adapter or missing check. If #11241's verifier is reusable, adopt it only after confirming its semantics match the engineering profile; if #10816 already exposes the visibility receipt needed, consume it unchanged.
 
 As of this preregistration update, #10314 remains an open draft dependency, no V1.1 Draft 2020-12 engine run is claimed, no end-to-end semantic evaluator is qualified, and no assessor labels/vendor trials/physical evidence exist.
+
+
+### Pulse cryptographic/causal verifier boundary audit — 2026-11-14
+
+A read-only source inspection of Mycelix [Pulse multi-conductor auditor PR #5771](https://github.com/Luminous-Dynamics/mycelix/pull/5771) and its [auditor README](https://github.com/Luminous-Dynamics/mycelix/blob/research/pulse-authority-lifecycle-v1-20261104/tools/pulse-multiconductor-audit/README.md) confirms that the existing v2 structural verifier is a useful source of causal-history semantics:
+
+- conductor-local sequence values are compared only inside their own conductor;
+- cross-conductor order is represented only by explicit evidence-referenced edges in an acyclic graph;
+- verified-record signal checks bind the exact source-chain action, canonical payload digest, accepted receiving-validator event, integrity-WASM digest, observer lineage and author→validator→observer edges;
+- the report binds the original input bytes by SHA-256 and distinguishes PASS, FAIL and INCOMPLETE;
+- it does not treat a wall-clock sort, remote local sequence or topological position as a substitute for reachability.
+
+**Important implementation limits:** the borrowed parser performs a strict closed-world preflight, but the current semantic path still materializes an owned history after preflight; full borrowed/streaming semantics remain tracked under Mycelix #5872. The auditor is structural: it does not authenticate the evidence references, prove Holochain/DHT truth, or establish that the real-world event occurred. Its report is not itself an authority grant.
+
+The separate [Pulse signed-evidence audit](https://github.com/Luminous-Dynamics/mycelix/blob/main/tools/pulse-signed-evidence-audit/README.md) adds DSSE v1 / in-toto statements, Ed25519 signatures over exact DSSE PAE bytes, role/predicate authorization relative to a supplied policy, and exact source commit/trace-byte digest binding. Its documented ROLE_AUTHENTICATED_RELATIVE_TO_SUPPLIED_POLICY result is explicitly relative to caller-supplied policy bytes: the policy is not authenticated by that mode. The README also says SCITT/COSE verification is incomplete (opaque-byte digest checks are not COSE signature, TS identity or VDS proof verification), and key-validity/revocation history is not yet handled by that baseline.
+
+PR #5771's description records an additive pinned-root mode and a bounded trust-root model, but explicitly marks the new root-mode Rust verification/format/Clippy as pending at the described revision. Do not promote historical tests for an earlier verifier or finite TLA+ model results to the current PR head. This is why SEM-025 through SEM-028 are separate mutation controls: structural DAG consistency, signature verification relative to a supplied policy, root-authenticated policy snapshots, SCITT transparency verification, historical key validation and real-world event truth are different claims.
+
+**Required evaluator interpretation:**
+
+| Observed result | Permitted conclusion | Prohibited promotion |
+|---|---|---|
+| Multi-conductor structural auditor PASS | Supplied event/edge graph is internally consistent under the named schema and verifier | Authenticated evidence, conductor honesty, physical truth, Byzantine consensus or current action authority |
+| DSSE role signature relative to supplied policy | Covered bytes were signed by a key allowed by the exact supplied policy bytes | Authenticated trust root, valid current permission, SCITT inclusion or event truth |
+| Pinned-root policy snapshot (only after exact-head verification) | Exact trust-policy snapshot is authenticated under the relying party's pinned root | SCITT receipt verification, physical truth or current effect authorization |
+| Parsed SCITT/COSE envelope with byte digest only | Envelope bytes were identified/committed as stated | COSE signature validity, transparency-service identity, VDS inclusion proof |
+| Independent event/physical observation | Only the exact observation claim under its qualified method and scope | Generalized system safety or universal truth |
+
+The engineering evaluator must preserve these claim ceilings in its machine-readable result. A structurally valid DAG with unauthenticated edge references remains structurally valid but evidentially incomplete. A role signature under an unauthenticated policy remains relative authentication, not root authentication. An authorized source record still does not prove the physical event; a physical observation still does not grant the system action authority.
+
+The source inspection is against the public research PR branch and README surfaces. The #5771 branch itself is an open draft with substantial divergence from current main, so its historical exact-head checks are not current-main qualification evidence. No new Holochain runtime, DHT, SCITT service or physical process was executed in this audit.
