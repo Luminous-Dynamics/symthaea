@@ -1,0 +1,120 @@
+{
+  "fixture_id": "DYNPLAN-SYN-001",
+  "status": "public_synthetic_known_answer",
+  "selected_plan": "plan:evidence-first",
+  "selected_first_action": "action:audit-exact-pins",
+  "conditional_next_actions": [
+    "action:owner-contract-review",
+    "action:consumer-conformance-fixtures"
+  ],
+  "implementation_authorization": "not_granted",
+  "implementation_status": "blocked_pending_two_sided_contract_and_consumer_fixtures",
+  "plan_dispositions": [
+    {
+      "plan_id": "plan:immediate-implementation",
+      "disposition": "infeasible",
+      "reason_codes": [
+        "missing_two_sided_contract",
+        "missing_consumer_conformance",
+        "schema_version_equality_is_not_contract_conformance"
+      ]
+    },
+    {
+      "plan_id": "plan:evidence-first",
+      "disposition": "conditional_feasible",
+      "reason_codes": [
+        "within_budget",
+        "resolves_critical_unknowns",
+        "preserves_owner_authority",
+        "implementation_remains_blocked_until_evidence"
+      ]
+    },
+    {
+      "plan_id": "plan:broad-scan",
+      "disposition": "infeasible",
+      "reason_codes": [
+        "over_budget",
+        "does_not_resolve_critical_contract"
+      ]
+    },
+    {
+      "plan_id": "plan:unrelated-benchmark",
+      "disposition": "dominated",
+      "reason_codes": [
+        "over_budget",
+        "unrelated_to_target_capability",
+        "does_not_resolve_critical_contract"
+      ]
+    },
+    {
+      "plan_id": "plan:defer",
+      "disposition": "valid_fallback",
+      "reason_codes": [
+        "preserves_unknown",
+        "no_unsupported_mutation"
+      ]
+    }
+  ],
+  "hard_invariants": [
+    "A matching schema version string is not evidence of exact schema blob identity or two-sided conformance.",
+    "A graph edge or source-declared integration statement does not satisfy an owner contract prerequisite.",
+    "No plan may implement the consumer while the two-sided contract and consumer conformance evidence are missing.",
+    "Map, review and planning outputs cannot grant authority or authorize repository mutation.",
+    "Action estimates and expected benefits are proposed values and must be calibrated against observed outcomes before operational use.",
+    "If owner-side evidence cannot be obtained, the correct result is defer/indeterminate rather than guessed compatibility."
+  ],
+  "negative_controls": [
+    {
+      "id": "DYNPLAN-NC-01",
+      "mutation": "Change one owner's schema version string but retain the old schema blob.",
+      "expected": "reject_contract_version_without_blob_identity"
+    },
+    {
+      "id": "DYNPLAN-NC-02",
+      "mutation": "Keep schema version and blob equal but remove two-sided owner conformance.",
+      "expected": "keep_contract_unqualified"
+    },
+    {
+      "id": "DYNPLAN-NC-03",
+      "mutation": "Mark immediate implementation ready while critical contract and consumer evidence are missing.",
+      "expected": "reject_false_feasible_plan"
+    },
+    {
+      "id": "DYNPLAN-NC-04",
+      "mutation": "Reduce broad scan cost below budget without making it resolve the critical contract.",
+      "expected": "do_not_promote_irrelevant_plan"
+    },
+    {
+      "id": "DYNPLAN-NC-05",
+      "mutation": "Add an authority grant or repository mutation to a plan without a separate owner authorization.",
+      "expected": "reject_authority_transfer"
+    },
+    {
+      "id": "DYNPLAN-NC-06",
+      "mutation": "Change the subject source revision while leaving the map artifact commit/blob unchanged.",
+      "expected": "mark_subject_map_pair_stale"
+    },
+    {
+      "id": "DYNPLAN-NC-07",
+      "mutation": "Change the map artifact while leaving the subject source revision/tree unchanged.",
+      "expected": "treat_artifact_refresh_separately"
+    },
+    {
+      "id": "DYNPLAN-NC-08",
+      "mutation": "Remove the owner evidence response from the plan horizon.",
+      "expected": "select_defer_or_indeterminate"
+    }
+  ],
+  "metrics": [
+    "hard-constraint violation rate",
+    "prerequisite-closure precision and recall",
+    "blocked-action detection and false-feasible rate",
+    "source/contract identity mismatch detection",
+    "evidence-obligation coverage",
+    "budget-normalized regret",
+    "plan cost calibration and realized overrun",
+    "correct defer/abstention rate",
+    "Pareto-front coverage and dominated-plan rate"
+  ],
+  "claim_ceiling": "One synthetic known-answer case only. No actual development trajectory, budget forecast, owner conformance, implementation or planning performance is established."
+}
