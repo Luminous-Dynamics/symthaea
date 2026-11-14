@@ -12,22 +12,60 @@ struct Fixture {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Case {
-    id: String,
-    method_id: String,
-    edition: String,
-    evidence_kind: String,
-    material_pair_class: String,
-    geometry: String,
-    endpoint: String,
-    requested_claim: String,
-    protocol_id: Option<String>,
-    protocol_sha256: Option<String>,
-    raw_data_sha256: Option<String>,
-    suitability_review_sha256: Option<String>,
-    specimen_ids: Vec<String>,
-    expected_disposition: String,
-    rationale: String,
+pub(super) struct Case {
+    pub(super) id: String,
+    pub(super) method_id: String,
+    pub(super) edition: String,
+    pub(super) evidence_kind: String,
+    pub(super) material_pair_class: String,
+    pub(super) geometry: String,
+    pub(super) endpoint: String,
+    pub(super) requested_claim: String,
+    pub(super) protocol_id: Option<String>,
+    pub(super) protocol_sha256: Option<String>,
+    pub(super) raw_data_sha256: Option<String>,
+    pub(super) suitability_review_sha256: Option<String>,
+    pub(super) specimen_ids: Vec<String>,
+    pub(super) expected_disposition: String,
+    pub(super) rationale: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ScopeEvidence {
+    pub(super) id: String,
+    pub(super) method_id: String,
+    pub(super) edition: String,
+    pub(super) evidence_kind: String,
+    pub(super) material_pair_class: String,
+    pub(super) geometry: String,
+    pub(super) endpoint: String,
+    pub(super) requested_claim: String,
+    pub(super) protocol_id: Option<String>,
+    pub(super) protocol_sha256: Option<String>,
+    pub(super) raw_data_sha256: Option<String>,
+    pub(super) suitability_review_sha256: Option<String>,
+    pub(super) specimen_ids: Vec<String>,
+}
+
+impl From<&Case> for ScopeEvidence {
+    fn from(case: &Case) -> Self {
+        Self {
+            id: case.id.clone(),
+            method_id: case.method_id.clone(),
+            edition: case.edition.clone(),
+            evidence_kind: case.evidence_kind.clone(),
+            material_pair_class: case.material_pair_class.clone(),
+            geometry: case.geometry.clone(),
+            endpoint: case.endpoint.clone(),
+            requested_claim: case.requested_claim.clone(),
+            protocol_id: case.protocol_id.clone(),
+            protocol_sha256: case.protocol_sha256.clone(),
+            raw_data_sha256: case.raw_data_sha256.clone(),
+            suitability_review_sha256: case.suitability_review_sha256.clone(),
+            specimen_ids: case.specimen_ids.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -56,7 +94,7 @@ const RULES: &[MethodRule] = &[
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Disposition {
+pub(super) enum Disposition {
     Supported,
     Blocked,
     Rejected,
@@ -72,10 +110,10 @@ impl Disposition {
     }
 }
 
-struct Decision {
-    disposition: Disposition,
-    reason: &'static str,
-    claim_ceiling: &'static str,
+pub(super) struct Decision {
+    pub(super) disposition: Disposition,
+    pub(super) reason: &'static str,
+    pub(super) claim_ceiling: &'static str,
 }
 
 fn is_sha256(value: Option<&str>) -> bool {
@@ -103,7 +141,7 @@ fn is_known_overclaim(claim: &str) -> bool {
     )
 }
 
-fn decide(case: &Case) -> Decision {
+pub(super) fn decide(case: &ScopeEvidence) -> Decision {
     let blocked = |reason, ceiling| Decision {
         disposition: Disposition::Blocked,
         reason,
@@ -241,7 +279,8 @@ pub fn run(path: &Path) -> anyhow::Result<()> {
     println!("Claim ceiling: method-scoped measurement only; no product qualification, design allowable, service-life, or standards-compliance claim.");
 
     for case in &fixture.cases {
-        let decision = decide(case);
+        let evidence = ScopeEvidence::from(case);
+        let decision = decide(&evidence);
         let index = match decision.disposition {
             Disposition::Supported => 0,
             Disposition::Blocked => 1,
@@ -301,7 +340,7 @@ mod tests {
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
-            let actual = decide(case).disposition.as_str();
+            let actual = decide(&ScopeEvidence::from(case)).disposition.as_str();
             assert_eq!(
                 actual, case.expected_disposition,
                 "disposition mismatch for {}",
@@ -327,7 +366,7 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
         for id in ["astm-d3163-rigid-plastic-comparative", "astm-d5868-frp-to-frp-comparative", "astm-d5868-frp-to-metal-comparative"] {
             let case = fixture.cases.iter().find(|case| case.id == id).expect("case exists");
-            assert_eq!(decide(case).disposition, Disposition::Supported, "{id}");
+            assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported, "{id}");
         }
     }
 
@@ -336,7 +375,7 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
         for id in ["astm-d2093-preparation-reference", "astm-d1151-conditioning-reference", "astm-d1183-conditioning-reference", "astm-d4896-interpretation-guide-reference"] {
             let case = fixture.cases.iter().find(|case| case.id == id).expect("case exists");
-            assert_eq!(decide(case).disposition, Disposition::Supported, "{id}");
+            assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported, "{id}");
             assert_ne!(case.evidence_kind, "measurement");
         }
     }
@@ -345,7 +384,7 @@ mod tests {
     fn evidence_kind_mismatch_is_rejected() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
         let case = fixture.cases.iter().find(|case| case.id == "astm-d3163-evidence-kind-mismatch").expect("case exists");
-        assert_eq!(decide(case).disposition, Disposition::Rejected);
+        assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Rejected);
     }
 
     #[test]
