@@ -12,6 +12,8 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 6. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
 7. [MEL-AUTO-001 runtime regeneration qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10098).
 
+6. [Finite viability-localized model](FINITE_VIABILITY_MODEL_2026-11-14.md) — AP1–AP4-style finite witnesses and local-to-global obstruction experiments.
+
 ## Current implementation
 
 The first executable package is a standalone nested Cargo workspace:
