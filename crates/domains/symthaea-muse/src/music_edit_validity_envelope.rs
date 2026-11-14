@@ -890,10 +890,10 @@ mod tests {
             protected_invariants: vec![
                 constraint("protect.harmony", MusicEditValidityPropertyV1::Harmony, MusicEditValidityScopeV1::Composition, MusicEditValidityRelationV1::NoChange),
                 constraint("protect.melody", MusicEditValidityPropertyV1::MelodyPitch, MusicEditValidityScopeV1::UnaffectedParts, MusicEditValidityRelationV1::NoChange),
-                constraint("protect.part-lineage", MusicEditValidityPropertyV1::EventLineage, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
-                constraint("protect.part-pitch", MusicEditValidityPropertyV1::MelodyPitch, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
-                constraint("protect.part-onset", MusicEditValidityPropertyV1::OnsetTicks, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
                 constraint("protect.part-duration", MusicEditValidityPropertyV1::DurationTicks, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-lineage", MusicEditValidityPropertyV1::EventLineage, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-onset", MusicEditValidityPropertyV1::OnsetTicks, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
+                constraint("protect.part-pitch", MusicEditValidityPropertyV1::MelodyPitch, MusicEditValidityScopeV1::TargetPart, MusicEditValidityRelationV1::NoChange),
             ],
             permitted_variations: vec![variation],
             forbidden_changes: vec![
@@ -1404,7 +1404,10 @@ mod tests {
         envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
         assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
 
-        envelope.requested_change[1].evidence = MusicEditValidityEvidenceV1::Symbolic;
+        envelope.requested_change.iter_mut()
+            .find(|item| item.constraint_id == "remove.part.acoustic")
+            .expect("acoustic removal obligation exists")
+            .evidence = MusicEditValidityEvidenceV1::Symbolic;
         assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
             &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
                 operation: MusicEditOperationV1::RemoveInstrument,
@@ -1432,7 +1435,10 @@ mod tests {
         envelope.references.clear();
         envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
         assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
-        envelope.requested_change[1].evidence = MusicEditValidityEvidenceV1::Symbolic;
+        envelope.requested_change.iter_mut()
+            .find(|item| item.constraint_id == "extract.target-present")
+            .expect("target-presence obligation exists")
+            .evidence = MusicEditValidityEvidenceV1::Symbolic;
         assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
             &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
                 operation: MusicEditOperationV1::ExtractInstrument,
