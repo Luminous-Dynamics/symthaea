@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mace-signed-checkpoint-v1.json",
+  "title": "MACE Signed Checkpoint v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpoint",
+    "signature"
+  ],
+  "properties": {
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "key_id",
+        "database_id",
+        "checkpoint_sequence",
+        "journal_sequence",
+        "journal_head_sha256",
+        "issued_at_unix"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mace-checkpoint/v1"
+        },
+        "key_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "database_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "checkpoint_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "journal_sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "journal_head_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "previous_checkpoint_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "issued_at_unix": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "signature": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "minLength": 88,
+      "maxLength": 88
+    }
+  }
+}
