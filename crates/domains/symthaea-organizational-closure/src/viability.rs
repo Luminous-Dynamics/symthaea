@@ -42,8 +42,16 @@ pub struct FiniteState {
 }
 
 impl FiniteState {
-    pub fn new(id: impl Into<String>, viability_class: impl Into<ViabilityClassId>, viable: bool) -> Self {
-        Self { id: id.into(), viability_class: viability_class.into(), viable }
+    pub fn new(
+        id: impl Into<String>,
+        viability_class: impl Into<ViabilityClassId>,
+        viable: bool,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            viability_class: viability_class.into(),
+            viable,
+        }
     }
 }
 
@@ -194,14 +202,18 @@ fn finding(
     subject: Option<String>,
     detail: impl Into<String>,
 ) {
-    report.findings.push(ViabilityFinding { code, subject, detail: detail.into() });
+    report.findings.push(ViabilityFinding {
+        code,
+        subject,
+        detail: detail.into(),
+    });
 }
 
-fn class_map_is_bijective(
-    source_to_target: &BTreeMap<ViabilityClassId, ViabilityClassId>,
-) -> bool {
+fn class_map_is_bijective(source_to_target: &BTreeMap<ViabilityClassId, ViabilityClassId>) -> bool {
     let mut targets = BTreeSet::new();
-    source_to_target.values().all(|target| targets.insert(target.clone()))
+    source_to_target
+        .values()
+        .all(|target| targets.insert(target.clone()))
 }
 
 fn partial_constraints_compatible(
@@ -210,9 +222,15 @@ fn partial_constraints_compatible(
 ) -> bool {
     constraints.iter().all(|constraint| {
         constraint.allowed_assignments.iter().any(|tuple| {
-            constraint.scope.iter().zip(tuple.iter()).all(|(variable, value)| {
-                assignment.get(variable).is_none_or(|assigned| assigned == value)
-            })
+            constraint
+                .scope
+                .iter()
+                .zip(tuple.iter())
+                .all(|(variable, value)| {
+                    assignment
+                        .get(variable)
+                        .is_none_or(|assigned| assigned == value)
+                })
         })
     })
 }
@@ -271,69 +289,111 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
 
     // AP1-style witness: realization induces a bijection on viable classes.
     let mut ap1_ok = true;
-    let viable_production: Vec<_> = model.production_states.iter()
-        .filter(|(_, state)| state.viable).collect();
-    let viable_organization_classes: BTreeSet<_> = model.organization_states.values()
+    let viable_production: Vec<_> = model
+        .production_states
+        .iter()
+        .filter(|(_, state)| state.viable)
+        .collect();
+    let viable_organization_classes: BTreeSet<_> = model
+        .organization_states
+        .values()
         .filter(|state| state.viable)
-        .map(|state| state.viability_class.clone()).collect();
+        .map(|state| state.viability_class.clone())
+        .collect();
 
     if viable_production.is_empty() {
         ap1_ok = false;
-        finding(&mut report, ViabilityFindingCode::EmptyViableProductionStates, None,
-            "no viable production states were declared");
+        finding(
+            &mut report,
+            ViabilityFindingCode::EmptyViableProductionStates,
+            None,
+            "no viable production states were declared",
+        );
     }
     if viable_organization_classes.is_empty() {
         ap1_ok = false;
-        finding(&mut report, ViabilityFindingCode::EmptyViableOrganizationStates, None,
-            "no viable organization equivalence classes were declared");
+        finding(
+            &mut report,
+            ViabilityFindingCode::EmptyViableOrganizationStates,
+            None,
+            "no viable organization equivalence classes were declared",
+        );
     }
 
     let mut induced_realization = BTreeMap::new();
     for (key, state) in &model.production_states {
         if key.0 != state.id {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::StateMapKeyMismatch, Some(key.0.clone()),
-                "production-state map key differs from the embedded state ID");
+            finding(
+                &mut report,
+                ViabilityFindingCode::StateMapKeyMismatch,
+                Some(key.0.clone()),
+                "production-state map key differs from the embedded state ID",
+            );
         }
     }
     for (key, state) in &model.organization_states {
         if key.0 != state.id {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::StateMapKeyMismatch, Some(key.0.clone()),
-                "organization-state map key differs from the embedded state ID");
+            finding(
+                &mut report,
+                ViabilityFindingCode::StateMapKeyMismatch,
+                Some(key.0.clone()),
+                "organization-state map key differs from the embedded state ID",
+            );
         }
     }
 
     for (source, target) in &model.realization {
         if !model.production_states.contains_key(source) {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::UnknownRealizationSource, Some(source.0.clone()),
-                "realization map contains an unknown production-state source");
+            finding(
+                &mut report,
+                ViabilityFindingCode::UnknownRealizationSource,
+                Some(source.0.clone()),
+                "realization map contains an unknown production-state source",
+            );
         }
         if !model.organization_states.contains_key(target) {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::UnknownRealizationTarget, Some(source.0.clone()),
-                "realization map contains an unknown organization-state target");
+            finding(
+                &mut report,
+                ViabilityFindingCode::UnknownRealizationTarget,
+                Some(source.0.clone()),
+                "realization map contains an unknown organization-state target",
+            );
         }
     }
 
     for (production_id, production_state) in &viable_production {
         let Some(organization_id) = model.realization.get(*production_id) else {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::MissingRealization, Some(production_id.0.clone()),
-                "viable production state has no realization");
+            finding(
+                &mut report,
+                ViabilityFindingCode::MissingRealization,
+                Some(production_id.0.clone()),
+                "viable production state has no realization",
+            );
             continue;
         };
         let Some(organization_state) = model.organization_states.get(organization_id) else {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::UnknownRealizationTarget, Some(production_id.0.clone()),
-                "realization references an unknown organization state");
+            finding(
+                &mut report,
+                ViabilityFindingCode::UnknownRealizationTarget,
+                Some(production_id.0.clone()),
+                "realization references an unknown organization state",
+            );
             continue;
         };
         if !organization_state.viable {
             ap1_ok = false;
-            finding(&mut report, ViabilityFindingCode::NonViableRealizationTarget, Some(production_id.0.clone()),
-                "viable production state realizes to a non-viable organization state");
+            finding(
+                &mut report,
+                ViabilityFindingCode::NonViableRealizationTarget,
+                Some(production_id.0.clone()),
+                "viable production state realizes to a non-viable organization state",
+            );
             continue;
         }
         if let Some(previous) = induced_realization.insert(
@@ -342,48 +402,80 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         ) {
             if previous != organization_state.viability_class {
                 ap1_ok = false;
-                finding(&mut report, ViabilityFindingCode::RealizationNotWellDefined, Some(production_id.0.clone()),
-                    "one viable production class maps to multiple organization classes");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::RealizationNotWellDefined,
+                    Some(production_id.0.clone()),
+                    "one viable production class maps to multiple organization classes",
+                );
             }
         }
     }
     if !class_map_is_bijective(&induced_realization) {
         ap1_ok = false;
-        finding(&mut report, ViabilityFindingCode::RealizationNotInjective, None,
-            "distinct viable production classes map to the same organization class");
+        finding(
+            &mut report,
+            ViabilityFindingCode::RealizationNotInjective,
+            None,
+            "distinct viable production classes map to the same organization class",
+        );
     }
     let mapped_targets: BTreeSet<_> = induced_realization.values().cloned().collect();
     if mapped_targets != viable_organization_classes {
         ap1_ok = false;
-        finding(&mut report, ViabilityFindingCode::RealizationNotSurjective, None,
-            "realization does not cover exactly the viable organization classes");
+        finding(
+            &mut report,
+            ViabilityFindingCode::RealizationNotSurjective,
+            None,
+            "realization does not cover exactly the viable organization classes",
+        );
     }
-    report.ap1_realization = Some(if ap1_ok { WitnessStatus::Pass } else { WitnessStatus::Fail });
+    report.ap1_realization = Some(if ap1_ok {
+        WitnessStatus::Pass
+    } else {
+        WitnessStatus::Fail
+    });
 
     // AP2-style witness: viable production classes produce viable boundary classes.
     let mut ap2_ok = true;
     if model.required_boundary_classes.is_empty() {
         ap2_ok = false;
-        finding(&mut report, ViabilityFindingCode::EmptyRequiredBoundaryClasses, None,
-            "no required viable boundary class was declared");
+        finding(
+            &mut report,
+            ViabilityFindingCode::EmptyRequiredBoundaryClasses,
+            None,
+            "no required viable boundary class was declared",
+        );
     }
     for (key, state) in &model.boundary_states {
         if key.0 != state.id {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::StateMapKeyMismatch, Some(key.0.clone()),
-                "boundary-state map key differs from the embedded state ID");
+            finding(
+                &mut report,
+                ViabilityFindingCode::StateMapKeyMismatch,
+                Some(key.0.clone()),
+                "boundary-state map key differs from the embedded state ID",
+            );
         }
     }
     for (source, target) in &model.boundary_production {
         if !model.production_states.contains_key(source) {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::UnknownBoundarySource, Some(source.0.clone()),
-                "boundary-production map contains an unknown production-state source");
+            finding(
+                &mut report,
+                ViabilityFindingCode::UnknownBoundarySource,
+                Some(source.0.clone()),
+                "boundary-production map contains an unknown production-state source",
+            );
         }
         if !model.boundary_states.contains_key(target) {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::UnknownBoundaryTarget, Some(source.0.clone()),
-                "boundary-production map contains an unknown boundary-state target");
+            finding(
+                &mut report,
+                ViabilityFindingCode::UnknownBoundaryTarget,
+                Some(source.0.clone()),
+                "boundary-production map contains an unknown boundary-state target",
+            );
         }
     }
     let mut induced_boundary = BTreeMap::new();
@@ -391,20 +483,32 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
     for (production_id, production_state) in &viable_production {
         let Some(boundary_id) = model.boundary_production.get(*production_id) else {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::MissingBoundaryProduction, Some(production_id.0.clone()),
-                "viable production state has no boundary-production witness");
+            finding(
+                &mut report,
+                ViabilityFindingCode::MissingBoundaryProduction,
+                Some(production_id.0.clone()),
+                "viable production state has no boundary-production witness",
+            );
             continue;
         };
         let Some(boundary_state) = model.boundary_states.get(boundary_id) else {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::UnknownBoundaryTarget, Some(production_id.0.clone()),
-                "boundary-production map references an unknown boundary state");
+            finding(
+                &mut report,
+                ViabilityFindingCode::UnknownBoundaryTarget,
+                Some(production_id.0.clone()),
+                "boundary-production map references an unknown boundary state",
+            );
             continue;
         };
         if !boundary_state.viable {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::NonViableBoundaryTarget, Some(production_id.0.clone()),
-                "viable production state produces a non-viable boundary state");
+            finding(
+                &mut report,
+                ViabilityFindingCode::NonViableBoundaryTarget,
+                Some(production_id.0.clone()),
+                "viable production state produces a non-viable boundary state",
+            );
             continue;
         }
         represented_boundary_classes.insert(boundary_state.viability_class.clone());
@@ -414,34 +518,54 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         ) {
             if previous != boundary_state.viability_class {
                 ap2_ok = false;
-                finding(&mut report, ViabilityFindingCode::BoundaryClassNotWellDefined, Some(production_id.0.clone()),
-                    "one viable production class produces multiple boundary classes");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::BoundaryClassNotWellDefined,
+                    Some(production_id.0.clone()),
+                    "one viable production class produces multiple boundary classes",
+                );
             }
         }
     }
     for required in &model.required_boundary_classes {
         if !represented_boundary_classes.contains(required) {
             ap2_ok = false;
-            finding(&mut report, ViabilityFindingCode::RequiredBoundaryClassMissing, Some(required.0.clone()),
-                "a required viable boundary class is not produced");
+            finding(
+                &mut report,
+                ViabilityFindingCode::RequiredBoundaryClassMissing,
+                Some(required.0.clone()),
+                "a required viable boundary class is not produced",
+            );
         }
     }
-    report.ap2_boundary_production = Some(if ap2_ok { WitnessStatus::Pass } else { WitnessStatus::Fail });
+    report.ap2_boundary_production = Some(if ap2_ok {
+        WitnessStatus::Pass
+    } else {
+        WitnessStatus::Fail
+    });
 
     // AP3-style witness: every boundary produced by a viable process is admissible.
     let mut ap3_ok = true;
     if model.admissible_boundaries.is_empty() {
         ap3_ok = false;
-        finding(&mut report, ViabilityFindingCode::EmptyAdmissibilitySet, None,
-            "the admissibility predicate contains no boundary states");
+        finding(
+            &mut report,
+            ViabilityFindingCode::EmptyAdmissibilitySet,
+            None,
+            "the admissibility predicate contains no boundary states",
+        );
     }
     for boundary_id in &model.admissible_boundaries {
         match model.boundary_states.get(boundary_id) {
             Some(state) if state.viable => {}
             _ => {
                 ap3_ok = false;
-                finding(&mut report, ViabilityFindingCode::UnknownAdmissibleBoundary, Some(boundary_id.0.clone()),
-                    "admissibility references an unknown or non-viable boundary state");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::UnknownAdmissibleBoundary,
+                    Some(boundary_id.0.clone()),
+                    "admissibility references an unknown or non-viable boundary state",
+                );
             }
         }
     }
@@ -449,75 +573,123 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
         match model.boundary_production.get(production_id) {
             None => {
                 ap3_ok = false;
-                finding(&mut report, ViabilityFindingCode::MissingBoundaryProduction, Some(production_id.0.clone()),
-                    "admissibility cannot be established without a boundary-production witness");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::MissingBoundaryProduction,
+                    Some(production_id.0.clone()),
+                    "admissibility cannot be established without a boundary-production witness",
+                );
             }
             Some(boundary_id) if !model.boundary_states.contains_key(boundary_id) => {
                 ap3_ok = false;
-                finding(&mut report, ViabilityFindingCode::UnknownBoundaryTarget, Some(production_id.0.clone()),
-                    "produced boundary target is not declared in the finite model");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::UnknownBoundaryTarget,
+                    Some(production_id.0.clone()),
+                    "produced boundary target is not declared in the finite model",
+                );
             }
             Some(boundary_id) if !model.admissible_boundaries.contains(boundary_id) => {
                 ap3_ok = false;
-                finding(&mut report, ViabilityFindingCode::InadmissibleProducedBoundary, Some(production_id.0.clone()),
-                    "viable production produces a boundary outside the frozen admissibility predicate");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::InadmissibleProducedBoundary,
+                    Some(production_id.0.clone()),
+                    "viable production produces a boundary outside the frozen admissibility predicate",
+                );
             }
             Some(_) => {}
         }
     }
-    report.ap3_admissibility = Some(if ap3_ok { WitnessStatus::Pass } else { WitnessStatus::Fail });
+    report.ap3_admissibility = Some(if ap3_ok {
+        WitnessStatus::Pass
+    } else {
+        WitnessStatus::Fail
+    });
 
     // AP4-style witness: a non-empty globally consistent assignment exists.
     let mut ap4_valid = true;
     if model.variables.is_empty() {
         ap4_valid = false;
-        finding(&mut report, ViabilityFindingCode::EmptyVariableSet, None,
-            "global viability requires a non-empty finite variable set");
+        finding(
+            &mut report,
+            ViabilityFindingCode::EmptyVariableSet,
+            None,
+            "global viability requires a non-empty finite variable set",
+        );
     }
     if model.constraints.is_empty() {
         ap4_valid = false;
-        finding(&mut report, ViabilityFindingCode::EmptyConstraintSet, None,
-            "global viability requires at least one registered local constraint");
+        finding(
+            &mut report,
+            ViabilityFindingCode::EmptyConstraintSet,
+            None,
+            "global viability requires at least one registered local constraint",
+        );
     }
     let mut constraint_ids = BTreeSet::new();
     let mut local_ok_count = 0;
     for constraint in &model.constraints {
         if !constraint_ids.insert(constraint.id.clone()) {
             ap4_valid = false;
-            finding(&mut report, ViabilityFindingCode::DuplicateConstraintId, Some(constraint.id.clone()),
-                "local constraint ID is duplicated");
+            finding(
+                &mut report,
+                ViabilityFindingCode::DuplicateConstraintId,
+                Some(constraint.id.clone()),
+                "local constraint ID is duplicated",
+            );
         }
         let mut relation_valid = true;
         if constraint.scope.is_empty() {
             relation_valid = false;
             ap4_valid = false;
-            finding(&mut report, ViabilityFindingCode::EmptyConstraintScope, Some(constraint.id.clone()),
-                "local constraint scope is empty");
+            finding(
+                &mut report,
+                ViabilityFindingCode::EmptyConstraintScope,
+                Some(constraint.id.clone()),
+                "local constraint scope is empty",
+            );
         }
         let mut seen_variables = BTreeSet::new();
         for variable in &constraint.scope {
             if !seen_variables.insert(variable.clone()) {
                 relation_valid = false;
                 ap4_valid = false;
-                finding(&mut report, ViabilityFindingCode::DuplicateVariableInScope, Some(constraint.id.clone()),
-                    "local constraint repeats a variable in its scope");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::DuplicateVariableInScope,
+                    Some(constraint.id.clone()),
+                    "local constraint repeats a variable in its scope",
+                );
             }
             if !model.variables.contains_key(variable) {
                 relation_valid = false;
                 ap4_valid = false;
-                finding(&mut report, ViabilityFindingCode::UnknownConstraintVariable, Some(constraint.id.clone()),
-                    "local constraint references an unknown variable");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::UnknownConstraintVariable,
+                    Some(constraint.id.clone()),
+                    "local constraint references an unknown variable",
+                );
             }
         }
         if constraint.allowed_assignments.is_empty() {
             ap4_valid = false;
-            finding(&mut report, ViabilityFindingCode::EmptyLocalRelation, Some(constraint.id.clone()),
-                "local patch has no allowed assignment");
+            finding(
+                &mut report,
+                ViabilityFindingCode::EmptyLocalRelation,
+                Some(constraint.id.clone()),
+                "local patch has no allowed assignment",
+            );
             continue;
         }
 
         for variable in &constraint.scope {
-            if model.variables.get(variable).is_some_and(BTreeSet::is_empty) {
+            if model
+                .variables
+                .get(variable)
+                .is_some_and(BTreeSet::is_empty)
+            {
                 relation_valid = false;
             }
         }
@@ -525,16 +697,28 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             if tuple.len() != constraint.scope.len() {
                 relation_valid = false;
                 ap4_valid = false;
-                finding(&mut report, ViabilityFindingCode::TupleArityMismatch, Some(constraint.id.clone()),
-                    "allowed tuple arity differs from the local constraint scope");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::TupleArityMismatch,
+                    Some(constraint.id.clone()),
+                    "allowed tuple arity differs from the local constraint scope",
+                );
                 continue;
             }
             for (variable, value) in constraint.scope.iter().zip(tuple.iter()) {
-                if model.variables.get(variable).is_some_and(|domain| !domain.contains(value)) {
+                if model
+                    .variables
+                    .get(variable)
+                    .is_some_and(|domain| !domain.contains(value))
+                {
                     relation_valid = false;
                     ap4_valid = false;
-                    finding(&mut report, ViabilityFindingCode::UnknownValueInRelation, Some(constraint.id.clone()),
-                        "allowed tuple contains a value outside the variable domain");
+                    finding(
+                        &mut report,
+                        ViabilityFindingCode::UnknownValueInRelation,
+                        Some(constraint.id.clone()),
+                        "allowed tuple contains a value outside the variable domain",
+                    );
                 }
             }
         }
@@ -545,15 +729,21 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
     for (variable, domain) in &model.variables {
         if domain.is_empty() {
             ap4_valid = false;
-            finding(&mut report, ViabilityFindingCode::EmptyVariableDomain, Some(variable.0.clone()),
-                "finite variable has an empty domain");
+            finding(
+                &mut report,
+                ViabilityFindingCode::EmptyVariableDomain,
+                Some(variable.0.clone()),
+                "finite variable has an empty domain",
+            );
         }
     }
     report.local_patch_count = model.constraints.len();
     report.locally_satisfiable_patch_count = local_ok_count;
 
     if ap4_valid && local_ok_count == model.constraints.len() {
-        let variables: Vec<_> = model.variables.iter()
+        let variables: Vec<_> = model
+            .variables
+            .iter()
             .map(|(id, domain)| (id.clone(), domain.iter().cloned().collect()))
             .collect();
         let mut assignment = BTreeMap::new();
@@ -562,8 +752,12 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             SearchResult::Exhausted
         } else {
             search_global_regime(
-                0, &variables, &model.constraints, &mut assignment,
-                model.search_budget, &mut nodes,
+                0,
+                &variables,
+                &model.constraints,
+                &mut assignment,
+                model.search_budget,
+                &mut nodes,
             )
         };
         report.search_nodes_examined = nodes;
@@ -571,8 +765,12 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             SearchResult::Found => WitnessStatus::Pass,
             SearchResult::NoSolution => WitnessStatus::Fail,
             SearchResult::Exhausted => {
-                finding(&mut report, ViabilityFindingCode::SearchBudgetExhausted, None,
-                    "global search reached its declared node budget; non-existence is not established");
+                finding(
+                    &mut report,
+                    ViabilityFindingCode::SearchBudgetExhausted,
+                    None,
+                    "global search reached its declared node budget; non-existence is not established",
+                );
                 WitnessStatus::Inconclusive
             }
         });
@@ -593,24 +791,40 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
 mod tests {
     use super::*;
 
-    fn id<T: From<&'static str>>(value: &'static str) -> T { value.into() }
+    fn id<T: From<&'static str>>(value: &'static str) -> T {
+        value.into()
+    }
 
     fn healthy_model() -> FiniteViabilityModel {
         let mut model = FiniteViabilityModel::default();
-        model.production_states.insert(id("p0"), FiniteState::new("p0", "prod-class", true));
-        model.production_states.insert(id("p1"), FiniteState::new("p1", "prod-class", true));
-        model.organization_states.insert(id("o0"), FiniteState::new("o0", "org-class", true));
-        model.organization_states.insert(id("o1"), FiniteState::new("o1", "org-class", true));
-        model.boundary_states.insert(id("b0"), FiniteState::new("b0", "boundary-class", true));
+        model
+            .production_states
+            .insert(id("p0"), FiniteState::new("p0", "prod-class", true));
+        model
+            .production_states
+            .insert(id("p1"), FiniteState::new("p1", "prod-class", true));
+        model
+            .organization_states
+            .insert(id("o0"), FiniteState::new("o0", "org-class", true));
+        model
+            .organization_states
+            .insert(id("o1"), FiniteState::new("o1", "org-class", true));
+        model
+            .boundary_states
+            .insert(id("b0"), FiniteState::new("b0", "boundary-class", true));
         model.realization.insert(id("p0"), id("o0"));
         model.realization.insert(id("p1"), id("o1"));
         model.boundary_production.insert(id("p0"), id("b0"));
         model.boundary_production.insert(id("p1"), id("b0"));
         model.required_boundary_classes.insert(id("boundary-class"));
         model.admissible_boundaries.insert(id("b0"));
-        model.variables.insert(id("x"), [id("zero"), id("one")].into_iter().collect());
+        model
+            .variables
+            .insert(id("x"), [id("zero"), id("one")].into_iter().collect());
         model.constraints.push(LocalConstraint::new(
-            "x-is-one", vec![id("x")], vec![vec![id("one")]],
+            "x-is-one",
+            vec![id("x")],
+            vec![vec![id("one")]],
         ));
         model
     }
@@ -629,11 +843,18 @@ mod tests {
     #[test]
     fn non_well_defined_realization_fails_ap1() {
         let mut model = healthy_model();
-        model.organization_states.insert(id("o2"), FiniteState::new("o2", "other-org-class", true));
+        model
+            .organization_states
+            .insert(id("o2"), FiniteState::new("o2", "other-org-class", true));
         model.realization.insert(id("p1"), id("o2"));
         let report = evaluate_finite_viability_model(&model);
         assert_eq!(report.ap1_realization, Some(WitnessStatus::Fail));
-        assert!(report.findings.iter().any(|f| f.code == ViabilityFindingCode::RealizationNotWellDefined));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ViabilityFindingCode::RealizationNotWellDefined)
+        );
     }
 
     #[test]
@@ -642,7 +863,12 @@ mod tests {
         model.boundary_production.remove(&id("p1"));
         let report = evaluate_finite_viability_model(&model);
         assert_eq!(report.ap2_boundary_production, Some(WitnessStatus::Fail));
-        assert!(report.findings.iter().any(|f| f.code == ViabilityFindingCode::MissingBoundaryProduction));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ViabilityFindingCode::MissingBoundaryProduction)
+        );
     }
 
     #[test]
@@ -651,7 +877,12 @@ mod tests {
         model.admissible_boundaries.clear();
         let report = evaluate_finite_viability_model(&model);
         assert_eq!(report.ap3_admissibility, Some(WitnessStatus::Fail));
-        assert!(report.findings.iter().any(|f| f.code == ViabilityFindingCode::InadmissibleProducedBoundary));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ViabilityFindingCode::InadmissibleProducedBoundary)
+        );
     }
 
     #[test]
@@ -660,18 +891,26 @@ mod tests {
         model.variables.clear();
         model.constraints.clear();
         for name in ["x", "y", "z"] {
-            model.variables.insert(id(name), [id("0"), id("1")].into_iter().collect());
+            model
+                .variables
+                .insert(id(name), [id("0"), id("1")].into_iter().collect());
         }
         model.constraints = vec![
-            LocalConstraint::new("xy-equal", vec![id("x"), id("y")], vec![
-                vec![id("0"), id("0")], vec![id("1"), id("1")],
-            ]),
-            LocalConstraint::new("yz-equal", vec![id("y"), id("z")], vec![
-                vec![id("0"), id("0")], vec![id("1"), id("1")],
-            ]),
-            LocalConstraint::new("xz-different", vec![id("x"), id("z")], vec![
-                vec![id("0"), id("1")], vec![id("1"), id("0")],
-            ]),
+            LocalConstraint::new(
+                "xy-equal",
+                vec![id("x"), id("y")],
+                vec![vec![id("0"), id("0")], vec![id("1"), id("1")]],
+            ),
+            LocalConstraint::new(
+                "yz-equal",
+                vec![id("y"), id("z")],
+                vec![vec![id("0"), id("0")], vec![id("1"), id("1")]],
+            ),
+            LocalConstraint::new(
+                "xz-different",
+                vec![id("x"), id("z")],
+                vec![vec![id("0"), id("1")], vec![id("1"), id("0")]],
+            ),
         ];
         let report = evaluate_finite_viability_model(&model);
         assert_eq!(report.locally_satisfiable_patch_count, 3);
@@ -684,19 +923,30 @@ mod tests {
         let mut model = healthy_model();
         model.variables.clear();
         model.constraints.clear();
-        model.variables.insert(id("x"), [id("0"), id("1")].into_iter().collect());
-        model.variables.insert(id("y"), [id("0"), id("1")].into_iter().collect());
+        model
+            .variables
+            .insert(id("x"), [id("0"), id("1")].into_iter().collect());
+        model
+            .variables
+            .insert(id("y"), [id("0"), id("1")].into_iter().collect());
         model.constraints = vec![
-            LocalConstraint::new("requires-equal", vec![id("x"), id("y")], vec![
-                vec![id("0"), id("0")], vec![id("1"), id("1")],
-            ]),
-            LocalConstraint::new("requires-different", vec![id("x"), id("y")], vec![
-                vec![id("0"), id("1")], vec![id("1"), id("0")],
-            ]),
+            LocalConstraint::new(
+                "requires-equal",
+                vec![id("x"), id("y")],
+                vec![vec![id("0"), id("0")], vec![id("1"), id("1")]],
+            ),
+            LocalConstraint::new(
+                "requires-different",
+                vec![id("x"), id("y")],
+                vec![vec![id("0"), id("1")], vec![id("1"), id("0")]],
+            ),
         ];
         model.search_budget = 1;
         let report = evaluate_finite_viability_model(&model);
-        assert_eq!(report.ap4_global_viability, Some(WitnessStatus::Inconclusive));
+        assert_eq!(
+            report.ap4_global_viability,
+            Some(WitnessStatus::Inconclusive)
+        );
         assert_eq!(report.local_to_global_obstruction, None);
     }
 
@@ -715,10 +965,17 @@ mod tests {
     fn malformed_local_relation_fails_closed() {
         let mut model = healthy_model();
         model.constraints[0] = LocalConstraint::new(
-            "wrong-arity", vec![id("x")], vec![vec![id("zero"), id("one")]],
+            "wrong-arity",
+            vec![id("x")],
+            vec![vec![id("zero"), id("one")]],
         );
         let report = evaluate_finite_viability_model(&model);
         assert_eq!(report.ap4_global_viability, Some(WitnessStatus::Fail));
-        assert!(report.findings.iter().any(|f| f.code == ViabilityFindingCode::TupleArityMismatch));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ViabilityFindingCode::TupleArityMismatch)
+        );
     }
 }
