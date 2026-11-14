@@ -1,0 +1,77 @@
+name: MUSE MusicXML Score Evaluation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/muse-musicxml-score-eval.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_score_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
+  push:
+    branches:
+      - "research/melothaea-score-symbol-eval-v1"
+    paths:
+      - ".github/workflows/muse-musicxml-score-eval.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_score_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-musicxml-score-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  score-eval:
+    name: Source-native MusicXML score evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-muse-score-eval-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-muse-score-eval-
+
+      - name: Check formatting of evaluator and parser modules
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-muse/src/musicxml_score_eval.rs \
+            crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
+            crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
+            crates/domains/symthaea-muse/src/lib.rs
+
+      - name: Run source-native score evaluator tests
+        run: "cargo test --locked -p symthaea-muse --features theory musicxml_score_eval::tests::"
+
+      - name: Run MusicXML parser and graph tests
+        run: |
+          cargo test --locked -p symthaea-muse --features theory musicxml_notation_events::tests::
+          cargo test --locked -p symthaea-muse --features theory musicxml_barline_adapter::tests::
