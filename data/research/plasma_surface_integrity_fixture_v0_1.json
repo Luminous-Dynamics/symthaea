@@ -1,0 +1,3797 @@
+{
+  "schema_version": "plasma-surface-integrity-fixture-v0.1",
+  "cases": [
+    {
+      "id": "within-hard-barrier-and-tensile-limits",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "within-hard-barrier-and-tensile-limits-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c40",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "within-hard-barrier-and-tensile-limits-WVTR-BASE-SPEC-1",
+              "within-hard-barrier-and-tensile-limits-WVTR-BASE-SPEC-2",
+              "within-hard-barrier-and-tensile-limits-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c41",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "within-hard-barrier-and-tensile-limits-WVTR-TREAT-SPEC-1",
+              "within-hard-barrier-and-tensile-limits-WVTR-TREAT-SPEC-2",
+              "within-hard-barrier-and-tensile-limits-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "within-hard-barrier-and-tensile-limits-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c42",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c43",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c44",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "within-hard-barrier-and-tensile-limits-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c45",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "within-hard-barrier-and-tensile-limits-TENSILE-BASE-SPEC-1",
+              "within-hard-barrier-and-tensile-limits-TENSILE-BASE-SPEC-2",
+              "within-hard-barrier-and-tensile-limits-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c46",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-SPEC-1",
+              "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-SPEC-2",
+              "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "within-hard-barrier-and-tensile-limits-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c47",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c48",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c49",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "within-hard-barrier-and-tensile-limits-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "within-hard-barrier-and-tensile-limits-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c4a",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "within-hard-barrier-and-tensile-limits-WCA-1",
+          "within-hard-barrier-and-tensile-limits-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "PASS",
+      "rationale": "Barrier and tensile-retention intervals both meet their frozen application-specific hard limits."
+    },
+    {
+      "id": "wettability-improves-barrier-hard-limit-fails",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "wettability-improves-barrier-hard-limit-fails-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.31,
+          "ratio_upper": 1.42,
+          "baseline_method_receipt": {
+            "id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c4b",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-SPEC-1",
+              "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-SPEC-2",
+              "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c4c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-SPEC-1",
+              "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-SPEC-2",
+              "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "wettability-improves-barrier-hard-limit-fails-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c4d",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c4e",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c4f",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.31,
+            "ratio_upper": 1.42
+          }
+        },
+        {
+          "constraint_id": "wettability-improves-barrier-hard-limit-fails-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c50",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-SPEC-1",
+              "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-SPEC-2",
+              "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c51",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-SPEC-1",
+              "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-SPEC-2",
+              "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c52",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c53",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c54",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "wettability-improves-barrier-hard-limit-fails-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "wettability-improves-barrier-hard-limit-fails-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c55",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "wettability-improves-barrier-hard-limit-fails-WCA-1",
+          "wettability-improves-barrier-hard-limit-fails-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "Contact-angle diagnostic is present and bond outcome is declared successful, but barrier transmission degradation violates the hard upper limit."
+    },
+    {
+      "id": "barrier-interval-crosses-limit",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "barrier-interval-crosses-limit-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.06,
+          "ratio_upper": 1.19,
+          "baseline_method_receipt": {
+            "id": "barrier-interval-crosses-limit-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c56",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-interval-crosses-limit-WVTR-BASE-SPEC-1",
+              "barrier-interval-crosses-limit-WVTR-BASE-SPEC-2",
+              "barrier-interval-crosses-limit-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "barrier-interval-crosses-limit-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c57",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-interval-crosses-limit-WVTR-TREAT-SPEC-1",
+              "barrier-interval-crosses-limit-WVTR-TREAT-SPEC-2",
+              "barrier-interval-crosses-limit-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "barrier-interval-crosses-limit-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c58",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c59",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c5a",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "barrier-interval-crosses-limit-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "barrier-interval-crosses-limit-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "barrier-interval-crosses-limit-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "barrier-interval-crosses-limit-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "barrier-interval-crosses-limit-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "barrier-interval-crosses-limit-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "barrier-interval-crosses-limit-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "barrier-interval-crosses-limit-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.06,
+            "ratio_upper": 1.19
+          }
+        },
+        {
+          "constraint_id": "barrier-interval-crosses-limit-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "barrier-interval-crosses-limit-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c5b",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-interval-crosses-limit-TENSILE-BASE-SPEC-1",
+              "barrier-interval-crosses-limit-TENSILE-BASE-SPEC-2",
+              "barrier-interval-crosses-limit-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "barrier-interval-crosses-limit-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c5c",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-interval-crosses-limit-TENSILE-TREAT-SPEC-1",
+              "barrier-interval-crosses-limit-TENSILE-TREAT-SPEC-2",
+              "barrier-interval-crosses-limit-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "barrier-interval-crosses-limit-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c5d",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c5e",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c5f",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "barrier-interval-crosses-limit-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "barrier-interval-crosses-limit-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "barrier-interval-crosses-limit-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "barrier-interval-crosses-limit-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "barrier-interval-crosses-limit-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "barrier-interval-crosses-limit-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "barrier-interval-crosses-limit-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-interval-crosses-limit-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "barrier-interval-crosses-limit-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "barrier-interval-crosses-limit-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c60",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "barrier-interval-crosses-limit-WCA-1",
+          "barrier-interval-crosses-limit-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "BLOCKED",
+      "rationale": "Barrier interval overlaps the maximum permitted ratio; uncertainty blocks safe-window admission."
+    },
+    {
+      "id": "contact-angle-only",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [],
+      "contact_angle_diagnostic": {
+        "id": "contact-angle-only-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c61",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "contact-angle-only-WCA-1",
+          "contact-angle-only-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "BLOCKED",
+      "rationale": "A wettability diagnostic without any hard substrate-integrity measurement cannot qualify a safe process window."
+    },
+    {
+      "id": "d882-outside-thickness-profile",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 1.2,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "d882-outside-thickness-profile-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "d882-outside-thickness-profile-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c62",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "d882-outside-thickness-profile-WVTR-BASE-SPEC-1",
+              "d882-outside-thickness-profile-WVTR-BASE-SPEC-2",
+              "d882-outside-thickness-profile-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "d882-outside-thickness-profile-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c63",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "d882-outside-thickness-profile-WVTR-TREAT-SPEC-1",
+              "d882-outside-thickness-profile-WVTR-TREAT-SPEC-2",
+              "d882-outside-thickness-profile-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "d882-outside-thickness-profile-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c64",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c65",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c66",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "d882-outside-thickness-profile-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "d882-outside-thickness-profile-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "d882-outside-thickness-profile-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "d882-outside-thickness-profile-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "d882-outside-thickness-profile-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "d882-outside-thickness-profile-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "d882-outside-thickness-profile-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "d882-outside-thickness-profile-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "d882-outside-thickness-profile-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "d882-outside-thickness-profile-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c67",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "d882-outside-thickness-profile-TENSILE-BASE-SPEC-1",
+              "d882-outside-thickness-profile-TENSILE-BASE-SPEC-2",
+              "d882-outside-thickness-profile-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "d882-outside-thickness-profile-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c68",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "d882-outside-thickness-profile-TENSILE-TREAT-SPEC-1",
+              "d882-outside-thickness-profile-TENSILE-TREAT-SPEC-2",
+              "d882-outside-thickness-profile-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "d882-outside-thickness-profile-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c69",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c6a",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c6b",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "d882-outside-thickness-profile-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "d882-outside-thickness-profile-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "d882-outside-thickness-profile-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "d882-outside-thickness-profile-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "d882-outside-thickness-profile-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "d882-outside-thickness-profile-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "d882-outside-thickness-profile-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "d882-outside-thickness-profile-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "d882-outside-thickness-profile-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "d882-outside-thickness-profile-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c6c",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "d882-outside-thickness-profile-WCA-1",
+          "d882-outside-thickness-profile-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "BLOCKED",
+      "rationale": "ASTM D882 is not used for film stock at or above 1.0 mm; the audit blocks that method/profile combination."
+    },
+    {
+      "id": "method-receipt-sample-mismatch",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "method-receipt-sample-mismatch-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "method-receipt-sample-mismatch-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c6d",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "method-receipt-sample-mismatch-WVTR-BASE-SPEC-1",
+              "method-receipt-sample-mismatch-WVTR-BASE-SPEC-2",
+              "method-receipt-sample-mismatch-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "method-receipt-sample-mismatch-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c6e",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "method-receipt-sample-mismatch-WVTR-TREAT-SPEC-1",
+              "method-receipt-sample-mismatch-WVTR-TREAT-SPEC-2",
+              "method-receipt-sample-mismatch-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "method-receipt-sample-mismatch-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c6f",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c70",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c71",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "method-receipt-sample-mismatch-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "method-receipt-sample-mismatch-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "method-receipt-sample-mismatch-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "method-receipt-sample-mismatch-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "method-receipt-sample-mismatch-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "method-receipt-sample-mismatch-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "method-receipt-sample-mismatch-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "method-receipt-sample-mismatch-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "method-receipt-sample-mismatch-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "method-receipt-sample-mismatch-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c72",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "method-receipt-sample-mismatch-TENSILE-BASE-SPEC-1",
+              "method-receipt-sample-mismatch-TENSILE-BASE-SPEC-2",
+              "method-receipt-sample-mismatch-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "method-receipt-sample-mismatch-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c73",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "OTHER-SPECIMEN",
+              "method-receipt-sample-mismatch-TENSILE-TREAT-SPEC-2",
+              "method-receipt-sample-mismatch-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "method-receipt-sample-mismatch-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c74",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c75",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c76",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "method-receipt-sample-mismatch-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "method-receipt-sample-mismatch-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "method-receipt-sample-mismatch-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "method-receipt-sample-mismatch-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "method-receipt-sample-mismatch-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "method-receipt-sample-mismatch-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "method-receipt-sample-mismatch-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "method-receipt-sample-mismatch-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "method-receipt-sample-mismatch-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "method-receipt-sample-mismatch-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c77",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "method-receipt-sample-mismatch-WCA-1",
+          "method-receipt-sample-mismatch-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "The tensile method receipt lists specimens absent from its analysis manifest."
+    },
+    {
+      "id": "visual-only-no-hard-measurement",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [],
+      "contact_angle_diagnostic": null,
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "BLOCKED",
+      "rationale": "Visual inspection and process telemetry do not replace calibrated substrate-property measurements."
+    },
+    {
+      "id": "treatment-to-bond-window-exceeded",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 90,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "treatment-to-bond-window-exceeded-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "treatment-to-bond-window-exceeded-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c78",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "treatment-to-bond-window-exceeded-WVTR-BASE-SPEC-1",
+              "treatment-to-bond-window-exceeded-WVTR-BASE-SPEC-2",
+              "treatment-to-bond-window-exceeded-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "treatment-to-bond-window-exceeded-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c79",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "treatment-to-bond-window-exceeded-WVTR-TREAT-SPEC-1",
+              "treatment-to-bond-window-exceeded-WVTR-TREAT-SPEC-2",
+              "treatment-to-bond-window-exceeded-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "treatment-to-bond-window-exceeded-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c7a",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c7b",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c7c",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "treatment-to-bond-window-exceeded-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "treatment-to-bond-window-exceeded-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c7d",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "treatment-to-bond-window-exceeded-TENSILE-BASE-SPEC-1",
+              "treatment-to-bond-window-exceeded-TENSILE-BASE-SPEC-2",
+              "treatment-to-bond-window-exceeded-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c7e",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "treatment-to-bond-window-exceeded-TENSILE-TREAT-SPEC-1",
+              "treatment-to-bond-window-exceeded-TENSILE-TREAT-SPEC-2",
+              "treatment-to-bond-window-exceeded-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "treatment-to-bond-window-exceeded-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c7f",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c80",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c81",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "treatment-to-bond-window-exceeded-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "treatment-to-bond-window-exceeded-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c82",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "treatment-to-bond-window-exceeded-WCA-1",
+          "treatment-to-bond-window-exceeded-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "Treatment-to-bond interval exceeds the declared application-specific maximum window."
+    },
+    {
+      "id": "higher-contact-angle-integrity-good",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "higher-contact-angle-integrity-good-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "higher-contact-angle-integrity-good-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c83",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "higher-contact-angle-integrity-good-WVTR-BASE-SPEC-1",
+              "higher-contact-angle-integrity-good-WVTR-BASE-SPEC-2",
+              "higher-contact-angle-integrity-good-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "higher-contact-angle-integrity-good-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c84",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "higher-contact-angle-integrity-good-WVTR-TREAT-SPEC-1",
+              "higher-contact-angle-integrity-good-WVTR-TREAT-SPEC-2",
+              "higher-contact-angle-integrity-good-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "higher-contact-angle-integrity-good-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c85",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c86",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c87",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "higher-contact-angle-integrity-good-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "higher-contact-angle-integrity-good-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c88",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "higher-contact-angle-integrity-good-TENSILE-BASE-SPEC-1",
+              "higher-contact-angle-integrity-good-TENSILE-BASE-SPEC-2",
+              "higher-contact-angle-integrity-good-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "higher-contact-angle-integrity-good-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c89",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "higher-contact-angle-integrity-good-TENSILE-TREAT-SPEC-1",
+              "higher-contact-angle-integrity-good-TENSILE-TREAT-SPEC-2",
+              "higher-contact-angle-integrity-good-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "higher-contact-angle-integrity-good-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c8a",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c8b",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c8c",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "higher-contact-angle-integrity-good-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "higher-contact-angle-integrity-good-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "higher-contact-angle-integrity-good-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c8d",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "higher-contact-angle-integrity-good-WCA-1",
+          "higher-contact-angle-integrity-good-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "PASS",
+      "rationale": "Wettability is diagnostic only; hard barrier and tensile properties meet their limits without requiring a minimum contact angle."
+    },
+    {
+      "id": "tensile-property-degradation-rejected-despite-bond-pass",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "WVTR-OK",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.01,
+          "ratio_upper": 1.03,
+          "baseline_method_receipt": {
+            "id": "WVTR-OK-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c93",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "WVTR-OK-BASE-SPEC-1",
+              "WVTR-OK-BASE-SPEC-2",
+              "WVTR-OK-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "WVTR-OK-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c94",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "WVTR-OK-TREAT-SPEC-1",
+              "WVTR-OK-TREAT-SPEC-2",
+              "WVTR-OK-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "WVTR-OK-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c95",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c96",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c97",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "WVTR-OK-BASE-SPEC-1",
+                "independent_cluster_id": "WVTR-OK-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "WVTR-OK-BASE-SPEC-2",
+                "independent_cluster_id": "WVTR-OK-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "WVTR-OK-BASE-SPEC-3",
+                "independent_cluster_id": "WVTR-OK-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "WVTR-OK-TREAT-SPEC-1",
+                "independent_cluster_id": "WVTR-OK-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "WVTR-OK-TREAT-SPEC-2",
+                "independent_cluster_id": "WVTR-OK-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "WVTR-OK-TREAT-SPEC-3",
+                "independent_cluster_id": "WVTR-OK-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.01,
+            "ratio_upper": 1.03
+          }
+        },
+        {
+          "constraint_id": "TENSILE-DEGRADED",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.74,
+          "ratio_upper": 0.82,
+          "baseline_method_receipt": {
+            "id": "TENSILE-DEGRADED-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c8e",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "TENSILE-DEGRADED-BASE-SPEC-1",
+              "TENSILE-DEGRADED-BASE-SPEC-2",
+              "TENSILE-DEGRADED-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "TENSILE-DEGRADED-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c8f",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "TENSILE-DEGRADED-TREAT-SPEC-1",
+              "TENSILE-DEGRADED-TREAT-SPEC-2",
+              "TENSILE-DEGRADED-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "TENSILE-DEGRADED-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c90",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c91",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c92",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "TENSILE-DEGRADED-BASE-SPEC-1",
+                "independent_cluster_id": "TENSILE-DEGRADED-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "TENSILE-DEGRADED-BASE-SPEC-2",
+                "independent_cluster_id": "TENSILE-DEGRADED-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "TENSILE-DEGRADED-BASE-SPEC-3",
+                "independent_cluster_id": "TENSILE-DEGRADED-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "TENSILE-DEGRADED-TREAT-SPEC-1",
+                "independent_cluster_id": "TENSILE-DEGRADED-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "TENSILE-DEGRADED-TREAT-SPEC-2",
+                "independent_cluster_id": "TENSILE-DEGRADED-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "TENSILE-DEGRADED-TREAT-SPEC-3",
+                "independent_cluster_id": "TENSILE-DEGRADED-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.74,
+            "ratio_upper": 0.82
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "tensile-property-degradation-rejected-despite-bond-pass-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c98",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "tensile-property-degradation-rejected-despite-bond-pass-WCA-1",
+          "tensile-property-degradation-rejected-despite-bond-pass-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "A good bond result cannot offset tensile-property retention below the minimum hard limit."
+    },
+    {
+      "id": "paired-by-film-roll-design-pass",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "paired-by-film-roll-design-pass-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "paired-by-film-roll-design-pass-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c99",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "paired-by-film-roll-design-pass-WVTR-BASE-SPEC-1",
+              "paired-by-film-roll-design-pass-WVTR-BASE-SPEC-2",
+              "paired-by-film-roll-design-pass-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "paired-by-film-roll-design-pass-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c9a",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "paired-by-film-roll-design-pass-WVTR-TREAT-SPEC-1",
+              "paired-by-film-roll-design-pass-WVTR-TREAT-SPEC-2",
+              "paired-by-film-roll-design-pass-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "paired-by-film-roll-design-pass-WVTR-ANALYSIS",
+            "analysis_profile": "paired_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009c9b",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009c9c",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009c9d",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "paired_by_cluster",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "PAIRED-ROLL-1"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "PAIRED-ROLL-2"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "PAIRED-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "PAIRED-ROLL-1"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "PAIRED-ROLL-2"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "PAIRED-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "paired-by-film-roll-design-pass-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "paired-by-film-roll-design-pass-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c9e",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "paired-by-film-roll-design-pass-TENSILE-BASE-SPEC-1",
+              "paired-by-film-roll-design-pass-TENSILE-BASE-SPEC-2",
+              "paired-by-film-roll-design-pass-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "paired-by-film-roll-design-pass-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009c9f",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "paired-by-film-roll-design-pass-TENSILE-TREAT-SPEC-1",
+              "paired-by-film-roll-design-pass-TENSILE-TREAT-SPEC-2",
+              "paired-by-film-roll-design-pass-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "paired-by-film-roll-design-pass-TENSILE-ANALYSIS",
+            "analysis_profile": "paired_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009ca0",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009ca1",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009ca2",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "paired_by_cluster",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "PAIRED-ROLL-1"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "PAIRED-ROLL-2"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "PAIRED-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "PAIRED-ROLL-1"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "PAIRED-ROLL-2"
+              },
+              {
+                "specimen_id": "paired-by-film-roll-design-pass-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "PAIRED-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "paired-by-film-roll-design-pass-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ca3",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "paired-by-film-roll-design-pass-WCA-1",
+          "paired-by-film-roll-design-pass-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "PASS",
+      "rationale": "Matched control and treated specimens use the same independent film-roll clusters while preserving distinct specimen identities."
+    },
+    {
+      "id": "independent-arms-share-roll-rejected",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "independent-arms-share-roll-rejected-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "independent-arms-share-roll-rejected-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ca4",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "independent-arms-share-roll-rejected-WVTR-BASE-SPEC-1",
+              "independent-arms-share-roll-rejected-WVTR-BASE-SPEC-2",
+              "independent-arms-share-roll-rejected-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "independent-arms-share-roll-rejected-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ca5",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "independent-arms-share-roll-rejected-WVTR-TREAT-SPEC-1",
+              "independent-arms-share-roll-rejected-WVTR-TREAT-SPEC-2",
+              "independent-arms-share-roll-rejected-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "independent-arms-share-roll-rejected-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009ca6",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009ca7",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009ca8",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "independent-arms-share-roll-rejected-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "independent-arms-share-roll-rejected-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ca9",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "independent-arms-share-roll-rejected-TENSILE-BASE-SPEC-1",
+              "independent-arms-share-roll-rejected-TENSILE-BASE-SPEC-2",
+              "independent-arms-share-roll-rejected-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "independent-arms-share-roll-rejected-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009caa",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "independent-arms-share-roll-rejected-TENSILE-TREAT-SPEC-1",
+              "independent-arms-share-roll-rejected-TENSILE-TREAT-SPEC-2",
+              "independent-arms-share-roll-rejected-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "independent-arms-share-roll-rejected-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cab",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cac",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cad",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "independent-arms-share-roll-rejected-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "independent-arms-share-roll-rejected-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "independent-arms-share-roll-rejected-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cae",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "independent-arms-share-roll-rejected-WCA-1",
+          "independent-arms-share-roll-rejected-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "Independent-arm design reuses a production film roll across baseline and treated arms."
+    },
+    {
+      "id": "plan-frozen-after-outcome-rejected",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "plan-frozen-after-outcome-rejected-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "plan-frozen-after-outcome-rejected-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009caf",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "plan-frozen-after-outcome-rejected-WVTR-BASE-SPEC-1",
+              "plan-frozen-after-outcome-rejected-WVTR-BASE-SPEC-2",
+              "plan-frozen-after-outcome-rejected-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cb0",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "plan-frozen-after-outcome-rejected-WVTR-TREAT-SPEC-1",
+              "plan-frozen-after-outcome-rejected-WVTR-TREAT-SPEC-2",
+              "plan-frozen-after-outcome-rejected-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "plan-frozen-after-outcome-rejected-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cb1",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cb2",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cb3",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": true,
+            "baseline_samples": [
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "plan-frozen-after-outcome-rejected-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cb4",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "plan-frozen-after-outcome-rejected-TENSILE-BASE-SPEC-1",
+              "plan-frozen-after-outcome-rejected-TENSILE-BASE-SPEC-2",
+              "plan-frozen-after-outcome-rejected-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cb5",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "plan-frozen-after-outcome-rejected-TENSILE-TREAT-SPEC-1",
+              "plan-frozen-after-outcome-rejected-TENSILE-TREAT-SPEC-2",
+              "plan-frozen-after-outcome-rejected-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "plan-frozen-after-outcome-rejected-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cb6",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cb7",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cb8",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "plan-frozen-after-outcome-rejected-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "plan-frozen-after-outcome-rejected-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cb9",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "plan-frozen-after-outcome-rejected-WCA-1",
+          "plan-frozen-after-outcome-rejected-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "A study plan changed after outcomes were available."
+    },
+    {
+      "id": "confidence-below-application-minimum-blocked",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "confidence-below-application-minimum-blocked-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "confidence-below-application-minimum-blocked-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cba",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "confidence-below-application-minimum-blocked-WVTR-BASE-SPEC-1",
+              "confidence-below-application-minimum-blocked-WVTR-BASE-SPEC-2",
+              "confidence-below-application-minimum-blocked-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "confidence-below-application-minimum-blocked-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cbb",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "confidence-below-application-minimum-blocked-WVTR-TREAT-SPEC-1",
+              "confidence-below-application-minimum-blocked-WVTR-TREAT-SPEC-2",
+              "confidence-below-application-minimum-blocked-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "confidence-below-application-minimum-blocked-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cbc",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cbd",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cbe",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.8,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "confidence-below-application-minimum-blocked-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "confidence-below-application-minimum-blocked-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cbf",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "confidence-below-application-minimum-blocked-TENSILE-BASE-SPEC-1",
+              "confidence-below-application-minimum-blocked-TENSILE-BASE-SPEC-2",
+              "confidence-below-application-minimum-blocked-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cc0",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "confidence-below-application-minimum-blocked-TENSILE-TREAT-SPEC-1",
+              "confidence-below-application-minimum-blocked-TENSILE-TREAT-SPEC-2",
+              "confidence-below-application-minimum-blocked-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "confidence-below-application-minimum-blocked-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cc1",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cc2",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cc3",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "confidence-below-application-minimum-blocked-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "confidence-below-application-minimum-blocked-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cc4",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "confidence-below-application-minimum-blocked-WCA-1",
+          "confidence-below-application-minimum-blocked-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "BLOCKED",
+      "rationale": "A method result is below the predeclared application confidence requirement."
+    },
+    {
+      "id": "analysis-exposure-digest-mismatch-rejected",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "analysis-exposure-digest-mismatch-rejected-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cc5",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-SPEC-1",
+              "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-SPEC-2",
+              "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cc6",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-SPEC-1",
+              "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-SPEC-2",
+              "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "analysis-exposure-digest-mismatch-rejected-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cc7",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cc8",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cc9",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "analysis-exposure-digest-mismatch-rejected-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cca",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-SPEC-1",
+              "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-SPEC-2",
+              "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ccb",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-SPEC-1",
+              "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-SPEC-2",
+              "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009ccc",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009ccd",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cce",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "analysis-exposure-digest-mismatch-rejected-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "analysis-exposure-digest-mismatch-rejected-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ccf",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "analysis-exposure-digest-mismatch-rejected-WCA-1",
+          "analysis-exposure-digest-mismatch-rejected-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "Analysis result references a different plasma exposure profile."
+    },
+    {
+      "id": "barrier-method-edition-unknown-blocked",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "barrier-method-edition-unknown-blocked-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "barrier-method-edition-unknown-blocked-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2009",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cd0",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-method-edition-unknown-blocked-WVTR-BASE-SPEC-1",
+              "barrier-method-edition-unknown-blocked-WVTR-BASE-SPEC-2",
+              "barrier-method-edition-unknown-blocked-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cd1",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-method-edition-unknown-blocked-WVTR-TREAT-SPEC-1",
+              "barrier-method-edition-unknown-blocked-WVTR-TREAT-SPEC-2",
+              "barrier-method-edition-unknown-blocked-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "barrier-method-edition-unknown-blocked-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cd2",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cd3",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cd4",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "barrier-method-edition-unknown-blocked-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cd5",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-method-edition-unknown-blocked-TENSILE-BASE-SPEC-1",
+              "barrier-method-edition-unknown-blocked-TENSILE-BASE-SPEC-2",
+              "barrier-method-edition-unknown-blocked-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cd6",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "barrier-method-edition-unknown-blocked-TENSILE-TREAT-SPEC-1",
+              "barrier-method-edition-unknown-blocked-TENSILE-TREAT-SPEC-2",
+              "barrier-method-edition-unknown-blocked-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "barrier-method-edition-unknown-blocked-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cd7",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cd8",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cd9",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "barrier-method-edition-unknown-blocked-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "barrier-method-edition-unknown-blocked-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cda",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "barrier-method-edition-unknown-blocked-WCA-1",
+          "barrier-method-edition-unknown-blocked-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "BLOCKED",
+      "rationale": "An unrecognized ISO 15106 edition is not admitted by the versioned method registry."
+    },
+    {
+      "id": "tensile-method-wrong-material-class-rejected",
+      "substrate": {
+        "substrate_grade": "PP-FILM-GRADE-A",
+        "supplier_id": "SUPPLIER-01",
+        "lot_id": "PP-LOT-2026-01",
+        "product_function": "oxygen_and_moisture_barrier_packaging",
+        "thickness_mm": 0.1,
+        "surface_finish": "extruded-film-surface",
+        "profile_sha256": "dededededededededededededededededededededededededededededededede",
+        "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "minimum_confidence_level": 0.9
+      },
+      "exposure": {
+        "plasma_article_id": "PLASMA-ARTICLE-S0-01",
+        "plasma_head_id": "ROTATING-HEAD-01",
+        "gas_species": "argon",
+        "gas_purity_pct": 99.99,
+        "delivered_power_w": 250,
+        "gas_flow_l_min": 3,
+        "standoff_mm": 5,
+        "line_speed_mm_s": 500,
+        "pass_count": 1,
+        "treatment_to_bond_min": 15,
+        "maximum_treatment_to_bond_min": 60,
+        "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+        "raw_trace_sha256": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "time_source_ref": "EXPERIMENT-CLOCK-UTC-01"
+      },
+      "integrity_constraints": [
+        {
+          "constraint_id": "tensile-method-wrong-material-class-rejected-WVTR",
+          "endpoint": "water_vapour_transmission_rate",
+          "limit_direction": "maximum_ratio",
+          "limit_value": 1.1,
+          "ratio_lower": 1.02,
+          "ratio_upper": 1.06,
+          "baseline_method_receipt": {
+            "id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cdb",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "tensile-method-wrong-material-class-rejected-WVTR-BASE-SPEC-1",
+              "tensile-method-wrong-material-class-rejected-WVTR-BASE-SPEC-2",
+              "tensile-method-wrong-material-class-rejected-WVTR-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-OBS",
+            "method_id": "ISO_15106_5",
+            "edition": "ISO 15106-5:2015",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_sheet_laminate",
+            "geometry": "wvtr_pressure_sensor",
+            "endpoint": "water_vapour_transmission_rate",
+            "requested_claim": "substrate_barrier_integrity_observation",
+            "protocol_id": "PROTO-ISO_15106_5-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009cdc",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "tensile-method-wrong-material-class-rejected-WVTR-TREAT-SPEC-1",
+              "tensile-method-wrong-material-class-rejected-WVTR-TREAT-SPEC-2",
+              "tensile-method-wrong-material-class-rejected-WVTR-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "tensile-method-wrong-material-class-rejected-WVTR-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009cdd",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009cde",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009cdf",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-SPEC-1",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-SPEC-2",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-SPEC-3",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-WVTR-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-SPEC-1",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-SPEC-2",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-SPEC-3",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-WVTR-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "maximum_ratio",
+            "result_limit_value": 1.1,
+            "ratio_lower": 1.02,
+            "ratio_upper": 1.06
+          }
+        },
+        {
+          "constraint_id": "tensile-method-wrong-material-class-rejected-TENSILE",
+          "endpoint": "thin_film_tensile_properties",
+          "limit_direction": "minimum_ratio",
+          "limit_value": 0.9,
+          "ratio_lower": 0.94,
+          "ratio_upper": 0.98,
+          "baseline_method_receipt": {
+            "id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "plastic_film_lt_1mm",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ce0",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "tensile-method-wrong-material-class-rejected-TENSILE-BASE-SPEC-1",
+              "tensile-method-wrong-material-class-rejected-TENSILE-BASE-SPEC-2",
+              "tensile-method-wrong-material-class-rejected-TENSILE-BASE-SPEC-3"
+            ]
+          },
+          "treated_method_receipt": {
+            "id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-OBS",
+            "method_id": "ASTM_D882",
+            "edition": "D882-26",
+            "evidence_kind": "measurement",
+            "material_pair_class": "frp_to_frp",
+            "geometry": "tensile_strip",
+            "endpoint": "thin_film_tensile_properties",
+            "requested_claim": "substrate_mechanical_integrity_observation",
+            "protocol_id": "PROTO-ASTM_D882-01",
+            "protocol_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ce1",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-SPEC-1",
+              "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-SPEC-2",
+              "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-SPEC-3"
+            ]
+          },
+          "analysis": {
+            "analysis_id": "tensile-method-wrong-material-class-rejected-TENSILE-ANALYSIS",
+            "analysis_profile": "independent_cluster_ratio_interval_v1",
+            "plan_sha256": "0000000000000000000000000000000000000000000000000000000000009ce2",
+            "constraint_plan_sha256": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+            "sample_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000009ce3",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000009ce4",
+            "substrate_profile_sha256": "dededededededededededededededededededededededededededededededede",
+            "exposure_profile_sha256": "abababababababababababababababababababababababababababababababab",
+            "time_source_ref": "EXPERIMENT-CLOCK-UTC-01",
+            "grouping_scheme": "independent_arms",
+            "independent_unit": "film_roll",
+            "minimum_independent_clusters": 3,
+            "minimum_confidence_level": 0.9,
+            "confidence_level": 0.95,
+            "frozen_at": 100,
+            "first_outcome_available_at": 200,
+            "design_changed_after_outcome": false,
+            "baseline_samples": [
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-SPEC-1",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-ROLL-1"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-SPEC-2",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-ROLL-2"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-SPEC-3",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-TENSILE-BASE-ROLL-3"
+              }
+            ],
+            "treated_samples": [
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-SPEC-1",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-ROLL-1"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-SPEC-2",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-ROLL-2"
+              },
+              {
+                "specimen_id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-SPEC-3",
+                "independent_cluster_id": "tensile-method-wrong-material-class-rejected-TENSILE-TREAT-ROLL-3"
+              }
+            ],
+            "result_limit_direction": "minimum_ratio",
+            "result_limit_value": 0.9,
+            "ratio_lower": 0.94,
+            "ratio_upper": 0.98
+          }
+        }
+      ],
+      "contact_angle_diagnostic": {
+        "id": "tensile-method-wrong-material-class-rejected-WCA-DIAGNOSTIC",
+        "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+        "edition": "protocol-defined-v1",
+        "evidence_kind": "measurement",
+        "material_pair_class": "material_surface",
+        "geometry": "sessile_drop",
+        "endpoint": "water_contact_angle",
+        "requested_claim": "wettability_observation",
+        "protocol_id": "WCA-DIAGNOSTIC-PROTOCOL",
+        "protocol_sha256": "dededededededededededededededededededededededededededededededede",
+        "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000009ce5",
+        "suitability_review_sha256": null,
+        "specimen_ids": [
+          "tensile-method-wrong-material-class-rejected-WCA-1",
+          "tensile-method-wrong-material-class-rejected-WCA-2"
+        ]
+      },
+      "claimed_bond_outcome_passed": true,
+      "expected_disposition": "REJECTED",
+      "rationale": "A thin-film tensile method receipt cannot claim an unsupported FRP material class."
+    }
+  ]
+}
