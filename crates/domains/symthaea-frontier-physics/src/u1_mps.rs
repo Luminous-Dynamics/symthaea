@@ -3009,6 +3009,12 @@ impl U1TeBDLayer {
             gate_truncations.push(truncation);
         }
 
+        if self.gates.is_empty() {
+            // An empty parity layer is the identity map: no truncation or gauge
+            // operation occurred, so its compression error contribution is zero.
+            truncation_ledger.global_state_error_bound_qualified = true;
+            truncation_ledger.global_state_error_bound_upper = Some(0.0);
+        }
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
         let global_l2_bound_qualified = truncation_ledger.global_state_error_bound_qualified;
         Ok(U1TeBDLayerResult {
@@ -3028,6 +3034,173 @@ impl U1TeBDLayer {
         })
     }
 }
+
+
+
+/// Symmetric second-order TEBD composition for a nearest-neighbour Hamiltonian.
+///
+/// The discrete propagator is
+/// exp(-i dt H_even / 2) exp(-i dt H_odd) exp(-i dt H_even / 2).
+/// Its compression/gauge ledger is separate from the O(dt^3) local
+/// Strang/Trotter discretization error; no Trotter error bound is inferred.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepper {
+    site_count: usize,
+    time_step: f64,
+    even_half_layer: U1TeBDLayer,
+    odd_full_layer: U1TeBDLayer,
+    local_hamiltonian_receipts: Vec<(usize, U1TwoSiteHamiltonianGateReceipt)>,
+}
+
+/// Output and error qualification for one symmetric Strang step.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub trotter_order: u8,
+    pub even_half_first: U1TeBDLayerResult,
+    pub odd_full: U1TeBDLayerResult,
+    pub even_half_second: U1TeBDLayerResult,
+    /// Bound for MPS compression, gauge reconstruction and gate defects only.
+    /// It does not include the finite-dt Strang/Trotter discretization error.
+    pub global_compression_error_bound_upper: Option<f64>,
+    pub global_compression_error_bound_qualified: bool,
+    /// Deliberately None until a Hamiltonian-specific commutator bound is supplied.
+    pub trotter_error_bound: Option<f64>,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+}
+
+impl U1TeBDStrangStepper {
+    /// Build a nearest-neighbour Strang step from one Hermitian U(1)-preserving
+    /// 4x4 local Hamiltonian per bond. Bond i couples sites (i, i+1).
+    pub fn new(
+        site_count: usize,
+        bond_hamiltonians: Vec<[[Complex64; 4]; 4]>,
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if site_count < 2 {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        if !time_step.is_finite() || time_step == 0.0 {
+            return Err(U1MpsError::InvalidTimeStep(time_step));
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        let expected = site_count - 1;
+        if bond_hamiltonians.len() != expected {
+            return Err(U1MpsError::HamiltonianBondCountMismatch {
+                expected,
+                actual: bond_hamiltonians.len(),
+            });
+        }
+
+        let mut even_gates = Vec::new();
+        let mut odd_gates = Vec::new();
+        let mut local_hamiltonian_receipts = Vec::with_capacity(expected);
+        for (bond, hamiltonian) in bond_hamiltonians.into_iter().enumerate() {
+            let parity = (bond % 2) as u8;
+            let local_time_step = if parity == 0 {
+                0.5 * time_step
+            } else {
+                time_step
+            };
+            let (gate, receipt) = U1TwoSiteGate::from_hermitian_u1_hamiltonian(
+                hamiltonian,
+                local_time_step,
+                tolerance,
+            )?;
+            let entry = U1TeBDGate::new(bond, gate);
+            if parity == 0 {
+                even_gates.push(entry);
+            } else {
+                odd_gates.push(entry);
+            }
+            local_hamiltonian_receipts.push((bond, receipt));
+        }
+
+        Ok(Self {
+            site_count,
+            time_step,
+            even_half_layer: U1TeBDLayer::new(site_count, 0, even_gates)?,
+            odd_full_layer: U1TeBDLayer::new(site_count, 1, odd_gates)?,
+            local_hamiltonian_receipts,
+        })
+    }
+
+    pub const fn site_count(&self) -> usize {
+        self.site_count
+    }
+
+    pub const fn time_step(&self) -> f64 {
+        self.time_step
+    }
+
+    pub fn local_hamiltonian_receipts(
+        &self,
+    ) -> &[(usize, U1TwoSiteHamiltonianGateReceipt)] {
+        &self.local_hamiltonian_receipts
+    }
+
+    /// Apply one even-half / odd-full / even-half Strang step.
+    pub fn apply(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStrangStepResult, U1MpsError> {
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let even_half_first = self.even_half_layer.apply(input, policy)?;
+        let odd_full = self.odd_full_layer.apply(&even_half_first.state, policy)?;
+        let even_half_second = self.even_half_layer.apply(&odd_full.state, policy)?;
+        let output_norm_squared = even_half_second.state.norm_squared(policy.tolerance)?;
+
+        let layers_qualified = even_half_first.global_l2_bound_qualified
+            && odd_full.global_l2_bound_qualified
+            && even_half_second.global_l2_bound_qualified;
+        let global_compression_error_bound_upper = if layers_qualified {
+            let first = even_half_first
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .unwrap_or(0.0);
+            let second = odd_full
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .unwrap_or(0.0);
+            let third = even_half_second
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .unwrap_or(0.0);
+            let total = first + second + third;
+            total.is_finite().then_some(total)
+        } else {
+            None
+        };
+        let qualified = layers_qualified && global_compression_error_bound_upper.is_some();
+
+        Ok(U1TeBDStrangStepResult {
+            state: even_half_second.state.clone(),
+            time_step: self.time_step,
+            trotter_order: 2,
+            even_half_first,
+            odd_full,
+            even_half_second,
+            global_compression_error_bound_upper,
+            global_compression_error_bound_qualified: qualified,
+            trotter_error_bound: None,
+            input_norm_squared,
+            output_norm_squared,
+        })
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
