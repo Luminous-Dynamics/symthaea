@@ -3207,7 +3207,8 @@ mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
         U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
+        U1TwoSiteTruncationPolicy, U1TwoSiteHamiltonianGateReceipt, U1TeBDStrangStepper,
+        left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -4661,4 +4662,258 @@ mod tests {
         ));
         assert_eq!(state.to_dense(8).unwrap(), before);
     }
+
+    fn exchange_hamiltonian(coupling: f64) -> [[Complex64; 4]; 4] {
+        let mut h = [[complex_zero(); 4]; 4];
+        h[1][2] = Complex64::new(coupling, 0.0);
+        h[2][1] = Complex64::new(coupling, 0.0);
+        h
+    }
+
+    #[test]
+    fn hermitian_u1_hamiltonian_exponential_matches_analytic_xy_rotation() {
+        let coupling = 0.7;
+        let time_step = 0.4;
+        let mut h = exchange_hamiltonian(coupling);
+        h[0][0] = Complex64::new(0.2, 0.0);
+        h[3][3] = Complex64::new(-0.1, 0.0);
+
+        let (gate, receipt): (U1TwoSiteGate, U1TwoSiteHamiltonianGateReceipt) =
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(h, time_step, 1.0e-12).unwrap();
+        let angle = coupling * time_step;
+        let matrix = gate.matrix();
+        assert!((matrix[0][0] - Complex64::from_polar(1.0, -0.2 * time_step)).norm() <= 1.0e-12);
+        assert!((matrix[3][3] - Complex64::from_polar(1.0, 0.1 * time_step)).norm() <= 1.0e-12);
+        assert!((matrix[1][1] - Complex64::new(angle.cos(), 0.0)).norm() <= 1.0e-12);
+        assert!((matrix[2][2] - Complex64::new(angle.cos(), 0.0)).norm() <= 1.0e-12);
+        assert!((matrix[1][2] - Complex64::new(0.0, -angle.sin())).norm() <= 1.0e-12);
+        assert!((matrix[2][1] - Complex64::new(0.0, -angle.sin())).norm() <= 1.0e-12);
+        assert!(receipt.hamiltonian_hermiticity_residual <= 1.0e-12);
+        assert!(receipt.hamiltonian_charge_leakage_residual <= 1.0e-12);
+        assert!(receipt.gate_unitarity_residual <= 1.0e-12);
+        assert!(receipt.gate_charge_conservation_residual <= 1.0e-12);
+    }
+
+    #[test]
+    fn hermitian_u1_hamiltonian_exponential_handles_complex_exchange_phase_and_reverses() {
+        let time_step = 0.31;
+        let z = Complex64::new(0.4, -0.3);
+        let mut h = [[complex_zero(); 4]; 4];
+        h[1][1] = Complex64::new(0.2, 0.0);
+        h[2][2] = Complex64::new(-0.1, 0.0);
+        h[1][2] = z;
+        h[2][1] = z.conj();
+
+        let (forward, _) =
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(h, time_step, 1.0e-12).unwrap();
+        let (backward, _) =
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(h, -time_step, 1.0e-12).unwrap();
+        for row in 0..4 {
+            for column in 0..4 {
+                let mut product = complex_zero();
+                for inner in 0..4 {
+                    product += backward.matrix()[row][inner] * forward.matrix()[inner][column];
+                }
+                let expected = if row == column {
+                    Complex64::new(1.0, 0.0)
+                } else {
+                    complex_zero()
+                };
+                assert!((product - expected).norm() <= 1.0e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn hermitian_u1_hamiltonian_exponential_rejects_leakage_nonhermiticity_and_bad_time() {
+        let mut leaking = exchange_hamiltonian(0.5);
+        leaking[0][1] = Complex64::new(0.1, 0.0);
+        leaking[1][0] = Complex64::new(0.1, 0.0);
+        assert!(matches!(
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(leaking, 0.2, 1.0e-12),
+            Err(U1MpsError::HamiltonianChargeLeakage { .. })
+        ));
+
+        let mut nonhermitian = exchange_hamiltonian(0.5);
+        nonhermitian[1][2] = Complex64::new(0.5, 0.2);
+        nonhermitian[2][1] = Complex64::new(0.5, 0.0);
+        assert!(matches!(
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(nonhermitian, 0.2, 1.0e-12),
+            Err(U1MpsError::HamiltonianHermiticityResidual { .. })
+        ));
+
+        assert_eq!(
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(exchange_hamiltonian(0.5), 0.0, 1.0e-12),
+            Err(U1MpsError::InvalidTimeStep(0.0))
+        );
+        assert!(matches!(
+            U1TwoSiteGate::from_hermitian_u1_hamiltonian(
+                exchange_hamiltonian(0.5),
+                f64::NAN,
+                1.0e-12
+            ),
+            Err(U1MpsError::InvalidTimeStep(_))
+        ));
+    }
+
+    fn exact_three_site_single_excitation(
+        time: f64,
+        coupling: f64,
+        initial_site: usize,
+    ) -> [Complex64; 3] {
+        let hamiltonian = nalgebra::DMatrix::<f64>::from_row_slice(
+            3,
+            3,
+            &[
+                0.0, coupling, 0.0,
+                coupling, 0.0, coupling,
+                0.0, coupling, 0.0,
+            ],
+        );
+        let decomposition = hamiltonian.symmetric_eigen();
+        let mut output = [complex_zero(); 3];
+        for mode in 0..3 {
+            let coefficient = decomposition.eigenvectors[(initial_site, mode)];
+            let phase =
+                Complex64::from_polar(1.0, -time * decomposition.eigenvalues[mode]);
+            for site in 0..3 {
+                output[site] += Complex64::new(
+                    decomposition.eigenvectors[(site, mode)] * coefficient,
+                    0.0,
+                ) * phase;
+            }
+        }
+        output
+    }
+
+    fn simulate_three_site_strang(
+        time_step: f64,
+        total_time: f64,
+        coupling: f64,
+    ) -> (ComplexU1Mps, U1TeBDStrangStepResult) {
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![exchange_hamiltonian(coupling), exchange_hamiltonian(coupling)],
+            time_step,
+            1.0e-10,
+        )
+        .unwrap();
+        let steps = (total_time / time_step).round() as usize;
+        let mut state = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 8,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let mut last = None;
+        for _ in 0..steps {
+            let result = stepper.apply(&state, policy).unwrap();
+            assert_eq!(result.trotter_order, 2);
+            assert!(result.trotter_error_bound.is_none());
+            assert!(result.global_compression_error_bound_qualified);
+            state = result.state.clone();
+            last = Some(result);
+        }
+        (state, last.unwrap())
+    }
+
+    #[test]
+    fn strang_stepper_executes_even_odd_even_and_preserves_charge_norm_and_receipts() {
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![exchange_hamiltonian(0.7), exchange_hamiltonian(0.7)],
+            0.2,
+            1.0e-10,
+        )
+        .unwrap();
+        assert_eq!(stepper.site_count(), 3);
+        assert_eq!(stepper.time_step(), 0.2);
+        assert_eq!(stepper.local_hamiltonian_receipts().len(), 2);
+        assert_eq!(stepper.local_hamiltonian_receipts()[0].0, 0);
+        assert_eq!(stepper.local_hamiltonian_receipts()[1].0, 1);
+        assert!((stepper.local_hamiltonian_receipts()[0].1.time_step - 0.1).abs() <= 1.0e-15);
+        assert!((stepper.local_hamiltonian_receipts()[1].1.time_step - 0.2).abs() <= 1.0e-15);
+
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.even_half_first.bond_indices, vec![0]);
+        assert_eq!(result.odd_full.bond_indices, vec![1]);
+        assert_eq!(result.even_half_second.bond_indices, vec![0]);
+        assert_eq!(result.state.total_charge(), 1);
+        assert_eq!(result.trotter_order, 2);
+        assert!(result.trotter_error_bound.is_none());
+        assert!(result.global_compression_error_bound_qualified);
+        assert!(result.global_compression_error_bound_upper.is_some());
+        assert!((result.output_norm_squared - result.input_norm_squared).abs() <= 1.0e-9);
+        assert!(result.state.selection_rule_residual() <= 1.0e-10);
+    }
+
+    #[test]
+    fn strang_stepper_has_second_order_global_convergence_against_dense_exact_dynamics() {
+        let coupling = 0.7;
+        let total_time = 1.0;
+        let exact = exact_three_site_single_excitation(total_time, coupling, 0);
+        let (coarse, coarse_receipt) =
+            simulate_three_site_strang(0.1, total_time, coupling);
+        let (fine, fine_receipt) =
+            simulate_three_site_strang(0.05, total_time, coupling);
+
+        let dense_indices = [4, 2, 1]; // |100>, |010>, |001> in MSB-first order.
+        let coarse_dense = coarse.to_dense(4).unwrap();
+        let fine_dense = fine.to_dense(4).unwrap();
+        let coarse_error = dense_indices
+            .iter()
+            .enumerate()
+            .map(|(site, index)| (coarse_dense[*index] - exact[site]).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let fine_error = dense_indices
+            .iter()
+            .enumerate()
+            .map(|(site, index)| (fine_dense[*index] - exact[site]).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!(coarse_error > 0.0);
+        assert!(fine_error > 0.0);
+        assert!(coarse_error / fine_error > 3.4);
+        assert!(coarse_error / fine_error < 4.6);
+        assert!(coarse_receipt.global_compression_error_bound_qualified);
+        assert!(fine_receipt.global_compression_error_bound_qualified);
+        assert!(coarse_receipt.global_compression_error_bound_upper.unwrap() < 1.0e-8);
+        assert!(fine_receipt.global_compression_error_bound_upper.unwrap() < 1.0e-8);
+    }
+
+    #[test]
+    fn strang_stepper_rejects_bad_site_and_bond_counts() {
+        assert!(matches!(
+            U1TeBDStrangStepper::new(1, Vec::new(), 0.1, 1.0e-10),
+            Err(U1MpsError::TwoSiteShapeMismatch)
+        ));
+        assert!(matches!(
+            U1TeBDStrangStepper::new(3, vec![exchange_hamiltonian(0.5)], 0.1, 1.0e-10),
+            Err(U1MpsError::HamiltonianBondCountMismatch {
+                expected: 2,
+                actual: 1
+            })
+        ));
+        assert!(matches!(
+            U1TeBDStrangStepper::new(
+                2,
+                vec![exchange_hamiltonian(0.5)],
+                f64::INFINITY,
+                1.0e-10
+            ),
+            Err(U1MpsError::InvalidTimeStep(_))
+        ));
+    }
+
 }
