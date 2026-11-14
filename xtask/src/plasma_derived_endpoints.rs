@@ -91,6 +91,8 @@ struct DerivedRatioResult {
     derivation_code_sha256: String,
     derivation_definition_id: String,
     derivation_definition_sha256: String,
+    numerator_definition: String,
+    denominator_definition: String,
     input_manifest_sha256: String,
     analysis_profile: String,
     estimate: f64,
@@ -563,6 +565,12 @@ fn audit_aged_retention(evidence: &AgedRetentionEvidence) -> Decision {
         || result.input_manifest_sha256 != evidence.design.sample_manifest_sha256
     {
         return Decision::rejected("retention derivation is not bound to the preregistered design and input manifest");
+    }
+    if result.numerator_definition != "conditioned_mean_apparent_shear_strength_mpa"
+        || result.denominator_definition != "baseline_mean_apparent_shear_strength_mpa"
+        || result.derivation_definition_id != "conditioned_mean_over_baseline_mean_apparent_shear_v1"
+    {
+        return Decision::rejected("aged-retention numerator, denominator or derivation definition is not the registered conditioned/baseline strength ratio");
     }
     if ![
         result.estimate,
