@@ -173,3 +173,10 @@ The E2 implementation is a local companion source artifact, not part of this pub
 ## 14 November 2026 — local E2 observer checkpoint boundary
 
 The local companion now includes an expected-head comparison that illustrates a further boundary: a hash chain proves internal consistency but does not authenticate an entire database against a privileged full rewrite. A test rewrites a receipt and matching business row, recomputes the intent/record hashes, and shows that the unanchored audit accepts the internally consistent replacement while the original out-of-band head rejects it. The caller-supplied checkpoint API and test remain local companion source, not this public PR diff; this public document records the trust model and E3/E4 follow-up. No remote checkpoint service, signature or key custody is implemented.
+
+
+## 14 November 2026 — bounded TLA+ specification authored (TLC pending)
+
+Added formal/MACEEffectFence.tla, formal/MACEEffectFence.cfg and formal/run-tlc.sh. The model contains two idempotency keys and two intents, delayed pending dispatch, globally serialized effect/fence transactions, receipt/business staging, atomic commit, rollback/process crash and derived reconciliation outcomes. Invariants check type correctness, atomic visibility, transaction coherence, intent binding, reconciliation soundness and that a fenced key never exposes a business effect.
+
+The runner pins the stable TLA+ tools v1.7.4 release using the upstream-published SHA-1 for tla2tools.jar and runs a single TLC worker. TLC was **not run** in this environment: Java 21 is available but no TLA+ JAR is installed, and outbound artifact retrieval is unavailable. The Go finite-state model remains a separate, executed test (68 states / 200 transitions); it is not a substitute for TLC. Do not count the formal tier as passed until the pinned runner succeeds and records its state/transition counts and tool version.
