@@ -234,6 +234,12 @@ fn validate_generation_set<'a>(
             {
                 return Err(AuditDisposition::Blocked);
             }
+            if !matches!(
+                claim.claim_type.as_str(),
+                "method_measurement" | "survival_reliability" | "transfer_qualification" | "process_observation" | "surface_state" | "material_integrity" | "lifecycle_recovery"
+            ) {
+                return Err(AuditDisposition::Rejected);
+            }
             if !claim_ids.insert(claim.claim_id.as_str()) {
                 return Err(AuditDisposition::Rejected);
             }
@@ -441,7 +447,7 @@ fn event_applies_to_claim(
         .unwrap_or(evaluation_time)
         .min(evaluation_time);
     overlap(
-        generation.valid_from.max(claim.valid_until.map_or(i64::MIN, |end| i64::MIN)),
+        generation.valid_from,
         Some(claim_end),
         event.effective_from,
         event.effective_until,
