@@ -43,6 +43,8 @@ pub mod musicxml_notation_eval;
 #[cfg(feature = "theory")]
 pub mod musicxml_corpus_qualification;
 #[cfg(feature = "theory")]
+pub mod musicxml_composer_folds;
+#[cfg(feature = "theory")]
 pub mod symbolic_import;
 #[cfg(feature = "theory")]
 pub mod repeat_traversal;
