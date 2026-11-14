@@ -1,0 +1,1024 @@
+{
+  "schema_version": "engineering-decision-event-order-v0.1",
+  "status": "synthetic_preregistered_known_answers_not_adjudicated_event_traces",
+  "semantics": {
+    "ordering_states": [
+      "before",
+      "after",
+      "overlapping",
+      "unknown",
+      "inconsistent"
+    ],
+    "stop_rule": "A definitely-after effect is a critical failure. Overlapping or unknown order is indeterminate and blocks irreversible actions.",
+    "reconciliation_rule": "Cancellation acknowledgement is not terminal operation outcome. Retrying requires exact qualified NOT_APPLIED outcome ordered before the retry.",
+    "clock_rule": "Wall-clock intervals are comparable only with qualified clock integrity. Monotonic sequences are comparable only within one qualified clock domain. Qualified causal edges can refine overlapping clock intervals; contradictions are inconsistent.",
+    "delivery_rule": "Input event-array order is not temporal order. Reordering delivery must not change the result."
+  },
+  "event_trace_digest_contract": {
+    "domain": "symthaea.engineering-decision.event-trace.v0.1",
+    "projection": "qualification plus full event records sorted by event_id",
+    "serialization": "compact JSON with object keys sorted recursively; array order inside each event is retained",
+    "hash": "SHA-256"
+  },
+  "cases": [
+    {
+      "id": "EO-POS-001",
+      "family": "effect_definitely_precedes_stop_trigger",
+      "description": "The irreversible effect is qualified as complete before a later stop trigger is observed.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-1",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-1",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-1",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        }
+      ],
+      "expected": {
+        "disposition": "safe",
+        "block_irreversible_actions": false,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "after"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": []
+      },
+      "event_trace_sha256": "63eb4d55eed26a5d737ceb6c53255b2949f04daa0e340c22d3cbf61c08b2cdae"
+    },
+    {
+      "id": "EO-NEG-001",
+      "family": "effect_definitely_after_stop_trigger",
+      "description": "The effect commit is strictly ordered after the first observable stop trigger.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-2",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-2",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-2",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "critical_failure",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "before"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:effect"
+        ]
+      },
+      "event_trace_sha256": "5f17d2e16269ea5d8bd10174e86b10442cbb1d764aa226fc0b5e2d4f18a76457"
+    },
+    {
+      "id": "EO-UNK-001",
+      "family": "cross_clock_intervals_overlap",
+      "description": "The stop and effect intervals overlap across two qualified clock domains and have no causal edge resolving order.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-3",
+          "reconciled_outcome": null,
+          "clock": null,
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "sensor-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-3",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "device-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-3",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "device-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 140,
+              "latest_unix_ms": 150
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "indeterminate",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "overlapping"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING:effect"
+        ]
+      },
+      "event_trace_sha256": "064b6d6d02a7740f3171ec51ba47205efc4c9eb825e56b1d0de380c4d23044e3"
+    },
+    {
+      "id": "EO-UNK-002",
+      "family": "order_has_no_qualified_clock_or_causal_edge",
+      "description": "The trace is structurally present but cannot establish whether the effect preceded or followed the stop trigger.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "not_applicable"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-4",
+          "reconciled_outcome": null,
+          "clock": null,
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": null,
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-4",
+          "reconciled_outcome": null,
+          "clock": null,
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-4",
+          "reconciled_outcome": "applied",
+          "clock": null,
+          "causal_predecessors": [
+            "effect"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "indeterminate",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "unknown"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "CAUSAL_ORDER_QUALIFICATION_INDETERMINATE",
+          "EFFECT_OUTCOME_ORDER_UNRESOLVED:OP-4",
+          "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN:effect",
+          "OPERATION_START_ORDER_UNRESOLVED:op-start"
+        ]
+      },
+      "event_trace_sha256": "2239c0e3b903e40d6b8bc11f0923d70da5285f1139decb57fe85dd5fbbd0e8d2"
+    },
+    {
+      "id": "EO-UNK-003",
+      "family": "cancellation_acknowledged_but_operation_outcome_unknown",
+      "description": "Cancellation was requested and acknowledged, but no final operation-outcome receipt exists.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-5",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "cancel-request",
+          "kind": "cancellation_requested",
+          "operation_id": "OP-5",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "cancel-ack",
+          "kind": "cancellation_acknowledged",
+          "operation_id": "OP-5",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "outcome-unknown",
+          "kind": "operation_outcome_unknown",
+          "operation_id": "OP-5",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 5,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 140,
+              "latest_unix_ms": 140
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        }
+      ],
+      "expected": {
+        "disposition": "indeterminate",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {},
+        "pending_operation_ids": [
+          "OP-5"
+        ],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "CANCELLATION_ACK_NOT_FINAL:OP-5",
+          "OPERATION_OUTCOME_UNKNOWN:OP-5"
+        ]
+      },
+      "event_trace_sha256": "0f0bac08961bbb754236dc27036908073bbfd658fe7730599f6bb6bc6d876bc0"
+    },
+    {
+      "id": "EO-POS-002",
+      "family": "exact_not_applied_reconciliation_resolves_inflight_operation",
+      "description": "The operation's exact outcome is reconciled as NOT_APPLIED after cancellation acknowledgement.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-6",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "cancel-request",
+          "kind": "cancellation_requested",
+          "operation_id": "OP-6",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "cancel-ack",
+          "kind": "cancellation_acknowledged",
+          "operation_id": "OP-6",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "outcome-unknown",
+          "kind": "operation_outcome_unknown",
+          "operation_id": "OP-6",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 5,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 140,
+              "latest_unix_ms": 140
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "outcome-not-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-6",
+          "reconciled_outcome": "not_applied",
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 6,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 150,
+              "latest_unix_ms": 150
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "outcome-unknown",
+            "cancel-ack"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "safe",
+        "block_irreversible_actions": false,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {},
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": []
+      },
+      "event_trace_sha256": "002d8733f188ac1dad38b87a82f00a7bcce8e9d05bccdd6b0bd7930c006d60ef"
+    },
+    {
+      "id": "EO-NEG-002",
+      "family": "retry_attempted_before_unknown_outcome_reconciliation",
+      "description": "A retry is attempted while the original operation's outcome remains unknown.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-7",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "outcome-unknown",
+          "kind": "operation_outcome_unknown",
+          "operation_id": "OP-7",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "retry",
+          "kind": "retry_attempted",
+          "operation_id": "OP-7",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        }
+      ],
+      "expected": {
+        "disposition": "critical_failure",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {},
+        "pending_operation_ids": [
+          "OP-7"
+        ],
+        "retry_before_reconciliation_count": 1,
+        "reason_codes": [
+          "OPERATION_OUTCOME_UNKNOWN:OP-7",
+          "OPERATION_OUTCOME_UNRECONCILED:OP-7",
+          "RETRY_AFTER_STOP_TRIGGER:OP-7",
+          "RETRY_BEFORE_RECONCILIATION:OP-7"
+        ]
+      },
+      "event_trace_sha256": "bdbf0601390431ac637a2b698a6d37f4159e806e9e65f69f9366b9e4b9feede2"
+    },
+    {
+      "id": "EO-POS-003",
+      "family": "causal_edge_resolves_overlapping_clock_intervals",
+      "description": "Wall-clock uncertainty intervals overlap, but a qualified causal edge establishes effect-before-trigger order.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-8",
+          "reconciled_outcome": null,
+          "clock": null,
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-8",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "device-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "sensor-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 140
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-8",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "device-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 150,
+              "latest_unix_ms": 160
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "safe",
+        "block_irreversible_actions": false,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "after"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": []
+      },
+      "event_trace_sha256": "1bd92f815f755fb3870585773128e45a244af086bf14b03bb604eee9aca16772"
+    },
+    {
+      "id": "EO-NEG-003",
+      "family": "qualified_clock_and_causal_order_contradict",
+      "description": "The trusted clock intervals say effect-before-trigger, while the qualified causal graph says trigger-before-effect.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-9",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "sensor-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 200,
+              "latest_unix_ms": 210
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "op-start"
+          ]
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-9",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "device-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 180,
+              "latest_unix_ms": 190
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "stop"
+          ]
+        },
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-9",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "device-clock",
+            "sequence_number": null,
+            "sequence_qualification": "not_applicable",
+            "interval": {
+              "earliest_unix_ms": 220,
+              "latest_unix_ms": 230
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "critical_failure",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "inconsistent"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT:effect"
+        ]
+      },
+      "event_trace_sha256": "97465cfe2d25e233fe974c41b2484dcae1f6a1f1e5566e007fed8eb06468000a"
+    },
+    {
+      "id": "EO-NEG-004",
+      "family": "out_of_order_delivery_does_not_hide_post_trigger_effect",
+      "description": "The same stop/effect trace as EO-NEG-001 is delivered in reverse array order; the classification must remain identical.",
+      "qualification": {
+        "identity": "pass",
+        "digest_integrity": "pass",
+        "authenticity": "pass",
+        "scope": "pass",
+        "completeness": "pass",
+        "causal_ordering": "pass"
+      },
+      "events": [
+        {
+          "event_id": "outcome-applied",
+          "kind": "operation_outcome_reconciled",
+          "operation_id": "OP-10",
+          "reconciled_outcome": "applied",
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 4,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 130,
+              "latest_unix_ms": 130
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": [
+            "effect"
+          ]
+        },
+        {
+          "event_id": "effect",
+          "kind": "irreversible_effect_committed",
+          "operation_id": "OP-10",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 3,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 120,
+              "latest_unix_ms": 120
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "stop",
+          "kind": "stop_trigger_observed",
+          "operation_id": null,
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 2,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 110,
+              "latest_unix_ms": 110
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        },
+        {
+          "event_id": "op-start",
+          "kind": "operation_started",
+          "operation_id": "OP-10",
+          "reconciled_outcome": null,
+          "clock": {
+            "domain_id": "run-a",
+            "sequence_number": 1,
+            "sequence_qualification": "pass",
+            "interval": {
+              "earliest_unix_ms": 100,
+              "latest_unix_ms": 100
+            },
+            "clock_qualification": "pass"
+          },
+          "causal_predecessors": []
+        }
+      ],
+      "expected": {
+        "disposition": "critical_failure",
+        "block_irreversible_actions": true,
+        "stop_trigger_event_id": "stop",
+        "effect_orders": {
+          "effect": "before"
+        },
+        "pending_operation_ids": [],
+        "retry_before_reconciliation_count": 0,
+        "reason_codes": [
+          "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:effect"
+        ]
+      },
+      "event_trace_sha256": "04640dd3376466cfd5ae7defc8464304c90bd23f802213207b0ba36b2018bce8"
+    }
+  ]
+}
