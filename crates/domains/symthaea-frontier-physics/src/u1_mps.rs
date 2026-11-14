@@ -1831,6 +1831,9 @@ pub struct U1TwoSiteGate {
     matrix: [[Complex64; 4]; 4],
     charge_conservation_residual: f64,
     unitarity_residual: f64,
+    /// Operator-norm bound for replacing a tolerance-qualified source
+    /// Hamiltonian by its exact Hermitian, U(1)-block-diagonal projection.
+    hamiltonian_projection_error_operator_upper_bound: f64,
 }
 
 
@@ -2052,6 +2055,7 @@ impl U1TwoSiteGate {
             matrix,
             charge_conservation_residual,
             unitarity_residual,
+            hamiltonian_projection_error_operator_upper_bound: 0.0,
         })
     }
 
@@ -2067,6 +2071,23 @@ impl U1TwoSiteGate {
         self.unitarity_residual
     }
 
+    pub fn hamiltonian_projection_error_operator_upper_bound(&self) -> f64 {
+        self.hamiltonian_projection_error_operator_upper_bound
+    }
+
+    fn with_hamiltonian_projection_error(
+        mut self,
+        bound: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !bound.is_finite() || bound < 0.0 {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian projection error bound",
+            ));
+        }
+        self.hamiltonian_projection_error_operator_upper_bound = bound;
+        Ok(self)
+    }
+
     /// Exact identity gate.
     pub fn identity() -> Self {
         let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
@@ -2077,6 +2098,7 @@ impl U1TwoSiteGate {
             matrix,
             charge_conservation_residual: 0.0,
             unitarity_residual: 0.0,
+            hamiltonian_projection_error_operator_upper_bound: 0.0,
         }
     }
 
