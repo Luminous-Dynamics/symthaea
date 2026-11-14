@@ -1,0 +1,89 @@
+name: Melothaea component rights policy
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/music_dataset_rights_policy.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "tools/mel-music-rights-policy-harness/**"
+      - "benchmarks/mel/schemas/music-component-rights-v1.schema.json"
+      - "benchmarks/mel/schemas/music-rights-use-request-v1.schema.json"
+      - "benchmarks/mel/schemas/music-rights-decision-v1.schema.json"
+      - "benchmarks/mel/registry/synthetic-smebench-rights-structure-v1.json"
+      - "benchmarks/mel/registry/synthetic-music-rights-commercial-evaluation-request-v1.json"
+      - "docs/research/MEL_MR_RIGHTS_001_COMPONENT_POLICY_V1_2026-11-14.md"
+      - ".github/workflows/mel-music-rights-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  component-rights-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_RIGHTS_POLICY_REVISION=$actual" >> "$GITHUB_ENV"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Stage standalone rights policy harness with exact production module
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-music-rights-policy-harness"
+          mkdir -p "$staged/src" "$staged/examples" "$staged/fixtures"
+          cp tools/mel-music-rights-policy-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-music-rights-policy-harness/src/lib.rs "$staged/src/lib.rs"
+          cp crates/domains/symthaea-muse/src/music_dataset_rights_policy.rs "$staged/src/music_dataset_rights_policy.rs"
+          cp tools/mel-music-rights-policy-harness/examples/validate_fixture.rs "$staged/examples/validate_fixture.rs"
+          cp tools/mel-music-rights-policy-harness/fixtures/synthetic-smebench-rights-structure-v1.json "$staged/fixtures/"
+          cp tools/mel-music-rights-policy-harness/fixtures/synthetic-commercial-evaluation-request-v1.json "$staged/fixtures/"
+          echo "MEL_RIGHTS_POLICY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "MEL_RIGHTS_POLICY_DIR=$staged" >> "$GITHUB_ENV"
+      - name: Format and verify exact staged sources
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MEL_RIGHTS_POLICY_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MEL_RIGHTS_POLICY_MANIFEST"
+      - name: Resolve standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_RIGHTS_POLICY_MANIFEST"
+      - name: Run rights policy contract tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_RIGHTS_POLICY_MANIFEST"
+      - name: Validate metadata-only SMEBench rights fixture
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_RIGHTS_POLICY_MANIFEST" --example validate_fixture
+      - name: Run rights policy Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_RIGHTS_POLICY_MANIFEST" --all-targets -- -D warnings
+      - name: Record exact rights policy evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-music-rights-policy-evidence"
+          mkdir -p "$evidence"
+          cp "$MEL_RIGHTS_POLICY_MANIFEST" "$evidence/Cargo.toml"
+          cp "$MEL_RIGHTS_POLICY_DIR/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum crates/domains/symthaea-muse/src/music_dataset_rights_policy.rs > "$evidence/production-module.sha256"
+          sha256sum benchmarks/mel/schemas/music-component-rights-v1.schema.json > "$evidence/component-rights-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-rights-use-request-v1.schema.json > "$evidence/use-request-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-rights-decision-v1.schema.json > "$evidence/decision-schema.sha256"
+          sha256sum benchmarks/mel/registry/synthetic-smebench-rights-structure-v1.json > "$evidence/rights-fixture.sha256"
+          printf 'exact_head=%s\n' "$MEL_RIGHTS_POLICY_REVISION" > "$evidence/source-identities.txt"
+      - name: Upload rights policy evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-music-rights-policy-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-music-rights-policy-evidence/
+          if-no-files-found: error
+          retention-days: 90

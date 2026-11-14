@@ -1,0 +1,11 @@
+{
+  "schema_version": "mel-music-rights-use-request-v1",
+  "purpose": "commercial_evaluation",
+  "commercial_context": true,
+  "distribute_output": false,
+  "public_release": false,
+  "derivative_created": false,
+  "output_attribution_attached": false,
+  "output_notices_attached": false,
+  "output_share_alike_declared": false
+}

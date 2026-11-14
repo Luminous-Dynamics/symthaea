@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-rights-use-request-v1.schema.json",
+  "title": "Melothaea music rights use request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "purpose",
+    "commercial_context",
+    "distribute_output",
+    "public_release",
+    "derivative_created",
+    "output_attribution_attached",
+    "output_notices_attached",
+    "output_share_alike_declared"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-rights-use-request-v1"
+    },
+    "purpose": {
+      "enum": [
+        "internal_research",
+        "evaluation",
+        "commercial_evaluation",
+        "training",
+        "fine_tuning",
+        "redistribution",
+        "public_release"
+      ]
+    },
+    "commercial_context": {
+      "type": "boolean"
+    },
+    "distribute_output": {
+      "type": "boolean"
+    },
+    "public_release": {
+      "type": "boolean"
+    },
+    "derivative_created": {
+      "type": "boolean"
+    },
+    "output_attribution_attached": {
+      "type": "boolean"
+    },
+    "output_notices_attached": {
+      "type": "boolean"
+    },
+    "output_share_alike_declared": {
+      "type": "boolean"
+    }
+  }
+}

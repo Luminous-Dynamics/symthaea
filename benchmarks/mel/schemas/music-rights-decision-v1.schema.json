@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-rights-decision-v1.schema.json",
+  "title": "Melothaea deterministic music rights decision receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_version",
+    "dataset_id",
+    "dataset_version",
+    "rights_bundle_sha256",
+    "use_request_sha256",
+    "status",
+    "reasons",
+    "output_obligations",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-rights-decision-v1"
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rights_bundle_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "use_request_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "status": {
+      "enum": [
+        "allowed",
+        "denied",
+        "blocked"
+      ]
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "output_obligations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

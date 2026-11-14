@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-component-rights-v1.schema.json",
+  "title": "Melothaea component-level rights bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "dataset_version",
+    "components"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-component-rights-v1"
+    },
+    "dataset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "permission": {
+      "enum": [
+        "allowed",
+        "denied",
+        "unknown"
+      ]
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "component_sha256",
+        "license",
+        "permissions",
+        "attribution_required",
+        "notice_required",
+        "share_alike",
+        "review_status"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_version",
+            "source_uri",
+            "license_text_sha256"
+          ],
+          "properties": {
+            "license_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "license_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_uri": {
+              "type": "string",
+              "minLength": 1
+            },
+            "license_text_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "inherited_from": {
+              "type": "string",
+              "minLength": 1
+            },
+            "rights_holder_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retrieved_at_utc": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "internal_research",
+            "evaluation",
+            "training",
+            "fine_tuning",
+            "commercial_use",
+            "redistribution",
+            "public_release"
+          ],
+          "properties": {
+            "internal_research": {
+              "$ref": "#/$defs/permission"
+            },
+            "evaluation": {
+              "$ref": "#/$defs/permission"
+            },
+            "training": {
+              "$ref": "#/$defs/permission"
+            },
+            "fine_tuning": {
+              "$ref": "#/$defs/permission"
+            },
+            "commercial_use": {
+              "$ref": "#/$defs/permission"
+            },
+            "redistribution": {
+              "$ref": "#/$defs/permission"
+            },
+            "public_release": {
+              "$ref": "#/$defs/permission"
+            }
+          }
+        },
+        "attribution_required": {
+          "type": "boolean"
+        },
+        "attribution_statement": {
+          "type": "string"
+        },
+        "notice_required": {
+          "type": "boolean"
+        },
+        "notice_statement": {
+          "type": "string"
+        },
+        "share_alike": {
+          "enum": [
+            "not_applicable",
+            "applies",
+            "unknown"
+          ]
+        },
+        "share_alike_scope": {
+          "type": "string"
+        },
+        "review_status": {
+          "enum": [
+            "human_reviewed",
+            "machine_extracted",
+            "unreviewed"
+          ]
+        },
+        "human_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewer_ref",
+            "reviewer_role",
+            "jurisdiction",
+            "reviewed_at_utc",
+            "rationale",
+            "decision_record_sha256"
+          ],
+          "properties": {
+            "reviewer_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewer_role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "jurisdiction": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewed_at_utc": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "decision_record_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    }
+  }
+}

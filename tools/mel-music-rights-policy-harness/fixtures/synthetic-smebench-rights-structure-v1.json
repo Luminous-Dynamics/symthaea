@@ -1,0 +1,61 @@
+{
+  "schema_version": "mel-music-component-rights-v1",
+  "dataset_id": "smebench-license-structure-metadata-only",
+  "dataset_version": "arxiv-2610.36715-metadata-v1",
+  "components": [
+    {
+      "component_id": "arachno-soundfont",
+      "component_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "license": {
+        "license_id": "CC-BY-NC-SA",
+        "license_version": "4.0",
+        "source_uri": "https://arxiv.org/abs/2610.36715",
+        "license_text_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "inherited_from": "SME-Bench licensing appendix",
+        "source_revision": "SMEBench-paper-arxiv-2610.36715-2026-10-27"
+      },
+      "permissions": {
+        "internal_research": "unknown",
+        "evaluation": "unknown",
+        "training": "unknown",
+        "fine_tuning": "unknown",
+        "commercial_use": "unknown",
+        "redistribution": "unknown",
+        "public_release": "unknown"
+      },
+      "attribution_required": true,
+      "attribution_statement": "Unreviewed; obtain from authoritative license",
+      "notice_required": true,
+      "notice_statement": "Unreviewed; obtain from authoritative license",
+      "share_alike": "unknown",
+      "review_status": "unreviewed"
+    },
+    {
+      "component_id": "moisesdb-derived-midi",
+      "component_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "license": {
+        "license_id": "CC-BY-NC-SA",
+        "license_version": "4.0",
+        "source_uri": "https://arxiv.org/abs/2610.36715",
+        "license_text_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "inherited_from": "MoisesDB, as identified by SMEBench licensing appendix",
+        "source_revision": "SMEBench-paper-arxiv-2610.36715-2026-10-27"
+      },
+      "permissions": {
+        "internal_research": "unknown",
+        "evaluation": "unknown",
+        "training": "unknown",
+        "fine_tuning": "unknown",
+        "commercial_use": "unknown",
+        "redistribution": "unknown",
+        "public_release": "unknown"
+      },
+      "attribution_required": true,
+      "attribution_statement": "Unreviewed; obtain from authoritative license",
+      "notice_required": true,
+      "notice_statement": "Unreviewed; obtain from authoritative license",
+      "share_alike": "unknown",
+      "review_status": "unreviewed"
+    }
+  ]
+}
