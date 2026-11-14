@@ -10,7 +10,7 @@
 
 CausalIDView asks what happens when the *same causal world and target estimand* are presented through different observational views.
 
-Its released scaffold derives four views from one deterministic SCM realization, preserving the same units, treatment assignment, potential outcomes, context/query split and target CATE:
+The released point-identification scaffold derives four views from one deterministic SCM realization, preserving the same units, treatment assignment, potential outcomes, context/query split and target CATE:
 
 | View | Extra information exposed | Identification route |
 |---|---|---|
@@ -19,7 +19,9 @@ Its released scaffold derives four views from one deterministic SCM realization,
 | Instrumental variable (IV) | instrument I | Wald / IV identification |
 | Proximal (PROX) | proxies Z_P and W_P | proximal identification |
 
-The current released configuration uses 40 deterministic paired worlds, 1,024 context rows, 100 query rows and 50 baseline covariates. Its SCM cycles through five CATE families: linear, quadratic interaction, threshold piecewise, Fourier/nonstationary and shallow MLP. Each estimator receives only the variables allowed by its view; query factual treatment/outcome and potential outcomes / true effects are withheld. Prediction artifacts are aligned by exact query unit_id. The headline CATE metric is decomposed into ATE-error squared plus centered sPEHE squared, with bootstrap uncertainty computed at the SCM-world level (10,000 replicates in the released configuration).
+The paper also studies a **Hidden Confounding (HC)** stress view that exposes only (X,T,Y), with U withheld. It scores point predictions against the target effect as a stress test, not as a point-identification regime. Separately, its partial-identification companion uses three matched views: Manski bounds (X,T,Y), monotone-IV bounds (X,I,T,Y), and sensitivity bounds (X,T,Y). These share the same realized observed data, context/query split, query units and target CATE within that companion SCM; the paper uses binary potential outcomes and 40 additional worlds. It reports endpoint errors for the Manski, IV and sensitivity identified sets, with TabPFN-v3.5-based bound estimators obtaining the lowest endpoint RMSE in those evaluated settings.
+
+The public point-estimation configuration uses 40 deterministic paired worlds, 1,024 context rows, 100 query rows and 50 baseline covariates. Its SCM cycles through five CATE families: linear, quadratic interaction, threshold piecewise, Fourier/nonstationary and shallow MLP. Each estimator receives only the variables allowed by its view; query factual treatment/outcome and potential outcomes / true effects are withheld. Prediction artifacts are aligned by exact query unit_id. The headline CATE metric is decomposed into ATE-error squared plus centered sPEHE squared, with bootstrap uncertainty computed at the SCM-world level (10,000 replicates in the released configuration). The paper additionally evaluates semi-synthetic ACIC/LaLonde-style data and real-world null-effect tests using pre-treatment outcomes from randomized trials.
 
 The paper reports that no tested causal foundation model consistently wins across all observational regimes; rankings change with the available identifying information. A modular predictive model plus regime-specific identification procedures is competitive and outperforms several CFMs on some views. Its structural response experiments also distinguish *Stay* (the underlying target effect is preserved) from *Move* (the target effect genuinely changes).
 
@@ -86,6 +88,8 @@ Use paired seeds and common random numbers where valid, so a score change is att
 - CausalPFN, Do-PFN and CausalFM under identical view inputs and matched SCM worlds.
 - Classical back-door adjustment, front-door plug-in, IV/Wald and proximal estimators where assumptions apply.
 - Modular predictive tabular model plus regime-specific identification, matching the CausalIDView TabPFN-v3.5 plus X/S/DR learner, front-door, Wald and proximal P-Learner families.
+- Classical Manski worst-case bounds, monotone-IV bounds and sensitivity-model bounds; compare endpoint error and validity separately.
+- TabPFN-v3.5-based bound estimators, B-Learner and NeuralCSA sensitivity baselines where the corresponding model applies.
 - Exact finite-world oracle regime classifier and bound estimator on enumerable controls.
 - Always-point-estimate, always-wide-interval and always-abstain negative baselines.
 - AOBench estimator with explicit assumption/evidence ledger, model-adequacy check and partial-identification fallback.
@@ -150,11 +154,19 @@ This is a defensible path to a stronger benchmark: not a claim to beat CausalIDV
 
 The nested Rust package now contains `src/observational_views.rs`, exported from its public crate root. It is a matched-view **data-contract validator**, not a causal-identification engine.
 
-The default policy encodes the upstream four-regime column allowlists:
+The default policy *requires* the four point-identification regimes:
 - BD context: X, U, T, Y; query: X, U.
 - FD context: X, M, T, Y; query: X, M.
 - IV context: X, I, T, Y; query: X, I.
 - PROX context: X, Z_P, W_P, T, Y; query: X, Z_P, W_P.
+
+The validator also supports optional regime policies matching the paper's additional tasks:
+- HC context: X, T, Y; query: X.
+- Manski bounds context: X, T, Y; query: X.
+- Monotone-IV bounds context: X, I, T, Y; query: X, I.
+- Sensitivity bounds context: X, T, Y; query: X.
+
+These four additional regimes are available in the API but are not required by the default policy. An evaluation manifest must explicitly request them and freeze their respective identifying/bounding assumptions. The point-estimation HC stress view must not be confused with the partial-identification HC/Manski/sensitivity task.
 
 It checks:
 - all required regimes exist exactly once;
@@ -166,7 +178,7 @@ It checks:
 - query factual treatment/outcome and evaluator-only columns (tau, Y0/Y1, M0/M1, T0/T1, true effect, oracle fields) never enter the estimator view;
 - each column has the correct row count, consistent vector dimensions and finite values.
 
-Thirteen deterministic unit tests cover a valid four-view set, target-effect leakage, query T/Y leakage, changed query ordering, SCM/estimand digest mismatch, missing regime, duplicate regime, malformed/non-finite columns, context/query overlap, unexpected columns, shared context-value drift, shared query-value drift and cross-view feature-dimension mismatch.
+Fifteen deterministic unit tests cover a valid four-view set, target-effect leakage, query T/Y leakage, changed query ordering, SCM/estimand digest mismatch, missing regime, duplicate regime, malformed/non-finite columns, context/query overlap, unexpected columns, shared context-value drift, shared query-value drift, cross-view feature-dimension mismatch, the optional HC view, and the three partial-identification companion allowlists.
 
 This validator proves only that the supplied serialized view matches its declared data contract. It does not authenticate the SCM digest, prove the observation source is truthful, or establish the back-door/front-door/IV/proximal assumptions. Those require separate oracle/evidence contracts. No Rust compiler, test or Clippy pass is claimed until exact-head qualification completes.
 
