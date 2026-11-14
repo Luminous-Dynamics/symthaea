@@ -1,0 +1,293 @@
+{
+  "schema": "luminous.airroad.mimo_holdout_falsification.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_hard_set_holdout_falsification",
+  "claim_class": "deterministic_hard_set_model_invalidation",
+  "campaign_id": "airroad-holdout-campaign-001",
+  "acquisition_id": "airroad-holdout-acquisition-001",
+  "model_identity": "sha256:airroad-hidden-crossport-models-v0.1",
+  "topology_identity": "sha256:airroad-two-port-topology-v0.1",
+  "sample_clock_identity": "airroad-holdout-clock-001",
+  "port_order": [
+    "input-a",
+    "input-b"
+  ],
+  "training": {
+    "frequencies": [
+      1,
+      2,
+      4
+    ],
+    "observation_ids": [
+      "train-f1",
+      "train-f2",
+      "train-f4"
+    ],
+    "used_for_model_selection": true,
+    "holdout_used_for_fit": false,
+    "nominal_matrices": [
+      [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        ]
+      ],
+      [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        ]
+      ],
+      [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        ]
+      ]
+    ]
+  },
+  "candidates": {
+    "ZA": {
+      "candidate_id": "candidate-diagonal-A",
+      "transfer_definition": "Z_A(s)=diag(2,3)",
+      "predicted_holdout_crossport": {
+        "re": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "im": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    },
+    "ZB": {
+      "candidate_id": "candidate-hidden-crossport-B",
+      "transfer_definition": "Z_B(s)=[[2,Delta(s)],[0,3]]",
+      "delta_definition": "1000*(s^2+1)*(s^2+4)*(s^2+16)/(s+5)^7"
+    }
+  },
+  "holdout": {
+    "observation_id": "holdout-f3-crossport-12",
+    "frequency": 3,
+    "port_element": [
+      1,
+      2
+    ],
+    "selection_status": "preregistered_before_observation",
+    "selected_before_observation": true,
+    "used_for_fit": false,
+    "independent_observation_id": true,
+    "observed_value": {
+      "re": {
+        "numerator": "-401712500",
+        "denominator": "410338673"
+      },
+      "im": {
+        "numerator": "299932500",
+        "denominator": "410338673"
+      }
+    },
+    "observation_truth": "synthetic-ZB"
+  },
+  "calibration": {
+    "nuisance_id": "calibration-common-real-crossport-001",
+    "scope": "shared_across_all_training_and_holdout_frequencies",
+    "component": "real",
+    "lower": {
+      "numerator": "-1",
+      "denominator": "20"
+    },
+    "upper": {
+      "numerator": "1",
+      "denominator": "20"
+    }
+  },
+  "measurement_error": {
+    "semantics": "deterministic_hard_componentwise_bound",
+    "real_lower": {
+      "numerator": "-1",
+      "denominator": "20"
+    },
+    "real_upper": {
+      "numerator": "1",
+      "denominator": "20"
+    },
+    "imaginary_lower": {
+      "numerator": "-1",
+      "denominator": "20"
+    },
+    "imaginary_upper": {
+      "numerator": "1",
+      "denominator": "20"
+    },
+    "holdout_error_id": "holdout-sensor-error-001"
+  },
+  "expected": {
+    "delta_at_training": [
+      {
+        "frequency": 1,
+        "re": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "im": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "frequency": 2,
+        "re": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "im": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      {
+        "frequency": 4,
+        "re": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "im": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    ],
+    "delta_at_holdout": {
+      "re": {
+        "numerator": "-401712500",
+        "denominator": "410338673"
+      },
+      "im": {
+        "numerator": "299932500",
+        "denominator": "410338673"
+      }
+    },
+    "candidate_A_real_admissible_lower": {
+      "numerator": "-1",
+      "denominator": "10"
+    },
+    "candidate_A_real_admissible_upper": {
+      "numerator": "1",
+      "denominator": "10"
+    },
+    "candidate_A_holdout_real_outside": true,
+    "candidate_A_status": "FALSIFIED",
+    "candidate_B_holdout_residual_re": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "candidate_B_holdout_residual_im": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "candidate_B_status": "NOT_FALSIFIED_BY_THIS_HOLDOUT",
+    "min_measurement_error_halfwidth_to_rescue_A": {
+      "numerator": "7623911327",
+      "denominator": "8206773460"
+    },
+    "continuous_band_adequacy": "NOT_ESTABLISHED",
+    "terminal_verified_true_state": "FORBIDDEN"
+  },
+  "negative_controls": [
+    {
+      "id": "holdout-equals-training-frequency",
+      "expected": "not-falsified-by-this-holdout"
+    },
+    {
+      "id": "holdout-used-for-fit",
+      "expected": "reject-leakage"
+    },
+    {
+      "id": "holdout-selected-after-observation",
+      "expected": "reject-preregistration"
+    },
+    {
+      "id": "split-shared-calibration-id",
+      "expected": "reject-dependency"
+    },
+    {
+      "id": "stale-model-or-topology-id",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "unbounded-measurement-error",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "retrospective-error-inflation",
+      "expected": "reject"
+    },
+    {
+      "id": "statistical-covariance-as-hard-error",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "candidate-B-not-falsified-promoted-to-verified-true",
+      "expected": "reject-claim-promotion"
+    },
+    {
+      "id": "pointwise-holdout-promoted-to-continuous-band",
+      "expected": "reject-claim-promotion"
+    }
+  ],
+  "claim_ceiling": [
+    "Exact-rational falsification of candidate A under the declared synthetic hard-set holdout.",
+    "Candidate B is only not falsified by this one holdout; it is not proven true.",
+    "No continuous-frequency adequacy, IQC, physical FRF or robust-stability claim is established."
+  ]
+}
