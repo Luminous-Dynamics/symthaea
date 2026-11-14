@@ -1086,7 +1086,7 @@ mod tests {
                         <time><beat-type>4</beat-type><beats>4</beats></time>
                         <divisions>4</divisions>
                     </attributes>
-                    <note color="#FFFFFF" id="different"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+                    <note color="FFFFFF" id="different"><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
                     <note><rest/><duration>12</duration></note>
                 </measure>
             </part>
@@ -1207,4 +1207,85 @@ mod tests {
             Err(MusicXmlScoreEvaluationErrorV1::DiffWorkBudgetExceeded { .. })
         ));
     }
+
+    #[test]
+    fn one_symbol_substitution_is_one_insert_plus_one_delete() {
+        let reference = parse(&simple_score(rest_note()));
+        let changed_note = r#"<note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff><type>quarter</type></note>"#;
+        let prediction = parse(&simple_score(changed_note));
+        let report = evaluate_musicxml_score_graphs_v1(
+            &reference, &prediction, &MusicXmlScoreEvaluationConfigV1::default()
+        ).unwrap();
+        let distance = report.overall_distance.unwrap();
+        assert_eq!(distance.insertions, 1);
+        assert_eq!(distance.deletions, 1);
+        assert_eq!(distance.edit_distance, 2);
+        assert_eq!(
+            distance.normalized_distance,
+            Some(2.0 / (distance.reference_symbol_count + distance.prediction_symbol_count) as f64)
+        );
+    }
+
+    #[test]
+    fn namespace_uri_is_part_of_the_source_symbol_identity() {
+        let left = r#"<score-partwise xmlns:ext="urn:notation:one"><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <ext:future-ornament kind="x">turn</ext:future-ornament>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let right = r#"<score-partwise xmlns:ext="urn:notation:two"><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <ext:future-ornament kind="x">turn</ext:future-ornament>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let reference = parse(left);
+        let prediction = parse(right);
+        let report = evaluate_musicxml_score_graphs_v1(
+            &reference, &prediction, &MusicXmlScoreEvaluationConfigV1::default()
+        ).unwrap();
+        assert!(report.overall_distance.unwrap().edit_distance > 0);
+    }
+
+    #[test]
+    fn visual_tie_and_tuplet_edits_appear_in_separate_families() {
+        let tied = r#"<note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration><tie type="start"/><notations><tied type="start"/></notations></note>"#;
+        let untied = r#"<note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration></note>"#;
+        let reference = parse(&simple_score(tied));
+        let prediction = parse(&simple_score(untied));
+        let report = evaluate_musicxml_score_graphs_v1(
+            &reference, &prediction, &MusicXmlScoreEvaluationConfigV1::default()
+        ).unwrap();
+        let families: BTreeMap<_, _> = report.family_distances.iter()
+            .map(|metric| (metric.family, metric.distance.edit_distance))
+            .collect();
+        assert!(families.get(&MusicXmlSymbolFamilyV1::Ties).copied().unwrap_or(0) > 0);
+    }
+
+    #[test]
+    fn canonicalization_mismatch_is_refused_even_when_clock_matches() {
+        let reference = parse(&simple_score(rest_note()));
+        let mut prediction = reference.clone();
+        prediction[0].map.canonicalization_version = "unknown-canonicalization".into();
+        assert!(matches!(
+            evaluate_musicxml_score_graphs_v1(
+                &reference, &prediction, &MusicXmlScoreEvaluationConfigV1::default()
+            ),
+            Err(MusicXmlScoreEvaluationErrorV1::CanonicalizationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn input_graph_mutation_is_rejected_by_report_replay() {
+        let graph = parse(&simple_score(rest_note()));
+        let report = evaluate_musicxml_score_graphs_v1(
+            &graph, &graph, &MusicXmlScoreEvaluationConfigV1::default()
+        ).unwrap();
+        let changed = parse(&simple_score(
+            r#"<note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff></note>"#
+        ));
+        assert!(!validate_musicxml_score_evaluation_replay_v1(
+            &graph, &changed, &MusicXmlScoreEvaluationConfigV1::default(), &report
+        ).unwrap());
+    }
+
 }
