@@ -267,6 +267,14 @@ pub struct FibreLengthBin {
 pub struct FibreLengthEvidence {
     /// Method/standard and version used to measure fibre length.
     pub method_ref: String,
+    /// Versioned sampling plan for the exact output-lot sample (location, extraction and conditioning).
+    pub sampling_plan_ref: String,
+    /// Measured sample mass in milligrams taken from the accepted output lot.
+    pub sample_mass_mg: u64,
+    /// Number of independently measured subsamples/replicates represented by this distribution.
+    pub replicate_count: u32,
+    /// Declared relative expanded measurement uncertainty, parts per million.
+    pub measurement_uncertainty_ppm: u32,
     /// Exact accepted output lot physically sampled for this distribution.
     pub accepted_output_lot_id: String,
     /// Exact process-trial evidence ID which generated this accepted output lot.
@@ -420,6 +428,10 @@ pub enum RouteReason {
     InvalidFibreLengthDistribution,
     /// Fibre-length measurements are not bound to the exact trial and accepted output lot.
     FibreLengthTrialBindingMismatch,
+    /// Fibre-length sample mass exceeds the accepted output lot mass.
+    FibreLengthSampleExceedsOutput,
+    /// Fibre-length sampling plan, replicate count or uncertainty declaration is invalid.
+    InvalidFibreLengthMeasurementProtocol,
     /// Measured fibre-length distribution fails the receiving route policy.
     FibreLengthBelowPolicy,
     /// Chemical compatibility trial is absent.
@@ -660,14 +672,25 @@ fn fibre_length_binds_to_trial(
         nonempty(&balance.accepted_output_lot_id)
             && balance.accepted_output_lot_id == evidence.accepted_output_lot_id
             && balance.accepted_output_mass_mg > 0
+            && evidence.sample_mass_mg > 0
+            && evidence.sample_mass_mg <= balance.accepted_output_mass_mg
     })
+}
+
+fn fibre_length_protocol_valid(evidence: &FibreLengthEvidence) -> bool {
+    nonempty(&evidence.method_ref)
+        && nonempty(&evidence.sampling_plan_ref)
+        && evidence.sample_mass_mg > 0
+        && evidence.replicate_count > 0
+        && evidence.measurement_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
+        && evidence.evidence.method_ref == evidence.method_ref
 }
 
 fn fibre_length_fraction_at_or_above(
     evidence: &FibreLengthEvidence,
     minimum_length_um: u32,
 ) -> Option<u32> {
-    if evidence.method_ref.trim().is_empty() || evidence.bins.is_empty() {
+    if !fibre_length_protocol_valid(evidence) || evidence.bins.is_empty() {
         return None;
     }
     let mut total = 0_u64;
@@ -894,11 +917,24 @@ pub fn qualify_recovery_route(
                     ) {
                         reasons.push(RouteReason::InvalidFibreLengthDistribution);
                     }
+                    if !fibre_length_protocol_valid(length) {
+                        reasons.push(RouteReason::InvalidFibreLengthMeasurementProtocol);
+                    }
+                    let sample_exceeds_output = bundle
+                        .process_trial
+                        .as_ref()
+                        .and_then(|trial| trial.mass_balance.as_ref())
+                        .is_some_and(|balance| {
+                            length.sample_mass_mg > balance.accepted_output_mass_mg
+                        });
+                    if sample_exceeds_output {
+                        reasons.push(RouteReason::FibreLengthSampleExceedsOutput);
+                    }
                     let trial_binding_matches = bundle
                         .process_trial
                         .as_ref()
                         .is_some_and(|trial| fibre_length_binds_to_trial(length, trial));
-                    if !trial_binding_matches {
+                    if !trial_binding_matches && !sample_exceeds_output {
                         reasons.push(RouteReason::FibreLengthTrialBindingMismatch);
                     }
                     match fibre_length_fraction_at_or_above(length, policy.minimum_fibre_length_um)
@@ -1173,6 +1209,10 @@ mod tests {
     fn length() -> FibreLengthEvidence {
         FibreLengthEvidence {
             method_ref: "FIBRE-ARRAY-ASTM-D1440-V1".to_owned(),
+            sampling_plan_ref: "FIBRE-SAMPLING-PLAN-V1".to_owned(),
+            sample_mass_mg: 25_000,
+            replicate_count: 3,
+            measurement_uncertainty_ppm: 20_000,
             accepted_output_lot_id: "ACCEPTED-FIBRE-LOT-01".to_owned(),
             source_trial_evidence_id: "TRIAL-01".to_owned(),
             evidence: evidence(
