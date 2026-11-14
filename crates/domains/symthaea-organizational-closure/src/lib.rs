@@ -1148,7 +1148,6 @@ mod tests {
                 .iter()
                 .any(|finding| { finding.code == FindingCode::UndeclaredExternalDependency })
         );
-
     }
 
     #[test]
