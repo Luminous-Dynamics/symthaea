@@ -2,7 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde_json::Value;
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 const CASES: &str = include_str!("../../minimal-evidence-cases-v0.1.json");
 const MUTATIONS: &str = include_str!("../../minimal-evidence-mutations-v0.1.json");
@@ -49,6 +50,37 @@ fn digest_is_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn canonical_inventory_sha256(case: &Value, world: &Value) -> String {
+    let mut evidence = world_evidence(case, world).to_vec();
+    evidence.sort_by(|left, right| string_at(left, "id").cmp(string_at(right, "id")));
+    let mut predicates = strings_at(case, "mandatory_predicates");
+    predicates.sort();
+
+    let projection = json!({
+        "domain": "symthaea.engineering-decision-min-evidence.source-inventory.v0.1",
+        "target_configuration": world_target(case, world),
+        "source_inventory_state": world_inventory_state(case, world),
+        "mandatory_predicates": predicates,
+        "minimum_independent_roots_per_predicate": case["minimum_independent_roots_per_predicate"],
+        "evidence": evidence
+    });
+    format!("{:x}", Sha256::digest(serde_json::to_vec(&projection).unwrap()))
+}
+
+fn irrelevant_injection_sha256(evidence: &[Value]) -> String {
+    let mut irrelevant: Vec<Value> = evidence
+        .iter()
+        .filter(|record| strings_at(record, "supports").iter().any(|p| p == "irrelevant_background"))
+        .cloned()
+        .collect();
+    irrelevant.sort_by(|left, right| string_at(left, "id").cmp(string_at(right, "id")));
+    let projection = json!({
+        "domain": "symthaea.engineering-decision-min-evidence.irrelevant-injection.v0.1",
+        "evidence": irrelevant
+    });
+    format!("{:x}", Sha256::digest(serde_json::to_vec(&projection).unwrap()))
 }
 
 fn combinations(values: &[String], choose: usize) -> Vec<Vec<String>> {
@@ -315,8 +347,16 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
     for case in cases {
         let case_id = string_at(case, "id");
         assert!(seen_ids.insert(case_id.to_owned()), "duplicate case ID {case_id}");
-        assert!(digest_is_sha256(string_at(case, "source_inventory_sha256")), "{case_id}: malformed inventory digest");
-        assert_eq!(string_at(case, "source_inventory_state"), "complete_frozen");
+
+        if case.get("evidence").is_some() {
+            assert!(digest_is_sha256(string_at(case, "source_inventory_sha256")), "{case_id}: malformed inventory digest");
+            assert_eq!(string_at(case, "source_inventory_state"), "complete_frozen");
+            assert_eq!(
+                string_at(case, "source_inventory_sha256"),
+                canonical_inventory_sha256(case, case),
+                "{case_id}: canonical source-inventory digest"
+            );
+        }
 
         if let Some(worlds) = case.get("candidate_worlds").and_then(Value::as_array) {
             assert_eq!(worlds.len(), 2, "{case_id}: every paired case has exactly two worlds");
@@ -324,6 +364,13 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                 .iter()
                 .map(|world| {
                     assert!(digest_is_sha256(string_at(world, "source_inventory_sha256")), "{case_id}: malformed world digest");
+                    assert_eq!(world_inventory_state(case, world), "complete_frozen", "{case_id}: world inventory must be frozen");
+                    assert_eq!(
+                        string_at(world, "source_inventory_sha256"),
+                        canonical_inventory_sha256(case, world),
+                        "{case_id} / {}: canonical source-inventory digest",
+                        string_at(world, "world_id")
+                    );
                     let visible = visible_ids(case, world);
                     let evidence = world_evidence(case, world);
                     let evidence_ids: BTreeSet<String> = evidence
@@ -333,6 +380,15 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                     assert_eq!(evidence_ids.len(), evidence.len(), "{case_id}: duplicate evidence ID");
                     for id in visible {
                         assert!(evidence_ids.contains(&id), "{case_id}: candidate-visible ID absent from inventory: {id}");
+                    }
+                    if world.get("irrelevant_evidence_injection_count").and_then(Value::as_u64).unwrap_or(0) > 0 {
+                        let expected_batch = string_at(world, "irrelevant_evidence_injection_digest");
+                        assert_eq!(
+                            expected_batch,
+                            irrelevant_injection_sha256(evidence),
+                            "{case_id} / {}: irrelevant injection digest",
+                            string_at(world, "world_id")
+                        );
                     }
                     let report = evaluate_world(case, world);
                     assert_expected_world(case, world, &report);
@@ -347,6 +403,13 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                 other => panic!("{case_id}: unsupported paired relation {other}"),
             }
             if case.get("candidate_visible_evidence_ids").is_some() {
+                if case.get("irrelevant_evidence_injection_count").and_then(Value::as_u64).unwrap_or(0) > 0 {
+                    assert_eq!(
+                        string_at(case, "irrelevant_evidence_injection_digest"),
+                        irrelevant_injection_sha256(world_evidence(case, case)),
+                        "{case_id}: top-level irrelevant injection digest"
+                    );
+                }
                 let mut top_level = evaluate_world(case, case);
                 if case_id == "ME-NEG-002" {
                     top_level.reason_codes.push("LAST_SUFFICIENT_ROOT_REMOVED".to_owned());
