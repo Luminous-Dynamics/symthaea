@@ -116,6 +116,16 @@ pub struct FibreTail {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct LocalScopeValidation {
+    pub method_id: String,
+    pub method_version: String,
+    pub material_class: MaterialClass,
+    pub process_state: ProcessState,
+    pub evidence: EvidenceRef,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FibreLengthDistribution {
     pub measurement_id: String,
     pub measured_lot_id: String,
@@ -132,7 +142,7 @@ pub struct FibreLengthDistribution {
     pub observed_at_ns: u64,
     pub instrument_id: String,
     pub calibration: Option<CalibrationRecord>,
-    pub local_scope_validation: Option<EvidenceRef>,
+    pub local_scope_validation: Option<LocalScopeValidation>,
     pub sample_plan: SamplePlan,
     pub underflow: FibreTail,
     pub bins: Vec<FibreLengthBin>,
@@ -168,6 +178,7 @@ pub enum Finding {
     MethodIdentityMismatch,
     MethodScopeExceeded,
     LocalScopeValidationMissing,
+    LocalScopeValidationMismatch,
     UnsupportedWeightingBasis,
     MissingCalibration,
     InvalidCalibration,
@@ -279,10 +290,22 @@ pub fn assess_distribution(
     {
         push_unique(&mut findings, Finding::MethodScopeExceeded);
     }
-    if method.local_validation_required_states.contains(&distribution.process_state)
-        && distribution.local_scope_validation.as_ref().is_none_or(|item| !valid_evidence(item))
-    {
-        push_unique(&mut findings, Finding::LocalScopeValidationMissing);
+    if method.local_validation_required_states.contains(&distribution.process_state) {
+        match distribution.local_scope_validation.as_ref() {
+            None => push_unique(&mut findings, Finding::LocalScopeValidationMissing),
+            Some(validation) => {
+                if validation.method_id != method.method_id
+                    || validation.method_version != method.version
+                    || validation.material_class != distribution.material_class
+                    || validation.process_state != distribution.process_state
+                {
+                    push_unique(&mut findings, Finding::LocalScopeValidationMismatch);
+                }
+                if !valid_evidence(&validation.evidence) {
+                    push_unique(&mut findings, Finding::LocalScopeValidationMissing);
+                }
+            }
+        }
     }
     if !method.supported_weighting_bases.contains(&distribution.weighting_basis)
         || distribution.weighting_basis != WeightingBasis::MassWeighted
@@ -742,6 +765,16 @@ mod tests {
         }
     }
 
+    fn local_scope_validation(method: &MethodDefinition) -> LocalScopeValidation {
+        LocalScopeValidation {
+            method_id: method.method_id.clone(),
+            method_version: method.version.clone(),
+            material_class: MaterialClass::Cotton,
+            process_state: ProcessState::RecoveredAfterOpening,
+            evidence: evidence("local-scope", 'e'),
+        }
+    }
+
     fn distribution(method: &MethodDefinition, lot: &str, state: ProcessState) -> FibreLengthDistribution {
         FibreLengthDistribution {
             measurement_id: format!("measurement-{lot}"),
@@ -844,6 +877,45 @@ mod tests {
         let result = assess_distribution(&specimen, &method, &criterion());
         assert_eq!(result.decision, Decision::InsufficientEvidence);
         assert!(result.findings.contains(&Finding::LocalScopeValidationMissing));
+    }
+
+    #[test]
+    fn local_scope_validation_is_bound_to_exact_method_material_and_process_state() {
+        let method = method();
+        let mut specimen = distribution(
+            &method,
+            "output-001",
+            ProcessState::RecoveredAfterOpening,
+        );
+        specimen.local_scope_validation = Some(local_scope_validation(&method));
+        assert_eq!(
+            assess_distribution(&specimen, &method, &criterion()).decision,
+            Decision::Qualified
+        );
+
+        let mut wrong = local_scope_validation(&method);
+        wrong.method_version = "other-version".to_owned();
+        specimen.local_scope_validation = Some(wrong);
+        let result = assess_distribution(&specimen, &method, &criterion());
+        assert_eq!(result.decision, Decision::InsufficientEvidence);
+        assert!(result.findings.contains(&Finding::LocalScopeValidationMismatch));
+    }
+
+    #[test]
+    fn photoelectric_method_profile_cannot_be_assumed_valid_for_recovered_fabric_fibres() {
+        let mut d1447 = method();
+        d1447.method_id = "ASTM-D1447-26".to_owned();
+        d1447.version = "2026".to_owned();
+        d1447.allowed_process_states = vec![ProcessState::PreProcessReferenceFibre];
+        d1447.local_validation_required_states.clear();
+        let specimen = distribution(
+            &d1447,
+            "recovered-output-001",
+            ProcessState::RecoveredAfterOpening,
+        );
+        let result = assess_distribution(&specimen, &d1447, &criterion());
+        assert_eq!(result.decision, Decision::Rejected);
+        assert!(result.findings.contains(&Finding::MethodScopeExceeded));
     }
 
     #[test]
@@ -1013,7 +1085,7 @@ mod tests {
         let mut output = distribution(&method, "output-lot", ProcessState::RecoveredAfterOpening);
         output.parent_lot_id = "incoming-lot".to_owned();
         output.source_process_trial_id = Some("trial-001".to_owned());
-        output.local_scope_validation = Some(evidence("local-scope", 'e'));
+        output.local_scope_validation = Some(local_scope_validation(&method));
         let comparison = ProcessComparison {
             incoming_lot_id: "incoming-lot".to_owned(),
             output_lot_id: "output-lot".to_owned(),
@@ -1035,7 +1107,7 @@ mod tests {
         let mut output = distribution(&method, "output-lot", ProcessState::RecoveredAfterOpening);
         output.parent_lot_id = "different-incoming-lot".to_owned();
         output.source_process_trial_id = Some("other-trial".to_owned());
-        output.local_scope_validation = Some(evidence("local-scope", 'e'));
+        output.local_scope_validation = Some(local_scope_validation(&method));
         let comparison = ProcessComparison {
             incoming_lot_id: "incoming-lot".to_owned(),
             output_lot_id: "output-lot".to_owned(),
