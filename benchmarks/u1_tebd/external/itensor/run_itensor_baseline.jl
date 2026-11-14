@@ -131,7 +131,7 @@ function continuous_oracle(case, initial)
         for site in 1:n
             if site <= bond
                 left = kron(left, identity)
-            elseif site > bond + 1
+            elseif site > bond + 2
                 right = kron(right, identity)
             end
         end
