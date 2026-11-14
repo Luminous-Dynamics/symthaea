@@ -66,3 +66,25 @@ Terminal safe-stop, energy closure, command response and other physical qualific
 The event records now bind policy digest to the decision and action chunk, actuator/controller configuration digests to the application, and thermal sensor calibration to the physical transition. These are checked by the independent replay before an application can count as linked/closed.
 
 Current source corpus: 28 core causal-replay tests and 17 single-joint metrology-join tests. The exact-head Rust 1.96 workflow completed successfully: formatting passed, **45/45 tests passed**, and strict Clippy passed. This is software/reference qualification only; no physical trial or safety certification is implied.
+
+
+## Versioned single-joint receipt consumer (v0.1)
+
+The Symthaea replay crate now includes an independent Rust consumer for the Symtropy \`LOCO-JOINT-RECEIPT-INTEROP-001\` packet:
+
+- verifies duplicate-key-free JSON, v0.1 numeric restrictions, RFC 8785 canonical payload bytes, and the SHA-256 digest;
+- binds the packet's mission/robot/clock/scenario identities and source, decision, proposal, assurance, command, application, physical-transition and terminal event identities to the independently supplied \`MissionTrace\`;
+- binds actuator/controller/policy/model/action-domain and calibration digests to the instrument receipts and trace;
+- requires separate caller-supplied mission-trace, assurance, terminal and same-clock authority bindings because those digests are not stored as fields in \`MissionTrace\`;
+- recomputes source-to-actuator AoI and command-to-motion intervals from the supplied bounded timestamps; an unqualified clock relation cannot be promoted into numeric AoI;
+- keeps thermal-node/sequence, energy boundary, sampling, terminal closure and future-option evidence separate;
+- refuses to promote the future-options slot: it must remain \`NotEvaluated\` until the dedicated option-ledger consumer is composed;
+- reports \`actuation_authorized = false\` unconditionally.
+
+The v0.1 consumer currently accepts the single-observation / single-decision / single-proposal / single-application / single-transition profile only. It does not infer missing event objects from the packet, authenticate external actors, verify the physical truth of measurements, or calculate energy/thermal/viability. The packet's assurance and terminal receipt digests are checked against independent authority bindings; they are never compared with themselves.
+
+The frozen synthetic golden packet is vendored byte-for-byte under \`fixtures/\`. Its digest is:
+
+    cb19e0327c2f47c895eae4e49a89c9f8f9c9918e080d52b201d98b1a794823b8
+
+The dedicated exact-head Rust 1.96 workflow runs formatting, locked tests and strict Clippy. A passing result would establish only deterministic wire/integrity/identity binding and replay over the synthetic record—not physical qualification or certification.
