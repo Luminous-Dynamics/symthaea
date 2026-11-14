@@ -214,10 +214,14 @@ fn polar_speed_envelope(
         return Err(PolarError::Invalid);
     }
 
-    Ok(ScalarInterval {
+    let envelope = ScalarInterval {
         lower: (nominal_min - absolute_error_mps).max(0.0),
         upper: nominal_max + absolute_error_mps,
-    })
+    };
+    if !envelope.is_finite_ordered() {
+        return Err(PolarError::Invalid);
+    }
+    Ok(envelope)
 }
 
 fn absolute_twa_interval(
@@ -417,6 +421,12 @@ pub fn evaluate_robust_route_candidates(
         current.toward_direction,
         target_bearing,
     );
+    if !current_vmg.is_finite_ordered() {
+        return RobustRouteEvaluation::blocked(
+            RobustPlanStatus::NotEvaluated,
+            "current projection overflowed the finite VMG contract",
+        );
+    }
 
     let mut best_port = None;
     let mut best_starboard = None;
@@ -450,6 +460,15 @@ pub fn evaluate_robust_route_candidates(
         let heading_projection = (heading_deg - target_bearing).to_radians().cos();
         let boat_vmg = boat_speed.scale(heading_projection);
         let ground_vmg = boat_vmg.add(current_vmg);
+        if !boat_speed.is_finite_ordered()
+            || !boat_vmg.is_finite_ordered()
+            || !ground_vmg.is_finite_ordered()
+        {
+            return RobustRouteEvaluation::blocked(
+                RobustPlanStatus::NotEvaluated,
+                "propagated VMG interval overflowed the finite arithmetic contract",
+            );
+        }
         let signed_centre_twa =
             signed_angle_deg(wind.from_direction.center_deg, heading_deg);
         let tack_side = if signed_centre_twa > 0.0 {
