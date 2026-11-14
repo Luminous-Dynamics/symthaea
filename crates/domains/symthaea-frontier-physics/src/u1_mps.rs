@@ -5186,6 +5186,83 @@ mod tests {
     }
 
     #[test]
+    fn hamiltonian_projection_residual_is_measured_and_attached_to_evolution_gate() {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[0][0] = Complex64::new(0.2, 1.0e-8);
+        matrix[3][3] = Complex64::new(-0.3, 0.0);
+        matrix[1][1] = Complex64::new(0.1, 2.0e-8);
+        matrix[2][2] = Complex64::new(-0.1, 0.0);
+        matrix[1][2] = Complex64::new(0.7, 1.0e-8);
+        matrix[2][1] = Complex64::new(0.7, 0.0);
+        matrix[0][1] = Complex64::new(1.0e-8, 0.0);
+        matrix[1][0] = Complex64::new(1.0e-8, 0.0);
+
+        let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 1.0e-6).unwrap();
+        assert!(hamiltonian.hermiticity_residual() > 0.0);
+        assert!(hamiltonian.charge_conservation_residual() > 0.0);
+        assert!(hamiltonian.projection_residual_frobenius() > 0.0);
+
+        let gate = hamiltonian.evolution_gate(0.3, 1.0e-12).unwrap();
+        assert!(gate.hamiltonian_projection_error_operator_upper_bound() > 0.0);
+        assert!(gate.hamiltonian_projection_error_operator_upper_bound().is_finite());
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+        assert_eq!(gate.charge_conservation_residual(), 0.0);
+    }
+
+    #[test]
+    fn strang_global_error_ledger_accounts_for_hamiltonian_model_projection() {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[0][0] = Complex64::new(0.1, 1.0e-8);
+        matrix[1][1] = Complex64::new(0.0, 1.0e-8);
+        matrix[2][2] = Complex64::new(0.0, 0.0);
+        matrix[1][2] = Complex64::new(0.4, 0.0);
+        matrix[2][1] = Complex64::new(0.4, 0.0);
+        matrix[0][1] = Complex64::new(1.0e-8, 0.0);
+        matrix[1][0] = Complex64::new(1.0e-8, 0.0);
+        let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 1.0e-6).unwrap();
+
+        let stepper = U1TeBDStrangStepper::new(
+            2,
+            vec![U1TeBDHamiltonianTerm::new(0, hamiltonian)],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let result = stepper
+            .apply(
+                &input,
+                0.2,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-6,
+                },
+            )
+            .unwrap();
+        assert!(result.global_l2_bound_qualified);
+        assert!(result.gate_receipts.len() == 2);
+        assert!(
+            result
+                .truncation_ledger
+                .cumulative_hamiltonian_projection_l2_error_bound
+                > 0.0
+        );
+        let component_sum = result
+            .truncation_ledger
+            .cumulative_canonicalization_l2_error_bound
+            + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+            + result
+                .truncation_ledger
+                .cumulative_hamiltonian_projection_l2_error_bound
+            + result.truncation_ledger.cumulative_projection_l2_error_bound;
+        let bound = result.truncation_ledger.global_state_error_bound_upper.unwrap();
+        assert!((component_sum - bound).abs() <= 1.0e-12);
+        assert!(result.gate_receipts.iter().all(|receipt| {
+            receipt.hamiltonian_projection_operator_error_upper_bound.is_finite()
+                && receipt.hamiltonian_projection_error_upper_bound.is_finite()
+        }));
+    }
+
+    #[test]
     fn strang_stepper_continues_global_error_ledger_across_time_steps() {
         let coupling = 0.8;
         let stepper = U1TeBDStrangStepper::new(
