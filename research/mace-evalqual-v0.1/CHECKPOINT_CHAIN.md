@@ -91,3 +91,10 @@ The current public reference package has 21 checkpoint tests, including the `Acc
 
 
 A checkpoint is not considered progress merely because its integer sequence advances: the journal-head digest must also differ from the currently trusted digest. A new witness checkpoint that repeats the old head is rejected as `ErrNoProgress`.
+
+
+## Peer consistency and split-view detection
+
+The checkpoint verifier includes `VerifyPeerConsistency(older, newer, bridge, publicKey)`. It validates that the newer trusted cursor is a descendant of the older cursor under the same witness key/database, using every intervening signed checkpoint. It detects a same-sequence fork, a missing/broken bridge, identity substitution, rollback, or a peer cursor not reached by the signed chain.
+
+This is a **proof comparison primitive**, not split-view prevention. A witness may present two signed histories to isolated clients; the clients detect the fork only after exchanging cursors/bridges or submitting them to a common monitor. Without gossip, transparency-log consistency proofs or an independent witness quorum, an undisclosed fork can remain hidden. Peer consistency therefore complements but does not replace independent checkpoint issuance, durable external cursor storage and key custody.
