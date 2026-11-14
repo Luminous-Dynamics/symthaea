@@ -362,6 +362,21 @@ An adaptive assay-selection agent can then be evaluated on its ability to choose
 
 The formal motivation is Segura (2026), *Experimental probes of autopoietic self-maintenance*, which uses restricted response profiles as model-relative discriminators and makes conservativity conditional on the available protocol family. AOBench borrows the experimental discipline; it does not claim to implement the paper's categorical or topos-theoretic formalism.
 
+### Initial executable assay-adequacy primitive
+
+A deterministic evaluator is now implemented in \`crates/domains/symthaea-organizational-closure/src/assay.rs\`. It accepts candidate models with frozen target-equivalence-class labels and assay observations with exact response digests. It builds a pairwise distinguishability matrix over candidate pairs from different classes and reports:
+- number of non-equivalent pairs;
+- number and fraction resolved by at least one registered assay;
+- the distinguishing assays for each resolved pair;
+- unresolved pairs when observations are missing or responses match;
+- invalid candidate/assay observations as hard findings.
+
+The evaluator deliberately returns not-applicable when the candidate set contains no non-equivalent pairs. Unknown model observations and duplicate model/assay observations block a conservative result. It does not infer equivalence from a missing observation.
+
+Five deterministic tests cover complete-panel separation, incomplete-panel unresolved status, target-equivalent models, malformed/duplicate observations, and empty candidate sets. This is a finite deterministic pilot, not a statistical distinguishability estimator. It has no noisy response distributions, confidence intervals, power analysis or multiplicity correction yet. Exact-head CI for the new assay module is pending.
+
+
+
 ## 14. Runtime evidence implementation tranche (2026-11-14)
 
 A first Rust package has been added at \`crates/domains/symthaea-organizational-closure\` as an independently locked nested Cargo workspace. It is excluded from the root monorepo glob workspace so benchmark qualification does not require unrelated workspace dev-dependencies.
