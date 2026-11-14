@@ -974,6 +974,11 @@ mod tests {
     }
 
     fn attach_receiver(lot: &mut MaterialLot, outcome: AcceptanceOutcome, id: &str, sha: char) {
+        lot.disposition = match outcome {
+            AcceptanceOutcome::Accepted => LotDisposition::Accepted,
+            AcceptanceOutcome::Rejected => LotDisposition::Rejected,
+            AcceptanceOutcome::Conditional | AcceptanceOutcome::Unknown => LotDisposition::Accepted,
+        };
         lot.receiver_acceptance = Some(DownstreamAcceptance {
             specification_id: "receiver-spec-v1".to_owned(),
             accepted_output_lot_id: lot.lot_id.clone(),
