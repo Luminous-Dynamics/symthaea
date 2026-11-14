@@ -619,7 +619,7 @@
         "study_design_identifiable": true,
         "expanded_uncertainty": 0.2,
         "decision_margin": 2,
-        "validity_start": "2026-01-01",
+        "validity_start": "2025-01-01",
         "validity_end": "2025-12-31",
         "invalidation_events": [],
         "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
