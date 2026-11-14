@@ -6,8 +6,10 @@ This directory contains the research specification and operational model for AOB
 
 1. [AOBench specification](AOBENCH_SPEC_2026-11-13.md) — benchmark tracks, metrics, baselines, protocol and staged implementation.
 2. [Organizational closure model](ORGANIZATIONAL_CLOSURE_MODEL_2026-11-13.md) — definitions, system boundaries, runtime evidence, causal interventions and claim limits.
-3. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
-4. [MEL-AUTO-001 runtime regeneration work](https://github.com/Luminous-Dynamics/symthaea/issues/10098), which is the implementation foundation to reuse.
+3. [Organizational reconfiguration specification](AOBENCH_ORGANIZATIONAL_RECONFIGURATION_2026-11-14.md) — capability-preserving structural evolution compared with parameter-only and adaptive-topology baselines.
+4. [AOBENCH-007 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/12113) — constrained organizational reconfiguration and capability preservation.
+5. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
+6. [MEL-AUTO-001 runtime regeneration work](https://github.com/Luminous-Dynamics/symthaea/issues/10098), which is the implementation foundation to reuse.
 
 ## Current evidence status
 
