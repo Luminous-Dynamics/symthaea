@@ -1799,9 +1799,6 @@
         "reason_codes": []
       },
       "target_configuration": "ACT-9",
-      "source_inventory_state": "complete_frozen",
-      "source_inventory_ref": "synthetic://source-inventory/ME-POS-004",
-      "source_inventory_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
       "expected_intervention_relation": "invariant"
     },
     {
