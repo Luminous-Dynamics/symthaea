@@ -437,14 +437,15 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
 
         let mut blocks = Vec::new();
         for (charge, rows) in row_groups {
-            if let Some(columns) = column_groups.get(&charge) {
-                if !rows.is_empty() && !columns.is_empty() {
-                    blocks.push(AbelianChargeBlock {
-                        intermediate_charge: charge,
-                        rows,
-                        columns: columns.clone(),
-                    });
-                }
+            if let Some(columns) = column_groups.get(&charge)
+                && !rows.is_empty()
+                && !columns.is_empty()
+            {
+                blocks.push(AbelianChargeBlock {
+                    intermediate_charge: charge,
+                    rows,
+                    columns: columns.clone(),
+                });
             }
         }
         if blocks.is_empty() {
