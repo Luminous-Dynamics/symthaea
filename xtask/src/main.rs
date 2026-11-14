@@ -83,7 +83,7 @@ enum Commands {
     },
     /// Audit complete specimen-level failure-mode compositions without inferring acceptability.
     PlasmaFailureCompositionAudit {
-        #[arg(long, default_value = "data/research/plasma_failure_composition_fixture_v0_1.json")]
+        #[arg(long, default_value = "data/research/plasma_failure_composition_fixture_v0_2.json")]
         fixture: PathBuf,
     },
     GenerateManifest {
