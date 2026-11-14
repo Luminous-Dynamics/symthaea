@@ -56,9 +56,17 @@ jobs:
         working-directory: crates/domains/symthaea-organizational-closure
         run: cargo fmt --all -- --check
 
-      - name: Compile all package targets
+      - name: Resolve lockfile and compile all package targets (diagnostic)
         working-directory: crates/domains/symthaea-organizational-closure
-        run: cargo check --locked --all-targets
+        run: |
+          set +e
+          cargo check --all-targets
+          status=$?
+          git diff -- Cargo.lock
+          if [ "$status" -ne 0 ]; then
+            exit "$status"
+          fi
+          git diff --quiet -- Cargo.lock
 
       - name: Run deterministic verifier tests
         working-directory: crates/domains/symthaea-organizational-closure
