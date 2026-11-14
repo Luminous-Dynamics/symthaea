@@ -179,6 +179,7 @@ pub mod steering;
 pub mod stewardship_governance;
 #[cfg(feature = "theory")]
 pub mod stewardship_release;
+pub mod musical_context;
 pub mod stream;
 pub mod streaming;
 #[cfg(feature = "theory")]
