@@ -145,6 +145,18 @@ pub struct MusicRealizationBridgeReceiptV1 {
     pub receipt_sha256: String,
 }
 
+/// One control from the independently verified frozen request and capability
+/// manifest. The provider receipt must contain this exact control; omission,
+/// addition, or substitution is rejected before a candidate can be verified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MusicRealizationExpectedControlV1 {
+    pub control_id: String,
+    pub request_control_sha256: String,
+    pub requirement: MusicRealizerControlRequirementV1,
+    pub declared_fidelity: MusicRealizerDeclaredFidelityV1,
+    pub fidelity_bound_sha256: Option<String>,
+}
+
 /// Trusted identity values obtained from the upstream realization verifier and
 /// the caller's frozen request/manifest. A self-sealed receipt cannot choose
 /// these expected values for itself.
@@ -163,6 +175,9 @@ pub struct MusicRealizationExpectedBindingV1 {
     pub adapter_id: String,
     pub adapter_version: String,
     pub output_modality: MusicRealizationOutputModalityV1,
+    /// Complete canonical control set from the frozen request/manifest.
+    /// This is not reconstructed from provider-reported receipt contents.
+    pub controls: Vec<MusicRealizationExpectedControlV1>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -275,6 +290,8 @@ pub enum MusicRealizationBridgeIssueV1 {
     MissingByteMaterializationEvidence,
     ByteEvidenceMismatch,
     NonCanonicalControlOrder,
+    ExpectedControlSetMismatch,
+    ExpectedControlBindingMismatch(String),
     DuplicateControl(String),
     HardControlNotHonored(String),
     InvalidControl(String),
@@ -497,6 +514,7 @@ fn validate_execution_events(
 }
 
 fn validate_controls(
+    expected_controls: &[MusicRealizationExpectedControlV1],
     controls: &[MusicRealizerControlBindingV1],
 ) -> Vec<MusicRealizationBridgeIssueV1> {
     use MusicRealizerControlRequirementV1::Hard;
@@ -504,11 +522,48 @@ fn validate_controls(
     use MusicRealizerObservedDispositionV1 as O;
 
     let mut issues = Vec::new();
-    if !controls
+    if !expected_controls
         .windows(2)
         .all(|pair| pair[0].control_id.as_str() < pair[1].control_id.as_str())
+        || !controls
+            .windows(2)
+            .all(|pair| pair[0].control_id.as_str() < pair[1].control_id.as_str())
     {
         issues.push(MusicRealizationBridgeIssueV1::NonCanonicalControlOrder);
+    }
+
+    if expected_controls.len() != controls.len() {
+        issues.push(MusicRealizationBridgeIssueV1::ExpectedControlSetMismatch);
+    }
+    for (expected, observed) in expected_controls.iter().zip(controls) {
+        if expected.control_id != observed.control_id
+            || expected.request_control_sha256 != observed.request_control_sha256
+            || expected.requirement != observed.requirement
+            || expected.declared_fidelity != observed.declared_fidelity
+            || expected.fidelity_bound_sha256 != observed.fidelity_bound_sha256
+        {
+            issues.push(MusicRealizationBridgeIssueV1::ExpectedControlBindingMismatch(
+                expected.control_id.clone(),
+            ));
+        }
+    }
+
+    let mut expected_seen = BTreeSet::new();
+    for control in expected_controls {
+        if !nonempty(&control.control_id)
+            || !expected_seen.insert(control.control_id.clone())
+            || !is_sha256(&control.request_control_sha256)
+            || (control.declared_fidelity == F::Bounded
+                && !control.fidelity_bound_sha256.as_deref().is_some_and(is_sha256))
+            || (control.declared_fidelity != F::Bounded
+                && control.fidelity_bound_sha256.is_some())
+            || (control.requirement == Hard
+                && !matches!(control.declared_fidelity, F::Exact | F::Bounded))
+        {
+            issues.push(MusicRealizationBridgeIssueV1::InvalidControl(
+                control.control_id.clone(),
+            ));
+        }
     }
 
     let mut seen = BTreeSet::new();
@@ -559,6 +614,7 @@ fn validate_controls(
 
 fn validate_payload_shape(
     payload: &MusicRealizationBridgeReceiptPayloadV1,
+    expected_controls: &[MusicRealizationExpectedControlV1],
 ) -> Vec<MusicRealizationBridgeIssueV1> {
     let mut issues = Vec::new();
     if payload.schema_version != MUSIC_REALIZATION_BRIDGE_SCHEMA_V1 {
@@ -591,7 +647,7 @@ fn validate_payload_shape(
             issues.push(MusicRealizationBridgeIssueV1::InvalidDigest(field));
         }
     }
-    issues.extend(validate_controls(&payload.controls));
+    issues.extend(validate_controls(expected_controls, &payload.controls));
     issues
 }
 
@@ -619,7 +675,7 @@ pub fn verify_music_realization_transaction_binding_v1(
     use MusicEditEvidenceStateV1 as E;
     use MusicRealizerExecutionEventStateV1 as S;
 
-    let mut issues = validate_payload_shape(&receipt.payload);
+    let mut issues = validate_payload_shape(&receipt.payload, &expected.controls);
 
     // These expected identities must come from the upstream realization
     // request/manifest verifier and the caller's frozen execution context.
@@ -1010,6 +1066,7 @@ mod tests {
             adapter_id: "mock-adapter".to_owned(),
             adapter_version: "1.0.0".to_owned(),
             output_modality,
+            controls: Vec::new(),
         }
     }
 
