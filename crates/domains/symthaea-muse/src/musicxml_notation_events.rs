@@ -8,7 +8,6 @@
 //! written values, tuplets, sound ties, visual ties, voice/staff identity and
 //! score-order attribute changes. Unknown XML children are retained as source
 //! trees rather than silently discarded.
-
 use crate::barline_eval::{MeasureSpan, RationalBeat};
 use serde::{Deserialize, Serialize};
 
@@ -236,9 +235,7 @@ pub fn legacy_missing_notation_events() -> MusicXmlPartNotationEventsV1 {
     }
 }
 
-pub fn is_legacy_missing_notation_events(
-    value: &MusicXmlPartNotationEventsV1,
-) -> bool {
+pub fn is_legacy_missing_notation_events(value: &MusicXmlPartNotationEventsV1) -> bool {
     value.part_id.is_empty()
         && value.note_events.is_empty()
         && value.attribute_events.is_empty()
@@ -298,7 +295,10 @@ pub fn parse_musicxml_part_metadata(
     if !is_musicxml_element(root, "score-partwise", namespace) || part_id.trim().is_empty() {
         return Err("invalid MusicXML root or empty part identity".into());
     }
-    let Some(part_list) = root.children().find(|node| is_musicxml_element(*node, "part-list", namespace)) else {
+    let Some(part_list) = root
+        .children()
+        .find(|node| is_musicxml_element(*node, "part-list", namespace))
+    else {
         return Ok(None);
     };
     let mut matching = part_list.children().filter(|node| {
@@ -311,8 +311,8 @@ pub fn parse_musicxml_part_metadata(
         return Err(format!("duplicate score-part metadata for {part_id}"));
     }
     let mut total_nodes = 0usize;
-    let source_score_part = source_node(score_part, 0, &mut total_nodes)
-        .map_err(|error| error.reason())?;
+    let source_score_part =
+        source_node(score_part, 0, &mut total_nodes).map_err(|error| error.reason())?;
     let score_instrument_ids = score_part
         .children()
         .filter(|node| is_musicxml_element(*node, "score-instrument", namespace))
@@ -349,16 +349,18 @@ pub fn parse_musicxml_part_notation_events(
         );
     }
     match parse_part_events(part, part_id, measure_spans) {
-        Ok((note_events, attribute_events, auxiliary_events, cursor_moves)) => MusicXmlPartNotationEventsV1 {
-            schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
-            canonicalization_version: MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into(),
-            part_id: part_id.to_string(),
-            status: MusicXmlNotationEventsStatusV1::Supported,
-            note_events,
-            attribute_events,
-            auxiliary_events,
-            cursor_moves,
-        },
+        Ok((note_events, attribute_events, auxiliary_events, cursor_moves)) => {
+            MusicXmlPartNotationEventsV1 {
+                schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
+                canonicalization_version: MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into(),
+                part_id: part_id.to_string(),
+                status: MusicXmlNotationEventsStatusV1::Supported,
+                note_events,
+                attribute_events,
+                auxiliary_events,
+                cursor_moves,
+            }
+        }
         Err(error) => unknown(part_id, error.reason()),
     }
 }
@@ -456,9 +458,15 @@ fn parse_part_events(
                         "MusicXML note-event budget exceeded".into(),
                     ));
                 }
-                let is_grace = element.children().any(|node| is_musicxml_element(*node, "grace", namespace));
-                let is_cue = element.children().any(|node| is_musicxml_element(*node, "cue", namespace));
-                let is_chord_member = element.children().any(|node| is_musicxml_element(*node, "chord", namespace));
+                let is_grace = element
+                    .children()
+                    .any(|node| is_musicxml_element(*node, "grace", namespace));
+                let is_cue = element
+                    .children()
+                    .any(|node| is_musicxml_element(*node, "cue", namespace));
+                let is_chord_member = element
+                    .children()
+                    .any(|node| is_musicxml_element(*node, "chord", namespace));
                 let duration_node = element
                     .children()
                     .find(|node| is_musicxml_element(*node, "duration", namespace));
@@ -477,10 +485,9 @@ fn parse_part_events(
                                 "note duration appears before an explicit divisions value".into(),
                             )
                         })?;
-                        Some(
-                            RationalBeat::new(raw, division_value)
-                                .map_err(|_| ParseEventError::Unknown("note duration overflow".into()))?,
-                        )
+                        Some(RationalBeat::new(raw, division_value).map_err(|_| {
+                            ParseEventError::Unknown("note duration overflow".into())
+                        })?)
                     }
                     None if is_grace => None,
                     None => {
@@ -532,8 +539,12 @@ fn parse_part_events(
                     .map(|node| {
                         Ok(MusicXmlGraceV1 {
                             slash: node.attribute("slash").map(str::to_string),
-                            steal_time_previous: node.attribute("steal-time-previous").map(str::to_string),
-                            steal_time_following: node.attribute("steal-time-following").map(str::to_string),
+                            steal_time_previous: node
+                                .attribute("steal-time-previous")
+                                .map(str::to_string),
+                            steal_time_following: node
+                                .attribute("steal-time-following")
+                                .map(str::to_string),
                             make_time: node.attribute("make-time").map(str::to_string),
                             source: source_node(node, 0, &mut source_tree_nodes)?,
                         })
@@ -640,9 +651,9 @@ fn parse_part_events(
                     });
                     if !is_grace {
                         if let Some(duration) = performed_duration {
-                            cursor = cursor
-                                .checked_add(duration)
-                                .map_err(|_| ParseEventError::Unknown("note cursor overflow".into()))?;
+                            cursor = cursor.checked_add(duration).map_err(|_| {
+                                ParseEventError::Unknown("note cursor overflow".into())
+                            })?;
                         }
                     }
                 }
@@ -653,7 +664,9 @@ fn parse_part_events(
                 let duration_node = element
                     .children()
                     .find(|node| is_musicxml_element(*node, "duration", namespace))
-                    .ok_or_else(|| ParseEventError::Unknown("backup/forward has no duration".into()))?;
+                    .ok_or_else(|| {
+                        ParseEventError::Unknown("backup/forward has no duration".into())
+                    })?;
                 let raw = parse_i64(duration_node.text()).ok_or_else(|| {
                     ParseEventError::Unknown("invalid backup/forward duration".into())
                 })?;
@@ -667,8 +680,9 @@ fn parse_part_events(
                         "backup/forward appears before explicit divisions".into(),
                     )
                 })?;
-                let duration = RationalBeat::new(raw, division_value)
-                    .map_err(|_| ParseEventError::Unknown("backup/forward duration overflow".into()))?;
+                let duration = RationalBeat::new(raw, division_value).map_err(|_| {
+                    ParseEventError::Unknown("backup/forward duration overflow".into())
+                })?;
                 let before = cursor;
                 let is_backup = is_musicxml_element(element, "backup", namespace);
                 cursor = if is_backup {
@@ -693,13 +707,13 @@ fn parse_part_events(
                     direction: if is_backup { "backup" } else { "forward" }.into(),
                     voice: child_text(element, "voice", namespace),
                     staff: child_text(element, "staff", namespace),
-                    score_offset_before: measure_start
-                        .checked_add(before)
-                        .map_err(|_| ParseEventError::Unknown("cursor move offset overflow".into()))?,
+                    score_offset_before: measure_start.checked_add(before).map_err(|_| {
+                        ParseEventError::Unknown("cursor move offset overflow".into())
+                    })?,
                     duration,
-                    score_offset_after: measure_start
-                        .checked_add(cursor)
-                        .map_err(|_| ParseEventError::Unknown("cursor move offset overflow".into()))?,
+                    score_offset_after: measure_start.checked_add(cursor).map_err(|_| {
+                        ParseEventError::Unknown("cursor move offset overflow".into())
+                    })?,
                     source: source_node(element, 0, &mut source_tree_nodes)?,
                 });
                 source_order = next_order(source_order)?;
@@ -720,26 +734,32 @@ fn parse_part_events(
                         })?;
                         let division_value = divisions.ok_or_else(|| {
                             ParseEventError::Unknown(
-                                "MusicXML auxiliary offset appears before explicit divisions".into(),
+                                "MusicXML auxiliary offset appears before explicit divisions"
+                                    .into(),
                             )
                         })?;
-                        let duration = RationalBeat::new(magnitude, division_value)
-                            .map_err(|_| ParseEventError::Unknown("auxiliary offset overflow".into()))?;
+                        let duration =
+                            RationalBeat::new(magnitude, division_value).map_err(|_| {
+                                ParseEventError::Unknown("auxiliary offset overflow".into())
+                            })?;
                         Ok::<_, ParseEventError>((raw < 0, duration))
                     })
                     .transpose()?;
-                let mut score_offset = measure_start
-                    .checked_add(cursor)
-                    .map_err(|_| ParseEventError::Unknown("auxiliary score offset overflow".into()))?;
+                let mut score_offset = measure_start.checked_add(cursor).map_err(|_| {
+                    ParseEventError::Unknown("auxiliary score offset overflow".into())
+                })?;
                 if let Some((negative, amount)) = offset {
                     score_offset = if negative {
                         score_offset.checked_sub(amount)
                     } else {
                         score_offset.checked_add(amount)
                     }
-                    .map_err(|_| ParseEventError::Unknown(
-                        "MusicXML auxiliary offset leaves the supported score coordinate range".into()
-                    ))?;
+                    .map_err(|_| {
+                        ParseEventError::Unknown(
+                            "MusicXML auxiliary offset leaves the supported score coordinate range"
+                                .into(),
+                        )
+                    })?;
                 }
                 let measure_end = measure_start
                     .checked_add(measure_duration)
@@ -765,19 +785,29 @@ fn parse_part_events(
         }
     }
 
-    Ok((note_events, attribute_events, auxiliary_events, cursor_moves))
+    Ok((
+        note_events,
+        attribute_events,
+        auxiliary_events,
+        cursor_moves,
+    ))
 }
 
 fn parse_event_kind(
     note: roxmltree::Node<'_, '_>,
     namespace: Option<&str>,
 ) -> Result<MusicXmlNotationEventKindV1, ParseEventError> {
-    let pitched = note.children().find(|node| is_musicxml_element(*node, "pitch", namespace));
-    let rest = note.children().find(|node| is_musicxml_element(*node, "rest", namespace));
-    let unpitched = note.children().find(|node| is_musicxml_element(*node, "unpitched", namespace));
-    let present = (pitched.is_some() as usize)
-        + (rest.is_some() as usize)
-        + (unpitched.is_some() as usize);
+    let pitched = note
+        .children()
+        .find(|node| is_musicxml_element(*node, "pitch", namespace));
+    let rest = note
+        .children()
+        .find(|node| is_musicxml_element(*node, "rest", namespace));
+    let unpitched = note
+        .children()
+        .find(|node| is_musicxml_element(*node, "unpitched", namespace));
+    let present =
+        (pitched.is_some() as usize) + (rest.is_some() as usize) + (unpitched.is_some() as usize);
     if present != 1 {
         return Err(ParseEventError::Unknown(
             "note must contain exactly one of pitch, rest or unpitched".into(),
@@ -787,19 +817,25 @@ fn parse_event_kind(
         let step = child_text(pitch, "step", namespace)
             .ok_or_else(|| ParseEventError::Unknown("pitched note has no step".into()))?;
         if !matches!(step.as_str(), "A" | "B" | "C" | "D" | "E" | "F" | "G") {
-            return Err(ParseEventError::Unknown("invalid MusicXML pitch step".into()));
+            return Err(ParseEventError::Unknown(
+                "invalid MusicXML pitch step".into(),
+            ));
         }
         let octave = child_text(pitch, "octave", namespace)
             .and_then(|value| value.parse::<i32>().ok())
             .ok_or_else(|| ParseEventError::Unknown("pitched note has invalid octave".into()))?;
-        Ok(MusicXmlNotationEventKindV1::Pitched(MusicXmlWrittenPitchV1 {
-            step,
-            alter: child_text(pitch, "alter", namespace),
-            octave,
-        }))
+        Ok(MusicXmlNotationEventKindV1::Pitched(
+            MusicXmlWrittenPitchV1 {
+                step,
+                alter: child_text(pitch, "alter", namespace),
+                octave,
+            },
+        ))
     } else if let Some(rest) = rest {
         Ok(MusicXmlNotationEventKindV1::Rest {
-            measure: rest.attribute("measure").is_some_and(|value| value == "yes"),
+            measure: rest
+                .attribute("measure")
+                .is_some_and(|value| value == "yes"),
             display: display_pitch(rest, namespace),
         })
     } else {
@@ -812,7 +848,8 @@ fn parse_event_kind(
 fn display_pitch(node: roxmltree::Node<'_, '_>, namespace: Option<&str>) -> MusicXmlDisplayPitchV1 {
     MusicXmlDisplayPitchV1 {
         step: child_text(node, "display-step", namespace),
-        octave: child_text(node, "display-octave", namespace).and_then(|value| value.parse::<i32>().ok()),
+        octave: child_text(node, "display-octave", namespace)
+            .and_then(|value| value.parse::<i32>().ok()),
     }
 }
 
@@ -858,9 +895,9 @@ fn source_node(
             "MusicXML source subtree exceeded maximum depth".into(),
         ));
     }
-    *total_nodes = total_nodes
-        .checked_add(1)
-        .ok_or_else(|| ParseEventError::Unknown("MusicXML source tree node counter overflow".into()))?;
+    *total_nodes = total_nodes.checked_add(1).ok_or_else(|| {
+        ParseEventError::Unknown("MusicXML source tree node counter overflow".into())
+    })?;
     if *total_nodes > MAX_SOURCE_TREE_NODES {
         return Err(ParseEventError::Unknown(
             "MusicXML source tree node budget exceeded".into(),
@@ -929,9 +966,7 @@ pub(crate) fn is_musicxml_element(
     name: &str,
     namespace: Option<&str>,
 ) -> bool {
-    node.is_element()
-        && node.tag_name().name() == name
-        && node.tag_name().namespace() == namespace
+    node.is_element() && node.tag_name().name() == name && node.tag_name().namespace() == namespace
 }
 
 fn parse_i64(value: Option<&str>) -> Option<i64> {
@@ -962,10 +997,7 @@ mod tests {
         }
     }
 
-    fn parse_with_span(
-        xml: &str,
-        end: (i64, i64),
-    ) -> MusicXmlPartNotationEventsV1 {
+    fn parse_with_span(xml: &str, end: (i64, i64)) -> MusicXmlPartNotationEventsV1 {
         let document = roxmltree::Document::parse(xml).unwrap();
         let part = document
             .root_element()
@@ -981,10 +1013,7 @@ mod tests {
     }
 
     fn supported(events: &MusicXmlPartNotationEventsV1) {
-        assert_eq!(
-            events.status,
-            MusicXmlNotationEventsStatusV1::Supported
-        );
+        assert_eq!(events.status, MusicXmlNotationEventsStatusV1::Supported);
     }
 
     #[test]
@@ -1003,12 +1032,21 @@ mod tests {
             &events.note_events[0].kind,
             MusicXmlNotationEventKindV1::Rest { measure: false, .. }
         ));
-        assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
-        assert_eq!(events.note_events[0].performed_duration, Some(RationalBeat::new(1, 1).unwrap()));
+        assert_eq!(
+            events.note_events[0].score_offset,
+            RationalBeat::new(0, 1).unwrap()
+        );
+        assert_eq!(
+            events.note_events[0].performed_duration,
+            Some(RationalBeat::new(1, 1).unwrap())
+        );
         assert!(events.note_events[1].is_grace);
         assert_eq!(events.note_events[1].performed_duration, None);
         assert_eq!(
-            events.note_events[1].grace.as_ref().and_then(|grace| grace.steal_time_previous.as_deref()),
+            events.note_events[1]
+                .grace
+                .as_ref()
+                .and_then(|grace| grace.steal_time_previous.as_deref()),
             Some("20")
         );
         match &events.note_events[1].kind {
@@ -1055,11 +1093,20 @@ mod tests {
         let events = parse(xml);
         supported(&events);
         assert_eq!(events.note_events.len(), 3);
-        assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
-        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(
+            events.note_events[0].score_offset,
+            RationalBeat::new(0, 1).unwrap()
+        );
+        assert_eq!(
+            events.note_events[1].score_offset,
+            RationalBeat::new(0, 1).unwrap()
+        );
         assert!(events.note_events[1].is_chord_member);
         assert_eq!(events.note_events[1].chord_anchor_source_order, Some(2));
-        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            events.note_events[2].score_offset,
+            RationalBeat::new(2, 1).unwrap()
+        );
     }
 
     #[test]
@@ -1073,10 +1120,22 @@ mod tests {
         let events = parse(xml);
         supported(&events);
         assert_eq!(events.note_events.len(), 3);
-        assert_eq!(events.note_events[0].performed_duration, Some(RationalBeat::new(1, 3).unwrap()));
-        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(1, 3).unwrap());
-        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(2, 3).unwrap());
-        assert_eq!(events.note_events[0].written_type.as_deref(), Some("eighth"));
+        assert_eq!(
+            events.note_events[0].performed_duration,
+            Some(RationalBeat::new(1, 3).unwrap())
+        );
+        assert_eq!(
+            events.note_events[1].score_offset,
+            RationalBeat::new(1, 3).unwrap()
+        );
+        assert_eq!(
+            events.note_events[2].score_offset,
+            RationalBeat::new(2, 3).unwrap()
+        );
+        assert_eq!(
+            events.note_events[0].written_type.as_deref(),
+            Some("eighth")
+        );
         let ratio = events.note_events[0].time_modification.as_ref().unwrap();
         assert_eq!((ratio.actual_notes, ratio.normal_notes), (3, 2));
         assert_eq!(ratio.normal_dot_count, 1);
@@ -1113,7 +1172,12 @@ mod tests {
             .find(|node| node.element == "notations")
             .unwrap();
         assert!(notations.children.iter().any(|node| node.element == "slur"));
-        assert!(notations.children.iter().any(|node| node.element == "articulations"));
+        assert!(
+            notations
+                .children
+                .iter()
+                .any(|node| node.element == "articulations")
+        );
     }
 
     #[test]
@@ -1128,11 +1192,20 @@ mod tests {
         supported(&events);
         assert_eq!(events.attribute_events.len(), 5);
         assert_eq!(events.attribute_events[0].source.element, "divisions");
-        assert_eq!(events.attribute_events[3].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            events.attribute_events[3].score_offset,
+            RationalBeat::new(2, 1).unwrap()
+        );
         assert_eq!(events.attribute_events[3].source.element, "clef");
-        assert_eq!(events.attribute_events[4].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            events.attribute_events[4].score_offset,
+            RationalBeat::new(2, 1).unwrap()
+        );
         assert_eq!(events.attribute_events[4].source.element, "key");
-        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            events.note_events[1].score_offset,
+            RationalBeat::new(2, 1).unwrap()
+        );
     }
 
     #[test]
@@ -1148,9 +1221,18 @@ mod tests {
         let events = parse_with_span(xml, (6, 1));
         supported(&events);
         assert_eq!(events.note_events.len(), 3);
-        assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
-        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
-        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            events.note_events[0].score_offset,
+            RationalBeat::new(0, 1).unwrap()
+        );
+        assert_eq!(
+            events.note_events[1].score_offset,
+            RationalBeat::new(0, 1).unwrap()
+        );
+        assert_eq!(
+            events.note_events[2].score_offset,
+            RationalBeat::new(2, 1).unwrap()
+        );
         assert_eq!(events.cursor_moves.len(), 2);
         assert_eq!(events.cursor_moves[0].direction, "backup");
         assert_eq!(events.cursor_moves[1].direction, "forward");
@@ -1169,21 +1251,30 @@ mod tests {
         assert_eq!(events.note_events[1].source_order, 3);
         let first = &events.note_events[0].source_note;
         assert_eq!(
-            first.attributes.iter()
+            first
+                .attributes
+                .iter()
                 .map(|attribute| (attribute.name.as_str(), attribute.value.as_str()))
                 .collect::<Vec<_>>(),
             vec![("id", "n-1"), ("time-only", "2"), ("attack", "1")]
         );
         assert_eq!(events.note_events[0].time_only.as_deref(), Some("2"));
         assert_eq!(events.note_events[0].attack_divisions.as_deref(), Some("1"));
-        assert!(first.children.iter().any(|node| node.element == "future-symbol"));
+        assert!(
+            first
+                .children
+                .iter()
+                .any(|node| node.element == "future-symbol")
+        );
         assert_eq!(
-            first.children.iter().find(|node| node.element == "future-symbol")
+            first
+                .children
+                .iter()
+                .find(|node| node.element == "future-symbol")
                 .and_then(|node| node.text.as_deref()),
             Some("opaque")
         );
     }
-
     #[test]
     fn ambiguous_chord_and_invalid_duration_withhold_the_event_layer() {
         let no_anchor = r#"<score-partwise><part id="P1"><measure number="1">
@@ -1235,9 +1326,15 @@ mod tests {
         assert!(events.note_events[0].is_grace);
         assert!(events.note_events[1].is_grace);
         assert!(events.note_events[1].is_chord_member);
-        assert_eq!(events.note_events[1].score_offset, events.note_events[0].score_offset);
+        assert_eq!(
+            events.note_events[1].score_offset,
+            events.note_events[0].score_offset
+        );
         assert_eq!(events.note_events[1].chord_anchor_source_order, Some(2));
-        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(
+            events.note_events[2].score_offset,
+            RationalBeat::new(0, 1).unwrap()
+        );
     }
 
     #[test]
@@ -1250,12 +1347,23 @@ mod tests {
         </measure></part></score-partwise>"#;
         let events = parse(xml);
         supported(&events);
-        let other = events.note_events[0].source_note.children.iter()
-            .find(|node| node.element == "other-notation").unwrap();
-        assert!(matches!(&other.content[0], MusicXmlSourceContentV1::Text(value) if value == "before"));
-        assert!(matches!(&other.content[1], MusicXmlSourceContentV1::ElementIndex(0)));
+        let other = events.note_events[0]
+            .source_note
+            .children
+            .iter()
+            .find(|node| node.element == "other-notation")
+            .unwrap();
+        assert!(
+            matches!(&other.content[0], MusicXmlSourceContentV1::Text(value) if value == "before")
+        );
+        assert!(matches!(
+            &other.content[1],
+            MusicXmlSourceContentV1::ElementIndex(0)
+        ));
         assert_eq!(other.children[0].element, "future-code");
-        assert!(matches!(&other.content[2], MusicXmlSourceContentV1::Text(value) if value == "after"));
+        assert!(
+            matches!(&other.content[2], MusicXmlSourceContentV1::Text(value) if value == "after")
+        );
     }
 
     #[test]
@@ -1284,16 +1392,29 @@ mod tests {
         let events = parse(xml);
         supported(&events);
         assert_eq!(events.auxiliary_events.len(), 2);
-        assert_eq!(events.auxiliary_events[0].score_offset, RationalBeat::new(5, 2).unwrap());
-        assert_eq!(events.auxiliary_events[1].score_offset, RationalBeat::new(3, 2).unwrap());
+        assert_eq!(
+            events.auxiliary_events[0].score_offset,
+            RationalBeat::new(5, 2).unwrap()
+        );
+        assert_eq!(
+            events.auxiliary_events[1].score_offset,
+            RationalBeat::new(3, 2).unwrap()
+        );
         assert_eq!(events.auxiliary_events[0].source.element, "direction");
         assert_eq!(events.auxiliary_events[1].source.element, "harmony");
-        assert!(events.auxiliary_events[0].source.children.iter().any(|node| node.element == "sound"));
+        assert!(
+            events.auxiliary_events[0]
+                .source
+                .children
+                .iter()
+                .any(|node| node.element == "sound")
+        );
         assert_eq!(events.note_events.len(), 2);
-        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(
+            events.note_events[1].score_offset,
+            RationalBeat::new(2, 1).unwrap()
+        );
     }
-
-
     #[test]
     fn auxiliary_offsets_outside_explicit_measure_span_withhold_all_events() {
         let xml = r#"<score-partwise><part id="P1"><measure number="1">
@@ -1333,22 +1454,34 @@ mod tests {
         assert_eq!(metadata.part_name.as_deref(), Some("Violin I"));
         assert_eq!(metadata.part_abbreviation.as_deref(), Some("Vln. I"));
         assert_eq!(metadata.score_instrument_ids, vec!["P1-I1"]);
-        let midi = metadata.source_score_part.children.iter()
-            .find(|node| node.element == "midi-instrument").unwrap();
+        let midi = metadata
+            .source_score_part
+            .children
+            .iter()
+            .find(|node| node.element == "midi-instrument")
+            .unwrap();
         assert_eq!(
-            midi.children.iter().find(|node| node.element == "midi-program")
+            midi.children
+                .iter()
+                .find(|node| node.element == "midi-program")
                 .and_then(|node| node.text.as_deref()),
             Some("41")
         );
-        assert!(metadata.source_score_part.children.iter()
-            .any(|node| node.element == "midi-device"));
+        assert!(
+            metadata
+                .source_score_part
+                .children
+                .iter()
+                .any(|node| node.element == "midi-device")
+        );
     }
 
     #[test]
     fn missing_or_duplicate_part_metadata_is_not_guessed() {
         let without_part_list = roxmltree::Document::parse(
-            r#"<score-partwise><part id="P1"><measure/></part></score-partwise>"#
-        ).unwrap();
+            r#"<score-partwise><part id="P1"><measure/></part></score-partwise>"#,
+        )
+        .unwrap();
         assert_eq!(
             parse_musicxml_part_metadata(without_part_list.root_element(), "P1").unwrap(),
             None
@@ -1358,8 +1491,9 @@ mod tests {
             r#"<score-partwise><part-list>
                 <score-part id="P1"><part-name>One</part-name></score-part>
                 <score-part id="P1"><part-name>Two</part-name></score-part>
-            </part-list><part id="P1"/></score-partwise>"#
-        ).unwrap();
+            </part-list><part id="P1"/></score-partwise>"#,
+        )
+        .unwrap();
         assert!(parse_musicxml_part_metadata(duplicate.root_element(), "P1").is_err());
     }
 
@@ -1370,15 +1504,19 @@ mod tests {
             <note><rest/><duration>16</duration></note>
         </measure></part></score-partwise>"#;
         let document = roxmltree::Document::parse(xml).unwrap();
-        let part = document.root_element().children()
-            .find(|node| node.has_tag_name("part")).unwrap();
-        let events = parse_musicxml_part_notation_events(
-            part, "forged-part-id", &[span((0, 1), (4, 1))]
-        );
-        assert!(matches!(events.status, MusicXmlNotationEventsStatusV1::Unknown { .. }));
+        let part = document
+            .root_element()
+            .children()
+            .find(|node| node.has_tag_name("part"))
+            .unwrap();
+        let events =
+            parse_musicxml_part_notation_events(part, "forged-part-id", &[span((0, 1), (4, 1))]);
+        assert!(matches!(
+            events.status,
+            MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
         assert!(events.note_events.is_empty());
     }
-
 
     #[test]
     fn opaque_source_tree_preserves_element_and_attribute_namespace_uris() {
@@ -1397,7 +1535,9 @@ mod tests {
         assert_eq!(note.attack_divisions.as_deref(), Some("-2"));
         assert_eq!(note.release_divisions.as_deref(), Some("3"));
         let node = &note.source_note;
-        let mut attribute_namespaces: Vec<_> = node.attributes.iter()
+        let mut attribute_namespaces: Vec<_> = node
+            .attributes
+            .iter()
             .filter(|attribute| attribute.name == "state")
             .map(|attribute| attribute.namespace_uri.as_deref().unwrap())
             .collect();
@@ -1406,17 +1546,20 @@ mod tests {
             attribute_namespaces,
             vec!["urn:example:extension-a", "urn:example:extension-b"]
         );
-        let elements: Vec<_> = node.children.iter()
+        let elements: Vec<_> = node
+            .children
+            .iter()
             .filter(|child| child.element == "articulation")
             .collect();
         assert_eq!(elements.len(), 2);
         assert_eq!(
-            elements.iter().map(|child| child.namespace_uri.as_deref().unwrap()).collect::<Vec<_>>(),
+            elements
+                .iter()
+                .map(|child| child.namespace_uri.as_deref().unwrap())
+                .collect::<Vec<_>>(),
             vec!["urn:example:extension-a", "urn:example:extension-b"]
         );
     }
-
-
     #[test]
     fn foreign_namespace_core_name_collisions_remain_opaque_extensions() {
         let xml = r#"<score-partwise xmlns:ext="urn:example:extension"><part id="P1"><measure number="1">
@@ -1444,7 +1587,6 @@ mod tests {
             Some("urn:example:extension")
         );
     }
-
     #[test]
     fn foreign_namespace_extensions_inside_attributes_are_retained_as_auxiliary() {
         let xml = r#"<score-partwise xmlns:ext="urn:example:attribute-extension"><part id="P1"><measure number="1">
@@ -1481,5 +1623,4 @@ mod tests {
             Some(RationalBeat::new(4, 1).unwrap())
         );
     }
-
 }
