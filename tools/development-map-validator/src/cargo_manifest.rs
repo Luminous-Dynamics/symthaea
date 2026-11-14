@@ -122,7 +122,7 @@ fn validate_anchor(anchor: &ManifestAnchor) -> Result<(), String> {
     Ok(())
 }
 
-fn table<'a>(value: &'a Value, path: &str) -> Result<&'a toml::map::Map<String, Value>, String> {
+fn table<'a>(value: &'a Value, path: &str) -> Result<&'a toml::Table, String> {
     value.as_table().ok_or_else(|| format!("{path} must be a TOML table"))
 }
 
