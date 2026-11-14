@@ -83,7 +83,7 @@ enum Commands {
     },
     /// Audit direct observations and typed derived plasma qualification endpoints.
     PlasmaEndpointDerivationAudit {
-        #[arg(long, default_value = "data/research/plasma_endpoint_derivation_fixture_v0_1.json")]
+        #[arg(long, default_value = "data/research/plasma_endpoint_derivation_fixture_v0_2.json")]
         fixture: PathBuf,
     },
     GenerateManifest {
