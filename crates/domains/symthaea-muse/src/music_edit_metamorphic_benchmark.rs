@@ -852,14 +852,14 @@ mod tests {
             validity_report_sha256: d(32),
             properties: vec![
                 MusicEditMetamorphicPropertyObservationV1 {
-                    property_id: "target_pitch".to_owned(),
-                    evidence: MusicEditMetamorphicEvidenceV1::Symbolic,
-                    value: MusicEditMetamorphicValueV1::Numeric { value: pitch, unit: "midi".to_owned() },
-                },
-                MusicEditMetamorphicPropertyObservationV1 {
                     property_id: "target_part_present".to_owned(),
                     evidence: MusicEditMetamorphicEvidenceV1::Acoustic,
                     value: MusicEditMetamorphicValueV1::Boolean { value: true },
+                },
+                MusicEditMetamorphicPropertyObservationV1 {
+                    property_id: "target_pitch".to_owned(),
+                    evidence: MusicEditMetamorphicEvidenceV1::Symbolic,
+                    value: MusicEditMetamorphicValueV1::Numeric { value: pitch, unit: "midi".to_owned() },
                 },
             ],
         }
