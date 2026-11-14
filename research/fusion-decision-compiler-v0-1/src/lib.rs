@@ -138,6 +138,10 @@ pub struct SolverRun {
     pub run_id: String,
     pub solver_id: String,
     pub solver_revision: String,
+    /// Exact candidate design revision evaluated by this run.
+    pub candidate_revision: String,
+    /// Exact geometry identity evaluated by this run.
+    pub geometry_sha256: String,
     pub supported_regimes: Vec<String>,
     pub supported_observables: Vec<String>,
     pub applicability: Applicability,
@@ -249,6 +253,8 @@ pub enum ValidationError {
     DuplicateClaimId(String),
     DuplicateGate(HardGateKind),
     DuplicateSolverRunId(String),
+    SolverCandidateRevisionMismatch(String),
+    SolverGeometryMismatch(String),
     PassingGateWithoutEvidence(HardGateKind),
     NonPassingGateWithoutReason(HardGateKind),
     DanglingGateEvidence {
@@ -589,6 +595,21 @@ fn validate_candidate(candidate: &CandidateInput) -> Vec<ValidationError> {
             "solver_run.solver_revision",
             &mut errors,
         );
+        require_nonempty(
+            &run.candidate_revision,
+            "solver_run.candidate_revision",
+            &mut errors,
+        );
+        if run.candidate_revision != candidate.candidate_revision {
+            errors.push(ValidationError::SolverCandidateRevisionMismatch(
+                run.run_id.clone(),
+            ));
+        }
+        if !is_sha256(&run.geometry_sha256) {
+            errors.push(ValidationError::InvalidSha256("solver_run.geometry_sha256"));
+        } else if run.geometry_sha256 != candidate.geometry_sha256 {
+            errors.push(ValidationError::SolverGeometryMismatch(run.run_id.clone()));
+        }
         if !run_ids.insert(run.run_id.as_str()) {
             errors.push(ValidationError::DuplicateSolverRunId(run.run_id.clone()));
         }
@@ -743,6 +764,8 @@ mod tests {
             run_id: run_id.to_string(),
             solver_id: "reference-solver".to_string(),
             solver_revision: "1.2.3+commit".to_string(),
+            candidate_revision: "design-r7".to_string(),
+            geometry_sha256: sha('b'),
             supported_regimes: vec!["tokamak-equilibrium".to_string()],
             supported_observables: vec!["psi".to_string(), "q95".to_string()],
             applicability: Applicability::InDeclaredDomain,
@@ -875,6 +898,28 @@ mod tests {
         source.solver_runs.clear();
         let build = compile_candidate(&source).unwrap();
         assert_eq!(build.disposition, CandidateDisposition::Indeterminate);
+    }
+
+    #[test]
+    fn solver_run_must_bind_exact_candidate_revision() {
+        let mut source = candidate();
+        source.solver_runs[0].candidate_revision = "design-r6".to_string();
+        let errors = compile_candidate(&source).unwrap_err();
+        assert!(has_error(
+            &errors,
+            ValidationError::SolverCandidateRevisionMismatch("run-a".to_string())
+        ));
+    }
+
+    #[test]
+    fn solver_run_must_bind_exact_geometry_identity() {
+        let mut source = candidate();
+        source.solver_runs[0].geometry_sha256 = sha('e');
+        let errors = compile_candidate(&source).unwrap_err();
+        assert!(has_error(
+            &errors,
+            ValidationError::SolverGeometryMismatch("run-a".to_string())
+        ));
     }
 
     #[test]
