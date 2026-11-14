@@ -152,7 +152,7 @@ pub enum MusicXmlNotationEvaluationErrorV1 {
     EventBudgetExceeded { part_id: String, count: usize, maximum: usize },
     DocumentEventBudgetExceeded { count: usize, maximum: usize },
     PartBindingBudgetExceeded { count: usize, maximum: usize },
-    CandidateEdgeBudgetExceeded { count: usize, maximum: usize },
+    CandidateWorkBudgetExceeded { count: usize, maximum: usize },
     ArithmeticOverflow,
     SerializationFailed,
 }
@@ -496,17 +496,19 @@ fn note_adjacency(
             if pred.score_offset.compare_exact(gold.score_offset) == Ordering::Greater && !within {
                 break;
             }
-            if within && event_family(&pred.kind) == event_family(&gold.kind) {
+            if within {
                 *candidate_budget = candidate_budget
                     .checked_add(1)
                     .ok_or(MusicXmlNotationEvaluationErrorV1::ArithmeticOverflow)?;
                 if *candidate_budget > MUSICXML_NOTATION_MAX_CANDIDATE_EDGES_V1 {
-                    return Err(MusicXmlNotationEvaluationErrorV1::CandidateEdgeBudgetExceeded {
+                    return Err(MusicXmlNotationEvaluationErrorV1::CandidateWorkBudgetExceeded {
                         count: *candidate_budget,
                         maximum: MUSICXML_NOTATION_MAX_CANDIDATE_EDGES_V1,
                     });
                 }
-                adjacency[gold_index].push(pred_index);
+                if event_family(&pred.kind) == event_family(&gold.kind) {
+                    adjacency[gold_index].push(pred_index);
+                }
             }
             scan += 1;
         }
@@ -551,17 +553,19 @@ fn keyed_adjacency(
             if pred_offset.compare_exact(*gold_offset) == Ordering::Greater && !within {
                 break;
             }
-            if within && pred_key == gold_key {
+            if within {
                 *candidate_budget = candidate_budget
                     .checked_add(1)
                     .ok_or(MusicXmlNotationEvaluationErrorV1::ArithmeticOverflow)?;
                 if *candidate_budget > MUSICXML_NOTATION_MAX_CANDIDATE_EDGES_V1 {
-                    return Err(MusicXmlNotationEvaluationErrorV1::CandidateEdgeBudgetExceeded {
+                    return Err(MusicXmlNotationEvaluationErrorV1::CandidateWorkBudgetExceeded {
                         count: *candidate_budget,
                         maximum: MUSICXML_NOTATION_MAX_CANDIDATE_EDGES_V1,
                     });
                 }
-                adjacency[gold_index].push(pred_index);
+                if pred_key == gold_key {
+                    adjacency[gold_index].push(pred_index);
+                }
             }
             scan += 1;
         }
