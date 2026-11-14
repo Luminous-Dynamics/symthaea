@@ -91,8 +91,8 @@ const EVENT_KINDS: &[&str] = &[
     "repository_revision_observed", "source_introduced", "source_changed", "source_removed",
     "contract_changed", "configuration_world_changed", "test_evidence_recorded",
     "benchmark_evidence_recorded", "evidence_invalidated", "evidence_superseded",
-    "capability_link_changed", "decision_recorded", "development_action_proposed",
-    "development_action_observed", "risk_opened", "risk_closed",
+    "capability_link_changed", "decision_recorded", "authority_evidence_recorded",
+    "development_action_proposed", "development_action_observed", "risk_opened", "risk_closed",
 ];
 
 const EVENT_EFFECTS: &[&str] = &[
@@ -1095,11 +1095,54 @@ fn validate_event(
                     "authority_evidence_recorded must use state_effect=observes",
                 );
             }
+            let payload = event.get("payload");
+            let evidence_id = payload
+                .and_then(|value| value.get("evidence_id"))
+                .and_then(Value::as_str);
+            if evidence_id.is_none_or(|id| !targets_for_event.iter().any(|target| target == id)) {
+                report.error(
+                    "DTEA-AUTH-017",
+                    format!("{path}.payload.evidence_id"),
+                    "authority evidence event payload evidence_id must be one of its exact targets",
+                );
+            }
+            let event_observed_at = event.get("observed_at")
+                .and_then(Value::as_str)
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
             for target in &targets_for_event {
                 match nodes.get(target) {
-                    Some(node) if node.node_type == "evidence" => {}
+                    Some(node) if node.node_type == "evidence" => {
+                        if let (Some(payload), Some(observed)) = (payload, event_observed_at.as_ref()) {
+                            let actor = payload.get("actor_id").and_then(Value::as_str);
+                            let scope = payload.get("authority_scope").and_then(Value::as_str);
+                            let policy = payload.get("policy_version").and_then(Value::as_str);
+                            for (key, actual) in [
+                                ("actor_id", actor),
+                                ("authority_scope", scope),
+                                ("policy_version", policy),
+                            ] {
+                                if actual != node.attributes.get(key).and_then(Value::as_str) {
+                                    report.error(
+                                        "DTEA-AUTH-018",
+                                        format!("{path}.payload.{key}"),
+                                        format!("authority event {key} does not match its evidence node"),
+                                    );
+                                }
+                            }
+                            let available = payload.get("available_to_actor_at")
+                                .and_then(Value::as_str)
+                                .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                            if available.as_ref().is_none_or(|available| available < observed) {
+                                report.error(
+                                    "DTEA-AUTH-019",
+                                    format!("{path}.payload.available_to_actor_at"),
+                                    "authority evidence cannot be available to the actor before the event was observed",
+                                );
+                            }
+                        }
+                    }
                     Some(node) => report.error(
-                        "DTEA-AUTH-017",
+                        "DTEA-AUTH-020",
                         format!("{path}.targets"),
                         format!("authority evidence event must target evidence nodes, not {}", node.node_type),
                     ),
