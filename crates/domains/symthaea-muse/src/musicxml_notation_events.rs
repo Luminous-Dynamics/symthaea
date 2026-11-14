@@ -1356,11 +1356,13 @@ mod tests {
         assert_eq!(note.attack_divisions.as_deref(), Some("-2"));
         assert_eq!(note.release_divisions.as_deref(), Some("3"));
         let node = &note.source_note;
+        let mut attribute_namespaces: Vec<_> = node.attributes.iter()
+            .filter(|attribute| attribute.name == "state")
+            .map(|attribute| attribute.namespace_uri.as_deref().unwrap())
+            .collect();
+        attribute_namespaces.sort_unstable();
         assert_eq!(
-            node.attributes.iter()
-                .filter(|attribute| attribute.name == "state")
-                .map(|attribute| attribute.namespace_uri.as_deref().unwrap())
-                .collect::<Vec<_>>(),
+            attribute_namespaces,
             vec!["urn:example:extension-a", "urn:example:extension-b"]
         );
         let elements: Vec<_> = node.children.iter()
