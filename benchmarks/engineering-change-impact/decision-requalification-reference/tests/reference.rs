@@ -76,11 +76,22 @@ fn event_inventory_projection(case: &Value) -> Value {
     })
 }
 
-fn candidate_visible_event_projection(case: &Value) -> Value {
-    let mut event_ids = strings_at(case, "candidate_visible_event_ids");
+fn candidate_visible_event_projection(case: &Value, as_of_k0: bool) -> Value {
+    let (domain, field) = if as_of_k0 {
+        (
+            "symthaea.engineering-decision-requalification.candidate-visible-events-k0.v0.1",
+            "candidate_visible_event_ids_at_k0",
+        )
+    } else {
+        (
+            "symthaea.engineering-decision-requalification.candidate-visible-events-k1.v0.1",
+            "candidate_visible_event_ids",
+        )
+    };
+    let mut event_ids = strings_at(case, field);
     event_ids.sort();
     json!({
-        "domain": "symthaea.engineering-decision-requalification.candidate-visible-events.v0.1",
+        "domain": domain,
         "event_inventory_sha256": string_at(case, "event_inventory_sha256"),
         "event_ids": event_ids
     })
@@ -166,15 +177,20 @@ fn evaluate_frontier(case: &Value, decision: &Value, as_of_k0: bool) -> Disposit
 
     let decision_dependencies: BTreeSet<String> =
         strings_at(decision, "dependency_ids").into_iter().collect();
+    let visible_field = if as_of_k0 {
+        "candidate_visible_event_ids_at_k0"
+    } else {
+        "candidate_visible_event_ids"
+    };
     let visible_ids: BTreeSet<String> =
-        strings_at(case, "candidate_visible_event_ids").into_iter().collect();
+        strings_at(case, visible_field).into_iter().collect();
     let k0 = string_at(decision, "knowledge_frontier_k0");
 
+    // Walk the complete owner-frozen event inventory, not merely the events
+    // materialized into candidate context. Otherwise a missing relevant event
+    // could be silently interpreted as "no change".
     for event in array_at(case, "events") {
         let event_id = string_at(event, "event_id");
-        if !visible_ids.contains(event_id) {
-            continue;
-        }
         let effective_at = string_at(event, "effective_at");
         let observed_at = string_at(event, "observed_at");
 
@@ -198,6 +214,12 @@ fn evaluate_frontier(case: &Value, decision: &Value, as_of_k0: bool) -> Disposit
         });
         if !scope_matches {
             reasons.insert("NON_AFFECTING_EVENT_IGNORED".to_owned());
+            continue;
+        }
+
+        if !visible_ids.contains(event_id) {
+            reasons.insert("RELEVANT_EVENT_NOT_MATERIALIZED".to_owned());
+            indeterminate = true;
             continue;
         }
 
@@ -252,7 +274,7 @@ fn find_case<'a>(corpus: &'a Value, case_id: &str) -> &'a Value {
 fn ten_known_answer_cases_match_K0_K1_reference_and_manifest_digests() {
     let corpus: Value = serde_json::from_str(CASES).expect("valid requalification corpus");
     assert_eq!(string_at(&corpus, "schema_version"), "engineering-decision-requalification-v0.1");
-    assert_eq!(array_at(&corpus, "cases").len(), 10);
+    assert_eq!(array_at(&corpus, "cases").len(), 11);
 
     let mut case_ids = BTreeSet::new();
     for case in array_at(&corpus, "cases") {
@@ -270,9 +292,14 @@ fn ten_known_answer_cases_match_K0_K1_reference_and_manifest_digests() {
             "{case_id}: event inventory digest"
         );
         assert_eq!(
-            sha256(&candidate_visible_event_projection(case)),
+            sha256(&candidate_visible_event_projection(case, true)),
+            string_at(case, "candidate_visible_event_manifest_k0_sha256"),
+            "{case_id}: K0 candidate-visible event digest"
+        );
+        assert_eq!(
+            sha256(&candidate_visible_event_projection(case, false)),
             string_at(case, "candidate_visible_event_manifest_sha256"),
-            "{case_id}: candidate-visible event digest"
+            "{case_id}: K1 candidate-visible event digest"
         );
 
         let dependency_ids: BTreeSet<String> = array_at(case, "dependencies").iter()
@@ -281,8 +308,11 @@ fn ten_known_answer_cases_match_K0_K1_reference_and_manifest_digests() {
         let event_ids: BTreeSet<String> = array_at(case, "events").iter()
             .map(|event| string_at(event, "event_id").to_owned()).collect();
         assert_eq!(event_ids.len(), array_at(case, "events").len(), "{case_id}: duplicate event");
+        for id in strings_at(case, "candidate_visible_event_ids_at_k0") {
+            assert!(event_ids.contains(&id), "{case_id}: K0 candidate-visible event {id} missing");
+        }
         for id in strings_at(case, "candidate_visible_event_ids") {
-            assert!(event_ids.contains(&id), "{case_id}: candidate-visible event {id} missing");
+            assert!(event_ids.contains(&id), "{case_id}: K1 candidate-visible event {id} missing");
         }
 
         let decision_ids: Vec<String> = array_at(case, "decisions").iter()
@@ -313,10 +343,33 @@ fn ten_known_answer_cases_match_K0_K1_reference_and_manifest_digests() {
 }
 
 #[test]
+fn relevant_owner_events_missing_from_K0_or_K1_candidate_context_are_indeterminate() {
+    let corpus: Value = serde_json::from_str(CASES).expect("valid requalification corpus");
+
+    let late = find_case(&corpus, "RQ-NEG-002");
+    let late_decision = find_decision(late, "D-BOND-03");
+    let mut missing_k1 = late.clone();
+    missing_k1["candidate_visible_event_ids"] = json!([]);
+    let result_k1 = evaluate_frontier(&missing_k1, late_decision, false);
+    assert_eq!(result_k1.state, "indeterminate");
+    assert_eq!(result_k1.action, "hold_pending_evidence");
+    assert!(result_k1.reason_codes.iter().any(|r| r == "RELEVANT_EVENT_NOT_MATERIALIZED"));
+    assert_eq!(evaluate_frontier(late, late_decision, true).state, "supported");
+
+    let known = find_case(&corpus, "RQ-NEG-006");
+    let known_decision = find_decision(known, "D-VALVE-10");
+    let mut missing_k0 = known.clone();
+    missing_k0["candidate_visible_event_ids_at_k0"] = json!([]);
+    let result_k0 = evaluate_frontier(&missing_k0, known_decision, true);
+    assert_eq!(result_k0.state, "indeterminate");
+    assert!(result_k0.reason_codes.iter().any(|r| r == "RELEVANT_EVENT_NOT_MATERIALIZED"));
+}
+
+#[test]
 fn eight_intervention_pairs_preserve_history_and_scope_requalification() {
     let corpus: Value = serde_json::from_str(CASES).expect("valid requalification corpus");
     let pairs = array_at(&corpus, "intervention_pairs");
-    assert_eq!(pairs.len(), 8);
+    assert_eq!(pairs.len(), 9);
     let mut pair_ids = BTreeSet::new();
 
     for pair in pairs {
@@ -368,6 +421,13 @@ fn eight_intervention_pairs_preserve_history_and_scope_requalification() {
                 assert_eq!(after_k1.state, string_at(pair, "expected_current_state"), "{pair_id}");
                 assert_eq!(after_k1.action, string_at(pair, "expected_current_action"), "{pair_id}");
             }
+            "materialization_gate" => {
+                assert_eq!(before_k0.state, string_at(pair, "expected_as_of_state"), "{pair_id}: before K0");
+                assert_eq!(after_k0.state, string_at(pair, "expected_as_of_state"), "{pair_id}: after K0");
+                assert_eq!(before_k1.state, string_at(pair, "expected_before_current_state"), "{pair_id}: materialized owner event");
+                assert_eq!(after_k1.state, string_at(pair, "expected_after_current_state"), "{pair_id}: missing candidate materialization");
+                assert_eq!(after_k1.action, string_at(pair, "expected_after_action"), "{pair_id}: missing event must block");
+            }
             "historical_rejection" => {
                 assert_eq!(before_k0.state, "supported", "{pair_id}");
                 assert_eq!(after_k0.state, string_at(pair, "expected_as_of_state"), "{pair_id}");
@@ -379,14 +439,14 @@ fn eight_intervention_pairs_preserve_history_and_scope_requalification() {
 }
 
 #[test]
-fn eighteen_mutation_controls_are_unique_and_reference_known_cases() {
+fn twenty_mutation_controls_are_unique_and_reference_known_cases() {
     let corpus: Value = serde_json::from_str(CASES).expect("valid requalification corpus");
     let mutations: Value = serde_json::from_str(MUTATIONS).expect("valid mutation control manifest");
     assert_eq!(string_at(&mutations, "schema_version"), "engineering-decision-requalification-mutations-v0.1");
     assert_eq!(string_at(&mutations, "status"), "preregistered_controls_not_results");
     let controls = array_at(&mutations, "controls");
-    assert_eq!(controls.len(), 18);
-    assert_eq!(mutations["control_count"].as_u64(), Some(18));
+    assert_eq!(controls.len(), 20);
+    assert_eq!(mutations["control_count"].as_u64(), Some(20));
     let case_ids: BTreeSet<String> = array_at(&corpus, "cases").iter()
         .map(|c| string_at(c, "id").to_owned()).collect();
     let mut control_ids = BTreeSet::new();
