@@ -132,7 +132,8 @@
         "reason_codes": [
           "ACTED_AFTER_VISIBLE_TRIGGER",
           "IRREVERSIBLE_EFFECT_AFTER_VISIBLE_TRIGGER",
-          "SHOULD_HOLD_SIDE_ACTED"
+          "SHOULD_HOLD_SIDE_ACTED",
+          "TIMELY_INTERRUPTION_NOT_OBSERVABLE"
         ]
       }
     },
