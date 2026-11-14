@@ -1,4 +1,4 @@
-# MEL-MR-EVAL-031 — Rights-gated music-edit byte materializer v1
+# MEL-MR-EVAL-035 — Rights-gated music-edit byte materializer v1
 
 **Date:** 14 November 2026  
 **Status:** Implementation tranche; exact-head qualification pending  
@@ -7,7 +7,7 @@
 
 ## Objective
 
-The EVAL-030 adapter validates manifest declarations. It does not open files. EVAL-031 adds the missing byte boundary: before an external editor or evaluator receives a dataset, every declared input, paired target, instruction and permission-evidence artifact must be found under an explicit local root and hashed from actual bytes.
+The EVAL-030 adapter validates manifest declarations. It does not open files. EVAL-035 adds the missing byte boundary: before an external editor or evaluator receives a dataset, every declared input, paired target, instruction and permission-evidence artifact must be found under an explicit local root and hashed from actual bytes.
 
 The operation matrix remains unchanged: all twelve SMEBench operation families are NotYetQualified. Materializing data is not evidence that Muse can perform an edit.
 

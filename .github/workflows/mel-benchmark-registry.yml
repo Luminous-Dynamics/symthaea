@@ -10,7 +10,7 @@ on:
       - "crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs"
       - "tools/mel-music-edit-adapter-harness/**"
       - "docs/research/MEL_MR_EVAL_030_SMEBENCH_MMAE_ADAPTER_V1_2026-11-13.md"
-      - "docs/research/MEL_MR_EVAL_031_BYTE_MATERIALIZER_V1_2026-11-14.md"
+      - "docs/research/MEL_MR_EVAL_035_BYTE_MATERIALIZER_V1_2026-11-14.md"
       - "benchmarks/mel/registry/synthetic-music-edit-dataset-manifest-v1.json"
       - "benchmarks/mel/registry/synthetic-music-edit-capability-matrix-v1.json"
       - "benchmarks/mel/registry/synthetic-music-edit-comparison-scope-v1.json"
