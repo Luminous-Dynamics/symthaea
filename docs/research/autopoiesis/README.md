@@ -15,6 +15,8 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 9. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
 10. [MEL-AUTO-001 runtime regeneration qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10098).
 
+6. [Stochastic categorical assay evaluation](STOCHASTIC_ASSAY_2026-11-14.md) — exact permutation tests, Holm correction and statistical assumptions.
+
 ## Current implementation
 
 The first executable package is a standalone nested Cargo workspace:
@@ -23,12 +25,13 @@ The first executable package is a standalone nested Cargo workspace:
   - `src/lib.rs`: runtime component/digest/lineage verifier.
   - `src/assay.rs`: deterministic finite-model assay adequacy evaluator.
   - `src/viability.rs`: bounded finite viability, boundary-production, admissibility and global-constraint witnesses.
+  - `src/stochastic_assay.rs`: categorical replicate distributions, exact permutation testing and Holm correction.
 
 It has exact serde / sha2 dependency pins and its own lockfile, and is explicitly excluded from the root workspace's crates/domains glob. Its focused CI builds the nested workspace independently.
 
 The runtime verifier recomputes SHA-256 digests from stored artifact bytes and verifies process contracts, executable-identity consistency, exact component-version lineage, required/optional external observations, and producer/consumer coverage for required regenerative components. It qualifies bounded functional self-maintenance only.
 
-The deterministic assay module compares response digests over a frozen finite model class. It does not yet provide stochastic response distributions, confidence intervals, power analysis or multiplicity correction; these are tracked in #12048.
+The deterministic assay module compares response digests over a frozen finite model class. The separate stochastic assay module supports independent categorical replicates, exact permutation tests and Holm correction; confidence intervals, power analysis, paired/clustered designs and continuous outcomes remain future work under #12048.
 
 The finite viability module checks explicit finite witnesses inspired by the 2026 viability-localized formalization: realization on viability classes, boundary production, admissibility and existence of a global assignment. It is not a categorical implementation of arbitrary topoi and does not establish biological autopoiesis. Its result is separate from runtime execution evidence and assay adequacy.
 
