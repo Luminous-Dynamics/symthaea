@@ -21,7 +21,7 @@ impl Disposition {
 pub fn run(fixture_path: &Path) -> Result<()> {
     let bytes = fs::read(fixture_path).with_context(|| format!("reading {}", fixture_path.display()))?;
     let fixture: Value = serde_json::from_slice(&bytes).context("parsing plasma-transfer fixture")?;
-    if fixture.get("schema_version").and_then(Value::as_str) != Some("plasma-transfer-fixture-v0.2") {
+    if fixture.get("schema_version").and_then(Value::as_str) != Some("plasma-transfer-fixture-v0.3") {
         bail!("unsupported plasma-transfer fixture schema");
     }
     if fixture.get("material_scope_map").and_then(Value::as_object).is_none() {
@@ -297,7 +297,7 @@ mod tests {
     use serde_json::Value;
 
     fn fixture() -> Value {
-        serde_json::from_str(include_str!("../../data/research/plasma_transfer_fixture_v0_2.json")).expect("fixture parses")
+        serde_json::from_str(include_str!("../../data/research/plasma_transfer_fixture_v0_3.json")).expect("fixture parses")
     }
     fn case<'a>(data: &'a Value, id: &str) -> &'a Value {
         data["cases"].as_array().expect("cases").iter().find(|row| row["id"].as_str() == Some(id)).expect("case exists")
