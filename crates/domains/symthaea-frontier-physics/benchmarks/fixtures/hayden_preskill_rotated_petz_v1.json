@@ -1,0 +1,140 @@
+{
+  "schema": "luminous.black_hole_information.hayden_preskill_rotated_petz.v1",
+  "status": "Rust rotated-Petz source and tests passed in exact-head Rust 1.96 suite",
+  "claim_ceiling": "The tested Rust source implements and validates finite-dimensional classical rotated-Petz recovery channels for the declared four-qubit channel. It does not establish exact optimality, gate-level circuit complexity, hardware performance or macroscopic black-hole information recovery.",
+  "channel": {
+    "input": "message qubit M",
+    "reference": "Q maximally entangled with M",
+    "black_hole_early_radiation": "B,R initially maximally entangled",
+    "scrambler": "seeded Haar U(4) on M tensor B",
+    "output": "outgoing E and inaccessible B-prime",
+    "decoder_access": "A=E tensor R only; B-prime is traced as channel environment"
+  },
+  "rotated_petz": {
+    "formula": "R_t(X) = sigma^((1+it)/2) N^dagger(N(sigma)^(-(1+it)/2) X N(sigma)^(-(1-it)/2)) sigma^((1-it)/2)",
+    "simplification_for_sigma_I_over_2": "Recovery Kraus R_b(t) = (1/sqrt(2)) K_b^dagger rho_A^(-1/2 - i*t/2); outer reference modular factors cancel to the scalar 1/sqrt(2).",
+    "modular_parameter": "real t",
+    "preregistered_t_grid": [
+      -2,
+      -1,
+      -0.5,
+      0,
+      0.5,
+      1,
+      2
+    ],
+    "numerical_matrix_power": "complex Hermitian eigen-decomposition; no eigenvalue flooring; only positive-definite rho_A accepted",
+    "matrix_power_identity": "P_t rho_A P_t^dagger = I, where P_t = rho_A^(-1/2 - i*t/2)",
+    "ordinary_petz_limit": "t=0"
+  },
+  "observables": [
+    "entanglement_fidelity",
+    "inverse_modular_power_residual",
+    "trace_preservation_residual",
+    "accessible_input_dimension",
+    "recovered_message_dimension",
+    "recovery_kraus_count",
+    "modular_parameter"
+  ],
+  "independent_numpy_comparator": {
+    "generator": "Independent NumPy PRNG and complex Gaussian QR Haar U(4); Hermitian eigh for rho_A matrix powers; direct Kraus completeness and entanglement fidelity calculation.",
+    "sample_count": 64,
+    "first_seed_hex": "0xB047",
+    "seed_schedule": "0xB047 + sample_index, sample_index 0..63; same seed used for every t",
+    "results_by_t": {
+      "-2.0": {
+        "mean_entanglement_fidelity": 0.43898660627261366,
+        "standard_error": 0.023738449828041058,
+        "minimum": 0.15384471537680033,
+        "maximum": 0.9341610271023583
+      },
+      "-1.0": {
+        "mean_entanglement_fidelity": 0.6921176812813528,
+        "standard_error": 0.018153159848429155,
+        "minimum": 0.4087143410736773,
+        "maximum": 0.9732975544722742
+      },
+      "-0.5": {
+        "mean_entanglement_fidelity": 0.7905151568088227,
+        "standard_error": 0.013482561491449975,
+        "minimum": 0.5660177480726385,
+        "maximum": 0.9832532429766057
+      },
+      "0.0": {
+        "mean_entanglement_fidelity": 0.827512496162762,
+        "standard_error": 0.01142990979599923,
+        "minimum": 0.6326215731284699,
+        "maximum": 0.98658717101613
+      },
+      "0.5": {
+        "mean_entanglement_fidelity": 0.7905151568088227,
+        "standard_error": 0.013482561491449973,
+        "minimum": 0.5660177480726385,
+        "maximum": 0.9832532429766057
+      },
+      "1.0": {
+        "mean_entanglement_fidelity": 0.6921176812813528,
+        "standard_error": 0.018153159848429162,
+        "minimum": 0.4087143410736772,
+        "maximum": 0.9732975544722742
+      },
+      "2.0": {
+        "mean_entanglement_fidelity": 0.43898660627261366,
+        "standard_error": 0.023738449828041065,
+        "minimum": 0.15384471537680028,
+        "maximum": 0.9341610271023583
+      }
+    },
+    "interpretation": "For this channel/ensemble, the finite grid's mean fidelity is largest at t=0 and decreases symmetrically with |t|. This does not prove t=0 is globally optimal, nor does it generalize to other channels/reference states. The result motivates channel-matched optimization and exact small-instance comparisons.",
+    "status_note": "Independent equation-level comparator, not Rust output and not a ChaCha20 bitstream fixture."
+  },
+  "rust_contract": {
+    "api": "simulate_small_hayden_preskill_rotated_petz_recovery(seed,t,tolerance)",
+    "ensemble_api": "sample_small_hayden_preskill_rotated_petz_ensemble(sample_count,first_seed,t,tolerance)",
+    "acceptance": {
+      "t_zero_matches_ordinary_petz_fidelity_absolute_error": 1e-8,
+      "modular_power_identity_residual": 1e-8,
+      "trace_preservation_residual": 1e-8,
+      "entanglement_fidelity_interval": [
+        0,
+        1
+      ],
+      "fixed_seed_reproducibility": "exact deterministic equality",
+      "decoder_access": "A=E tensor R only; no B-prime"
+    },
+    "current_status": "source_authored_not_executed"
+  },
+  "negative_controls": [
+    "mismatch seed schedules between t values",
+    "claim finite-grid maximum is the exact optimal decoder",
+    "apply spectral flooring to rho_A before complex powers",
+    "silently repair recovery Kraus completeness",
+    "give the decoder B-prime or global state-vector access",
+    "claim a physical gate-level implementation from a classical Kraus simulation"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "branch",
+    "seed",
+    "modular_parameter_t",
+    "scrambler_identity",
+    "rho_A_minimum_eigenvalue",
+    "modular_power_identity_residual",
+    "trace_preservation_residual",
+    "entanglement_fidelity",
+    "runtime",
+    "peak_memory"
+  ],
+  "rust_validation": {
+    "tested_pr_head": "847bff5a6e27dc3de43c09f1dcba791b43aa9a8d",
+    "workflow_run_id": 43308906962,
+    "crate_test_result": "148 passed; 0 failed",
+    "black_hole_information_module_test_count": 84,
+    "test_coverage": [
+      "t=0 equivalence with ordinary Petz over fixed seeds",
+      "nonzero modular parameters preserve CPTP and fidelity bounds",
+      "seeded ensemble reproducibility and uncertainty",
+      "non-finite parameter and insufficient sample rejection"
+    ]
+  }
+}

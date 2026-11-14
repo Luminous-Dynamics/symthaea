@@ -1,0 +1,169 @@
+{
+  "schema": "luminous.black_hole_information.tensor_network_qualification.v1",
+  "status": "benchmark_contract_authored; no Rust MPS/TEBD backend implemented",
+  "claim_ceiling": "MPS/TEBD simulation of finite-dimensional U(1)-conserving unitary circuits. This fixture does not qualify Hawking radiation, gravitational backreaction, a Page-island/QES calculation, or a four-dimensional black-hole solution.",
+  "motivation": "Dense state vectors and dense reduced density matrices are exact but scale exponentially. A scalable programme needs symmetry-preserving tensor networks whose truncation error, bond growth, and output uncertainty are measured rather than hidden.",
+  "model_families": [
+    "nearest-neighbour U(1)-conserving random brickwork circuits from low-entanglement product states",
+    "U(1)-conserving domain-wall transport quenches",
+    "U(1)-conserving sequential product-state boundary emission with immutable emitted factors",
+    "operator spreading and squared-commutator profiles when the tensor-network operator backend exists"
+  ],
+  "reference_implementations": [
+    {
+      "name": "Quimb CircuitMPS / TEBD",
+      "role": "external MPS circuit simulator comparator",
+      "exposed_controls": [
+        "max_bond",
+        "singular-value cutoff",
+        "gate contraction strategy",
+        "MPS and lazy MPO evolution"
+      ],
+      "reference": "https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html",
+      "note": "The public documentation exposes explicit maximum bond dimension and cutoff controls; do not compare raw runtime without matched accuracy."
+    },
+    {
+      "name": "Exact dense Symthaea state-vector backend",
+      "role": "overlap oracle for small N",
+      "limits": "20-qubit state-vector cap, 64-dimensional retained reduced state cap, dense reference for overlapping small system sizes"
+    },
+    {
+      "name": "Second independently declared tensor-network implementation",
+      "role": "cross-implementation comparator",
+      "status": "to be selected and pinned at implementation time"
+    }
+  ],
+  "conventions": {
+    "qubit_order": "most-significant-bit first",
+    "symmetry": "exact U(1) total excitation number K",
+    "local_gate_family": "Haar U(1) x U(2) x U(1) two-site unitaries",
+    "entropy_units": "nats",
+    "truncation": "Schmidt singular values sorted descending; per-bond discarded squared Schmidt weight is recorded before any renormalization",
+    "charge_blocks": "each Schmidt block is labeled by its left-block excitation charge q; truncation may not merge distinct q sectors"
+  },
+  "benchmark_ladder": [
+    {
+      "id": "TN-0",
+      "name": "exact-to-MPS overlap",
+      "system_sizes": [
+        8,
+        10,
+        12
+      ],
+      "purpose": "Compare MPS against the existing exact dense backend on identical fixed gates, initial states, seeds and output checkpoints.",
+      "observables": [
+        "state-vector fidelity",
+        "trace distance of reduced density matrices",
+        "entropy error",
+        "charge leakage",
+        "norm drift"
+      ],
+      "proposed_acceptance": {
+        "reduced_state_trace_distance": 1e-8,
+        "entropy_absolute_error_nats": 1e-8,
+        "total_charge_expectation_drift": 1e-10,
+        "fixed_sector_charge_variance": 1e-10
+      }
+    },
+    {
+      "id": "TN-1",
+      "name": "charge-resolved Schmidt truncation accounting",
+      "observables": [
+        "bond dimension by bond and step",
+        "Schmidt spectrum per charge block",
+        "discarded weight per truncation",
+        "cumulative conservative state error envelope",
+        "maximum bond-cap saturation"
+      ],
+      "negative_control": "Truncate across charge sectors or drop an unreported Schmidt tail; the contract must detect it."
+    },
+    {
+      "id": "TN-2",
+      "name": "finite-size scaling",
+      "system_sizes": [
+        16,
+        24,
+        32,
+        48,
+        64
+      ],
+      "sweeps": [
+        "bond-dimension cap",
+        "Schmidt cutoff",
+        "circuit depth",
+        "filling fraction K/N",
+        "topology",
+        "number of seeds"
+      ],
+      "observables": [
+        "half-chain entropy",
+        "symmetry-resolved entanglement spectrum",
+        "domain-wall imbalance",
+        "central-cut current",
+        "operator influence where supported",
+        "runtime",
+        "peak memory",
+        "allocation volume"
+      ],
+      "proposed_acceptance": {
+        "dense_vs_MPS_trace_distance_for_overlap_sizes": 0.000001,
+        "entropy_absolute_error_nats_for_overlap_sizes": 0.00001,
+        "exact_total_charge_conservation": true,
+        "report_bond_cap_saturation": true
+      }
+    },
+    {
+      "id": "TN-3",
+      "name": "cost per qualified observable",
+      "comparison_rule": "Compare dense, MPS and external tensor-network methods at matched state/reduced-state error, same circuit, same seeds, same checkpoint set and same output observables.",
+      "required_cost_fields": [
+        "wall_time_seconds",
+        "peak_host_memory_bytes",
+        "allocation_volume_bytes",
+        "cpu_model",
+        "thread_count",
+        "energy_joules_if_measured_with_provenance"
+      ],
+      "primary_metric": "qualified_observables_per_compute_cost",
+      "prohibited": "raw qubits per second or gates per second without an error and truncation receipt"
+    }
+  ],
+  "proposed_error_accounting": {
+    "per_truncation": "For a normalized pure state with discarded Schmidt weight delta at one truncation, the distance to its normalized projection is bounded by sqrt(2*delta) in vector 2-norm.",
+    "accumulated": "A conservative trajectory envelope is the sum of the per-truncation vector-distance bounds under norm-preserving subsequent unitaries; tighter bounds may be used only with a derivation and matched tests.",
+    "reduced_states": "Use contractivity of trace distance under partial trace to propagate the global pure-state error envelope to reduced states.",
+    "entropy": "Do not infer a tight entropy error from trace distance alone without dimension-dependent continuity bounds; report the explicit bound or empirical dense overlap.",
+    "caveat": "This error accounting is a proposed contract. It does not constitute a proof for an MPS backend that has not been implemented."
+  },
+  "negative_controls": [
+    "discarded Schmidt weight not recorded at each truncation",
+    "merge different U(1) charge blocks during truncation",
+    "claim an exact result after hitting the bond cap",
+    "report entropy without truncation or continuity-error bounds",
+    "compare runtime at unequal fidelity or unequal truncation policies",
+    "fit diffusion exponents from one system size or post-selected times",
+    "interpret MPS circuit dynamics as Hawking radiation or QES physics"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "branch",
+    "toolchain",
+    "system_size",
+    "total_charge_sector",
+    "initial_state_digest",
+    "gate_ensemble_digest",
+    "seed_schedule",
+    "bond_cap",
+    "singular_value_cutoff",
+    "bond_dimension_profile",
+    "charge_block_schmidt_spectra",
+    "discarded_weight_by_truncation",
+    "cumulative_state_error_envelope",
+    "exact_dense_overlap_error_when_available",
+    "entropy_error",
+    "charge_residual",
+    "norm_residual",
+    "runtime",
+    "peak_memory"
+  ]
+}

@@ -75,8 +75,8 @@ pub fn minimum_entropy_production(
     // This means free forces are determined by fixed forces
     let mut optimal_forces = fixed_forces.to_vec();
     // Simple: set free forces to 0 (minimum perturbation)
-    for i in (n - n_free)..n {
-        optimal_forces[i] = 0.0;
+    for force in optimal_forces.iter_mut().skip(n - n_free) {
+        *force = 0.0;
     }
     optimal_forces
 }

@@ -112,6 +112,12 @@ mod tests {
 
         // Optimal noise should give higher SNR than too-low or too-high
         assert!(
+            snr_opt > snr_low,
+            "Optimal ({:.6}) should beat low noise ({:.6})",
+            snr_opt,
+            snr_low
+        );
+        assert!(
             snr_opt > snr_high,
             "Optimal ({:.6}) should beat high noise ({:.6})",
             snr_opt,

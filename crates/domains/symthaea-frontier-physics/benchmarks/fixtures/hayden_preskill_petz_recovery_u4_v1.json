@@ -1,0 +1,112 @@
+{
+  "schema": "luminous.black_hole_information.hayden_preskill_petz_recovery_u4.v1",
+  "status": "five_Rust_tests_authored_exact_head_runner_pending_independent_numpy_comparator_executed",
+  "claim_ceiling": "One-qubit-message, one-qubit-black-hole, one-step Haar U(4) channel with a Petz recovery map. This is a finite-dimensional operational decoder-channel benchmark, not a macroscopic black hole, gravitational evaporation, QES/islands, or evidence that decoding is efficient in gate complexity.",
+  "register": {
+    "order": "Q,M,B,R, most-significant-bit-first",
+    "initial_state": "Bell(Q,M) tensor Bell(B,R)",
+    "unitary": "seeded Haar U(4) on M tensor B",
+    "outputs": "M,B -> E,Bprime",
+    "accessible_decoder_input": "A = E tensor R, dimension 4",
+    "inaccessible_environment": "Bprime, dimension 2",
+    "logical_input": "M, dimension 2",
+    "references": "Q is maximally entangled with M before scrambling; R purifies the initially maximally mixed B"
+  },
+  "channel": {
+    "definition": "N_{M->A}(rho_M) = Tr_{Bprime}[(U_{MB} tensor I_R)(rho_M tensor Phi_BR)(Udagger tensor I_R)]",
+    "kraus_operators": "K_bprime[a,m] = U[(e,bprime),(m,r)] / sqrt(2), with a=(e,r)",
+    "maximally_mixed_reference_input": "pi_M = I_M/2",
+    "channel_reference_state": "sigma_A = N(pi_M) = 1/2 sum_bprime K_bprime K_bprime dagger",
+    "petz_map": "R_{pi,N}(rho_A) = pi_M^(1/2) Ndagger(sigma_A^(-1/2) rho_A sigma_A^(-1/2)) pi_M^(1/2)",
+    "petz_kraus": "R_bprime = K_bprime dagger sigma_A^(-1/2) / sqrt(2)",
+    "inverse_sqrt_method": "4x4 complex Hermitian Newton-Schulz iteration; no eigenvalue floor, support projection or silent PSD repair; nonconvergence is a typed failure"
+  },
+  "observables": {
+    "primary": "entanglement fidelity F_e = <Phi_QMhat| (id_Q tensor R o N)(Phi_QM) |Phi_QMhat>",
+    "trace_preservation": "max_abs(sum_s R_s dagger R_s - I_A)",
+    "inverse_square_root": "Frobenius_norm(sigma_A^(-1/2) sigma_A sigma_A^(-1/2) - I_A)",
+    "access": "decoder input is A=E tensor R only; Bprime is a channel-environment label used to construct Kraus operators, never a runtime decoder input",
+    "decoder_representation": "two 2x4 Kraus matrices, defining a CPTP map A(4)->Mhat(2)",
+    "complexity_boundary": "No physical quantum circuit decomposition, gate count, circuit depth, runtime on quantum hardware, or implementation cost is claimed. The map assumes the exact scrambler/channel is known."
+  },
+  "references": {
+    "identity_channel_control": {
+      "scrambler": "U=I_4",
+      "expected_entanglement_fidelity": 1,
+      "numpy_observed_entanglement_fidelity": 0.9999999999999998,
+      "maximum_observed_trace_preservation_residual": 0,
+      "maximum_observed_inverse_square_root_residual": 4.440892098500626e-16
+    },
+    "constant_output_baseline": {
+      "decoder": "ignore A and prepare I/2 on Mhat",
+      "expected_entanglement_fidelity": 0.25,
+      "interpretation": "input-independent qubit replacement channel; lower baseline, not a matched optimal decoder"
+    }
+  },
+  "independent_numpy_comparator": {
+    "generator": "NumPy PRNG; independently generated complex-Gaussian Haar U(4) via QR; channel Kraus construction; np.linalg.eigh inverse square root; direct Petz composition and entanglement fidelity",
+    "sample_count": 32,
+    "first_seed": 18961,
+    "seed_schedule": "seed = 0x4A11 + sample_index, sample_index 0..31",
+    "mean_entanglement_fidelity": 0.8358772014514745,
+    "standard_error": 0.016479346761601312,
+    "normal_approx_95_percent_interval": [
+      0.8035776817987359,
+      0.8681767211042131
+    ],
+    "minimum_entanglement_fidelity": 0.5764198502322044,
+    "maximum_entanglement_fidelity": 0.9689366889841043,
+    "maximum_trace_preservation_residual": 1.1006896870128552e-14,
+    "maximum_inverse_square_root_residual": 1.2783529342679856e-14,
+    "minimum_sigma_A_eigenvalue": 0.0034265148327853046,
+    "maximum_sigma_A_eigenvalue": 0.7256956126235807,
+    "independent_newton_schulz_vs_eigendecomposition": {
+      "maximum_entanglement_fidelity_difference": 1.5528578423129602e-11,
+      "maximum_trace_preservation_residual": 9.947819288927523e-11,
+      "maximum_inverse_square_root_residual": 9.947779049353203e-11
+    },
+    "caveat": "Independent NumPy QR/eigensolver and PRNG path. These are not bit-for-bit ChaCha20 Rust results or Rust execution receipts."
+  },
+  "rust_implementation": {
+    "sample_api": "simulate_small_hayden_preskill_petz_recovery(seed,tolerance)",
+    "analytic_control_api": "simulate_identity_hayden_preskill_petz_control(tolerance)",
+    "ensemble_api": "sample_small_hayden_preskill_petz_ensemble(sample_count,first_seed,tolerance)",
+    "test_plan": [
+      "identity channel returns entanglement fidelity 1",
+      "32 Haar scramblers yield finite fidelity in [0,1], inverse-square-root residual and trace-preservation residual within tolerance",
+      "same seed reproduces exact output",
+      "ensemble reports mean, standard error, min/max and numerical residual maxima",
+      "sample count below two is rejected"
+    ],
+    "status": "five Rust tests authored; exact-head focused Rust runner pending"
+  },
+  "negative_controls": [
+    "give the Petz decoder access to Bprime",
+    "give the Petz decoder hidden full-state amplitudes rather than A",
+    "omit the initial Bell(B,R) purification while retaining R as accessible side information",
+    "drop the 1/sqrt(2) factor in the channel Kraus operators",
+    "drop the pi_M^(1/2)=I/sqrt(2) factors from the Petz Kraus map",
+    "claim efficient quantum decoding from a two-Kraus representation without a circuit decomposition and gate/depth costs",
+    "replace the exact sigma_A inverse square root with eigenvalue clipping or silent regularization",
+    "compare entanglement fidelity against 1/2 rather than the input-independent qubit replacement baseline 1/4"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "seed",
+    "scrambler_sha_or_digest",
+    "message_dimension",
+    "remaining_Bprime_dimension",
+    "accessible_register_A",
+    "accessible_input_dimension",
+    "Petz_reference_state_digest",
+    "Petz_inverse_sqrt_residual",
+    "recovery_trace_preservation_residual",
+    "entanglement_fidelity",
+    "constant_output_baseline",
+    "runtime",
+    "peak_memory",
+    "decoder_representation",
+    "gate_count_status",
+    "hardware_execution_status"
+  ]
+}

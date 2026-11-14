@@ -1,0 +1,203 @@
+{
+  "schema": "luminous.black_hole_information.sequential_evaporation_u1.v1",
+  "status": "product_state_initialization_and_32_seed_numpy_comparator_added; Rust source authored and Rust execution pending",
+  "model": "finite-dimensional closed pure-state qubit chain with sequential tensor-factor emission",
+  "claim_ceiling": "This is a U(1)-conserving quantum-circuit toy model. It is not Hawking radiation, a gravitational evaporation calculation, a Page-island derivation, or evidence for a four-dimensional black-hole information solution.",
+  "conventions": {
+    "qubit_ordering": "most_significant_bit_first",
+    "pair_gate_basis": [
+      "00",
+      "01",
+      "10",
+      "11"
+    ],
+    "entropy_units": "nats",
+    "equal_gap_hamiltonian": "H = hbar*omega*sum_i |1><1|_i",
+    "total_charge": "N = sum_i |1><1|_i",
+    "initial_state": "seeded low-entanglement computational-basis product state in the exact Hamming-weight-K sector",
+    "initial_pattern": "For 0<K<N, qubit 0 is occupied, qubit 1 is empty, and K-1 occupied sites are seeded from qubits 2..N-1. K=0 and K=N are explicit trivial-sector controls."
+  },
+  "evolution": {
+    "each_emission_step": [
+      "Apply a seeded Haar element of U(1) x U(2) x U(1) to the first two active black-hole factors.",
+      "Move the first active tensor factor into the collected radiation register.",
+      "Never apply any later gate to an emitted tensor factor."
+    ],
+    "final_single_qubit": "The final active qubit is transferred without another two-qubit gate.",
+    "gate_family": "Block diagonal in pair excitation sectors: a phase on |00>, a Haar U(2) on span{|01>,|10>}, and a phase on |11>.",
+    "state_representation": "One full 2^N pure-state vector with an explicit B/R partition; emission is a factor relabelling after a unitary boundary interaction."
+  },
+  "qualification_observables": [
+    "state_norm_squared_at_every_emission",
+    "total_excitation_expectation_and_variance_at_every_emission",
+    "radiation_von_neumann_entropy",
+    "remaining_register_von_neumann_entropy",
+    "complementary_entropy_residual",
+    "radiation_and_remaining_register_purity",
+    "emitted_qubit_identity_and_immutability",
+    "two_qubit_gate_count",
+    "seed_reproducibility",
+    "initial_excited_qubit_labels",
+    "initial_product_state_entropy",
+    "first_emission_entropy_growth",
+    "final_complete_radiation_purification",
+    "smaller_complementary_reduction_dimension"
+  ],
+  "reference_controls": [
+    {
+      "id": "U1-CTRL-001",
+      "case": "vacuum_sector",
+      "number_of_qubits": 6,
+      "initial_excitations": 0,
+      "expected": "zero entanglement at every cut; N expectation 0; variance 0"
+    },
+    {
+      "id": "U1-CTRL-002",
+      "case": "fully_filled_sector",
+      "number_of_qubits": 6,
+      "initial_excitations": 6,
+      "expected": "zero entanglement at every cut; N expectation 6; variance 0"
+    },
+    {
+      "id": "U1-CTRL-003",
+      "case": "pair_gate_charge_blocks",
+      "expected": "all matrix elements between different pair-excitation sectors vanish; U dagger U = identity; [U,N_pair] = 0"
+    },
+    {
+      "id": "U1-CTRL-004",
+      "case": "closed_pure_register_complementarity",
+      "expected": "S(R) = S(B) at each emission step within independently declared numerical tolerance"
+    },
+    {
+      "id": "U1-CTRL-005",
+      "case": "late_radiation_state",
+      "expected": "after the final factor transfer, the collected radiation is the full pure state; entropy 0 and purity 1"
+    }
+  ],
+  "benchmark_case": {
+    "id": "U1-EVAP-8Q-K4",
+    "number_of_qubits": 8,
+    "initial_excitations": 4,
+    "seed_hex": "0xE_AA0",
+    "status": "source_authored_rust_execution_pending",
+    "purpose": "finite-size sequential boundary-emission trajectory with charge conservation and independent B/R entropy comparison",
+    "independent_numpy_comparator": {
+      "generator": "32 independent NumPy PRNG seeds; seeded random product-state occupancy and independent complex-Gaussian Gram-Schmidt U(2) gate construction. Not ChaCha20 bitwise Rust fixture.",
+      "sample_count": 32,
+      "first_seed_hex": "0xE_AA0",
+      "seed_schedule": "0xEAA0 + sample_index, sample_index 0..31",
+      "results": [
+        {
+          "emission_count": 0,
+          "mean_radiation_entropy_nats": 0,
+          "standard_error_nats": 0,
+          "min_nats": 0,
+          "max_nats": 0
+        },
+        {
+          "emission_count": 1,
+          "mean_radiation_entropy_nats": 0.5323730323354667,
+          "standard_error_nats": 0.032540734143632545,
+          "min_nats": 0.005359530433036107,
+          "max_nats": 0.6922755308452949
+        },
+        {
+          "emission_count": 2,
+          "mean_radiation_entropy_nats": 0.44032774490803495,
+          "standard_error_nats": 0.03636620874200684,
+          "min_nats": 0.010915474217097517,
+          "max_nats": 0.6929024379450199
+        },
+        {
+          "emission_count": 3,
+          "mean_radiation_entropy_nats": 0.4032874840495291,
+          "standard_error_nats": 0.0384667124204956,
+          "min_nats": 0.03491368026528051,
+          "max_nats": 0.6931471305897383
+        },
+        {
+          "emission_count": 4,
+          "mean_radiation_entropy_nats": 0.43529271436806877,
+          "standard_error_nats": 0.03802787118369539,
+          "min_nats": 0.0008504918338138173,
+          "max_nats": 0.691546586704639
+        },
+        {
+          "emission_count": 5,
+          "mean_radiation_entropy_nats": 0.4420827531818077,
+          "standard_error_nats": 0.03731158611264512,
+          "min_nats": 0.015523603832564204,
+          "max_nats": 0.6913340737792115
+        },
+        {
+          "emission_count": 6,
+          "mean_radiation_entropy_nats": 0.3953588180794906,
+          "standard_error_nats": 0.03658144280952179,
+          "min_nats": 0.014610086934874485,
+          "max_nats": 0.6929284422072931
+        },
+        {
+          "emission_count": 7,
+          "mean_radiation_entropy_nats": 0.4322606679272916,
+          "standard_error_nats": 0.04005585131002241,
+          "min_nats": 0.022122032272452706,
+          "max_nats": 0.6929719907574248
+        },
+        {
+          "emission_count": 8,
+          "mean_radiation_entropy_nats": 0,
+          "standard_error_nats": 0,
+          "min_nats": 0,
+          "max_nats": 0
+        }
+      ],
+      "max_observed_norm_drift": 4.440892098500626e-16,
+      "max_observed_charge_expectation_drift": 1.7763568394002505e-15,
+      "interpretation": "The low-entropy initial condition produces nonzero first-emission entanglement and full-register purification at the final cut. The one-boundary-gate-per-step conveyor has modest entropy in this N=8,K=4 sample; it is not a Haar-equilibrated scrambler. A deeper per-emission scrambler should be a separately declared model."
+    }
+  },
+  "resource_limits": {
+    "maximum_total_qubits": 12,
+    "maximum_complementary_reduced_dimension": 64,
+    "note": "The bound ensures both sides of every nontrivial bipartition fit the current dense reduced-density-matrix backend."
+  },
+  "negative_controls": [
+    "replace a U(1)-conserving gate with an unrestricted Haar U(4) gate",
+    "apply a gate to a previously emitted radiation qubit",
+    "prepare a state with support outside the declared excitation sector",
+    "renormalize an evolved state after a deliberately non-unitary perturbation",
+    "report a Page-island or Hawking result from this circuit",
+    "seed_initial_state_in_Haar_fixed_charge_ensemble_when_claiming_low_entropy_initial_evaporation"
+  ],
+  "required_receipt": {
+    "fields": [
+      "source_sha",
+      "branch",
+      "seed",
+      "compiler_version",
+      "target_triple",
+      "cargo_options",
+      "sample_count",
+      "state_norm_drift",
+      "charge_drift",
+      "charge_variance",
+      "S_R_by_step",
+      "S_B_by_step",
+      "complementarity_residual_by_step",
+      "runtime",
+      "peak_memory",
+      "initial_excited_qubit_labels",
+      "initial_radiation_entropy",
+      "first_emission_entropy",
+      "late_complete_radiation_entropy"
+    ],
+    "ci_policy": "queued, missing, or skipped checks are not passes"
+  },
+  "implementation_status": "source_authored_smaller_complementary_reduction; exact-head Rust execution pending",
+  "numerics": {
+    "dense_reduced_dimension_max": 64,
+    "strategy": "At each pure B|R cut, materialize the smaller subsystem only; complementary nonzero Schmidt spectra imply equal entropies and purities.",
+    "equality_residual": "Report |S(R)-S(B)| and |Tr(rho_R^2)-Tr(rho_B^2)| using the computed smaller-side values.",
+    "no_over_cap_materialization": true
+  }
+}

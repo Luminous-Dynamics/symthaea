@@ -11,4 +11,7 @@ keywords = ["path-integral", "information-geometry", "dmrg", "tqft", "consciousn
 categories = ["science", "simulation"]
 
 [dependencies]
+num-complex = { workspace = true }
+rand = { workspace = true }
+rand_chacha = "0.3"
 serde = { version = "1.0", features = ["derive"] }
