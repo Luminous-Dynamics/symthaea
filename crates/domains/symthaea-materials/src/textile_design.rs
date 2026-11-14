@@ -836,6 +836,46 @@ mod tests {
         }
     }
 
+    fn nonwoven_structure() -> FabricStructure {
+        FabricStructure {
+            kind: FabricStructureKind::Nonwoven,
+            source_ref: Some("MILL-SPEC-NONWOVEN-01".to_owned()),
+            basis_weight_gsm: Some(80),
+            yarn_system: None,
+            yarn_count_tex: None,
+            weave_pattern: None,
+            warp_density_per_cm: None,
+            weft_density_per_cm: None,
+            interlacement_per_cm2: None,
+            knit_structure: None,
+            wales_per_cm: None,
+            courses_per_cm: None,
+            nonwoven_bonding: Some(NonwovenBonding::NeedlePunched),
+            lamination_method: None,
+            substrate_structure_ref: None,
+        }
+    }
+
+    fn laminated_structure() -> FabricStructure {
+        FabricStructure {
+            kind: FabricStructureKind::Laminated,
+            source_ref: Some("MILL-SPEC-LAMINATE-01".to_owned()),
+            basis_weight_gsm: Some(220),
+            yarn_system: None,
+            yarn_count_tex: None,
+            weave_pattern: None,
+            warp_density_per_cm: None,
+            weft_density_per_cm: None,
+            interlacement_per_cm2: None,
+            knit_structure: None,
+            wales_per_cm: None,
+            courses_per_cm: None,
+            nonwoven_bonding: None,
+            lamination_method: Some(LaminationMethod::Adhesive),
+            substrate_structure_ref: Some("FABRIC-STRUCTURE-SHELL-01".to_owned()),
+        }
+    }
+
     fn valid_dossier() -> TextileDesignDossier {
         TextileDesignDossier {
             product_id: "OVERSHIRT-01".to_owned(),
@@ -1098,6 +1138,40 @@ mod tests {
         );
     }
 
+    #[test]
+    fn nonwoven_opening_descriptor_requires_bonding_process() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        let mut structure = nonwoven_structure();
+        structure.nonwoven_bonding = None;
+        dossier.components[0].fabric_structure = Some(structure.clone());
+        dossier.components[1].fabric_structure = Some(structure);
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::FabricStructureMissingNonwovenBonding)
+        );
+    }
+
+    #[test]
+    fn laminated_opening_descriptor_requires_method_and_substrate_reference() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        let mut structure = laminated_structure();
+        structure.substrate_structure_ref = None;
+        dossier.components[0].fabric_structure = Some(structure.clone());
+        dossier.components[1].fabric_structure = Some(structure);
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::FabricStructureMissingLaminationDetails)
+        );
+    }
+
     fn exercise_design_case(case_id: &str) -> (&'static str, Option<&'static str>) {
         match case_id {
             "DESIGN-001-COMPLETE-MODULAR" => {
@@ -1175,6 +1249,14 @@ mod tests {
                 unknown_fabric_structure_is_not_promoted_by_opening_intent();
                 ("incomplete", Some("FabricStructureUnknown"))
             }
+            "DESIGN-019-NONWOVEN-BONDING-MISSING" => {
+                nonwoven_opening_descriptor_requires_bonding_process();
+                ("incomplete", Some("FabricStructureMissingNonwovenBonding"))
+            }
+            "DESIGN-020-LAMINATED-SUBSTRATE-MISSING" => {
+                laminated_opening_descriptor_requires_method_and_substrate_reference();
+                ("incomplete", Some("FabricStructureMissingLaminationDetails"))
+            }
             other => panic!("unknown textile design corpus case: {other}"),
         }
     }
@@ -1193,7 +1275,7 @@ mod tests {
         let schema: serde_json::Value =
             serde_json::from_str(SCHEMA).expect("design schema must parse as JSON");
         assert_eq!(schema["properties"]["schema_version"]["const"], "0.1.0");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(18));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(20));
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-DESIGN-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
@@ -1201,7 +1283,7 @@ mod tests {
         let cases = corpus["cases"]
             .as_array()
             .expect("design cases must be an array");
-        assert_eq!(cases.len(), 18, "review design corpus count changes");
+        assert_eq!(cases.len(), 20, "review design corpus count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"].as_str().expect("case_id must be a string");
@@ -1224,6 +1306,6 @@ mod tests {
             );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 18);
+        assert_eq!(seen.len(), 20);
     }
 }
