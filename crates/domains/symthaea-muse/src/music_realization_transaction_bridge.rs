@@ -306,7 +306,7 @@ fn domain_digest<T: Serialize>(
         .map_err(|_| MusicRealizationBridgeIssueV1::SerializationError)?;
     let mut hasher = Sha256::new();
     hasher.update(domain);
-    hasher.update(b"\\0");
+    hasher.update(b"\0");
     hasher.update(bytes);
     Ok(format!("{:x}", hasher.finalize()))
 }
@@ -1532,6 +1532,87 @@ mod tests {
         )
         .unwrap_err()
         .contains(&MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted));
+    }
+
+    #[test]
+    fn resealed_receipt_cannot_substitute_expected_capability_manifest() {
+        let bytes = b"candidate";
+        let output_sha = sha256_bytes(bytes);
+        let tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        let mut receipt = completed_receipt(&tx, bytes);
+        receipt.payload.capability_manifest_sha256 = d(88);
+        receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
+        assert!(verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes)
+        )
+        .unwrap_err()
+        .contains(&MusicRealizationBridgeIssueV1::ExpectedBindingMismatch(
+            "capability_manifest_sha256"
+        )));
+    }
+
+    #[test]
+    fn reconciled_completed_call_becomes_verified_without_a_second_submission() {
+        let bytes = b"candidate-resolved-by-status";
+        let output_sha = sha256_bytes(bytes);
+        let mut tx = transaction(
+            MusicEditAttemptOutcomeV1::CandidateReady,
+            Some(&output_sha),
+            bytes.len() as u64,
+            1,
+        );
+        let mut receipt = completed_receipt(&tx, bytes);
+        receipt.payload.execution_events = vec![
+            MusicRealizerExecutionEventV1 {
+                sequence: 1,
+                state: MusicRealizerExecutionEventStateV1::Submitted,
+                provider_request_id: Some("provider-request-001".to_owned()),
+                reconciles_sequence: None,
+                reconciliation_receipt_sha256: None,
+                reason_code: None,
+            },
+            MusicRealizerExecutionEventV1 {
+                sequence: 2,
+                state: MusicRealizerExecutionEventStateV1::OutcomeUnknown,
+                provider_request_id: Some("provider-request-001".to_owned()),
+                reconciles_sequence: None,
+                reconciliation_receipt_sha256: None,
+                reason_code: Some("client_timeout".to_owned()),
+            },
+            MusicRealizerExecutionEventV1 {
+                sequence: 3,
+                state: MusicRealizerExecutionEventStateV1::ReconciledCompleted,
+                provider_request_id: Some("provider-request-001".to_owned()),
+                reconciles_sequence: Some(2),
+                reconciliation_receipt_sha256: Some(d(89)),
+                reason_code: None,
+            },
+        ];
+        receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
+        let binding = verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes),
+        )
+        .unwrap();
+        assert_eq!(binding.submission_count, 1);
+        assert_eq!(
+            binding.final_execution_state,
+            MusicRealizerExecutionEventStateV1::ReconciledCompleted
+        );
+        let evidence = binding.to_evidence_record(&d(0x77)).unwrap();
+        attach_realization_evidence(&mut tx, evidence);
+        let decision = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(decision.payload.action, MusicEditDecisionActionV1::Accept);
     }
 
     #[test]
