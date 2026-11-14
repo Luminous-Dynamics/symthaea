@@ -292,6 +292,8 @@ pub struct RecoveryPolicy {
     pub max_unknown_fraction_ppm: u32,
     /// Maximum mass-balance expanded uncertainty as a share of input mass.
     pub max_mass_balance_uncertainty_ppm: u32,
+    /// Maximum relative expanded uncertainty permitted for the fibre-length measurement.
+    pub max_fibre_length_measurement_uncertainty_ppm: u32,
     /// Minimum fibre length required by the declared downstream spinning route.
     pub minimum_fibre_length_um: u32,
     /// Minimum recovered fibre mass fraction in bins meeting that length threshold.
@@ -303,6 +305,7 @@ impl RecoveryPolicy {
     pub fn validate(&self) -> bool {
         self.max_unknown_fraction_ppm <= FRACTION_SCALE_PPM as u32
             && self.max_mass_balance_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
+            && self.max_fibre_length_measurement_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
             && self.minimum_fibre_length_um > 0
             && self.minimum_mass_fraction_at_or_above_length_ppm <= FRACTION_SCALE_PPM as u32
     }
@@ -432,6 +435,8 @@ pub enum RouteReason {
     FibreLengthSampleExceedsOutput,
     /// Fibre-length sampling plan, replicate count or uncertainty declaration is invalid.
     InvalidFibreLengthMeasurementProtocol,
+    /// Fibre-length measurement uncertainty exceeds the receiving route policy.
+    FibreLengthMeasurementUncertaintyAbovePolicy,
     /// Measured fibre-length distribution fails the receiving route policy.
     FibreLengthBelowPolicy,
     /// Chemical compatibility trial is absent.
@@ -921,6 +926,11 @@ pub fn qualify_recovery_route(
                     if !protocol_valid {
                         reasons.push(RouteReason::InvalidFibreLengthMeasurementProtocol);
                     }
+                    if length.measurement_uncertainty_ppm
+                        > policy.max_fibre_length_measurement_uncertainty_ppm
+                    {
+                        reasons.push(RouteReason::FibreLengthMeasurementUncertaintyAbovePolicy);
+                    }
                     let sample_exceeds_output = bundle
                         .process_trial
                         .as_ref()
@@ -1058,6 +1068,7 @@ fn assessment(
                 | RouteReason::FibreLengthTrialBindingMismatch
                 | RouteReason::FibreLengthSampleExceedsOutput
                 | RouteReason::InvalidFibreLengthMeasurementProtocol
+                | RouteReason::FibreLengthMeasurementUncertaintyAbovePolicy
                 | RouteReason::InvalidChemicalCompatibilityEvidence
                 | RouteReason::InvalidDownstreamAcceptance
                 | RouteReason::DownstreamAcceptanceBindingMismatch
@@ -1107,6 +1118,7 @@ mod tests {
         RecoveryPolicy {
             max_unknown_fraction_ppm: 20_000,
             max_mass_balance_uncertainty_ppm: 10_000,
+            max_fibre_length_measurement_uncertainty_ppm: 50_000,
             minimum_fibre_length_um: 12_700,
             minimum_mass_fraction_at_or_above_length_ppm: 500_000,
         }
@@ -1512,6 +1524,25 @@ mod tests {
             result
                 .reasons
                 .contains(&RouteReason::FibreLengthSampleExceedsOutput)
+        );
+    }
+
+    #[test]
+    fn fibre_length_measurement_uncertainty_must_meet_receiving_policy() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.measurement_uncertainty_ppm = 60_000;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(
+            result
+                .reasons
+                .contains(&RouteReason::FibreLengthMeasurementUncertaintyAbovePolicy)
         );
     }
 
@@ -2017,6 +2048,10 @@ mod tests {
                 fibre_length_sample_mass_cannot_exceed_accepted_output_lot();
                 ("ineligible", Some("FibreLengthSampleExceedsOutput"))
             }
+            "ROUTE-039-FIBRE-LENGTH-UNCERTAINTY-ABOVE-POLICY" => {
+                fibre_length_measurement_uncertainty_must_meet_receiving_policy();
+                ("ineligible", Some("FibreLengthMeasurementUncertaintyAbovePolicy"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -2038,12 +2073,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(38));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(39));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 38, "review route corpus case count changes");
+        assert_eq!(cases.len(), 39, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"].as_str().expect("case_id must be a string");
@@ -2066,7 +2101,7 @@ mod tests {
             );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 38);
+        assert_eq!(seen.len(), 39);
     }
 
     #[test]
