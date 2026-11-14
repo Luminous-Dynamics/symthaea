@@ -1,0 +1,287 @@
+{
+  "schema": "luminous.airroad.mimo_active_excitation_reference.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_model_discrimination_reference",
+  "model_set": {
+    "identity": "sha256:finite-knot-hidden-crossport-model-pair-v0.1",
+    "models": [
+      "constant-diagonal-model",
+      "hidden-crossport-model"
+    ],
+    "difference_entry": {
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-b"
+    },
+    "delta_expression": "1000*(s^2+1)*(s^2+4)*(s^2+16)/(s+5)^7",
+    "valid_angular_frequency_domain_rad_s": {
+      "lower": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "4",
+        "denominator": "1"
+      }
+    }
+  },
+  "candidate_experiments": [
+    {
+      "candidate_id": "omega-1-full-mimo",
+      "angular_frequency_rad_s": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    {
+      "candidate_id": "omega-2-full-mimo",
+      "angular_frequency_rad_s": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    {
+      "candidate_id": "omega-3-full-mimo",
+      "angular_frequency_rad_s": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    {
+      "candidate_id": "omega-4-full-mimo",
+      "angular_frequency_rad_s": {
+        "numerator": "4",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    }
+  ],
+  "expected": {
+    "selected_candidate_id": "omega-3-full-mimo",
+    "no_guaranteed_discriminator_without_omega_3": true,
+    "off_grid_model_separation_squared": {
+      "numerator": "612500000",
+      "denominator": "410338673"
+    },
+    "diagonal_only_score_at_omega_3": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "wrong_driven_port_score_at_omega_3": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "missing_crossport_score_at_omega_3": {
+      "numerator": "0",
+      "denominator": "1"
+    }
+  },
+  "counterfactuals": {
+    "no_omega_3_candidate": [
+      "omega-1-full-mimo",
+      "omega-2-full-mimo",
+      "omega-4-full-mimo"
+    ],
+    "diagonal_only": {
+      "candidate_id": "omega-3-diagonal-only",
+      "angular_frequency_rad_s": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    "wrong_driven_port": {
+      "candidate_id": "omega-3-drive-a",
+      "angular_frequency_rad_s": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-a",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    "uncertainty_overlap": {
+      "candidate_id": "omega-3-wide-uncertainty",
+      "angular_frequency_rad_s": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    "out_of_domain": {
+      "candidate_id": "omega-5-out-of-domain",
+      "angular_frequency_rad_s": {
+        "numerator": "5",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": true
+    },
+    "not_approved": {
+      "candidate_id": "omega-3-not-approved",
+      "angular_frequency_rad_s": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_ids": [
+        "bus-a",
+        "bus-b"
+      ],
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "uncertainty_disk_radius": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "approved_under_protocol": false
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "only-measured-knots",
+      "expected": "no_guaranteed_discriminating_proposal"
+    },
+    {
+      "id": "diagonal-only-comparison",
+      "expected": "misses-crossport-difference"
+    },
+    {
+      "id": "wrong-driven-port",
+      "expected": "no-discrimination"
+    },
+    {
+      "id": "missing-crossport-observation",
+      "expected": "no-discrimination"
+    },
+    {
+      "id": "uncertainty-sets-overlap",
+      "expected": "not-guaranteed"
+    },
+    {
+      "id": "outside-model-frequency-domain",
+      "expected": "reject"
+    },
+    {
+      "id": "not-approved-experiment",
+      "expected": "reject"
+    },
+    {
+      "id": "missing-or-nonpositive-cost",
+      "expected": "reject"
+    },
+    {
+      "id": "duplicate-candidate-id",
+      "expected": "reject"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact-rational model-discrimination reference only.",
+    "Candidate selection is a non-authoritative experiment proposal, not a hardware command.",
+    "No physical excitation safety, information gain calibration, model completeness or aircraft qualification is claimed."
+  ]
+}
