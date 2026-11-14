@@ -167,13 +167,13 @@ A partial removal is not a successful complete removal. A closed mass balance is
 ### 5.4 Fibre opening and fibre quality
 The fibre-length distribution must be bound to the exact physical process trial and accepted output lot, and must record:
 - measurement method/standard and version;
-- a versioned sampling plan (sampling locations, subsampling, conditioning and specimen selection);
-- total sampled mass in milligrams;
+- a versioned sampling plan (sampling locations, subsampling, conditioning and specimen selection) with a SHA-256 digest of its exact bytes;
+- total sampled mass in milligrams, which cannot exceed the measured accepted output-lot mass;
 - number of independent subsamples/replicates represented;
-- expanded measurement uncertainty and the receiving-policy ceiling;
+- relative expanded measurement uncertainty in ppm, its coverage probability in ppm, and the receiving-policy ceiling;
 - exact accepted output lot ID and source trial evidence ID.
 
-A valid histogram summing to 1,000,000 ppm is not sufficient if its sampling plan is absent, the replicate count is zero, the measurement uncertainty exceeds the declared receiver limit, or the sample mass exceeds the accepted output-lot mass. Record repeatability and between-subsample variation separately when available; do not treat repeated reads of one specimen as independent physical samples.
+A valid histogram summing to 1,000,000 ppm is not sufficient if its sampling plan is absent or has no digest, the replicate count is zero, the coverage probability is missing, the measurement uncertainty exceeds the declared receiver limit, or the sample mass exceeds the accepted output-lot mass. Record repeatability and between-subsample variation separately when available; do not treat repeated reads of one specimen as independent physical samples. The synthetic contract does not prescribe a universal minimum replicate count or uncertainty ceiling: those are preregistered by the method and receiving process for each pilot.
 
 
 For each accepted fibre output lot, record:
