@@ -236,14 +236,14 @@ mod tests {
     #[test]
     fn non_granted_permission_cannot_allow_any_operation() {
         let mut value = fixture();
-        value["cases"][10]["permission"]["permitted_uses"] = json!(["cite"]);
+        value["cases"][9]["permission"]["permitted_uses"] = json!(["cite"]);
         assert!(audit_fixture(&value).is_err());
     }
 
     #[test]
     fn requested_protected_operation_must_be_explicitly_denied() {
         let mut value = fixture();
-        value["cases"][10]["permission"]["prohibited_uses"] =
+        value["cases"][9]["permission"]["prohibited_uses"] =
             json!(["read", "summarize", "translate", "train", "redistribute", "export"]);
         assert!(audit_fixture(&value).is_err());
     }
@@ -251,7 +251,7 @@ mod tests {
     #[test]
     fn rights_fixture_requires_governance_reference() {
         let mut value = fixture();
-        value["cases"][10]["permission"]["authority_reference"] = Value::Null;
+        value["cases"][9]["permission"]["authority_reference"] = Value::Null;
         assert!(audit_fixture(&value).is_err());
     }
 
