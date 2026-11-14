@@ -433,6 +433,71 @@ mod tests {
     }
 
     #[test]
+    fn vision_configuration_change_requires_a_new_manifest() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.vision_config_sha256 = "0".repeat(64);
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::VisionConfigMismatch));
+    }
+
+    #[test]
+    fn proprioceptive_encoder_change_requires_a_new_manifest() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.vehicle_encoder_seed_sha256 = "0".repeat(64);
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::EncoderSeedMismatch));
+    }
+
+    #[test]
+    fn fused_input_schema_change_requires_a_new_manifest() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.fused_input_schema_sha256 = "0".repeat(64);
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::InputSchemaMismatch));
+    }
+
+    #[test]
+    fn action_output_schema_change_requires_a_new_manifest() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.action_output_schema_sha256 = "0".repeat(64);
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::ActionSchemaMismatch));
+    }
+
+    #[test]
+    fn changed_hdc_dimension_is_rejected() {
+        let (mut manifest, bytes, input, scope) = fixture();
+        manifest.hdc_dimension = 8_192;
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::HdcDimensionMismatch));
+    }
+
+    #[test]
+    fn camera_learning_must_remain_frozen() {
+        let (manifest, bytes, mut input, scope) = fixture();
+        input.receipt.vision_training_steps_after = 1;
+        input.receipt.receipt_sha256 = crate::digest_receipt(&input.receipt);
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::VisionLearningNotFrozen));
+    }
+
+    #[test]
+    fn receipt_mutation_is_rejected_even_when_manifest_matches() {
+        let (manifest, bytes, mut input, scope) = fixture();
+        input.receipt.upstream_renderer_revision = "renderer-r2".into();
+        let error = manifest.validate_for(&bytes, &input, &scope);
+        assert_eq!(error, Err(CameraPolicyCompatibilityError::ReceiptCommitmentMismatch));
+    }
+
+    #[test]
+    fn manifest_rejects_unknown_json_fields() {
+        let (manifest, _, _, _) = fixture();
+        let mut value = serde_json::to_value(manifest).unwrap();
+        value["controller_authorized"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<CameraDrivingPolicyManifest>(value).is_err());
+    }
+
+    #[test]
     fn stale_bridge_delivery_is_rejected_before_policy_compatibility() {
         let (manifest, bytes, mut input, scope) = fixture();
         input.receipt.upstream_delivered_timestamp_us = 1_200;
