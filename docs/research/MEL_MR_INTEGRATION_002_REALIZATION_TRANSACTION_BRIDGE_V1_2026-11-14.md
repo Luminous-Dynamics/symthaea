@@ -300,3 +300,51 @@ The numerical thresholds above are research targets. Their use in a public claim
 ### 14.2 Reporting rule
 
 Publish a capability × operation × modality × renderer matrix. Report failures, partial outputs, unknown outcomes, abstentions and budget exhaustion in the denominator. A single aggregate score must not conceal a backend that performs well on easy generation but cannot execute a hard preservation obligation.
+
+
+## 15. Current generation-quality frontier: keep the comparison lanes separate
+
+A fresh 14 November 2026 capture of **Artificial Analysis AA-Music-Instrumental v1.1** lists the following leading blind-preference results:
+
+| Model | Elo | 95% interval | Samples |
+|---|---:|---:|---:|
+| Suno v6 | 1,148 | 1,126–1,170 | 2,208 |
+| Suno v6-mini | 1,114 | 1,093–1,135 | 2,332 |
+| Mureka V9.5 | 1,084 | 1,063–1,105 | 2,297 |
+| Mureka V9 | 1,083 | 1,062–1,104 | 2,322 |
+| Google Lyria 3 Pro | 1,080 | 1,059–1,101 | 2,329 |
+
+The board uses blind pairwise comparisons of samples generated from the same prompt and private evaluators. It is a useful external anchor for *instrumental generation preference*, not for precise editing, protected-content preservation, renderer provenance, rights safety or reciprocal collaboration. The ranking and sample counts should be snapshotted with the date and model IDs; do not blend this Elo with MMAE IFR/CR/EMR, SMEBench target/preservation metrics, CMI-RewardBench evaluator agreement or RMI-Bench causal interaction scores.
+
+- Official leaderboard: https://artificialanalysis.ai/music/leaderboard/instrumental
+- Methodology link from the leaderboard: https://artificialanalysis.ai/methodology/music
+
+### 15.1 Consequence for Melothaea's product and competitive strategy
+
+The correct objective is not to claim that a verification system can beat a generation model at generating songs. Split the product into three independently measured planes:
+
+1. **Creative quality plane:** prompt-matched, blind human preference for complete songs, instrumental generation, arrangement alternatives and live improvisation. Use MUSE-EVAL-IND-001 / #9453, with the public Arena methodology as a comparability reference. Report preference, ties, neither-acceptable, genre slices and confidence intervals.
+2. **Edit/control plane:** MMAE, SMEBench, EVAL-037/038 and renderer-bound tests. Measure exact instruction execution, preservation, edit validity, real-audio generalization and false acceptance. A high-preference whole-song model does not earn note-level preservation credit without demonstrating that capability.
+3. **Relationship/agency plane:** RMI-Bench / #10088 and MEL-013A / #10051. Measure causal contingency, contributor influence, branching, consent enforcement, recovery and musician ownership separately from whether a listener likes the final waveform.
+
+A generator may win plane 1 and still be an unsuitable executor for a hard edit. A conservative editor may win plane 2 and still be a poor creative partner. Melothaea should orchestrate both and expose the trade-offs rather than hide them in a single scalar score.
+
+### 15.2 Foundation-model leverage without foundation-model duplication
+
+The July 2026 Qwen-Music technical report describes a three-part stack (semantic tokenizer, autoregressive semantic model with melody-token planning, and generative stereo renderer), trained on more than five million hours; the authors report leading results on 13 of 16 objective music/audio metrics across 600 Chinese/English prompts and preference wins against leading proprietary systems. These are author-reported results, not an independent reproduction or an editing qualification. The architectural lesson is useful: separate semantic planning, long-range musical structure and high-fidelity acoustic realization. Melothaea should consume such capabilities through the replaceable realization boundary rather than attempt to clone a foundation model before the editing/verification infrastructure is working.
+
+- Qwen-Music Technical Report (13 July 2026): https://arxiv.org/abs/2607.11699
+
+For the first product, the best combination is likely a strong external generator for high-level exploration, local symbolic/MIDI realizers for exact operations, and an independent transaction/evidence system that determines which candidates are safe and valid. Use each backend only on tasks whose capability manifest and observed controls support them.
+
+### 15.3 Revised competitive success criterion
+
+Melothaea is competitive when it can demonstrate, on matched tasks:
+
+- generation quality within the leading human-preference range when using qualified backends, without falsely attributing the backend's Elo to Melothaea;
+- materially better instruction execution and preservation on supported edit tasks than full regeneration or a provider-native workflow;
+- fewer renders and lower time/cost per *verified* acceptance at the same false-acceptance and collateral-change risk;
+- transferable provenance, consent and explicit commit authority across independent tools;
+- causal collaboration and durable authorship/branch lineage that a one-shot generation leaderboard does not measure.
+
+The defensible claim is therefore **best available creative backend + strongest independently verified editing/collaboration workflow**, not a single universal “best music model.”
