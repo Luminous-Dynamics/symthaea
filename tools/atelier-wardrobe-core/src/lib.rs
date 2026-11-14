@@ -276,7 +276,7 @@ pub fn search_exact(
             .newly_manufactured_items
             .cmp(&right.metrics.newly_manufactured_items)
             .then(left.metrics.added_items.cmp(&right.metrics.added_items))
-            .then(left.metrics.cost_cents.cmp(&right.metrics.cost_cents))
+            .then(left.metrics.cost_minor_units.cmp(&right.metrics.cost_minor_units))
             .then(left.metrics.effort_minutes.cmp(&right.metrics.effort_minutes))
             .then(left.metrics.selected_choices.cmp(&right.metrics.selected_choices))
             .then(left.selected_choice_ids.cmp(&right.selected_choice_ids))
@@ -343,7 +343,7 @@ fn add_choice_metrics(
         .ok_or(WardrobeError::ArithmeticOverflow)?;
     metrics.cost_minor_units = metrics
         .cost_minor_units
-        .checked_add(choice.cost_cents)
+        .checked_add(choice.cost_minor_units)
         .ok_or(WardrobeError::ArithmeticOverflow)?;
     metrics.effort_minutes = metrics
         .effort_minutes
@@ -396,6 +396,7 @@ mod tests {
             covers_need_ids: covers.iter().map(|value| (*value).to_owned()).collect(),
             origin,
             cost_minor_units,
+            currency_code: "ZAR".to_owned(),
             effort_minutes,
             usable: true,
             must_keep: false,
