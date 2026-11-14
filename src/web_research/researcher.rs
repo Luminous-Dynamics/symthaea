@@ -10,7 +10,7 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::collections::HashSet;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::extractor::{ContentExtractor, ContentType};
 use super::types::{
@@ -30,6 +30,8 @@ pub struct WebResearcher {
     extractor: ContentExtractor,
     /// Epistemic verifier
     verifier: EpistemicVerifier,
+    /// Serialize arXiv requests and enforce the provider's recommended spacing.
+    arxiv_rate_limiter: tokio::sync::Mutex<Instant>,
 }
 
 /// Build a bounded arXiv query that combines exact title/abstract phrase
@@ -133,6 +135,9 @@ impl WebResearcher {
             client,
             extractor: ContentExtractor::new(),
             verifier: EpistemicVerifier::new(),
+            arxiv_rate_limiter: tokio::sync::Mutex::new(
+                Instant::now() - Duration::from_secs(3),
+            ),
         })
     }
 
@@ -571,6 +576,16 @@ impl WebResearcher {
             self.config.arxiv_endpoint, encoded_query, sort_by, sort_order
         );
 
+        {
+            let mut last_request = self.arxiv_rate_limiter.lock().await;
+            let minimum_interval = Duration::from_secs(3);
+            let elapsed = last_request.elapsed();
+            if elapsed < minimum_interval {
+                tokio::time::sleep(minimum_interval - elapsed).await;
+            }
+            *last_request = Instant::now();
+        }
+
         let response = self
             .client
             .get(url)
@@ -933,7 +948,8 @@ mod tests {
         )
         .unwrap();
         assert!(query.len() < 400);
-        assert!(query.contains("all:long AND all:neural AND all:dynamics AND all:hyperdimensional"));
+        assert!(query.contains("all:long AND all:prompt AND all:neural AND all:dynamics"));
+        assert!(query.contains("hyperdimensional representations"));
         assert!(!query.contains("additional"));
     }
 
