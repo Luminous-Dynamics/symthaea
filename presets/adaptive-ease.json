@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "preset_id": "adaptive-ease",
+  "name": "Adaptive Ease",
+  "revision": 1,
+  "compatible_families": ["top", "bottom", "outerwear", "dress", "one_piece", "adaptive"],
+  "intent_defaults": {
+    "description": "A garment starting point for user-defined dressing, mobility, posture and sensory requirements.",
+    "style_tags": ["adaptive", "dignified", "comfortable", "user-directed"],
+    "silhouette": "User-defined; no assumed body or mobility profile",
+    "component_defaults": {"closure": "User-selectable magnetic, loop, zipper, snap, tie or conventional closure subject to material and safety review", "opening": "Adjustable opening placement", "seams": "User-selectable seam placement and finish", "access": "Optional seated access and task-specific reach"},
+    "fit_intent": "user_defined"
+  },
+  "objective_defaults": [
+    {"metric": "sensory_accessibility", "direction": "maximize", "weight": 100},
+    {"metric": "comfort_preference", "direction": "maximize", "weight": 100},
+    {"metric": "fit_preference", "direction": "maximize", "weight": 95},
+    {"metric": "durability", "direction": "maximize", "weight": 70},
+    {"metric": "appearance_preference", "direction": "maximize", "weight": 85}
+  ],
+  "hard_constraints": [],
+  "accessibility_defaults": ["Ask the wearer which tasks and postures matter; do not infer disability or diagnosis.", "Test closure operation with the intended user and use context.", "Allow seated and standing fit views where relevant."],
+  "circularity_defaults": ["Prefer replaceable closures and components when they improve maintainability without compromising user needs."],
+  "manufacturing_defaults": {"preferred_route": "local_maker", "allowed_operations": []},
+  "caveats": ["Adaptive features require wearer-led evaluation; this preset is not a clinical or medical recommendation.", "Closure suitability, skin contact, load capacity and safety must be evaluated for the selected garment and use."]
+}
