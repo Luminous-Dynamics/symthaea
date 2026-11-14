@@ -326,6 +326,12 @@ pub fn parse_musicxml_part_notation_events(
     if part_id.trim().is_empty() {
         return unknown(part_id, "empty MusicXML part identity");
     }
+    if !part.has_tag_name("part") || part.attribute("id") != Some(part_id) {
+        return unknown(
+            part_id,
+            "supplied part identity does not match the source MusicXML part locator",
+        );
+    }
     match parse_part_events(part, part_id, measure_spans) {
         Ok((note_events, attribute_events, auxiliary_events, cursor_moves)) => MusicXmlPartNotationEventsV1 {
             schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
@@ -1227,6 +1233,78 @@ mod tests {
             parse(xml).status,
             MusicXmlNotationEventsStatusV1::Unknown { .. }
         ));
+    }
+
+
+    #[test]
+    fn part_metadata_preserves_score_instrument_and_midi_setup() {
+        let xml = r#"<score-partwise>
+            <part-list>
+                <score-part id="P1">
+                    <part-name>Violin I</part-name>
+                    <part-abbreviation>Vln. I</part-abbreviation>
+                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
+                    <midi-device>Port A</midi-device>
+                    <midi-instrument id="P1-I1">
+                        <midi-channel>1</midi-channel>
+                        <midi-program>41</midi-program>
+                        <volume>86</volume>
+                    </midi-instrument>
+                </score-part>
+            </part-list>
+            <part id="P1"><measure number="1"/></part>
+        </score-partwise>"#;
+        let document = roxmltree::Document::parse(xml).unwrap();
+        let root = document.root_element();
+        let metadata = parse_musicxml_part_metadata(root, "P1").unwrap().unwrap();
+        assert_eq!(metadata.source_part_id, "P1");
+        assert_eq!(metadata.part_name.as_deref(), Some("Violin I"));
+        assert_eq!(metadata.part_abbreviation.as_deref(), Some("Vln. I"));
+        assert_eq!(metadata.score_instrument_ids, vec!["P1-I1"]);
+        let midi = metadata.source_score_part.children.iter()
+            .find(|node| node.element == "midi-instrument").unwrap();
+        assert_eq!(
+            midi.children.iter().find(|node| node.element == "midi-program")
+                .and_then(|node| node.text.as_deref()),
+            Some("41")
+        );
+        assert!(metadata.source_score_part.children.iter()
+            .any(|node| node.element == "midi-device"));
+    }
+
+    #[test]
+    fn missing_or_duplicate_part_metadata_is_not_guessed() {
+        let without_part_list = roxmltree::Document::parse(
+            r#"<score-partwise><part id="P1"><measure/></part></score-partwise>"#
+        ).unwrap();
+        assert_eq!(
+            parse_musicxml_part_metadata(without_part_list.root_element(), "P1").unwrap(),
+            None
+        );
+
+        let duplicate = roxmltree::Document::parse(
+            r#"<score-partwise><part-list>
+                <score-part id="P1"><part-name>One</part-name></score-part>
+                <score-part id="P1"><part-name>Two</part-name></score-part>
+            </part-list><part id="P1"/></score-partwise>"#
+        ).unwrap();
+        assert!(parse_musicxml_part_metadata(duplicate.root_element(), "P1").is_err());
+    }
+
+    #[test]
+    fn notation_event_parser_rejects_a_mismatched_source_part_id() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let document = roxmltree::Document::parse(xml).unwrap();
+        let part = document.root_element().children()
+            .find(|node| node.has_tag_name("part")).unwrap();
+        let events = parse_musicxml_part_notation_events(
+            part, "forged-part-id", &[span((0, 1), (4, 1))]
+        );
+        assert!(matches!(events.status, MusicXmlNotationEventsStatusV1::Unknown { .. }));
+        assert!(events.note_events.is_empty());
     }
 
 }
