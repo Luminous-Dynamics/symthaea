@@ -3302,6 +3302,11 @@ impl U1TeBDLayer {
             let global_l2_error_bound_after_gate =
                 truncation_ledger.global_state_error_bound_upper;
             let local_projection_error_upper_bound = truncation.discarded_weight.sqrt();
+            let hamiltonian_projection_operator_error_upper_bound =
+                entry.gate.hamiltonian_projection_error_operator_upper_bound();
+            let hamiltonian_projection_error_upper_bound =
+                hamiltonian_projection_operator_error_upper_bound
+                    * gauge_receipt.output_norm_squared.sqrt();
             state.tensors[bond] = truncation.left_tensor.clone();
             state.tensors[bond + 1] = truncation.right_tensor.clone();
             state = ComplexU1Mps::new(state.tensors.clone(), input_total_charge, policy.tolerance)?;
@@ -3317,13 +3322,8 @@ impl U1TeBDLayer {
                 global_l2_error_contribution,
                 global_l2_error_bound_after_gate,
                 global_projection_error_upper_bound,
-                hamiltonian_projection_operator_error_upper_bound: entry
-                    .gate
-                    .hamiltonian_projection_error_operator_upper_bound(),
-                hamiltonian_projection_error_upper_bound: entry
-                    .gate
-                    .hamiltonian_projection_error_operator_upper_bound()
-                    * gauge_receipt.output_norm_squared.sqrt(),
+                hamiltonian_projection_operator_error_upper_bound,
+                hamiltonian_projection_error_upper_bound,
             });
             gate_truncations.push(truncation);
         }
