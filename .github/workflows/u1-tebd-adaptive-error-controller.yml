@@ -6,13 +6,13 @@ on:
       - research/u1-tebd-adaptive-error-controller-20261114
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
-      - .github/workflows/u1-tebd-strang-stepper.yml
+      - .github/workflows/u1-tebd-adaptive-error-controller.yml
   pull_request:
     branches:
-      - research/u1-tebd-adaptive-error-controller-20261113
+      - research/u1-tebd-strang-stepper-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
-      - .github/workflows/u1-tebd-strang-stepper.yml
+      - .github/workflows/u1-tebd-adaptive-error-controller.yml
 
 permissions:
   contents: read
