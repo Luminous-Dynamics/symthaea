@@ -858,7 +858,18 @@ pub fn evaluate_partial_identification(
         push_finding(&mut findings, PartialIdentificationFindingCode::TooManySelectedExperiments,
             None, None, "selected experiment set exceeds trial budget");
     }
-    if unresolved {
+
+    // Invalid selections and budget violations remain hard failures even if
+    // another trial also has unavailable evidence; uncertainty cannot mask a
+    // non-compensatory resource-contract violation.
+    if findings.iter().any(|finding| matches!(
+        finding.code,
+        PartialIdentificationFindingCode::UnknownSelectedExperiment
+            | PartialIdentificationFindingCode::DuplicateSelectedExperiment
+            | PartialIdentificationFindingCode::CostBudgetExceeded
+            | PartialIdentificationFindingCode::RiskBudgetExceeded
+            | PartialIdentificationFindingCode::TooManySelectedExperiments
+    )) {
         return PartialIdentificationReport {
             qualification: PartialIdentificationQualification::Inconclusive,
             decision_quality: None,
@@ -884,40 +895,8 @@ pub fn evaluate_partial_identification(
         };
     }
 
-    if findings.iter().any(|finding| matches!(
-        finding.code,
-        PartialIdentificationFindingCode::UnknownSelectedExperiment
-            | PartialIdentificationFindingCode::DuplicateSelectedExperiment
-            | PartialIdentificationFindingCode::CostBudgetExceeded
-            | PartialIdentificationFindingCode::RiskBudgetExceeded
-            | PartialIdentificationFindingCode::TooManySelectedExperiments
-    )) {
-        return PartialIdentificationReport {
-            qualification: PartialIdentificationQualification::NotQualified,
-            decision_quality: None,
-            exact_identified_bounds: None,
-            declared_bounds: trace.declared_bounds,
-            selected_experiment_count: selected_ids.len(),
-            total_cost_units: total_cost,
-            total_risk_units: total_risk,
-            possible_worlds_before: oracle.admissible_worlds.len(),
-            possible_worlds_after: 0,
-            guaranteed_potency: None,
-            optimal_guaranteed_potency: None,
-            guaranteed_potency_regret: None,
-            normalized_potency_regret: None,
-            selected_experiment_ids: selected_ids.into_iter().collect(),
-            oracle_optimal_experiment_ids: Vec::new(),
-            zero_potency_experiment_count: 0,
-            selected_zero_potency_count: 0,
-            path_interception_candidate_count: 0,
-            path_interception_confirmed_count: 0,
-            path_interception_disagreement_count: 0,
-            findings,
-        };
-    }
-
-    let selected_vec = selected_ids.iter().cloned().collect::<Vec<_>>();
+    if unresolved {
+        return PartialIdentificationReport {    let selected_vec = selected_ids.iter().cloned().collect::<Vec<_>>();
     let selection_potency = guaranteed_potency(
         &oracle.admissible_worlds,
         scenario.initial_bounds,
@@ -1294,6 +1273,26 @@ mod tests {
         );
         assert_eq!(report.qualification, PartialIdentificationQualification::NotQualified);
         assert!(report.findings.iter().any(|f| f.code == PartialIdentificationFindingCode::UnsafeActDecision));
+    }
+
+    #[test]
+    fn budget_violation_is_not_hidden_by_unavailable_evidence() {
+        let (mut scenario, oracle) = scenario();
+        scenario.budget.max_risk_units = 0;
+        let mut observation = trial("probe-a", "constant");
+        observation.delivery = ExperimentEvidenceStatus::Unavailable;
+        let trace = PartialIdentificationTrace {
+            trials: vec![observation],
+            declared_bounds: EffectInterval::new(-2, 3),
+            decision: RobustDecision::Defer,
+        };
+        let report = evaluate_partial_identification(
+            &scenario, &oracle, &trace, &PartialIdentificationPolicy::default(),
+        );
+        assert_eq!(report.qualification, PartialIdentificationQualification::NotQualified);
+        assert!(report.findings.iter().any(|f| {
+            f.code == PartialIdentificationFindingCode::RiskBudgetExceeded
+        }));
     }
 
     #[test]
