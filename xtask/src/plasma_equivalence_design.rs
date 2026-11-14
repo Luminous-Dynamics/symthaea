@@ -626,12 +626,13 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
                 }
             }
         }
-        let cluster_ids = |cohort: &HashMap<&str, &str>| -> HashSet<&str> {
-            cohort.values().copied().collect()
-        };
-        if cluster_ids(baseline_unaged) != cluster_ids(baseline_aged)
-            || cluster_ids(candidate_unaged) != cluster_ids(candidate_aged)
-            || !cluster_ids(baseline_aged).is_disjoint(&cluster_ids(candidate_aged))
+        let baseline_unaged_clusters: HashSet<&str> = baseline_unaged.values().copied().collect();
+        let candidate_unaged_clusters: HashSet<&str> = candidate_unaged.values().copied().collect();
+        let baseline_aged_clusters: HashSet<&str> = baseline_aged.values().copied().collect();
+        let candidate_aged_clusters: HashSet<&str> = candidate_aged.values().copied().collect();
+        if baseline_unaged_clusters != baseline_aged_clusters
+            || candidate_unaged_clusters != candidate_aged_clusters
+            || !baseline_aged_clusters.is_disjoint(&candidate_aged_clusters)
         {
             return rejected("four-cohort retention design does not preserve within-arm lot pairing and between-arm independence");
         }
