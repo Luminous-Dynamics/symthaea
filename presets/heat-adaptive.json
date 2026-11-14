@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "preset_id": "heat-adaptive",
+  "name": "Heat-Adaptive",
+  "revision": 1,
+  "compatible_families": ["top", "bottom", "outerwear", "dress", "one_piece", "workwear"],
+  "intent_defaults": {
+    "description": "A warm-weather garment concept that explores ventilation, low bulk, movement and user-selected coverage.",
+    "style_tags": ["lightweight-look", "ventilated-design", "climate-aware", "user-directed"],
+    "silhouette": "User-adjustable relaxed fit with editable ventilation zones",
+    "component_defaults": {"neckline": "Open or adjustable neckline", "sleeves": "Sleeve length chosen by wearer", "ventilation": "Optional vents or breathable panel placement", "coverage": "User-controlled"},
+    "fit_intent": "relaxed"
+  },
+  "objective_defaults": [
+    {"metric": "breathability", "direction": "maximize", "weight": 100},
+    {"metric": "comfort_preference", "direction": "maximize", "weight": 95},
+    {"metric": "thermal_suitability", "direction": "maximize", "weight": 90},
+    {"metric": "affordability", "direction": "minimize", "weight": 65},
+    {"metric": "durability", "direction": "maximize", "weight": 70}
+  ],
+  "hard_constraints": [],
+  "accessibility_defaults": ["Coverage, ventilation placement and sleeve geometry must remain editable."],
+  "circularity_defaults": ["Prefer construction that permits replacement of high-wear panels."],
+  "manufacturing_defaults": {"preferred_route": "unknown", "allowed_operations": []},
+  "caveats": ["The name describes design intent, not measured cooling or heat-stress protection.", "Breathability and thermal performance must be measured on the selected fabric and finished garment."]
+}
