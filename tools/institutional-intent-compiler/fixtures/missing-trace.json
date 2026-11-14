@@ -1,0 +1,17 @@
+{
+  "schema_version":"0.1","brief_id":"synthetic-brief-002","baseline_version":1,
+  "sources":[],"derivations":[],
+  "requirements":[{
+    "id":"REQ-002","statement":"The institution shall retain an approved record.",
+    "class":"operational","declared_modality":"mandatory","proposed_modality":"mandatory","lifecycle":"accepted",
+    "traceability":{"source_spans":[],"derivation_ref":null},
+    "verification":{"method":"test","acceptance_condition":"A synthetic retention test passes.","limitation":null},
+    "owner":{"system":"mycelix","reference":"records-owner"},
+    "links":[],"review_decision_ref":"DEC-002","modality_change_decision_ref":null,"unverifiable_exception_decision_ref":null
+  }],
+  "decisions":[{
+    "id":"DEC-002","subject_type":"requirement","subject_id":"REQ-002","action":"accept",
+    "reviewer_ref":"reviewer:synthetic-01","authority_profile_ref":"profile:synthetic-review-v1",
+    "baseline_version":1,"rationale":"Synthetic acceptance."
+  }]
+}

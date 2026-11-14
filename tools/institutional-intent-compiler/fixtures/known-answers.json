@@ -1,0 +1,76 @@
+{
+  "corpus_version": "0.1",
+  "oracle_scope": "Independent structural subset: source-span existence/bounds, accepted trace/review decisions, modality-change approvals, accepted dependencies, and nonempty requirement sets. This is not a semantic-quality or legal-authority oracle.",
+  "cases": [
+    {
+      "id": "IIC-001",
+      "file": "valid.json",
+      "expected_status": "STRUCTURALLY_VALID",
+      "expected_diagnostics": []
+    },
+    {
+      "id": "IIC-002",
+      "file": "missing-trace.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "accepted_without_trace"
+      ]
+    },
+    {
+      "id": "IIC-003",
+      "file": "unapproved-modality.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "missing_decision"
+      ]
+    },
+    {
+      "id": "IIC-004",
+      "file": "unreviewed-acceptance.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "missing_decision"
+      ]
+    },
+    {
+      "id": "IIC-005",
+      "file": "unknown-source.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "unknown_source"
+      ]
+    },
+    {
+      "id": "IIC-006",
+      "file": "span-out-of-bounds.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "invalid_source_span"
+      ]
+    },
+    {
+      "id": "IIC-007",
+      "file": "empty-requirements.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "empty_requirements"
+      ]
+    },
+    {
+      "id": "IIC-008",
+      "file": "dependency-unaccepted.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "accepted_dependency_not_accepted"
+      ]
+    },
+    {
+      "id": "IIC-009",
+      "file": "stale-decision.json",
+      "expected_status": "REJECTED",
+      "expected_diagnostics": [
+        "decision_baseline_mismatch"
+      ]
+    }
+  ]
+}

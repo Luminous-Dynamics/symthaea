@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.1",
+  "brief_id": "synthetic-brief-007",
+  "baseline_version": 1,
+  "sources": [
+    {
+      "id": "brief",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byte_length": 100,
+      "classification": "public"
+    }
+  ],
+  "derivations": [],
+  "requirements": [],
+  "decisions": [
+    {
+      "id": "DEC-001",
+      "subject_type": "requirement",
+      "subject_id": "REQ-001",
+      "action": "accept",
+      "reviewer_ref": "reviewer:synthetic-01",
+      "authority_profile_ref": "profile:synthetic-review-v1",
+      "baseline_version": 1,
+      "rationale": "Accepted in synthetic fixture."
+    }
+  ]
+}
