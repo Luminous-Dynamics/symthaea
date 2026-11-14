@@ -167,6 +167,7 @@ fn audit_profile(case: &Case) -> Decision {
                 matches!(role.method_id.as_str(), "ASTM_D5573" | "ISO_10365")
                     && role.evidence_kind == "classification_practice"
                     && role.geometry == "failure_surface_classification"
+                    && (role.method_id != "ASTM_D5573" || content.material_pair_class == "frp_smc_joint")
             }),
             "adhesive_constitutive_response" => claim.roles.iter().all(|role| {
                 role.method_id == "ASTM_D5656_D5656M"
