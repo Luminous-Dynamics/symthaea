@@ -112,6 +112,12 @@ pub struct ObservationalViewPolicy {
     pub column_policies: BTreeMap<IdentificationRegime, RegimeColumnPolicy>,
     /// Names are canonicalized to ASCII lowercase before checking.
     pub forbidden_columns: BTreeSet<String>,
+    /// These variables must contain identical row-aligned values in every
+    /// context view (the upstream CausalIDView contract uses X, T and Y).
+    pub shared_context_columns: BTreeSet<String>,
+    /// These variables must contain identical row-aligned values in every
+    /// query view (the upstream contract uses X).
+    pub shared_query_columns: BTreeSet<String>,
     pub require_identical_context_ids: bool,
     pub require_identical_query_ids: bool,
     pub require_context_query_disjointness: bool,
@@ -178,6 +184,8 @@ impl Default for ObservationalViewPolicy {
             .into_iter()
             .map(str::to_owned)
             .collect(),
+            shared_context_columns: ["X", "T", "Y"].into_iter().map(str::to_owned).collect(),
+            shared_query_columns: ["X"].into_iter().map(str::to_owned).collect(),
             require_identical_context_ids: true,
             require_identical_query_ids: true,
             require_context_query_disjointness: true,
@@ -217,6 +225,9 @@ pub enum ObservationalViewFindingCode {
     EmptyColumnVector,
     ColumnDimensionMismatch,
     NonFiniteObservedValue,
+    CrossViewColumnDimensionMismatch,
+    SharedContextColumnValueMismatch,
+    SharedQueryColumnValueMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -445,6 +456,9 @@ pub fn validate_matched_observational_views(
     let common_estimand_digest = first.map(|view| view.estimand_digest);
     let common_context_ids = first.map(|view| view.context.unit_ids.as_slice());
     let common_query_ids = first.map(|view| view.query.unit_ids.as_slice());
+    let mut shared_context_values: BTreeMap<String, Vec<Vec<f64>>> = BTreeMap::new();
+    let mut shared_query_values: BTreeMap<String, Vec<Vec<f64>>> = BTreeMap::new();
+    let mut common_column_dimensions: BTreeMap<String, usize> = BTreeMap::new();
 
     for view in &matched.views {
         if Some(view.scm_digest) != common_scm_digest {
@@ -545,6 +559,56 @@ pub fn validate_matched_observational_views(
             true,
             &mut findings,
         );
+
+        for (table, is_query) in [(&view.context, false), (&view.query, true)] {
+            for (name, rows) in &table.columns {
+                if let Some(width) = rows.first().map(Vec::len) {
+                    let key = canonical(name);
+                    if common_column_dimensions.get(&key).is_some_and(|existing| *existing != width) {
+                        push_finding(
+                            &mut findings,
+                            ObservationalViewFindingCode::CrossViewColumnDimensionMismatch,
+                            Some(view.regime),
+                            Some(name.clone()),
+                            "a shared variable has different vector dimensions across views or splits",
+                        );
+                    } else {
+                        common_column_dimensions.entry(key).or_insert(width);
+                    }
+                }
+
+                let shared = if is_query {
+                    policy.shared_query_columns.contains(name)
+                } else {
+                    policy.shared_context_columns.contains(name)
+                };
+                if !shared {
+                    continue;
+                }
+                let reference = if is_query {
+                    &mut shared_query_values
+                } else {
+                    &mut shared_context_values
+                };
+                if let Some(existing) = reference.get(name) {
+                    if existing != rows {
+                        push_finding(
+                            &mut findings,
+                            if is_query {
+                                ObservationalViewFindingCode::SharedQueryColumnValueMismatch
+                            } else {
+                                ObservationalViewFindingCode::SharedContextColumnValueMismatch
+                            },
+                            Some(view.regime),
+                            Some(name.clone()),
+                            "row-aligned values of a shared column differ across observational views",
+                        );
+                    }
+                } else {
+                    reference.insert(name.clone(), rows.clone());
+                }
+            }
+        }
     }
 
     let validated_regime_count = by_regime.len();
@@ -737,6 +801,48 @@ mod tests {
         }));
         assert!(report.findings.iter().any(|finding| {
             finding.code == ObservationalViewFindingCode::NonFiniteObservedValue
+        }));
+    }
+
+    #[test]
+    fn shared_context_values_must_remain_identical_across_views() {
+        let mut matched = matched();
+        matched.views[2].context.columns.get_mut("X").unwrap()[0][0] = 999.0;
+        let report = validate_matched_observational_views(
+            &matched,
+            &ObservationalViewPolicy::default(),
+        );
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == ObservationalViewFindingCode::SharedContextColumnValueMismatch
+        }));
+    }
+
+    #[test]
+    fn shared_query_values_must_remain_identical_across_views() {
+        let mut matched = matched();
+        matched.views[3].query.columns.get_mut("X").unwrap()[1][0] = 999.0;
+        let report = validate_matched_observational_views(
+            &matched,
+            &ObservationalViewPolicy::default(),
+        );
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == ObservationalViewFindingCode::SharedQueryColumnValueMismatch
+        }));
+    }
+
+    #[test]
+    fn shared_variable_dimensions_must_match_across_views() {
+        let mut matched = matched();
+        matched.views[1].query.columns.insert(
+            "X".into(),
+            vec![vec![0.1, 0.2], vec![0.3, 0.4]],
+        );
+        let report = validate_matched_observational_views(
+            &matched,
+            &ObservationalViewPolicy::default(),
+        );
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == ObservationalViewFindingCode::CrossViewColumnDimensionMismatch
         }));
     }
 
