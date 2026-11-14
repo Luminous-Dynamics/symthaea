@@ -7,12 +7,14 @@ It is an integration contract, not another fusion system code. It does not repla
 ## Initial capabilities
 
 - Candidate and objective identity checks.
-- Explicit energy-service boundary admission.
+- Exact solver-run binding to candidate revision and geometry digest.
+- Explicit energy-service boundary admission, resolved to the exact evidence record consumed by the energy hard gate.
 - Required hard-gate evaluation for energy, material, manufacturing, inspection, assembly and replacement.
 - Solver capability, regime, observable, applicability, execution and convergence checks.
 - Explicit distinction between blocked and indeterminate candidates.
 - Evidence-to-claim class and revision/scope binding.
-- Pairwise solver dependence classification across declared dataset, code and assumption groups.
+- Pairwise solver dependence classification across declared dataset, code and assumption groups; empty or missing dependency identities remain unknown.
+- Deterministic transitive invalidation of downstream dependency nodes.
 - Transitive dependency invalidation after upstream changes.
 - Fixed claim ceiling: eligible candidates are only eligible for further engineering review.
 
@@ -26,7 +28,7 @@ A hard failure takes precedence over an unknown. Missing evidence is never treat
 
 ## Evidence classes
 
-A claim must cite evidence with an exact compatible class and the same subject revision. Synthetic fixtures cannot support measured, independently verified or physically qualified claims. A digest string is an identity declaration; the crate does not fetch or hash arbitrary source payloads.
+A claim must cite evidence with an exact compatible class and the same subject revision. Synthetic fixtures cannot support measured, independently verified or physically qualified claims. A digest string is an identity declaration; the crate does not fetch or hash arbitrary source payloads. Solver run records must bind the exact candidate revision and geometry, but source-byte verification remains the responsibility of a separate payload verifier.
 
 ## Solver dependence
 
