@@ -38,6 +38,7 @@ struct ObservationNode {
 #[serde(deny_unknown_fields)]
 struct AnalysisReceipt {
     result_id: String,
+    graph_id: String,
     result_sha256: String,
     design_id: String,
     design_sha256: String,
@@ -332,8 +333,16 @@ fn validate_aged_retention(nodes: &[&ObservationNode]) -> std::result::Result<()
         }
     }
 
-    if ba.aging_exposure.as_ref().map(|x| (&x.profile_id, &x.conditions_sha256))
-        != ca.aging_exposure.as_ref().map(|x| (&x.profile_id, &x.conditions_sha256))
+    let base_exposure = ba.aging_exposure.as_ref().ok_or(Disposition::Blocked)?;
+    let candidate_exposure = ca.aging_exposure.as_ref().ok_or(Disposition::Blocked)?;
+    if base_exposure.profile_id != candidate_exposure.profile_id
+        || base_exposure.protocol_id != candidate_exposure.protocol_id
+        || base_exposure.protocol_sha256 != candidate_exposure.protocol_sha256
+        || base_exposure.conditions_sha256 != candidate_exposure.conditions_sha256
+        || !close(base_exposure.temperature_c, candidate_exposure.temperature_c)
+        || !close(base_exposure.relative_humidity_pct, candidate_exposure.relative_humidity_pct)
+        || !close(base_exposure.duration_hours, candidate_exposure.duration_hours)
+        || base_exposure.exposure_receipt_sha256 == candidate_exposure.exposure_receipt_sha256
     {
         return Err(Disposition::Rejected);
     }
@@ -480,6 +489,8 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
 
     let analysis = &graph.analysis;
     if !nonempty(&analysis.result_id)
+        || !nonempty(&analysis.graph_id)
+        || analysis.graph_id != graph.graph_id
         || !nonempty(&analysis.design_id)
         || !nonempty(&analysis.analysis_method_ref)
         || !nonempty(&analysis.quantity_unit)
@@ -499,6 +510,8 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
     }
     if analysis.transform_sha256 != graph.transform_sha256
         || analysis.analysis_profile != expected_analysis_profile(graph)
+        || !unique_strings(&analysis.source_receipt_ids)
+        || !unique_strings(&analysis.source_artifact_digests)
         || analysis.source_receipt_ids.iter().collect::<HashSet<_>>()
             != source_ids.iter().collect::<HashSet<_>>()
         || analysis.source_artifact_digests.iter().collect::<HashSet<_>>()
