@@ -48,7 +48,30 @@ fn string_set(value: &Value, key: &str, context: &str) -> Result<Vec<String>, Bo
         out.push(text.to_owned());
     }
     out.sort();
+    if out.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(err(format!("{context}: duplicate value in '{key}'")));
+    }
     Ok(out)
+}
+
+fn exact_list_metrics(gold: &[String], reported: &[String]) -> (usize, usize, usize, f64, f64, f64) {
+    let gold_set: HashSet<&str> = gold.iter().map(String::as_str).collect();
+    let reported_set: HashSet<&str> = reported.iter().map(String::as_str).collect();
+    let matched = gold_set.intersection(&reported_set).count();
+    let false_positive = reported_set.len().saturating_sub(matched);
+    let false_negative = gold_set.len().saturating_sub(matched);
+    let precision = if reported_set.is_empty() {
+        if gold_set.is_empty() { 1.0 } else { 0.0 }
+    } else {
+        matched as f64 / reported_set.len() as f64
+    };
+    let recall = if gold_set.is_empty() {
+        if reported_set.is_empty() { 1.0 } else { 0.0 }
+    } else {
+        matched as f64 / gold_set.len() as f64
+    };
+    let f1 = if precision + recall == 0.0 { 0.0 } else { 2.0 * precision * recall / (precision + recall) };
+    (matched, false_positive, false_negative, precision, recall, f1)
 }
 
 fn index_unique<'a>(items: &'a [Value], id_key: &str, label: &str) -> Result<HashMap<String, &'a Value>, Box<dyn Error>> {
@@ -112,6 +135,12 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut gold_prohibitions = 0usize;
     let mut preserved_prohibitions = 0usize;
     let mut duplicate_candidates = 0usize;
+    let mut total_required_questions = 0usize;
+    let mut total_reported_questions = 0usize;
+    let mut matched_required_questions = 0usize;
+    let mut total_prohibited_inferences = 0usize;
+    let mut total_reported_prohibited_flags = 0usize;
+    let mut matched_prohibited_flags = 0usize;
     let mut per_case = Vec::new();
 
     let mut ordered_ids: Vec<String> = inputs.keys().cloned().collect();
@@ -235,6 +264,22 @@ fn run() -> Result<(), Box<dyn Error>> {
             if all_present { temporal_complete += 1; }
         }
 
+        let gold_questions = string_set(answer, "required_questions", &format!("{case_id} oracle"))?;
+        let reported_questions = string_set(output, "unresolved_questions", &format!("{case_id} output"))?;
+        let (question_tp, question_fp, question_fn, question_precision, question_recall, question_f1) =
+            exact_list_metrics(&gold_questions, &reported_questions);
+        total_required_questions += gold_questions.len();
+        total_reported_questions += reported_questions.len();
+        matched_required_questions += question_tp;
+
+        let gold_prohibited = string_set(answer, "prohibited_inferences", &format!("{case_id} oracle"))?;
+        let reported_prohibited = string_set(output, "prohibited_inference_flags", &format!("{case_id} output"))?;
+        let (prohibited_tp, prohibited_fp, prohibited_fn, prohibited_precision, prohibited_recall, prohibited_f1) =
+            exact_list_metrics(&gold_prohibited, &reported_prohibited);
+        total_prohibited_inferences += gold_prohibited.len();
+        total_reported_prohibited_flags += reported_prohibited.len();
+        matched_prohibited_flags += prohibited_tp;
+
         let mut case_gold_prohibitions = 0usize;
         for c in gold_candidates {
             total_gold += 1;
@@ -269,7 +314,23 @@ fn run() -> Result<(), Box<dyn Error>> {
             "false_mandatory_promotions": case_false_mandatory,
             "gold_prohibitions": case_gold_prohibitions,
             "temporal_query_slices": temporal_required,
-            "temporal_query_slices_complete": temporal_complete
+            "temporal_query_slices_complete": temporal_complete,
+            "required_questions_gold": gold_questions.len(),
+            "unresolved_questions_reported": reported_questions.len(),
+            "required_questions_matched": question_tp,
+            "required_questions_false_positive": question_fp,
+            "required_questions_false_negative": question_fn,
+            "required_question_precision": question_precision,
+            "required_question_recall": question_recall,
+            "required_question_f1": question_f1,
+            "prohibited_inferences_gold": gold_prohibited.len(),
+            "prohibited_inference_flags_reported": reported_prohibited.len(),
+            "prohibited_inference_flags_matched": prohibited_tp,
+            "prohibited_inference_flags_false_positive": prohibited_fp,
+            "prohibited_inference_flags_false_negative": prohibited_fn,
+            "prohibited_inference_flag_precision": prohibited_precision,
+            "prohibited_inference_flag_recall": prohibited_recall,
+            "prohibited_inference_flag_f1": prohibited_f1
         }));
     }
 
@@ -280,6 +341,25 @@ fn run() -> Result<(), Box<dyn Error>> {
     let recall = if total_gold == 0 { 0.0 } else { true_positive as f64 / total_gold as f64 };
     let f1 = if precision + recall == 0.0 { 0.0 } else { 2.0 * precision * recall / (precision + recall) };
     let attr_denominator = matched_attributes.max(1) as f64;
+    let (_, _, _, question_precision, question_recall, question_f1) =
+        exact_list_metrics(
+            &(0..total_required_questions).map(|_| String::new()).collect::<Vec<_>>(),
+            &(0..total_reported_questions).map(|_| String::new()).collect::<Vec<_>>()
+        );
+    let question_precision = if total_reported_questions == 0 {
+        if total_required_questions == 0 { 1.0 } else { 0.0 }
+    } else { matched_required_questions as f64 / total_reported_questions as f64 };
+    let question_recall = if total_required_questions == 0 {
+        if total_reported_questions == 0 { 1.0 } else { 0.0 }
+    } else { matched_required_questions as f64 / total_required_questions as f64 };
+    let question_f1 = if question_precision + question_recall == 0.0 { 0.0 } else { 2.0 * question_precision * question_recall / (question_precision + question_recall) };
+    let prohibited_precision = if total_reported_prohibited_flags == 0 {
+        if total_prohibited_inferences == 0 { 1.0 } else { 0.0 }
+    } else { matched_prohibited_flags as f64 / total_reported_prohibited_flags as f64 };
+    let prohibited_recall = if total_prohibited_inferences == 0 {
+        if total_reported_prohibited_flags == 0 { 1.0 } else { 0.0 }
+    } else { matched_prohibited_flags as f64 / total_prohibited_inferences as f64 };
+    let prohibited_f1 = if prohibited_precision + prohibited_recall == 0.0 { 0.0 } else { 2.0 * prohibited_precision * prohibited_recall / (prohibited_precision + prohibited_recall) };
     let receipt = json!({
         "corpus_file_sha256": sha256_file(&args[1])?,
         "oracle_file_sha256": sha256_file(&args[2])?,
@@ -312,7 +392,19 @@ fn run() -> Result<(), Box<dyn Error>> {
             "duplicate_candidates":duplicate_candidates,
             "temporal_query_slice_count":total_temporal_queries,
             "complete_temporal_query_slices":complete_temporal_queries,
-            "decision_time_evidence_coverage":temporal_coverage
+            "decision_time_evidence_coverage":temporal_coverage,
+            "required_question_gold_count":total_required_questions,
+            "required_question_report_count":total_reported_questions,
+            "required_question_matches":matched_required_questions,
+            "required_question_precision":question_precision,
+            "required_question_recall":question_recall,
+            "required_question_f1":question_f1,
+            "prohibited_inference_gold_count":total_prohibited_inferences,
+            "prohibited_inference_flag_count":total_reported_prohibited_flags,
+            "prohibited_inference_flag_matches":matched_prohibited_flags,
+            "prohibited_inference_flag_precision":prohibited_precision,
+            "prohibited_inference_flag_recall":prohibited_recall,
+            "prohibited_inference_flag_f1":prohibited_f1
         },
         "per_case":per_case,
         "interpretation_limits":[
@@ -336,6 +428,40 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::span_matches;
+
+    #[test]
+    fn required_question_matching_reports_exact_precision_and_recall() {
+        let gold = vec!["Which supplier list applies?".to_owned(),"Who approves?".to_owned()];
+        let reported = vec!["Which supplier list applies?".to_owned(),"What is the deadline?".to_owned()];
+        let (matched, fp, fn_, precision, recall, _) = exact_list_metrics(&gold,&reported);
+        assert_eq!(matched,1);
+        assert_eq!(fp,1);
+        assert_eq!(fn_,1);
+        assert_eq!(precision,0.5);
+        assert_eq!(recall,0.5);
+    }
+
+    #[test]
+    fn prohibited_inference_acknowledgement_is_scored_separately() {
+        let gold = vec!["Do not infer authority.".to_owned(),"Do not invent amount.".to_owned()];
+        let flags = vec!["Do not infer authority.".to_owned()];
+        let (matched, fp, fn_, precision, recall, _) = exact_list_metrics(&gold,&flags);
+        assert_eq!(matched,1);
+        assert_eq!(fp,0);
+        assert_eq!(fn_,1);
+        assert_eq!(precision,1.0);
+        assert_eq!(recall,0.5);
+    }
+
+    #[test]
+    fn exact_string_matching_does_not_claim_paraphrase_equivalence() {
+        let gold = vec!["Ask who can approve.".to_owned()];
+        let paraphrase = vec!["Clarify the authorised approver.".to_owned()];
+        let (matched, _, missing, _, recall, _) = exact_list_metrics(&gold,&paraphrase);
+        assert_eq!(matched,0);
+        assert_eq!(missing,1);
+        assert_eq!(recall,0.0);
+    }
 
     #[test]
     fn accepts_exact_ascii_byte_span() {
