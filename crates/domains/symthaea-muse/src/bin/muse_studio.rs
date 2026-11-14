@@ -6306,10 +6306,8 @@ mod notation_summary_tests {
             <part-list>
                 <score-part id="P1">
                     <part-name>Violin I</part-name>
-                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
-                    <score-instrument id="P1-I2"><instrument-name>Muted Violin</instrument-name></score-instrument>
-                    <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument>
-                    <midi-instrument id="P1-I2"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument>
+                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name><midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument></score-instrument>
+                    <score-instrument id="P1-I2"><instrument-name>Muted Violin</instrument-name><midi-instrument id="P1-I2"><midi-channel>1</midi-channel><midi-program>41</midi-program></midi-instrument></score-instrument>
                 </score-part>
             </part-list>
             <part id="P1"><measure number="1">
