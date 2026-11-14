@@ -14,10 +14,10 @@
   "shared_contract": {
     "schema_version": "0.1.0",
     "schema_path": "docs/research/development-map-v0.1.schema.json",
-    "schema_blob_oid": "36d8cbcf541ac7ab563493f707e7834c66d7af60",
-    "schema_artifact_commit_sha": "f3e43b67eb2acca57cb93625d1d019bcdbd1491e",
+    "schema_blob_oid": "f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+    "schema_artifact_commit_sha": "0e198b7d1ff254c6675f5ccb1dcae9113e71d656",
     "status": "schema_shape_checked",
-    "claim_ceiling": "Provisional draft. Selected structural shape checks were applied to four maps; full Draft 2020-12 meta-validation, executable schema consumers, Rust qualification and independent review remain pending."
+    "claim_ceiling": "Provisional draft. Selected structural checks were applied to four maps; decision-time actor-authority projection and federation consumers are still uncompiled/unexecuted. Full Draft 2020-12 meta-validation, consumer integration and independent review remain pending."
   },
   "members": [
     {
