@@ -1,7 +1,7 @@
 # AOBench Runtime Evidence Layer v0.1
 
 **Date:** 2026-11-14  
-**Status:** Rust source and unit fixtures committed; compilation and execution not yet verified  
+**Status:** Implemented; exact-head standalone qualification passed on 2026-11-14
 **Package:** \`symthaea-organizational-closure\`  
 **Tracking:** [AOBENCH-001 #11980](https://github.com/Luminous-Dynamics/symthaea/issues/11980) · [MEL-AUTO-001 #10098](https://github.com/Luminous-Dynamics/symthaea/issues/10098)
 
@@ -19,11 +19,11 @@ Core types:
 
 - \`OrganizationSpec\`: frozen component and process declarations.
 - \`ComponentSpec\` / \`ComponentClass\`: regenerative internal, immutable provisioned, external resource, constraint, or evidence artifact.
-- \`ProcessSpec\`: required/optional component inputs and outputs, plus an external-dependency allow-list.
+- \`ProcessSpec\`: required/optional component inputs and outputs, required/optional external dependencies, and frozen expected executable digest.
 - \`ArtifactVersionId\`: exact component/version identity.
 - \`ArtifactRef\`: version identity, digest, and producer origin.
 - \`ArtifactStore\`: insert-once versioned bytes.
-- \`ExecutionEvent\`: event sequence, process and executable version identities, exact input/output refs, external observations, policy identity, and result.
+- \`ExecutionEvent\`: event sequence, process version, claimed executable digest, exact input/output refs, external observations, policy identity, and result.
 - \`ExecutionTrace\`: ordered events.
 - \`VerificationReport\`: findings, successful execution count, verified outputs, and required-regenerative coverage.
 
@@ -46,15 +46,16 @@ The pass predicate is intentionally named \`qualifies_functional_self_maintenanc
 3. Successful events reference known process IDs and the frozen process version.
 4. Event sequence is strictly increasing and execution IDs are unique.
 5. Successful events satisfy required/allowed input and output contracts.
-6. Input bytes exist and their SHA-256 digest matches the artifact reference.
-7. Provisioned roots are restricted to immutable/constraint classes.
-8. Produced inputs must match an exact earlier verified output version and producer event.
-9. Output origin must name the current execution; output bytes must exist and hash to the declared digest.
-10. Component output versions increase monotonically in the observed trace.
-11. External observations must be declared, unique per event, and carry a digest when reported available.
-12. An event cannot report success when a declared observed dependency is denied or unavailable.
-13. Failed, abstained, and interrupted events cannot publish committed outputs.
-14. A successful write must carry an authorization-policy identity. This records the policy version; it does not itself authorize the write.
+6. Event executable digest matches the identity frozen in its process specification.
+7. Input bytes exist and their SHA-256 digest matches the artifact reference.
+8. Provisioned roots are restricted to immutable/constraint classes.
+9. Produced inputs must match an exact earlier verified output version and producer event.
+10. Output origin must name the current execution; output bytes must exist and hash to the declared digest.
+11. Component output versions increase monotonically in the observed trace.
+12. Required external dependencies must be observed; optional dependencies may be absent. Observations must be declared, unique per event, and carry a digest when reported available.
+13. An event cannot report success when a declared observed dependency is denied or unavailable.
+14. Failed, abstained, and interrupted events cannot publish committed outputs.
+15. A successful write must carry an authorization-policy identity. This records the policy version; it does not itself authorize the write.
 
 ## 4. Deterministic fixtures included
 
@@ -64,6 +65,8 @@ The pass predicate is intentionally named \`qualifies_functional_self_maintenanc
 - Interrupted execution attempting to expose an output.
 - Undeclared external dependency.
 - Available external dependency without a receipt digest.
+- Required external dependency omitted from runtime observations.
+- Mismatched executable digest despite matching process ID/version.
 - Duplicate artifact version insertion.
 - Empty regenerative scope.
 
@@ -85,7 +88,7 @@ Not yet implemented:
 - assay-family adequacy and model-class distinguishability;
 - full-run evidence manifest and reproducible report export.
 
-An agent-generated event cannot prove that the declared executable ran. Production qualification must bind events to an independent runtime or supervisor, authenticate the executable identity, and verify immutable stored bytes outside the agent's write authority.
+A process specification pins an expected executable digest and the verifier rejects mismatches, but that is only identity consistency. An agent-generated event still cannot prove that the declared executable ran. Production qualification must bind events to an independent runtime or supervisor, authenticate the executable identity, and verify immutable stored bytes outside the agent's write authority.
 
 A digest proves content identity relative to the bytes supplied to the verifier; it does not prove source authenticity, correctness, or authorization.
 
@@ -100,7 +103,7 @@ cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 \`\`\`
 
-These commands have not yet been executed in this environment. Do not interpret source presence or authored fixtures as a pass.
+**Exact-head CI evidence:** the dedicated AOBench Runtime Qualification workflow passed on commit `59c4c6c5fa4a2777bf9be75cc9e6fe1535ce17ca` using Rust 1.96.0. All four gates passed: formatting, locked all-target compilation, unit tests (**10 passed, 0 failed**) and strict Clippy with `-D warnings`. See [the successful workflow run](https://github.com/Luminous-Dynamics/symthaea/actions/runs/43568786315).
 
 ## 7. Promotion rule
 
