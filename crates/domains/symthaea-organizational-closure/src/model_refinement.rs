@@ -15,16 +15,6 @@ use super::experiment_design::{
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct RefinementProbeId(pub String);
-
-impl From<&str> for RefinementProbeId {
-    fn from(value: &str) -> Self {
-        Self(value.to_owned())
-    }
-}
-
 /// A probe descriptor. It contains no outcome or oracle information.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -546,14 +536,6 @@ pub fn evaluate_model_refinement(
     let consistent_ids = consistent_models.iter()
         .map(|model| model.hypothesis.id.clone()).collect::<Vec<_>>();
     let model_inadequacy_detected = consistent_models.is_empty();
-    if model_inadequacy_detected {
-        push_finding(&mut findings, ModelRefinementFindingCode::NoExistingModelFitsTrace,
-            None, None, "no supplied model explains the complete qualified discovery trace");
-    } else {
-        push_finding(&mut findings, ModelRefinementFindingCode::ExistingModelStillFitsTrace,
-            None, None, "at least one supplied model still explains the complete qualified discovery trace");
-    }
-
     match &trace.decision {
         ModelAdequacyDecision::RetainExistingModel { rationale: _ } => {
             if model_inadequacy_detected {
