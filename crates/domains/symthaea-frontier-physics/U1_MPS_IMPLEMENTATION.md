@@ -1,6 +1,6 @@
 # Complex U(1)-symmetric MPS state representation
 
-**Status:** the complex charge-labelled MPS core, charge-block dense factorization, U(1)-conserving two-site gates, exact two-site charge-block split, and explicit global truncation/error ledger are source-authored. The latest truncation branch is awaiting its exact-head Rust 1.96 harness. Full TEBD sequencing and scaling remain unimplemented.
+**Status:** source-authored implementation now includes complex U(1)-symmetric MPS storage, dense fixed-charge factorization, validated local gates, exact and truncated charge-block two-site SVD, deterministic even/odd TEBD layers, mixed-canonical gauge receipts, a gate/model-projection/truncation error ledger, analytic U(1) Hamiltonian gates, and a second-order even/odd/even Strang stepper. The latest consolidated exact-head Rust 1.96 harness is the remaining validation gate. Long-range MPO/TDVP and matched large-N performance remain unimplemented.
 
 ## Scope of this increment
 
@@ -129,25 +129,50 @@ The per-gate contributions are accumulated by the triangle inequality, and the g
 
 
 
+
+## Hamiltonian-driven second-order Strang TEBD
+
+The latest increment connects local gates to an actual nearest-neighbour Hamiltonian evolution path.
+
+- \`U1TwoSiteHamiltonian\` validates finite entries, Hermiticity and U(1) charge conservation.
+- Its nearest Hermitian, charge-block-diagonal projection is computed explicitly. The Frobenius residual from the supplied matrix is recorded rather than silently discarded.
+- The \(q=0\) and \(q=2\) sectors exponentiate as scalar phases; the \(q=1\) sector uses the analytic exponential of a \(2\times2\) Hermitian matrix. No generic \(4\times4\) eigensolver is needed.
+- Every generated gate carries a Duhamel operator-norm upper bound for the difference between the supplied tolerance-qualified Hamiltonian and the Hermitian U(1)-block projection actually exponentiated.
+- \`U1TeBDStrangStepper\` constructs a symmetric even-half / odd-full / even-half composition. The same truncation/error ledger is carried through all three layers and can be continued across successive time steps with \`apply_with_ledger\`.
+
+### Four distinct error channels
+
+1. **Hamiltonian model projection:** discrepancy between the supplied tolerance-qualified local matrix and its exact Hermitian, U(1)-block projection. This is included in the global ledger using the measured Frobenius residual and a Duhamel exponential bound.
+2. **Representation/evolution implementation:** canonicalization reconstruction, gate unitarity defect and charge-sector leakage, propagated by subsequent gate operator-norm bounds.
+3. **Compression:** discarded Schmidt weight measured only after the relevant mixed-canonical exterior-isometry receipt passes. No implicit renormalization is performed.
+4. **Time discretization / Trotter splitting:** deliberately excluded from the global state-error ledger. The result reports \`time_discretization_error_qualified = false\`. The second-order claim is a numerical-method property, not a certified trajectory error; it must be established by a step-refinement envelope or an independent commutator bound.
+
+The dense three-site one-excitation test checks the exact hopping-chain solution and a roughly fourfold reduction in global error when the time step is halved. A separate multi-step test checks that the global ledger is carried forward instead of being reset. These are authored acceptance tests until the consolidated exact-head runner passes.
+
 ## Explicit limitations
 
-This increment now includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate-quality checks, and a global circuit L2 error ledger for the deterministic nearest-neighbour parity-layer executor. It does **not** yet implement:
-- Hamiltonian-to-gate exponentiation or a second-order even/odd/even (or odd/even/odd) Strang time-stepper.
-- Trotter/discretization error accounting or adaptive time-step control.
-- Nonlocal MPO gate application.
-- N=16–64 scale-out or matched Quimb/ITensor/cuQuantum performance evidence.
+This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
+- A Trotter-error certificate, adaptive time-step controller, or higher-order TEBD4 integrator.
+- Long-range MPO application, lazy/nonlocal gate contraction, or TDVP.
+- Independent Hamiltonian-to-MPO and local-effective-Hamiltonian qualification.
+- N=16–64 scale-out or accuracy-matched Quimb/ITensor/SeeMPS/cuQuantum performance evidence.
 
-The next stages are Hamiltonian-to-gate generation and Strang layer composition, Trotter-error qualification, nonlocal MPO support, and controlled accuracy-matched performance comparisons.
+The next stages are Trotter-envelope qualification, canonical-gauge TDVP/MPO exploration, lazy/nonlocal MPO support, and controlled accuracy-matched comparisons.
 
 ## Competitive benchmark policy
 
-Quimb CircuitMPS exposes maximum bond dimension, singular-value cutoff and state-norm-based error/fidelity estimates; those are useful external controls, but raw elapsed time alone is not comparable. Match the gate tensors, qubit ordering, initial state, seeds, checkpoints, observables, bond cap and truncation policy. Compare error envelopes and dense overlap on small N before comparing throughput. ITensor's QN-conserving MPS facilities are another specialist implementation reference.
+Quimb CircuitMPS is a strong direct TEBD/MPS baseline: it supports maximum bond dimension, singular-value cutoff, swap-and-split two-qubit gates, nonlocal MPO contraction, lazy delayed compression, and norm-based fidelity/error estimates. Its lazy path is a required comparator, not an optional extra. ITensor supplies Abelian QN block-sparse MPS and symmetry-aware tensor operations. SeeMPS/TDVP and the standard TDVP reference are important long-range baselines: 2TDVP handles general MPO Hamiltonians and dynamic bond dimensions, while 1TDVP has different energy/norm-conservation and bond-growth trade-offs. We should compare at matched accuracy and include these modes rather than asserting TEBD is universally superior.
+
+Match the Hamiltonian, MPO or gate tensors, site ordering, initial state, precision, bond cap, truncation threshold, Krylov tolerance, time-step schedule, hardware/backend and output checkpoints. Compare error envelopes and dense overlap for small N before throughput.
 
 Primary external references:
 - Quimb CircuitMPS API: https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html
 - Quimb MPS circuit guide: https://quimb.readthedocs.io/en/latest/circuit/circuit-mps.html
 - ITensor QN conserving MPS documentation: https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html
+- Quimb lazy MPS and nonlocal MPO compression: https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html
+- TDVP errors and conservation trade-offs: https://tensornetwork.org/mps/algorithms/timeevo/tdvp.html
+- TEBD time-step error and higher-order splitting: https://tensornetwork.org/mps/algorithms/timeevo/tebd.html
 
 ## Claim ceiling
 
-A passing exact-head harness would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense factorization, local gates, exact and approximate charge-block splits, deterministic parity-layer execution, mixed-canonical gauge receipts and a gate-quality-aware global L2 bound for those layer operations. It would not establish a full time-evolution solver, Trotter accuracy, nonlocal MPO scaling, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing exact-head harness would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense factorization, local gates, exact and approximate charge-block splits, deterministic parity layers, mixed-canonical gauge receipts, a global bound covering canonicalization/gate/model-projection/compression defects, and a nearest-neighbour second-order Strang stepper. It would **not** establish a Trotter-error certificate, long-range MPO/TDVP support, advantage over Quimb/ITensor, large-N speedup, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
