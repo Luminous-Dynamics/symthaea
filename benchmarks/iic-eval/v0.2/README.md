@@ -13,7 +13,7 @@ The v0.1 prototype focuses on structural validation: source references, spans, t
 
 ## Current seed cases
 
-Nine synthetic cases cover modality/prohibition, conditional scope, negation and permissive language, conflicting source records, embedded instruction injection, future-effective amendment, Unicode/quantity fidelity, a missing referenced attachment, and separate quantity/threshold/measurement semantics.
+Forty synthetic cases now cover modality/prohibition, conditional scope, negation and permissive language, conflicting source records, embedded instruction injection, future-effective amendments, Unicode/quantity fidelity, missing referenced attachments, decision-time reconstruction, vague operation requests, missing approver/supplier definitions, ambiguous deadlines, undefined units, review-versus-approval, exception scope, and service/control non-inference.
 
 The input corpus and known-answer oracle are separate files. The oracle is a provisional reference and has not been independently adjudicated. Do not expose it to systems under test.
 
@@ -34,6 +34,7 @@ The input corpus and known-answer oracle are separate files. The oracle is a pro
 - Source-span fidelity; source version binding; derivation-chain completeness.
 - Unsupported inference and contradiction detection.
 - Correct abstention and clarification-question quality.
+- Exact required-question recall/precision and prohibited-inference acknowledgement coverage (lexical development proxies; paraphrase equivalence still requires human adjudication).
 - Change-impact precision/recall and unaffected-control stability.
 - Expert review time and correction effort.
 - Prompt injection and privacy leakage.
