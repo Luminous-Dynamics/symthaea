@@ -53,7 +53,7 @@ The standalone read-only Rust prototype is in [`tools/development-map-validator`
 
 ## Retrieval benchmark fixture
 
-[DYNRETR-001](https://github.com/Luminous-Dynamics/symthaea/issues/12078) adds a public synthetic seven-case retrieval/exploration corpus and expected oracle under `fixtures/retrieval-exploration-v0.1.*.json`. It separates natural no-gold from wrong-repository counterfactual no-gold and includes feature/world, stale-revision, non-local impact and lexical-decoy controls. Each case pins its own repository revision/tree and fixed token/line budgets. This is authored synthetic data, not a measured retrieval score or an external benchmark reproduction.
+[DYNRETR-001](https://github.com/Luminous-Dynamics/symthaea/issues/12080) adds a public synthetic seven-case retrieval/exploration corpus and expected oracle under `fixtures/retrieval-exploration-v0.1.*.json`. It separates natural no-gold from wrong-repository counterfactual no-gold and includes feature/world, stale-revision, non-local impact and lexical-decoy controls. Each case pins its own repository revision/tree and fixed token/line budgets. This is authored synthetic data, not a measured retrieval score or an external benchmark reproduction.
 
 ## Refresh procedure
 
