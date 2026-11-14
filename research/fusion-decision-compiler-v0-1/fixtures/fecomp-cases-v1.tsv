@@ -22,3 +22,6 @@ changed-material-invalidates-design|REVIEW|dependency_invalidation
 dependency-cycle|REVIEW|dependency_cycle
 solver-stale-candidate-revision|REJECT|solver_revision_mismatch
 solver-stale-geometry|REJECT|solver_geometry_mismatch
+unsupported-observable|BLOCKED|unsupported_observable
+boundary-evidence-missing|REJECT|service_boundary_unresolved
+boundary-evidence-wrong-scope|REJECT|service_boundary_scope
