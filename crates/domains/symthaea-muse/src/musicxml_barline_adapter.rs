@@ -40,6 +40,7 @@ pub enum MusicXmlMeasureAdapterError {
     SamePartCompared,
     DuplicatePartId { id: String },
     PartMetadata(String),
+    ForeignNamespaceCoreElement { element: String, namespace: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +72,17 @@ pub fn parse_musicxml_measure_map(
     let document = roxmltree::Document::parse(text)
         .map_err(|error| MusicXmlMeasureAdapterError::MalformedXml(error.to_string()))?;
     let root = document.root_element();
+    if let Some((element, namespace)) = foreign_namespace_core_element(root) {
+        return Ok(unavailable_map(
+            source_id,
+            score_clock_id,
+            MeasureMapStatus::Unsupported {
+                reason: format!(
+                    "foreign namespace {namespace} reuses MusicXML core element {element}"
+                ),
+            },
+        ));
+    }
 
     if root.has_tag_name("score-timewise") {
         return Ok(unavailable_map(
@@ -492,6 +504,12 @@ pub fn parse_musicxml_part_notation_graph(
             root: root.tag_name().name().to_string(),
         });
     }
+    if let Some((element, namespace)) = foreign_namespace_core_element(root) {
+        return Err(MusicXmlMeasureAdapterError::ForeignNamespaceCoreElement {
+            element,
+            namespace,
+        });
+    }
     let parts: Vec<_> = root
         .children()
         .filter(|node| node.has_tag_name("part"))
@@ -655,6 +673,40 @@ pub fn validate_musicxml_notation_graph_replay(
     Ok(replayed == supplied)
 }
 
+
+
+/// The legacy measure/barline parser uses MusicXML local element names.
+/// Reject foreign-namespace elements that collide with those names until
+/// every legacy branch is namespace-aware. The notation-event layer itself
+/// retains such elements as opaque extensions; this preflight prevents the
+/// older measure parser from interpreting them as score structure.
+fn foreign_namespace_core_element(
+    root: roxmltree::Node<'_, '_>,
+) -> Option<(String, String)> {
+    const CORE_ELEMENTS: &[&str] = &[
+        "score-partwise", "score-timewise", "part-list", "score-part", "part",
+        "measure", "attributes", "divisions", "key", "time", "staves", "clef",
+        "staff-details", "transpose", "note", "grace", "cue", "chord", "pitch",
+        "rest", "unpitched", "duration", "backup", "forward", "barline",
+        "bar-style", "repeat", "ending", "segno", "coda", "sound", "direction",
+        "harmony", "figured-bass", "notations", "tied", "tie",
+        "time-modification", "tuplet", "instrument", "score-instrument",
+        "midi-instrument", "offset", "beats", "beat-type",
+    ];
+    let expected_namespace = root.tag_name().namespace();
+    root.descendants()
+        .filter(|node| node.is_element())
+        .find(|node| {
+            node.tag_name().namespace() != expected_namespace
+                && CORE_ELEMENTS.contains(&node.tag_name().name())
+        })
+        .map(|node| {
+            (
+                node.tag_name().name().to_string(),
+                node.tag_name().namespace().unwrap_or("").to_string(),
+            )
+        })
+}
 
 fn parse_measure_locators_for_part(
     part: roxmltree::Node<'_, '_>,
@@ -2196,6 +2248,30 @@ mod tests {
             "score-clock",
             &[graph],
         ).unwrap());
+    }
+
+
+    #[test]
+    fn foreign_namespace_core_name_collision_is_not_used_as_score_structure() {
+        let xml = r#"<score-partwise xmlns:ext="urn:example:extension"><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <ext:note><ext:pitch><ext:step>D</ext:step><ext:octave>5</ext:octave></ext:pitch><ext:duration>16</ext:duration></ext:note>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        assert_eq!(
+            parse_musicxml_part_notation_graph(
+                xml.as_bytes(), "sha256:foreign-core-name", "score-clock"
+            ),
+            Err(MusicXmlMeasureAdapterError::ForeignNamespaceCoreElement {
+                element: "note".into(),
+                namespace: "urn:example:extension".into(),
+            })
+        );
+        let map = parse_musicxml_measure_map(
+            xml.as_bytes(), "sha256:foreign-core-name", "score-clock"
+        ).unwrap();
+        assert!(matches!(map.status, MeasureMapStatus::Unsupported { .. }));
+        assert!(map.measures.is_empty());
     }
 
 }
