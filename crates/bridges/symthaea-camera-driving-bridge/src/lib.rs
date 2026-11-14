@@ -12,6 +12,8 @@ use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use symthaea_vehicle::{VehicleHdcEncoder, VehicleState};
 use symthaea_vision_manifold::{VisionConfig, VisionManifold, VisionTelemetry};
 
+pub mod policy_compatibility;
+
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 pub const MAX_ID_BYTES: usize = 256;
 pub const MAX_FRAME_BYTES_HARD_LIMIT: usize = 64 * 1024 * 1024;
