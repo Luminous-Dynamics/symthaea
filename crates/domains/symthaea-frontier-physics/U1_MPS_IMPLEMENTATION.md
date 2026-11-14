@@ -149,6 +149,20 @@ The latest increment connects local gates to an actual nearest-neighbour Hamilto
 
 The dense three-site one-excitation test checks the exact hopping-chain solution and a roughly fourfold reduction in global error when the time step is halved. A separate multi-step test checks that the global ledger is carried forward instead of being reset. These are authored acceptance tests until the consolidated exact-head runner passes.
 
+
+## Structural-zero storage audit
+
+The current site tensor still stores a dense rank-3 complex payload. The new U1MpsTensor::storage_audit method measures the storage cost implied by the charge labels without changing the representation.
+
+For each intermediate charge q it reports the allowed block shape:
+- rows: all (left-bond, physical-bit) pairs with q_left + s = q;
+- columns: right-bond indices carrying q;
+- values: row_count times column_count.
+
+The receipt reports dense entries, symmetry-allowed entries, forbidden entries, forbidden nonzero entries and their squared weight, non-finite entries, dense payload bytes, ideal packed-value bytes, and the theoretical value-payload savings fraction.
+
+The ideal packed byte count assumes forbidden-sector values are exactly zero. Tolerated forbidden nonzero values are surfaced separately and cannot be silently dropped by a future packed representation. This is a storage audit, **not** a block-sparse production tensor or an observed memory reduction. The next storage milestone is a packed charge-block tensor with dense round-trip and exact operation equivalence tests.
+
 ## Explicit limitations
 
 This increment includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate and Hamiltonian-projection quality checks, a global ledger for representation/model-projection/compression errors, and a nearest-neighbour second-order Strang TEBD stepper. It does **not** yet implement:
