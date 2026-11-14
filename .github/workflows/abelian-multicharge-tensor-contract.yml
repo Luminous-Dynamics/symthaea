@@ -1,16 +1,16 @@
-name: U1^K Abelian charge-vector tensor contract source harness
+name: U1^K exact charge-block SVD source harness
 
 on:
   push:
     branches:
-      - research/abelian-multicharge-tensor-contract-20261113
+      - research/abelian-multicharge-block-svd-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/abelian_mps.rs
       - crates/domains/symthaea-frontier-physics/src/lib.rs
       - .github/workflows/abelian-multicharge-tensor-contract.yml
   pull_request:
     branches:
-      - research/u1-tebd-step-doubling-error-estimator-20261113
+      - research/abelian-multicharge-tensor-contract-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/abelian_mps.rs
       - crates/domains/symthaea-frontier-physics/src/lib.rs
@@ -20,12 +20,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: abelian-multicharge-tensor-contract-${{ github.event.pull_request.number || github.ref }}
+  group: abelian-multicharge-block-svd-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
   source-harness:
-    name: Rust 1.96 U1^K exact-source validation
+    name: Rust 1.96 U1^K SVD exact-source validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,12 +46,13 @@ jobs:
           cp crates/domains/symthaea-frontier-physics/src/abelian_mps.rs "$harness/src/lib.rs"
           cat > "$harness/Cargo.toml" <<'EOF'
           [package]
-          name = "abelian-multicharge-tensor-contract-validation"
+          name = "abelian-multicharge-block-svd-validation"
           version = "0.1.0"
           edition = "2024"
 
           [dependencies]
           num-complex = "=0.4.6"
+          nalgebra = "=0.34.2"
           EOF
           cargo clippy --manifest-path "$harness/Cargo.toml" --all-targets -- -D warnings
           cargo test --manifest-path "$harness/Cargo.toml" --lib
