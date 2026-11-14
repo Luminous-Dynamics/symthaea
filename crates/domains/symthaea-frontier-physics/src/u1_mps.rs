@@ -4950,6 +4950,147 @@ mod tests {
         assert!(model.evolution_gate(0.1, f64::NAN).is_err());
     }
 
+
+
+    fn nearest_neighbour_hopping_term(coupling: f64) -> U1TwoSiteHamiltonian {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[1][2] = Complex64::new(coupling, 0.0);
+        matrix[2][1] = Complex64::new(coupling, 0.0);
+        U1TwoSiteHamiltonian::new(matrix, 1.0e-12).unwrap()
+    }
+
+    fn one_excitation_chain_exact(time: f64, coupling: f64) -> Vec<Complex64> {
+        let angle = 2.0_f64.sqrt() * coupling * time;
+        vec![
+            Complex64::new((0.5 * angle).cos().powi(2), 0.0),
+            Complex64::new(0.0, -(1.0 / 2.0_f64.sqrt()) * angle.sin()),
+            Complex64::new(-(0.5 * angle).sin().powi(2), 0.0),
+        ]
+    }
+
+    #[test]
+    fn strang_stepper_builds_even_odd_even_layers_and_preserves_global_ledger() {
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(0.7)),
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(0.7)),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            stepper
+                .terms()
+                .iter()
+                .map(U1TeBDHamiltonianTerm::bond_index)
+                .collect::<Vec<_>>(),
+            vec![0, 1]
+        );
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let result = stepper
+            .apply(
+                &input,
+                0.2,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.splitting_order, 2);
+        assert_eq!(result.layer_parities, vec![0, 1, 0]);
+        assert_eq!(result.layer_bond_indices, vec![vec![0], vec![1], vec![0]]);
+        assert_eq!(result.input_total_charge, 1);
+        assert_eq!(result.output_total_charge, 1);
+        assert!(result.output_selection_rule_residual <= 1.0e-10);
+        assert!(result.global_l2_bound_qualified);
+        assert!(!result.time_discretization_error_qualified);
+        assert_eq!(result.truncation_ledger.gate_count, 3);
+        assert_eq!(result.gate_receipts.len(), 3);
+
+        let dense = result.state.to_dense(4).unwrap();
+        let exact = one_excitation_chain_exact(0.2, 0.7);
+        let actual = [dense[4], dense[2], dense[1]];
+        let error = actual
+            .iter()
+            .zip(exact.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!(error < 5.0e-3, "Strang one-step error {error}");
+    }
+
+    #[test]
+    fn strang_stepper_shows_second_order_global_convergence_against_dense_solution() {
+        let coupling = 0.55;
+        let total_time = 0.6;
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(coupling)),
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(coupling)),
+            ],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 4,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-11,
+        };
+
+        let evolve = |steps: usize| {
+            let dt = total_time / steps as f64;
+            let mut state = input.clone();
+            for _ in 0..steps {
+                state = stepper.apply(&state, dt, policy).unwrap().state;
+            }
+            state
+        };
+        let coarse = evolve(8).to_dense(4).unwrap();
+        let fine = evolve(16).to_dense(4).unwrap();
+        let exact = one_excitation_chain_exact(total_time, coupling);
+        let dense_components = |state: &[Complex64]| [state[4], state[2], state[1]];
+        let coarse_error = dense_components(&coarse)
+            .iter()
+            .zip(exact.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let fine_error = dense_components(&fine)
+            .iter()
+            .zip(exact.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!(coarse_error / fine_error > 3.2);
+        assert!(coarse_error / fine_error < 4.8);
+        assert!(fine_error < 5.0e-4);
+    }
+
+    #[test]
+    fn strang_stepper_rejects_duplicate_and_out_of_range_hamiltonian_bonds() {
+        let hamiltonian = nearest_neighbour_hopping_term(0.3);
+        assert!(matches!(
+            U1TeBDStrangStepper::new(
+                3,
+                vec![
+                    U1TeBDHamiltonianTerm::new(0, hamiltonian.clone()),
+                    U1TeBDHamiltonianTerm::new(0, hamiltonian.clone()),
+                ]
+            ),
+            Err(U1MpsError::DuplicateTeBDGate { bond_index: 0 })
+        ));
+        assert!(matches!(
+            U1TeBDStrangStepper::new(
+                3,
+                vec![U1TeBDHamiltonianTerm::new(3, hamiltonian)]
+            ),
+            Err(U1MpsError::TeBDGateOutOfRange { .. })
+        ));
+    }
+
     #[test]
     fn tebd_global_error_bound_stays_disabled_when_any_gauge_receipt_fails() {
         let input = canonical_w_state();
