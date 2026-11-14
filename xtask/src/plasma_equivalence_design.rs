@@ -110,6 +110,16 @@ pub(super) struct EquivalenceDesignReceipt {
     baseline_method_receipt: ScopeEvidence,
     candidate_method_receipt: ScopeEvidence,
     analysis_result: EquivalenceAnalysisResult,
+    #[serde(default)]
+    transfer_case_id: Option<String>,
+    #[serde(default)]
+    transfer_bridge_id: Option<String>,
+    #[serde(default)]
+    baseline_profile_sha256: Option<String>,
+    #[serde(default)]
+    candidate_profile_sha256: Option<String>,
+    #[serde(default)]
+    bridge_dimension_keys: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -483,6 +493,60 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         equivalence: outcome,
         reason: "frozen design, independent-unit grouping, method receipts, actual sample manifest and analysis-result lineage are structurally consistent; numerical validity is not certified",
     }
+}
+
+pub(super) fn validate_transfer_binding(
+    receipt: &EquivalenceDesignReceipt,
+    transfer_case_id: &str,
+    transfer_bridge_id: &str,
+    baseline_profile_sha256: &str,
+    candidate_profile_sha256: &str,
+    bridge_dimension_keys: &[String],
+    endpoint: &str,
+    baseline_method_receipt: &ScopeEvidence,
+    candidate_method_receipt: &ScopeEvidence,
+) -> Decision {
+    let decision = validate_bridge(
+        receipt,
+        endpoint,
+        baseline_method_receipt,
+        candidate_method_receipt,
+    );
+    if decision.disposition != Disposition::Pass {
+        return decision;
+    }
+    let Some(case_id) = receipt.transfer_case_id.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks transfer-case identity" };
+    };
+    let Some(bridge_id) = receipt.transfer_bridge_id.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks transfer-bridge identity" };
+    };
+    let Some(base_digest) = receipt.baseline_profile_sha256.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks exact baseline profile digest" };
+    };
+    let Some(candidate_digest) = receipt.candidate_profile_sha256.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks exact candidate bridge profile digest" };
+    };
+    let Some(keys) = receipt.bridge_dimension_keys.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks explicit bridge dimension set" };
+    };
+    let mut actual_keys = keys.to_vec();
+    let mut expected_keys = bridge_dimension_keys.to_vec();
+    actual_keys.sort();
+    expected_keys.sort();
+    if case_id != transfer_case_id
+        || bridge_id != transfer_bridge_id
+        || base_digest != baseline_profile_sha256
+        || candidate_digest != candidate_profile_sha256
+        || actual_keys != expected_keys
+    {
+        return Decision {
+            disposition: Disposition::Rejected,
+            equivalence: "NOT_EVALUATED",
+            reason: "study design is bound to a different transfer case, bridge dimension set or exact profile digest",
+        };
+    }
+    decision
 }
 
 pub(super) fn validate_bridge(
