@@ -24,7 +24,7 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 10,
+      "minItems": 16,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -82,7 +82,8 @@
             "minLength": 1
           }
         }
-      }
+      },
+      "maxItems": 16
     },
     "claim_ceiling": {
       "type": "string",
