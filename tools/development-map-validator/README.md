@@ -47,4 +47,4 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence and four-project federation manifests. Thirty Rust unit-test cases are authored at the current branch head; compilation and execution remain pending. Compilation and test execution remain pending the repository's qualified execution-isolation path; do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence and four-project federation manifests. Thirty-five Rust unit-test cases are authored at the current branch head; compilation and execution remain pending. Compilation and test execution remain pending the repository's qualified execution-isolation path; do not treat unexecuted tests as passing.
