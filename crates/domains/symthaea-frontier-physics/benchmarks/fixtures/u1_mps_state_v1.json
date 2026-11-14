@@ -5,9 +5,9 @@
   "created": "2026-11-13",
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
-  "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Source-authored: complex U1 MPS core, dense fixed-charge factorization, U1 local gates, exact charge-block split, global cutoff/bond-cap compression, mixed-canonical receipts, canonical/gate/model-projection/compression error ledger, analytic U1 Hamiltonian gates, deterministic even/odd TEBD layers and second-order even/odd/even Strang stepper. Consolidated exact-head Rust 1.96 harness pending.",
-  "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim.",
+  "status": "u1_mps_canonical_gauge_and_strang_source_authored_pending_validation",
+  "execution_status": "Source-authored consolidated stack: complex U1 MPS core, dense factorization, local gates, exact/truncated charge-block splits, even/odd layer scheduler, transactional mixed-canonical sweeps, per-gate gauge/gate/Hamiltonian-projection/truncation error ledger, analytic U1 Hamiltonian exponentials and second-order even/odd/even Strang stepper. Exact-head Rust 1.96 harness pending.",
+  "claim_ceiling": "A global L2 state-vector receipt is enabled only when each canonical-gauge receipt verifies the complete exterior isometries and gate/operator/model-projection defects are separately bounded. Trotter/time-discretization error remains unqualified. No large-N advantage or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
     "physical_charges": [
@@ -166,7 +166,7 @@
       "type": "U1MpsTruncationLedger",
       "method": "record_with_canonical_gauge_and_gate",
       "local_bound": "sum_j sqrt(discarded_weight_j) in local two-site tensor Frobenius norm",
-      "global_bound": "Recursive gate-by-gate: E_(k+1) <= ||G_k||_upper E_k + e_canonical,k*||G_k||_upper + e_gate,k + e_Hprojection,k + e_Schmidt,k*||L_k||_upper*||R_k||_upper. Components are propagated consistently through later gate operator-norm bounds.",
+      "global_bound": "Recursive gate-by-gate global bound, only after complete mixed-canonical receipt. Propagate prior error through measured gate operator-norm upper bound; add canonicalization error, gate quality defect, Hamiltonian model projection defect, and Schmidt residual scaled by left/right exterior operator-norm upper bounds.",
       "gate_quality_bound": {
         "unitarity": "max(sqrt(1+delta)-1, 1-sqrt(1-delta))*||psi_before_gate||, delta=||G†G-I||_F<1",
         "charge": "sqrt(10)*max_abs_charge_off_block_entry*||psi_before_gate|| for the ten forbidden off-block entries of a 4x4 two-qubit matrix"
@@ -261,6 +261,19 @@
         "mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries",
         "mixed_canonical_sweep_handles_left_and_right_boundary_centers",
         "canonicalization_is_idempotent_at_a_fixed_two_site_center"
+      ],
+      "state_equivalence": "Stable direct-sum MPS difference contraction, independent of dense expansion.",
+      "exterior_operator_bound": "Product over measured site residuals of sqrt(1+r_site), where r_site is Frobenius norm of the local Gram-minus-identity matrix.",
+      "tests": [
+        "canonicalization_preserves_dense_state_and_qualifies_all_two_site_centers",
+        "canonicalization_receipt_is_bound_to_measured_external_isometries",
+        "mps_overlap_matches_norm_and_survives_gauge_rebasing",
+        "canonicalization_rejects_invalid_center_without_mutating_state",
+        "mixed_canonicalization_qualifies_both_two_site_centers_and_preserves_dense_state",
+        "canonicalization_is_idempotent_at_a_fixed_two_site_center",
+        "mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries",
+        "mixed_canonical_sweep_handles_left_and_right_boundary_centers",
+        "mixed_canonicalization_rejects_invalid_center_and_tolerance_without_mutation"
       ]
     },
     "tebd_gate_quality": {
@@ -332,6 +345,28 @@
         "strang_stepper_continues_global_error_ledger_across_time_steps"
       ],
       "claim_ceiling": "Nearest-neighbour second-order splitting only. Trotter error is not folded into the canonical/gate/model-projection/compression bound and remains unqualified pending step-refinement envelope or commutator bound."
+    },
+    "strang_stepper": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TeBDStrangStepper::apply / apply_with_ledger",
+      "splitting": "Even half-step, odd full-step, even half-step",
+      "order": 2,
+      "receipts": [
+        "layer parities/order",
+        "gate/model projection receipts",
+        "carried error ledger",
+        "input/output norm",
+        "total charge",
+        "global state error qualification",
+        "Trotter error explicitly unqualified"
+      ],
+      "tests": [
+        "strang_stepper_builds_even_odd_even_layers_and_preserves_global_ledger",
+        "strang_stepper_shows_second_order_global_convergence_against_dense_solution",
+        "strang_global_error_ledger_accounts_for_hamiltonian_model_projection",
+        "strang_stepper_continues_global_error_ledger_across_time_steps",
+        "strang_stepper_rejects_duplicate_and_out_of_range_hamiltonian_bonds"
+      ]
     }
   },
   "known_answers": [
@@ -419,14 +454,15 @@
     {
       "id": "MPS-2",
       "name": "Global charge-aware truncation and conservative ledger",
-      "status": "source_authored_runner_pending",
+      "status": "local_truncation_receipts_source_authored",
       "acceptance": [
         "relative cutoff semantics frozen as sigma_i >= r*sigma_max",
         "global max bond across charge sectors",
         "separate cutoff and bond-cap discarded weights",
         "pre/post norm and no implicit renormalization",
         "per-charge retained rank",
-        "cumulative L2 bound sum sqrt(discarded weight) under unitary/orthogonal-projection assumptions"
+        "local Frobenius projection residual reported without a global interpretation",
+        "global state-vector L2 interpretation disabled until MPS-3 canonical/gate/model-projection receipts pass"
       ]
     },
     {
@@ -638,7 +674,14 @@
     "strang_layer_parities",
     "strang_layer_bond_indices",
     "time_discretization_error_qualified",
-    "strang_step_refinement_error_ratio"
+    "strang_step_refinement_error_ratio",
+    "canonical_gauge_state_reconstruction_l2_residual",
+    "canonical_gauge_left_exterior_norm_bound",
+    "canonical_gauge_right_exterior_norm_bound",
+    "global_state_error_bound_upper",
+    "hamiltonian_projection_operator_error_upper_bound",
+    "strang_splitting_order",
+    "time_discretization_error_qualified"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
