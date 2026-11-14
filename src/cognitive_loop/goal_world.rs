@@ -179,7 +179,8 @@ impl WorldModelBridge {
     /// Number of action slots represented by this world-model bridge.
     ///
     /// Exposing the exact vocabulary size prevents generic planning adapters from
-    /// accepting an action index they cannot actually predict.
+    /// accepting an action index they cannot actually predict. The value is fixed
+    /// at construction and bounds `predict_action` and `observe_action_transition`.
     pub fn action_count(&self) -> usize {
         self.action_deltas.len()
     }
