@@ -91,6 +91,18 @@
             "inherited_from": {
               "type": "string",
               "minLength": 1
+            },
+            "rights_holder_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retrieved_at_utc": {
+              "type": "string",
+              "format": "date-time"
             }
           }
         },
@@ -159,8 +171,42 @@
             "unreviewed"
           ]
         },
-        "human_review_receipt_sha256": {
-          "$ref": "#/$defs/sha256"
+        "human_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewer_ref",
+            "reviewer_role",
+            "jurisdiction",
+            "reviewed_at_utc",
+            "rationale",
+            "decision_record_sha256"
+          ],
+          "properties": {
+            "reviewer_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewer_role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "jurisdiction": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewed_at_utc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "decision_record_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
         }
       }
     }
