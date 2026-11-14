@@ -603,6 +603,22 @@ pub fn evaluate_music_edit_transaction_v1(
     let last_attempt = transaction.attempts.last();
     let selected_attempt_id = last_attempt.map(|attempt| attempt.attempt_id.clone());
 
+    // An unresolved provider/render execution can still produce side effects or
+    // a competing candidate. It blocks acceptance of every earlier candidate
+    // until the original execution is reconciled.
+    if last_attempt.is_some_and(|attempt| {
+        attempt.outcome == MusicEditAttemptOutcomeV1::OutcomeUnknown
+    }) {
+        return make_receipt(
+            transaction,
+            MusicEditDecisionActionV1::Abstain,
+            selected_attempt_id,
+            vec![MusicEditDecisionReasonV1::OutcomeUnknown],
+            usage,
+        )
+        .map_err(|issue| vec![issue]);
+    }
+
     if transaction.attempts.iter().any(|attempt| {
         attempt.source_lineage_sha256 != transaction.source_lineage_sha256
             || attempt.evidence.iter().any(|record| {
@@ -991,6 +1007,29 @@ mod tests {
             .contains(&MusicEditTransactionIssueV1::UnknownOutcomeNotTerminal(
                 "attempt-001".to_owned()
             )));
+    }
+
+    #[test]
+    fn unknown_later_attempt_blocks_acceptance_of_an_earlier_verified_candidate() {
+        let mut tx = transaction();
+        let mut unknown = ready_attempt();
+        unknown.attempt_index = 2;
+        unknown.attempt_id = "attempt-002".to_owned();
+        unknown.candidate_id = "candidate-002".to_owned();
+        unknown.kind = MusicEditAttemptKindV1::Alternative;
+        unknown.outcome = MusicEditAttemptOutcomeV1::OutcomeUnknown;
+        unknown.outcome_reason_code = Some("provider-timeout-after-submit".to_owned());
+        unknown.candidate_artifact_sha256 = None;
+        unknown.candidate_symbolic_sha256 = None;
+        unknown.evidence.clear();
+        tx.attempts.push(unknown);
+
+        let receipt = evaluate_music_edit_transaction_v1(&tx, &tx.policy_sha256).unwrap();
+        assert_eq!(receipt.payload.action, MusicEditDecisionActionV1::Abstain);
+        assert_eq!(
+            receipt.payload.reasons,
+            vec![MusicEditDecisionReasonV1::OutcomeUnknown]
+        );
     }
 
     #[test]
