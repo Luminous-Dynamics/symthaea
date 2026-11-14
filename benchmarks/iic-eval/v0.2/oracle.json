@@ -267,6 +267,55 @@
         "Do not substitute 18 m³ as the target reserve.",
         "Do not omit per-site scope or the measurement time."
       ]
+    },
+    {
+      "case_id": "IIC-010",
+      "expected_candidates": [
+        {
+          "candidate_ref": "IIC-010-R1",
+          "source_document_id": "INSPECTION-010-V2",
+          "verbatim_span": "replace the 90-day inspection interval with a 60-day interval",
+          "modality": "mandatory",
+          "conditions": [
+            "effective from 2026-01-01 through 2026-06-30"
+          ],
+          "adjudication_state": "superseded"
+        },
+        {
+          "candidate_ref": "IIC-010-R2",
+          "source_document_id": "INSPECTION-010-V3",
+          "verbatim_span": "replace the 60-day inspection interval with a 30-day interval",
+          "modality": "mandatory",
+          "conditions": [
+            "effective from 2026-07-01"
+          ],
+          "adjudication_state": "candidate"
+        }
+      ],
+      "required_questions": [],
+      "prohibited_inferences": [
+        "Do not use the 30-day interval for the 2026-02-15 effective-time query.",
+        "Do not erase the 60-day intermediate policy version.",
+        "Do not confuse effective_at with known_at."
+      ],
+      "temporal_queries": [
+        {
+          "query_id": "historical_2026_02_15",
+          "effective_at": "2026-02-15T00:00:00Z",
+          "known_at": "2026-11-14T00:00:00Z",
+          "required_candidate_refs": [
+            "IIC-010-R1"
+          ]
+        },
+        {
+          "query_id": "current_2026_11_14",
+          "effective_at": "2026-11-14T00:00:00Z",
+          "known_at": "2026-11-14T00:00:00Z",
+          "required_candidate_refs": [
+            "IIC-010-R2"
+          ]
+        }
+      ]
     }
   ]
 }
