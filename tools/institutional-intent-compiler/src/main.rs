@@ -545,18 +545,23 @@ fn validate(manifest: &Manifest) -> ValidationReport {
                 && target.lifecycle == Lifecycle::Accepted
                 && link.kind == LinkKind::ConflictsWith
             {
-                let resolution = link.resolution_decision_ref.as_ref().and_then(|id| decisions.get(id));
-                match resolution {
-                    Some(decision)
-                        if decision.action == DecisionAction::ResolveConflict
-                            && decision.subject_id == requirement.id
-                            && decision.baseline_version == manifest.baseline_version => {}
-                    _ => push(
+                let resolution_result = decision_matches(
+                    &link.resolution_decision_ref,
+                    &decisions,
+                    DecisionSubject::Requirement,
+                    &requirement.id,
+                    &[DecisionAction::ResolveConflict],
+                    manifest.baseline_version,
+                    &format!("{link_path}.resolution_decision_ref"),
+                    &mut diagnostics,
+                );
+                if resolution_result.is_none() {
+                    push(
                         &mut diagnostics,
                         "unresolved_accepted_conflict",
                         link_path,
                         format!("accepted requirement conflicts with accepted '{}' without a matching conflict-resolution decision", target.id),
-                    ),
+                    );
                 }
             }
         }
@@ -731,6 +736,36 @@ mod tests {
         });
         let report = validate(&manifest);
         assert!(report.diagnostics.iter().any(|d| d.code == "accepted_dependency_not_accepted"));
+    }
+
+    #[test]
+    fn rejects_conflict_between_accepted_requirements_without_resolution() {
+        let mut manifest = valid_manifest();
+        let mut second = manifest.requirements[0].clone();
+        second.id = "REQ-002".to_owned();
+        second.statement = "The system shall disclose the same secret in the public view.".to_owned();
+        second.review_decision_ref = Some("DEC-002".to_owned());
+        manifest.requirements[0].links.push(RequirementLink {
+            kind: LinkKind::ConflictsWith,
+            target_requirement_id: "REQ-002".to_owned(),
+            resolution_decision_ref: None,
+        });
+        manifest.requirements.push(second);
+        let mut second_decision = manifest.decisions[0].clone();
+        second_decision.id = "DEC-002".to_owned();
+        second_decision.subject_id = "REQ-002".to_owned();
+        manifest.decisions.push(second_decision);
+
+        let report = validate(&manifest);
+        assert!(report.diagnostics.iter().any(|d| d.code == "unresolved_accepted_conflict"));
+    }
+
+    #[test]
+    fn rejects_source_span_past_declared_byte_length() {
+        let mut manifest = valid_manifest();
+        manifest.requirements[0].traceability.source_spans[0].end_byte = 101;
+        let report = validate(&manifest);
+        assert!(report.diagnostics.iter().any(|d| d.code == "invalid_source_span"));
     }
 
     #[test]
