@@ -47,9 +47,9 @@ The v0.1.1 manifest currently contains 11 directional relationship statements. T
 
 ## Validation tool
 
-The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, federation manifests v0.1.0/v0.1.1, DYNRETR fixed-budget retrieval/exploration cases, a pure Cargo manifest projection library, and a syntax-only Rust source projection library.
+The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, federation manifests v0.1.0/v0.1.1, DYNRETR fixed-budget retrieval/exploration cases, a pure Cargo manifest projection library, and a syntax-only Rust source projection library with parser-derived source spans.
 
-**The Rust source and its 78 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
+**The Rust source and its 79 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
 
 ## Retrieval benchmark fixture
 
