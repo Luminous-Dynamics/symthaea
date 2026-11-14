@@ -268,7 +268,7 @@ pub fn evaluate_act_hold_pair(
     if should_hold.critical_trigger_visible_before_action
         && should_hold.disposition == ActHoldDisposition::Act
     {
-        reasons.insert("POST_HOC_ABSTENTION_AFTER_VISIBLE_TRIGGER".to_owned());
+        reasons.insert("ACTED_AFTER_VISIBLE_TRIGGER".to_owned());
     }
 
     let critical_premature_action = should_hold.disposition == ActHoldDisposition::Act
@@ -994,7 +994,7 @@ mod tests {
 
     fn sample_packet() -> Value {
         let receipt = |owner: &str, suffix: char| {
-            let mut packet = json!({
+            json!({
                 "owner_id": owner,
                 "artifact_ref": format!("synthetic://{owner}/receipt-001"),
                 "artifact_sha256": suffix.to_string().repeat(64),
@@ -1004,7 +1004,7 @@ mod tests {
             })
         };
 
-        json!({
+        let mut packet = json!({
             "schema_version": ASSESSMENT_SCHEMA_VERSION,
             "assessment_id": "synthetic-eng-decision-001",
             "artifact_visibility": "public_synthetic",
