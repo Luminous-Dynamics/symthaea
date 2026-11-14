@@ -109,3 +109,12 @@ TLA+/TLC is the complementary route for checking a finite protocol specification
 5. Run common-cause fault injection and report which failures affect both the effect producer and observer.
 
 **Claim ceiling:** an observer can only establish claims within its declared source, coverage, trust and freshness boundaries. No E0–E4 class proves complete observation of every real-world consequence.
+
+## Hash-chain consistency is not history authenticity
+
+A recomputed hash chain proves that the rows currently visible form a self-consistent sequence. It does not authenticate that sequence against an administrator or other actor who can rewrite every receipt and matching business row and recompute the hashes. An unanchored audit may correctly accept such a rewritten database.
+
+To detect a coordinated rewrite, compare the observed journal head with a previously trusted digest obtained **outside** the database, under a separately declared trust domain. The local companion adds an `AuditWithExpectedHead` call for this purpose and a test that rewrites a receipt plus its business row, recomputes the intent/record hashes, confirms that the unanchored audit accepts the self-consistent rewrite, and confirms that the original out-of-band head rejects it.
+
+This is a caller-supplied checkpoint comparison, not remote signing or key custody. The local prototype does not issue, sign, retain or protect the external checkpoint. A digest stored beside the database is not independent. A production E3/E4 design needs an independently administered checkpoint source (for example, a signed remote receipt or transparency log), key-management separation and rollback/fork detection.
+
