@@ -15,7 +15,7 @@ MUSE has three related but distinct representations:
 2. The MUSE-MIR-012 graph: explicit per-part measure spans, source measure locators, barline/repeat/endings and playback controls.
 3. The MUSE-MIR-018 notation-event layer: written and performed-symbolic note/rest semantics, plus score-order attributes, kept beside the graph.
 
-The first two are insufficient for readable-score reconstruction and editing. Flattening MusicXML into a list of pitched notes loses rests, grace/cue notes, unpitched percussion, written values, ties, tuplets, staff/voice assignments, chord groupings and score-order attributes.
+The first two are insufficient for readable-score reconstruction and editing. Flattening MusicXML into a list of pitched notes loses rests, grace/cue notes, unpitched percussion, written values, ties, tuplets, staff/voice assignments, chord groupings, score-order attributes and the part-list declarations that bind written parts to score instruments and MIDI program/channel setup.
 
 ## MusicXML semantics that must not be conflated
 
@@ -53,6 +53,15 @@ Each source event records:
 
 Chord members share their immediately preceding base note's onset and do not advance the cursor. Grace chords are supported without fabricating a non-zero duration. A chord member longer than its base note, or without a resolvable base, makes the event layer Unknown.
 
+### Part-list identity and instrument bindings
+
+The graph now also carries the matching MusicXML `<score-part>` declaration, when present:
+- exact part ID, part name and abbreviation;
+- declared `score-instrument` IDs;
+- the entire source `score-part` subtree, including `midi-instrument`, device, channel, bank, program, volume, pan and future extension declarations.
+
+Note-level `<instrument id>` references remain on their events. The Studio summary counts part metadata, declared score instruments and MIDI instrument setups, and reports note instrument references that do not bind to a declared score-instrument ID. Missing part-list entries remain absent/unknown; no instrument is inferred from pitch or staff.
+
 ### Score-order attributes and cursor movement
 
 Each child of MusicXML `<attributes>` becomes an ordered attribute event at its exact cursor position. This preserves divisions, key, meter, clefs, staves, transpose, staff details and future child elements in source order.
@@ -74,7 +83,7 @@ Opaque source subtrees preserve ordered element children, ordered attributes, ex
 - A measure map can remain Supported while its notation-event layer is Unknown; consumers must read both status values independently.
 - Existing Score importer signatures and note-only MIDI metrics are unchanged.
 - New graph commitments include note/rest events, attribute events, auxiliary events and cursor moves, including ordered mixed content in retained source trees.
-- Import summaries report note-event, auxiliary-event, attribute-event and cursor-move counts, plus unpitched/cue/chord/time-modification counts. The overall summary becomes partially unknown if either the measure graph or notation-event layer is unresolved.
+- Import summaries report note-event, auxiliary-event, attribute-event and cursor-move counts, plus unpitched/cue/chord/time-modification counts, rests/grace/tuplets/ties/voice/staff assignments, part-list declarations, score-instrument and MIDI-instrument counts, and unresolved note-instrument references. The overall summary becomes partially unknown if either the measure graph or notation-event layer is unresolved.
 - Old graph JSON without the field deserializes to a legacy Unknown sentinel; serialization skips the sentinel, keeping old graph commitment shape stable.
 - Replay validation projects newly parsed graphs back to the legacy shape when validating an old receipt. New receipts compare the full event layer, so tampering is rejected.
 
@@ -85,7 +94,7 @@ Resource budgets:
 
 ## Tests authored
 
-### Notation-event parser (14 tests)
+### Notation-event parser (17 tests)
 
 - rest and measure-rest, grace, cue, unpitched, microtonal pitch spelling, voice/staff and instrument ID;
 - chord member onset anchoring and no cursor advance;
@@ -102,13 +111,20 @@ Resource budgets:
 - positioned direction/harmony/sound events with signed offsets;
 - out-of-measure auxiliary offsets fail closed.
 
-### Integrated graph (32 adapter tests total)
+### Integrated graph (34 adapter tests total)
 
 New integration tests verify:
 - notation events are part of the per-part graph and graph commitment;
 - deterministic replay accepts the same source and rejects a tampered event position;
 - legacy graph serialization omits the sentinel and legacy replay remains valid;
-- unsupported mid-measure meter change does not leak partial notation events.
+- unsupported mid-measure meter change does not leak partial notation events;
+- part-list names, abbreviations, score-instrument IDs and MIDI instrument declarations bind to the correct part;
+- a mutation to part-list instrument metadata is rejected by graph replay;
+- documents without a matching part-list entry do not invent instrument metadata.
+
+### Muse Studio summary
+
+The Studio tests verify that aggregate import summary counts include source part-list metadata, score/MIDI instrument declarations and unresolved note-level instrument references.
 
 These are authored tests. They have not been compiled or executed in this environment.
 
