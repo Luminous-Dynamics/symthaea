@@ -1,6 +1,6 @@
 # MACE research programme: independently qualified agent execution
 
-**Version:** 0.1, 2026-11-13  
+**Version:** 0.2, 2026-11-14  
 **Status:** research and engineering targets; proposed, not achieved unless explicitly stated below.
 
 ## Thesis
@@ -18,6 +18,23 @@ The paradigm shift is from **agent scoreboards** to **independently qualified ac
 - **AgentDojo.** The NeurIPS 2024 benchmark contains 97 realistic tasks and 629 security test cases for prompt-injection attacks against tool-using agents. MACE's extension is to measure unauthorized external effects and their evidence, not only whether an attack or defense classifier fires. Source: https://proceedings.neurips.cc/paper_files/paper/2024/hash/97091a5177d8dc64b1da8bf3e1f6fb54-Abstract-Datasets_and_Benchmarks_Track.html
 
 These figures are not directly comparable: the unit, task mix, grader, harness and evaluation protocol differ. Their common lesson is that a high leaderboard score cannot, by itself, establish evaluator validity or effect integrity.
+
+
+### Industry frontier snapshot — 14 November 2026
+
+The figures below are not a common ranking. Task sets, agent harnesses, budget caps, metrics and evidence provenance differ.
+
+| Benchmark | Current visible frontier | Evidence status | MACE comparison target |
+|---|---|---|---|
+| SWE-Bench Pro V2 Full | Scale's official board lists Claude Opus 5 / Claude Code at 99.40±0.40%, Gemini 4 Argon / mini-swe-agent at 99.22±0.45%, Fable 5.1 at 99.10±0.50%, and GPT-6 Astra / Codex at 96.90±1.10%. | Official board; model, harness and effort-specific. Scale's locked V2 protocol uses 642 tasks, reference/empty-patch gates, restricted agent network and pristine-image re-grading; the page discloses residual trust boundaries. | Preserve native task score; add repository mutation, tool/effect evidence and independent re-grade provenance. Use saved artifacts for assurance re-grading without another model run when possible. |
+| Terminal-Bench 4.1 | The maintainers released Worker-based verifier isolation and regraded saved TB4.0 trials. | Maintainer release notes: 44 TB4.0 tasks executed agent-authored code during verification; 162 trials changed on re-grade, 134 expected verifier effects and 28 retained at original scores due to measurement discrepancies. | Adopt Harbor Worker isolation as baseline. Add independent effect-origin observation, oracle non-interference and destination effect-or-fence semantics beyond process isolation. |
+| OSWorld 2.1 | BenchLM's November 13 snapshot lists Claude Opus 5.5 at 81.8% partial score. | All 11 table entries are lab-reported; BenchLM says none was independently rerun. Epoch AI's audit found defects in 36 of 50 sampled tasks, with up to 50.4% potential impact on the audited score. | Use an audited task-pinned subset; compare application/process/filesystem/network effects against independent oracles. Do not claim independently reproduced SOTA from provider scores. |
+| τ³-Banking | Sierra's official board lists Qwen 3.8 Max at 55.2% Pass¹, Claude Opus 5 at 48.7%, Grok 4.5 at 47.9%, and GPT-5.6-sol at 46.9%. | Official banking/knowledge-retrieval domain with ~700 documents; not an aggregate score for every τ³ domain. | Test stateful policy application, exact tool effects, one-shot dispatch, idempotency, effect-or-fence and lost-ack recovery. Preserve native Pass¹/Pass^k reporting. |
+
+Sources: [Scale SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full); [Terminal-Bench 4.1](https://www.tbench.ai/news/terminal-bench-4-1); [OSWorld 2.1 snapshot](https://benchlm.ai/benchmarks/osworld-2-1); [Epoch OSWorld audit](https://epoch.ai/benchmarks/osworld-2-1/review); [Sierra τ-bench leaderboard](https://taubench.com/leaderboard/).
+
+**Competitive interpretation:** MACE cannot beat a solver benchmark with a verifier microbenchmark. It should aim for higher *trustworthy completion at matched utility*: identical agent, task revision, harness, network policy, budgets and seeds across baseline, telemetry-only and full-MACE arms. Publish the Pareto frontier for utility, unauthorized effects, observer coverage, reconciliation correctness, latency/cost and human intervention. Do not hide failures inside a weighted composite.
+
 
 ## Align the accountability model; do not invent another one
 
@@ -51,11 +68,15 @@ The production experiment must observe the effect boundary from outside the agen
 
 Use exact prerequisite receipt IDs and source sequence/parent references to establish causal dependencies. Wall-clock timestamps can be retained for diagnosis, but timestamps from independent systems must not be used as proof that one effect caused another. Delivery order and causal order are separate fields; a reordered transport stream is acceptable only if source sequence and parent receipts remain intact.
 
-### 3. From happy-path tests to two-sided mutation qualification
+### 3. From client-side retries to destination-side effect-or-fence
+
+A timeout followed by an ordinary `not found` lookup is not proof that a delayed request cannot still arrive. The destination must linearize the original effect against a durable fence for the exact idempotency key and intent. The terminal outcomes are either the effect committed, or a destination tombstone committed that rejects every later arrival. If the destination cannot atomically commit the business mutation and idempotency/fence row, it must preserve `indeterminate`; it must not simulate non-execution with a client-side cancel token. This is a destination protocol property, not an end-to-end exactly-once guarantee for arbitrary remote systems.
+
+### 4. From happy-path tests to two-sided mutation qualification
 
 Every negative control should have a known-good positive baseline and a condition-removed twin. The twin changes only the targeted fault condition and must restore the baseline outcome. Add representation twins to test invariance under irrelevant encodings. Mutations should include missing, extra, duplicate, replayed, substituted, unauthorized, revoked, expired, out-of-order, partially observed and fabricated effects, plus grader mutations that deliberately stop checks from running.
 
-### 4. From one score to an assurance vector
+### 5. From one score to an assurance vector
 
 Publish independent measurements for:
 
@@ -67,7 +88,7 @@ Publish independent measurements for:
 
 Report these as separate scorecards and hard gates, never as a weighted score that hides an assurance failure.
 
-### 5. From a single implementation to independent conformance
+### 6. From a single implementation to independent conformance
 
 Keep a reference implementation, but require a second independently maintained verifier/adapter to consume the same frozen vectors and bytes. Record shared dependencies and governance. A second binary built from the same codebase is not independent evidence. For subjective outcomes, use blinded human adjudication and report disagreement rather than converting consensus uncertainty into a clean pass.
 
@@ -93,6 +114,12 @@ Hold model version, prompts, scaffold, tool schemas, task revision, environment 
 
 Do not compare a verifier's millisecond microbenchmark to a model's SWE-bench score. Compare the same agent with and without the assurance layer under matched conditions.
 
+## Executed effect-or-fence reference increment (local prototype)
+
+The `effectbridge` package supplies a local destination-side HTTP fixture with a single-writer append-only journal. A successful effect and a durable fence are mutually exclusive terminal states for the same idempotency key and exact intent. An ordinary `not_found_unfenced` lookup remains indeterminate because a delayed packet can still arrive; a committed fence tombstone rejects late dispatch. Repeated fence requests are idempotent after acknowledgement loss. The package composes with #11647 (broker durability/IPC/grant accounting) and #9490 (action authority); it is not a second broker and does not mint permits.
+
+The local experiment includes child-process clients, service kill/restart after lost effect acknowledgement, lost fence acknowledgement recovery, effect/fence races, a single-writer advisory lock and 10,000 generated sequential protocol operations checked against a separate finite-state model. Those 10,000 operations are not 10,000 crash schedules. The modeled business effect is the journal commit itself; a real adapter still requires a native transaction combining business state with idempotency/fence, or must remain indeterminate. No storage-device power-loss or production database qualification is claimed.
+
 ## Proposed qualification targets (not achieved results)
 
 | Area | Qualification target | Evidence boundary |
@@ -101,6 +128,7 @@ Do not compare a verifier's millisecond microbenchmark to a model's SWE-bench sc
 | Adversarial closure | Zero accepted missing, extra, duplicate, replayed, substituted, unauthorized, revoked, expired or premature effects in the registered corpus | Claim only zero observed accepts in that frozen corpus |
 | Dependencies | 100% rejection of cycles, wrong parent receipt IDs and premature dependent dispatch | Exact parent references, not timestamp order |
 | Lost acknowledgements | Correctly reconcile every remote-success/lost-ack fixture; otherwise remain `indeterminate` and block new mutation | Never blindly retry an effect whose remote outcome is unknown |
+| Destination effect-or-fence | 100% finite-state-oracle agreement for dispatch/fence races; zero effect after a committed fence | Only where destination atomically commits the effect or fence for the exact same idempotency key and intent |
 | Durable broker replay | Zero double-consumption events in at least 10,000 fixed-seed schedules on the actual persistent broker | Include process crash/restart, expiry, revocation, concurrent requests and crash points; not a population guarantee |
 | Observer fidelity | Zero missed/fabricated events in a finite independently enumerated ground-truth corpus | Include dropped, delayed, duplicated, reordered, forged, partial and substituted records |
 | Grader integrity | Every registered grader mutation is detected; reference controls pass and no-op/empty controls fail | Include condition-removed twins; independently adjudicate subjective tasks |
@@ -146,10 +174,11 @@ Provisional engineering targets remain: 100% expected results on registered muta
 ## Immediate execution sequence
 
 1. **Completed locally and published for review:** benchmark-integrity protocol branch (#11921) and executable evaluator/observer laboratory branch (#11965). Both are draft PRs; no hosted CI result is claimed.
-2. **Next:** replace the observerlab's simulator-authored truth with a recorder at the effect origin and retain the independent comparator. Introduce one real stateful adapter with a non-destructive test service.
-3. **Then:** attach the adapter to the durable one-shot authority/broker; run 10,000+ deterministic crash, retry, race, expiry and revoke schedules; specifically test success at the remote service followed by a lost acknowledgement.
-4. **Then:** add adapters for one coding benchmark and one desktop/stateful-tool benchmark while preserving official scores and pinned versions.
-5. **Finally:** commission a second independent implementation and blinded benchmark/grader audit; publish raw artifacts, hashes, environment identity, limitations and independent reports.
+2. **Completed locally / draft implementation:** add destination-side effect-or-fence with absent lookup remaining indeterminate, a durable exact-intent tombstone and delayed-request rejection.
+3. **Next:** replace the journal-as-effect simplification with a disposable real stateful service whose business mutation and idempotency/fence row share one native transaction; independently observe its authoritative transaction log.
+4. **Then:** compose with #11647 and #9490 and run the full 10,000+ crash/restart/race/expiry/revocation/lost-ack schedules against the actual broker plus destination adapter. Qualify power-loss separately from process restart.
+5. **Then:** use Terminal-Bench 4.1 / Harbor Worker as the process-isolation baseline, then add one coding benchmark and one desktop/stateful-tool adapter while preserving official scores and pinned versions.
+6. **Finally:** commission a second independent implementation and blinded benchmark/grader audit; publish raw artifacts, hashes, environment identity, limitations and independent reports.
 
 ## Current claim boundary
 
