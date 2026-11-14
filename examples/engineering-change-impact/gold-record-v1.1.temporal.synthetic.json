@@ -141,7 +141,12 @@
         "observation_ref": "synthetic://clock/frontier-K"
       },
       "boundary": "inclusive",
-      "frontier_ref": "synthetic://frontier/K-001"
+      "frontier_ref": "synthetic://frontier/K-001",
+      "ordering_model": "single_source_authoritative_clock_or_monotonic_sequence",
+      "causal_frontier": {
+        "required": false,
+        "state": "not_required"
+      }
     },
     "declared_principal_ref": "synthetic://principal/engineering-reviewer",
     "rights_profile_ref": "synthetic://rights/profile-001",
