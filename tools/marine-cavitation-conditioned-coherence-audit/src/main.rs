@@ -53,6 +53,8 @@ struct Case {
     vibration_calibration_certificate_sha256: String,
     maximum_sync_alignment_uncertainty_s: f64,
     frequency_match_tolerance_fraction: f64,
+    coherence_estimator_fingerprint_sha256: String,
+    cross_spectrum_convention: String,
     minimum_windows_per_state_per_run: usize,
     minimum_independent_runs: usize,
     windows: Vec<JoinedWindow>,
@@ -143,6 +145,9 @@ struct CoherenceBand {
 struct AuditReport {
     schema_version: &'static str,
     case_id: String,
+    source_dataset_id: String,
+    source_citation: String,
+    source_data_sha256: String,
     intermittency_report_case_id: String,
     intermittency_report_sha256: String,
     evidence_kind: &'static str,
@@ -178,7 +183,7 @@ struct RunReport {
     band_reports: Vec<RunBandReport>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct RunBandReport {
     band_id: String,
     frequency_hz: f64,
@@ -189,7 +194,7 @@ struct RunBandReport {
     present_minus_absent_mean_residual_pressure_psd_pa2_per_hz: Option<f64>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct CohortSummary {
     window_count: usize,
     mean_coherence: f64,
@@ -313,6 +318,8 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
     for (label, value) in [
         ("case_id", case.case_id.as_str()),
+        ("source dataset_id", case.source.dataset_id.as_str()),
+        ("source citation", case.source.citation.as_str()),
         ("intermittency_report_case_id", case.intermittency_report_case_id.as_str()),
         ("vessel_id", case.vessel_id.as_str()),
         ("propeller_revision", case.propeller_revision.as_str()),
@@ -324,6 +331,7 @@ fn validate_case(case: &Case) -> Vec<String> {
         ("vibration_channel_id", case.vibration_channel_id.as_str()),
         ("vibration_reference_location", case.vibration_reference_location.as_str()),
         ("vibration_reference_orientation", case.vibration_reference_orientation.as_str()),
+        ("cross_spectrum_convention", case.cross_spectrum_convention.as_str()),
     ] {
         if value.trim().is_empty() {
             errors.push(format!("{label} is required"));
@@ -339,6 +347,7 @@ fn validate_case(case: &Case) -> Vec<String> {
         ("synchronization receipt", &case.synchronization_receipt_sha256),
         ("hydrophone calibration", &case.hydrophone_calibration_certificate_sha256),
         ("vibration calibration", &case.vibration_calibration_certificate_sha256),
+        ("coherence estimator", &case.coherence_estimator_fingerprint_sha256),
     ] {
         if !is_sha256(digest) {
             errors.push(format!("{label} digest must be 64 hexadecimal characters"));
@@ -417,6 +426,9 @@ fn validate_case(case: &Case) -> Vec<String> {
         if !is_sha256(&coh.report_sha256) || !coherence_report_digests.insert(coh.report_sha256.clone()) {
             errors.push(format!("{identity}: malformed or reused coherence report digest"));
         }
+        if coh.vibration_raw_trace_sha256 == coh.pressure_raw_trace_sha256 {
+            errors.push(format!("{identity}: pressure and vibration raw-trace digests must be distinct"));
+        }
         for (label, digest) in [
             ("coherence source data", &coh.source_data_sha256),
             ("coherence operating point", &coh.operating_point_receipt_sha256),
@@ -467,22 +479,32 @@ fn validate_case(case: &Case) -> Vec<String> {
             }
             let recomposed = band.vibration_reference_coherent_pressure_psd_pa2_per_hz
                 + band.non_coherent_residual_pressure_psd_pa2_per_hz;
-            let allowed = PSD_REL_TOLERANCE * band.pressure_psd_pa2_per_hz.max(1.0);
+            let allowed = PSD_REL_TOLERANCE * band.pressure_psd_pa2_per_hz.max(f64::MIN_POSITIVE) + 1.0e-24;
             if (recomposed - band.pressure_psd_pa2_per_hz).abs() > allowed {
                 errors.push(format!("{identity} / {}: coherent plus residual PSD does not recover measured pressure PSD", band.band_id));
             }
-            for (lower, upper, value, label) in [
+            let intervals = [
                 (band.coherence_lower_bound, band.coherence_upper_bound, band.coherence_magnitude_squared, "coherence"),
                 (band.vibration_reference_coherent_pressure_psd_lower_bound, band.vibration_reference_coherent_pressure_psd_upper_bound, band.vibration_reference_coherent_pressure_psd_pa2_per_hz, "coherent PSD"),
                 (band.non_coherent_residual_pressure_psd_lower_bound, band.non_coherent_residual_pressure_psd_upper_bound, band.non_coherent_residual_pressure_psd_pa2_per_hz, "residual PSD"),
-            ] {
-                match (lower, upper) {
-                    (Some(lo), Some(hi)) if lo.is_finite() && hi.is_finite() && lo >= 0.0 && lo <= value && value <= hi => {}
-                    _ => errors.push(format!("{identity} / {}: {label} must have an ordered conservative marginal interval", band.band_id)),
+            ];
+            match band.uncertainty_status.as_str() {
+                "marginal_interval_envelope_available" => {
+                    for (lower, upper, value, label) in intervals {
+                        match (lower, upper) {
+                            (Some(lo), Some(hi))
+                                if lo.is_finite()
+                                    && hi.is_finite()
+                                    && lo >= 0.0
+                                    && lo <= value
+                                    && value <= hi
+                                    && (label != "coherence" || hi <= 1.0 + 1.0e-9) => {}
+                            _ => errors.push(format!("{identity} / {}: {label} must have an ordered conservative marginal interval", band.band_id)),
+                        }
+                    }
                 }
-            }
-            if band.uncertainty_status != "marginal_interval_envelope_available" {
-                errors.push(format!("{identity} / {}: uncertainty-unresolved coherence output is not eligible", band.band_id));
+                "coherent_residual_interval_unresolved" => {}
+                _ => errors.push(format!("{identity} / {}: unsupported uncertainty status", band.band_id)),
             }
             if band.phase_status != "phase_resolved_within_declared_limit" && band.phase_status != "phase_unresolved" {
                 errors.push(format!("{identity} / {}: unsupported phase status", band.band_id));
@@ -495,8 +517,42 @@ fn validate_case(case: &Case) -> Vec<String> {
 fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
     let mut incomparable = false;
     let mut reasons = Vec::new();
+    let reference_sample_rate = case.windows.first().map(|w| w.coherence.sample_rate_hz).unwrap_or_default();
+    let reference_sample_count = case.windows.first().map(|w| w.coherence.sample_count).unwrap_or_default();
+    let reference_band_coverage: BTreeMap<String, f64> = case.windows.first()
+        .map(|window| window.coherence.bands.iter().map(|band| (band.band_id.clone(), band.marginal_uncertainty_coverage_level)).collect())
+        .unwrap_or_default();
+    let reference_band_ids: BTreeSet<String> = case.windows.first()
+        .map(|window| window.coherence.bands.iter().map(|band| band.band_id.clone()).collect())
+        .unwrap_or_default();
+    let reference_frequencies: BTreeMap<String, f64> = case.windows.first()
+        .map(|window| window.coherence.bands.iter().map(|band| (band.band_id.clone(), band.frequency_hz)).collect())
+        .unwrap_or_default();
+
     for window in &case.windows {
         let coh = &window.coherence;
+        let current_band_ids: BTreeSet<String> = coh.bands.iter().map(|band| band.band_id.clone()).collect();
+        if current_band_ids != reference_band_ids {
+            incomparable = true;
+            reasons.push(format!("{}: coherence band ID set differs across windows", window.window_id));
+        }
+        if (coh.sample_rate_hz - reference_sample_rate).abs() > 1.0e-9 || coh.sample_count != reference_sample_count {
+            incomparable = true;
+            reasons.push(format!("{}: coherence sample rate/count differs across windows", window.window_id));
+        }
+        for band in &coh.bands {
+            if reference_band_coverage.get(&band.band_id).is_some_and(|coverage| (coverage - band.marginal_uncertainty_coverage_level).abs() > 1.0e-9) {
+                incomparable = true;
+                reasons.push(format!("{}: marginal uncertainty coverage differs for band {}", window.window_id, band.band_id));
+            }
+            if let Some(reference_frequency) = reference_frequencies.get(&band.band_id) {
+                let relative = (reference_frequency - band.frequency_hz).abs() / reference_frequency.max(1.0);
+                if relative > case.frequency_match_tolerance_fraction {
+                    incomparable = true;
+                    reasons.push(format!("{}: frequency grid differs for band {}", window.window_id, band.band_id));
+                }
+            }
+        }
         let checks = [
             (coh.source_dataset_id == case.source.dataset_id, "source dataset identity differs"),
             (coh.source_data_sha256 == case.source.raw_data_sha256, "source data digest differs"),
@@ -512,6 +568,8 @@ fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
             (coh.pressure_instrument_id == case.hydrophone_instrument_id && coh.pressure_channel_id == case.hydrophone_channel_id && coh.pressure_calibration_certificate_sha256 == case.hydrophone_calibration_certificate_sha256 && window.hydrophone_instrument_id == case.hydrophone_instrument_id && window.hydrophone_calibration_certificate_sha256 == case.hydrophone_calibration_certificate_sha256, "hydrophone identity/calibration differs"),
             (coh.vibration_instrument_id == case.vibration_instrument_id && coh.vibration_channel_id == case.vibration_channel_id && coh.vibration_calibration_certificate_sha256 == case.vibration_calibration_certificate_sha256 && coh.vibration_reference_location == case.vibration_reference_location && coh.vibration_reference_orientation == case.vibration_reference_orientation, "vibration reference identity/calibration/location differs"),
             (coh.evidence_kind == case.evidence_kind, "coherence evidence kind differs"),
+            (coh.estimator_fingerprint_sha256 == case.coherence_estimator_fingerprint_sha256, "coherence estimator configuration differs"),
+            (coh.cross_spectrum_convention == case.cross_spectrum_convention, "cross-spectrum convention differs"),
         ];
         for (ok, reason) in checks {
             if !ok {
@@ -519,9 +577,17 @@ fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
                 reasons.push(format!("{}: {reason}", window.window_id));
             }
         }
+        let phase_unresolved_in_bands = coh.bands.iter().any(|band| band.phase_status == "phase_unresolved");
+        let uncertainty_unresolved_in_bands = coh.bands.iter().any(|band| band.uncertainty_status == "coherent_residual_interval_unresolved");
         match coh.disposition.as_str() {
-            "COHERENCE_ESTIMATE_ONLY" | "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" => {}
-            "UNCERTAINTY_UNRESOLVED" => reasons.push(format!("{}: coherence uncertainty is unresolved", window.window_id)),
+            "COHERENCE_ESTIMATE_ONLY" if !phase_unresolved_in_bands && !uncertainty_unresolved_in_bands => {}
+            "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" if phase_unresolved_in_bands && !uncertainty_unresolved_in_bands => {}
+            "UNCERTAINTY_UNRESOLVED" if uncertainty_unresolved_in_bands => {
+                reasons.push(format!("{}: coherence uncertainty is unresolved", window.window_id));
+            }
+            "COHERENCE_ESTIMATE_ONLY" | "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" | "UNCERTAINTY_UNRESOLVED" => {
+                reasons.push(format!("{}: coherence report disposition conflicts with per-band phase/uncertainty status", window.window_id));
+            }
             "INVALID" => reasons.push(format!("{}: parent coherence report is invalid", window.window_id)),
             _ => reasons.push(format!("{}: parent coherence report is incomplete or unsupported", window.window_id)),
         }
@@ -658,7 +724,9 @@ fn audit(case: &Case) -> AuditReport {
                 present_minus_absent_mean_coherent_pressure_psd_pa2_per_hz: delta_coherent,
                 present_minus_absent_mean_residual_pressure_psd_pa2_per_hz: delta_residual,
             };
-            per_band_run_reports.entry(band_id.clone()).or_default().push(report.clone());
+            if has_both {
+                per_band_run_reports.entry(band_id.clone()).or_default().push(report.clone());
+            }
             band_reports.push(report);
         }
         run_reports.push(RunReport {
@@ -708,25 +776,33 @@ fn audit(case: &Case) -> AuditReport {
         });
     }
 
-    let mut disposition = "CONDITIONED_SUMMARY_ONLY";
-    if invalid_input {
-        disposition = "INVALID";
-        reasons.push("one or more joined input records are malformed".to_string());
-    } else if has_incomparable_identity {
-        disposition = "INCOMPARABLE";
-    } else if reasons.iter().any(|reason| reason.contains("frequency for band")) {
-        disposition = "INCOMPARABLE";
-    } else if reasons.iter().any(|reason| reason.contains("coherence uncertainty is unresolved") || reason.contains("parent coherence report is incomplete")) {
-        disposition = "INCOMPLETE";
-    } else if case.evidence_kind == EvidenceKind::Synthetic
+    let invalid_coherence_parent = reasons.iter().any(|reason| {
+        reason.contains("parent coherence report is invalid")
+            || reason.contains("disposition conflicts with per-band phase")
+    });
+    let frequency_incomparable = reasons.iter().any(|reason| reason.contains("frequency for band"));
+    let unresolved_parent = reasons.iter().any(|reason| {
+        reason.contains("coherence uncertainty is unresolved")
+            || reason.contains("parent coherence report is incomplete")
+    });
+    let evidence_incomplete = case.evidence_kind == EvidenceKind::Synthetic
         || case.source.rights_status != RightsStatus::PublicOrPermitted
         || !case.source.independently_reviewed
         || case.intermittency_disposition != "DISTRIBUTIONAL_SUMMARY_ONLY"
         || insufficient_runs
         || runs_with_both_cohorts < case.minimum_independent_runs
-        || run_reports.iter().any(|r| r.excluded_unknown_cavitation_state > 0 || r.excluded_alignment_ineligible > 0)
-    {
-        disposition = "INCOMPLETE";
+        || run_reports.iter().any(|r| r.excluded_unknown_cavitation_state > 0 || r.excluded_alignment_ineligible > 0);
+    let disposition = if invalid_input || invalid_coherence_parent {
+        "INVALID"
+    } else if has_incomparable_identity || frequency_incomparable {
+        "INCOMPARABLE"
+    } else if unresolved_parent || evidence_incomplete {
+        "INCOMPLETE"
+    } else {
+        "CONDITIONED_SUMMARY_ONLY"
+    };
+    if invalid_input {
+        reasons.push("one or more joined input records are malformed".to_string());
     }
 
     if case.evidence_kind == EvidenceKind::Synthetic {
@@ -748,6 +824,9 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
+        source_dataset_id: case.source.dataset_id.clone(),
+        source_citation: case.source.citation.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
         intermittency_report_case_id: case.intermittency_report_case_id.clone(),
         intermittency_report_sha256: case.intermittency_report_sha256.clone(),
         evidence_kind: match case.evidence_kind { EvidenceKind::Synthetic => "synthetic", EvidenceKind::Measured => "measured" },
@@ -934,6 +1013,8 @@ mod tests {
             vibration_calibration_certificate_sha256: digest(8),
             maximum_sync_alignment_uncertainty_s: 0.01,
             frequency_match_tolerance_fraction: 0.001,
+            coherence_estimator_fingerprint_sha256: digest(9),
+            cross_spectrum_convention: "pressure_times_conjugate_acceleration".to_string(),
             minimum_windows_per_state_per_run: 2,
             minimum_independent_runs: 2,
             windows,
@@ -947,6 +1028,44 @@ mod tests {
         for window in &mut input.windows {
             window.coherence.evidence_kind = EvidenceKind::Measured;
         }
+    }
+
+    #[test]
+    fn committed_schema_and_fixture_match_runtime_contract() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-cavitation-conditioned-coherence-v0.1.0.schema.json"
+        )).expect("committed schema is valid JSON");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        for field in [
+            "intermittency_report_sha256",
+            "coherence_estimator_fingerprint_sha256",
+            "cross_spectrum_convention",
+            "minimum_independent_runs",
+            "windows",
+        ] {
+            assert!(schema["required"].as_array().unwrap().iter().any(|value| value == field));
+        }
+        assert_eq!(
+            schema["$defs"]["coherenceBand"]["properties"]["coherence_lower_bound"]["type"],
+            serde_json::json!(["number", "null"])
+        );
+
+        let fixture: Case = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-cavitation-conditioned-coherence-v0.1.0.json"
+        )).expect("committed synthetic fixture matches runtime input contract");
+        let report = audit(&fixture);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports.len(), 2);
+        assert!((report.aggregate_band_reports[0].present_minus_absent_equal_run_weighted_mean_coherence.unwrap() - 0.5).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn source_dataset_citation_and_digest_survive_receipt() {
+        let input = case();
+        let report = audit(&input);
+        assert_eq!(report.source_dataset_id, input.source.dataset_id);
+        assert_eq!(report.source_citation, input.source.citation);
+        assert_eq!(report.source_data_sha256, input.source.raw_data_sha256);
     }
 
     #[test]
@@ -1049,6 +1168,14 @@ mod tests {
     fn coherence_uncertainty_unresolved_is_not_eligible() {
         let mut input = case();
         measured(&mut input);
+        let band = &mut input.windows[0].coherence.bands[0];
+        band.uncertainty_status = "coherent_residual_interval_unresolved".to_string();
+        band.coherence_lower_bound = None;
+        band.coherence_upper_bound = None;
+        band.vibration_reference_coherent_pressure_psd_lower_bound = None;
+        band.vibration_reference_coherent_pressure_psd_upper_bound = None;
+        band.non_coherent_residual_pressure_psd_lower_bound = None;
+        band.non_coherent_residual_pressure_psd_upper_bound = None;
         input.windows[0].coherence.disposition = "UNCERTAINTY_UNRESOLVED".to_string();
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
@@ -1089,9 +1216,66 @@ mod tests {
     }
 
     #[test]
+    fn one_continuous_vibration_trace_may_back_multiple_windowed_reports() {
+        let mut input = case();
+        measured(&mut input);
+        let shared_trace = input.windows[0].coherence.vibration_raw_trace_sha256.clone();
+        for window in input.windows.iter_mut().skip(1) {
+            window.coherence.vibration_raw_trace_sha256 = shared_trace.clone();
+        }
+        assert_eq!(audit(&input).disposition, "CONDITIONED_SUMMARY_ONLY");
+    }
+
+    #[test]
+    fn uncertainty_unresolved_parent_window_is_incomplete_not_invalid() {
+        let mut input = case();
+        measured(&mut input);
+        let band = &mut input.windows[0].coherence.bands[0];
+        band.uncertainty_status = "coherent_residual_interval_unresolved".to_string();
+        band.coherence_lower_bound = None;
+        band.coherence_upper_bound = None;
+        band.vibration_reference_coherent_pressure_psd_lower_bound = None;
+        band.vibration_reference_coherent_pressure_psd_upper_bound = None;
+        band.non_coherent_residual_pressure_psd_lower_bound = None;
+        band.non_coherent_residual_pressure_psd_upper_bound = None;
+        input.windows[0].coherence.disposition = "UNCERTAINTY_UNRESOLVED".to_string();
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports[0].excluded_uncertainty_unresolved, 1);
+    }
+
+    #[test]
+    fn unresolved_band_bounds_with_resolved_parent_disposition_are_invalid() {
+        let mut input = case();
+        input.windows[0].coherence.bands[0].uncertainty_status = "coherent_residual_interval_unresolved".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn invalid_parent_coherence_report_remains_invalid_in_join() {
+        let mut input = case();
+        input.windows[0].coherence.disposition = "INVALID".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn resolved_parent_report_requires_all_marginal_bounds() {
+        let mut input = case();
+        input.windows[0].coherence.bands[0].coherence_lower_bound = None;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn uncertainty_unresolved_parent_report_must_have_matching_band_status() {
+        let mut input = case();
+        input.windows[0].coherence.disposition = "UNCERTAINTY_UNRESOLVED".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
     fn coherent_plus_residual_pressure_psd_must_recompose_total() {
         let mut input = case();
-        input.windows[0].coherence.bands[0].non_coherent_residual_pressure_psd_pa2_per_hz = 0.8;
+        input.windows[0].coherence.bands[0].non_coherent_residual_pressure_psd_pa2_per_hz = 0.7;
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
@@ -1107,13 +1291,33 @@ mod tests {
         let mut input = case();
         measured(&mut input);
         for index in 0..20 {
-            input.windows.push(window(0, 100 + index, true, 1.0));
+            let mut extra = window(0, 1_000 + index, true, 1.0);
+            extra.coherence.evidence_kind = EvidenceKind::Measured;
+            input.windows.push(extra);
         }
         let report = audit(&input);
+        assert!(
+            !report.aggregate_band_reports.is_empty(),
+            "aggregate absent; reasons={:?}; runs={:?}",
+            report.reasons,
+            report.run_reports
+        );
         let band = &report.aggregate_band_reports[0];
         assert_eq!(band.independent_runs_with_both_cohorts, 2);
         // Aggregate present mean is the mean of the two run means, not all windows pooled.
-        assert!(band.cavitation_present_equal_run_weighted_mean_coherence.unwrap() < 1.0);
+        assert!((band.cavitation_present_equal_run_weighted_mean_coherence.unwrap() - 0.8636363636363636).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn under_sampled_run_remains_visible_but_is_excluded_from_campaign_aggregate() {
+        let mut input = case();
+        measured(&mut input);
+        input.windows.retain(|window| !(window.run_id == "run-0" && window.window_id == "window-0-1"));
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports.len(), 2);
+        assert_eq!(report.aggregate_band_reports[0].independent_runs_with_both_cohorts, 1);
+        assert!((report.aggregate_band_reports[0].cavitation_present_equal_run_weighted_mean_coherence.unwrap() - 0.75).abs() < 1.0e-12);
     }
 
     #[test]
@@ -1137,6 +1341,27 @@ mod tests {
         let mut input = case();
         input.windows[0].coherence.bands[0].uncertainty_status = "unknown".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn coherence_estimator_change_is_incomparable() {
+        let mut input = case();
+        input.windows[0].coherence.estimator_fingerprint_sha256 = digest(88);
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn cross_spectrum_convention_change_is_incomparable() {
+        let mut input = case();
+        input.windows[0].coherence.cross_spectrum_convention = "acceleration_times_conjugate_pressure".to_string();
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn missing_band_id_in_one_window_is_incomparable() {
+        let mut input = case();
+        input.windows[0].coherence.bands[0].band_id = "different-band".to_string();
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
     }
 
     #[test]
