@@ -271,10 +271,15 @@ fn validate_part_graph(
             reason: "part identity, source identity, schema or canonicalization is invalid".into(),
         });
     }
-    if graph.notation_events.note_events.len() > MUSICXML_NOTATION_MAX_PART_EVENTS_V1 {
+    let total_event_count = graph.notation_events.note_events.len()
+        .checked_add(graph.notation_events.attribute_events.len())
+        .and_then(|count| count.checked_add(graph.notation_events.auxiliary_events.len()))
+        .and_then(|count| count.checked_add(graph.notation_events.cursor_moves.len()))
+        .ok_or(MusicXmlNotationEvaluationErrorV1::ArithmeticOverflow)?;
+    if total_event_count > MUSICXML_NOTATION_MAX_PART_EVENTS_V1 {
         return Err(MusicXmlNotationEvaluationErrorV1::EventBudgetExceeded {
             part_id: part_id.into(),
-            count: graph.notation_events.note_events.len(),
+            count: total_event_count,
             maximum: MUSICXML_NOTATION_MAX_PART_EVENTS_V1,
         });
     }
@@ -1404,4 +1409,41 @@ mod tests {
         assert_eq!(evaluated.config_sha256.len(), 64);
         assert_eq!(evaluated.report_sha256.len(), 64);
     }
+
+    #[test]
+    fn maximum_matching_uses_an_augmenting_path_instead_of_greedy_first_fit() {
+        // Gold 0 can match either prediction; gold 1 can only match prediction 0.
+        // A first-fit greedy matcher gets one match. Maximum cardinality is two.
+        let adjacency = vec![vec![0, 1], vec![0]];
+        let (pair_gold, pair_pred) = maximum_matching(&adjacency, 2);
+        assert_eq!(pair_gold, vec![Some(1), Some(0)]);
+        assert_eq!(pair_pred, vec![Some(1), Some(0)]);
+    }
+
+    #[test]
+    fn matching_with_exact_rational_tolerance_is_inclusive() {
+        let gold = xml("P1", r#"
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+        "#);
+        let pred = xml("P1", r#"
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+        "#);
+        let mut reference = graph(&gold, "gold", "clock");
+        let mut prediction = graph(&pred, "pred", "clock");
+        reference[0].notation_events.note_events[0].score_offset =
+            RationalBeat::new(1, 4).unwrap();
+        prediction[0].notation_events.note_events[0].score_offset =
+            RationalBeat::new(3, 8).unwrap();
+        let exact = MusicXmlNotationEvaluationConfigV1 {
+            onset_tolerance: RationalBeat::new(1, 8).unwrap(),
+        };
+        let outcome = evaluate_musicxml_notation_graphs(
+            &reference, &prediction, &[binding("P1", "P1")], exact
+        ).unwrap();
+        assert_eq!(
+            report(outcome).event_alignment.counts.true_positives,
+            1
+        );
+    }
+
 }
