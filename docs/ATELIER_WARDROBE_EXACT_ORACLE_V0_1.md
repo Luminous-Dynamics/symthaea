@@ -12,7 +12,7 @@ The caller supplies:
 - available garments and alternative actions;
 - explicit compatibility between each garment/action and each need;
 - protected garments;
-- user cost and effort estimates;
+- user cost in integer minor units, an explicit planning currency and effort estimates;
 - acquisition policy and made-to-order policy.
 
 The optimizer does not infer fit, hygiene, safety, weatherproofness, cultural meaning, style quality, sentimental value, or lifecycle benefit.
@@ -36,7 +36,7 @@ A protected garment is retained in every plan, even if currently unusable. An un
 
 The current reference implementation enumerates every subset of up to 18 optional choices. It returns an error above that limit; no partial result is called exact.
 
-The Pareto dimensions are all minimized and remain separate:
+The Pareto dimensions are all minimized and remain separate. Every cost is an integer minor-unit amount in one explicitly declared currency. All choices in a search must use the same three-letter uppercase currency code as the policy; mixed currencies are rejected. The crate checks code shape, not authoritative ISO registry membership or FX conversion.
 
 1. newly acquired items;
 2. made-to-order items;
@@ -58,6 +58,8 @@ A plan dominates another only when it is no worse on every dimension and strictl
 - Made-to-order can be disabled independently of other acquisition types.
 - Uncovered requirements are listed.
 - Empty required-need sets still preserve protected items.
+- Mixed currency inputs are rejected rather than compared.
+- Malformed currency-code shape is rejected.
 
 ## Benchmark extensions
 
