@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod hmp_record_audit;
+mod hmp_pib_audit;
 mod manifest;
 mod rhn_sweep;
 
@@ -44,6 +45,12 @@ enum Commands {
         file: PathBuf,
         #[arg(long, default_value = "schemas/pluralistic-knowledge-record-v0.1.0.schema.json")]
         schema: PathBuf,
+    },
+    /// Audit the PIB synthetic interaction fixture and rights-related negative controls.
+    /// This does not score models or validate human cultural representation.
+    HmpPibAudit {
+        #[arg(long, default_value = "research-fixtures/plurality-integrity/synthetic-adversarial-v0.1.0.json")]
+        file: PathBuf,
     },
     /// Audit HMP-Bench fixture integrity and rights-related negative controls.
     /// This does not score models or validate cultural competence.
@@ -162,6 +169,13 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::HmpPibAudit { file } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            hmp_pib_audit::run(&root, &file)?;
         }
         Commands::HmpBenchAudit { file } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
