@@ -3162,6 +3162,15 @@ impl U1TeBDLayer {
         input: &ComplexU1Mps,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TeBDLayerResult, U1MpsError> {
+        self.apply_with_ledger(input, policy, U1MpsTruncationLedger::default())
+    }
+
+    fn apply_with_ledger(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+        mut truncation_ledger: U1MpsTruncationLedger,
+    ) -> Result<U1TeBDLayerResult, U1MpsError> {
         if input.site_count() != self.site_count {
             return Err(U1MpsError::TeBDLayerSiteCountMismatch {
                 layer_sites: self.site_count,
@@ -3171,7 +3180,6 @@ impl U1TeBDLayer {
         let input_norm_squared = input.norm_squared(policy.tolerance)?;
         let input_total_charge = input.total_charge;
         let mut state = input.clone();
-        let mut truncation_ledger = U1MpsTruncationLedger::default();
         let mut gate_truncations = Vec::with_capacity(self.gates.len());
         let mut canonical_gauge_receipts = Vec::with_capacity(self.gates.len());
         let mut gate_receipts = Vec::with_capacity(self.gates.len());
@@ -3244,12 +3252,197 @@ impl U1TeBDLayer {
     }
 }
 
+
+
+/// One nearest-neighbour two-site Hamiltonian term in a U(1) chain.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDHamiltonianTerm {
+    bond_index: usize,
+    hamiltonian: U1TwoSiteHamiltonian,
+}
+
+impl U1TeBDHamiltonianTerm {
+    pub fn new(bond_index: usize, hamiltonian: U1TwoSiteHamiltonian) -> Self {
+        Self { bond_index, hamiltonian }
+    }
+
+    pub const fn bond_index(&self) -> usize {
+        self.bond_index
+    }
+
+    pub fn hamiltonian(&self) -> &U1TwoSiteHamiltonian {
+        &self.hamiltonian
+    }
+}
+
+/// Second-order nearest-neighbour TEBD stepper using Strang composition.
+///
+/// A full step applies exp(-i dt H_even/2), exp(-i dt H_odd), then
+/// exp(-i dt H_even/2). Same-parity terms act on disjoint bonds and commute
+/// within each layer. The truncation ledger is passed through all three
+/// layers rather than reset at each composition boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepper {
+    site_count: usize,
+    terms: Vec<U1TeBDHamiltonianTerm>,
+}
+
+/// Result of one second-order Strang TEBD time step.
+///
+/// The global L2 receipt covers representation, canonicalization, gate quality
+/// and local truncation errors. Trotter error is not bounded by this receipt;
+/// it requires a step-refinement study or an independent commutator bound.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStepResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub splitting_order: u8,
+    pub layer_parities: Vec<u8>,
+    pub layer_bond_indices: Vec<Vec<usize>>,
+    pub gate_receipts: Vec<U1TeBDGateReceipt>,
+    pub truncation_ledger: U1MpsTruncationLedger,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+    pub input_total_charge: i32,
+    pub output_total_charge: i32,
+    pub output_selection_rule_residual: f64,
+    pub global_l2_bound_qualified: bool,
+    pub time_discretization_error_qualified: bool,
+}
+
+impl U1TeBDStrangStepper {
+    /// Construct a fixed nearest-neighbour Hamiltonian decomposition.
+    ///
+    /// Every bond index must be unique and in range. Terms are stored in
+    /// deterministic ascending bond order.
+    pub fn new(
+        site_count: usize,
+        mut terms: Vec<U1TeBDHamiltonianTerm>,
+    ) -> Result<Self, U1MpsError> {
+        if site_count == 0 {
+            return Err(U1MpsError::EmptyChain);
+        }
+        for term in &terms {
+            if term.bond_index >= site_count.saturating_sub(1) {
+                return Err(U1MpsError::TeBDGateOutOfRange {
+                    bond_index: term.bond_index,
+                    site_count,
+                });
+            }
+        }
+        terms.sort_by_key(U1TeBDHamiltonianTerm::bond_index);
+        for pair in terms.windows(2) {
+            if pair[0].bond_index == pair[1].bond_index {
+                return Err(U1MpsError::DuplicateTeBDGate {
+                    bond_index: pair[0].bond_index,
+                });
+            }
+        }
+        Ok(Self { site_count, terms })
+    }
+
+    pub const fn site_count(&self) -> usize {
+        self.site_count
+    }
+
+    pub fn terms(&self) -> &[U1TeBDHamiltonianTerm] {
+        &self.terms
+    }
+
+    /// Apply one symmetric second-order even/odd/even step.
+    ///
+    /// Trotter error is intentionally separate from the compression ledger.
+    /// Callers should establish time-discretization convergence independently.
+    pub fn apply(
+        &self,
+        input: &ComplexU1Mps,
+        dt: f64,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStepResult, U1MpsError> {
+        if !dt.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction("TEBD Strang time step"));
+        }
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+
+        let mut even_half_gates = Vec::new();
+        let mut odd_full_gates = Vec::new();
+        for term in &self.terms {
+            let gate = if term.bond_index % 2 == 0 {
+                term.hamiltonian.evolution_gate(0.5 * dt, policy.tolerance)?
+            } else {
+                term.hamiltonian.evolution_gate(dt, policy.tolerance)?
+            };
+            let entry = U1TeBDGate::new(term.bond_index, gate);
+            if term.bond_index % 2 == 0 {
+                even_half_gates.push(entry);
+            } else {
+                odd_full_gates.push(entry);
+            }
+        }
+
+        let even_first = U1TeBDLayer::new(self.site_count, 0, even_half_gates.clone())?;
+        let odd = U1TeBDLayer::new(self.site_count, 1, odd_full_gates)?;
+        let even_last = U1TeBDLayer::new(self.site_count, 0, even_half_gates)?;
+
+        let first = even_first.apply(input, policy)?;
+        let second = odd.apply_with_ledger(
+            &first.state,
+            policy,
+            first.truncation_ledger.clone(),
+        )?;
+        let third = even_last.apply_with_ledger(
+            &second.state,
+            policy,
+            second.truncation_ledger.clone(),
+        )?;
+
+        let mut gate_receipts = first.gate_receipts;
+        gate_receipts.extend(second.gate_receipts);
+        gate_receipts.extend(third.gate_receipts);
+        let layer_bond_indices = vec![
+            even_first.bond_indices(),
+            odd.bond_indices(),
+            even_last.bond_indices(),
+        ];
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let output_norm_squared = third.state.norm_squared(policy.tolerance)?;
+        let output_selection_rule_residual = third.state.selection_rule_residual();
+        let output_total_charge = third.state.total_charge();
+        let global_l2_bound_qualified =
+            third.truncation_ledger.global_state_error_bound_qualified;
+
+        Ok(U1TeBDStepResult {
+            state: third.state,
+            time_step: dt,
+            splitting_order: 2,
+            layer_parities: vec![0, 1, 0],
+            layer_bond_indices,
+            gate_receipts,
+            truncation_ledger: third.truncation_ledger,
+            input_norm_squared,
+            output_norm_squared,
+            input_total_charge: input.total_charge(),
+            output_total_charge,
+            output_selection_rule_residual,
+            global_l2_bound_qualified,
+            time_discretization_error_qualified: false,
+        })
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate,
-        U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
+        U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
+        U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
