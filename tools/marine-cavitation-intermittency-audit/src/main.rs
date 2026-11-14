@@ -1909,8 +1909,12 @@ mod tests {
         let windows = &mut input.runs[0].windows;
         // First active segment ends at an acquisition gap; the next sample is inactive.
         windows[0].cavitation_present = Some(true);
-        windows[1].start_time_s += 1.0;
-        windows[1].end_time_s += 1.0;
+        // Shift the entire suffix together so later windows stay chronological
+        // and non-overlapping while a real acquisition gap remains.
+        for window in windows.iter_mut().skip(1) {
+            window.start_time_s += 1.0;
+            window.end_time_s += 1.0;
+        }
         windows[1].cavitation_present = Some(false);
         let report = audit(&input);
         let run = &report.run_reports[0];
