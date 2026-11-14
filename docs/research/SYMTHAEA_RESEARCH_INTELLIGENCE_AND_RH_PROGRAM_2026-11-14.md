@@ -420,3 +420,67 @@ Therefore:
 - do not promote any bounded-height result to full RH.
 
 This programme should outperform industry by being more reliable, more cost-efficient and more epistemically disciplined—not by claiming that different benchmark scores prove one system is generally superior.
+
+
+## 10. New RH-adjacent frontier: fixed-theorem critical-line bound (2026-11-14)
+
+A new near-term mathematical target is the independent Riemann.fail arena. As of the 2026-11-14 review, its public ledger reports a current unconditional lower bound
+
+\[
+\kappa_* =
+\frac{33366251109982218737921064894121261303861213265473}
+{49531331836748571742426383080768585205078125000000}
+= 0.673639287955\ldots
+\]
+
+The arena's score counts **distinct** nontrivial zeros on \(\operatorname{Re}(s)=1/2\) in the numerator and all nontrivial zeros counted with multiplicity in the denominator. It is not the proportion of all zeros on the line with multiplicity. The challenge fixes two asymptotic obligations, both of which a candidate must prove: a dyadic bound over \((T,2T]\) and a cumulative bound over \((0,T]\). The candidate controls only an exact rational \(\kappa\), which must strictly exceed the current record.
+
+Sources:
+- Record ledger and exact rational: https://riemann-fail.vercel.app/
+- Fixed theorem and score definition: https://riemann-fail.vercel.app/challenge
+- Verification method: https://riemann-fail.vercel.app/methodology
+- Accepted submission and method: https://riemann-fail.vercel.app/submissions/knausgard-ten-win10-lp
+- Accepted Solution.lean at source commit fe796b7a07c2f759370dfdea1d9560f243395534: https://github.com/josusanmartin/riemann/blob/fe796b7a07c2f759370dfdea1d9560f243395534/submissions/knausgard-ten-win10-lp/proof/Solution.lean
+
+The current accepted entry is dated November 12, 2026, 11:37 UTC. Its published method description reports joint LP co-optimization of a 16-harmonic cosine window and 10-point certificate weights, an order-36 Taylor enclosure, an H_W rational floor at denominator 10^50, regenerated pyramids/tangent table/leaf set, 5,385 tangent entries, 29,555 term leaves and 1,138 additional splits. This is a concrete, structured certificate family that Symthaea can study.
+
+### Fixed theorem and verifier boundary
+
+The challenge requires both the dyadic and cumulative statement forms to match exactly. The arena says it pins Zeta23, Mathlib, Lean Comparator and nanoda by commit; the displayed identifiers are respectively 3635e74826a4, 51e6992efd06, 273294467ce0 and 418320295890. The verifier checks exact statement equality, a restricted axiom profile, and then replays the exported proof in both the Lean kernel and independent nanoda kernel. The published allowlist is propext, Quot.sound and Classical.choice; any additional transitive axiom is rejected.
+
+**Do not conflate this with the paper's own large-scale computation formalization.** Knausgård's arXiv paper (2610.08965) states that three computer-assisted branch-and-bound evaluations are recorded as extra computation-result axioms in that paper's development, while separate ceiling results are proved with only standard axioms. The arena reports zero additional assumptions for its newer accepted challenge solution. The precise relationship between the paper's development, the accepted single-file arena proof and its checker must be determined by inspecting the exact theorem/dependency/axiom outputs. This comparison is a research task, not something to infer from matching headline decimals.
+
+### What this unlocks for Symthaea
+
+This is a better first RH-adjacent tournament than a free-form prompt to prove RH. It has:
+- a fixed theorem and exact objective;
+- a reproducible public record;
+- accepted proof code;
+- a frozen verifier and allowed-axiom contract;
+- a sequence of increasingly strong certificate families;
+- an explicit independent formal acceptance condition.
+
+The initial work is tracked in [MATH-RH-BOUND-001 #12159](https://github.com/Luminous-Dynamics/symthaea/issues/12159), under #12129. Its order is: freeze source and checker, reproduce the record, map the certificate to the written mathematical argument, resolve the paper/arena axiom boundary, then compare multiple search approaches. No external submission is authorized by this research plan.
+
+The research campaign must distinguish:
+1. **Record reproduction** — verify the accepted 67.3639% result on the exact frozen contract.
+2. **Certificate refinement** — improve the bound inside the current 16-harmonic/10-point family.
+3. **New certificate discovery** — alter the window, frame inequality, tangent scheme or mathematical decomposition.
+4. **Method ceiling** — prove that a whole family cannot exceed a stated bound, showing when a genuinely new idea is required.
+5. **Formal acceptance** — prove a strictly larger exact rational under the unmodified theorem statements and allowed axioms.
+
+A leaderboard improvement obtained only by a slightly better parameter search is useful but should not be presented as a major mathematical paradigm shift. The more ambitious result would be a new inequality/certificate family, a proof of a meaningful family ceiling, or a substantially smaller/clearer independently checked formal proof.
+
+### Matched mathematical-discovery baselines
+
+Compare, at matched exact theorem/source snapshots and fully inclusive compute/tool budgets:
+- the accepted LP/cutting-plane pipeline;
+- deterministic grid and parameter search;
+- alternate LP and interval-optimization formulations;
+- theorem-dependency and symbolic-derivation search;
+- an independently implemented certificate checker;
+- Symthaea's full research policy;
+- ablations without HDC/CfC and without active evidence acquisition;
+- independent mathematician review of the mathematical mechanism, not just the proof's appearance.
+
+Measure exact reproduction, valid candidate rate, pre-verification predicted floor calibration, certificate acceptance, exact improvement in κ, proof size, verification cost, checker agreement, full compute/token/tool/human cost, and transfer to new theorem/certificate families. A false theorem or an axiom/statement bypass remains a hard failure.
