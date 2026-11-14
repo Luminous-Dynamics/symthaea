@@ -80,7 +80,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-BASE-SPEC-1-2",
@@ -116,7 +117,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-BASE-SPEC-2-1",
@@ -152,7 +154,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-BASE-SPEC-2-2",
@@ -188,7 +191,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -259,7 +263,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-CAND-SPEC-1-2",
@@ -295,7 +300,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-CAND-SPEC-2-1",
@@ -331,7 +337,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-CAND-SPEC-2-2",
@@ -367,7 +374,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -576,7 +584,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIRED-01-BASE-SPEC-1-2",
@@ -612,7 +621,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIRED-01-BASE-SPEC-2-1",
@@ -648,7 +658,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIRED-01-BASE-SPEC-2-2",
@@ -684,7 +695,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -755,7 +767,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIRED-01-CAND-SPEC-1-2",
@@ -791,7 +804,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIRED-01-CAND-SPEC-2-1",
@@ -827,7 +841,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIRED-01-CAND-SPEC-2-2",
@@ -863,7 +878,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -1072,7 +1088,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SAME-COHESIVE-SHARE-01-BASE-SPEC-1-2",
@@ -1108,7 +1125,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SAME-COHESIVE-SHARE-01-BASE-SPEC-2-1",
@@ -1144,7 +1162,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SAME-COHESIVE-SHARE-01-BASE-SPEC-2-2",
@@ -1180,7 +1199,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -1251,7 +1271,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SAME-COHESIVE-SHARE-01-CAND-SPEC-1-2",
@@ -1287,7 +1308,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SAME-COHESIVE-SHARE-01-CAND-SPEC-2-1",
@@ -1323,7 +1345,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SAME-COHESIVE-SHARE-01-CAND-SPEC-2-2",
@@ -1359,7 +1382,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -1568,7 +1592,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-BELOW-BASE-SPEC-1-2",
@@ -1604,7 +1629,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-BELOW-BASE-SPEC-2-1",
@@ -1640,7 +1666,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-BELOW-BASE-SPEC-2-2",
@@ -1676,7 +1703,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -1747,7 +1775,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-BELOW-CAND-SPEC-1-2",
@@ -1783,7 +1812,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-BELOW-CAND-SPEC-2-1",
@@ -1819,7 +1849,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-BELOW-CAND-SPEC-2-2",
@@ -1855,7 +1886,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -2064,7 +2096,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-ABOVE-BASE-SPEC-1-2",
@@ -2100,7 +2133,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-ABOVE-BASE-SPEC-2-1",
@@ -2136,7 +2170,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-ABOVE-BASE-SPEC-2-2",
@@ -2172,7 +2207,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -2243,7 +2279,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-ABOVE-CAND-SPEC-1-2",
@@ -2279,7 +2316,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-ABOVE-CAND-SPEC-2-1",
@@ -2315,7 +2353,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-SUM-ABOVE-CAND-SPEC-2-2",
@@ -2351,7 +2390,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -2560,7 +2600,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-NEGATIVE-BASE-SPEC-1-2",
@@ -2596,7 +2637,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-NEGATIVE-BASE-SPEC-2-1",
@@ -2632,7 +2674,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-NEGATIVE-BASE-SPEC-2-2",
@@ -2668,7 +2711,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -2739,7 +2783,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-NEGATIVE-CAND-SPEC-1-2",
@@ -2775,7 +2820,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-NEGATIVE-CAND-SPEC-2-1",
@@ -2811,7 +2857,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-NEGATIVE-CAND-SPEC-2-2",
@@ -2847,7 +2894,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -3056,7 +3104,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OVER-ONE-BASE-SPEC-1-2",
@@ -3092,7 +3141,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OVER-ONE-BASE-SPEC-2-1",
@@ -3128,7 +3178,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OVER-ONE-BASE-SPEC-2-2",
@@ -3164,7 +3215,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -3235,7 +3287,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OVER-ONE-CAND-SPEC-1-2",
@@ -3271,7 +3324,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OVER-ONE-CAND-SPEC-2-1",
@@ -3307,7 +3361,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OVER-ONE-CAND-SPEC-2-2",
@@ -3343,7 +3398,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -3548,7 +3604,8 @@
                   "category_id": "light_fiber_tear",
                   "fraction": 0.2
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MISSING-CAT-BASE-SPEC-1-2",
@@ -3584,7 +3641,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MISSING-CAT-BASE-SPEC-2-1",
@@ -3620,7 +3678,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MISSING-CAT-BASE-SPEC-2-2",
@@ -3656,7 +3715,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -3727,7 +3787,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MISSING-CAT-CAND-SPEC-1-2",
@@ -3763,7 +3824,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MISSING-CAT-CAND-SPEC-2-1",
@@ -3799,7 +3861,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MISSING-CAT-CAND-SPEC-2-2",
@@ -3835,7 +3898,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -4044,7 +4108,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-CAT-BASE-SPEC-1-2",
@@ -4080,7 +4145,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-CAT-BASE-SPEC-2-1",
@@ -4116,7 +4182,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-CAT-BASE-SPEC-2-2",
@@ -4152,7 +4219,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -4223,7 +4291,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-CAT-CAND-SPEC-1-2",
@@ -4259,7 +4328,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-CAT-CAND-SPEC-2-1",
@@ -4295,7 +4365,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-CAT-CAND-SPEC-2-2",
@@ -4331,7 +4402,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -4540,7 +4612,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ORDER-BASE-SPEC-1-2",
@@ -4576,7 +4649,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ORDER-BASE-SPEC-2-1",
@@ -4612,7 +4686,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ORDER-BASE-SPEC-2-2",
@@ -4648,7 +4723,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -4719,7 +4795,8 @@
                   "category_id": "adhesive_failure",
                   "fraction": 0.14
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ORDER-CAND-SPEC-1-2",
@@ -4755,7 +4832,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ORDER-CAND-SPEC-2-1",
@@ -4791,7 +4869,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ORDER-CAND-SPEC-2-2",
@@ -4827,7 +4906,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -5036,7 +5116,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-BASIS-BASE-SPEC-1-2",
@@ -5072,7 +5153,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-BASIS-BASE-SPEC-2-1",
@@ -5108,7 +5190,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-BASIS-BASE-SPEC-2-2",
@@ -5144,7 +5227,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -5215,7 +5299,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-BASIS-CAND-SPEC-1-2",
@@ -5251,7 +5336,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-BASIS-CAND-SPEC-2-1",
@@ -5287,7 +5373,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-BASIS-CAND-SPEC-2-2",
@@ -5323,7 +5410,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -5532,7 +5620,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONTOLOGY-BASE-SPEC-1-2",
@@ -5568,7 +5657,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONTOLOGY-BASE-SPEC-2-1",
@@ -5604,7 +5694,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONTOLOGY-BASE-SPEC-2-2",
@@ -5640,7 +5731,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -5711,7 +5803,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONTOLOGY-CAND-SPEC-1-2",
@@ -5747,7 +5840,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONTOLOGY-CAND-SPEC-2-1",
@@ -5783,7 +5877,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONTOLOGY-CAND-SPEC-2-2",
@@ -5819,7 +5914,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -6028,7 +6124,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OLD-EDITION-BASE-SPEC-1-2",
@@ -6064,7 +6161,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OLD-EDITION-BASE-SPEC-2-1",
@@ -6100,7 +6198,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OLD-EDITION-BASE-SPEC-2-2",
@@ -6136,7 +6235,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -6207,7 +6307,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OLD-EDITION-CAND-SPEC-1-2",
@@ -6243,7 +6344,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OLD-EDITION-CAND-SPEC-2-1",
@@ -6279,7 +6381,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-OLD-EDITION-CAND-SPEC-2-2",
@@ -6315,7 +6418,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -6524,7 +6628,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-METHOD-BASE-SPEC-1-2",
@@ -6560,7 +6665,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-METHOD-BASE-SPEC-2-1",
@@ -6596,7 +6702,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-METHOD-BASE-SPEC-2-2",
@@ -6632,7 +6739,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -6703,7 +6811,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-METHOD-CAND-SPEC-1-2",
@@ -6739,7 +6848,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-METHOD-CAND-SPEC-2-1",
@@ -6775,7 +6885,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-METHOD-CAND-SPEC-2-2",
@@ -6811,7 +6922,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -7020,7 +7132,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-MATERIAL-BASE-SPEC-1-2",
@@ -7056,7 +7169,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-MATERIAL-BASE-SPEC-2-1",
@@ -7092,7 +7206,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-MATERIAL-BASE-SPEC-2-2",
@@ -7128,7 +7243,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -7199,7 +7315,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-MATERIAL-CAND-SPEC-1-2",
@@ -7235,7 +7352,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-MATERIAL-CAND-SPEC-2-1",
@@ -7271,7 +7389,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-MATERIAL-CAND-SPEC-2-2",
@@ -7307,7 +7426,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -7516,7 +7636,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-KIND-BASE-SPEC-1-2",
@@ -7552,7 +7673,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-KIND-BASE-SPEC-2-1",
@@ -7588,7 +7710,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-KIND-BASE-SPEC-2-2",
@@ -7624,7 +7747,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -7695,7 +7819,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-KIND-CAND-SPEC-1-2",
@@ -7731,7 +7856,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-KIND-CAND-SPEC-2-1",
@@ -7767,7 +7893,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-WRONG-KIND-CAND-SPEC-2-2",
@@ -7803,7 +7930,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -8012,7 +8140,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ACCEPT-BASE-SPEC-1-2",
@@ -8048,7 +8177,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ACCEPT-BASE-SPEC-2-1",
@@ -8084,7 +8214,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ACCEPT-BASE-SPEC-2-2",
@@ -8120,7 +8251,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -8191,7 +8323,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ACCEPT-CAND-SPEC-1-2",
@@ -8227,7 +8360,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ACCEPT-CAND-SPEC-2-1",
@@ -8263,7 +8397,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ACCEPT-CAND-SPEC-2-2",
@@ -8299,7 +8434,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -8508,7 +8644,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PSEUDO-BASE-SPEC-1-2",
@@ -8544,7 +8681,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PSEUDO-BASE-SPEC-2-1",
@@ -8580,7 +8718,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PSEUDO-BASE-SPEC-2-2",
@@ -8616,7 +8755,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -8687,7 +8827,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PSEUDO-CAND-SPEC-1-2",
@@ -8723,7 +8864,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PSEUDO-CAND-SPEC-2-1",
@@ -8759,7 +8901,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PSEUDO-CAND-SPEC-2-2",
@@ -8795,7 +8938,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -9004,7 +9148,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLUSTER-OVERLAP-BASE-SPEC-1-2",
@@ -9040,7 +9185,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLUSTER-OVERLAP-BASE-SPEC-2-1",
@@ -9076,7 +9222,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLUSTER-OVERLAP-BASE-SPEC-2-2",
@@ -9112,7 +9259,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -9183,7 +9331,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLUSTER-OVERLAP-CAND-SPEC-1-2",
@@ -9219,7 +9368,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLUSTER-OVERLAP-CAND-SPEC-2-1",
@@ -9255,7 +9405,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLUSTER-OVERLAP-CAND-SPEC-2-2",
@@ -9291,7 +9442,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -9500,7 +9652,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIR-MISMATCH-BASE-SPEC-1-2",
@@ -9536,7 +9689,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIR-MISMATCH-BASE-SPEC-2-1",
@@ -9572,7 +9726,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIR-MISMATCH-BASE-SPEC-2-2",
@@ -9608,7 +9763,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -9679,7 +9835,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIR-MISMATCH-CAND-SPEC-1-2",
@@ -9715,7 +9872,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIR-MISMATCH-CAND-SPEC-2-1",
@@ -9751,7 +9909,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PAIR-MISMATCH-CAND-SPEC-2-2",
@@ -9787,7 +9946,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -9996,7 +10156,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNCLASSIFIABLE-BASE-SPEC-1-2",
@@ -10032,7 +10193,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNCLASSIFIABLE-BASE-SPEC-2-1",
@@ -10068,7 +10230,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNCLASSIFIABLE-BASE-SPEC-2-2",
@@ -10104,7 +10267,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -10175,7 +10339,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNCLASSIFIABLE-CAND-SPEC-1-2",
@@ -10211,7 +10376,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNCLASSIFIABLE-CAND-SPEC-2-1",
@@ -10247,7 +10413,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNCLASSIFIABLE-CAND-SPEC-2-2",
@@ -10283,7 +10450,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [
@@ -10494,7 +10662,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-IMAGE-DIGEST-BASE-SPEC-1-2",
@@ -10530,7 +10699,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-IMAGE-DIGEST-BASE-SPEC-2-1",
@@ -10566,7 +10736,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-IMAGE-DIGEST-BASE-SPEC-2-2",
@@ -10602,7 +10773,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -10673,7 +10845,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-IMAGE-DIGEST-CAND-SPEC-1-2",
@@ -10709,7 +10882,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-IMAGE-DIGEST-CAND-SPEC-2-1",
@@ -10745,7 +10919,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-IMAGE-DIGEST-CAND-SPEC-2-2",
@@ -10781,7 +10956,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -10989,7 +11165,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONE-OBSERVER-BASE-SPEC-1-2",
@@ -11025,7 +11202,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONE-OBSERVER-BASE-SPEC-2-1",
@@ -11061,7 +11239,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONE-OBSERVER-BASE-SPEC-2-2",
@@ -11097,7 +11276,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -11168,7 +11348,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONE-OBSERVER-CAND-SPEC-1-2",
@@ -11204,7 +11385,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONE-OBSERVER-CAND-SPEC-2-1",
@@ -11240,7 +11422,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ONE-OBSERVER-CAND-SPEC-2-2",
@@ -11276,7 +11459,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -11485,7 +11669,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNRESOLVED-BASE-SPEC-1-2",
@@ -11521,7 +11706,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNRESOLVED-BASE-SPEC-2-1",
@@ -11557,7 +11743,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNRESOLVED-BASE-SPEC-2-2",
@@ -11593,7 +11780,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -11664,7 +11852,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNRESOLVED-CAND-SPEC-1-2",
@@ -11700,7 +11889,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNRESOLVED-CAND-SPEC-2-1",
@@ -11736,7 +11926,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNRESOLVED-CAND-SPEC-2-2",
@@ -11772,7 +11963,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -11981,7 +12173,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RELIABILITY-DIGEST-BASE-SPEC-1-2",
@@ -12017,7 +12210,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RELIABILITY-DIGEST-BASE-SPEC-2-1",
@@ -12053,7 +12247,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RELIABILITY-DIGEST-BASE-SPEC-2-2",
@@ -12089,7 +12284,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -12160,7 +12356,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RELIABILITY-DIGEST-CAND-SPEC-1-2",
@@ -12196,7 +12393,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RELIABILITY-DIGEST-CAND-SPEC-2-1",
@@ -12232,7 +12430,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RELIABILITY-DIGEST-CAND-SPEC-2-2",
@@ -12268,7 +12467,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -12477,7 +12677,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-AGREEMENT-LOW-BASE-SPEC-1-2",
@@ -12513,7 +12714,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-AGREEMENT-LOW-BASE-SPEC-2-1",
@@ -12549,7 +12751,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-AGREEMENT-LOW-BASE-SPEC-2-2",
@@ -12585,7 +12788,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -12656,7 +12860,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-AGREEMENT-LOW-CAND-SPEC-1-2",
@@ -12692,7 +12897,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-AGREEMENT-LOW-CAND-SPEC-2-1",
@@ -12728,7 +12934,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-AGREEMENT-LOW-CAND-SPEC-2-2",
@@ -12764,7 +12971,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -12973,7 +13181,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-POSTHOC-BASE-SPEC-1-2",
@@ -13009,7 +13218,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-POSTHOC-BASE-SPEC-2-1",
@@ -13045,7 +13255,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-POSTHOC-BASE-SPEC-2-2",
@@ -13081,7 +13292,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -13152,7 +13364,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-POSTHOC-CAND-SPEC-1-2",
@@ -13188,7 +13401,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-POSTHOC-CAND-SPEC-2-1",
@@ -13224,7 +13438,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-POSTHOC-CAND-SPEC-2-2",
@@ -13260,7 +13475,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -13469,7 +13685,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-NONE-BASE-SPEC-1-2",
@@ -13505,7 +13722,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-NONE-BASE-SPEC-2-1",
@@ -13541,7 +13759,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-NONE-BASE-SPEC-2-2",
@@ -13577,7 +13796,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -13648,7 +13868,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-NONE-CAND-SPEC-1-2",
@@ -13684,7 +13905,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-NONE-CAND-SPEC-2-1",
@@ -13720,7 +13942,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-NONE-CAND-SPEC-2-2",
@@ -13756,7 +13979,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -13965,7 +14189,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-PSEUDO-BASE-SPEC-1-2",
@@ -14001,7 +14226,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-PSEUDO-BASE-SPEC-2-1",
@@ -14037,7 +14263,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-PSEUDO-BASE-SPEC-2-2",
@@ -14073,7 +14300,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -14144,7 +14372,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-PSEUDO-CAND-SPEC-1-2",
@@ -14180,7 +14409,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-PSEUDO-CAND-SPEC-2-1",
@@ -14216,7 +14446,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-ZERO-PSEUDO-CAND-SPEC-2-2",
@@ -14252,7 +14483,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -14461,7 +14693,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PLAN-DIGEST-BASE-SPEC-1-2",
@@ -14497,7 +14730,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PLAN-DIGEST-BASE-SPEC-2-1",
@@ -14533,7 +14767,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PLAN-DIGEST-BASE-SPEC-2-2",
@@ -14569,7 +14804,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -14640,7 +14876,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PLAN-DIGEST-CAND-SPEC-1-2",
@@ -14676,7 +14913,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PLAN-DIGEST-CAND-SPEC-2-1",
@@ -14712,7 +14950,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-PLAN-DIGEST-CAND-SPEC-2-2",
@@ -14748,7 +14987,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -14957,7 +15197,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MANIFEST-DIGEST-BASE-SPEC-1-2",
@@ -14993,7 +15234,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MANIFEST-DIGEST-BASE-SPEC-2-1",
@@ -15029,7 +15271,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MANIFEST-DIGEST-BASE-SPEC-2-2",
@@ -15065,7 +15308,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -15136,7 +15380,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MANIFEST-DIGEST-CAND-SPEC-1-2",
@@ -15172,7 +15417,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MANIFEST-DIGEST-CAND-SPEC-2-1",
@@ -15208,7 +15454,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-MANIFEST-DIGEST-CAND-SPEC-2-2",
@@ -15244,7 +15491,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -15453,7 +15701,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-EFFECT-SHORT-BASE-SPEC-1-2",
@@ -15489,7 +15738,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-EFFECT-SHORT-BASE-SPEC-2-1",
@@ -15525,7 +15775,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-EFFECT-SHORT-BASE-SPEC-2-2",
@@ -15561,7 +15812,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -15632,7 +15884,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-EFFECT-SHORT-CAND-SPEC-1-2",
@@ -15668,7 +15921,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-EFFECT-SHORT-CAND-SPEC-2-1",
@@ -15704,7 +15958,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-EFFECT-SHORT-CAND-SPEC-2-2",
@@ -15740,7 +15995,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -15944,7 +16200,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-ALPHA-BASE-SPEC-1-2",
@@ -15980,7 +16237,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-ALPHA-BASE-SPEC-2-1",
@@ -16016,7 +16274,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-ALPHA-BASE-SPEC-2-2",
@@ -16052,7 +16311,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -16123,7 +16383,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-ALPHA-CAND-SPEC-1-2",
@@ -16159,7 +16420,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-ALPHA-CAND-SPEC-2-1",
@@ -16195,7 +16457,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-ALPHA-CAND-SPEC-2-2",
@@ -16231,7 +16494,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -16440,7 +16704,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-NOT-EQ-BASE-SPEC-1-2",
@@ -16476,7 +16741,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-NOT-EQ-BASE-SPEC-2-1",
@@ -16512,7 +16778,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-NOT-EQ-BASE-SPEC-2-2",
@@ -16548,7 +16815,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -16619,7 +16887,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-NOT-EQ-CAND-SPEC-1-2",
@@ -16655,7 +16924,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-NOT-EQ-CAND-SPEC-2-1",
@@ -16691,7 +16961,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-RESULT-NOT-EQ-CAND-SPEC-2-2",
@@ -16727,7 +16998,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -16936,7 +17208,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLASS-RAW-BASE-SPEC-1-2",
@@ -16972,7 +17245,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLASS-RAW-BASE-SPEC-2-1",
@@ -17008,7 +17282,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLASS-RAW-BASE-SPEC-2-2",
@@ -17044,7 +17319,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -17115,7 +17391,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLASS-RAW-CAND-SPEC-1-2",
@@ -17151,7 +17428,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLASS-RAW-CAND-SPEC-2-1",
@@ -17187,7 +17465,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-CLASS-RAW-CAND-SPEC-2-2",
@@ -17223,7 +17502,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -17432,7 +17712,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-DUP-SPEC-BASE-SPEC-1-2",
@@ -17468,7 +17749,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-DUP-SPEC-BASE-SPEC-2-1",
@@ -17504,7 +17786,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-DUP-SPEC-BASE-SPEC-2-2",
@@ -17540,7 +17823,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -17611,7 +17895,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-DUP-SPEC-CAND-SPEC-1-2",
@@ -17647,7 +17932,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-DUP-SPEC-CAND-SPEC-2-1",
@@ -17683,7 +17969,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-DUP-SPEC-CAND-SPEC-2-2",
@@ -17719,7 +18006,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -17928,7 +18216,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-UNIT-BASE-SPEC-1-2",
@@ -17964,7 +18253,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-UNIT-BASE-SPEC-2-1",
@@ -18000,7 +18290,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-UNIT-BASE-SPEC-2-2",
@@ -18036,7 +18327,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -18107,7 +18399,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-UNIT-CAND-SPEC-1-2",
@@ -18143,7 +18436,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-UNIT-CAND-SPEC-2-1",
@@ -18179,7 +18473,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-UNKNOWN-UNIT-CAND-SPEC-2-2",
@@ -18215,7 +18510,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -18424,7 +18720,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-LOW-CLUSTERS-BASE-SPEC-1-2",
@@ -18460,7 +18757,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-LOW-CLUSTERS-BASE-SPEC-2-1",
@@ -18496,7 +18794,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-LOW-CLUSTERS-BASE-SPEC-2-2",
@@ -18532,7 +18831,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -18603,7 +18903,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-LOW-CLUSTERS-CAND-SPEC-1-2",
@@ -18639,7 +18940,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-LOW-CLUSTERS-CAND-SPEC-2-1",
@@ -18675,7 +18977,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-LOW-CLUSTERS-CAND-SPEC-2-2",
@@ -18711,7 +19014,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -18920,7 +19224,8 @@
                   "category_id": "stock_break",
                   "fraction": 0
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-BASE-SPEC-1-2",
@@ -18956,7 +19261,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-BASE-SPEC-2-1",
@@ -18992,7 +19298,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-BASE-SPEC-2-2",
@@ -19028,7 +19335,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -19099,7 +19407,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-CAND-SPEC-1-2",
@@ -19135,7 +19444,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-CAND-SPEC-2-1",
@@ -19171,7 +19481,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             },
             {
               "specimen_id": "FMC-VALID-01-CAND-SPEC-2-2",
@@ -19207,7 +19518,8 @@
                   "category_id": "stock_break",
                   "fraction": 0.1
                 }
-              ]
+              ],
+              "observation_mode": "direct_unaided_visual"
             }
           ],
           "unclassifiable_specimen_ids": [],
@@ -19336,6 +19648,510 @@
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
       "rationale": "A specimen-count composition records one classified category per specimen; a fractional mix belongs to a different measurement basis."
+    },
+    {
+      "id": "magnified-imaging-is-not-d5573-visual-classification",
+      "receipt": {
+        "receipt_id": "FMC-MAGNIFIED-OBSERVATION",
+        "category_ontology_id": "D5573-SMC-FAILURE-V1",
+        "category_ontology_version": "1.0.0",
+        "categories": [
+          {
+            "id": "adhesive_failure",
+            "label": "Adhesive failure"
+          },
+          {
+            "id": "cohesive_failure",
+            "label": "Cohesive failure"
+          },
+          {
+            "id": "thin_layer_cohesive",
+            "label": "Thin-layer cohesive failure"
+          },
+          {
+            "id": "fiber_tear",
+            "label": "Fiber-tear failure"
+          },
+          {
+            "id": "light_fiber_tear",
+            "label": "Light-fiber-tear failure"
+          },
+          {
+            "id": "stock_break",
+            "label": "Stock-break failure"
+          }
+        ],
+        "measurement_tolerance": 0.005,
+        "baseline": {
+          "cohort_id": "FMC-VALID-01-BASE",
+          "category_ontology_id": "D5573-SMC-FAILURE-V1",
+          "category_ontology_version": "1.0.0",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "measurement_basis": "visual_area_fraction",
+          "fraction_protocol_id": "FAILURE-SURFACE-AREA-ESTIMATE-01",
+          "fraction_protocol_sha256": "0000000000000000000000000000000000000000000000000000000000004e2a",
+          "observer_reliability_sha256": "0000000000000000000000000000000000000000000000000000000000004e2b",
+          "unresolved_disagreement_count": 0,
+          "specimens": [
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-1-1",
+              "cluster_id": "LOT-B1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e20",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "magnified_imaging"
+            },
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-1-2",
+              "cluster_id": "LOT-B1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e21",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            },
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-2-1",
+              "cluster_id": "LOT-B2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e22",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            },
+            {
+              "specimen_id": "FMC-VALID-01-BASE-SPEC-2-2",
+              "cluster_id": "LOT-B2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e23",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.15
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            }
+          ],
+          "unclassifiable_specimen_ids": [],
+          "classification_receipt": {
+            "id": "FMC-VALID-01-BASE-CLASSIFICATION",
+            "method_id": "ASTM_D5573",
+            "edition": "D5573-99R19",
+            "evidence_kind": "classification_practice",
+            "material_pair_class": "frp_smc_joint",
+            "geometry": "failure_surface_classification",
+            "endpoint": "frp_joint_failure_mode_classification",
+            "requested_claim": "failure_mode_classification_reference",
+            "protocol_id": "D5573-VISUAL-PROTOCOL-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000004e2c",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000004e2d",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "FMC-VALID-01-BASE-SPEC-1-1",
+              "FMC-VALID-01-BASE-SPEC-1-2",
+              "FMC-VALID-01-BASE-SPEC-2-1",
+              "FMC-VALID-01-BASE-SPEC-2-2"
+            ]
+          }
+        },
+        "candidate": {
+          "cohort_id": "FMC-VALID-01-CAND",
+          "category_ontology_id": "D5573-SMC-FAILURE-V1",
+          "category_ontology_version": "1.0.0",
+          "independent_unit": "material_lot",
+          "grouping_scheme": "independent_arms",
+          "measurement_basis": "visual_area_fraction",
+          "fraction_protocol_id": "FAILURE-SURFACE-AREA-ESTIMATE-01",
+          "fraction_protocol_sha256": "0000000000000000000000000000000000000000000000000000000000004e2a",
+          "observer_reliability_sha256": "0000000000000000000000000000000000000000000000000000000000004e2e",
+          "unresolved_disagreement_count": 0,
+          "specimens": [
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-1-1",
+              "cluster_id": "LOT-C1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e24",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            },
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-1-2",
+              "cluster_id": "LOT-C1",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e25",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            },
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-2-1",
+              "cluster_id": "LOT-C2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e26",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            },
+            {
+              "specimen_id": "FMC-VALID-01-CAND-SPEC-2-2",
+              "cluster_id": "LOT-C2",
+              "image_sha256": "0000000000000000000000000000000000000000000000000000000000004e27",
+              "observer_refs": [
+                "OBSERVER-A",
+                "OBSERVER-B"
+              ],
+              "blinding_status": "blinded",
+              "fractions": [
+                {
+                  "category_id": "adhesive_failure",
+                  "fraction": 0.14
+                },
+                {
+                  "category_id": "cohesive_failure",
+                  "fraction": 0.21
+                },
+                {
+                  "category_id": "thin_layer_cohesive",
+                  "fraction": 0.1
+                },
+                {
+                  "category_id": "fiber_tear",
+                  "fraction": 0.25
+                },
+                {
+                  "category_id": "light_fiber_tear",
+                  "fraction": 0.2
+                },
+                {
+                  "category_id": "stock_break",
+                  "fraction": 0.1
+                }
+              ],
+              "observation_mode": "direct_unaided_visual"
+            }
+          ],
+          "unclassifiable_specimen_ids": [],
+          "classification_receipt": {
+            "id": "FMC-VALID-01-CAND-CLASSIFICATION",
+            "method_id": "ASTM_D5573",
+            "edition": "D5573-99R19",
+            "evidence_kind": "classification_practice",
+            "material_pair_class": "frp_smc_joint",
+            "geometry": "failure_surface_classification",
+            "endpoint": "frp_joint_failure_mode_classification",
+            "requested_claim": "failure_mode_classification_reference",
+            "protocol_id": "D5573-VISUAL-PROTOCOL-01",
+            "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000004e2f",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000004e30",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "FMC-VALID-01-CAND-SPEC-1-1",
+              "FMC-VALID-01-CAND-SPEC-1-2",
+              "FMC-VALID-01-CAND-SPEC-2-1",
+              "FMC-VALID-01-CAND-SPEC-2-2"
+            ]
+          }
+        },
+        "analysis_plan": {
+          "plan_id": "FMC-VALID-01-PLAN",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000004e28",
+          "analysis_profile": "clustered_compositional_effect_v1",
+          "analysis_method_ref": "statistics-owner:compositional-equivalence-method-v1",
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "changed_after_outcome": false,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "zero_policy": "model_based",
+          "pseudocount": null,
+          "joint_distance_margin": 0.25,
+          "category_margins": [
+            {
+              "category_id": "adhesive_failure",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "cohesive_failure",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "thin_layer_cohesive",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "fiber_tear",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "light_fiber_tear",
+              "lower": -0.05,
+              "upper": 0.05
+            },
+            {
+              "category_id": "stock_break",
+              "lower": -0.05,
+              "upper": 0.05
+            }
+          ],
+          "minimum_baseline_clusters": 2,
+          "minimum_candidate_clusters": 2,
+          "minimum_observer_agreement": 0.9,
+          "agreement_policy_ref": "MSA-AGREEMENT-POLICY-01"
+        },
+        "analysis_result": {
+          "result_id": "FMC-VALID-01-ANALYSIS",
+          "result_sha256": "0000000000000000000000000000000000000000000000000000000000004e31",
+          "plan_sha256": "0000000000000000000000000000000000000000000000000000000000004e28",
+          "vector_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000004e29",
+          "analysis_profile": "clustered_compositional_effect_v1",
+          "baseline_specimen_count": 4,
+          "candidate_specimen_count": 4,
+          "baseline_cluster_count": 2,
+          "candidate_cluster_count": 2,
+          "observer_agreement": 0.96,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "category_effects": [
+            {
+              "category_id": "adhesive_failure",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "cohesive_failure",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "thin_layer_cohesive",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "fiber_tear",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "light_fiber_tear",
+              "lower": -0.01,
+              "upper": 0.01
+            },
+            {
+              "category_id": "stock_break",
+              "lower": -0.01,
+              "upper": 0.01
+            }
+          ],
+          "joint_distance_lower": 0.03,
+          "joint_distance_upper": 0.1,
+          "outcome": "COMPOSITIONAL_EQUIVALENCE_ESTABLISHED"
+        },
+        "vector_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000004e29"
+      },
+      "expected_disposition": "REJECTED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "D5573 classifies by unaided visual observation; microscope/magnified imaging requires a separate evidence method."
     }
   ]
 }
