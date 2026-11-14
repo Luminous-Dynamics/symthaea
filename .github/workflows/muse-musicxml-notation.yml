@@ -10,6 +10,7 @@ on:
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_correction_ledger.rs"
       - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
@@ -71,6 +72,7 @@ jobs:
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
             crates/domains/symthaea-muse/src/musicxml_notation_eval.rs \
+            crates/domains/symthaea-muse/src/musicxml_correction_ledger.rs \
             crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
             crates/domains/symthaea-muse/src/bin/muse_studio.rs \
             crates/domains/symthaea-muse/src/lib.rs \
@@ -85,6 +87,9 @@ jobs:
 
       - name: Test multidimensional MusicXML score-event evaluator
         run: cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::
+
+      - name: Test measure-localized MusicXML correction ledger
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_correction_ledger::tests::
 
       - name: Test Muse Studio graph persistence and coverage summary
         run: cargo test --locked -p symthaea-muse --features studio --bin muse_studio notation_summary_tests::
