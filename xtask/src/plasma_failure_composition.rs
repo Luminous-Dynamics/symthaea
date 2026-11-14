@@ -34,11 +34,15 @@ struct SpecimenClassification {
 #[serde(deny_unknown_fields)]
 struct CohortReceipt {
     cohort_id: String,
+    category_ontology_id: String,
+    category_ontology_version: String,
     independent_unit: String,
     grouping_scheme: String,
     measurement_basis: String,
     fraction_protocol_id: String,
     fraction_protocol_sha256: String,
+    observer_reliability_sha256: String,
+    unresolved_disagreement_count: usize,
     specimens: Vec<SpecimenClassification>,
     unclassifiable_specimen_ids: Vec<String>,
     classification_receipt: ScopeEvidence,
@@ -95,6 +99,8 @@ struct AnalysisResult {
     baseline_cluster_count: usize,
     candidate_cluster_count: usize,
     observer_agreement: f64,
+    alpha: f64,
+    confidence_level: f64,
     category_effects: Vec<CategoryEffect>,
     joint_distance_lower: f64,
     joint_distance_upper: f64,
@@ -188,8 +194,11 @@ fn audit_cohort(
     tolerance: f64,
 ) -> std::result::Result<(), Disposition> {
     if !nonempty(&cohort.cohort_id)
+        || !nonempty(&cohort.category_ontology_id)
+        || !nonempty(&cohort.category_ontology_version)
         || !nonempty(&cohort.fraction_protocol_id)
         || !sha256_shape(&cohort.fraction_protocol_sha256)
+        || !sha256_shape(&cohort.observer_reliability_sha256)
     {
         return Err(Disposition::Blocked);
     }
@@ -202,7 +211,15 @@ fn audit_cohort(
     if !matches!(cohort.measurement_basis.as_str(), "visual_area_fraction" | "specimen_count_fraction") {
         return Err(Disposition::Rejected);
     }
-    if cohort.specimens.is_empty() || !cohort.unclassifiable_specimen_ids.is_empty() {
+    if cohort.category_ontology_id != ontology_id
+        || cohort.category_ontology_version != ontology_version
+    {
+        return Err(Disposition::Rejected);
+    }
+    if cohort.unresolved_disagreement_count > 0
+        || cohort.specimens.is_empty()
+        || !cohort.unclassifiable_specimen_ids.is_empty()
+    {
         return Err(Disposition::Blocked);
     }
 
@@ -332,7 +349,9 @@ fn audit_receipt(receipt: &FailureCompositionReceipt) -> Decision {
         }
     }
 
-    if receipt.baseline.measurement_basis != receipt.candidate.measurement_basis
+    if receipt.baseline.category_ontology_id != receipt.candidate.category_ontology_id
+        || receipt.baseline.category_ontology_version != receipt.candidate.category_ontology_version
+        || receipt.baseline.measurement_basis != receipt.candidate.measurement_basis
         || receipt.baseline.fraction_protocol_id != receipt.candidate.fraction_protocol_id
         || receipt.baseline.fraction_protocol_sha256 != receipt.candidate.fraction_protocol_sha256
     {
@@ -396,8 +415,12 @@ fn audit_receipt(receipt: &FailureCompositionReceipt) -> Decision {
     if !matches!(plan.zero_policy.as_str(), "none" | "multiplicative_replacement" | "model_based") {
         return rejected("zero/near-zero handling policy is not registered");
     }
+    let has_zero = receipt.baseline.specimens.iter().chain(receipt.candidate.specimens.iter())
+        .flat_map(|sample| sample.fractions.iter())
+        .any(|fraction| fraction.fraction == 0.0);
     match plan.zero_policy.as_str() {
         "none" if plan.pseudocount.is_some() => return rejected("pseudocount supplied while zero policy is none"),
+        "none" if has_zero => return blocked("zero-valued categories require an explicit preregistered structural-zero or replacement policy"),
         "multiplicative_replacement" if !plan.pseudocount.is_some_and(|value| value.is_finite() && value > 0.0) => {
             return blocked("multiplicative zero replacement requires a declared positive pseudocount")
         }
@@ -441,11 +464,18 @@ fn audit_receipt(receipt: &FailureCompositionReceipt) -> Decision {
     }
     if !result.observer_agreement.is_finite()
         || !(0.0..=1.0).contains(&result.observer_agreement)
+        || !result.alpha.is_finite()
+        || !result.confidence_level.is_finite()
     {
         return rejected("observed inter-rater agreement is outside [0,1]");
     }
     if result.observer_agreement < plan.minimum_observer_agreement {
         return blocked("observed inter-rater agreement is below the preregistered minimum");
+    }
+    if (result.alpha - plan.alpha).abs() > 1e-9
+        || (result.confidence_level - plan.confidence_level).abs() > 1e-9
+    {
+        return rejected("analysis result alpha or confidence level differs from the frozen plan");
     }
     if result.category_effects.len() != receipt.categories.len() {
         return blocked("analysis result does not report a full per-category effect vector");
