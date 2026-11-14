@@ -21,6 +21,12 @@ impl Disposition {
 pub fn run(fixture_path: &Path) -> Result<()> {
     let bytes = fs::read(fixture_path).with_context(|| format!("reading {}", fixture_path.display()))?;
     let fixture: Value = serde_json::from_slice(&bytes).context("parsing plasma-transfer fixture")?;
+    if fixture.get("schema_version").and_then(Value::as_str) != Some("plasma-transfer-fixture-v0.2") {
+        bail!("unsupported plasma-transfer fixture schema");
+    }
+    if fixture.get("material_scope_map").and_then(Value::as_object).is_none() {
+        bail!("plasma-transfer v0.2 fixture must declare material_scope_map");
+    }
     let cases = fixture.get("cases").and_then(Value::as_array).context("fixture must contain cases[]")?;
     let (mut pass, mut blocked, mut rejected) = (0usize, 0usize, 0usize);
     for case in cases {
