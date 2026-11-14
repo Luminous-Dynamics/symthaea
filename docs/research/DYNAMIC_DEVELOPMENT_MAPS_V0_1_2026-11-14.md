@@ -83,6 +83,7 @@ Two new/current temporal benchmarks clarify the opportunity:
 
 - **TEMPO (EMNLP 2026)** has 1,730 complex queries across 13 domains and 3,976 decomposed retrieval steps. Its leaderboard reports best Temporal Coverage@10 of 71.4% (DiVeR) and best NDCG@10 of 32.0. These measure temporally relevant retrieval and coverage, not whether an institutional or engineering decision used only evidence that was available to the actor when the decision was made. Source: https://aclanthology.org/2026.emnlp-main.291/ and https://tempo-bench.github.io/
 - **SWE-Time (2026-11-09)** evaluates retrospective first-bad-commit reasoning and prospective change-scope/CI workflow reasoning on 1,661 cases from 65 repositories. Its best reported Claude Code result is 61.9 average for Opus 4.8. It does not directly evaluate whether the evidence cited to justify a past decision was available to the decision-maker at the decision time. Source: https://arxiv.org/abs/2611.12083
+- **TEMPS (EMNLP 2026)** adds temporal embeddings to retrieval and reports TS-Retriever R@1 improving from 19.92 to 25.39 on its evaluated setup. This is a useful retrieval baseline for time-aware relevance, but still does not establish actor-specific authority or decision-time admissibility. Source: https://aclanthology.org/2026.emnlp-main.2657/
 
 EGDDM should add **Decision-Time Evidence Admissibility (DTEA)** as a distinct research lane.
 
@@ -102,11 +103,18 @@ A decision record should bind:
 - the policy/contract version and actor/authority scope;
 - the knowledge cut-off used for the decision;
 - the evidence IDs actually consulted;
+- an exact owner-native authority-evidence reference (owner repository and record ID/type), binding actor ID, exact scope, policy/constitution version, source-observed time, available-to-actor time, effective validity interval and owner-record disposition;
 - each cited item's availability time, authority and admissibility disposition at decision time;
 - excluded or unavailable evidence with reason;
 - the outcome, abstention/defer disposition and later supersession/correction links.
 
 This enables a new class of tests: backdated evidence, delayed publication, delayed ingestion, post-decision corrections, expired credentials, revocations, contested sources, incomplete retrieval and unauthorized information. The evaluator should ask not only "is the reconstructed answer true now?" but "was this decision justified using only admissible evidence available to this actor at this time?"
+
+### DTEA authority evidence is a reference, not a new authority engine
+
+The decision-time record projection now requires an `actor_authority` evidence reference. It binds the decision's actor, exact scope and policy version to an owner record, plus source-observed, actor-available and effective-validity times. The validator checks reference identity, node/event agreement, actor/scope/policy equality, availability by the decision cutoff and validity across the decision time.
+
+The current fixture's owner record is deliberately synthetic (`synthetic://mycelix/authority-grant/AG-001`) and source-declared. It is not a real Mycelix permission, cryptographic signature, trusted-root policy or grant of release authority. Mycelix remains the owner of authority records and semantics; DTEA tests whether the cited owner evidence was admissible at the decision frontier. The validator cannot authenticate an owner-native authority record or prove actor rights.
 
 ## 3. Model: four connected views
 
@@ -270,6 +278,7 @@ DynaMapBench is a proposed evaluation profile, not a new task/receipt/evaluator 
 | Cross-repository | Can contract breaks be detected across projects? | Version mismatch recall/precision; compatibility false negatives; map reconciliation correctness |
 | Planning | Does map-guided development improve outcomes? | Independently accepted capability gain per budget; expected/observed calibration; human review effort |
 | Decision-time admissibility | Was the decision justified using only evidence available and authorized at the decision time? | Admissible-evidence precision/recall; future-evidence leakage; backdated/late-arrival rejection; decision-time reconstruction accuracy; abstention correctness |
+| Federation integrity | Are local maps joined only through exact, owner-published identities and contracts without transferring authority? | Exact map-blob resolution; source-snapshot vs artifact-pin accuracy; cross-project edge precision; contract-version/digest match; stale-member detection; false-qualified-edge rate; authority-transfer violations |
 | Safety/evidence | Does the map resist false confidence? | False-current acceptance; authority inflation; fabricated evidence detection; unauthorized mutation rate |
 
 ### Required comparison arms
@@ -302,6 +311,7 @@ These are research hypotheses, not achieved results or industry standards:
 - Cross-repository critical contract-mismatch recall ≥0.95, with high-severity false negatives treated as hard failures.
 - Zero unsupported evidence promotion and zero unauthorized mutation in deterministic adversarial controls.
 - DTEA pilot: 100% detection of the explicitly planted future-evidence and unauthorized-source negative controls; ≥0.95 precision/recall on adjudicated decision-time admissibility labels, after calibration and power analysis; report decision correctness separately from evidence-admissibility correctness.
+- Federation pilot: 100% of exact artifact path/blob pins resolve at the pinned artifact commit; 100% separation of subject-source and map-artifact identity; zero independently-qualified edges without two-sided conformance evidence; missing or mismatched owner contracts remain unjoined/unknown; zero authority transfer.
 
 Report confidence intervals, per-relation/task-family breakdowns, cost, latency, memory, human minutes and abstention. Do not publish one aggregate score that can hide a critical failure. Use repository-family/time-held-out splits and keep development, calibration and confirmatory answer custody separate.
 
