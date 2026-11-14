@@ -285,7 +285,11 @@ pub struct FibreLengthEvidence {
     pub source_trial_evidence_id: String,
     /// Instrument/measurement evidence.
     pub evidence: EvidenceRef,
-    /// Ordered non-overlapping fibre-length bins.
+    /// Contiguous fibre-length partition of [0, u32::MAX) micrometres.
+    ///
+    /// The final bin must end at u32::MAX, which is the open-ended upper-tail
+    /// sentinel. This prevents a closed mass sum from silently omitting an
+    /// unreported length interval.
     pub bins: Vec<FibreLengthBin>,
 }
 
@@ -298,6 +302,12 @@ pub struct RecoveryPolicy {
     pub max_mass_balance_uncertainty_ppm: u32,
     /// Maximum relative expanded uncertainty permitted for the fibre-length measurement.
     pub max_fibre_length_measurement_uncertainty_ppm: u32,
+    /// Minimum mass of the accepted output lot that must be sampled.
+    pub minimum_fibre_length_sample_mass_mg: u64,
+    /// Minimum number of independent fibre-length subsamples/replicates.
+    pub minimum_fibre_length_replicates: u32,
+    /// Minimum expanded-uncertainty coverage probability required by the receiver.
+    pub minimum_fibre_length_measurement_coverage_probability_ppm: u32,
     /// Minimum fibre length required by the declared downstream spinning route.
     pub minimum_fibre_length_um: u32,
     /// Minimum recovered fibre mass fraction in bins meeting that length threshold.
@@ -310,6 +320,11 @@ impl RecoveryPolicy {
         self.max_unknown_fraction_ppm <= FRACTION_SCALE_PPM as u32
             && self.max_mass_balance_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
             && self.max_fibre_length_measurement_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
+            && self.minimum_fibre_length_sample_mass_mg > 0
+            && self.minimum_fibre_length_replicates > 0
+            && self.minimum_fibre_length_measurement_coverage_probability_ppm > 0
+            && self.minimum_fibre_length_measurement_coverage_probability_ppm
+                <= FRACTION_SCALE_PPM as u32
             && self.minimum_fibre_length_um > 0
             && self.minimum_mass_fraction_at_or_above_length_ppm <= FRACTION_SCALE_PPM as u32
     }
@@ -441,6 +456,10 @@ pub enum RouteReason {
     InvalidFibreLengthMeasurementProtocol,
     /// Fibre-length measurement uncertainty exceeds the receiving route policy.
     FibreLengthMeasurementUncertaintyAbovePolicy,
+    /// Fibre-length sample mass or independent replicate count is below the receiver's protocol.
+    FibreLengthSamplingBelowPolicy,
+    /// Expanded-uncertainty coverage probability is below the receiver's protocol.
+    FibreLengthCoverageBelowPolicy,
     /// Measured fibre-length distribution fails the receiving route policy.
     FibreLengthBelowPolicy,
     /// Chemical compatibility trial is absent.
@@ -701,6 +720,36 @@ fn fibre_length_protocol_valid(evidence: &FibreLengthEvidence) -> bool {
         && evidence.evidence.method_ref == evidence.method_ref
 }
 
+fn fibre_length_sampling_meets_policy(
+    evidence: &FibreLengthEvidence,
+    policy: &RecoveryPolicy,
+) -> bool {
+    evidence.sample_mass_mg >= policy.minimum_fibre_length_sample_mass_mg
+        && evidence.replicate_count >= policy.minimum_fibre_length_replicates
+}
+
+fn fibre_length_coverage_meets_policy(
+    evidence: &FibreLengthEvidence,
+    policy: &RecoveryPolicy,
+) -> bool {
+    evidence.measurement_coverage_probability_ppm
+        >= policy.minimum_fibre_length_measurement_coverage_probability_ppm
+}
+
+/// Converts the receiver's nominal length floor into a conservative measured
+/// threshold using the declared relative expanded uncertainty.
+///
+/// For a measured length x with relative expanded uncertainty U, the lower
+/// end of the symmetric relative interval is x/(1+U). Therefore a bin is
+/// counted only when its lower edge is at least nominal_floor * (1+U).
+fn conservative_measured_length_floor_um(evidence: &FibreLengthEvidence, nominal_floor_um: u32) -> Option<u32> {
+    let scale = u64::from(FRACTION_SCALE_PPM as u32);
+    let factor = scale.checked_add(u64::from(evidence.measurement_uncertainty_ppm))?;
+    let numerator = u64::from(nominal_floor_um).checked_mul(factor)?;
+    let rounded_up = numerator.checked_add(scale.checked_sub(1)?)? / scale;
+    u32::try_from(rounded_up).ok()
+}
+
 fn fibre_length_fraction_at_or_above(
     evidence: &FibreLengthEvidence,
     minimum_length_um: u32,
@@ -708,26 +757,39 @@ fn fibre_length_fraction_at_or_above(
     if !fibre_length_protocol_valid(evidence) || evidence.bins.is_empty() {
         return None;
     }
+    let measured_floor =
+        conservative_measured_length_floor_um(evidence, minimum_length_um)?;
     let mut total = 0_u64;
     let mut qualifying = 0_u64;
     let mut previous_upper = None;
-    for bin in &evidence.bins {
+
+    for (index, bin) in evidence.bins.iter().enumerate() {
         if bin.lower_bound_um >= bin.upper_bound_um
-            || previous_upper.is_some_and(|upper| bin.lower_bound_um < upper)
             || bin.mass_fraction_ppm > FRACTION_SCALE_PPM as u32
         {
             return None;
         }
-        total += u64::from(bin.mass_fraction_ppm);
-        if bin.lower_bound_um >= minimum_length_um {
-            qualifying += u64::from(bin.mass_fraction_ppm);
+        if index == 0 {
+            if bin.lower_bound_um != 0 {
+                return None;
+            }
+        } else if previous_upper != Some(bin.lower_bound_um) {
+            // Require exact contiguity: gaps and overlaps both invalidate the
+            // distribution, even when the listed mass fractions sum to 100%.
+            return None;
+        }
+
+        total = total.checked_add(u64::from(bin.mass_fraction_ppm))?;
+        if bin.lower_bound_um >= measured_floor {
+            qualifying = qualifying.checked_add(u64::from(bin.mass_fraction_ppm))?;
         }
         previous_upper = Some(bin.upper_bound_um);
     }
-    if total != FRACTION_SCALE_PPM {
+
+    if total != FRACTION_SCALE_PPM || previous_upper != Some(u32::MAX) {
         return None;
     }
-    Some(qualifying.min(u64::from(u32::MAX)) as u32)
+    u32::try_from(qualifying).ok()
 }
 
 fn add_composition_checks(
@@ -942,6 +1004,12 @@ pub fn qualify_recovery_route(
                     {
                         reasons.push(RouteReason::FibreLengthMeasurementUncertaintyAbovePolicy);
                     }
+                    if !fibre_length_sampling_meets_policy(length, policy) {
+                        reasons.push(RouteReason::FibreLengthSamplingBelowPolicy);
+                    }
+                    if !fibre_length_coverage_meets_policy(length, policy) {
+                        reasons.push(RouteReason::FibreLengthCoverageBelowPolicy);
+                    }
                     let sample_exceeds_output = bundle
                         .process_trial
                         .as_ref()
@@ -1130,6 +1198,9 @@ mod tests {
             max_unknown_fraction_ppm: 20_000,
             max_mass_balance_uncertainty_ppm: 10_000,
             max_fibre_length_measurement_uncertainty_ppm: 50_000,
+            minimum_fibre_length_sample_mass_mg: 20_000,
+            minimum_fibre_length_replicates: 3,
+            minimum_fibre_length_measurement_coverage_probability_ppm: 950_000,
             minimum_fibre_length_um: 12_700,
             minimum_mass_fraction_at_or_above_length_ppm: 500_000,
         }
@@ -1266,17 +1337,17 @@ mod tests {
             bins: vec![
                 FibreLengthBin {
                     lower_bound_um: 0,
-                    upper_bound_um: 12_700,
+                    upper_bound_um: 13_000,
                     mass_fraction_ppm: 300_000,
                 },
                 FibreLengthBin {
-                    lower_bound_um: 12_700,
+                    lower_bound_um: 13_000,
                     upper_bound_um: 25_400,
                     mass_fraction_ppm: 500_000,
                 },
                 FibreLengthBin {
                     lower_bound_um: 25_400,
-                    upper_bound_um: 50_000,
+                    upper_bound_um: u32::MAX,
                     mass_fraction_ppm: 200_000,
                 },
             ],
