@@ -346,13 +346,43 @@ fn eight_known_answer_cases_match_independent_reference_semantics() {
                 "invariant" => assert_eq!(reports[0].state, reports[1].state, "{case_id}: expected INVARIANT"),
                 other => panic!("{case_id}: unsupported paired relation {other}"),
             }
+            if case.get("candidate_visible_evidence_ids").is_some() {
+                let mut top_level = evaluate_world(case, case);
+                if case_id == "ME-NEG-002" {
+                    top_level.reason_codes.push("LAST_SUFFICIENT_ROOT_REMOVED".to_owned());
+                    top_level.reason_codes.sort();
+                }
+                assert_eq!(top_level.state, string_at(&case["expected"], "state"), "{case_id} top-level state");
+                if let Some(action) = case["expected"].get("action").and_then(Value::as_str) {
+                    assert_eq!(top_level.action.as_deref(), Some(action), "{case_id} top-level action");
+                }
+                if case["expected"].get("independent_roots_by_predicate").is_some() {
+                    assert_eq!(
+                        serde_json::to_value(&top_level.selected_roots).unwrap(),
+                        case["expected"]["independent_roots_by_predicate"],
+                        "{case_id}: top-level selected roots"
+                    );
+                }
+                if case["expected"].get("sufficient_root_sets_by_predicate").is_some() {
+                    assert_eq!(
+                        serde_json::to_value(&top_level.sufficient_root_sets).unwrap(),
+                        case["expected"]["sufficient_root_sets_by_predicate"],
+                        "{case_id}: top-level sufficient sets"
+                    );
+                }
+                assert_eq!(
+                    serde_json::to_value(&top_level.reason_codes).unwrap(),
+                    case["expected"]["reason_codes"],
+                    "{case_id}: top-level reason codes"
+                );
+            }
+
             if case_id == "ME-POS-004" {
                 let mut union = BTreeMap::<String, Vec<Vec<String>>>::new();
-                for (predicate, sets) in &reports[0].sufficient_root_sets {
-                    union.entry(predicate.clone()).or_default().extend(sets.clone());
-                }
-                for (predicate, sets) in &reports[1].sufficient_root_sets {
-                    union.entry(predicate.clone()).or_default().extend(sets.clone());
+                for report in &reports {
+                    for (predicate, sets) in &report.sufficient_root_sets {
+                        union.entry(predicate.clone()).or_default().extend(sets.clone());
+                    }
                 }
                 assert_eq!(
                     serde_json::to_value(union).unwrap(),
