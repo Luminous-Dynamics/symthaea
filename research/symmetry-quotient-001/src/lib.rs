@@ -1261,6 +1261,59 @@ mod tests {
             QualificationBudgetV1::default(),
         )
         .unwrap();
+
+        // Compare an actual objective search, not only orbit partitions.
+        let exhaustive_best = problem
+            .semantics
+            .iter()
+            .map(|semantics| semantics.objective_cost)
+            .min()
+            .unwrap();
+        let exhaustive_solutions: BTreeSet<usize> = problem
+            .semantics
+            .iter()
+            .enumerate()
+            .filter_map(|(index, semantics)| {
+                (semantics.objective_cost == exhaustive_best).then_some(index)
+            })
+            .collect();
+
+        let quotient_best = certificate
+            .orbits
+            .iter()
+            .map(|orbit| problem.semantics[orbit.representative_index].objective_cost)
+            .min()
+            .unwrap();
+        let mut lifted_quotient_solutions = BTreeSet::new();
+        for orbit in &certificate.orbits {
+            if problem.semantics[orbit.representative_index].objective_cost == quotient_best {
+                let lifted = lift_representative_solution(
+                    &problem,
+                    &action,
+                    &certificate,
+                    orbit.representative_index,
+                    QualificationBudgetV1::default(),
+                )
+                .unwrap();
+                lifted_quotient_solutions.extend(
+                    lifted
+                        .into_iter()
+                        .map(|candidate| candidate.candidate_index),
+                );
+            }
+        }
+        assert_eq!(quotient_best, exhaustive_best);
+        assert_eq!(lifted_quotient_solutions, exhaustive_solutions);
+        assert_eq!(exhaustive_solutions.len(), 4);
+        assert_eq!(problem.candidate_ids.len(), 16);
+        assert_eq!(certificate.orbits.len(), 3);
+        // The exact finite fixture needs 3 representative objective calls
+        // instead of 16 exhaustive calls: 16/3 = 5.33x fewer evaluations.
+        // This is candidate-work reduction, not measured wall-clock speedup.
+        assert_eq!(
+            problem.candidate_ids.len(),
+            certificate.orbits.len() * 5 + 1
+        );
     }
 
     #[test]
