@@ -116,5 +116,7 @@
     "correct defer/abstention rate",
     "Pareto-front coverage and dominated-plan rate"
   ],
-  "claim_ceiling": "One synthetic known-answer case only. No actual development trajectory, budget forecast, owner conformance, implementation or planning performance is established."
+  "claim_ceiling": "One synthetic known-answer case only. No actual development trajectory, budget forecast, owner conformance, implementation or planning performance is established.",
+  "document_type": "development_trajectory_planning_oracle",
+  "benchmark_id": "DYNPLAN-001"
 }
