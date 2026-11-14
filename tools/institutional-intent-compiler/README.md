@@ -43,3 +43,15 @@ No client-private source text belongs in public fixtures. The included fixture i
 ## Evidence state
 
 The source and tests in this directory are an implementation proposal on an open draft PR. No compile/test result or CI pass is claimed until the exact head has actually run the commands above.
+
+## Independent evaluation
+
+A separate reference evaluator now lives in reference-evaluator/. It has its own implementation and does not import the primary validator. The nine-case synthetic oracle is in fixtures/known-answers.json.
+
+Run the independent evaluator from the repository root:
+
+    cargo run --manifest-path tools/institutional-intent-compiler/reference-evaluator/Cargo.toml -- \
+      tools/institutional-intent-compiler/fixtures \
+      tools/institutional-intent-compiler/fixtures/known-answers.json
+
+The evaluator is intentionally a second, limited structural implementation; see its README for scope and claim ceiling. Both Rust packages remain uncompiled and unexecuted until a Rust toolchain is available.
