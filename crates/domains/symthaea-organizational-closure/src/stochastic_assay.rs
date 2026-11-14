@@ -172,10 +172,7 @@ impl StochasticAssayReport {
         if self.non_equivalent_pair_count == 0 {
             return None;
         }
-        Some(
-            self.findings.is_empty()
-                && self.resolved_pair_count == self.non_equivalent_pair_count,
-        )
+        Some(self.findings.is_empty() && self.resolved_pair_count == self.non_equivalent_pair_count)
     }
 
     pub fn resolved_pair_fraction(&self) -> Option<f64> {
@@ -263,12 +260,7 @@ fn enumerate_allocations(
 ) {
     if remaining == 0 {
         *total_allocations += 1;
-        let effect = total_variation_from_counts(
-            selected_counts,
-            total_counts,
-            first_n,
-            second_n,
-        );
+        let effect = total_variation_from_counts(selected_counts, total_counts, first_n, second_n);
         if effect + 1e-12 >= observed_effect {
             *extreme_allocations += 1;
         }
@@ -332,12 +324,8 @@ fn exact_permutation_tv(
     for label in labels.iter().take(first_n) {
         observed_first_counts[*label] += 1;
     }
-    let observed_effect = total_variation_from_counts(
-        &observed_first_counts,
-        &pooled_counts,
-        first_n,
-        second_n,
-    );
+    let observed_effect =
+        total_variation_from_counts(&observed_first_counts, &pooled_counts, first_n, second_n);
 
     let mut selected_counts = vec![0_usize; category_ids.len()];
     let mut total_allocations = 0;
@@ -448,7 +436,10 @@ pub fn evaluate_stochastic_assay_adequacy(
             );
             continue;
         }
-        if candidate_by_id.insert(candidate.id.clone(), candidate).is_some() {
+        if candidate_by_id
+            .insert(candidate.id.clone(), candidate)
+            .is_some()
+        {
             push_finding(
                 &mut report,
                 StochasticAssayFindingCode::DuplicateModelId,
@@ -681,7 +672,9 @@ pub fn evaluate_stochastic_assay_adequacy(
     apply_holm_correction(&mut report.comparisons, plan);
 
     for (first, second) in non_equivalent_pairs {
-        let distinguishing_assays: Vec<_> = report.comparisons.iter()
+        let distinguishing_assays: Vec<_> = report
+            .comparisons
+            .iter()
             .filter(|comparison| {
                 comparison.first == first
                     && comparison.second == second
@@ -748,7 +741,8 @@ mod tests {
             observations.push(observed("b", "remove-producer", trial, "healthy"));
         }
 
-        let report = evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
         assert_eq!(report.non_equivalent_pair_count, 1);
         assert_eq!(report.resolved_pair_count, 1);
         assert_eq!(report.comparisons[0].total_variation_effect, Some(1.0));
@@ -766,11 +760,22 @@ mod tests {
         let assays = vec![assay("assay-1")];
         let mut observations = Vec::new();
         for trial in 0..4 {
-            observations.push(observed("a", "assay-1", trial, if trial < 2 { "x" } else { "y" }));
-            observations.push(observed("b", "assay-1", trial, if trial < 2 { "x" } else { "y" }));
+            observations.push(observed(
+                "a",
+                "assay-1",
+                trial,
+                if trial < 2 { "x" } else { "y" },
+            ));
+            observations.push(observed(
+                "b",
+                "assay-1",
+                trial,
+                if trial < 2 { "x" } else { "y" },
+            ));
         }
 
-        let report = evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
         assert_eq!(report.comparisons[0].total_variation_effect, Some(0.0));
         assert_eq!(report.comparisons[0].exact_p_value, Some(1.0));
         assert_eq!(
@@ -791,17 +796,22 @@ mod tests {
             observed("b", "assay-1", 1, "y"),
         ];
         observations.push(StochasticAssayObservation::unavailable(
-            "a".into(), assay("assay-1"), "trial-2", SampleStatus::Missing,
+            "a".into(),
+            assay("assay-1"),
+            "trial-2",
+            SampleStatus::Missing,
         ));
         observations.push(StochasticAssayObservation::unavailable(
-            "b".into(), assay("assay-1"), "trial-2", SampleStatus::Failed,
+            "b".into(),
+            assay("assay-1"),
+            "trial-2",
+            SampleStatus::Failed,
         ));
 
         let mut insufficient = plan();
         insufficient.minimum_samples_per_model = 3;
-        let report = evaluate_stochastic_assay_adequacy(
-            &candidates, &assays, &observations, insufficient,
-        );
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, insufficient);
         assert_eq!(report.comparisons[0].first_missing_count, 1);
         assert_eq!(report.comparisons[0].second_failed_count, 1);
         assert_eq!(
@@ -823,9 +833,8 @@ mod tests {
         ];
         let mut constrained = plan();
         constrained.maximum_permutations = 1;
-        let report = evaluate_stochastic_assay_adequacy(
-            &candidates, &assays, &observations, constrained,
-        );
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, constrained);
         assert_eq!(
             report.comparisons[0].disposition,
             StochasticTestDisposition::Inconclusive
@@ -849,7 +858,8 @@ mod tests {
             observations.push(observed("b", "assay-1", trial, "healthy"));
         }
 
-        let report = evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
         assert_eq!(report.planned_comparison_count, 2);
         assert_eq!(report.comparisons.len(), 2);
         for comparison in &report.comparisons {
@@ -865,12 +875,8 @@ mod tests {
     #[test]
     fn target_equivalent_models_do_not_create_required_tests() {
         let candidates = vec![model("a", "same-class"), model("b", "same-class")];
-        let report = evaluate_stochastic_assay_adequacy(
-            &candidates,
-            &[assay("assay-1")],
-            &[],
-            plan(),
-        );
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &[assay("assay-1")], &[], plan());
         assert_eq!(report.non_equivalent_pair_count, 0);
         assert_eq!(report.comparisons.len(), 0);
         assert_eq!(report.is_conservative_for_declared_classes(), None);
@@ -887,7 +893,8 @@ mod tests {
         }
         observations.push(observed("a", "assay-1", 0, "x"));
 
-        let report = evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
+        let report =
+            evaluate_stochastic_assay_adequacy(&candidates, &assays, &observations, plan());
         assert!(report.findings.iter().any(|finding| {
             finding.code == StochasticAssayFindingCode::DuplicateTrialObservation
         }));
