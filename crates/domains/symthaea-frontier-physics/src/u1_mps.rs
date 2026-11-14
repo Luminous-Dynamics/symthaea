@@ -135,6 +135,12 @@ pub enum U1MpsError {
         relative_cutoff: f64,
         tolerance: f64,
     },
+    TruncationBudgetInfeasible {
+        requested_l2_error: f64,
+        achievable_l2_error: f64,
+        max_bond_dimension: usize,
+    },
+    InvalidErrorBudget,
     InvalidTeBDParity(u8),
     TeBDGateOutOfRange {
         bond_index: usize,
@@ -296,6 +302,17 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "invalid truncation policy: max_bond={max_bond_dimension}, relative_cutoff={relative_cutoff}, tolerance={tolerance}"
             ),
+            Self::TruncationBudgetInfeasible {
+                requested_l2_error,
+                achievable_l2_error,
+                max_bond_dimension,
+            } => write!(
+                f,
+                "local L2 truncation budget {requested_l2_error} is infeasible with max bond {max_bond_dimension}; best achievable residual is {achievable_l2_error}"
+            ),
+            Self::InvalidErrorBudget => {
+                write!(f, "error budget must be positive, finite, and allocated fractions must sum to at most one")
+            },
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
             }
@@ -2306,6 +2323,112 @@ pub struct U1TwoSiteTruncationDiagnostics {
     pub reconstruction_l2_residual: f64,
 }
 
+
+
+/// Absolute local two-site tensor L2 error target for adaptive compression.
+///
+/// The target is measured in the Frobenius norm of the two-site center. A
+/// canonical-gauge exterior-norm receipt is still required before interpreting
+/// it as a global state-vector error.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TwoSiteErrorBudgetPolicy {
+    pub max_bond_dimension: usize,
+    pub maximum_local_l2_error: f64,
+    pub tolerance: f64,
+}
+
+/// Result of selecting the smallest bond dimension that meets a local error target.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteBudgetedSplitDiagnostics {
+    pub truncation: U1TwoSiteTruncationDiagnostics,
+    pub requested_local_l2_error: f64,
+    pub achieved_local_l2_error: f64,
+    pub minimum_required_bond_dimension: usize,
+    pub selected_bond_dimension: usize,
+    pub cap_headroom: usize,
+    /// Exact charge-block SVD factorizations performed while satisfying the target.
+    /// The current implementation exposes retries rather than hiding their cost.
+    pub svd_factorization_passes: usize,
+    pub budget_satisfied: bool,
+}
+
+/// Fractions of a user-requested end-to-end simulation error budget.
+///
+/// Fractions must be finite, non-negative, and sum to at most one. Unallocated
+/// mass remains an explicit reserve rather than being silently consumed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsErrorBudgetFractions {
+    pub canonicalization: f64,
+    pub gate_quality: f64,
+    pub hamiltonian_projection: f64,
+    pub compression: f64,
+    pub time_discretization: f64,
+}
+
+/// Compiled absolute error allowances for the distinct numerical error channels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1MpsErrorBudgetPlan {
+    pub total_l2_error: f64,
+    pub canonicalization_l2_error: f64,
+    pub gate_quality_l2_error: f64,
+    pub hamiltonian_projection_l2_error: f64,
+    pub compression_l2_error: f64,
+    pub time_discretization_l2_error: f64,
+    pub reserved_l2_error: f64,
+}
+
+impl U1MpsErrorBudgetPlan {
+    pub fn compile(
+        total_l2_error: f64,
+        fractions: U1MpsErrorBudgetFractions,
+    ) -> Result<Self, U1MpsError> {
+        let values = [
+            fractions.canonicalization,
+            fractions.gate_quality,
+            fractions.hamiltonian_projection,
+            fractions.compression,
+            fractions.time_discretization,
+        ];
+        if !total_l2_error.is_finite()
+            || total_l2_error <= 0.0
+            || values
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let allocated_fraction = values.iter().sum::<f64>();
+        if !allocated_fraction.is_finite() || allocated_fraction > 1.0 + 8.0 * f64::EPSILON {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+
+        let reserve_fraction = (1.0 - allocated_fraction).max(0.0);
+        Ok(Self {
+            total_l2_error,
+            canonicalization_l2_error: total_l2_error * fractions.canonicalization,
+            gate_quality_l2_error: total_l2_error * fractions.gate_quality,
+            hamiltonian_projection_l2_error: total_l2_error
+                * fractions.hamiltonian_projection,
+            compression_l2_error: total_l2_error * fractions.compression,
+            time_discretization_l2_error: total_l2_error
+                * fractions.time_discretization,
+            reserved_l2_error: total_l2_error * reserve_fraction,
+        })
+    }
+
+    /// Equal per-gate allocation for a fixed number of planned compression events.
+    pub fn per_gate_compression_l2_error(
+        &self,
+        gate_count: usize,
+    ) -> Result<f64, U1MpsError> {
+        if gate_count == 0 {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        Ok(self.compression_l2_error / gate_count as f64)
+    }
+}
+
+
 impl U1TwoSiteState {
     /// Construct a checked two-site tensor with external virtual-charge labels.
     pub fn new(
@@ -2911,6 +3034,299 @@ impl U1TwoSiteState {
             bond_cap_binding,
             reconstruction_max_residual,
             reconstruction_l2_residual: reconstruction_squared.sqrt(),
+        })
+    }
+
+
+
+    /// Select the smallest global bond dimension that satisfies an absolute
+    /// local two-site L2 projection budget.
+    ///
+    /// The exact charge-block factorization is performed once. Candidate ranks
+    /// are assembled from the same factors, so adaptive rank search does not
+    /// trigger repeated SVDs.
+    /// The method first estimates the minimum rank from the exact charge-block
+    /// Schmidt spectrum, then validates the *measured reconstruction residual*
+    /// using the ordinary truncation path. If finite-precision factorization
+    /// pushes the measured residual above budget, it increases the retained
+    /// rank until the request is met or the global bond cap is exhausted.
+    ///
+    /// This policy does not renormalize. Its local error is a two-site tensor
+    /// Frobenius residual; a canonical-gauge exterior receipt is required to
+    /// convert it into a global state-vector bound.
+
+
+    fn assemble_truncated_from_exact(
+        &self,
+        exact: &U1TwoSiteSplitDiagnostics,
+        singular_values: &[f64],
+        retained: &[usize],
+        tolerance: f64,
+    ) -> Result<U1TwoSiteTruncationDiagnostics, U1MpsError> {
+        let full_rank = exact.retained_singular_values;
+        if singular_values.len() != full_rank
+            || retained.is_empty()
+            || retained.iter().any(|index| *index >= full_rank)
+        {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+
+        let mut retained_mask = vec![false; full_rank];
+        for &index in retained {
+            if retained_mask[index] {
+                return Err(U1MpsError::TwoSiteShapeMismatch);
+            }
+            retained_mask[index] = true;
+        }
+        let total_schmidt_weight = singular_values
+            .iter()
+            .map(|value| value * value)
+            .sum::<f64>();
+        let retained_schmidt_weight = retained
+            .iter()
+            .map(|index| singular_values[*index] * singular_values[*index])
+            .sum::<f64>();
+        let discarded_weight = singular_values
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !retained_mask[*index])
+            .map(|(_, value)| value * value)
+            .sum::<f64>();
+        if !total_schmidt_weight.is_finite()
+            || total_schmidt_weight <= 0.0
+            || !retained_schmidt_weight.is_finite()
+            || retained_schmidt_weight <= 0.0
+            || !discarded_weight.is_finite()
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive truncation Schmidt weights",
+            ));
+        }
+
+        let retained_rank = retained.len();
+        let left_entries = exact
+            .left_tensor
+            .left_dimension()
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(retained_rank))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let right_entries = retained_rank
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(exact.right_tensor.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut left_data = vec![Complex64::new(0.0, 0.0); left_entries];
+        let mut right_data = vec![Complex64::new(0.0, 0.0); right_entries];
+        let mut retained_middle_charges = Vec::with_capacity(retained_rank);
+
+        for (new_middle, old_middle) in retained.iter().copied().enumerate() {
+            retained_middle_charges
+                .push(exact.left_tensor.right_charges()[old_middle]);
+            for left in 0..exact.left_tensor.left_dimension() {
+                for first_physical in 0..2 {
+                    let index = (left * 2 + first_physical) * retained_rank + new_middle;
+                    left_data[index] =
+                        exact.left_tensor.get(left, first_physical, old_middle);
+                }
+            }
+            for second_physical in 0..2 {
+                for right in 0..exact.right_tensor.right_dimension() {
+                    let index = (new_middle * 2 + second_physical)
+                        * exact.right_tensor.right_dimension()
+                        + right;
+                    right_data[index] =
+                        exact.right_tensor.get(old_middle, second_physical, right);
+                }
+            }
+        }
+
+        let left_tensor = U1MpsTensor::new(
+            exact.left_tensor.left_charges().to_vec(),
+            retained_middle_charges.clone(),
+            left_data,
+        )?;
+        let right_tensor = U1MpsTensor::new(
+            retained_middle_charges.clone(),
+            exact.right_tensor.right_charges().to_vec(),
+            right_data,
+        )?;
+
+        let state_entries = self
+            .left_dimension()
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(self.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut retained_state_data =
+            vec![Complex64::new(0.0, 0.0); state_entries];
+        let mut reconstruction_max_residual: f64 = 0.0;
+        let mut reconstruction_squared = 0.0;
+        for left in 0..self.left_dimension() {
+            for first_physical in 0..2 {
+                for second_physical in 0..2 {
+                    let pair = first_physical * 2 + second_physical;
+                    for right in 0..self.right_dimension() {
+                        let mut value = Complex64::new(0.0, 0.0);
+                        for middle in 0..retained_rank {
+                            value += left_tensor.get(left, first_physical, middle)
+                                * right_tensor.get(middle, second_physical, right);
+                        }
+                        let index = (left * 4 + pair) * self.right_dimension() + right;
+                        retained_state_data[index] = value;
+                        let residual = (value - self.get(left, pair, right)).norm();
+                        reconstruction_max_residual =
+                            reconstruction_max_residual.max(residual);
+                        reconstruction_squared += residual * residual;
+                    }
+                }
+            }
+        }
+        if !reconstruction_max_residual.is_finite() || !reconstruction_squared.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive truncation reconstruction",
+            ));
+        }
+        let _retained_state = U1TwoSiteState::new(
+            self.left_charges.clone(),
+            self.right_charges.clone(),
+            retained_state_data,
+            tolerance,
+        )?;
+
+        let mut retained_rank_by_charge = Vec::new();
+        for charge in retained_middle_charges.iter().copied() {
+            if !retained_rank_by_charge
+                .iter()
+                .any(|(existing, _)| *existing == charge)
+            {
+                let count = retained_middle_charges
+                    .iter()
+                    .filter(|candidate| **candidate == charge)
+                    .count();
+                retained_rank_by_charge.push((charge, count));
+            }
+        }
+
+        let relative_discarded_weight = discarded_weight / total_schmidt_weight;
+        let renormalization_factor_to_restore_original_norm =
+            (total_schmidt_weight / retained_schmidt_weight).sqrt();
+        if !relative_discarded_weight.is_finite()
+            || !renormalization_factor_to_restore_original_norm.is_finite()
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "adaptive truncation normalization diagnostics",
+            ));
+        }
+
+        Ok(U1TwoSiteTruncationDiagnostics {
+            left_tensor,
+            right_tensor,
+            retained_rank_by_charge,
+            total_singular_value_count: full_rank,
+            retained_singular_value_count: retained_rank,
+            cutoff_discarded_singular_value_count: 0,
+            bond_cap_discarded_singular_value_count: full_rank - retained_rank,
+            total_schmidt_weight,
+            retained_schmidt_weight,
+            cutoff_discarded_weight: 0.0,
+            bond_cap_discarded_weight: discarded_weight,
+            discarded_weight,
+            relative_discarded_weight,
+            pre_truncation_norm_squared: total_schmidt_weight,
+            post_truncation_norm_squared: retained_schmidt_weight,
+            renormalization_factor_to_restore_original_norm,
+            bond_cap_binding: retained_rank < full_rank,
+            reconstruction_max_residual,
+            reconstruction_l2_residual: reconstruction_squared.sqrt(),
+        })
+    }
+
+
+    pub fn split_with_error_budget(
+        &self,
+        policy: U1TwoSiteErrorBudgetPolicy,
+    ) -> Result<U1TwoSiteBudgetedSplitDiagnostics, U1MpsError> {
+        if policy.max_bond_dimension == 0
+            || !policy.maximum_local_l2_error.is_finite()
+            || policy.maximum_local_l2_error < 0.0
+            || !policy.tolerance.is_finite()
+            || policy.tolerance <= 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+
+        // One exact factorization supplies both the Schmidt spectrum and every
+        // candidate compressed tensor. Candidate ranks reuse these factors.
+        let exact = self.split_exact(policy.tolerance)?;
+        let full_rank = exact.retained_singular_values;
+        let mut singular_values = Vec::with_capacity(full_rank);
+        for middle in 0..full_rank {
+            let mut row_norm_squared = 0.0;
+            for physical in 0..2 {
+                for right in 0..exact.right_tensor.right_dimension() {
+                    row_norm_squared += exact.right_tensor.get(middle, physical, right).norm_sqr();
+                }
+            }
+            let singular_value = row_norm_squared.sqrt();
+            if !singular_value.is_finite() || singular_value <= 0.0 {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "adaptive Schmidt spectrum",
+                ));
+            }
+            singular_values.push(singular_value);
+        }
+
+        let mut ordered_indices = (0..full_rank).collect::<Vec<_>>();
+        ordered_indices.sort_by(|left, right| {
+            singular_values[*right]
+                .total_cmp(&singular_values[*left])
+                .then_with(|| left.cmp(right))
+        });
+        let max_rank = policy.max_bond_dimension.min(full_rank);
+        let ideal_minimum_rank = (1..=full_rank)
+            .find(|rank| {
+                ordered_indices[*rank..]
+                    .iter()
+                    .map(|index| singular_values[*index] * singular_values[*index])
+                    .sum::<f64>()
+                    .sqrt()
+                    <= policy.maximum_local_l2_error
+            })
+            .unwrap_or(full_rank);
+
+        let mut best_residual = f64::INFINITY;
+        for retained_rank in ideal_minimum_rank.min(max_rank)..=max_rank {
+            let mut retained = ordered_indices[..retained_rank].to_vec();
+            retained.sort_unstable();
+            let truncation = self.assemble_truncated_from_exact(
+                &exact,
+                &singular_values,
+                &retained,
+                policy.tolerance,
+            )?;
+            let achieved = truncation.reconstruction_l2_residual;
+            if !achieved.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "adaptive truncation reconstruction residual",
+                ));
+            }
+            best_residual = best_residual.min(achieved);
+            if achieved <= policy.maximum_local_l2_error {
+                return Ok(U1TwoSiteBudgetedSplitDiagnostics {
+                    truncation,
+                    requested_local_l2_error: policy.maximum_local_l2_error,
+                    achieved_local_l2_error: achieved,
+                    minimum_required_bond_dimension: retained_rank,
+                    selected_bond_dimension: retained_rank,
+                    cap_headroom: policy.max_bond_dimension.saturating_sub(retained_rank),
+                    svd_factorization_passes: 1,
+                    budget_satisfied: true,
+                });
+            }
+        }
+
+        Err(U1MpsError::TruncationBudgetInfeasible {
+            requested_l2_error: policy.maximum_local_l2_error,
+            achievable_l2_error: best_residual,
+            max_bond_dimension: max_rank,
         })
     }
 
@@ -3702,11 +4118,11 @@ impl U1TeBDStrangStepper {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
-        U1TeBDStepResult, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
-        U1TwoSiteState,
-        U1TwoSiteTruncationPolicy,
+        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsErrorBudgetFractions,
+        U1MpsErrorBudgetPlan, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
+        U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
+        U1TeBDStrangStepper, U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate,
+        U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
@@ -5711,4 +6127,172 @@ mod tests {
         ));
         assert_eq!(state.to_dense(8).unwrap(), before);
     }
+
+    fn two_site_error_budget_fixture(large: f64, small: f64) -> U1TwoSiteState {
+        U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(large, 0.0),
+                Complex64::new(small, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            1.0e-12,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn adaptive_error_budget_selects_minimum_rank_that_meets_local_l2_target() {
+        let state = two_site_error_budget_fixture(0.8, 0.6);
+        let result = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 2,
+                maximum_local_l2_error: 0.600_000_1,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.selected_bond_dimension, 1);
+        assert_eq!(result.minimum_required_bond_dimension, 1);
+        assert_eq!(result.truncation.retained_rank_by_charge, vec![(0, 1)]);
+        assert!(result.achieved_local_l2_error <= result.requested_local_l2_error);
+        assert_eq!(result.svd_factorization_passes, 1);
+        assert!(result.budget_satisfied);
+        assert!((result.truncation.retained_schmidt_weight - 0.64).abs() <= 1.0e-12);
+        assert!((result.truncation.discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.truncation.renormalization_factor_to_restore_original_norm - 1.25).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn adaptive_error_budget_increases_rank_when_target_requires_it() {
+        let state = two_site_error_budget_fixture(0.8, 0.6);
+        let result = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 2,
+                maximum_local_l2_error: 1.0e-12,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.selected_bond_dimension, 2);
+        assert_eq!(result.minimum_required_bond_dimension, 2);
+        assert!(result.achieved_local_l2_error <= 1.0e-12);
+        assert_eq!(result.svd_factorization_passes, 1);
+        assert_eq!(result.truncation.discarded_weight, 0.0);
+        let one_bond = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert!(one_bond.reconstruction_l2_residual > 0.5);
+    }
+
+    #[test]
+    fn adaptive_error_budget_fails_closed_when_bond_cap_cannot_meet_target() {
+        let state = two_site_error_budget_fixture(0.8, 0.6);
+        assert!(matches!(
+            state.split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 1,
+                maximum_local_l2_error: 0.5,
+                tolerance: 1.0e-12,
+            }),
+            Err(U1MpsError::TruncationBudgetInfeasible {
+                requested_l2_error,
+                achievable_l2_error,
+                max_bond_dimension: 1,
+            }) if (requested_l2_error - 0.5).abs() <= f64::EPSILON
+                && achievable_l2_error > requested_l2_error
+        ));
+    }
+
+    #[test]
+    fn adaptive_error_budget_rejects_invalid_fields() {
+        let state = two_site_error_budget_fixture(0.8, 0.6);
+        for policy in [
+            U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 0,
+                maximum_local_l2_error: 0.1,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 2,
+                maximum_local_l2_error: -0.1,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 2,
+                maximum_local_l2_error: f64::NAN,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteErrorBudgetPolicy {
+                max_bond_dimension: 2,
+                maximum_local_l2_error: 0.1,
+                tolerance: f64::INFINITY,
+            },
+        ] {
+            assert!(matches!(
+                state.split_with_error_budget(policy),
+                Err(U1MpsError::InvalidErrorBudget)
+            ));
+        }
+    }
+
+    #[test]
+    fn simulation_error_budget_compiles_named_channels_and_reserves_unallocated_fraction() {
+        let plan = U1MpsErrorBudgetPlan::compile(
+            1.0e-3,
+            U1MpsErrorBudgetFractions {
+                canonicalization: 0.1,
+                gate_quality: 0.1,
+                hamiltonian_projection: 0.1,
+                compression: 0.4,
+                time_discretization: 0.2,
+            },
+        )
+        .unwrap();
+        assert!((plan.canonicalization_l2_error - 1.0e-4).abs() <= 1.0e-15);
+        assert!((plan.gate_quality_l2_error - 1.0e-4).abs() <= 1.0e-15);
+        assert!((plan.hamiltonian_projection_l2_error - 1.0e-4).abs() <= 1.0e-15);
+        assert!((plan.compression_l2_error - 4.0e-4).abs() <= 1.0e-15);
+        assert!((plan.time_discretization_l2_error - 2.0e-4).abs() <= 1.0e-15);
+        assert!((plan.reserved_l2_error - 1.0e-4).abs() <= 1.0e-15);
+        assert!((plan.per_gate_compression_l2_error(10).unwrap() - 4.0e-5).abs() <= 1.0e-15);
+        assert_eq!(
+            plan.per_gate_compression_l2_error(0),
+            Err(U1MpsError::InvalidErrorBudget)
+        );
+    }
+
+    #[test]
+    fn simulation_error_budget_rejects_overallocation_and_nonfinite_fractions() {
+        assert_eq!(
+            U1MpsErrorBudgetPlan::compile(
+                1.0e-3,
+                U1MpsErrorBudgetFractions {
+                    canonicalization: 0.3,
+                    gate_quality: 0.3,
+                    hamiltonian_projection: 0.3,
+                    compression: 0.2,
+                    time_discretization: 0.0,
+                },
+            ),
+            Err(U1MpsError::InvalidErrorBudget)
+        );
+        assert_eq!(
+            U1MpsErrorBudgetPlan::compile(
+                f64::NAN,
+                U1MpsErrorBudgetFractions {
+                    canonicalization: 0.1,
+                    gate_quality: 0.1,
+                    hamiltonian_projection: 0.1,
+                    compression: 0.1,
+                    time_discretization: 0.1,
+                },
+            ),
+            Err(U1MpsError::InvalidErrorBudget)
+        );
+    }
+
 }
