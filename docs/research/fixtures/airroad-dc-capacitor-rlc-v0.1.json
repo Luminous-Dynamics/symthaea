@@ -1,0 +1,258 @@
+{
+  "schema": "luminous.airroad.dc_capacitor_rlc_discharge.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_analytical_reference",
+  "model": {
+    "initial_capacitor_voltage_v": {
+      "numerator": "600",
+      "denominator": "1"
+    },
+    "series_resistance_ohm": {
+      "numerator": "3",
+      "denominator": "50"
+    },
+    "series_inductance_h": {
+      "numerator": "1",
+      "denominator": "1000000"
+    },
+    "capacitance_f": {
+      "numerator": "1",
+      "denominator": "2500"
+    },
+    "initial_current_a": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "alpha_per_s": {
+      "numerator": "30000",
+      "denominator": "1"
+    },
+    "omega0_rad_s": {
+      "numerator": "50000",
+      "denominator": "1"
+    },
+    "omega_d_rad_s": {
+      "numerator": "40000",
+      "denominator": "1"
+    },
+    "evaluation_time_s": {
+      "numerator": "1",
+      "denominator": "160000"
+    },
+    "alpha_time": {
+      "numerator": "3",
+      "denominator": "16"
+    },
+    "omega_d_time": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "initial_capacitor_energy_j": {
+      "numerator": "72",
+      "denominator": "1"
+    },
+    "source_contribution": "none_isolated_capacitor_discharge_reference",
+    "assumptions": [
+      "single lumped series RLC path",
+      "constant R, L, C",
+      "initial capacitor voltage is 600 V",
+      "initial inductor current is zero",
+      "underdamped response",
+      "no continuing source contribution during this interval"
+    ],
+    "excluded_physics": [
+      "converter control or current limiting",
+      "source-fed current",
+      "multiple branches or sources",
+      "distributed cable propagation",
+      "dc arc",
+      "breaker recovery voltage",
+      "thermal damage or component withstand"
+    ]
+  },
+  "taylor_bounds": {
+    "exp_minus_alpha_t": {
+      "lower_order": 13,
+      "lower": {
+        "numerator": "95676130379373015489359",
+        "denominator": "115407442611145382297600"
+      },
+      "upper_order": 12,
+      "upper": {
+        "numerator": "91996279210935591823",
+        "denominator": "110968694818409021440"
+      }
+    },
+    "exp_minus_two_alpha_t": {
+      "lower_order": 13,
+      "lower": {
+        "numerator": "9682409423745681367",
+        "denominator": "14087822584368332800"
+      },
+      "upper_order": 12,
+      "upper": {
+        "numerator": "93100090612939307",
+        "denominator": "135459832542003200"
+      }
+    },
+    "sin_omega_t": {
+      "lower_order": 7,
+      "lower": {
+        "numerator": "347381052362476557599",
+        "denominator": "1404104661094367232000"
+      },
+      "upper_order": 6,
+      "upper": {
+        "numerator": "20677443593004557",
+        "denominator": "83577658398474240"
+      }
+    },
+    "cos_omega_t": {
+      "lower_order": 7,
+      "lower": {
+        "numerator": "22674240791935791967",
+        "denominator": "23401744351572787200"
+      },
+      "upper_order": 6,
+      "upper": {
+        "numerator": "1112354826919927",
+        "denominator": "1148044758220800"
+      }
+    },
+    "sin_two_omega_t": {
+      "lower_order": 7,
+      "lower": {
+        "numerator": "20543323773249479",
+        "denominator": "42849873690624000"
+      },
+      "upper_order": 6,
+      "upper": {
+        "numerator": "3493762546471",
+        "denominator": "7287393484800"
+      }
+    },
+    "cos_two_omega_t": {
+      "lower_order": 7,
+      "lower": {
+        "numerator": "1253476731003223",
+        "denominator": "1428329123020800"
+      },
+      "upper_order": 6,
+      "upper": {
+        "numerator": "245972670919",
+        "denominator": "280284364800"
+      }
+    }
+  },
+  "expected_enclosures": {
+    "current_at_t_a": {
+      "lower": {
+        "numerator": "33236074857156111605414060796202956735089041",
+        "denominator": "10802941873019328182939979412707087482880"
+      },
+      "upper": {
+        "numerator": "47556196853760461893012969338273435275",
+        "denominator": "15457506114095879382640767245746176"
+      }
+    },
+    "capacitor_voltage_at_t_v": {
+      "lower": {
+        "numerator": "206786764318159862569906908366961174829421281",
+        "denominator": "360098062433977606097999313756902916096000"
+      },
+      "upper": {
+        "numerator": "177529845740178453461398607073413338141",
+        "denominator": "309150122281917587652815344914923520"
+      }
+    },
+    "branch_i2t_a2s": {
+      "lower": {
+        "numerator": "391839863141060528891560239621127",
+        "denominator": "17886264246403058672845329530880"
+      },
+      "upper": {
+        "numerator": "141288412190294551258532903458727",
+        "denominator": "6449374127308795194535575552000"
+      }
+    },
+    "resistor_energy_j": {
+      "lower": {
+        "numerator": "391839863141060528891560239621127",
+        "denominator": "298104404106717644547422158848000"
+      },
+      "upper": {
+        "numerator": "141288412190294551258532903458727",
+        "denominator": "107489568788479919908926259200000"
+      }
+    },
+    "inductor_energy_j": {
+      "lower": {
+        "numerator": "1104636671910484644456200713039245938240400459778957120487451860330991275166290198299681",
+        "denominator": "233407106223668701205245978530476897233141435927822428291200355283131148586188800000000"
+      },
+      "upper": {
+        "numerator": "3618546974709786327321980628090710622369563672376662723108927940399382921",
+        "denominator": "764590384855396778504837130206593557387861381218264333776534459593523200"
+      }
+    },
+    "remaining_capacitor_energy_j": {
+      "lower": {
+        "numerator": "42760765897174192932257244875398902675780467072010345746472767200407386720627449375680961",
+        "denominator": "648353072843524170014572162584658047869837322021728967475556542453142079406080000000000"
+      },
+      "upper": {
+        "numerator": "31516846128531557778547759362425770695005195008828624658344257391004805335881",
+        "denominator": "477868990534622986565523206379120973367413363261415208610334037245952000000"
+      }
+    },
+    "initial_capacitor_energy_j": {
+      "lower": {
+        "numerator": "72",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "72",
+        "denominator": "1"
+      }
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "non-positive-rlc-input",
+      "expected": "reject"
+    },
+    {
+      "id": "non-underdamped-parameter-set",
+      "expected": "reject"
+    },
+    {
+      "id": "nonzero-initial-current",
+      "expected": "reject"
+    },
+    {
+      "id": "unsupported-series-domain",
+      "expected": "reject"
+    },
+    {
+      "id": "negative-i2t",
+      "expected": "reject"
+    },
+    {
+      "id": "energy-balance-does-not-overlap",
+      "expected": "not_established"
+    },
+    {
+      "id": "source-or-arc-claim-from-isolated-rlc",
+      "expected": "reject"
+    },
+    {
+      "id": "missing-topology-identity-for-protection-join",
+      "expected": "not_evaluable"
+    }
+  ],
+  "claim_ceiling": [
+    "Isolated source-free underdamped series-RLC analytical reference only.",
+    "No converter, source-fed, multi-branch, arc, breaker or thermal behavior is qualified.",
+    "No device interruption or aircraft safety claim is made."
+  ]
+}
