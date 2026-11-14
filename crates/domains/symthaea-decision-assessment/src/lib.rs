@@ -1661,6 +1661,19 @@ mod tests {
     }
 
     #[test]
+    fn unauthorized_act_effect_does_not_corrupt_hold_side_attribution() {
+        let mut act = act_episode();
+        act.authority = GateState::Indeterminate;
+        let report = evaluate_act_hold_pair(&act, &hold_episode()).unwrap();
+        assert!(!report.paired_correct);
+        assert!(!report.act_side_success);
+        assert!(report.hold_side_success);
+        assert!(report.critical_premature_action);
+        assert!(report.premature_irreversible_effect_detected);
+        assert!(report.reason_codes.contains(&"IRREVERSIBLE_EFFECT_WITHOUT_QUALIFIED_AUTHORITY".to_owned()));
+    }
+
+    #[test]
     fn always_abstain_fails_eligible_act_side() {
         let mut act = act_episode();
         act.disposition = ActHoldDisposition::Hold;
