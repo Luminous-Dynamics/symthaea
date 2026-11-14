@@ -25,6 +25,7 @@ struct SpecimenClassification {
     specimen_id: String,
     cluster_id: String,
     image_sha256: String,
+    observation_mode: String,
     observer_refs: Vec<String>,
     blinding_status: String,
     fractions: Vec<CategoryFraction>,
@@ -235,6 +236,9 @@ fn audit_cohort(
         cluster_set.insert(sample.cluster_id.as_str());
         if !sha256_shape(&sample.image_sha256) {
             return Err(Disposition::Blocked);
+        }
+        if sample.observation_mode != "direct_unaided_visual" {
+            return Err(Disposition::Rejected);
         }
         if sample.observer_refs.len() < 2 || !unique_strings(&sample.observer_refs) {
             return Err(Disposition::Blocked);
@@ -606,6 +610,14 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
         let case = fixture.cases.iter().find(|case| case.id == "many-specimens-one-lot").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn magnified_classification_does_not_claim_d5573_visual_scope() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let mut case = fixture.cases.iter().find(|case| case.id == "valid-independent-arm-failure-composition").expect("case exists").receipt;
+        case.baseline.specimens[0].observation_mode = "magnified_imaging".to_owned();
+        assert_eq!(audit_receipt(&case).disposition, Disposition::Rejected);
     }
 
     #[test]
