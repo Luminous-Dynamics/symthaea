@@ -1778,6 +1778,8 @@ fn validate_federation_compatibility_receipt(
     from_project: Option<&str>,
     to_project: Option<&str>,
     members: &HashMap<String, (String, String, String)>,
+    contract_id: Option<&str>,
+    contract_version: Option<&str>,
     contract_blob_oid: Option<&str>,
     report: &mut ValidationReport,
 ) {
@@ -1873,6 +1875,24 @@ fn validate_federation_compatibility_receipt(
                 ),
             }
         }
+    }
+
+
+    let receipt_contract_id = value.get("contract_id").and_then(Value::as_str);
+    let receipt_contract_version = value.get("contract_version").and_then(Value::as_str);
+    if receipt_contract_id != contract_id {
+        report.error(
+            "EGDDM-FEDERATION-043",
+            format!("{path}.contract_id"),
+            "receipt contract_id must match the relationship contract binding",
+        );
+    }
+    if receipt_contract_version != contract_version {
+        report.error(
+            "EGDDM-FEDERATION-044",
+            format!("{path}.contract_version"),
+            "receipt contract_version must match the relationship contract binding",
+        );
     }
 
     let receipt_contract_blob = field(value, "contract_blob_oid", path, report)
@@ -2041,8 +2061,14 @@ fn validate_federation_relationship(
 
     if let Some(receipt) = relationship.get("compatibility_receipt") {
         if !receipt.is_null() {
-            let bound_contract = relationship
-                .get("contract_binding")
+            let binding = relationship.get("contract_binding");
+            let bound_contract_id = binding
+                .and_then(|binding| binding.get("contract_id"))
+                .and_then(Value::as_str);
+            let bound_contract_version = binding
+                .and_then(|binding| binding.get("version"))
+                .and_then(Value::as_str);
+            let bound_contract = binding
                 .and_then(|binding| binding.get("contract_blob_oid"))
                 .and_then(Value::as_str);
             validate_federation_compatibility_receipt(
@@ -2051,6 +2077,8 @@ fn validate_federation_relationship(
                 from,
                 to,
                 members,
+                bound_contract_id,
+                bound_contract_version,
                 bound_contract,
                 report,
             );
@@ -2979,6 +3007,39 @@ mod tests {
         relationship["compatibility_receipt"] = Value::Null;
         let report = validate_federation_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-037"));
+    }
+
+    #[test]
+    fn federation_v011_receipt_must_match_contract_id_and_version() {
+        let mut value: Value = serde_json::from_str(FEDERATION_V011_FIXTURE).expect("v0.1.1 federation JSON");
+        let relationship = value["relationships"]
+            .as_array_mut().expect("relationships")
+            .iter_mut()
+            .find(|item| item["relation"] == "shared_schema_candidate")
+            .expect("shared schema candidate");
+        relationship["status"] = Value::String("independently_qualified".to_owned());
+        relationship["authority"] = Value::String("independently_adjudicated".to_owned());
+        relationship["contract_binding"]["status"] =
+            Value::String("independently_conformance_tested".to_owned());
+        relationship["compatibility_receipt"] = serde_json::json!({
+            "receipt_id":"synthetic:receipt",
+            "receipt_sha256":"a".repeat(64),
+            "verifier_build_sha256":"b".repeat(64),
+            "source_project_id":"mycelix",
+            "source_revision":"6089a68430a501c51934c2c4107061c2a2cb5565",
+            "source_tree_oid":"79283620f83cdfa155fc86a2362335390628913d",
+            "target_project_id":"symthaea",
+            "target_revision":"dcffe1060ece4815cf42548a8f646cec4f075535",
+            "target_tree_oid":"74972b6d6d1d3c67a8050cac76e46af49f8b0cd9",
+            "contract_id":"WRONG-CONTRACT",
+            "contract_version":"0.1.0",
+            "contract_blob_oid":"f4abb87b24fc00d30e323bffd3a774b08d0740d4",
+            "configuration_world_digest":"c".repeat(64),
+            "outcome":"passed",
+            "tested_at":"2026-11-14T12:00:00Z"
+        });
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-043"));
     }
 
     #[test]
