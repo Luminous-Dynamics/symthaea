@@ -1,0 +1,4330 @@
+{
+  "schema": "muse-ossq-omr-source-snapshot-v1",
+  "status": "source_metadata_recorded",
+  "upstream": {
+    "repository": "MALerLab/ossq-omr",
+    "commit_sha1": "7a17e45cddc0b7064fc3a179b62caeb57595e993",
+    "tree_sha1": "81e829b3755fe169bc3005b8b5d1d8767605afbe",
+    "tree_entry_count": 1375,
+    "tree_truncated": false,
+    "source_commit_message": "PR: (#12) camera-ready release of the OSSQ-OMR dataset",
+    "source_commit_parent_sha1": "31f519a5df8b03f3169cbefaf848117bd5a78535",
+    "manifest_blobs": [
+      {
+        "path": "README.md",
+        "git_blob_sha1": "651ceb649233ca8ee4684a67e49a8eb13ca3ff72",
+        "size_bytes": 11670
+      },
+      {
+        "path": "LICENSE.txt",
+        "git_blob_sha1": "0e259d42c996742e9e3cba14c677129b2c1b6311",
+        "size_bytes": 7048
+      },
+      {
+        "path": "data/scores.tsv",
+        "git_blob_sha1": "c9b26b2996ed8146cda99d8718eb2d32a2f0cd59",
+        "size_bytes": 22071
+      },
+      {
+        "path": "data/composers.tsv",
+        "git_blob_sha1": "2a8b09c798450063b81c9c15aef0311bbd4b707b",
+        "size_bytes": 16981
+      },
+      {
+        "path": "data/sets.tsv",
+        "git_blob_sha1": "c91a3676b0df643d329d0e78771a7cc44cfa4c22",
+        "size_bytes": 20536
+      },
+      {
+        "path": "data/scores.yaml",
+        "git_blob_sha1": "5d3e069f5ecb7ae015a20a5ff4d638194b7202a3",
+        "size_bytes": 27729
+      },
+      {
+        "path": "data/composers.yaml",
+        "git_blob_sha1": "156f3ee893a47ebad5f9763c257b3d2a681935cc",
+        "size_bytes": 22613
+      },
+      {
+        "path": "data/sets.yaml",
+        "git_blob_sha1": "7f161acfa24f71558ce02236f3a0c9331c755de0",
+        "size_bytes": 27973
+      }
+    ]
+  },
+  "inventory_scope": {
+    "description": "Tracked source MuseScore/MusicXML annotation history and per-score alignment metadata only. This is not the derived image/segmented-symbolic benchmark release.",
+    "score_subtree_git_blob_count": 844,
+    "score_rows": 122,
+    "composer_rows": 47,
+    "set_work_rows": 116,
+    "source_artifact_count": 462,
+    "source_artifact_counts": {
+      "mscx": 122,
+      "musicxml": 122,
+      "cleaned_musicxml": 122,
+      "scanned_alignment_csv": 96
+    },
+    "excluded_from_this_snapshot": [
+      "synthetic and scanned score-image files",
+      "systemwise/partwise cropped images",
+      "derived LMXE/PLMXE/RLMXE",
+      "derived kern/eKern",
+      "derived ABC/eABC",
+      "official benchmark split membership",
+      "acoustic audio and performance recordings"
+    ],
+    "sha_semantics": "git_blob_sha1 fields are Git object IDs, not SHA-256 file digests. No raw artifact bytes were acquired or SHA-256 hashed by this metadata inventory."
+  },
+  "cardinality_expectations": {
+    "unique_score_ids": 122,
+    "unique_composer_ids": 47,
+    "unique_work_set_ids": 116,
+    "required_per_score_roles": [
+      "native_musescore_source",
+      "native_musicxml_source"
+    ],
+    "optional_per_score_roles": [
+      "cleaned_musicxml_derivative",
+      "scanned_alignment_metadata"
+    ]
+  },
+  "scores": [
+    {
+      "score_id": "10307350",
+      "title": "String Quartet in F major, Hob.III:73, Op.74 No.2",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_F_major,_Hob.III73,_Op.74_No.2",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5954374",
+      "work_title": "String Quartet in F major, Hob.III:73, Op.74 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_major,_Hob.III73,_Op.74_No.2/sq10307350.mscx",
+          "git_blob_sha1": "629d9b33df4ad03c953cf2de9fa87b90d3935d99",
+          "size_bytes": 9153446
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_major,_Hob.III73,_Op.74_No.2/sq10307350.musicxml",
+          "git_blob_sha1": "d19609700c4c11bafa4e055ad2dad4d677b8617e",
+          "size_bytes": 4148511
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_major,_Hob.III73,_Op.74_No.2/sq10307350_cleaned.musicxml",
+          "git_blob_sha1": "8964c82b329571d8db0e99029d354f0b88badaf5",
+          "size_bytes": 3544840
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_major,_Hob.III73,_Op.74_No.2/sq10307350_scanned.csv",
+          "git_blob_sha1": "e05845f5f5d2b09fb411e2228fb6447c8f8a1d30",
+          "size_bytes": 91
+        }
+      ]
+    },
+    {
+      "score_id": "10313029",
+      "title": "String Quartet in G minor, Hob.III:74, Op.74 No.3 (The Horseman)",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III74,_Op.74_No.3_(The_Horseman)",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5954407",
+      "work_title": "String Quartet in G minor, Hob.III:74, Op.74 No.3 (The Horseman)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III74,_Op.74_No.3_(The_Horseman)/sq10313029.mscx",
+          "git_blob_sha1": "a24c00ac0f9a765a17c62506c3c2dc987cb2c17a",
+          "size_bytes": 7133340
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III74,_Op.74_No.3_(The_Horseman)/sq10313029.musicxml",
+          "git_blob_sha1": "f23a3e70a85c0696b1ba79a462dd224acb5fb59b",
+          "size_bytes": 3542684
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III74,_Op.74_No.3_(The_Horseman)/sq10313029_cleaned.musicxml",
+          "git_blob_sha1": "f6bb20c5baab80421cd86768e3691b98010dc49c",
+          "size_bytes": 2983528
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III74,_Op.74_No.3_(The_Horseman)/sq10313029_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "10328092",
+      "title": "String Quartet in E-flat major, Hob.III:20, Op.9 No.2",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III20,_Op.9_No.2",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5769909",
+      "work_title": "String Quartet in E-flat major, Hob.III:20, Op.9 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III20,_Op.9_No.2/sq10328092.mscx",
+          "git_blob_sha1": "e7f05c52932438744fec17c93933daa75ed9e845",
+          "size_bytes": 4955736
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III20,_Op.9_No.2/sq10328092.musicxml",
+          "git_blob_sha1": "4d1bafa0460c12c34720f5d0336ad038f798682c",
+          "size_bytes": 2413331
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III20,_Op.9_No.2/sq10328092_cleaned.musicxml",
+          "git_blob_sha1": "d698c92540e8eff722f4de989d6736fcffab0c5c",
+          "size_bytes": 2039945
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III20,_Op.9_No.2/sq10328092_scanned.csv",
+          "git_blob_sha1": "de84e895dd05e2c1679eb74ccf2a62049fad8fab",
+          "size_bytes": 58
+        }
+      ]
+    },
+    {
+      "score_id": "10372717",
+      "title": "String Quartet in C major, Hob.III:72, Op.74 No.1",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III72,_Op.74_No.1",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5954362",
+      "work_title": "String Quartet in C major, Hob.III:72, Op.74 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III72,_Op.74_No.1/sq10372717.mscx",
+          "git_blob_sha1": "a8fc8515e40cb8a55c2c064d9ee9cacc1d8fee4f",
+          "size_bytes": 9338792
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III72,_Op.74_No.1/sq10372717.musicxml",
+          "git_blob_sha1": "ebc6527efaa35a27064feea4eeb5b2752a1a7e65",
+          "size_bytes": 4311142
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III72,_Op.74_No.1/sq10372717_cleaned.musicxml",
+          "git_blob_sha1": "30f233ca4c6d7f94785bb1293a8a0095ac743329",
+          "size_bytes": 3663254
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III72,_Op.74_No.1/sq10372717_scanned.csv",
+          "git_blob_sha1": "927f47bd681a5bc2bebfb75fee3f55a141dae810",
+          "size_bytes": 61
+        }
+      ]
+    },
+    {
+      "score_id": "10381459",
+      "title": "String Quartet in G major, Hob.III:21, Op.9 No.3",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III21,_Op.9_No.3",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5769903",
+      "work_title": "String Quartet in G major, Hob.III:21, Op.9 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III21,_Op.9_No.3/sq10381459.mscx",
+          "git_blob_sha1": "c02de0dfc525b4dcf63875e3bd7c9e6566f22bee",
+          "size_bytes": 5450861
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III21,_Op.9_No.3/sq10381459.musicxml",
+          "git_blob_sha1": "d7e7a6cbbca74e038c9de810e3f6aca50b0edc55",
+          "size_bytes": 2587538
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III21,_Op.9_No.3/sq10381459_cleaned.musicxml",
+          "git_blob_sha1": "39286bd436757c182e3d02efd24f9fe8e3fc2a9e",
+          "size_bytes": 2180437
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III21,_Op.9_No.3/sq10381459_scanned.csv",
+          "git_blob_sha1": "04a7693bf49ba23a1537b586986d1806bc560078",
+          "size_bytes": 251
+        }
+      ]
+    },
+    {
+      "score_id": "10406164",
+      "title": "String Quartet, Op.16 No.1",
+      "score_relative_path": "scores/Gouvy,_Théodore/String_Quartet,_Op.16_No.1",
+      "composer_group_id": "699322",
+      "composer_path": "Gouvy,_Théodore",
+      "composer_name": "Théodore Gouvy",
+      "work_group_id": "5108687",
+      "work_title": "String Quartet, Op.16 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Gouvy,_Théodore/String_Quartet,_Op.16_No.1/sq10406164.mscx",
+          "git_blob_sha1": "d7cff33c61b90d5217dffbca1191ae7616a1fc34",
+          "size_bytes": 13960785
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Gouvy,_Théodore/String_Quartet,_Op.16_No.1/sq10406164.musicxml",
+          "git_blob_sha1": "d0f84b28803e6236041b2a1639c33714cb62d1b8",
+          "size_bytes": 6241691
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Gouvy,_Théodore/String_Quartet,_Op.16_No.1/sq10406164_cleaned.musicxml",
+          "git_blob_sha1": "d40461185228511b32eea9bcfa8c2971515d1dea",
+          "size_bytes": 5240056
+        }
+      ]
+    },
+    {
+      "score_id": "10414906",
+      "title": "String Quartet in D minor, Hob.III:22, Op.9 No.4",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III22,_Op.9_No.4",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5769912",
+      "work_title": "String Quartet in D minor, Hob.III:22, Op.9 No.4",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III22,_Op.9_No.4/sq10414906.mscx",
+          "git_blob_sha1": "53cf1d7ac5ec42e358ed0968f0a932263da8a1c3",
+          "size_bytes": 5930551
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III22,_Op.9_No.4/sq10414906.musicxml",
+          "git_blob_sha1": "58b03eb9ce2e78431d67ffd90c1ff8da13620eec",
+          "size_bytes": 2817790
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III22,_Op.9_No.4/sq10414906_cleaned.musicxml",
+          "git_blob_sha1": "513b3e481c96015ce2d22b6a07679c129245a425",
+          "size_bytes": 2397800
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III22,_Op.9_No.4/sq10414906_scanned.csv",
+          "git_blob_sha1": "63a0dff10151f849b1f15cc610dac5246e83c6cc",
+          "size_bytes": 129
+        }
+      ]
+    },
+    {
+      "score_id": "10490761",
+      "title": "String Quartet in D major, Op.1 No.6",
+      "score_relative_path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_D_major,_Op.1_No.6",
+      "composer_group_id": "726953",
+      "composer_path": "Saint-Georges,_Joseph_Bologne",
+      "composer_name": "Joseph Bologne Saint-Georges",
+      "work_group_id": "5108607",
+      "work_title": "String Quartet in D major, Op.1 No.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_D_major,_Op.1_No.6/sq10490761.mscx",
+          "git_blob_sha1": "a6790e4b72f3907c684b95445c40328d0c3fecba",
+          "size_bytes": 4210419
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_D_major,_Op.1_No.6/sq10490761.musicxml",
+          "git_blob_sha1": "f2542e23b59d1b7a3d127343a533fedf2111c1f3",
+          "size_bytes": 1924527
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_D_major,_Op.1_No.6/sq10490761_cleaned.musicxml",
+          "git_blob_sha1": "d7350b75c294bda41c436faa227ee62483e3c583",
+          "size_bytes": 1621229
+        }
+      ]
+    },
+    {
+      "score_id": "10502527",
+      "title": "Grosse Fuge in B-flat major, Op.133",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/Grosse_Fuge_in_B-flat_major,_Op.133",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108656",
+      "work_title": "Grosse Fuge in B-flat major, Op.133",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/Grosse_Fuge_in_B-flat_major,_Op.133/sq10502527.mscx",
+          "git_blob_sha1": "59d3e978209339f1cb48b961c0c8c1720d58a1fc",
+          "size_bytes": 10626223
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/Grosse_Fuge_in_B-flat_major,_Op.133/sq10502527.musicxml",
+          "git_blob_sha1": "3619dc4804e9b9df39e3ded7857382cc622ba126",
+          "size_bytes": 4778054
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/Grosse_Fuge_in_B-flat_major,_Op.133/sq10502527_cleaned.musicxml",
+          "git_blob_sha1": "e166cc41cabff4f551ffbf15edd755e3f66b4120",
+          "size_bytes": 3964981
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/Grosse_Fuge_in_B-flat_major,_Op.133/sq10502527_scanned.csv",
+          "git_blob_sha1": "be6b3e71a7695bdc73ec780a37fe02068e9fb8f5",
+          "size_bytes": 45
+        }
+      ]
+    },
+    {
+      "score_id": "10517302",
+      "title": "String Quartet No.1, Op.44",
+      "score_relative_path": "scores/Stanford,_Charles_Villiers/String_Quartet_No.1,_Op.44",
+      "composer_group_id": "368264",
+      "composer_path": "Stanford,_Charles_Villiers",
+      "composer_name": "Charles Villiers Stanford",
+      "work_group_id": "5108861",
+      "work_title": "String Quartet No.1, Op.44",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Stanford,_Charles_Villiers/String_Quartet_No.1,_Op.44/sq10517302.mscx",
+          "git_blob_sha1": "26c947c559335553b2d7f103551bb0437a9f1a5d",
+          "size_bytes": 18717135
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Stanford,_Charles_Villiers/String_Quartet_No.1,_Op.44/sq10517302.musicxml",
+          "git_blob_sha1": "a1530e8c2107603f4d3f88db6d263be1a0d95cc9",
+          "size_bytes": 7550224
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Stanford,_Charles_Villiers/String_Quartet_No.1,_Op.44/sq10517302_cleaned.musicxml",
+          "git_blob_sha1": "7190190f11b40289ee2c1c44c0f819e504c5196a",
+          "size_bytes": 6176751
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Stanford,_Charles_Villiers/String_Quartet_No.1,_Op.44/sq10517302_scanned.csv",
+          "git_blob_sha1": "14d663408c4a64a78250b8a8309e8cc199e4a324",
+          "size_bytes": 82
+        }
+      ]
+    },
+    {
+      "score_id": "10527526",
+      "title": "String Quartet No.12, Op.127",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.12,_Op.127",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108657",
+      "work_title": "String Quartet No.12, Op.127",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.12,_Op.127/sq10527526.mscx",
+          "git_blob_sha1": "10a4e655a93464cbbddd7f7215ad1d66f21883f4",
+          "size_bytes": 20749000
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.12,_Op.127/sq10527526.musicxml",
+          "git_blob_sha1": "5ce9c91679e76a577b3044896de2f26c66b05056",
+          "size_bytes": 9382539
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.12,_Op.127/sq10527526_cleaned.musicxml",
+          "git_blob_sha1": "3972e5e9dcce896c046bd98271a56bc60441cb0c",
+          "size_bytes": 7519545
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.12,_Op.127/sq10527526_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "10675759",
+      "title": "String Quartet No.2",
+      "score_relative_path": "scores/Borodin,_Alexander/String_Quartet_No.2",
+      "composer_group_id": "164004",
+      "composer_path": "Borodin,_Alexander",
+      "composer_name": "Alexander Borodin",
+      "work_group_id": "5108662",
+      "work_title": "String Quartet No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.2/sq10675759.mscx",
+          "git_blob_sha1": "0880f69dd5552e6d64ce51ea030475869f64b59d",
+          "size_bytes": 17987720
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.2/sq10675759.musicxml",
+          "git_blob_sha1": "0b0c371d9b675e2aee01898e53b0c569cf45ccae",
+          "size_bytes": 7293913
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.2/sq10675759_cleaned.musicxml",
+          "git_blob_sha1": "5439bab7f7144b10849367b40f299dcef1ed5e2c",
+          "size_bytes": 5781614
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.2/sq10675759_scanned.csv",
+          "git_blob_sha1": "57e35e6a37b295076819ca17a6930ab5f609ccae",
+          "size_bytes": 77
+        }
+      ]
+    },
+    {
+      "score_id": "11154985",
+      "title": "String Quartet No.1, Op.19, BV 208",
+      "score_relative_path": "scores/Busoni,_Ferruccio/String_Quartet_No.1,_Op.19,_BV_208",
+      "composer_group_id": "219551",
+      "composer_path": "Busoni,_Ferruccio",
+      "composer_name": "Ferruccio Busoni",
+      "work_group_id": "5108682",
+      "work_title": "String Quartet No.1, Op.19, BV 208",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Busoni,_Ferruccio/String_Quartet_No.1,_Op.19,_BV_208/sq11154985.mscx",
+          "git_blob_sha1": "451f51332e35cbcee5b4bc3d00e7a594d0be8e0c",
+          "size_bytes": 13326994
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Busoni,_Ferruccio/String_Quartet_No.1,_Op.19,_BV_208/sq11154985.musicxml",
+          "git_blob_sha1": "f52654d966de30ef007cf1b242f57a7782f3da2a",
+          "size_bytes": 6033935
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Busoni,_Ferruccio/String_Quartet_No.1,_Op.19,_BV_208/sq11154985_cleaned.musicxml",
+          "git_blob_sha1": "44589548e3d9545c88c86efed40f2775b76d67a1",
+          "size_bytes": 4870888
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Busoni,_Ferruccio/String_Quartet_No.1,_Op.19,_BV_208/sq11154985_scanned.csv",
+          "git_blob_sha1": "de9870c2d4b19af846f39f7e994e510acffab369",
+          "size_bytes": 125
+        }
+      ]
+    },
+    {
+      "score_id": "11164006",
+      "title": "String Quartet No.1",
+      "score_relative_path": "scores/Cherubini,_Luigi/String_Quartet_No.1",
+      "composer_group_id": "20721",
+      "composer_path": "Cherubini,_Luigi",
+      "composer_name": "Luigi Cherubini",
+      "work_group_id": "5108725",
+      "work_title": "String Quartet No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Cherubini,_Luigi/String_Quartet_No.1/sq11164006.mscx",
+          "git_blob_sha1": "9f03574894fd5ec775362aca5c78a95cb4ed1811",
+          "size_bytes": 15808494
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Cherubini,_Luigi/String_Quartet_No.1/sq11164006.musicxml",
+          "git_blob_sha1": "4e4538ed19e8d53de2f539e1fcb93f28d5fc1948",
+          "size_bytes": 7544375
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Cherubini,_Luigi/String_Quartet_No.1/sq11164006_cleaned.musicxml",
+          "git_blob_sha1": "b40a3520fa39e2ec51e5ec19dcafa040676c005e",
+          "size_bytes": 6407431
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Cherubini,_Luigi/String_Quartet_No.1/sq11164006_scanned.csv",
+          "git_blob_sha1": "0daf3f56264a2dae15fd2c53030965db73b58353",
+          "size_bytes": 88
+        }
+      ]
+    },
+    {
+      "score_id": "11539384",
+      "title": "String Quartet No.13 in B♭ major, Op.130",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.13_in_B♭_major,_Op.130",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108658",
+      "work_title": "String Quartet No.13 in B♭ major, Op.130",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.13_in_B♭_major,_Op.130/sq11539384.mscx",
+          "git_blob_sha1": "3949616d0ea5e1693ee04592d9c3351ce0562e75",
+          "size_bytes": 20972237
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.13_in_B♭_major,_Op.130/sq11539384.musicxml",
+          "git_blob_sha1": "4cc335b6c9dfa253b30ea9eca2c71b409c877e1b",
+          "size_bytes": 9994895
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.13_in_B♭_major,_Op.130/sq11539384_cleaned.musicxml",
+          "git_blob_sha1": "0b94e7032ea9a71d0dd3956bf0fdd102d65b794e",
+          "size_bytes": 7838126
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.13_in_B♭_major,_Op.130/sq11539384_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "12113164",
+      "title": "String Quartet No.2 in D major, K.155/134a",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.2_in_D_major,_K.155134a",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "6406690",
+      "work_title": "String Quartet No.2 in D major, K.155/134a",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.2_in_D_major,_K.155134a/sq12113164.mscx",
+          "git_blob_sha1": "9cb7a01815acad779b6a830b4ccd2e2ec7c334f4",
+          "size_bytes": 3613586
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.2_in_D_major,_K.155134a/sq12113164.musicxml",
+          "git_blob_sha1": "247edc74f43f28c4f787079dc353880fa649cc38",
+          "size_bytes": 1878679
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.2_in_D_major,_K.155134a/sq12113164_cleaned.musicxml",
+          "git_blob_sha1": "e4b4278ae96154c4211f06f9e3896f26094bc55e",
+          "size_bytes": 1606467
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.2_in_D_major,_K.155134a/sq12113164_scanned.csv",
+          "git_blob_sha1": "4ff5497b9bcd07694f41f4f60b674f1201a42275",
+          "size_bytes": 73
+        }
+      ]
+    },
+    {
+      "score_id": "12536479",
+      "title": "String Quartet No.1, Op.13",
+      "score_relative_path": "scores/Nielsen,_Carl/String_Quartet_No.1,_Op.13",
+      "composer_group_id": "205139",
+      "composer_path": "Nielsen,_Carl",
+      "composer_name": "Carl Nielsen",
+      "work_group_id": "5108849",
+      "work_title": "String Quartet No.1, Op.13",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Nielsen,_Carl/String_Quartet_No.1,_Op.13/sq12536479.mscx",
+          "git_blob_sha1": "4483049c15dee405b4372959fa0f5c251fd333c6",
+          "size_bytes": 14899074
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Nielsen,_Carl/String_Quartet_No.1,_Op.13/sq12536479.musicxml",
+          "git_blob_sha1": "fa6817acda7b6fd7928e26e48a2d451805d4f393",
+          "size_bytes": 6519425
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Nielsen,_Carl/String_Quartet_No.1,_Op.13/sq12536479_cleaned.musicxml",
+          "git_blob_sha1": "2a958371ba1b7bef7437183b2e3314bd63a6aca3",
+          "size_bytes": 5360951
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Nielsen,_Carl/String_Quartet_No.1,_Op.13/sq12536479_scanned.csv",
+          "git_blob_sha1": "fb55de4927362e623d4c4551a343944ba5181db6",
+          "size_bytes": 5
+        }
+      ]
+    },
+    {
+      "score_id": "12701461",
+      "title": "String Quartet No.9 in D major",
+      "score_relative_path": "scores/Hoffmeister,_Franz_Anton/String_Quartet_No.9_in_D_major",
+      "composer_group_id": "706138",
+      "composer_path": "Hoffmeister,_Franz_Anton",
+      "composer_name": "Franz Anton Hoffmeister",
+      "work_group_id": "5108735",
+      "work_title": "String Quartet No.9 in D major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Hoffmeister,_Franz_Anton/String_Quartet_No.9_in_D_major/sq12701461.mscx",
+          "git_blob_sha1": "85dff91f1088dc43f162015c69c013d03e85ab28",
+          "size_bytes": 5920276
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Hoffmeister,_Franz_Anton/String_Quartet_No.9_in_D_major/sq12701461.musicxml",
+          "git_blob_sha1": "b99fe2d007d95eeed1d9bf3ae77e8931bafdf770",
+          "size_bytes": 3019585
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Hoffmeister,_Franz_Anton/String_Quartet_No.9_in_D_major/sq12701461_cleaned.musicxml",
+          "git_blob_sha1": "ffe4af87c2751cb5041fc6fae8fa69c7fef796a1",
+          "size_bytes": 2612567
+        }
+      ]
+    },
+    {
+      "score_id": "12772795",
+      "title": "String Quartet in D minor, Hob.III:76, Op.76 No.2",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III76,_Op.76_No.2",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "6403711",
+      "work_title": "String Quartet in D minor, Hob.III:76, Op.76 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III76,_Op.76_No.2/sq12772795.mscx",
+          "git_blob_sha1": "3ea4c36ea6e9a51ce0c9bc3bfcca05a652d7dd6c",
+          "size_bytes": 8470541
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III76,_Op.76_No.2/sq12772795.musicxml",
+          "git_blob_sha1": "218b1b8375242c78710ebf338e7d27d1bfc7bb23",
+          "size_bytes": 3937261
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III76,_Op.76_No.2/sq12772795_cleaned.musicxml",
+          "git_blob_sha1": "75fe52910e44a861de48d77081a9d5b61f9a62ac",
+          "size_bytes": 3317032
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_minor,_Hob.III76,_Op.76_No.2/sq12772795_scanned.csv",
+          "git_blob_sha1": "884d7d374807e7442e3e899c9eb1fcd566ca9ddb",
+          "size_bytes": 56
+        }
+      ]
+    },
+    {
+      "score_id": "13744399",
+      "title": "String Quartet No.1 in D minor",
+      "score_relative_path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.1_in_D_minor",
+      "composer_group_id": "313669",
+      "composer_path": "Arriaga,_Juan_Crisóstomo_de",
+      "composer_name": "Juan Crisóstomo de Arriaga",
+      "work_group_id": "5116346",
+      "work_title": "String Quartet No.1 in D minor",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.1_in_D_minor/sq13744399.mscx",
+          "git_blob_sha1": "4fbf30a33928f897514b6bd78616216aa0b75427",
+          "size_bytes": 13116766
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.1_in_D_minor/sq13744399.musicxml",
+          "git_blob_sha1": "5f4c791f8661d066bfcabc28d8683a2077fcfcf6",
+          "size_bytes": 5742094
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.1_in_D_minor/sq13744399_cleaned.musicxml",
+          "git_blob_sha1": "3a10e9b18a1a34bf74ae1b2a95e0728b1767290c",
+          "size_bytes": 4780103
+        }
+      ]
+    },
+    {
+      "score_id": "14387632",
+      "title": "String Quartet, Op. 89",
+      "score_relative_path": "scores/Beach,_Amy/String_Quartet,_Op._89",
+      "composer_group_id": "235699",
+      "composer_path": "Beach,_Amy",
+      "composer_name": "Amy Beach",
+      "work_group_id": "6406540",
+      "work_title": "String Quartet, Op. 89",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beach,_Amy/String_Quartet,_Op._89/sq14387632.mscx",
+          "git_blob_sha1": "dc4ad20f33c4babbb5a89118ca2e3d03ef077d08",
+          "size_bytes": 6300513
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beach,_Amy/String_Quartet,_Op._89/sq14387632.musicxml",
+          "git_blob_sha1": "f5734c3d01ff68924f09ebf66381061b6acf3bd1",
+          "size_bytes": 2589421
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beach,_Amy/String_Quartet,_Op._89/sq14387632_cleaned.musicxml",
+          "git_blob_sha1": "6d0ffb3544d098dc1d2b5539bbfb91d53456523b",
+          "size_bytes": 2105015
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beach,_Amy/String_Quartet,_Op._89/sq14387632_scanned.csv",
+          "git_blob_sha1": "0b0fa4ac39560d663e42b63dbd3a845fd946e79c",
+          "size_bytes": 234
+        }
+      ]
+    },
+    {
+      "score_id": "14720995",
+      "title": "String Quartet",
+      "score_relative_path": "scores/Glinka,_Mikhail/String_Quartet",
+      "composer_group_id": "181885",
+      "composer_path": "Glinka,_Mikhail",
+      "composer_name": "Mikhail Glinka",
+      "work_group_id": "5108728",
+      "work_title": "String Quartet",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Glinka,_Mikhail/String_Quartet/sq14720995.mscx",
+          "git_blob_sha1": "91d897d9e389183ee76f327d8358b06a0f90398b",
+          "size_bytes": 10453638
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Glinka,_Mikhail/String_Quartet/sq14720995.musicxml",
+          "git_blob_sha1": "a32753f719a305b29ad7acbbd869da3825bc216d",
+          "size_bytes": 4478054
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Glinka,_Mikhail/String_Quartet/sq14720995_cleaned.musicxml",
+          "git_blob_sha1": "434c343258b0a0ab779401afba3c676662b9b5ae",
+          "size_bytes": 3583163
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Glinka,_Mikhail/String_Quartet/sq14720995_scanned.csv",
+          "git_blob_sha1": "2714984f7c8fdc689bd329bb859452ca78d281a6",
+          "size_bytes": 66
+        }
+      ]
+    },
+    {
+      "score_id": "15049456",
+      "title": "String Quartet in G major, Hob.III:75, Op.76 No.1",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III75,_Op.76_No.1",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "6403696",
+      "work_title": "String Quartet in G major, Hob.III:75, Op.76 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III75,_Op.76_No.1/sq15049456.mscx",
+          "git_blob_sha1": "c2e628b557a12ffe7618629dbcbeaf8956b380dc",
+          "size_bytes": 9405070
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III75,_Op.76_No.1/sq15049456.musicxml",
+          "git_blob_sha1": "b7946ff234379426a47bb168b70697d80b03d505",
+          "size_bytes": 4440730
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III75,_Op.76_No.1/sq15049456_cleaned.musicxml",
+          "git_blob_sha1": "3b7c832d01d7e748ef93954e6097a16bbf4f7eb8",
+          "size_bytes": 3776874
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III75,_Op.76_No.1/sq15049456_scanned.csv",
+          "git_blob_sha1": "5b73859f894319797405000f03ec9486157775bf",
+          "size_bytes": 136
+        }
+      ]
+    },
+    {
+      "score_id": "15230467",
+      "title": "String Quartet No.1 in G major, K.80/73f",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.1_in_G_major,_K.8073f",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "6406660",
+      "work_title": "String Quartet No.1 in G major, K.80/73f",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.1_in_G_major,_K.8073f/sq15230467.mscx",
+          "git_blob_sha1": "f992e6c94feafd05f81eca6d487381bf3e62550f",
+          "size_bytes": 3612200
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.1_in_G_major,_K.8073f/sq15230467.musicxml",
+          "git_blob_sha1": "139f32036281a672ad69a0856673d9b1b1b6676e",
+          "size_bytes": 1664239
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.1_in_G_major,_K.8073f/sq15230467_cleaned.musicxml",
+          "git_blob_sha1": "723acddcfb791d3a7cf9264a273f83944bb1d79b",
+          "size_bytes": 1422970
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.1_in_G_major,_K.8073f/sq15230467_scanned.csv",
+          "git_blob_sha1": "0deea595a993197278cb18356e9f75f5acdc6ca6",
+          "size_bytes": 98
+        }
+      ]
+    },
+    {
+      "score_id": "15624112",
+      "title": "String Quartet No.23 in F major, K.590",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.23_in_F_major,_K.590",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "6406837",
+      "work_title": "String Quartet No.23 in F major, K.590",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.23_in_F_major,_K.590/sq15624112.mscx",
+          "git_blob_sha1": "178843e1910dd5ba74b5edec634d40eb4ee35e34",
+          "size_bytes": 10726282
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.23_in_F_major,_K.590/sq15624112.musicxml",
+          "git_blob_sha1": "ceea3402507b6e554875019524ad56e13d7aebd4",
+          "size_bytes": 5168202
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.23_in_F_major,_K.590/sq15624112_cleaned.musicxml",
+          "git_blob_sha1": "bbb8bc064aa48dd06201e7bac81ba8ec3c50ea7d",
+          "size_bytes": 4454299
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.23_in_F_major,_K.590/sq15624112_scanned.csv",
+          "git_blob_sha1": "36669a1272a313f799964cc61ebfdadd8b010626",
+          "size_bytes": 81
+        }
+      ]
+    },
+    {
+      "score_id": "15730717",
+      "title": "String Quartet No.22 in B-flat major, K.589",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.22_in_B-flat_major,_K.589",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "6406831",
+      "work_title": "String Quartet No.22 in B-flat major, K.589",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.22_in_B-flat_major,_K.589/sq15730717.mscx",
+          "git_blob_sha1": "be04e84b5db678cdc458b7d4975f7cc1b7273308",
+          "size_bytes": 8165074
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.22_in_B-flat_major,_K.589/sq15730717.musicxml",
+          "git_blob_sha1": "b69a521ac875fa56f79fc6f39834738f933e030c",
+          "size_bytes": 3924275
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.22_in_B-flat_major,_K.589/sq15730717_cleaned.musicxml",
+          "git_blob_sha1": "5592de9db6cd72e2fa6f335f9952bc8848c9f8f4",
+          "size_bytes": 3323371
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.22_in_B-flat_major,_K.589/sq15730717_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "16138966",
+      "title": "String Quartet No.21 in D major, K.575",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.21_in_D_major,_K.575",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "6406813",
+      "work_title": "String Quartet No.21 in D major, K.575",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.21_in_D_major,_K.575/sq16138966.mscx",
+          "git_blob_sha1": "057df020d1e26239d79f192a18a02fc820426685",
+          "size_bytes": 3490042
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.21_in_D_major,_K.575/sq16138966.musicxml",
+          "git_blob_sha1": "31f94614dd57e2e81dde972c4fe2e3f81a93be48",
+          "size_bytes": 4211543
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.21_in_D_major,_K.575/sq16138966_cleaned.musicxml",
+          "git_blob_sha1": "d6c88ed2da1db6e8207a4ed14650ce919cae5252",
+          "size_bytes": 3578566
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.21_in_D_major,_K.575/sq16138966_scanned.csv",
+          "git_blob_sha1": "36c830cb601b6dfa13b0c4fa880bfff25018f5af",
+          "size_bytes": 72
+        }
+      ]
+    },
+    {
+      "score_id": "7070319",
+      "title": "String Quartet in G minor, Op.14",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5108458",
+      "work_title": "String Quartet in G minor, Op.14",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7070319.mscx",
+          "git_blob_sha1": "58867eb26332925d8dbb8d837200176ef8996ee7",
+          "size_bytes": 1430637
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7070319.musicxml",
+          "git_blob_sha1": "3b416cc2a48f6d92398f2058cc572e3123409843",
+          "size_bytes": 573164
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7070319_cleaned.musicxml",
+          "git_blob_sha1": "da4de220d1f3b5f10ba9cd5bde64db7cb67970e5",
+          "size_bytes": 453045
+        }
+      ]
+    },
+    {
+      "score_id": "7070781",
+      "title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108515",
+      "work_title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7070781.mscx",
+          "git_blob_sha1": "ca3b7307fa7a237355330d2777962cd78edca0bb",
+          "size_bytes": 1191692
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7070781.musicxml",
+          "git_blob_sha1": "10b799dfa8e6f394564e215203e83fb9e92d6b2c",
+          "size_bytes": 495510
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7070781_cleaned.musicxml",
+          "git_blob_sha1": "703da90053e0f78d64377f9e6a7438ab90c1828f",
+          "size_bytes": 410057
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7070781_scanned.csv",
+          "git_blob_sha1": "a42c5f0858b389155507d8af641225d3f220dc8a",
+          "size_bytes": 51
+        }
+      ]
+    },
+    {
+      "score_id": "7075297",
+      "title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108515",
+      "work_title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7075297.mscx",
+          "git_blob_sha1": "61561aebef6267538b3e5c4069b6956dd0c338d3",
+          "size_bytes": 3148452
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7075297.musicxml",
+          "git_blob_sha1": "3f99a02cda3c3cc34e027f8b7af1632e6b3d24be",
+          "size_bytes": 1387927
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7075297_cleaned.musicxml",
+          "git_blob_sha1": "3ab1673d8d359e67c647ee9b1c9a9cc00b461111",
+          "size_bytes": 1168755
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7075297_scanned.csv",
+          "git_blob_sha1": "91a64aebd4d82ed6c06cbbffb19b5fcf4570495e",
+          "size_bytes": 97
+        }
+      ]
+    },
+    {
+      "score_id": "7078259",
+      "title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108515",
+      "work_title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7078259.mscx",
+          "git_blob_sha1": "104cbe568a6a699ce778386141789d29bdc86251",
+          "size_bytes": 3449613
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7078259.musicxml",
+          "git_blob_sha1": "70e7ab74d505c75252d91d3d8fef3dbc76318754",
+          "size_bytes": 1570836
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7078259_cleaned.musicxml",
+          "git_blob_sha1": "9d00bc5739da458e6fe9f4e68956dafad6b0f5ae",
+          "size_bytes": 1310770
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7078259_scanned.csv",
+          "git_blob_sha1": "982bed3a6cf2216209a58ed637f57af8a90cc9fb",
+          "size_bytes": 95
+        }
+      ]
+    },
+    {
+      "score_id": "7082029",
+      "title": "String Quartet in G minor, Op.14",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5108458",
+      "work_title": "String Quartet in G minor, Op.14",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7082029.mscx",
+          "git_blob_sha1": "cb13bb605f4fa65126f8b6d7a7d6f4f016575dff",
+          "size_bytes": 1960883
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7082029.musicxml",
+          "git_blob_sha1": "05dce6a70561a75ad48028c19a6cd8fd4ebb9834",
+          "size_bytes": 864691
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7082029_cleaned.musicxml",
+          "git_blob_sha1": "46dd9140465ecdedb58a160f40a9064b694a4ae5",
+          "size_bytes": 677078
+        }
+      ]
+    },
+    {
+      "score_id": "7093885",
+      "title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108515",
+      "work_title": "String Quartet No.18 in A major, K.464 (Op. 10, No. 5)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7093885.mscx",
+          "git_blob_sha1": "d57268fc393e03f7183f8b89532a913d66412a82",
+          "size_bytes": 3071588
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7093885.musicxml",
+          "git_blob_sha1": "67203677b7a916cd58e361c46c8935bc3a362e0e",
+          "size_bytes": 1310996
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7093885_cleaned.musicxml",
+          "git_blob_sha1": "46b5e8fbb7b9bd59b315697a877523861937cc6f",
+          "size_bytes": 1096053
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.18_in_A_major,_K.464_(Op._10,_No._5)/sq7093885_scanned.csv",
+          "git_blob_sha1": "90466d5f302e7782b6784170c5ac0be2f7d5e6f9",
+          "size_bytes": 105
+        }
+      ]
+    },
+    {
+      "score_id": "7095930",
+      "title": "String Quartet in G minor, Op.14",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5108458",
+      "work_title": "String Quartet in G minor, Op.14",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7095930.mscx",
+          "git_blob_sha1": "5ef8f39425c8e7c808ee6ad7b1826f0b2e430b9e",
+          "size_bytes": 4276370
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7095930.musicxml",
+          "git_blob_sha1": "e7e78f7a53080d102ca43675b5c78bf96adfbc7d",
+          "size_bytes": 1961284
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7095930_cleaned.musicxml",
+          "git_blob_sha1": "0c11e260512ddb75c1a92001b150676a8507b423",
+          "size_bytes": 1615037
+        }
+      ]
+    },
+    {
+      "score_id": "7103818",
+      "title": "String Quartet No.14 in G major, K.387 (Op. 10, No. 1)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.14_in_G_major,_K.387_(Op._10,_No._1)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108511",
+      "work_title": "String Quartet No.14 in G major, K.387 (Op. 10, No. 1)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.14_in_G_major,_K.387_(Op._10,_No._1)/sq7103818.mscx",
+          "git_blob_sha1": "105d8d525d9b13b4ab25c07ff753326490d3ca25",
+          "size_bytes": 9990796
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.14_in_G_major,_K.387_(Op._10,_No._1)/sq7103818.musicxml",
+          "git_blob_sha1": "baf66e30e71d9802180d5b0fd5992e2d2ca7129f",
+          "size_bytes": 4579399
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.14_in_G_major,_K.387_(Op._10,_No._1)/sq7103818_cleaned.musicxml",
+          "git_blob_sha1": "a58b55d4ea687982c0d5365be54710e687bced17",
+          "size_bytes": 3766910
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.14_in_G_major,_K.387_(Op._10,_No._1)/sq7103818_scanned.csv",
+          "git_blob_sha1": "14ba054c5e0645048320c81ae8af0e07d1959557",
+          "size_bytes": 278
+        }
+      ]
+    },
+    {
+      "score_id": "7108150",
+      "title": "String Quartet No.1, Op.51 No.1",
+      "score_relative_path": "scores/Brahms,_Johannes/String_Quartet_No.1,_Op.51_No.1",
+      "composer_group_id": "7294",
+      "composer_path": "Brahms,_Johannes",
+      "composer_name": "Johannes Brahms",
+      "work_group_id": "5108531",
+      "work_title": "String Quartet No.1, Op.51 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.1,_Op.51_No.1/sq7108150.mscx",
+          "git_blob_sha1": "c3bc484782608ab6a336ee3458d2df451a9a4a67",
+          "size_bytes": 15729936
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.1,_Op.51_No.1/sq7108150.musicxml",
+          "git_blob_sha1": "699ab8382c11e8acc41fc9f5dd9d5aae25cc905e",
+          "size_bytes": 6649490
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.1,_Op.51_No.1/sq7108150_cleaned.musicxml",
+          "git_blob_sha1": "e57a7b229aac3ea43e4328cb2edec059a637f7fe",
+          "size_bytes": 5389431
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.1,_Op.51_No.1/sq7108150_scanned.csv",
+          "git_blob_sha1": "5db572988155cba10045485d28eb99588c10dc9d",
+          "size_bytes": 57
+        }
+      ]
+    },
+    {
+      "score_id": "7114183",
+      "title": "String Quartet in B minor, Hob.III:68, Op.64 No.2",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_B_minor,_Hob.III68,_Op.64_No.2",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5108562",
+      "work_title": "String Quartet in B minor, Hob.III:68, Op.64 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B_minor,_Hob.III68,_Op.64_No.2/sq7114183.mscx",
+          "git_blob_sha1": "a0d09eac0182f1bb62302142f3285dc14749aa7e",
+          "size_bytes": 6741425
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B_minor,_Hob.III68,_Op.64_No.2/sq7114183.musicxml",
+          "git_blob_sha1": "6d583676b9acd3b2c2df9cb90e871e6fee6362e4",
+          "size_bytes": 3091235
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B_minor,_Hob.III68,_Op.64_No.2/sq7114183_cleaned.musicxml",
+          "git_blob_sha1": "a8ceca1f10309b3c3a98a1ea8bb1cb018c341291",
+          "size_bytes": 2623848
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B_minor,_Hob.III68,_Op.64_No.2/sq7114183_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "7123582",
+      "title": "String Quartet in B-flat major, Hob.III:67, Op.64 No.3",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III67,_Op.64_No.3",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5108563",
+      "work_title": "String Quartet in B-flat major, Hob.III:67, Op.64 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III67,_Op.64_No.3/sq7123582.mscx",
+          "git_blob_sha1": "f143674ed02490f7efd91659ba94b31c44813041",
+          "size_bytes": 8974865
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III67,_Op.64_No.3/sq7123582.musicxml",
+          "git_blob_sha1": "52842753b5bf4f4a7e5f3aff15988b9c61275cf2",
+          "size_bytes": 4177861
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III67,_Op.64_No.3/sq7123582_cleaned.musicxml",
+          "git_blob_sha1": "0ca1dbd8c76692c0a389ea5e25450c9a202246f3",
+          "size_bytes": 3529489
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III67,_Op.64_No.3/sq7123582_scanned.csv",
+          "git_blob_sha1": "aaea0dd5eb47d44ecbb66ceb10c9f99dbcac9cb3",
+          "size_bytes": 293
+        }
+      ]
+    },
+    {
+      "score_id": "7127785",
+      "title": "String Quartet in C major, Hob.III:65, Op.64 No.1",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III65,_Op.64_No.1",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5108561",
+      "work_title": "String Quartet in C major, Hob.III:65, Op.64 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III65,_Op.64_No.1/sq7127785.mscx",
+          "git_blob_sha1": "5116b288dd42b8958a3159282d176b2e37fac376",
+          "size_bytes": 7693018
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III65,_Op.64_No.1/sq7127785.musicxml",
+          "git_blob_sha1": "0820ac9a910dd52f634b3c43bda8f57689877372",
+          "size_bytes": 3476126
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III65,_Op.64_No.1/sq7127785_cleaned.musicxml",
+          "git_blob_sha1": "60ed931b28dfdb4c6d34383003aa6d714c77a94b",
+          "size_bytes": 2883557
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III65,_Op.64_No.1/sq7127785_scanned.csv",
+          "git_blob_sha1": "c8e08e93725fb1cd72c1ee7a5a4448490faab122",
+          "size_bytes": 253
+        }
+      ]
+    },
+    {
+      "score_id": "7158117",
+      "title": "String Quartet No.1 “Kreutzer Sonata”",
+      "score_relative_path": "scores/Janáček,_Leoš/String_Quartet_No.1_“Kreutzer_Sonata”",
+      "composer_group_id": "184933",
+      "composer_path": "Janáček,_Leoš",
+      "composer_name": "Leoš Janáček",
+      "work_group_id": "5108558",
+      "work_title": "String Quartet No.1 “Kreutzer Sonata”",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.1_“Kreutzer_Sonata”/sq7158117.mscx",
+          "git_blob_sha1": "10c8b9c20f6f07f97f6a1d9a825414c776139c66",
+          "size_bytes": 10112955
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.1_“Kreutzer_Sonata”/sq7158117.musicxml",
+          "git_blob_sha1": "aa3c4442475d0552e3c7eaa4d16f7bbd5b728bd2",
+          "size_bytes": 4587203
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.1_“Kreutzer_Sonata”/sq7158117_cleaned.musicxml",
+          "git_blob_sha1": "35d269da35ab9cd0e8de420886eed89b4d6e74c5",
+          "size_bytes": 3626075
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.1_“Kreutzer_Sonata”/sq7158117_scanned.csv",
+          "git_blob_sha1": "25caed82672b7e510812ab6de17c9db45b7136e6",
+          "size_bytes": 389
+        }
+      ]
+    },
+    {
+      "score_id": "7224846",
+      "title": "String Quartet No.1, Op.12",
+      "score_relative_path": "scores/Mendelssohn,_Felix/String_Quartet_No.1,_Op.12",
+      "composer_group_id": "46096",
+      "composer_path": "Mendelssohn,_Felix",
+      "composer_name": "Felix Mendelssohn",
+      "work_group_id": "5108546",
+      "work_title": "String Quartet No.1, Op.12",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.1,_Op.12/sq7224846.mscx",
+          "git_blob_sha1": "cca417ffc31c71e081ac642ce7747decf3cf1101",
+          "size_bytes": 13786140
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.1,_Op.12/sq7224846.musicxml",
+          "git_blob_sha1": "029e824d90747244c8bffb491451caf75668d2e1",
+          "size_bytes": 6049484
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.1,_Op.12/sq7224846_cleaned.musicxml",
+          "git_blob_sha1": "37f891c8372de8663b4219047a5838e7123fe4fc",
+          "size_bytes": 4748011
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.1,_Op.12/sq7224846_scanned.csv",
+          "git_blob_sha1": "47b7fa6eb7de6bb418dfc485c004acc0773cb13a",
+          "size_bytes": 227
+        }
+      ]
+    },
+    {
+      "score_id": "7236909",
+      "title": "String Quartet in G minor, Op.14",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5108458",
+      "work_title": "String Quartet in G minor, Op.14",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7236909.mscx",
+          "git_blob_sha1": "c799f2924cc79e83a995d269cda38c2d0f7ab109",
+          "size_bytes": 4972451
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7236909.musicxml",
+          "git_blob_sha1": "a08934d3228254f88dc22939675feed16f07eb4b",
+          "size_bytes": 2148534
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_G_minor,_Op.14/sq7236909_cleaned.musicxml",
+          "git_blob_sha1": "d2c98320e53010cb39075b8bb983344ec12fb62e",
+          "size_bytes": 1726946
+        }
+      ]
+    },
+    {
+      "score_id": "7249986",
+      "title": "String Quartet in G major, Hob.III:66, Op.64, No.4",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III66,_Op.64,_No.4",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5108564",
+      "work_title": "String Quartet in G major, Hob.III:66, Op.64, No.4",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III66,_Op.64,_No.4/sq7249986.mscx",
+          "git_blob_sha1": "27e507c9f08d0a7067001c89835bf5281f0c83d3",
+          "size_bytes": 7387764
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III66,_Op.64,_No.4/sq7249986.musicxml",
+          "git_blob_sha1": "63c3a1f1d21837d626b48ca3cae8abb2e11bd2a4",
+          "size_bytes": 3392689
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III66,_Op.64,_No.4/sq7249986_cleaned.musicxml",
+          "git_blob_sha1": "558b1746781f4d28f57716e3ee3426ff6d0a573d",
+          "size_bytes": 2882026
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III66,_Op.64,_No.4/sq7249986_scanned.csv",
+          "git_blob_sha1": "387d67afa7519eea7ef2ac1ef813db15de29256f",
+          "size_bytes": 205
+        }
+      ]
+    },
+    {
+      "score_id": "7267316",
+      "title": "String Quartet No.2 “Intimate Letters”",
+      "score_relative_path": "scores/Janáček,_Leoš/String_Quartet_No.2_“Intimate_Letters”",
+      "composer_group_id": "184933",
+      "composer_path": "Janáček,_Leoš",
+      "composer_name": "Leoš Janáček",
+      "work_group_id": "5108692",
+      "work_title": "String Quartet No.2 “Intimate Letters”",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.2_“Intimate_Letters”/sq7267316.mscx",
+          "git_blob_sha1": "b9f5d9c991db4bcb82231e64431f6d7cec3d94ce",
+          "size_bytes": 14078380
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.2_“Intimate_Letters”/sq7267316.musicxml",
+          "git_blob_sha1": "88a93f4440991e946e176bb33916cee75f18d9a9",
+          "size_bytes": 6167161
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.2_“Intimate_Letters”/sq7267316_cleaned.musicxml",
+          "git_blob_sha1": "e45069ea4384b919923522676c9db8dfeda7dfe3",
+          "size_bytes": 4681785
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Janáček,_Leoš/String_Quartet_No.2_“Intimate_Letters”/sq7267316_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "7284122",
+      "title": "String Quartet in D major, Hob.III:63, Op.64 No.5",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III63,_Op.64_No.5",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5108566",
+      "work_title": "String Quartet in D major, Hob.III:63, Op.64 No.5",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III63,_Op.64_No.5/sq7284122.mscx",
+          "git_blob_sha1": "18f1ac198205694b2897ee48a7220ba4629053b5",
+          "size_bytes": 6682343
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III63,_Op.64_No.5/sq7284122.musicxml",
+          "git_blob_sha1": "cfec042f5614500b04bc6e73527adf99f7b0df28",
+          "size_bytes": 3168086
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III63,_Op.64_No.5/sq7284122_cleaned.musicxml",
+          "git_blob_sha1": "58faf2b7ed25e2c5c5a1b64f723f03f85e6fac1a",
+          "size_bytes": 2737101
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III63,_Op.64_No.5/sq7284122_scanned.csv",
+          "git_blob_sha1": "8af6cedcf9c6cca29389fc510b8115cd567b957c",
+          "size_bytes": 243
+        }
+      ]
+    },
+    {
+      "score_id": "7294793",
+      "title": "String Quartet No.15 in D minor, K.421/417b (Op. 10, No. 2)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.15_in_D_minor,_K.421417b_(Op._10,_No._2)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108512",
+      "work_title": "String Quartet No.15 in D minor, K.421/417b (Op. 10, No. 2)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.15_in_D_minor,_K.421417b_(Op._10,_No._2)/sq7294793.mscx",
+          "git_blob_sha1": "ddbbef31046d491a679169341a83cc224a641536",
+          "size_bytes": 8860334
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.15_in_D_minor,_K.421417b_(Op._10,_No._2)/sq7294793.musicxml",
+          "git_blob_sha1": "f609986d28719334f08e4538ba3ced1e83e7d3a2",
+          "size_bytes": 3854560
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.15_in_D_minor,_K.421417b_(Op._10,_No._2)/sq7294793_cleaned.musicxml",
+          "git_blob_sha1": "7288c1c3970868cb2928e5d29d8448e16b03a1b4",
+          "size_bytes": 3171528
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.15_in_D_minor,_K.421417b_(Op._10,_No._2)/sq7294793_scanned.csv",
+          "git_blob_sha1": "f2dd7061663a1d3abf4c094f311d8d71b7146317",
+          "size_bytes": 141
+        }
+      ]
+    },
+    {
+      "score_id": "7295726",
+      "title": "String Quartet No.1, Op.7 (Sz.40)",
+      "score_relative_path": "scores/Bartók,_Béla/String_Quartet_No.1,_Op.7_(Sz.40)",
+      "composer_group_id": "83326",
+      "composer_path": "Bartók,_Béla",
+      "composer_name": "Béla Bartók",
+      "work_group_id": "5108579",
+      "work_title": "String Quartet No.1, Op.7 (Sz.40)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.1,_Op.7_(Sz.40)/sq7295726.mscx",
+          "git_blob_sha1": "24454d2623d74c862073144e60bb406140bb2e6d",
+          "size_bytes": 15865232
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.1,_Op.7_(Sz.40)/sq7295726.musicxml",
+          "git_blob_sha1": "6e8c394fcb940a9e61eaf05ad323e1c3d8d6f324",
+          "size_bytes": 6582646
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.1,_Op.7_(Sz.40)/sq7295726_cleaned.musicxml",
+          "git_blob_sha1": "a86a247de833c9eb10cdb958a82c0ca0addb9c3f",
+          "size_bytes": 5093096
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.1,_Op.7_(Sz.40)/sq7295726_scanned.csv",
+          "git_blob_sha1": "ecadf37b7fb72f884c4f21ae64408afb1c2a8cf8",
+          "size_bytes": 417
+        }
+      ]
+    },
+    {
+      "score_id": "7300376",
+      "title": "String Quartet in E-flat major, Hob.III:64, Op.64 No.6",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III64,_Op.64_No.6",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5108567",
+      "work_title": "String Quartet in E-flat major, Hob.III:64, Op.64 No.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III64,_Op.64_No.6/sq7300376.mscx",
+          "git_blob_sha1": "c98c2742273070c409a9b3a7b6f24841d651379d",
+          "size_bytes": 6990047
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III64,_Op.64_No.6/sq7300376.musicxml",
+          "git_blob_sha1": "ef633c1030e4bfee58f668f1be6975a572162311",
+          "size_bytes": 3252973
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III64,_Op.64_No.6/sq7300376_cleaned.musicxml",
+          "git_blob_sha1": "203d4c9a79969bd1b37a0d07a6d5b026277684ed",
+          "size_bytes": 2755446
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III64,_Op.64_No.6/sq7300376_scanned.csv",
+          "git_blob_sha1": "ef4974bc0d9126b4ea5f31ad517347131340c0de",
+          "size_bytes": 215
+        }
+      ]
+    },
+    {
+      "score_id": "7302602",
+      "title": "String Quartet No.2, Op.51 No.2",
+      "score_relative_path": "scores/Brahms,_Johannes/String_Quartet_No.2,_Op.51_No.2",
+      "composer_group_id": "7294",
+      "composer_path": "Brahms,_Johannes",
+      "composer_name": "Johannes Brahms",
+      "work_group_id": "5108532",
+      "work_title": "String Quartet No.2, Op.51 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.2,_Op.51_No.2/sq7302602.mscx",
+          "git_blob_sha1": "2d49240bce93182057677e93f379bb32fb0c6836",
+          "size_bytes": 16819879
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.2,_Op.51_No.2/sq7302602.musicxml",
+          "git_blob_sha1": "fcb92e5d5db6088fa4849b8840ae8b815173f582",
+          "size_bytes": 7070125
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.2,_Op.51_No.2/sq7302602_cleaned.musicxml",
+          "git_blob_sha1": "aecfc56474a56a6dfc8875e82ca22cc8aa5fe41a",
+          "size_bytes": 5626398
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.2,_Op.51_No.2/sq7302602_scanned.csv",
+          "git_blob_sha1": "133d157577c4ec67317c221a34d8b8435de494d1",
+          "size_bytes": 56
+        }
+      ]
+    },
+    {
+      "score_id": "7302710",
+      "title": "String Quartet No.16 in E-flat major, K.428/421b (Op. 10, No. 4)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.16_in_E-flat_major,_K.428421b_(Op._10,_No._4)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108513",
+      "work_title": "String Quartet No.16 in E-flat major, K.428/421b (Op. 10, No. 4)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.16_in_E-flat_major,_K.428421b_(Op._10,_No._4)/sq7302710.mscx",
+          "git_blob_sha1": "d2fc179de078eca5af319f4395d7afc6dd471a52",
+          "size_bytes": 9499082
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.16_in_E-flat_major,_K.428421b_(Op._10,_No._4)/sq7302710.musicxml",
+          "git_blob_sha1": "c00acaa420dd8af957ec49fc695d9ba33292c136",
+          "size_bytes": 4310545
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.16_in_E-flat_major,_K.428421b_(Op._10,_No._4)/sq7302710_cleaned.musicxml",
+          "git_blob_sha1": "b33d6b96d2148fcd0f6992e4e111304654370576",
+          "size_bytes": 3576137
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.16_in_E-flat_major,_K.428421b_(Op._10,_No._4)/sq7302710_scanned.csv",
+          "git_blob_sha1": "f19d6ee85410e23c0c40cacf5ab3f5fd0c68efa7",
+          "size_bytes": 59
+        }
+      ]
+    },
+    {
+      "score_id": "7313978",
+      "title": "String Quartet in A major",
+      "score_relative_path": "scores/Andrée,_Elfrida/String_Quartet_in_A_major",
+      "composer_group_id": "451495",
+      "composer_path": "Andrée,_Elfrida",
+      "composer_name": "Elfrida Andrée",
+      "work_group_id": "5108429",
+      "work_title": "String Quartet in A major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Andrée,_Elfrida/String_Quartet_in_A_major/sq7313978.mscx",
+          "git_blob_sha1": "06609e12591f9052908fd734201448953cd5e9ad",
+          "size_bytes": 9871314
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Andrée,_Elfrida/String_Quartet_in_A_major/sq7313978.musicxml",
+          "git_blob_sha1": "b92d15b754e8fce43eaabc90d20156bebff266c0",
+          "size_bytes": 4423395
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Andrée,_Elfrida/String_Quartet_in_A_major/sq7313978_cleaned.musicxml",
+          "git_blob_sha1": "96aff67912e17393321e2e6997ee7289a5f8ab1f",
+          "size_bytes": 3574149
+        }
+      ]
+    },
+    {
+      "score_id": "7330550",
+      "title": "String Quartet",
+      "score_relative_path": "scores/Carreño,_Teresa/String_Quartet",
+      "composer_group_id": "241494",
+      "composer_path": "Carreño,_Teresa",
+      "composer_name": "Teresa Carreño",
+      "work_group_id": "5108430",
+      "work_title": "String Quartet",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Carreño,_Teresa/String_Quartet/sq7330550.mscx",
+          "git_blob_sha1": "f34e6321e3e836b46215c62e0d5b5aab96009602",
+          "size_bytes": 12288536
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Carreño,_Teresa/String_Quartet/sq7330550.musicxml",
+          "git_blob_sha1": "3038a5e0ac82ca6cbb8c317959927ad67a6bf146",
+          "size_bytes": 5299282
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Carreño,_Teresa/String_Quartet/sq7330550_cleaned.musicxml",
+          "git_blob_sha1": "ffbbe62479e75c10e4dd0afd7d76660a71deae47",
+          "size_bytes": 4104479
+        }
+      ]
+    },
+    {
+      "score_id": "7353137",
+      "title": "String Quartet No.17 in B-flat major, K.458 (Op. 10, No. 3)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.17_in_B-flat_major,_K.458_(Op._10,_No._3)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108514",
+      "work_title": "String Quartet No.17 in B-flat major, K.458 (Op. 10, No. 3)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.17_in_B-flat_major,_K.458_(Op._10,_No._3)/sq7353137.mscx",
+          "git_blob_sha1": "eaed66bb35d5a63bc25a2af5c66ab9cf6c6d1b28",
+          "size_bytes": 10412137
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.17_in_B-flat_major,_K.458_(Op._10,_No._3)/sq7353137.musicxml",
+          "git_blob_sha1": "4e2e44de7cbf97a0708bba534f826983f83e2b69",
+          "size_bytes": 4779212
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.17_in_B-flat_major,_K.458_(Op._10,_No._3)/sq7353137_cleaned.musicxml",
+          "git_blob_sha1": "5e9f0a503afb816d15366b57f5f457e276eb31af",
+          "size_bytes": 4003565
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.17_in_B-flat_major,_K.458_(Op._10,_No._3)/sq7353137_scanned.csv",
+          "git_blob_sha1": "a5724618e852ce747089229a0170e699d42516f8",
+          "size_bytes": 62
+        }
+      ]
+    },
+    {
+      "score_id": "7354505",
+      "title": "String Quartet No.1, Op.35",
+      "score_relative_path": "scores/Indy,_Vincent_d’/String_Quartet_No.1,_Op.35",
+      "composer_group_id": "313584",
+      "composer_path": "Indy,_Vincent_d’",
+      "composer_name": "Vincent d’Indy",
+      "work_group_id": "5108582",
+      "work_title": "String Quartet No.1, Op.35",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Indy,_Vincent_d’/String_Quartet_No.1,_Op.35/sq7354505.mscx",
+          "git_blob_sha1": "1fed9804409a9d7c76bb7d31437adc6d2e8191dc",
+          "size_bytes": 23642616
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Indy,_Vincent_d’/String_Quartet_No.1,_Op.35/sq7354505.musicxml",
+          "git_blob_sha1": "38d5ac5cad5df6e8c0a0e0f68f32c7f9ba67642c",
+          "size_bytes": 10115294
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Indy,_Vincent_d’/String_Quartet_No.1,_Op.35/sq7354505_cleaned.musicxml",
+          "git_blob_sha1": "a5c40262c89e41198cc0a8561ad4699fc0f7c238",
+          "size_bytes": 7947937
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Indy,_Vincent_d’/String_Quartet_No.1,_Op.35/sq7354505_scanned.csv",
+          "git_blob_sha1": "098f2a4ca529889c4c467ff1b8896e1d39a88c0e",
+          "size_bytes": 135
+        }
+      ]
+    },
+    {
+      "score_id": "7358579",
+      "title": "String Quartet No.1, Op.1",
+      "score_relative_path": "scores/Glazunov,_Alexander/String_Quartet_No.1,_Op.1",
+      "composer_group_id": "25872",
+      "composer_path": "Glazunov,_Alexander",
+      "composer_name": "Alexander Glazunov",
+      "work_group_id": "5108543",
+      "work_title": "String Quartet No.1, Op.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Glazunov,_Alexander/String_Quartet_No.1,_Op.1/sq7358579.mscx",
+          "git_blob_sha1": "d04524982d012d913b45bc2e7a0119e5edc77888",
+          "size_bytes": 13124076
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Glazunov,_Alexander/String_Quartet_No.1,_Op.1/sq7358579.musicxml",
+          "git_blob_sha1": "ebefd150df0e2cfed004632bd86fb8321be8faad",
+          "size_bytes": 5408167
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Glazunov,_Alexander/String_Quartet_No.1,_Op.1/sq7358579_cleaned.musicxml",
+          "git_blob_sha1": "74b4b7c7d332dac73982bcef1602588f9f651471",
+          "size_bytes": 4312898
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Glazunov,_Alexander/String_Quartet_No.1,_Op.1/sq7358579_scanned.csv",
+          "git_blob_sha1": "74cb834c3dff96e16f7e36e65a91a3f19c885733",
+          "size_bytes": 73
+        }
+      ]
+    },
+    {
+      "score_id": "7358708",
+      "title": "String Quartet, Op.121",
+      "score_relative_path": "scores/Fauré,_Gabriel/String_Quartet,_Op.121",
+      "composer_group_id": "104919",
+      "composer_path": "Fauré,_Gabriel",
+      "composer_name": "Gabriel Fauré",
+      "work_group_id": "5108666",
+      "work_title": "String Quartet, Op.121",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Fauré,_Gabriel/String_Quartet,_Op.121/sq7358708.mscx",
+          "git_blob_sha1": "618046113896407f2ea391ba6cb60938f5d01740",
+          "size_bytes": 10132031
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Fauré,_Gabriel/String_Quartet,_Op.121/sq7358708.musicxml",
+          "git_blob_sha1": "9e26d8eef87ce6387d36423ff94cc0cfb44e9f01",
+          "size_bytes": 3803260
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Fauré,_Gabriel/String_Quartet,_Op.121/sq7358708_cleaned.musicxml",
+          "git_blob_sha1": "ca77837fe912740dddc5ff1f0a61637d86c0d47f",
+          "size_bytes": 2897762
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Fauré,_Gabriel/String_Quartet,_Op.121/sq7358708_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "7362818",
+      "title": "String Quartet, Op.83",
+      "score_relative_path": "scores/Elgar,_Edward/String_Quartet,_Op.83",
+      "composer_group_id": "179631",
+      "composer_path": "Elgar,_Edward",
+      "composer_name": "Edward Elgar",
+      "work_group_id": "5108550",
+      "work_title": "String Quartet, Op.83",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Elgar,_Edward/String_Quartet,_Op.83/sq7362818.mscx",
+          "git_blob_sha1": "be2fd26059e7c1e24095417491282440312a89e2",
+          "size_bytes": 15414373
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Elgar,_Edward/String_Quartet,_Op.83/sq7362818.musicxml",
+          "git_blob_sha1": "f3eadb29810951b734835159c7940800ea55de26",
+          "size_bytes": 6450567
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Elgar,_Edward/String_Quartet,_Op.83/sq7362818_cleaned.musicxml",
+          "git_blob_sha1": "13b79aff8fa167b0ad01c5921e5f022252946be7",
+          "size_bytes": 4950009
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Elgar,_Edward/String_Quartet,_Op.83/sq7362818_scanned.csv",
+          "git_blob_sha1": "058f5616b72731a6e9f1e3ae647365d9ac020774",
+          "size_bytes": 6
+        }
+      ]
+    },
+    {
+      "score_id": "7383977",
+      "title": "String Quartet No.3 in E-flat Major",
+      "score_relative_path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.3_in_E-flat_Major",
+      "composer_group_id": "313669",
+      "composer_path": "Arriaga,_Juan_Crisóstomo_de",
+      "composer_name": "Juan Crisóstomo de Arriaga",
+      "work_group_id": "5116350",
+      "work_title": "String Quartet No.3 in E-flat Major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.3_in_E-flat_Major/sq7383977.mscx",
+          "git_blob_sha1": "76d04ddfbcff57ac071af2758dc6200397ac5f27",
+          "size_bytes": 13935474
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.3_in_E-flat_Major/sq7383977.musicxml",
+          "git_blob_sha1": "7ecdd9fa18740ccda5bcb994c45db02f2e1a1a57",
+          "size_bytes": 6759894
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.3_in_E-flat_Major/sq7383977_cleaned.musicxml",
+          "git_blob_sha1": "a583c1d37c6f8f5a7d4ed2394739bd88808cafb1",
+          "size_bytes": 5754362
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Arriaga,_Juan_Crisóstomo_de/String_Quartet_No.3_in_E-flat_Major/sq7383977_scanned.csv",
+          "git_blob_sha1": "1e6c80ee45a9cdacca5e6f8e41703acd90384bd1",
+          "size_bytes": 227
+        }
+      ]
+    },
+    {
+      "score_id": "7384409",
+      "title": "String Quartet No.3, Op.90",
+      "score_relative_path": "scores/Kalliwoda,_Johann_Wenzel/String_Quartet_No.3,_Op.90",
+      "composer_group_id": "642243",
+      "composer_path": "Kalliwoda,_Johann_Wenzel",
+      "composer_name": "Johann Wenzel Kalliwoda",
+      "work_group_id": "5108559",
+      "work_title": "String Quartet No.3, Op.90",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Kalliwoda,_Johann_Wenzel/String_Quartet_No.3,_Op.90/sq7384409.mscx",
+          "git_blob_sha1": "5a8e64717bbe6af890dc6ad8679156d9c7790e6f",
+          "size_bytes": 15120451
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Kalliwoda,_Johann_Wenzel/String_Quartet_No.3,_Op.90/sq7384409.musicxml",
+          "git_blob_sha1": "614f513a7abbb833556acd203c522a985f8964a1",
+          "size_bytes": 7456488
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Kalliwoda,_Johann_Wenzel/String_Quartet_No.3,_Op.90/sq7384409_cleaned.musicxml",
+          "git_blob_sha1": "53d7a452191a925eb1b0b6a73959b79b42817241",
+          "size_bytes": 6337075
+        }
+      ]
+    },
+    {
+      "score_id": "7397765",
+      "title": "String Quartet in D minor, D.810, Op.14 (“Death and the Maiden”)",
+      "score_relative_path": "scores/Schubert,_Franz/String_Quartet_in_D_minor,_D.810,_Op.14_(“Death_and_the_Maiden”)",
+      "composer_group_id": "7312",
+      "composer_path": "Schubert,_Franz",
+      "composer_name": "Franz Schubert",
+      "work_group_id": "5108909",
+      "work_title": "String Quartet in D minor, D.810, Op.14 (“Death and the Maiden”)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_D_minor,_D.810,_Op.14_(“Death_and_the_Maiden”)/sq7397765.mscx",
+          "git_blob_sha1": "bd2ac09e8eeaeb527cc69fa12aee7d6800170028",
+          "size_bytes": 22808955
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_D_minor,_D.810,_Op.14_(“Death_and_the_Maiden”)/sq7397765.musicxml",
+          "git_blob_sha1": "97853ccd85c058df97f1fdbe76d8dffd3c7d0267",
+          "size_bytes": 10206543
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_D_minor,_D.810,_Op.14_(“Death_and_the_Maiden”)/sq7397765_cleaned.musicxml",
+          "git_blob_sha1": "5c9b4360e86c2890ed2603f2b9e8620b35f1a73b",
+          "size_bytes": 8241917
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_D_minor,_D.810,_Op.14_(“Death_and_the_Maiden”)/sq7397765_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "7434431",
+      "title": "String Quartet No.3 in A minor",
+      "score_relative_path": "scores/Gounod,_Charles/String_Quartet_No.3_in_A_minor",
+      "composer_group_id": "180278",
+      "composer_path": "Gounod,_Charles",
+      "composer_name": "Charles Gounod",
+      "work_group_id": "5108686",
+      "work_title": "String Quartet No.3 in A minor",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Gounod,_Charles/String_Quartet_No.3_in_A_minor/sq7434431.mscx",
+          "git_blob_sha1": "716dd52acbdcfc7fecabda815477e4b748ae09f7",
+          "size_bytes": 8280276
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Gounod,_Charles/String_Quartet_No.3_in_A_minor/sq7434431.musicxml",
+          "git_blob_sha1": "ca66b2f5796d19ddd925175b4442cf63ef78653a",
+          "size_bytes": 3504359
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Gounod,_Charles/String_Quartet_No.3_in_A_minor/sq7434431_cleaned.musicxml",
+          "git_blob_sha1": "b16027947dde9c73b43525a419be7915cd0d2c41",
+          "size_bytes": 2754947
+        }
+      ]
+    },
+    {
+      "score_id": "7471661",
+      "title": "String Quartet No.19 in C major, K.465 (Op. 10, No. 6)",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.19_in_C_major,_K.465_(Op._10,_No._6)",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5108516",
+      "work_title": "String Quartet No.19 in C major, K.465 (Op. 10, No. 6)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.19_in_C_major,_K.465_(Op._10,_No._6)/sq7471661.mscx",
+          "git_blob_sha1": "f2757280462655888cb2c1bdf65b0b72cb6a7445",
+          "size_bytes": 13194367
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.19_in_C_major,_K.465_(Op._10,_No._6)/sq7471661.musicxml",
+          "git_blob_sha1": "45b165cf026f914dabf66613b077d6bb506dcaf9",
+          "size_bytes": 5665983
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.19_in_C_major,_K.465_(Op._10,_No._6)/sq7471661_cleaned.musicxml",
+          "git_blob_sha1": "9550104967581d1b5fba8796cf4ce4d808435cdc",
+          "size_bytes": 4706857
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.19_in_C_major,_K.465_(Op._10,_No._6)/sq7471661_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "7483523",
+      "title": "String Quartet No.1",
+      "score_relative_path": "scores/Smetana,_Bedřich/String_Quartet_No.1",
+      "composer_group_id": "48173",
+      "composer_path": "Smetana,_Bedřich",
+      "composer_name": "Bedřich Smetana",
+      "work_group_id": "5108519",
+      "work_title": "String Quartet No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Smetana,_Bedřich/String_Quartet_No.1/sq7483523.mscx",
+          "git_blob_sha1": "f60873412606e8a97bab89b36791bcc866e88c57",
+          "size_bytes": 18933630
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Smetana,_Bedřich/String_Quartet_No.1/sq7483523.musicxml",
+          "git_blob_sha1": "4745cd5982baeb96a05304944397bd512b20db45",
+          "size_bytes": 8543360
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Smetana,_Bedřich/String_Quartet_No.1/sq7483523_cleaned.musicxml",
+          "git_blob_sha1": "386c746c384c1596509ad621c167f6042bde7912",
+          "size_bytes": 6710069
+        }
+      ]
+    },
+    {
+      "score_id": "7524617",
+      "title": "String Quartet, Op.44",
+      "score_relative_path": "scores/Krzyżanowska,_Halina/String_Quartet,_Op.44",
+      "composer_group_id": "5642364",
+      "composer_path": "Krzyżanowska,_Halina",
+      "composer_name": "Halina Krzyżanowska",
+      "work_group_id": "5108456",
+      "work_title": "String Quartet, Op.44",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Krzyżanowska,_Halina/String_Quartet,_Op.44/sq7524617.mscx",
+          "git_blob_sha1": "80b8d7f0f61afa02a873d546e64f1582fcd899d6",
+          "size_bytes": 9905367
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Krzyżanowska,_Halina/String_Quartet,_Op.44/sq7524617.musicxml",
+          "git_blob_sha1": "d5d21de631d6a598ad6f59e7d75b2cc4abac1b84",
+          "size_bytes": 3957468
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Krzyżanowska,_Halina/String_Quartet,_Op.44/sq7524617_cleaned.musicxml",
+          "git_blob_sha1": "11d3fbf97b23a84dc322c98bc65cc76282a74d8f",
+          "size_bytes": 3039778
+        }
+      ]
+    },
+    {
+      "score_id": "7541288",
+      "title": "String Quartet, Op.6",
+      "score_relative_path": "scores/Müller-Hermann,_Johanna/String_Quartet,_Op.6",
+      "composer_group_id": "534512",
+      "composer_path": "Müller-Hermann,_Johanna",
+      "composer_name": "Johanna Müller-Hermann",
+      "work_group_id": "5108505",
+      "work_title": "String Quartet, Op.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Müller-Hermann,_Johanna/String_Quartet,_Op.6/sq7541288.mscx",
+          "git_blob_sha1": "38fa015adc87d1cf21f186b76df9b3533028f9f2",
+          "size_bytes": 11096952
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Müller-Hermann,_Johanna/String_Quartet,_Op.6/sq7541288.musicxml",
+          "git_blob_sha1": "a30e8b9316bae789b02e820a0e7785e4a03db81b",
+          "size_bytes": 4885545
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Müller-Hermann,_Johanna/String_Quartet,_Op.6/sq7541288_cleaned.musicxml",
+          "git_blob_sha1": "6be9edaccb50d549ec28437c030102159339c6b0",
+          "size_bytes": 3902816
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Müller-Hermann,_Johanna/String_Quartet,_Op.6/sq7541288_scanned.csv",
+          "git_blob_sha1": "f834b216d08d950690be5b5849258eb58dc4f3f8",
+          "size_bytes": 4
+        }
+      ]
+    },
+    {
+      "score_id": "7551068",
+      "title": "String Quartet in A major",
+      "score_relative_path": "scores/Maier,_Amanda/String_Quartet_in_A_major",
+      "composer_group_id": "273661",
+      "composer_path": "Maier,_Amanda",
+      "composer_name": "Amanda Maier",
+      "work_group_id": "5108457",
+      "work_title": "String Quartet in A major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Maier,_Amanda/String_Quartet_in_A_major/sq7551068.mscx",
+          "git_blob_sha1": "f99b791ded25cb765885187fbf347747b5d3c2c6",
+          "size_bytes": 3792619
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Maier,_Amanda/String_Quartet_in_A_major/sq7551068.musicxml",
+          "git_blob_sha1": "190c5a0d6750e9fe513ca1032cf4292bd7adb18c",
+          "size_bytes": 1695895
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Maier,_Amanda/String_Quartet_in_A_major/sq7551068_cleaned.musicxml",
+          "git_blob_sha1": "f578babb7ef3ba6313e491ee617b1bb8a3febd0b",
+          "size_bytes": 1341254
+        }
+      ]
+    },
+    {
+      "score_id": "7555331",
+      "title": "String Quartet in E minor",
+      "score_relative_path": "scores/Smyth,_Ethel/String_Quartet_in_E_minor",
+      "composer_group_id": "236599",
+      "composer_path": "Smyth,_Ethel",
+      "composer_name": "Ethel Smyth",
+      "work_group_id": "5108481",
+      "work_title": "String Quartet in E minor",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Smyth,_Ethel/String_Quartet_in_E_minor/sq7555331.mscx",
+          "git_blob_sha1": "d5fdda17609f1d21f00f8014b3c4487cc8bde81c",
+          "size_bytes": 20347053
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Smyth,_Ethel/String_Quartet_in_E_minor/sq7555331.musicxml",
+          "git_blob_sha1": "e8963df6d41c9f9d40baf518eca0a05681c66e02",
+          "size_bytes": 9197719
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Smyth,_Ethel/String_Quartet_in_E_minor/sq7555331_cleaned.musicxml",
+          "git_blob_sha1": "8463e9ab9b058faf5a276bd096b236d5595c9b95",
+          "size_bytes": 6851308
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Smyth,_Ethel/String_Quartet_in_E_minor/sq7555331_scanned.csv",
+          "git_blob_sha1": "ccc7b1da94f4c628464218f2ad0cc7fabd5c06be",
+          "size_bytes": 667
+        }
+      ]
+    },
+    {
+      "score_id": "7556360",
+      "title": "String Quartet in E minor",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_E_minor",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5108504",
+      "work_title": "String Quartet in E minor",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_E_minor/sq7556360.mscx",
+          "git_blob_sha1": "82bddd58597fea8581057c6835e341ea2e4af9c8",
+          "size_bytes": 10687567
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_E_minor/sq7556360.musicxml",
+          "git_blob_sha1": "98db99a665bcb69c9959ed0ed4b3e09083aadfbf",
+          "size_bytes": 4877306
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_E_minor/sq7556360_cleaned.musicxml",
+          "git_blob_sha1": "ea98b30eb2e36b840d85ed9c0c8fc1bf78693f72",
+          "size_bytes": 3990053
+        }
+      ]
+    },
+    {
+      "score_id": "7577795",
+      "title": "String Quartet in E-flat major, Op. 277",
+      "score_relative_path": "scores/Hensel,_Fanny_(Mendelssohn)/String_Quartet_in_E-flat_major,_Op._277",
+      "composer_group_id": "57286",
+      "composer_path": "Hensel,_Fanny_(Mendelssohn)",
+      "composer_name": "Fanny (Mendelssohn) Hensel",
+      "work_group_id": "5150345",
+      "work_title": "String Quartet in E-flat major, Op. 277",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Hensel,_Fanny_(Mendelssohn)/String_Quartet_in_E-flat_major,_Op._277/sq7577795.mscx",
+          "git_blob_sha1": "1b72511d27d6fbc6f65b8e5d11e905e323977827",
+          "size_bytes": 9673742
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Hensel,_Fanny_(Mendelssohn)/String_Quartet_in_E-flat_major,_Op._277/sq7577795.musicxml",
+          "git_blob_sha1": "6eb546a2569684cfe56f2eeb51de428fb4d880ab",
+          "size_bytes": 4927862
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Hensel,_Fanny_(Mendelssohn)/String_Quartet_in_E-flat_major,_Op._277/sq7577795_cleaned.musicxml",
+          "git_blob_sha1": "3c0e18e1588885de4bf2b029d2846ffe4d285f85",
+          "size_bytes": 4095283
+        }
+      ]
+    },
+    {
+      "score_id": "7588853",
+      "title": "String Quartet in D Major",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_D_Major",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5152019",
+      "work_title": "String Quartet in D Major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_D_Major/sq7588853.mscx",
+          "git_blob_sha1": "9b4ead9054ee1967f4c02da32b1f9af9c580dfd2",
+          "size_bytes": 11229863
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_D_Major/sq7588853.musicxml",
+          "git_blob_sha1": "50b01b10f7f4d18722ae0595dd7bd35c6ff22691",
+          "size_bytes": 5144231
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_D_Major/sq7588853_cleaned.musicxml",
+          "git_blob_sha1": "e3bfe377013a6ad7ee3610dc8eed97904cb78631",
+          "size_bytes": 4261183
+        }
+      ]
+    },
+    {
+      "score_id": "7648382",
+      "title": "String Quartet in C minor, D.703",
+      "score_relative_path": "scores/Schubert,_Franz/String_Quartet_in_C_minor,_D.703",
+      "composer_group_id": "7312",
+      "composer_path": "Schubert,_Franz",
+      "composer_name": "Franz Schubert",
+      "work_group_id": "5162489",
+      "work_title": "String Quartet in C minor, D.703",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_C_minor,_D.703/sq7648382.mscx",
+          "git_blob_sha1": "905fc2c1e453dea62b44fa60019afbf1d8431b8b",
+          "size_bytes": 4457183
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_C_minor,_D.703/sq7648382.musicxml",
+          "git_blob_sha1": "ddcc21eee3c3e28adc6b9379fde02342e0923543",
+          "size_bytes": 1940334
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_C_minor,_D.703/sq7648382_cleaned.musicxml",
+          "git_blob_sha1": "c40ba901bb60f65db1aed500d7680ca17a72acb1",
+          "size_bytes": 1589673
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Schubert,_Franz/String_Quartet_in_C_minor,_D.703/sq7648382_scanned.csv",
+          "git_blob_sha1": "f42f62b6def5b31161f7dea432fba0146f0991ff",
+          "size_bytes": 17
+        }
+      ]
+    },
+    {
+      "score_id": "7872392",
+      "title": "String Quartet No.9, Op.59 No.3",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.9,_Op.59_No.3",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5193359",
+      "work_title": "String Quartet No.9, Op.59 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.9,_Op.59_No.3/sq7872392.mscx",
+          "git_blob_sha1": "43bf8c17afec6729d0a51afa0ce13dbf4190ccf2",
+          "size_bytes": 15853791
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.9,_Op.59_No.3/sq7872392.musicxml",
+          "git_blob_sha1": "d719c8ff91ad9c7804cd38a84404b9d4a856c39a",
+          "size_bytes": 6938646
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.9,_Op.59_No.3/sq7872392_cleaned.musicxml",
+          "git_blob_sha1": "4a421cec487b1353a64ac47f66ca9956f2b26d85",
+          "size_bytes": 5684735
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.9,_Op.59_No.3/sq7872392_scanned.csv",
+          "git_blob_sha1": "148fc1507f0eb5a127d65ba995d6308713ec5396",
+          "size_bytes": 120
+        }
+      ]
+    },
+    {
+      "score_id": "8071278",
+      "title": "String Quartet No.1, Op.18 No.1",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.1,_Op.18_No.1",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108454",
+      "work_title": "String Quartet No.1, Op.18 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.1,_Op.18_No.1/sq8071278.mscx",
+          "git_blob_sha1": "6c0f8339f35316bf685ac19269e83a90fc64b431",
+          "size_bytes": 15092706
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.1,_Op.18_No.1/sq8071278.musicxml",
+          "git_blob_sha1": "502e61b93ffa8a40d9b926b0c907408015333c87",
+          "size_bytes": 6632551
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.1,_Op.18_No.1/sq8071278_cleaned.musicxml",
+          "git_blob_sha1": "62181f8e389214252d43cd91cbeaa8d014db2a27",
+          "size_bytes": 5471622
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.1,_Op.18_No.1/sq8071278_scanned.csv",
+          "git_blob_sha1": "5d3314d2dae8a402e0216c5cfd7abc95475e7d0a",
+          "size_bytes": 364
+        }
+      ]
+    },
+    {
+      "score_id": "8075304",
+      "title": "String Quartet in E-flat major, Hob.III:31, Op.20 No.1",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III31,_Op.20_No.1",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5178593",
+      "work_title": "String Quartet in E-flat major, Hob.III:31, Op.20 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III31,_Op.20_No.1/sq8075304.mscx",
+          "git_blob_sha1": "07542944d16fe444d637ed126c2e4c20ccca5c6c",
+          "size_bytes": 5531951
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III31,_Op.20_No.1/sq8075304.musicxml",
+          "git_blob_sha1": "795abb6fd28252c8c937d76b130668cb4a998286",
+          "size_bytes": 2412027
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III31,_Op.20_No.1/sq8075304_cleaned.musicxml",
+          "git_blob_sha1": "775f29e17973aaccc10e873c47bcb495b0ed44a3",
+          "size_bytes": 2027824
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III31,_Op.20_No.1/sq8075304_scanned.csv",
+          "git_blob_sha1": "62ce2a9e468ec9594e3f65716fae315a73df3674",
+          "size_bytes": 41
+        }
+      ]
+    },
+    {
+      "score_id": "8088531",
+      "title": "String Quartet in C major, Hob.III:32, Op.20 No.2",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III32,_Op.20_No.2",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5178617",
+      "work_title": "String Quartet in C major, Hob.III:32, Op.20 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III32,_Op.20_No.2/sq8088531.mscx",
+          "git_blob_sha1": "efc3d47eb56c7676f9e5bde9a42274d6314ceaef",
+          "size_bytes": 7815750
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III32,_Op.20_No.2/sq8088531.musicxml",
+          "git_blob_sha1": "c5c8a74e909b0b9be8834f391e9e86d28e68024c",
+          "size_bytes": 3757681
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III32,_Op.20_No.2/sq8088531_cleaned.musicxml",
+          "git_blob_sha1": "d40e3d571b1f3fb223128b99b98711b3278816ee",
+          "size_bytes": 3231034
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III32,_Op.20_No.2/sq8088531_scanned.csv",
+          "git_blob_sha1": "e0dbb0577600232a596ca8c18712644405432000",
+          "size_bytes": 75
+        }
+      ]
+    },
+    {
+      "score_id": "8437280",
+      "title": "String Quartet in C minor, Op.1 No.4",
+      "score_relative_path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_minor,_Op.1_No.4",
+      "composer_group_id": "726953",
+      "composer_path": "Saint-Georges,_Joseph_Bologne",
+      "composer_name": "Joseph Bologne Saint-Georges",
+      "work_group_id": "5108605",
+      "work_title": "String Quartet in C minor, Op.1 No.4",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_minor,_Op.1_No.4/sq8437280.mscx",
+          "git_blob_sha1": "a023dedc0289407e0b478b62d1e8bbb637d15d3f",
+          "size_bytes": 2451006
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_minor,_Op.1_No.4/sq8437280.musicxml",
+          "git_blob_sha1": "715147ee0f72ad3d5c853c97abff76d5443d06b9",
+          "size_bytes": 1039980
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_minor,_Op.1_No.4/sq8437280_cleaned.musicxml",
+          "git_blob_sha1": "47fd2139e5fd44db8fa3cbc6d1af741b2aec81ce",
+          "size_bytes": 841791
+        }
+      ]
+    },
+    {
+      "score_id": "8437358",
+      "title": "String Quartet in C major, Op.1 No.1",
+      "score_relative_path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_major,_Op.1_No.1",
+      "composer_group_id": "726953",
+      "composer_path": "Saint-Georges,_Joseph_Bologne",
+      "composer_name": "Joseph Bologne Saint-Georges",
+      "work_group_id": "5108602",
+      "work_title": "String Quartet in C major, Op.1 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_major,_Op.1_No.1/sq8437358.mscx",
+          "git_blob_sha1": "add7cfe8413ca98d37dc52d3746b32c852729466",
+          "size_bytes": 2922624
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_major,_Op.1_No.1/sq8437358.musicxml",
+          "git_blob_sha1": "d2c507519cfab159b5bbeafec4bb695e803d3c5e",
+          "size_bytes": 1312347
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_C_major,_Op.1_No.1/sq8437358_cleaned.musicxml",
+          "git_blob_sha1": "841d4495059a71ab5bd484478a59ce9fc9fb762f",
+          "size_bytes": 1100069
+        }
+      ]
+    },
+    {
+      "score_id": "8438840",
+      "title": "String Quartet in E-flat major, Op.1 No.2",
+      "score_relative_path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_E-flat_major,_Op.1_No.2",
+      "composer_group_id": "726953",
+      "composer_path": "Saint-Georges,_Joseph_Bologne",
+      "composer_name": "Joseph Bologne Saint-Georges",
+      "work_group_id": "5108603",
+      "work_title": "String Quartet in E-flat major, Op.1 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_E-flat_major,_Op.1_No.2/sq8438840.mscx",
+          "git_blob_sha1": "d5cfcfeb82249ddf03699e47c716366035a4bcf0",
+          "size_bytes": 2486265
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_E-flat_major,_Op.1_No.2/sq8438840.musicxml",
+          "git_blob_sha1": "b615e1d6c813d03e20a523390b73b1ddabb3f324",
+          "size_bytes": 1115196
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_E-flat_major,_Op.1_No.2/sq8438840_cleaned.musicxml",
+          "git_blob_sha1": "bc3490790cee341bfa76d7da51dfad80a98c5818",
+          "size_bytes": 905766
+        }
+      ]
+    },
+    {
+      "score_id": "8438915",
+      "title": "String Quartet in G minor, Op.1 No.3",
+      "score_relative_path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.3",
+      "composer_group_id": "726953",
+      "composer_path": "Saint-Georges,_Joseph_Bologne",
+      "composer_name": "Joseph Bologne Saint-Georges",
+      "work_group_id": "5108604",
+      "work_title": "String Quartet in G minor, Op.1 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.3/sq8438915.mscx",
+          "git_blob_sha1": "ccb56eafd93ea2e2b9fb3916064a8417296f740f",
+          "size_bytes": 1863881
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.3/sq8438915.musicxml",
+          "git_blob_sha1": "21325fbf90d764d2ea1f397926e3025e2170a656",
+          "size_bytes": 804782
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.3/sq8438915_cleaned.musicxml",
+          "git_blob_sha1": "f217b8955b258d0da8c7e817d23a5176baa37e17",
+          "size_bytes": 641215
+        }
+      ]
+    },
+    {
+      "score_id": "8438999",
+      "title": "String Quartet in G minor, Op.1 No.5",
+      "score_relative_path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.5",
+      "composer_group_id": "726953",
+      "composer_path": "Saint-Georges,_Joseph_Bologne",
+      "composer_name": "Joseph Bologne Saint-Georges",
+      "work_group_id": "5108606",
+      "work_title": "String Quartet in G minor, Op.1 No.5",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.5/sq8438999.mscx",
+          "git_blob_sha1": "69b2f35e83f306069ab09db2ac2934cb52ca2df5",
+          "size_bytes": 2873014
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.5/sq8438999.musicxml",
+          "git_blob_sha1": "6720565c89b56391722720ef1ed4da507651457c",
+          "size_bytes": 1215786
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Saint-Georges,_Joseph_Bologne/String_Quartet_in_G_minor,_Op.1_No.5/sq8438999_cleaned.musicxml",
+          "git_blob_sha1": "0383d6bc38cb1f7a3b4b18fb0f08892745018417",
+          "size_bytes": 1006600
+        }
+      ]
+    },
+    {
+      "score_id": "8454356",
+      "title": "String Quartet in A major, G.213 (Op.39)",
+      "score_relative_path": "scores/Boccherini,_Luigi/String_Quartet_in_A_major,_G.213_(Op.39)",
+      "composer_group_id": "189766",
+      "composer_path": "Boccherini,_Luigi",
+      "composer_name": "Luigi Boccherini",
+      "work_group_id": "5108580",
+      "work_title": "String Quartet in A major, G.213 (Op.39)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Boccherini,_Luigi/String_Quartet_in_A_major,_G.213_(Op.39)/sq8454356.mscx",
+          "git_blob_sha1": "03301b5716e726e0f60eaa91cfe9fdfdbffa11be",
+          "size_bytes": 6813735
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Boccherini,_Luigi/String_Quartet_in_A_major,_G.213_(Op.39)/sq8454356.musicxml",
+          "git_blob_sha1": "d6a7fe0ce2bb97a191a3bf967591a7c9e9478a67",
+          "size_bytes": 3447637
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Boccherini,_Luigi/String_Quartet_in_A_major,_G.213_(Op.39)/sq8454356_cleaned.musicxml",
+          "git_blob_sha1": "845a296d62c6a916ade5daa05355994451aea8ea",
+          "size_bytes": 2879797
+        }
+      ]
+    },
+    {
+      "score_id": "8455808",
+      "title": "String Quartet in G minor, Hob.III:33, Op.20 No.3",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III33,_Op.20_No.3",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5178638",
+      "work_title": "String Quartet in G minor, Hob.III:33, Op.20 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III33,_Op.20_No.3/sq8455808.mscx",
+          "git_blob_sha1": "f76f2918a3480c612928a4e80a8f6c607d92809b",
+          "size_bytes": 7075020
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III33,_Op.20_No.3/sq8455808.musicxml",
+          "git_blob_sha1": "20a07ecf518daa85f488ea9214ec42e385502f10",
+          "size_bytes": 3171217
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III33,_Op.20_No.3/sq8455808_cleaned.musicxml",
+          "git_blob_sha1": "d764c78f93969185c010cae6754cdddff6527c47",
+          "size_bytes": 2659468
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_minor,_Hob.III33,_Op.20_No.3/sq8455808_scanned.csv",
+          "git_blob_sha1": "7b32da998553a64d59195adb1ff7d52be9319b5a",
+          "size_bytes": 64
+        }
+      ]
+    },
+    {
+      "score_id": "8461409",
+      "title": "String Quartet in B-flat major (“La Chasse”), Hob. III:1, Op.1 No.1",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major_(“La_Chasse”),_Hob._III1,_Op.1_No.1",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5446197",
+      "work_title": "String Quartet in B-flat major (“La Chasse”), Hob. III:1, Op.1 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major_(“La_Chasse”),_Hob._III1,_Op.1_No.1/sq8461409.mscx",
+          "git_blob_sha1": "860347354c4fbbf3b471a07b5f77a53676489917",
+          "size_bytes": 3914495
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major_(“La_Chasse”),_Hob._III1,_Op.1_No.1/sq8461409.musicxml",
+          "git_blob_sha1": "ef3a734d4eca9dd8102298dfd3be994f6b47ac0d",
+          "size_bytes": 1759897
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major_(“La_Chasse”),_Hob._III1,_Op.1_No.1/sq8461409_cleaned.musicxml",
+          "git_blob_sha1": "e922708f609243b3f6ab61b77ac31449c3943707",
+          "size_bytes": 1477626
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major_(“La_Chasse”),_Hob._III1,_Op.1_No.1/sq8461409_scanned.csv",
+          "git_blob_sha1": "c04256d079ff2ae9628033d94aa521f8903b6149",
+          "size_bytes": 67
+        }
+      ]
+    },
+    {
+      "score_id": "8482283",
+      "title": "String Quartet in F major",
+      "score_relative_path": "scores/Ravel,_Maurice/String_Quartet_in_F_major",
+      "composer_group_id": "1178",
+      "composer_path": "Ravel,_Maurice",
+      "composer_name": "Maurice Ravel",
+      "work_group_id": "5108574",
+      "work_title": "String Quartet in F major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Ravel,_Maurice/String_Quartet_in_F_major/sq8482283.mscx",
+          "git_blob_sha1": "7de8edab6412feec17593afec583f509ffd4d419",
+          "size_bytes": 16326807
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Ravel,_Maurice/String_Quartet_in_F_major/sq8482283.musicxml",
+          "git_blob_sha1": "4ebbb23c806041451ed872156f6cb49fe8b38935",
+          "size_bytes": 7451819
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Ravel,_Maurice/String_Quartet_in_F_major/sq8482283_cleaned.musicxml",
+          "git_blob_sha1": "72179c850161cd60b6ac1cd58979f781321c262b",
+          "size_bytes": 5827962
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Ravel,_Maurice/String_Quartet_in_F_major/sq8482283_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "8509238",
+      "title": "String Quartet in D major, Hob.III:34, Op.20 No.4",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III34,_Op.20_No.4",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5178650",
+      "work_title": "String Quartet in D major, Hob.III:34, Op.20 No.4",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III34,_Op.20_No.4/sq8509238.mscx",
+          "git_blob_sha1": "b02ccbc470f59c5ffe0259779a2ddd0029c66e54",
+          "size_bytes": 9080950
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III34,_Op.20_No.4/sq8509238.musicxml",
+          "git_blob_sha1": "20bad10a60ce63db25cc854fcf5e66d771f2ac20",
+          "size_bytes": 4014969
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III34,_Op.20_No.4/sq8509238_cleaned.musicxml",
+          "git_blob_sha1": "cd8cf20ed8a3ec1e0a441a12a2af41d550e0396f",
+          "size_bytes": 3322393
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III34,_Op.20_No.4/sq8509238_scanned.csv",
+          "git_blob_sha1": "582a47ad5b9354bf97a4f34a3274adb5bf1e42e0",
+          "size_bytes": 65
+        }
+      ]
+    },
+    {
+      "score_id": "8556926",
+      "title": "String Quartet in B-flat major, Hob.III:5, Op.1 No.5",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III5,_Op.1_No.5",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5470754",
+      "work_title": "String Quartet in B-flat major, Hob.III:5, Op.1 No.5",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III5,_Op.1_No.5/sq8556926.mscx",
+          "git_blob_sha1": "01e8311396d9a128f4b817292be139e16921299f",
+          "size_bytes": 3966175
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III5,_Op.1_No.5/sq8556926.musicxml",
+          "git_blob_sha1": "f28ee724ee311c86b665f92ff4d5a628ff284ea1",
+          "size_bytes": 2111474
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III5,_Op.1_No.5/sq8556926_cleaned.musicxml",
+          "git_blob_sha1": "d5eeb795d905f920cb0aba7047c1b3592cb14b77",
+          "size_bytes": 1808717
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_B-flat_major,_Hob.III5,_Op.1_No.5/sq8556926_scanned.csv",
+          "git_blob_sha1": "41b6b9f56c167a3951e6df51d51ab3ac718f0f31",
+          "size_bytes": 28
+        }
+      ]
+    },
+    {
+      "score_id": "8561633",
+      "title": "String Quartet No. 6 in F Minor, Op.80",
+      "score_relative_path": "scores/Mendelssohn,_Felix/String_Quartet_No._6_in_F_Minor,_Op.80",
+      "composer_group_id": "46096",
+      "composer_path": "Mendelssohn,_Felix",
+      "composer_name": "Felix Mendelssohn",
+      "work_group_id": "5514686",
+      "work_title": "String Quartet No. 6 in F Minor, Op.80",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No._6_in_F_Minor,_Op.80/sq8561633.mscx",
+          "git_blob_sha1": "c915ff23ee0e7fe7c5b1bb180ea31ecbb7df327f",
+          "size_bytes": 14170535
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No._6_in_F_Minor,_Op.80/sq8561633.musicxml",
+          "git_blob_sha1": "70e73326f20cfcbafb3833e87861e34531d5d186",
+          "size_bytes": 6449216
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No._6_in_F_Minor,_Op.80/sq8561633_cleaned.musicxml",
+          "git_blob_sha1": "a2979943a62143d3301d64165c5df1c035f73c6a",
+          "size_bytes": 5175559
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No._6_in_F_Minor,_Op.80/sq8561633_scanned.csv",
+          "git_blob_sha1": "b388a37021a80853cc336c88957adbf43f5df0a6",
+          "size_bytes": 84
+        }
+      ]
+    },
+    {
+      "score_id": "8623643",
+      "title": "String Quartet No.4 in E minor, Op.44 No.2",
+      "score_relative_path": "scores/Mendelssohn,_Felix/String_Quartet_No.4_in_E_minor,_Op.44_No.2",
+      "composer_group_id": "46096",
+      "composer_path": "Mendelssohn,_Felix",
+      "composer_name": "Felix Mendelssohn",
+      "work_group_id": "5514680",
+      "work_title": "String Quartet No.4 in E minor, Op.44 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.4_in_E_minor,_Op.44_No.2/sq8623643.mscx",
+          "git_blob_sha1": "3b1fa53784b0aef8b981a884fd6c7e5f96f879be",
+          "size_bytes": 16251001
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.4_in_E_minor,_Op.44_No.2/sq8623643.musicxml",
+          "git_blob_sha1": "b36cbbee31871e8eb88f4cec94c6c88eec9b5f77",
+          "size_bytes": 7445261
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.4_in_E_minor,_Op.44_No.2/sq8623643_cleaned.musicxml",
+          "git_blob_sha1": "53f94dec23d37fd6c853444990bc2f027eca6df8",
+          "size_bytes": 5988129
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.4_in_E_minor,_Op.44_No.2/sq8623643_scanned.csv",
+          "git_blob_sha1": "1884a553d681ce2b2797277caaf28af3bcc7bae3",
+          "size_bytes": 60
+        }
+      ]
+    },
+    {
+      "score_id": "8630159",
+      "title": "String Quartet No.1",
+      "score_relative_path": "scores/Schulhoff,_Erwin/String_Quartet_No.1",
+      "composer_group_id": "89540",
+      "composer_path": "Schulhoff,_Erwin",
+      "composer_name": "Erwin Schulhoff",
+      "work_group_id": "5108911",
+      "work_title": "String Quartet No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Schulhoff,_Erwin/String_Quartet_No.1/sq8630159.mscx",
+          "git_blob_sha1": "19c9cc24c8c5bfaa013afdb2ec2139d5d4ca7cf0",
+          "size_bytes": 12003654
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Schulhoff,_Erwin/String_Quartet_No.1/sq8630159.musicxml",
+          "git_blob_sha1": "6013f4cb345b076719b1a35034aea328562d4ae0",
+          "size_bytes": 5835364
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Schulhoff,_Erwin/String_Quartet_No.1/sq8630159_cleaned.musicxml",
+          "git_blob_sha1": "0386d657241c774ef4ed6c313c1f53ff45185af7",
+          "size_bytes": 4841313
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Schulhoff,_Erwin/String_Quartet_No.1/sq8630159_scanned.csv",
+          "git_blob_sha1": "6879f46ffe3d872fc1e17585eb74e0d7b5236df7",
+          "size_bytes": 76
+        }
+      ]
+    },
+    {
+      "score_id": "8661306",
+      "title": "String Quartet in G minor, Op.10",
+      "score_relative_path": "scores/Debussy,_Claude/String_Quartet_in_G_minor,_Op.10",
+      "composer_group_id": "4700",
+      "composer_path": "Debussy,_Claude",
+      "composer_name": "Claude Debussy",
+      "work_group_id": "5108549",
+      "work_title": "String Quartet in G minor, Op.10",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Debussy,_Claude/String_Quartet_in_G_minor,_Op.10/sq8661306.mscx",
+          "git_blob_sha1": "26ff1554dc7a435d44003f80e7e5d16208d97c58",
+          "size_bytes": 19112059
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Debussy,_Claude/String_Quartet_in_G_minor,_Op.10/sq8661306.musicxml",
+          "git_blob_sha1": "001eab6e8ee4ccdf74721e0da095572b1b189351",
+          "size_bytes": 8967887
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Debussy,_Claude/String_Quartet_in_G_minor,_Op.10/sq8661306_cleaned.musicxml",
+          "git_blob_sha1": "bc4a84f7fa90f442f970f79d5435a0e33ab3687f",
+          "size_bytes": 7437171
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Debussy,_Claude/String_Quartet_in_G_minor,_Op.10/sq8661306_scanned.csv",
+          "git_blob_sha1": "6974bea9abd1a0e143c1a9554fa78d267d1e45f0",
+          "size_bytes": 105
+        }
+      ]
+    },
+    {
+      "score_id": "8741475",
+      "title": "String Quartet No.2, Op.17 (Sz.67)",
+      "score_relative_path": "scores/Bartók,_Béla/String_Quartet_No.2,_Op.17_(Sz.67)",
+      "composer_group_id": "83326",
+      "composer_path": "Bartók,_Béla",
+      "composer_name": "Béla Bartók",
+      "work_group_id": "5530433",
+      "work_title": "String Quartet No.2, Op.17 (Sz.67)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.2,_Op.17_(Sz.67)/sq8741475.mscx",
+          "git_blob_sha1": "3de366bb117a23a0db0d78af0a804c7cd1371676",
+          "size_bytes": 16232823
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.2,_Op.17_(Sz.67)/sq8741475.musicxml",
+          "git_blob_sha1": "1e50aead93cc51caa7bc62e3d29be28749a7c58f",
+          "size_bytes": 6531679
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.2,_Op.17_(Sz.67)/sq8741475_cleaned.musicxml",
+          "git_blob_sha1": "17afe511df06bd5df08036ffd172691b5fae1534",
+          "size_bytes": 5156263
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Bartók,_Béla/String_Quartet_No.2,_Op.17_(Sz.67)/sq8741475_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "8796660",
+      "title": "String Quartet in A major, Hob.III:36, Op.20 No.6",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III36,_Op.20_No.6",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5178725",
+      "work_title": "String Quartet in A major, Hob.III:36, Op.20 No.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III36,_Op.20_No.6/sq8796660.mscx",
+          "git_blob_sha1": "586831bc8e80a7503125ca2fbaebff2e53735f0f",
+          "size_bytes": 6855963
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III36,_Op.20_No.6/sq8796660.musicxml",
+          "git_blob_sha1": "dea08b12eae58a9aa292b1b84872112c5b938863",
+          "size_bytes": 3141037
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III36,_Op.20_No.6/sq8796660_cleaned.musicxml",
+          "git_blob_sha1": "0011e3e7ee155b0abaf84c4546dc9604484a8b76",
+          "size_bytes": 2702461
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III36,_Op.20_No.6/sq8796660_scanned.csv",
+          "git_blob_sha1": "9f859451f319cac35c194c70fbb341592c12b3cc",
+          "size_bytes": 57
+        }
+      ]
+    },
+    {
+      "score_id": "8806134",
+      "title": "String Quartet in C major, Hob.III:6, Op.1 No.6",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III6,_Op.1_No.6",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5470757",
+      "work_title": "String Quartet in C major, Hob.III:6, Op.1 No.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III6,_Op.1_No.6/sq8806134.mscx",
+          "git_blob_sha1": "9bec27e2f902cadb1faa57d9c13da8c95bbb0a1b",
+          "size_bytes": 3713306
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III6,_Op.1_No.6/sq8806134.musicxml",
+          "git_blob_sha1": "0babc6f776a0df7200b0564ebdfcd98f6d4edbde",
+          "size_bytes": 1764319
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III6,_Op.1_No.6/sq8806134_cleaned.musicxml",
+          "git_blob_sha1": "ea90dc7aa2a8338e1b4c173581e020a698c1ec8d",
+          "size_bytes": 1453995
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III6,_Op.1_No.6/sq8806134_scanned.csv",
+          "git_blob_sha1": "b5bc751c122c8d27d313048fe03e7472b256ea2c",
+          "size_bytes": 75
+        }
+      ]
+    },
+    {
+      "score_id": "8806746",
+      "title": "String Quartet in D major, Hob.III:3, Op.1 No.3",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III3,_Op.1_No.3",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5470649",
+      "work_title": "String Quartet in D major, Hob.III:3, Op.1 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III3,_Op.1_No.3/sq8806746.mscx",
+          "git_blob_sha1": "4aedd5d8539c4e9cc5eda333c5ae57803ced7fe8",
+          "size_bytes": 4674785
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III3,_Op.1_No.3/sq8806746.musicxml",
+          "git_blob_sha1": "4a53352e09b89fb14d251e5b7f0167771b055b4b",
+          "size_bytes": 2131528
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III3,_Op.1_No.3/sq8806746_cleaned.musicxml",
+          "git_blob_sha1": "8b76ca667b9f773109f655518d231d9ab8ff59f6",
+          "size_bytes": 1821190
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_D_major,_Hob.III3,_Op.1_No.3/sq8806746_scanned.csv",
+          "git_blob_sha1": "85746ed30eb30ad128b682a414f5e352cac657a8",
+          "size_bytes": 46
+        }
+      ]
+    },
+    {
+      "score_id": "8806881",
+      "title": "String Quartet in E-flat major, Hob.III:2, Op.1 No.2",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III2,_Op.1_No.2",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5446206",
+      "work_title": "String Quartet in E-flat major, Hob.III:2, Op.1 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III2,_Op.1_No.2/sq8806881.mscx",
+          "git_blob_sha1": "aac4710650ae83202684ca4f1d397590d007bc32",
+          "size_bytes": 3986129
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III2,_Op.1_No.2/sq8806881.musicxml",
+          "git_blob_sha1": "406e2a5cdf6fbdb360fb84c09ee0c9f7ce2a4e88",
+          "size_bytes": 1942144
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III2,_Op.1_No.2/sq8806881_cleaned.musicxml",
+          "git_blob_sha1": "644d4a3b64857eb714250099fad6fc6e03612ecb",
+          "size_bytes": 1634944
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_E-flat_major,_Hob.III2,_Op.1_No.2/sq8806881_scanned.csv",
+          "git_blob_sha1": "072f6377bf23aee777b22782b35e5dd87bf04ae1",
+          "size_bytes": 30
+        }
+      ]
+    },
+    {
+      "score_id": "8807040",
+      "title": "String Quartet in F minor, Hob.III:35, Op.20 No.5",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_F_minor,_Hob.III35,_Op.20_No.5",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5178695",
+      "work_title": "String Quartet in F minor, Hob.III:35, Op.20 No.5",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_minor,_Hob.III35,_Op.20_No.5/sq8807040.mscx",
+          "git_blob_sha1": "018aa58cf466572ce0bec95d04e3672a7f1731f5",
+          "size_bytes": 7772465
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_minor,_Hob.III35,_Op.20_No.5/sq8807040.musicxml",
+          "git_blob_sha1": "0e0e1b2d275834af571283a65c2f481e067c7bd2",
+          "size_bytes": 3438029
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_minor,_Hob.III35,_Op.20_No.5/sq8807040_cleaned.musicxml",
+          "git_blob_sha1": "25da823e121545e47756ed0f3535ff2f6b7d6069",
+          "size_bytes": 2898115
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_F_minor,_Hob.III35,_Op.20_No.5/sq8807040_scanned.csv",
+          "git_blob_sha1": "95268b7187cbea161bcbc1915b7a200455665469",
+          "size_bytes": 56
+        }
+      ]
+    },
+    {
+      "score_id": "8807667",
+      "title": "String Quartet in G major, Hob.III:4, Op.1 No.4",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III4,_Op.1_No.4",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5470739",
+      "work_title": "String Quartet in G major, Hob.III:4, Op.1 No.4",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III4,_Op.1_No.4/sq8807667.mscx",
+          "git_blob_sha1": "acf55f00a24578cc9b64a4eebdba2e0febc0930e",
+          "size_bytes": 4726358
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III4,_Op.1_No.4/sq8807667.musicxml",
+          "git_blob_sha1": "5de5cc0bbeffe603d8c268682d6ff1c3c4f1b840",
+          "size_bytes": 2294934
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III4,_Op.1_No.4/sq8807667_cleaned.musicxml",
+          "git_blob_sha1": "a219bf7a120cef42e36a6026834500222ae86698",
+          "size_bytes": 1935572
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_G_major,_Hob.III4,_Op.1_No.4/sq8807667_scanned.csv",
+          "git_blob_sha1": "98ebcfda97d4ae1dc01053e4d617ee35ba826759",
+          "size_bytes": 38
+        }
+      ]
+    },
+    {
+      "score_id": "8811375",
+      "title": "String Quartet No.1",
+      "score_relative_path": "scores/Borodin,_Alexander/String_Quartet_No.1",
+      "composer_group_id": "164004",
+      "composer_path": "Borodin,_Alexander",
+      "composer_name": "Alexander Borodin",
+      "work_group_id": "5108581",
+      "work_title": "String Quartet No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.1/sq8811375.mscx",
+          "git_blob_sha1": "bd50a7b6a58fd5d06b97f4bae7aecea335c42006",
+          "size_bytes": 24020783
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.1/sq8811375.musicxml",
+          "git_blob_sha1": "8612cc8c66063a5f16295fe3fc52228cd6537838",
+          "size_bytes": 10318654
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.1/sq8811375_cleaned.musicxml",
+          "git_blob_sha1": "b25745c9a9e97b522a93422467db57e0b4f8bd81",
+          "size_bytes": 8370774
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Borodin,_Alexander/String_Quartet_No.1/sq8811375_scanned.csv",
+          "git_blob_sha1": "988dacfad2e2e191f8b53a5cce49be49e45f76a3",
+          "size_bytes": 149
+        }
+      ]
+    },
+    {
+      "score_id": "8812200",
+      "title": "Italian Serenade",
+      "score_relative_path": "scores/Wolf,_Hugo/Italian_Serenade",
+      "composer_group_id": "215747",
+      "composer_path": "Wolf,_Hugo",
+      "composer_name": "Hugo Wolf",
+      "work_group_id": "5626515",
+      "work_title": "Italian Serenade",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Wolf,_Hugo/Italian_Serenade/sq8812200.mscx",
+          "git_blob_sha1": "764e4bdfac65eea102dd0c5954216d09fb264edf",
+          "size_bytes": 6419884
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Wolf,_Hugo/Italian_Serenade/sq8812200.musicxml",
+          "git_blob_sha1": "285501d1604fc093abb7f20834e591ce9c44b13b",
+          "size_bytes": 2955817
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Wolf,_Hugo/Italian_Serenade/sq8812200_cleaned.musicxml",
+          "git_blob_sha1": "287979eceb3b493ec942b08567f3c8ca0067259d",
+          "size_bytes": 2391289
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Wolf,_Hugo/Italian_Serenade/sq8812200_scanned.csv",
+          "git_blob_sha1": "8889ebc8b2073ba5387833785ad18215fff3a60b",
+          "size_bytes": 45
+        }
+      ]
+    },
+    {
+      "score_id": "8818128",
+      "title": "String Quartet in A Major",
+      "score_relative_path": "scores/Mayer,_Emilie/String_Quartet_in_A_Major",
+      "composer_group_id": "447851",
+      "composer_path": "Mayer,_Emilie",
+      "composer_name": "Emilie Mayer",
+      "work_group_id": "5152007",
+      "work_title": "String Quartet in A Major",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_A_Major/sq8818128.mscx",
+          "git_blob_sha1": "12e19daaf874f4542ef29e094f15c5b93862c132",
+          "size_bytes": 11331347
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_A_Major/sq8818128.musicxml",
+          "git_blob_sha1": "1d6ee33a3e9b9dab3f02a96576957445072c10b8",
+          "size_bytes": 5244591
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mayer,_Emilie/String_Quartet_in_A_Major/sq8818128_cleaned.musicxml",
+          "git_blob_sha1": "94d3ad9fac8558af3433840358e15fea664287e2",
+          "size_bytes": 4278341
+        }
+      ]
+    },
+    {
+      "score_id": "8823783",
+      "title": "String Quartet",
+      "score_relative_path": "scores/Wolf,_Hugo/String_Quartet",
+      "composer_group_id": "215747",
+      "composer_path": "Wolf,_Hugo",
+      "composer_name": "Hugo Wolf",
+      "work_group_id": "5574612",
+      "work_title": "String Quartet",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Wolf,_Hugo/String_Quartet/sq8823783.mscx",
+          "git_blob_sha1": "6e88b2bf415974aa7a630b6a37bbbef1f40a7473",
+          "size_bytes": 26407279
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Wolf,_Hugo/String_Quartet/sq8823783.musicxml",
+          "git_blob_sha1": "9733a714c5471ec9627dde783abb5e4d8078ecc0",
+          "size_bytes": 11354038
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Wolf,_Hugo/String_Quartet/sq8823783_cleaned.musicxml",
+          "git_blob_sha1": "b3a68bae1373fa4867612989af6ca45259eb0e37",
+          "size_bytes": 8879730
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Wolf,_Hugo/String_Quartet/sq8823783_scanned.csv",
+          "git_blob_sha1": "7618710d974625c9c0897714ee141acb50274299",
+          "size_bytes": 211
+        }
+      ]
+    },
+    {
+      "score_id": "8853405",
+      "title": "String Quartet No.2, Op.18 No.2",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.2,_Op.18_No.2",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108476",
+      "work_title": "String Quartet No.2, Op.18 No.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.2,_Op.18_No.2/sq8853405.mscx",
+          "git_blob_sha1": "3946f6540265e89a46f337d2037ea9e59bf63bd3",
+          "size_bytes": 10810887
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.2,_Op.18_No.2/sq8853405.musicxml",
+          "git_blob_sha1": "65d9f9f07a1de14e6bb1a7c061662e932b178a5c",
+          "size_bytes": 5042617
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.2,_Op.18_No.2/sq8853405_cleaned.musicxml",
+          "git_blob_sha1": "3e307f31ffb3fd6e9787c77e1d67e412dc99f058",
+          "size_bytes": 4162296
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.2,_Op.18_No.2/sq8853405_scanned.csv",
+          "git_blob_sha1": "791c8a9c8db296540aee3ac0d4062132b546b8c5",
+          "size_bytes": 54
+        }
+      ]
+    },
+    {
+      "score_id": "8885439",
+      "title": "String Quartet No.12, Op.96 (“American”)",
+      "score_relative_path": "scores/Dvořák,_Antonín/String_Quartet_No.12,_Op.96_(“American”)",
+      "composer_group_id": "7298",
+      "composer_path": "Dvořák,_Antonín",
+      "composer_name": "Antonín Dvořák",
+      "work_group_id": "5108664",
+      "work_title": "String Quartet No.12, Op.96 (“American”)",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.12,_Op.96_(“American”)/sq8885439.mscx",
+          "git_blob_sha1": "d73491c1c2db5b3618444cbb6eeaf7704506082b",
+          "size_bytes": 16048959
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.12,_Op.96_(“American”)/sq8885439.musicxml",
+          "git_blob_sha1": "ff14ef4ff473748a7845da53d2d2a564bfd6b7a3",
+          "size_bytes": 6597370
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.12,_Op.96_(“American”)/sq8885439_cleaned.musicxml",
+          "git_blob_sha1": "14934a799a205b364d7b58531f9c3817491f50d9",
+          "size_bytes": 5168559
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.12,_Op.96_(“American”)/sq8885439_scanned.csv",
+          "git_blob_sha1": "98fb8af81741d696a674d45c83cafc0a9539510d",
+          "size_bytes": 88
+        }
+      ]
+    },
+    {
+      "score_id": "8885571",
+      "title": "String Quartet No.2, Op.13",
+      "score_relative_path": "scores/Mendelssohn,_Felix/String_Quartet_No.2,_Op.13",
+      "composer_group_id": "46096",
+      "composer_path": "Mendelssohn,_Felix",
+      "composer_name": "Felix Mendelssohn",
+      "work_group_id": "5108547",
+      "work_title": "String Quartet No.2, Op.13",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.2,_Op.13/sq8885571.mscx",
+          "git_blob_sha1": "df73503be02e0994fedc77005e87a225b4958482",
+          "size_bytes": 15535303
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.2,_Op.13/sq8885571.musicxml",
+          "git_blob_sha1": "a7a2a7c2663933bf103ef132503a82fda426dffd",
+          "size_bytes": 6893956
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.2,_Op.13/sq8885571_cleaned.musicxml",
+          "git_blob_sha1": "cae01baf23722dc3c95932093d7718c8692a1514",
+          "size_bytes": 5503083
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mendelssohn,_Felix/String_Quartet_No.2,_Op.13/sq8885571_scanned.csv",
+          "git_blob_sha1": "cce27cbbc32823e184478224693bc797d74f544f",
+          "size_bytes": 89
+        }
+      ]
+    },
+    {
+      "score_id": "8907120",
+      "title": "String Quartet No.3, Op.18 No.3",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.3,_Op.18_No.3",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108477",
+      "work_title": "String Quartet No.3, Op.18 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.3,_Op.18_No.3/sq8907120.mscx",
+          "git_blob_sha1": "2b28bf66e2157ec3405841c67c440511d6130695",
+          "size_bytes": 12623760
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.3,_Op.18_No.3/sq8907120.musicxml",
+          "git_blob_sha1": "06a499a710982b60ca0ade8682313574ff094a2b",
+          "size_bytes": 5696581
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.3,_Op.18_No.3/sq8907120_cleaned.musicxml",
+          "git_blob_sha1": "66160de97ab415574c4e77a9c04a6dbf0f461d74",
+          "size_bytes": 4569705
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.3,_Op.18_No.3/sq8907120_scanned.csv",
+          "git_blob_sha1": "63354613e9547c9645eab9e779269974922eb811",
+          "size_bytes": 72
+        }
+      ]
+    },
+    {
+      "score_id": "8913219",
+      "title": "String Quartet No.4, Op.18 No.4",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.4,_Op.18_No.4",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108478",
+      "work_title": "String Quartet No.4, Op.18 No.4",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.4,_Op.18_No.4/sq8913219.mscx",
+          "git_blob_sha1": "8abfe61c2882fcb99dbb206f95670fc30d828a4e",
+          "size_bytes": 10744847
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.4,_Op.18_No.4/sq8913219.musicxml",
+          "git_blob_sha1": "b3979407cf8aa6649648dacf9eb675b62750dc0e",
+          "size_bytes": 5328223
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.4,_Op.18_No.4/sq8913219_cleaned.musicxml",
+          "git_blob_sha1": "a5ebd2bc3e03f02033728cd690b798a3f3bd9016",
+          "size_bytes": 4349320
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.4,_Op.18_No.4/sq8913219_scanned.csv",
+          "git_blob_sha1": "81746cebb2459ea58cc8465ad9d4e502f56a16cb",
+          "size_bytes": 53
+        }
+      ]
+    },
+    {
+      "score_id": "8928855",
+      "title": "String Quartet No.3, Op.67",
+      "score_relative_path": "scores/Brahms,_Johannes/String_Quartet_No.3,_Op.67",
+      "composer_group_id": "7294",
+      "composer_path": "Brahms,_Johannes",
+      "composer_name": "Johannes Brahms",
+      "work_group_id": "5108542",
+      "work_title": "String Quartet No.3, Op.67",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.3,_Op.67/sq8928855.mscx",
+          "git_blob_sha1": "ace21ecbab593f1f8e54747b20e73dd4dff05aa3",
+          "size_bytes": 15427841
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.3,_Op.67/sq8928855.musicxml",
+          "git_blob_sha1": "6db60d05135713d3a7fbf68be1793f19b6bfd740",
+          "size_bytes": 6829870
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.3,_Op.67/sq8928855_cleaned.musicxml",
+          "git_blob_sha1": "48170182a8045016abb5a422f051b32acdada259",
+          "size_bytes": 5512902
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Brahms,_Johannes/String_Quartet_No.3,_Op.67/sq8928855_scanned.csv",
+          "git_blob_sha1": "d924bf4bcfd08454b7eb0197d11097669e9e67e4",
+          "size_bytes": 5
+        }
+      ]
+    },
+    {
+      "score_id": "8938822",
+      "title": "String Quartet No.1, H.70",
+      "score_relative_path": "scores/Bridge,_Frank/String_Quartet_No.1,_H.70",
+      "composer_group_id": "366636",
+      "composer_path": "Bridge,_Frank",
+      "composer_name": "Frank Bridge",
+      "work_group_id": "5108724",
+      "work_title": "String Quartet No.1, H.70",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.1,_H.70/sq8938822.mscx",
+          "git_blob_sha1": "821f70bd7293c626d3cb2d4355d8417720d10285",
+          "size_bytes": 15518834
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.1,_H.70/sq8938822.musicxml",
+          "git_blob_sha1": "c97cd0648095e26a3abad12faf0fb63de44713a5",
+          "size_bytes": 6754601
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.1,_H.70/sq8938822_cleaned.musicxml",
+          "git_blob_sha1": "b0b47c1a9ae592212b98ad51295270a562b4824e",
+          "size_bytes": 5379026
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.1,_H.70/sq8938822_scanned.csv",
+          "git_blob_sha1": "9da2e1d6230bd5b107cffdf21d88fa8851ffd01b",
+          "size_bytes": 141
+        }
+      ]
+    },
+    {
+      "score_id": "8940236",
+      "title": "String Quartet No.1, Op.54 No.1",
+      "score_relative_path": "scores/Reger,_Max/String_Quartet_No.1,_Op.54_No.1",
+      "composer_group_id": "57139",
+      "composer_path": "Reger,_Max",
+      "composer_name": "Max Reger",
+      "work_group_id": "5108850",
+      "work_title": "String Quartet No.1, Op.54 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Reger,_Max/String_Quartet_No.1,_Op.54_No.1/sq8940236.mscx",
+          "git_blob_sha1": "63acebf6f5513fb3055ac6ce9ef75bb5edafc9fa",
+          "size_bytes": 21394621
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Reger,_Max/String_Quartet_No.1,_Op.54_No.1/sq8940236.musicxml",
+          "git_blob_sha1": "a424f7fb8059007144b8c7b5df8a9684d334cefe",
+          "size_bytes": 8800822
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Reger,_Max/String_Quartet_No.1,_Op.54_No.1/sq8940236_cleaned.musicxml",
+          "git_blob_sha1": "63e0d48784fb0cb0c77ce52b93ab56dda50d1e54",
+          "size_bytes": 6741412
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Reger,_Max/String_Quartet_No.1,_Op.54_No.1/sq8940236_scanned.csv",
+          "git_blob_sha1": "2ec3da83d4b0371d06ac06a4a929fb8321e8be20",
+          "size_bytes": 92
+        }
+      ]
+    },
+    {
+      "score_id": "9010547",
+      "title": "String Quartet No.1, Op.41 No.1",
+      "score_relative_path": "scores/Schumann,_Robert/String_Quartet_No.1,_Op.41_No.1",
+      "composer_group_id": "7351",
+      "composer_path": "Schumann,_Robert",
+      "composer_name": "Robert Schumann",
+      "work_group_id": "5108569",
+      "work_title": "String Quartet No.1, Op.41 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.1,_Op.41_No.1/sq9010547.mscx",
+          "git_blob_sha1": "dc29c9f02bb11987a3852dead9521208dfdb6f48",
+          "size_bytes": 14033284
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.1,_Op.41_No.1/sq9010547.musicxml",
+          "git_blob_sha1": "b747e3c56f6a32fdba59cbf289570a597e495cd8",
+          "size_bytes": 6270324
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.1,_Op.41_No.1/sq9010547_cleaned.musicxml",
+          "git_blob_sha1": "ded6081958ed0258720bf2addefa3ab52aef430f",
+          "size_bytes": 4973947
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.1,_Op.41_No.1/sq9010547_scanned.csv",
+          "git_blob_sha1": "e44cb5578e8df2becb710a64974e97ccb06be9f9",
+          "size_bytes": 95
+        }
+      ]
+    },
+    {
+      "score_id": "9071492",
+      "title": "String Quartet in A minor",
+      "score_relative_path": "scores/Moeran,_Ernest_John/String_Quartet_in_A_minor",
+      "composer_group_id": "1356404",
+      "composer_path": "Moeran,_Ernest_John",
+      "composer_name": "Ernest John Moeran",
+      "work_group_id": "5108846",
+      "work_title": "String Quartet in A minor",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Moeran,_Ernest_John/String_Quartet_in_A_minor/sq9071492.mscx",
+          "git_blob_sha1": "f52223a7cdcef7721fd954cc1641554eeced6f89",
+          "size_bytes": 13575264
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Moeran,_Ernest_John/String_Quartet_in_A_minor/sq9071492.musicxml",
+          "git_blob_sha1": "8ed6298d5b132ff40c692226db8774695af255f5",
+          "size_bytes": 6331367
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Moeran,_Ernest_John/String_Quartet_in_A_minor/sq9071492_cleaned.musicxml",
+          "git_blob_sha1": "a03447afdf6da3faab1b392decf86f9d078042c0",
+          "size_bytes": 4858402
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Moeran,_Ernest_John/String_Quartet_in_A_minor/sq9071492_scanned.csv",
+          "git_blob_sha1": "e29479bb2323f5804ab90236b18178fd05f799d0",
+          "size_bytes": 82
+        }
+      ]
+    },
+    {
+      "score_id": "9094235",
+      "title": "String Quartet No.2, H.115",
+      "score_relative_path": "scores/Bridge,_Frank/String_Quartet_No.2,_H.115",
+      "composer_group_id": "366636",
+      "composer_path": "Bridge,_Frank",
+      "composer_name": "Frank Bridge",
+      "work_group_id": "5683980",
+      "work_title": "String Quartet No.2, H.115",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.2,_H.115/sq9094235.mscx",
+          "git_blob_sha1": "770fa6b6a30234a2ae46bae50e9c182dd18c5235",
+          "size_bytes": 17790678
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.2,_H.115/sq9094235.musicxml",
+          "git_blob_sha1": "0db00750e557e50693cfdf2ed2fb181fa3f00fc4",
+          "size_bytes": 7869919
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Bridge,_Frank/String_Quartet_No.2,_H.115/sq9094235_cleaned.musicxml",
+          "git_blob_sha1": "34ea9125366876473599b8430d3d79d65d5c12b6",
+          "size_bytes": 6330060
+        }
+      ]
+    },
+    {
+      "score_id": "9137469",
+      "title": "String Quartet No.10, Op.51",
+      "score_relative_path": "scores/Dvořák,_Antonín/String_Quartet_No.10,_Op.51",
+      "composer_group_id": "7298",
+      "composer_path": "Dvořák,_Antonín",
+      "composer_name": "Antonín Dvořák",
+      "work_group_id": "5770845",
+      "work_title": "String Quartet No.10, Op.51",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.10,_Op.51/sq9137469.mscx",
+          "git_blob_sha1": "597e6132bf6b581581a924d875161b0cca0ffddb",
+          "size_bytes": 16978376
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.10,_Op.51/sq9137469.musicxml",
+          "git_blob_sha1": "9649e77dd7497d27ab87f7b17a245d0441560bb0",
+          "size_bytes": 7570997
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.10,_Op.51/sq9137469_cleaned.musicxml",
+          "git_blob_sha1": "e48a48f63ffba8f442daabd2a3af8eec430bd31e",
+          "size_bytes": 5923181
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Dvořák,_Antonín/String_Quartet_No.10,_Op.51/sq9137469_scanned.csv",
+          "git_blob_sha1": "734d93720bf76ac3a488d6b3f8a9995da7bcee78",
+          "size_bytes": 93
+        }
+      ]
+    },
+    {
+      "score_id": "9146376",
+      "title": "String Quartet in A major, Hob.III:24, Op.9 No.6",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III24,_Op.9_No.6",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5769936",
+      "work_title": "String Quartet in A major, Hob.III:24, Op.9 No.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III24,_Op.9_No.6/sq9146376.mscx",
+          "git_blob_sha1": "139a0f2dfbcb84c97d97debbcd9551ffb34eacd1",
+          "size_bytes": 4937701
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III24,_Op.9_No.6/sq9146376.musicxml",
+          "git_blob_sha1": "3dd2a11d58213e8e1a1a68a1f7d96a18cda70d32",
+          "size_bytes": 2375442
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III24,_Op.9_No.6/sq9146376_cleaned.musicxml",
+          "git_blob_sha1": "30cc58ca5c33ee0f2b270f54c45f940af05c9d22",
+          "size_bytes": 2055890
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_A_major,_Hob.III24,_Op.9_No.6/sq9146376_scanned.csv",
+          "git_blob_sha1": "862e7dca8047db731e98459ad144c0242208c934",
+          "size_bytes": 118
+        }
+      ]
+    },
+    {
+      "score_id": "9199617",
+      "title": "String Quartet No.4 in C major, K.157",
+      "score_relative_path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.4_in_C_major,_K.157",
+      "composer_group_id": "254",
+      "composer_path": "Mozart,_Wolfgang_Amadeus",
+      "composer_name": "Wolfgang Amadeus Mozart",
+      "work_group_id": "5790447",
+      "work_title": "String Quartet No.4 in C major, K.157",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.4_in_C_major,_K.157/sq9199617.mscx",
+          "git_blob_sha1": "9e225e8a3f0536448af478b4267abe6f1079d604",
+          "size_bytes": 4628963
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.4_in_C_major,_K.157/sq9199617.musicxml",
+          "git_blob_sha1": "51e9d9683776725d0a440f3d677990dd66a55e6e",
+          "size_bytes": 2127994
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.4_in_C_major,_K.157/sq9199617_cleaned.musicxml",
+          "git_blob_sha1": "3e09a4fbd602f5a325ebd0e9d04c7c36d907ef35",
+          "size_bytes": 1792938
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Mozart,_Wolfgang_Amadeus/String_Quartet_No.4_in_C_major,_K.157/sq9199617_scanned.csv",
+          "git_blob_sha1": "866ef25f23177ed45a4abfb56547f5aa55ce7804",
+          "size_bytes": 31
+        }
+      ]
+    },
+    {
+      "score_id": "9396439",
+      "title": "String Quartet No.5, Op.18 No.5",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.5,_Op.18_No.5",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108479",
+      "work_title": "String Quartet No.5, Op.18 No.5",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.5,_Op.18_No.5/sq9396439.mscx",
+          "git_blob_sha1": "cf2830e051e8c7c351a81478c12aead6315a032b",
+          "size_bytes": 11167403
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.5,_Op.18_No.5/sq9396439.musicxml",
+          "git_blob_sha1": "a36839b8e70d04478dc20976aef0bbf44164509f",
+          "size_bytes": 5010397
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.5,_Op.18_No.5/sq9396439_cleaned.musicxml",
+          "git_blob_sha1": "215c2b4d3720440d26f59cd1495caf0b1ec4010d",
+          "size_bytes": 4113973
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.5,_Op.18_No.5/sq9396439_scanned.csv",
+          "git_blob_sha1": "82b15830cb30ef4b4805df56127b69f6af5c8703",
+          "size_bytes": 80
+        }
+      ]
+    },
+    {
+      "score_id": "9529900",
+      "title": "String Quartet No.3, Op.41 No.3",
+      "score_relative_path": "scores/Schumann,_Robert/String_Quartet_No.3,_Op.41_No.3",
+      "composer_group_id": "7351",
+      "composer_path": "Schumann,_Robert",
+      "composer_name": "Robert Schumann",
+      "work_group_id": "5108913",
+      "work_title": "String Quartet No.3, Op.41 No.3",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.3,_Op.41_No.3/sq9529900.mscx",
+          "git_blob_sha1": "d796c3f55ff01c351cbecf39eda59ef07a7dcac3",
+          "size_bytes": 14290002
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.3,_Op.41_No.3/sq9529900.musicxml",
+          "git_blob_sha1": "d17952736c607c501eb49700199a19aff17e36c2",
+          "size_bytes": 6346571
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.3,_Op.41_No.3/sq9529900_cleaned.musicxml",
+          "git_blob_sha1": "86f5b7bc7fe1eb9821b8ae3cbbdc72852afbd40a",
+          "size_bytes": 5081215
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Schumann,_Robert/String_Quartet_No.3,_Op.41_No.3/sq9529900_scanned.csv",
+          "git_blob_sha1": "7dea6d6872e0a683491f61874b9b09c5cb3e8c84",
+          "size_bytes": 247
+        }
+      ]
+    },
+    {
+      "score_id": "9608209",
+      "title": "String Quartet in A major, Op.2",
+      "score_relative_path": "scores/Strauss,_Richard/String_Quartet_in_A_major,_Op.2",
+      "composer_group_id": "13894",
+      "composer_path": "Strauss,_Richard",
+      "composer_name": "Richard Strauss",
+      "work_group_id": "5108858",
+      "work_title": "String Quartet in A major, Op.2",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Strauss,_Richard/String_Quartet_in_A_major,_Op.2/sq9608209.mscx",
+          "git_blob_sha1": "963109df9c7338442047148ec87c593313d18e73",
+          "size_bytes": 14875098
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Strauss,_Richard/String_Quartet_in_A_major,_Op.2/sq9608209.musicxml",
+          "git_blob_sha1": "e44affab40030891dbecfadf7878f607330a172b",
+          "size_bytes": 6679833
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Strauss,_Richard/String_Quartet_in_A_major,_Op.2/sq9608209_cleaned.musicxml",
+          "git_blob_sha1": "ea541fa98ad78d4e50b83ca39acdc0ac5a594266",
+          "size_bytes": 5533744
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Strauss,_Richard/String_Quartet_in_A_major,_Op.2/sq9608209_scanned.csv",
+          "git_blob_sha1": "9f741e97d7b63b77b64788c3167e69617beefec1",
+          "size_bytes": 3
+        }
+      ]
+    },
+    {
+      "score_id": "9631717",
+      "title": "String Quartet No.1, Op.27",
+      "score_relative_path": "scores/Grieg,_Edvard/String_Quartet_No.1,_Op.27",
+      "composer_group_id": "80621",
+      "composer_path": "Grieg,_Edvard",
+      "composer_name": "Edvard Grieg",
+      "work_group_id": "5108691",
+      "work_title": "String Quartet No.1, Op.27",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Grieg,_Edvard/String_Quartet_No.1,_Op.27/sq9631717.mscx",
+          "git_blob_sha1": "eb003106f88972eef3811408e12268212a969677",
+          "size_bytes": 26298205
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Grieg,_Edvard/String_Quartet_No.1,_Op.27/sq9631717.musicxml",
+          "git_blob_sha1": "d7705d6170dd41a52b7c486c1c505878f073b5af",
+          "size_bytes": 11489780
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Grieg,_Edvard/String_Quartet_No.1,_Op.27/sq9631717_cleaned.musicxml",
+          "git_blob_sha1": "ae03343dfe78e105d6c5925cf618caeecad6e0d8",
+          "size_bytes": 9205195
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Grieg,_Edvard/String_Quartet_No.1,_Op.27/sq9631717_scanned.csv",
+          "git_blob_sha1": "538d9308d1d7d3ab390df07dd41316bb01f9416d",
+          "size_bytes": 92
+        }
+      ]
+    },
+    {
+      "score_id": "9719026",
+      "title": "String Quartet No.6, Op.18 No.6",
+      "score_relative_path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.6,_Op.18_No.6",
+      "composer_group_id": "255",
+      "composer_path": "Beethoven,_Ludwig_van",
+      "composer_name": "Ludwig van Beethoven",
+      "work_group_id": "5108480",
+      "work_title": "String Quartet No.6, Op.18 No.6",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.6,_Op.18_No.6/sq9719026.mscx",
+          "git_blob_sha1": "4b5f67d34f62de61892cca2542c937cdcd45990f",
+          "size_bytes": 10128338
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.6,_Op.18_No.6/sq9719026.musicxml",
+          "git_blob_sha1": "1f7bf535711a3d8c3fea204ddcb9d5e7c9533fd2",
+          "size_bytes": 4793962
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.6,_Op.18_No.6/sq9719026_cleaned.musicxml",
+          "git_blob_sha1": "d5525a8e98ae58893a3a93dc122733ab69a7edfe",
+          "size_bytes": 3850514
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Beethoven,_Ludwig_van/String_Quartet_No.6,_Op.18_No.6/sq9719026_scanned.csv",
+          "git_blob_sha1": "b84c666793446f8ed293f81882f37b2e5e3dd414",
+          "size_bytes": 77
+        }
+      ]
+    },
+    {
+      "score_id": "9790696",
+      "title": "String Quartet in E minor",
+      "score_relative_path": "scores/Delius,_Frederick/String_Quartet_in_E_minor",
+      "composer_group_id": "312698",
+      "composer_path": "Delius,_Frederick",
+      "composer_name": "Frederick Delius",
+      "work_group_id": "5108663",
+      "work_title": "String Quartet in E minor",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Delius,_Frederick/String_Quartet_in_E_minor/sq9790696.mscx",
+          "git_blob_sha1": "25ca7cf5d49b360ecfe5199256ca008e28114e27",
+          "size_bytes": 12627701
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Delius,_Frederick/String_Quartet_in_E_minor/sq9790696.musicxml",
+          "git_blob_sha1": "2ae2144cac9f18d614c11bb7d2c83f7dede9091e",
+          "size_bytes": 5318290
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Delius,_Frederick/String_Quartet_in_E_minor/sq9790696_cleaned.musicxml",
+          "git_blob_sha1": "d06f3e95f9199f42aa19212aa55dda7d2288c79f",
+          "size_bytes": 4123036
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Delius,_Frederick/String_Quartet_in_E_minor/sq9790696_scanned.csv",
+          "git_blob_sha1": "dd5ff33204ac05600bf00fb9497070ed28764480",
+          "size_bytes": 103
+        }
+      ]
+    },
+    {
+      "score_id": "9961690",
+      "title": "String Quartet in C major, Hob.III:19, Op.9 No.1",
+      "score_relative_path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III19,_Op.9_No.1",
+      "composer_group_id": "7349",
+      "composer_path": "Haydn,_Joseph",
+      "composer_name": "Joseph Haydn",
+      "work_group_id": "5769894",
+      "work_title": "String Quartet in C major, Hob.III:19, Op.9 No.1",
+      "source_artifacts": [
+        {
+          "role": "native_musescore_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III19,_Op.9_No.1/sq9961690.mscx",
+          "git_blob_sha1": "ad3e4b7e85194e45467fa2b65bebe60ea7af9116",
+          "size_bytes": 5620501
+        },
+        {
+          "role": "native_musicxml_source",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III19,_Op.9_No.1/sq9961690.musicxml",
+          "git_blob_sha1": "6f06a79b85a661f838f21505dffac0e019ae0bab",
+          "size_bytes": 2559500
+        },
+        {
+          "role": "cleaned_musicxml_derivative",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III19,_Op.9_No.1/sq9961690_cleaned.musicxml",
+          "git_blob_sha1": "9424eaf323ffd91de7978fbc9ef049c9a2f0cbd2",
+          "size_bytes": 2156711
+        },
+        {
+          "role": "scanned_alignment_metadata",
+          "path": "scores/Haydn,_Joseph/String_Quartet_in_C_major,_Hob.III19,_Op.9_No.1/sq9961690_scanned.csv",
+          "git_blob_sha1": "89edac85fe3cf2a390d9403f78891c97c7aa190c",
+          "size_bytes": 4
+        }
+      ]
+    }
+  ]
+}
