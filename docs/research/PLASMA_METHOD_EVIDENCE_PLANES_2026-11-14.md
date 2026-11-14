@@ -147,3 +147,14 @@ No new fracture solver, constitutive model, strength estimator, QMS, materials r
 - Rust formatting, compilation, Clippy and exact-head hosted CI remain unverified.
 - Digest checks are syntactic; raw data, standard text, specimen identities and laboratory execution are not authenticated here.
 - No adhesive mechanical property, substrate adhesion, failure acceptability, product performance, design allowable, service life, material equivalence or product release is established.
+
+
+## 2026-11-14 — full failure-mode composition is a separate evidence plane
+
+Follow-on implementation: [PLASMA-FAILURE-COMPOSITION-001 #12097](https://github.com/Luminous-Dynamics/symthaea/issues/12097), branch `research/plasma-failure-composition-v0-1`.
+
+A scalar `failure_mode_fraction` can conceal shifts among failure categories. The new S0 receipt preserves the complete ordered category vector per specimen, measurement basis, independent cluster, observer references/reliability, blinded state, D5573 claim scope, preregistered zero handling, per-category uncertainty and joint compositional-distance interval.
+
+The current fixture has 40 known-answer cases and independently replays 40/40 (4 PASS, 15 BLOCKED, 21 REJECTED). A valid study may still return `COMPOSITIONAL_EQUIVALENCE_NOT_ESTABLISHED`. The audit does not decide whether a failure mode is acceptable.
+
+D5573-99R19 is the SMC FRP-specific route and must remain unaided visual classification. Image hashes are traceability artifacts, not a license to substitute magnified image analysis for the standard's observation scope. ISO 10365:2022 is a broader bonded-assembly failure-pattern designation and is being treated as a separate follow-on ontology rather than blended into D5573.
