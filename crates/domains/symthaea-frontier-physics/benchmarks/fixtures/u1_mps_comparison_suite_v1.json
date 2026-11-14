@@ -1,0 +1,386 @@
+{
+  "schema": "luminous.u1-mps-comparison-suite.v1",
+  "programme": "Luminous Dynamics / Symthaea frontier physics",
+  "status": "benchmark_contract_authored_not_yet_executed",
+  "created": "2026-11-14",
+  "objective": "Compare minimum cost to reach the same independently measured approximation error, while requiring conserved charge and a qualified certificate where applicable.",
+  "reference_implementations": {
+    "quimb": {
+      "docs": "https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html",
+      "modes": [
+        "CircuitMPS",
+        "CircuitMPSLazy",
+        "CircuitPermMPS"
+      ],
+      "match_controls": [
+        "max_bond",
+        "cutoff",
+        "gate_contract",
+        "dtype",
+        "backend"
+      ],
+      "special_cases": [
+        "auto-mps swaps and splits two-qubit gates",
+        "lazy/permutation MPS ordering must be included as separate baselines"
+      ]
+    },
+    "itensor": {
+      "docs": "https://docs.itensor.org/ITensorMPS/stable/tutorials/QN_DMRG.html",
+      "modes": [
+        "Abelian QN-conserving MPS/DMRG"
+      ],
+      "match_controls": [
+        "site QN sectors",
+        "total QN",
+        "MPS bond dimensions",
+        "SVD cutoff",
+        "dtype",
+        "backend"
+      ],
+      "limitation": "ITensor QN support is Abelian; compare only a matching U(1) sector."
+    },
+    "qiskit_aer": {
+      "docs": "https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.AerSimulator.html",
+      "modes": [
+        "AerSimulator method=matrix_product_state"
+      ],
+      "match_controls": [
+        "matrix_product_state_max_bond_dimension",
+        "matrix_product_state_truncation_threshold",
+        "mps_log_data",
+        "precision",
+        "device"
+      ],
+      "fairness": "Threshold is based on discarded squared Schmidt coefficients; report independent state L2 and infidelity rather than treating the threshold itself as L2."
+    },
+    "cutensornet": {
+      "docs": "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
+      "modes": [
+        "gate-split SVD",
+        "MPS factorization API (preview)"
+      ],
+      "match_controls": [
+        "bond extents",
+        "absolute/relative/discarded-weight truncation",
+        "SVD algorithm",
+        "GPU architecture",
+        "precision"
+      ],
+      "limitation": "Do not compare distributed SVD as distributed MPS gate execution; documented distributed decomposition support and gate-split support are distinct."
+    },
+    "tdvp": {
+      "docs": "https://tensornetwork.org/mps/algorithms/timeevo/tdvp.html",
+      "modes": [
+        "one-site TDVP",
+        "two-site TDVP"
+      ],
+      "match_controls": [
+        "MPO Hamiltonian",
+        "Krylov tolerance",
+        "time step",
+        "MPS bond policy",
+        "projection error"
+      ],
+      "fairness": "Compare at identical physical time and observables; report projection, Krylov, truncation and time-discretization errors separately."
+    }
+  },
+  "workloads": [
+    {
+      "id": "U1-RABI-2",
+      "category": "analytic_gate",
+      "sites": 2,
+      "total_charge": 1,
+      "initial_state": "|01>",
+      "hamiltonian": "H[1,2]=H[2,1]=J; all other entries zero in basis |00>,|01>,|10>,|11>.",
+      "parameters": {
+        "J": 0.7,
+        "total_time": 1.1,
+        "dt_values": [
+          0.2,
+          0.1,
+          0.05
+        ]
+      },
+      "oracle": "analytic 2x2 single-excitation exponential",
+      "goals": [
+        "gate unitarity",
+        "complex phase accuracy",
+        "Hamiltonian-to-gate model projection accounting"
+      ]
+    },
+    {
+      "id": "U1-W-3",
+      "category": "canonical_gauge_and_compression",
+      "sites": 3,
+      "total_charge": 1,
+      "initial_state": "(|001>+|010>+|100>)/sqrt(3)",
+      "circuit": "canonicalize at bonds 0 and 1; phase gate on first pair; exact split and budgeted split controls",
+      "oracle": "full dense 8-amplitude vector",
+      "goals": [
+        "all two-site center receipts",
+        "gauge idempotence",
+        "minimum-rank error budget",
+        "dense-state reconstruction"
+      ]
+    },
+    {
+      "id": "U1-XX-3",
+      "category": "strang_time_evolution",
+      "sites": 3,
+      "total_charge": 1,
+      "initial_state": "|100>",
+      "hamiltonian": "nearest-neighbour XX hopping: H_j[1,2]=H_j[2,1]=J",
+      "parameters": {
+        "J": 0.7,
+        "total_time": 1.2,
+        "dt_values": [
+          0.2,
+          0.1,
+          0.05,
+          0.025
+        ]
+      },
+      "oracle": "dense 3x3 one-excitation Hamiltonian exponential",
+      "goals": [
+        "even-half/odd-full/even-half order",
+        "second-order step refinement",
+        "global ledger against dense reference"
+      ]
+    },
+    {
+      "id": "U1-XXZ-8",
+      "category": "many_body_quench",
+      "sites": 8,
+      "total_charge": 4,
+      "initial_state": "Neel product state |10101010>",
+      "hamiltonian": "nearest-neighbour XXZ with exchange Jxy=1, anisotropy Delta=0.7, longitudinal field h=0.13",
+      "parameters": {
+        "total_time": 2,
+        "dt": 0.02,
+        "bond_caps": [
+          4,
+          8,
+          16,
+          32
+        ]
+      },
+      "oracle": "dense 256-dimensional statevector",
+      "goals": [
+        "bond growth",
+        "energy/density/correlator bias",
+        "truncation-budget coverage"
+      ]
+    },
+    {
+      "id": "U1-XXZ-12",
+      "category": "dense_crossover",
+      "sites": 12,
+      "total_charge": 6,
+      "initial_state": "Neel product state |101010101010>",
+      "hamiltonian": "same nearest-neighbour XXZ generator as U1-XXZ-8",
+      "parameters": {
+        "total_time": 1,
+        "dt": 0.01,
+        "bond_caps": [
+          8,
+          16,
+          32,
+          64
+        ]
+      },
+      "oracle": "dense 4096-dimensional statevector",
+      "goals": [
+        "certificate coverage at the dense-oracle boundary",
+        "cost-to-accuracy curve"
+      ]
+    },
+    {
+      "id": "U1-BRICKWALL-16",
+      "category": "random_u1_circuit",
+      "sites": 16,
+      "total_charge": 8,
+      "initial_state": "half-filled Neel product state",
+      "circuit": "seeded nearest-neighbour brick-wall layers with each gate in U(1) block form 1 direct_sum U(2) direct_sum 1",
+      "seeds": [
+        11,
+        29,
+        47,
+        83,
+        101
+      ],
+      "parameters": {
+        "depths": [
+          8,
+          16,
+          32
+        ],
+        "bond_caps": [
+          16,
+          32,
+          64,
+          128
+        ]
+      },
+      "oracle": "dense statevector for selected seeds and checkpoints",
+      "goals": [
+        "adaptive budget efficiency",
+        "charge-sector rank distribution",
+        "comparison with Quimb/Aer"
+      ]
+    },
+    {
+      "id": "U1-BRICKWALL-32",
+      "category": "scaling",
+      "sites": 32,
+      "total_charge": 16,
+      "initial_state": "half-filled Neel product state",
+      "circuit": "same seeded U(1) brick-wall generator",
+      "seeds": [
+        11,
+        29,
+        47
+      ],
+      "parameters": {
+        "depths": [
+          8,
+          16,
+          32
+        ],
+        "bond_caps": [
+          32,
+          64,
+          128,
+          256
+        ]
+      },
+      "oracle": "cross-simulator convergence; no dense oracle",
+      "goals": [
+        "peak memory",
+        "gates per second",
+        "bond/sector rank",
+        "accuracy envelope"
+      ]
+    },
+    {
+      "id": "U1-BRICKWALL-64",
+      "category": "scaling",
+      "sites": 64,
+      "total_charge": 32,
+      "initial_state": "half-filled Neel product state",
+      "circuit": "same seeded U(1) brick-wall generator",
+      "seeds": [
+        11,
+        29
+      ],
+      "parameters": {
+        "depths": [
+          8,
+          16,
+          32
+        ],
+        "bond_caps": [
+          64,
+          128,
+          256,
+          512
+        ]
+      },
+      "oracle": "cross-simulator convergence; no dense oracle",
+      "goals": [
+        "memory scaling",
+        "cap saturation",
+        "cost to reach target observable error"
+      ]
+    },
+    {
+      "id": "U1-FILLING-SWEEP",
+      "category": "symmetry_sparsity",
+      "sites": 32,
+      "total_charges": [
+        1,
+        8,
+        16,
+        24,
+        31
+      ],
+      "initial_state": "fixed-charge random state and fixed-charge product state controls",
+      "circuit": "same nearest-neighbour U(1) brick-wall generator",
+      "seeds": [
+        13,
+        31,
+        59
+      ],
+      "parameters": {
+        "depths": [
+          4,
+          8,
+          16
+        ],
+        "bond_caps": [
+          16,
+          32,
+          64,
+          128
+        ]
+      },
+      "oracle": "dense small-N analogue and cross-simulator convergence at N=32",
+      "goals": [
+        "sector rank distribution",
+        "structural zero fraction",
+        "payload/peak-memory comparison"
+      ]
+    }
+  ],
+  "protocol": {
+    "source_sha_required": true,
+    "exact_gate_and_hamiltonian_matrices_required": true,
+    "fixed_site_ordering_required": true,
+    "fixed_seed_list_required": true,
+    "dtype_and_backend_must_match": true,
+    "normalization_semantics_must_match": true,
+    "cpu_and_gpu_results_separated": true,
+    "warmups": 3,
+    "measured_repetitions": 10,
+    "report": [
+      "median_runtime",
+      "p95_runtime",
+      "peak_rss_bytes",
+      "allocation_bytes_if_available",
+      "peak_bond_dimension",
+      "rank_by_charge",
+      "stored_tensor_bytes",
+      "global_error_bound_if_qualified",
+      "dense_l2_error_when_oracle_exists",
+      "normalized_infidelity",
+      "energy_error",
+      "maximum_density_error",
+      "charge_drift"
+    ],
+    "compare_cost_only_after_accuracy_match": true
+  },
+  "qualification_targets": {
+    "exact_dense_l2_max_n12": 1e-10,
+    "charge_selection_rule_residual": 1e-12,
+    "canonical_isometry_residual": 1e-10,
+    "zero_false_success_error_budget_cases": 1000,
+    "error_budget_success_rate_on_feasible_cases": 1,
+    "strang_asymptotic_error_ratio_when_dt_halved": [
+      3.5,
+      4.5
+    ],
+    "global_bound_coverage": "actual dense-reference L2 error must never exceed the qualified recorded bound within declared numerical slack",
+    "global_bound_tightness": "measure bound/actual ratio; set a target only after pilot data"
+  },
+  "research_targets_not_claims": {
+    "matched_cpu_runtime": "within 2x Quimb median at equal independently measured error for nearest-neighbour N<=32; not yet measured",
+    "memory": "quantify current dense zero-storage overhead first; target packed charge-block payload savings only after implementation",
+    "adaptive_compression": "at equal local L2 target, use the minimum global Schmidt rank and no more rank than a fixed relative-cutoff baseline",
+    "large_n": "N=16,24,32 first; N=48,64 after stable accuracy and memory curves; N=128 only after N=64 qualification"
+  },
+  "explicit_nonclaims": [
+    "No current matched SOTA performance win.",
+    "No current packed block-sparse production storage.",
+    "No Trotter/time-discretization certificate from the canonical/gate/model/compression ledger.",
+    "No dense-reference accuracy claim for N>12."
+  ]
+}
