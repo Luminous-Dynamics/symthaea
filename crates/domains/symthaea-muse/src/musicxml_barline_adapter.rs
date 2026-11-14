@@ -2391,4 +2391,230 @@ mod tests {
         assert!(map.measures.is_empty());
     }
 
+
+    #[test]
+    fn timewise_graph_matches_partwise_semantics_in_part_list_order() {
+        let partwise = r#"<score-partwise>
+            <part-list>
+                <score-part id="P1"><part-name>Flute</part-name>
+                    <score-instrument id="P1-I1"><instrument-name>Flute</instrument-name></score-instrument>
+                </score-part>
+                <score-part id="P2"><part-name>Cello</part-name>
+                    <score-instrument id="P2-I1"><instrument-name>Cello</instrument-name></score-instrument>
+                </score-part>
+            </part-list>
+            <part id="P1"><measure number="1" id="p1-m1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+                <direction><sound tempo="108"/></direction>
+                <note id="p1-n1"><pitch><step>C</step><alter>0</alter><octave>5</octave></pitch><duration>8</duration><type>half</type><voice>1</voice><staff>1</staff><instrument id="P1-I1"/></note>
+                <note id="p1-n2"><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+                <barline location="right"><bar-style>light-heavy</bar-style></barline>
+            </measure></part>
+            <part id="P2"><measure number="1" id="p2-m1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>F</sign><line>4</line></clef></attributes>
+                <note id="p2-n1"><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><type>whole</type><voice>1</voice><staff>1</staff><instrument id="P2-I1"/></note>
+            </measure></part>
+        </score-partwise>"#;
+        let timewise = r#"<score-timewise>
+            <part-list>
+                <score-part id="P1"><part-name>Flute</part-name>
+                    <score-instrument id="P1-I1"><instrument-name>Flute</instrument-name></score-instrument>
+                </score-part>
+                <score-part id="P2"><part-name>Cello</part-name>
+                    <score-instrument id="P2-I1"><instrument-name>Cello</instrument-name></score-instrument>
+                </score-part>
+            </part-list>
+            <measure number="1" id="m1">
+                <part id="P2">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>F</sign><line>4</line></clef></attributes>
+                    <note id="p2-n1"><pitch><step>C</step><octave>3</octave></pitch><duration>16</duration><type>whole</type><voice>1</voice><staff>1</staff><instrument id="P2-I1"/></note>
+                </part>
+                <part id="P1">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+                    <direction><sound tempo="108"/></direction>
+                    <note id="p1-n1"><pitch><step>C</step><alter>0</alter><octave>5</octave></pitch><duration>8</duration><type>half</type><voice>1</voice><staff>1</staff><instrument id="P1-I1"/></note>
+                    <note id="p1-n2"><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+                    <barline location="right"><bar-style>light-heavy</bar-style></barline>
+                </part>
+            </measure>
+        </score-timewise>"#;
+
+        let mut partwise_graphs = parse_musicxml_part_notation_graph(
+            partwise.as_bytes(), "same-source-id", "shared-score-clock"
+        ).unwrap();
+        let mut timewise_graphs = parse_musicxml_part_notation_graph(
+            timewise.as_bytes(), "same-source-id", "shared-score-clock"
+        ).unwrap();
+        assert_eq!(
+            timewise_graphs.iter().map(|graph| graph.part_id.as_str()).collect::<Vec<_>>(),
+            vec!["P1", "P2"]
+        );
+        assert_eq!(partwise_graphs.len(), 2);
+        assert_eq!(timewise_graphs.len(), 2);
+
+        for graph in partwise_graphs.iter_mut().chain(timewise_graphs.iter_mut()) {
+            for locator in &mut graph.measure_locators {
+                // Partwise measure IDs are part-local; timewise measure IDs
+                // are attached to the shared outer measure container.
+                locator.source_id = None;
+            }
+        }
+        assert_eq!(partwise_graphs, timewise_graphs);
+    }
+
+    #[test]
+    fn timewise_measure_and_part_ids_survive_pickup_and_polymetric_maps() {
+        let xml = r#"<score-timewise>
+            <part-list>
+                <score-part id="P1"><part-name>Voice</part-name></score-part>
+                <score-part id="P2"><part-name>Accompaniment</part-name></score-part>
+            </part-list>
+            <measure number="0" id="pickup" implicit="yes">
+                <part id="P1">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                    <note><rest/><duration>4</duration></note>
+                </part>
+                <part id="P2">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                    <note><rest/><duration>8</duration></note>
+                </part>
+            </measure>
+            <measure number="A" id="irregular" non-controlling="yes" text="A">
+                <part id="P1"><note><rest/><duration>16</duration></note></part>
+                <part id="P2"><note><rest/><duration>8</duration></note></part>
+            </measure>
+        </score-timewise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "timewise-source", "score-clock"
+        ).unwrap();
+        assert_eq!(graphs.len(), 2);
+        for graph in &graphs {
+            assert_eq!(graph.map.score_clock_id, "score-clock");
+            assert_eq!(graph.measure_locators.len(), 2);
+            assert_eq!(graph.measure_locators[0].number.as_deref(), Some("0"));
+            assert_eq!(graph.measure_locators[0].source_id.as_deref(), Some("pickup"));
+            assert!(graph.measure_locators[0].implicit);
+            assert_eq!(graph.measure_locators[1].number.as_deref(), Some("A"));
+            assert_eq!(graph.measure_locators[1].display_text.as_deref(), Some("A"));
+            assert!(graph.measure_locators[1].non_controlling);
+            assert_eq!(graph.non_controlling_measure_indices, vec![1]);
+        }
+        assert_ne!(
+            graphs[0].map.measures[0].end,
+            graphs[1].map.measures[0].end
+        );
+        let maps = parse_musicxml_part_measure_maps(
+            xml.as_bytes(), "timewise-source", "score-clock"
+        ).unwrap();
+        assert_eq!(maps.len(), 2);
+        assert!(maps.iter().all(|map| map.map.status == MeasureMapStatus::Supported));
+        assert_ne!(
+            maps[0].map.measures[0].end,
+            maps[1].map.measures[0].end
+        );
+    }
+
+    #[test]
+    fn timewise_global_map_uses_shared_layout_when_per_part_spans_agree() {
+        let xml = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part><score-part id="P2"><part-name>Cello</part-name></score-part></part-list>
+            <measure number="1">
+                <part id="P2"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></part>
+                <part id="P1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></part>
+            </measure>
+        </score-timewise>"#;
+        let map = parse_musicxml_measure_map(
+            xml.as_bytes(), "timewise-global", "score-clock"
+        ).unwrap();
+        assert_eq!(map.status, MeasureMapStatus::Supported);
+        assert_eq!(map.measures.len(), 1);
+        assert_eq!(map.measures[0].end, RationalBeat::new(4, 1).unwrap());
+    }
+
+    #[test]
+    fn incomplete_unknown_and_duplicate_timewise_part_blocks_fail_closed() {
+        let missing = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part><score-part id="P2"><part-name>Cello</part-name></score-part></part-list>
+            <measure number="1"><part id="P1"><attributes><divisions>4</divisions></attributes><note><rest/><duration>16</duration></note></part></measure>
+        </score-timewise>"#;
+        assert!(matches!(
+            parse_musicxml_part_notation_graph(missing.as_bytes(), "timewise-missing", "clock"),
+            Err(MusicXmlMeasureAdapterError::IncompleteTimewiseMeasure { .. })
+        ));
+
+        let unknown = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <measure number="1"><part id="P9"><note><rest/><duration>16</duration></note></part></measure>
+        </score-timewise>"#;
+        assert!(matches!(
+            parse_musicxml_part_notation_graph(unknown.as_bytes(), "timewise-unknown", "clock"),
+            Err(MusicXmlMeasureAdapterError::UnknownTimewisePart { .. })
+        ));
+
+        let duplicate = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <measure number="1"><part id="P1"><note><rest/><duration>16</duration></note></part><part id="P1"><note><rest/><duration>16</duration></note></part></measure>
+        </score-timewise>"#;
+        assert!(matches!(
+            parse_musicxml_part_notation_graph(duplicate.as_bytes(), "timewise-duplicate", "clock"),
+            Err(MusicXmlMeasureAdapterError::DuplicateTimewisePart { .. })
+        ));
+    }
+
+    #[test]
+    fn timewise_part_list_and_measure_structure_are_required_and_unique() {
+        let no_list = r#"<score-timewise><measure number="1"><part id="P1"><note><rest/><duration>16</duration></note></part></measure></score-timewise>"#;
+        assert_eq!(
+            parse_musicxml_part_notation_graph(no_list.as_bytes(), "timewise-no-list", "clock"),
+            Err(MusicXmlMeasureAdapterError::MissingPartList)
+        );
+
+        let duplicate_list = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <measure number="1"><part id="P1"><note><rest/><duration>16</duration></note></part></measure>
+        </score-timewise>"#;
+        assert_eq!(
+            parse_musicxml_part_notation_graph(duplicate_list.as_bytes(), "timewise-double-list", "clock"),
+            Err(MusicXmlMeasureAdapterError::DuplicateTimewisePartList)
+        );
+
+        let unknown_child = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <measure number="1"><grouping/><part id="P1"><note><rest/><duration>16</duration></note></part></measure>
+        </score-timewise>"#;
+        assert!(matches!(
+            parse_musicxml_part_notation_graph(unknown_child.as_bytes(), "timewise-child", "clock"),
+            Err(MusicXmlMeasureAdapterError::UnexpectedTimewiseMeasureChild { .. })
+        ));
+    }
+
+    #[test]
+    fn timewise_notation_graph_replay_rejects_changed_part_order_and_measure_metadata() {
+        let xml = r#"<score-timewise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <measure number="1" id="measure-1">
+                <part id="P1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration></note></part>
+            </measure>
+        </score-timewise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "timewise-replay", "score-clock"
+        ).unwrap();
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "timewise-replay", "score-clock", &graphs
+        ).unwrap());
+
+        let mut tampered = graphs.clone();
+        tampered[0].measure_locators[0].number = Some("2".into());
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "timewise-replay", "score-clock", &tampered
+        ).unwrap());
+
+        let changed = xml.replace("<part id=\"P1\">", "<part id=\"P2\">");
+        assert!(matches!(
+            parse_musicxml_part_notation_graph(changed.as_bytes(), "timewise-replay", "score-clock"),
+            Err(MusicXmlMeasureAdapterError::UnknownTimewisePart { .. })
+        ));
+    }
+
 }
