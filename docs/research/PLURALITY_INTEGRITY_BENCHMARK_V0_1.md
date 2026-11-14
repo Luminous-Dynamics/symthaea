@@ -3,7 +3,9 @@
 **Programme:** HMP-001  
 **Status:** Benchmark design / RFC; no human data or model result is claimed  
 **Date:** 2026-11-14  
-**Companion fixture:** `research-fixtures/plurality-integrity/synthetic-adversarial-v0.1.0.json`
+**Companion fixture:** `research-fixtures/plurality-integrity/synthetic-adversarial-v0.1.0.json`  
+**Fixture schema:** `schemas/pib-synthetic-adversarial-v0.1.0.schema.json`  
+**Structural audit:** `cargo run -p xtask -- hmp-pib-audit`
 
 > The system-level goal is not to maximize disagreement. It is to preserve human-grounded differences when they matter, recognize justified convergence when evidence warrants it, and prevent coordination from silently becoming assimilation.
 
@@ -157,7 +159,7 @@ If one of these fails, the system is not yet better overall. Publish a Pareto co
 
 ## 9. Synthetic starter status
 
-The companion fixture contains fictional adversarial episodes only. It exercises the data shape and failure taxonomy; it is not a benchmark score, community sample, psychology study or substitute for consented human review. No human-data collection, model scoring or SOTA comparison has been performed.
+The companion fixture now contains **11 fictional adversarial episodes across all nine PIB tracks**, including within-group and between-group variation, interaction drift, minority evidence, majority-vote false consensus, justified convergence, judge limits and a pending-rights negative control. A Draft 2020-12 schema and a Rust `xtask hmp-pib-audit` structural audit are included. The audit checks unique episode/agent IDs, track coverage, required fields and operation-specific rights denials. It validates fixture integrity only; it is not a benchmark score, community sample, psychology study or substitute for consented human review. No human-data collection, model scoring or SOTA comparison has been performed.
 
 ## References
 
