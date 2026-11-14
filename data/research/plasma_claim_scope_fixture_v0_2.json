@@ -176,7 +176,7 @@
     {
       "id": "astm-d1002-unrecognized-edition",
       "method_id": "ASTM_D1002",
-      "edition": "D1002-26",
+      "edition": "D1002-10R19",
       "material_pair_class": "metal_to_metal",
       "geometry": "single_lap",
       "endpoint": "apparent_shear_strength",
@@ -666,6 +666,63 @@
       ],
       "expected_disposition": "REJECTED",
       "rationale": "D4896 warns against using small single-lap strength values as structural design allowables."
+    },
+    {
+      "id": "astm-d3163-evidence-kind-mismatch",
+      "method_id": "ASTM_D3163",
+      "edition": "D3163-01R23",
+      "evidence_kind": "preparation_practice",
+      "material_pair_class": "rigid_plastic_pair",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-03",
+        "METHOD-SPEC-04"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The evidence kind cannot relabel a test method as a preparation practice."
+    },
+    {
+      "id": "astm-d5868-wrong-geometry",
+      "method_id": "ASTM_D5868",
+      "edition": "D5868-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_to_frp",
+      "geometry": "double_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-03",
+        "METHOD-SPEC-04"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5868 is a single-lap FRP method; a double-lap geometry is outside the registered method scope."
+    },
+    {
+      "id": "astm-d1151-retained-strength-without-strength-test",
+      "method_id": "ASTM_D1151",
+      "edition": "D1151-00R22",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "adhesive_bonded_specimens",
+      "geometry": "continuous_environmental_conditioning",
+      "endpoint": "retained_strength_after_exposure",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-03",
+        "METHOD-SPEC-04"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D1151 defines conditioning conditions; the retained-strength measurement must be supplied by a separate strength-test method."
     }
   ]
 }
