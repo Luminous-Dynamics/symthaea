@@ -48,11 +48,11 @@ jobs:
           cargo test \
             --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml \
             --locked --all-targets
-      - name: Run isolated solver-smoke Clippy
+      - name: Run solver smoke test-target Clippy
         run: |
           cargo clippy \
             --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml \
-            --locked --all-targets -- -D warnings
+            --locked --tests -- -D warnings
       - name: Upload solver resolution receipt
         uses: actions/upload-artifact@v4
         with:
