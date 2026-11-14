@@ -435,18 +435,31 @@ fn audit_retention(
 
     let baseline_clusters = cluster_ids(&baseline.initial.samples);
     let candidate_clusters = cluster_ids(&candidate.initial.samples);
-    let baseline_specimens: HashSet<&str> = specimen_ids(&baseline.initial.samples)
-        .union(&specimen_ids(&baseline.aged.samples)).copied().collect();
-    let candidate_specimens: HashSet<&str> = specimen_ids(&candidate.initial.samples)
-        .union(&specimen_ids(&candidate.aged.samples)).copied().collect();
+    let mut baseline_specimens = specimen_ids(&baseline.initial.samples);
+    baseline_specimens.extend(specimen_ids(&baseline.aged.samples));
+    let mut candidate_specimens = specimen_ids(&candidate.initial.samples);
+    candidate_specimens.extend(specimen_ids(&candidate.aged.samples));
     if !baseline_clusters.is_disjoint(&candidate_clusters)
         || !baseline_specimens.is_disjoint(&candidate_specimens)
     {
         return rejected("baseline and candidate retention cohorts reuse a specimen or independent manufacturing cluster");
     }
 
+    let all_artifacts = [
+        baseline.initial.scope_evidence.raw_data_sha256.as_deref(),
+        baseline.aged.scope_evidence.raw_data_sha256.as_deref(),
+        candidate.initial.scope_evidence.raw_data_sha256.as_deref(),
+        candidate.aged.scope_evidence.raw_data_sha256.as_deref(),
+    ];
+    let mut artifact_set = HashSet::new();
+    if all_artifacts.iter().any(|digest| digest.is_none_or(|value| !artifact_set.insert(value))) {
+        return rejected("initial/aged or baseline/candidate raw-data artifacts are reused or missing");
+    }
+
     if baseline.initial.scope_evidence.method_id != baseline.aged.scope_evidence.method_id
         || baseline.initial.scope_evidence.edition != baseline.aged.scope_evidence.edition
+        || baseline.initial.scope_evidence.material_pair_class != baseline.aged.scope_evidence.material_pair_class
+        || baseline.initial.scope_evidence.geometry != baseline.aged.scope_evidence.geometry
         || baseline.initial.scope_evidence.protocol_id != baseline.aged.scope_evidence.protocol_id
         || baseline.initial.scope_evidence.protocol_sha256 != baseline.aged.scope_evidence.protocol_sha256
         || baseline.aged.conditioning_profile_id != candidate.aged.conditioning_profile_id
@@ -459,6 +472,8 @@ fn audit_retention(
         || baseline.aged.scope_evidence.edition != candidate.aged.scope_evidence.edition
         || baseline.aged.scope_evidence.material_pair_class != candidate.aged.scope_evidence.material_pair_class
         || baseline.aged.scope_evidence.geometry != candidate.aged.scope_evidence.geometry
+        || candidate.initial.scope_evidence.material_pair_class != candidate.aged.scope_evidence.material_pair_class
+        || candidate.initial.scope_evidence.geometry != candidate.aged.scope_evidence.geometry
         || candidate.initial.scope_evidence.protocol_id != candidate.aged.scope_evidence.protocol_id
         || candidate.initial.scope_evidence.protocol_sha256 != candidate.aged.scope_evidence.protocol_sha256
     {
@@ -603,6 +618,7 @@ fn audit_failure_fraction(
     if endpoint_id != "failure_mode_fraction"
         || estimand != "candidate_minus_baseline_specimen_fraction"
         || quantity_unit != "fraction"
+        || taxonomy_id != "ASTM-D5573-SMC-TAXONOMY-v1"
         || category_id != "adhesive_failure"
         || denominator_policy != "all_tested_specimens_including_unknown"
         || !matches!(grouping_scheme, "independent_arms" | "paired_by_cluster")
@@ -665,6 +681,12 @@ fn audit_failure_fraction(
             return rejected("paired classification arms do not share the exact cluster-pair set");
         }
         _ => {}
+    }
+
+    if baseline_scope_evidence.id == candidate_scope_evidence.id
+        || baseline_scope_evidence.raw_data_sha256 == candidate_scope_evidence.raw_data_sha256
+    {
+        return rejected("baseline and candidate classification artifacts or receipt identities are reused");
     }
 
     let base_fraction = base_num as f64 / base_den as f64;
