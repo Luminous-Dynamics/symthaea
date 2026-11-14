@@ -407,6 +407,101 @@ fn nonempty(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
+fn audit_fabric_structure(
+    structure: &FabricStructure,
+    reasons: &mut BTreeSet<DesignAuditReason>,
+) {
+    if structure
+        .source_ref
+        .as_deref()
+        .is_none_or(|value| !nonempty(value))
+    {
+        reasons.insert(DesignAuditReason::FabricStructureMissingSource);
+    }
+    if structure.basis_weight_gsm.is_none_or(|value| value == 0) {
+        reasons.insert(DesignAuditReason::FabricStructureMissingBasisWeight);
+    }
+
+    match structure.kind {
+        FabricStructureKind::Woven => {
+            let pattern_known = structure
+                .weave_pattern
+                .is_some_and(|value| value != WeavePattern::Unknown);
+            let yarn_known = structure
+                .yarn_system
+                .is_some_and(|value| value != YarnSystem::Unknown);
+            if structure.weave_pattern == Some(WeavePattern::Unknown)
+                || structure.yarn_system == Some(YarnSystem::Unknown)
+            {
+                reasons.insert(DesignAuditReason::FabricStructureUnknown);
+            }
+            if !pattern_known
+                || !yarn_known
+                || structure.yarn_count_tex.is_none_or(|value| value == 0)
+                || structure.warp_density_per_cm.is_none_or(|value| value == 0)
+                || structure.weft_density_per_cm.is_none_or(|value| value == 0)
+                || structure.interlacement_per_cm2.is_none_or(|value| value == 0)
+            {
+                reasons.insert(DesignAuditReason::FabricStructureMissingWovenMetrics);
+            }
+        }
+        FabricStructureKind::Knitted => {
+            let knit_known = structure
+                .knit_structure
+                .is_some_and(|value| value != KnitStructure::Unknown);
+            let yarn_known = structure
+                .yarn_system
+                .is_some_and(|value| value != YarnSystem::Unknown);
+            if structure.knit_structure == Some(KnitStructure::Unknown)
+                || structure.yarn_system == Some(YarnSystem::Unknown)
+            {
+                reasons.insert(DesignAuditReason::FabricStructureUnknown);
+            }
+            if !knit_known
+                || !yarn_known
+                || structure.yarn_count_tex.is_none_or(|value| value == 0)
+                || structure.wales_per_cm.is_none_or(|value| value == 0)
+                || structure.courses_per_cm.is_none_or(|value| value == 0)
+            {
+                reasons.insert(DesignAuditReason::FabricStructureMissingKnittedMetrics);
+            }
+        }
+        FabricStructureKind::Nonwoven => {
+            if structure
+                .nonwoven_bonding
+                .is_none_or(|value| value == NonwovenBonding::Unknown)
+            {
+                reasons.insert(DesignAuditReason::FabricStructureMissingNonwovenBonding);
+            }
+        }
+        FabricStructureKind::Laminated => {
+            if structure
+                .lamination_method
+                .is_none_or(|value| value == LaminationMethod::Unknown)
+                || structure
+                    .substrate_structure_ref
+                    .as_deref()
+                    .is_none_or(|value| !nonempty(value))
+            {
+                reasons.insert(DesignAuditReason::FabricStructureMissingLaminationDetails);
+            }
+        }
+        FabricStructureKind::Other | FabricStructureKind::Unknown => {
+            reasons.insert(DesignAuditReason::FabricStructureUnknown);
+        }
+    }
+}
+
+fn component_is_textile_bearing(role: ComponentRole) -> bool {
+    matches!(
+        role,
+        ComponentRole::ShellPanel
+            | ComponentRole::Lining
+            | ComponentRole::Trim
+            | ComponentRole::Padding
+    )
+}
+
 /// Detects cycles in a joint-removal dependency graph.
 fn has_dependency_cycle(joints: &[DesignJoint], known_ids: &BTreeSet<&str>) -> bool {
     fn visit(
@@ -497,6 +592,21 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
     let has_material_traceability_intent =
         dossier.intents.contains(&DesignIntent::MaterialTraceable);
     let has_repair_intent = dossier.intents.contains(&DesignIntent::Repairable);
+    let has_opening_characterized_intent =
+        dossier.intents.contains(&DesignIntent::OpeningCharacterized);
+    let mut fabric_structure_count = 0;
+    for component in &dossier.components {
+        if let Some(structure) = component.fabric_structure.as_ref() {
+            fabric_structure_count += 1;
+            if has_opening_characterized_intent {
+                audit_fabric_structure(structure, &mut reasons);
+            }
+        } else if has_opening_characterized_intent
+            && component_is_textile_bearing(component.role)
+        {
+            reasons.insert(DesignAuditReason::FabricStructureMissing);
+        }
+    }
 
     if has_disassembly_intent && dossier.joints.is_empty() {
         reasons.insert(DesignAuditReason::DisassemblyIntentWithoutJoints);
@@ -650,6 +760,7 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
         reversible_joint_count,
         conditional_joint_count,
         permanent_joint_count,
+        fabric_structure_count,
     }
 }
 
@@ -665,6 +776,7 @@ mod tests {
             declared_mass_mg: Some(100_000),
             replaceable,
             replacement_instructions_ref: replaceable.then(|| "REPAIR-CARD-V1".to_owned()),
+            fabric_structure: None,
         }
     }
 
@@ -681,6 +793,46 @@ mod tests {
             predecessor_joint_ids: Vec::new(),
             conditional_notes: None,
             construction_ref: Some("PATTERN-V1".to_owned()),
+        }
+    }
+
+    fn woven_structure() -> FabricStructure {
+        FabricStructure {
+            kind: FabricStructureKind::Woven,
+            source_ref: Some("MILL-SPEC-OVERSHIRT-01".to_owned()),
+            basis_weight_gsm: Some(180),
+            yarn_system: Some(YarnSystem::RingSpun),
+            yarn_count_tex: Some(24),
+            weave_pattern: Some(WeavePattern::Plain),
+            warp_density_per_cm: Some(24),
+            weft_density_per_cm: Some(20),
+            interlacement_per_cm2: Some(480),
+            knit_structure: None,
+            wales_per_cm: None,
+            courses_per_cm: None,
+            nonwoven_bonding: None,
+            lamination_method: None,
+            substrate_structure_ref: None,
+        }
+    }
+
+    fn knitted_structure() -> FabricStructure {
+        FabricStructure {
+            kind: FabricStructureKind::Knitted,
+            source_ref: Some("MILL-SPEC-JERSEY-01".to_owned()),
+            basis_weight_gsm: Some(160),
+            yarn_system: Some(YarnSystem::RingSpun),
+            yarn_count_tex: Some(20),
+            weave_pattern: None,
+            warp_density_per_cm: None,
+            weft_density_per_cm: None,
+            interlacement_per_cm2: None,
+            knit_structure: Some(KnitStructure::SingleJersey),
+            wales_per_cm: Some(14),
+            courses_per_cm: Some(18),
+            nonwoven_bonding: None,
+            lamination_method: None,
+            substrate_structure_ref: None,
         }
     }
 
@@ -876,6 +1028,76 @@ mod tests {
         );
     }
 
+    #[test]
+    fn opening_characterized_woven_dossier_requires_type_specific_metrics() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        dossier.components[0].fabric_structure = Some(woven_structure());
+        dossier.components[1].fabric_structure = Some(woven_structure());
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Complete);
+        assert_eq!(result.fabric_structure_count, 2);
+    }
+
+    #[test]
+    fn opening_characterized_dossier_requires_structure_on_textile_components() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        dossier.components[0].fabric_structure = Some(woven_structure());
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::FabricStructureMissing)
+        );
+    }
+
+    #[test]
+    fn woven_opening_descriptor_requires_interlacement_and_density() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        let mut structure = woven_structure();
+        structure.interlacement_per_cm2 = None;
+        dossier.components[0].fabric_structure = Some(structure.clone());
+        dossier.components[1].fabric_structure = Some(structure);
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::FabricStructureMissingWovenMetrics)
+        );
+    }
+
+    #[test]
+    fn knitted_opening_descriptor_uses_wale_and_course_gauge() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        dossier.components[0].fabric_structure = Some(knitted_structure());
+        dossier.components[1].fabric_structure = Some(knitted_structure());
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Complete);
+        assert_eq!(result.fabric_structure_count, 2);
+    }
+
+    #[test]
+    fn unknown_fabric_structure_is_not_promoted_by_opening_intent() {
+        let mut dossier = valid_dossier();
+        dossier.intents.push(DesignIntent::OpeningCharacterized);
+        let mut structure = woven_structure();
+        structure.kind = FabricStructureKind::Unknown;
+        dossier.components[0].fabric_structure = Some(structure.clone());
+        dossier.components[1].fabric_structure = Some(structure);
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::FabricStructureUnknown)
+        );
+    }
+
     fn exercise_design_case(case_id: &str) -> (&'static str, Option<&'static str>) {
         match case_id {
             "DESIGN-001-COMPLETE-MODULAR" => {
@@ -933,6 +1155,26 @@ mod tests {
                 disassembly_intent_must_name_recovery_relevant_joints();
                 ("incomplete", Some("DisassemblyIntentWithoutTargetJoints"))
             }
+            "DESIGN-014-WOVEN-OPENING-METADATA" => {
+                opening_characterized_woven_dossier_requires_type_specific_metrics();
+                ("complete", None)
+            }
+            "DESIGN-015-MISSING-FABRIC-STRUCTURE" => {
+                opening_characterized_dossier_requires_structure_on_textile_components();
+                ("incomplete", Some("FabricStructureMissing"))
+            }
+            "DESIGN-016-WOVEN-MISSING-INTERLACEMENT" => {
+                woven_opening_descriptor_requires_interlacement_and_density();
+                ("incomplete", Some("FabricStructureMissingWovenMetrics"))
+            }
+            "DESIGN-017-KNIT-WALE-COURSE-METADATA" => {
+                knitted_opening_descriptor_uses_wale_and_course_gauge();
+                ("complete", None)
+            }
+            "DESIGN-018-UNKNOWN-FABRIC-STRUCTURE" => {
+                unknown_fabric_structure_is_not_promoted_by_opening_intent();
+                ("incomplete", Some("FabricStructureUnknown"))
+            }
             other => panic!("unknown textile design corpus case: {other}"),
         }
     }
@@ -951,7 +1193,7 @@ mod tests {
         let schema: serde_json::Value =
             serde_json::from_str(SCHEMA).expect("design schema must parse as JSON");
         assert_eq!(schema["properties"]["schema_version"]["const"], "0.1.0");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(13));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(18));
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-DESIGN-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
@@ -959,7 +1201,7 @@ mod tests {
         let cases = corpus["cases"]
             .as_array()
             .expect("design cases must be an array");
-        assert_eq!(cases.len(), 13, "review design corpus count changes");
+        assert_eq!(cases.len(), 18, "review design corpus count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"].as_str().expect("case_id must be a string");
@@ -982,6 +1224,6 @@ mod tests {
             );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 13);
+        assert_eq!(seen.len(), 18);
     }
 }
