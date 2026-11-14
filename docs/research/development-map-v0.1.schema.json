@@ -143,6 +143,13 @@
       "items": {
         "type": "string"
       }
+    },
+    "events": {
+      "type": "array",
+      "description": "Optional append-only event slice associated with this snapshot. Event replay and immutability are semantic requirements, not enforced by JSON Schema alone.",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
     }
   },
   "$defs": {
@@ -454,6 +461,116 @@
         },
         "lifecycle": {
           "$ref": "#/$defs/lifecycle"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "observed_at",
+        "effective_revision",
+        "targets",
+        "provenance",
+        "payload"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "repository_revision_observed",
+            "source_introduced",
+            "source_changed",
+            "source_removed",
+            "contract_changed",
+            "configuration_world_changed",
+            "test_evidence_recorded",
+            "benchmark_evidence_recorded",
+            "evidence_invalidated",
+            "evidence_superseded",
+            "capability_link_changed",
+            "decision_recorded",
+            "development_action_proposed",
+            "development_action_observed",
+            "risk_opened",
+            "risk_closed"
+          ]
+        },
+        "occurred_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "effective_revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{7,64}$"
+        },
+        "prior_revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^([a-f0-9]{7,64})?$"
+        },
+        "targets": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "state_effect": {
+          "enum": [
+            "introduces",
+            "changes",
+            "invalidates",
+            "supersedes",
+            "observes",
+            "proposes",
+            "no_state_change"
+          ]
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "payload": {
+          "type": "object"
+        },
+        "validity": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "through_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "world_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
         }
       }
     }
