@@ -2658,4 +2658,32 @@ mod tests {
         ).unwrap());
     }
 
+
+    #[test]
+    fn namespace_qualified_timewise_musicxml_uses_the_same_part_measure_adapter() {
+        let xml = r#"<score-timewise xmlns="http://www.musicxml.org/ns/musicxml">
+            <part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+            <measure number="1" id="m1">
+                <part id="P1">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                    <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration></note>
+                    <direction><sound tempo="120"/></direction>
+                </part>
+            </measure>
+        </score-timewise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "timewise-namespaced", "score-clock"
+        ).unwrap();
+        assert_eq!(graphs.len(), 1);
+        assert_eq!(graphs[0].part_id, "P1");
+        assert_eq!(graphs[0].map.status, MeasureMapStatus::Supported);
+        assert_eq!(graphs[0].map.measures[0].end, RationalBeat::new(4, 1).unwrap());
+        assert_eq!(graphs[0].measure_locators[0].source_id.as_deref(), Some("m1"));
+        assert_eq!(graphs[0].playback_controls.len(), 1);
+        assert_eq!(graphs[0].playback_controls[0].element, "measure/direction/sound");
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "timewise-namespaced", "score-clock", &graphs
+        ).unwrap());
+    }
+
 }
