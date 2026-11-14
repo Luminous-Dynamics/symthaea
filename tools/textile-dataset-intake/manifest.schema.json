@@ -87,7 +87,10 @@
           ]
         },
         "license_url": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "uri"
         },
         "license_text_sha256": {
@@ -173,5 +176,62 @@
       "type": "string",
       "minLength": 1
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "status": {
+                "const": "reviewed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "rights"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights": {
+            "required": [
+              "license_url",
+              "license_text_local_path",
+              "license_text_sha256",
+              "reviewed_by",
+              "reviewed_at_utc"
+            ],
+            "properties": {
+              "license_url": {
+                "type": "string",
+                "format": "uri",
+                "minLength": 1
+              },
+              "license_text_local_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "license_text_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "reviewed_by": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewed_at_utc": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
