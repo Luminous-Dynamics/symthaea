@@ -72,7 +72,7 @@ In `EventOrderReport.effect_orders`, each relation is **effect relative to stop 
 
 Operation start, cancellation request, cancellation acknowledgement, unknown outcome, exact reconciliation and retry are separate event kinds. A cancellation acknowledgement is not a terminal operation outcome. A retry requires an exact `not_applied` reconciliation ordered before that retry. If an operation outcome remains unknown, the operation remains pending and new mutations are blocked.
 
-The evaluator consumes event/clock/causal-order and operation-outcome qualifications from their owners. It does not authenticate signatures, qualify clocks, prove trace completeness, execute cancellation, authorize effects, or replace the event/history owners.
+The evaluator consumes event/clock/causal-order and operation-outcome qualifications from their owners. A passing stop-disposition qualification is additionally bound to a non-empty receipt reference, SHA-256 digest, exact trigger event ID and exact discharge event ID; a mismatched or replayed binding fails closed. These fields are still caller-supplied owner qualification outputs, not authenticated by this crate. It does not authenticate signatures, qualify clocks, prove trace completeness, execute cancellation, authorize effects, or replace the event/history owners.
 
 A stop trigger remains an active no-new-effect obligation until a separate `StopObligationDischarged` event is ordered after the trigger and its `stop_disposition` owner qualification is PASS. A discharge cannot be used while any started operation remains unreconciled. An effect, operation start or retry after the trigger is accepted only when it is definitely after that qualified discharge.
 
