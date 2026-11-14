@@ -28,7 +28,7 @@ The optimizer does not infer fit, hygiene, safety, weatherproofness, cultural me
 - Purchase
 - Made-to-order
 
-A no-additions policy excludes Borrowed, Rented, Second-hand, Purchase and Made-to-order. It preserves Owned, Repair and Alteration. A separate made-to-order switch can forbid new manufacture while still permitting other acquisition paths.
+Owned, Repair and Alteration choices are always eligible. Borrowed, Rented, Second-hand, Purchase and Made-to-order choices each have independent policy flags. A no-purchase policy can still allow borrowing, rental or second-hand access. A strict no-acquisition policy disables all five acquisition routes. Made-to-order has its own flag because it implies new production.
 
 A protected garment is retained in every plan, even if currently unusable. An unusable garment never satisfies a need. A conflict between the protected set and an acquisition policy is an explicit error, not a silent deletion of the user's protected item.
 
@@ -49,12 +49,13 @@ A plan dominates another only when it is no worse on every dimension and strictl
 ## Required correctness tests
 
 - An existing owned garment covers declared needs with zero acquisition.
-- A no-acquisition policy cannot return a purchase recommendation.
+- A strict no-acquisition policy cannot return a purchase, rental, borrowing, second-hand or made-to-order recommendation.
+- A no-purchase policy can still select a user-permitted borrowing or rental path.
 - Repair and purchase may both remain non-dominated where one saves money and the other saves effort.
 - Protected archive/ceremonial garments remain present but cannot satisfy needs when unusable.
 - Unknown need references are rejected.
 - Exceeding the exact search bound returns an explicit error.
-- Protected acquired items conflict explicitly with a no-additions policy.
+- Protected acquired items conflict explicitly with a no-acquisition policy.
 - Made-to-order can be disabled independently of other acquisition types.
 - Uncovered requirements are listed.
 - Empty required-need sets still preserve protected items.
