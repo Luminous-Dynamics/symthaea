@@ -299,7 +299,7 @@ fn read_fixture(path: &Path) -> anyhow::Result<Fixture> {
 
 pub fn run(path: &Path) -> anyhow::Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-claim-scope-fixture-v0.3" {
+    if fixture.schema_version != "plasma-claim-scope-fixture-v0.4" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -360,12 +360,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_claim_scope_fixture_v0_3.json");
+        include_str!("../../data/research/plasma_claim_scope_fixture_v0_4.json");
 
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
-        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.3");
+        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.4");
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
@@ -407,6 +407,20 @@ mod tests {
             assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported, "{id}");
             assert_ne!(case.evidence_kind, "measurement");
         }
+    }
+
+    #[test]
+    fn iso_10365_general_bonded_assembly_pattern_is_supported() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let case = fixture.cases.iter().find(|case| case.id == "iso-10365-general-bonded-assembly-pattern").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported);
+    }
+
+    #[test]
+    fn iso_10365_does_not_establish_failure_acceptability() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let case = fixture.cases.iter().find(|case| case.id == "iso-10365-acceptability-overclaim").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Rejected);
     }
 
     #[test]
