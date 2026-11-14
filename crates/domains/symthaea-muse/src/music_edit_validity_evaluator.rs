@@ -310,7 +310,7 @@ fn relation_result(
                     }
                     if *uncertainty > 0.0 {
                         if constraint.relation == Relation::EqualTo {
-                            if (*value - expected_number).abs() + uncertainty == 0.0 {
+                            if (*value - expected_number).abs() + *uncertainty == 0.0 {
                                 true
                             } else if (*value - expected_number).abs() > *uncertainty {
                                 false
@@ -358,8 +358,8 @@ fn relation_result(
             if !minimum.is_finite() || !maximum.is_finite() || minimum > maximum {
                 return indeterminate(Reason::MalformedExpectedValue);
             }
-            let lower = value - uncertainty;
-            let upper = value + uncertainty;
+            let lower = *value - *uncertainty;
+            let upper = *value + *uncertainty;
             if lower >= minimum && upper <= maximum {
                 (Status::Satisfied, Reason::RelationSatisfied)
             } else if upper < minimum || lower > maximum {
@@ -442,23 +442,23 @@ fn relation_result(
             let mut changed = false;
             for pair in values.windows(2) {
                 if constraint.relation == Relation::MonotonicIncrease {
-                    if pair[1] + uncertainty < pair[0] - uncertainty {
+                    if pair[1] + *uncertainty < pair[0] - *uncertainty {
                         return (Status::Violated, Reason::NonMonotonicSeries);
                     }
-                    if pair[1] - uncertainty < pair[0] + uncertainty {
+                    if pair[1] - *uncertainty < pair[0] + *uncertainty {
                         ambiguous = true;
                     }
-                    if pair[1] - uncertainty > pair[0] + uncertainty {
+                    if pair[1] - *uncertainty > pair[0] + *uncertainty {
                         changed = true;
                     }
                 } else {
                     if pair[1] - uncertainty > pair[0] + uncertainty {
                         return (Status::Violated, Reason::NonMonotonicSeries);
                     }
-                    if pair[1] + uncertainty > pair[0] - uncertainty {
+                    if pair[1] + *uncertainty > pair[0] - *uncertainty {
                         ambiguous = true;
                     }
-                    if pair[1] + uncertainty < pair[0] - uncertainty {
+                    if pair[1] + *uncertainty < pair[0] - *uncertainty {
                         changed = true;
                     }
                 }
@@ -1049,7 +1049,6 @@ mod tests {
             None,
             Vec::new(),
         );
-        trend.unit = Some("dB".to_owned());
         trend.evidence = MusicEditValidityEvidenceV1::Acoustic;
         e.requested_change.push(trend);
         e.requested_change.sort_by(|left, right| left.constraint_id.cmp(&right.constraint_id));
