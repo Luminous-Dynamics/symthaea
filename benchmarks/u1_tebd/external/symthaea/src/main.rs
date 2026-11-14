@@ -297,6 +297,29 @@ fn charge_metrics(state: &DVector<Complex64>, target_charge: usize) -> Value {
     })
 }
 
+fn gate_quality_maxima(
+    terms: &[U1TeBDHamiltonianTerm],
+    time_step: f64,
+    steps: usize,
+    tolerance: f64,
+) -> Result<(f64, f64), String> {
+    let mut max_unitarity: f64 = 0.0;
+    let mut max_charge: f64 = 0.0;
+    for _ in 0..steps {
+        for (parity, scale) in [(0_usize, 0.5_f64), (1, 1.0), (0, 0.5)] {
+            for term in terms.iter().filter(|term| term.bond_index % 2 == parity) {
+                let gate = term
+                    .hamiltonian
+                    .to_gate(time_step * scale, tolerance)
+                    .map_err(|error| error.to_string())?;
+                max_unitarity = max_unitarity.max(gate.unitarity_residual());
+                max_charge = max_charge.max(gate.charge_conservation_residual());
+            }
+        }
+    }
+    Ok((max_unitarity, max_charge))
+}
+
 fn run_once(
     case: &Value,
     bits: &[bool],
@@ -313,6 +336,10 @@ fn run_once(
     let input_norm_squared = initial
         .norm_squared(TOLERANCE)
         .map_err(|error| error.to_string())?;
+    // Audit gate quality outside the timed region: runtime measures the
+    // production Strang stepper, not a second copy of every local exponential.
+    let (max_gate_unitarity_residual, max_gate_charge_residual) =
+        gate_quality_maxima(terms, time_step, steps, policy.tolerance)?;
 
     let started = Instant::now();
     let mut state = initial;
@@ -322,8 +349,6 @@ fn run_once(
     let mut global_l2_bound_qualified = true;
     let mut max_gauge_residual: f64 = 0.0;
     let mut max_selection_rule_residual: f64 = 0.0;
-    let mut max_gate_unitarity_residual: f64 = 0.0;
-    let mut max_gate_charge_residual: f64 = 0.0;
     let mut discarded_weight = 0.0;
     let mut cutoff_discarded_weight = 0.0;
     let mut bond_cap_discarded_weight = 0.0;
@@ -364,19 +389,6 @@ fn run_once(
                 "global_l2_error_bound": stage.global_l2_error_bound,
                 "global_l2_bound_qualified": stage.global_l2_bound_qualified
             }));
-        }
-
-        for (parity, scale) in [(0_usize, 0.5_f64), (1, 1.0), (0, 0.5)] {
-            for term in terms.iter().filter(|term| term.bond_index % 2 == parity) {
-                let gate = term
-                    .hamiltonian
-                    .to_gate(time_step * scale, policy.tolerance)
-                    .map_err(|error| error.to_string())?;
-                max_gate_unitarity_residual =
-                    max_gate_unitarity_residual.max(gate.unitarity_residual());
-                max_gate_charge_residual =
-                    max_gate_charge_residual.max(gate.charge_conservation_residual());
-            }
         }
 
         max_selection_rule_residual =
