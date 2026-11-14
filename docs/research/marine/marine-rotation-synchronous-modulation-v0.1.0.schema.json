@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-rotation-synchronous-modulation-v0.1.0.schema.json",
+  "title": "Marine rotation-synchronous modulation audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "operating_condition_id",
+    "operating_point_receipt_sha256",
+    "service_fingerprint_sha256",
+    "environment_fingerprint_sha256",
+    "shaft_encoder_instrument_id",
+    "shaft_encoder_calibration_sha256",
+    "timebase_receipt_sha256",
+    "shaft_phase_alignment_receipt_sha256",
+    "shaft_phase_zero_reference",
+    "blade_count",
+    "maximum_phase_uncertainty_rad",
+    "maximum_shaft_rpm_timebase_consistency_fraction",
+    "phase_bin_count",
+    "minimum_samples_per_phase_bin",
+    "minimum_phase_bin_coverage_fraction",
+    "orders_to_measure",
+    "runs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "operating_condition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_point_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "shaft_encoder_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "shaft_encoder_calibration_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "timebase_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "shaft_phase_alignment_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "shaft_phase_zero_reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "blade_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximum_phase_uncertainty_rad": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "maximum_shaft_rpm_timebase_consistency_fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 0.5
+    },
+    "phase_bin_count": {
+      "type": "integer",
+      "minimum": 4
+    },
+    "minimum_samples_per_phase_bin": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_phase_bin_coverage_fraction": {
+      "const": 1
+    },
+    "orders_to_measure": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "hydrophone_instrument_id",
+        "hydrophone_calibration_sha256",
+        "hydrophone_trace_sha256",
+        "run_timebase_receipt_sha256",
+        "operating_point_receipt_sha256",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "carrier_bands"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hydrophone_calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "run_timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "carrier_bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/carrierBand"
+          }
+        }
+      }
+    },
+    "carrierBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "lower_frequency_hz",
+        "upper_frequency_hz",
+        "envelope_quantity_id",
+        "observations"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lower_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "upper_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "envelope_quantity_id": {
+          "const": "linear_envelope_power"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/phaseObservation"
+          }
+        }
+      }
+    },
+    "phaseObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "timestamp_s",
+        "revolution_index",
+        "shaft_phase_unwrapped_rad",
+        "shaft_phase_expanded_uncertainty_rad",
+        "measured_shaft_rpm",
+        "measured_shaft_rpm_expanded_uncertainty",
+        "envelope_power",
+        "cavitation_present",
+        "acoustic_window_sha256",
+        "shaft_phase_evidence_sha256"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamp_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "revolution_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "shaft_phase_unwrapped_rad": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shaft_phase_expanded_uncertainty_rad": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "measured_shaft_rpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "measured_shaft_rpm_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "envelope_power": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cavitation_present": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "acoustic_window_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "shaft_phase_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
