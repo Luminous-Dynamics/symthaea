@@ -159,3 +159,77 @@ To claim superiority over industrial quality systems, a future blinded evaluatio
 - No plasma control, equipment actuation or product-release authority is introduced.
 
 The intended result is a more trustworthy Bond Qualification Passport: every claim should carry the exact evidence that supports it and a precise statement of what it does **not** establish.
+
+
+## New SOTA update — November 2026: evaluation must respect physical clusters
+
+A methodological review published **3 November 2026** directly addresses the small, hierarchical datasets typical of manufacturing experiments:
+
+Smakova et al., *Machine Learning on Small Experimental Datasets in Manufacturing: A Review of Data Leakage, Grouped Validation, and Uncertainty Quantification*, Information 17(11), 1095. DOI: https://doi.org/10.3390/info17111095
+
+This is not a plasma-joining benchmark, but it is directly relevant methodology. Its reproducible simulation shows why random row-wise splits are invalid when measurements share physical specimens. At ICC 0.74, row-wise CV estimated RMSE 0.458 against true new-specimen error 0.727; at ICC 0.92, it estimated 0.558 against true error 1.258. Grouped CV remained close to the true error in those simulations. The paper also warns that tuning and selecting models on the same folds produces optimistic estimates.
+
+The review further makes an important small-sample point about conformal uncertainty:
+- for 90% split-conformal intervals, at least 9 independent calibration clusters are needed for a finite distribution-free interval;
+- for 95%, at least 19 independent calibration clusters are needed;
+- these counts refer to independent calibration clusters (such as specimens or lots), not rows or repeated measurements;
+- simultaneous coverage of every measurement within a new cluster can require wider intervals than marginal row-level coverage.
+
+These are mathematical sample-size limits for the stated split-conformal construction, not universal sample-size recommendations. With few clusters, use model-based intervals only with explicit assumptions or consider cluster-level CV+/jackknife+ alternatives; do not report nominal coverage that the design cannot support.
+
+Source: https://www.mdpi.com/2078-2489/17/11/1095
+
+### Consequence for the Luminous benchmark
+
+The current prospective 85–95% empirical coverage target must be evaluated using:
+1. a declared independent unit (specimen, material lot, adhesive batch, plasma head, production day, line or site);
+2. grouped/nested grouped validation for every data-driven model-selection path;
+3. completely untouched whole-group test sets for the final transfer claim;
+4. cluster-level calibration and cluster-level resampling;
+5. interval width and decision-risk reporting alongside coverage;
+6. a reported number of independent groups and an explicit statement when the dataset is too small for the requested nominal coverage.
+
+A random coupon split is not an acceptable SOTA comparison for a transfer-to-new-lot or transfer-to-new-line use case.
+
+The review's recommended baseline families also matter: regularized/polynomial response-surface regression, mixed-effects models, Gaussian processes, tree ensembles/boosting, and physics-informed/hybrid models. Tabular foundation models such as TabPFN are worth testing as emerging comparators, but the review notes limited evidence for grouped experimental designs. Deep/tabular models must earn their place on untouched groups, not on row-wise accuracy.
+
+### Aged CFRP bonds: do not assume monotonic degradation
+
+Vigón et al., *Hygrothermal Degradation Effects on Mode I Fracture in Adhesively Bonded Carbon–Epoxy Composites*, Applied Sciences 16(21), 10810, published **31 October 2026**, DOI: https://doi.org/10.3390/app162110810.
+
+This study exposes why a single monotonic aging curve is unsafe. Carbon/epoxy adhesive joints were aged at 60 °C / 70% RH for 1, 2, 4 and 12 weeks. Mode I fracture toughness decreased by about 12% at 2 weeks, then reached about 19% above the unaged value at 12 weeks; the 12-week difference was statistically significant, while the 2-week reduction was not under the paper's analysis. Fatigue-initiation resistance was lowest after one week and improved at longer exposure, while aged crack-growth rates remained higher than unaged values.
+
+The fatigue program used 15 specimens per ageing condition and included run-outs as right-censored observations in Weibull regression. The authors also caution that simultaneous estimation of five Weibull parameters with 15 specimens per condition is sensitive to individual results. The paper is a useful methodological comparator—not evidence about Luminous plasma-treated joints or a general law of aging.
+
+Source: https://www.mdpi.com/2076-3417/16/21/10810
+
+### Reproduction caution from the five-polymer plasma study
+
+The October 2026 PP/HIPS/PVC/PC/PET-G argon/nitrogen paper is a valuable anchor because it measures both wettability and joint performance. However, its design also leaves precise replication questions:
+- three lap-shear specimens were tested per treatment category;
+- the exact bondline thickness was not measured;
+- substrate temperature was not measured directly;
+- contact angle and adhesive bonding were performed immediately after treatment to limit recovery;
+- visually degraded specimens were excluded from subsequent bonding tests.
+
+These choices are reasonable for a comparative laboratory study, but they mean its reported means should not be treated as a production reliability distribution. A Luminous reproduction should explicitly measure or bound bondline thickness and substrate temperature, preserve excluded/damaged specimens in the dataset with their true disposition, and include treatment-to-bond delay cohorts rather than only immediate bonding.
+
+Source: https://link.springer.com/article/10.1007/s44245-026-00396-4
+
+## Refined benchmark scorecard — no leaderboard metric without a valid split
+
+Add the following to the previously defined claim-scope and transfer metrics:
+
+| Benchmark | Prospective target / reporting rule |
+|---|---|
+| Group leakage | 0 specimen/lot/head/line overlap between train, calibration and final test partitions for the declared transfer task |
+| Nested selection | 100% of preprocessing, feature selection, hyperparameter/model-family choice occurs inside grouped training folds |
+| Independent units | Report both row count and independent cluster count for every endpoint |
+| Interval validity | Report empirical coverage, interval width and risk–coverage by whole-cluster holdout; report nominal level only when calibration count supports it |
+| Cluster calibration | At least 9 independent calibration clusters for 90% split-conformal; at least 19 for 95%; otherwise declare the interval method/coverage limitation |
+| Model comparison | Paired out-of-fold per-cluster losses, multiplicity correction, uncertainty on ranking; publish inconclusive results |
+| Aging mechanism | Separate static fracture, fatigue initiation, crack growth, sustained-load failure and service reliability; no forced monotonic trend |
+| Run-outs | Treat as right-censored with a method appropriate to the endpoint; never encode as failure at the test stop time |
+| Physical replication | Record bondline thickness, actual substrate temperature, treatment-to-bond delay and all degraded/invalid specimens |
+
+We should not promise “85–95% coverage” as a universal target from 10 coupons. The target is meaningful only when the independent-group count, calibration method, holdout design and interval width support it.
