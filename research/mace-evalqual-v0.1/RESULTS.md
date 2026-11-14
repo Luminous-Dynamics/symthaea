@@ -180,3 +180,10 @@ The local companion now includes an expected-head comparison that illustrates a 
 Added formal/MACEEffectFence.tla, formal/MACEEffectFence.cfg and formal/run-tlc.sh. The model contains two idempotency keys and two intents, delayed pending dispatch, globally serialized effect/fence transactions, receipt/business staging, atomic commit, rollback/process crash and derived reconciliation outcomes. Invariants check type correctness, atomic visibility, transaction coherence, intent binding, reconciliation soundness and that a fenced key never exposes a business effect.
 
 The runner pins the stable TLA+ tools v1.7.4 release using the upstream-published SHA-1 for tla2tools.jar and runs a single TLC worker. TLC was **not run** in this environment: Java 21 is available but no TLA+ JAR is installed, and outbound artifact retrieval is unavailable. The Go finite-state model remains a separate, executed test (68 states / 200 transitions); it is not a substitute for TLC. Do not count the formal tier as passed until the pinned runner succeeds and records its state/transition counts and tool version.
+
+
+## 14 November 2026 — detached signed checkpoint wire contract
+
+Added public CHECKPOINT_CHAIN.md, a Draft 2020-12 JSON schema and a synthetic cross-language test vector publishing exact canonical signing bytes, public key, signature hex/base64 and envelope digest. The v1 contract uses Ed25519 over a fixed domain-separated binary encoding, links each checkpoint to the previous signed envelope and requires an external monotonic consumer cursor to reject rollback/forks.
+
+The Go verifier and its 16 test functions are in the separate local companion package, not the public PR diff. It validates signature, database/key identity, sequence continuity, predecessor, journal-head progress, issue-time monotonicity, exact replay and malformed trust state. It does not run a witness service, protect private keys, persist the trusted cursor or solve key rotation/quorum/split-view detection. No E3/E4 deployment claim is made.
