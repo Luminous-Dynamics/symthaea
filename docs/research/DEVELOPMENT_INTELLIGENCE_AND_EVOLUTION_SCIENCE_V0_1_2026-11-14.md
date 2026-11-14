@@ -240,7 +240,7 @@ On 2026-11-14, the standalone development-map-validator received a DTEA hardenin
 - Equality at the start/end boundary is accepted under closed-interval semantics.
 - An explicit validity_completeness declaration distinguishes a known open interval edge (complete with a null bound) from incomplete applicability (incomplete).
 - Incomplete effective-time applicability cannot justify consulted evidence; it can remain explicitly excluded.
-- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection, bringing the standalone crate total to **69 authored tests**. The public DTEA expected-results fixture contains **21 negative controls**.
+- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection and nine cover Rust syntax extraction, bringing the standalone crate total to **78 authored tests**. The public DTEA expected-results fixture contains **21 negative controls**.
 
 These are source changes and authored checks. The tests have not been compiled or executed. Exact-head CI workflows were observed as skipped, not passed. Full JSON Schema 2020-12 validation, runtime replay, independent benchmark qualification and #10064 isolation qualification remain outstanding. No real Mycelix authorization record is authenticated by the synthetic DTEA fixture.
 
@@ -250,12 +250,12 @@ These are source changes and authored checks. The tests have not been compiled o
 
 A pure read-only library module is now present at `tools/development-map-validator/src/cargo_manifest.rs`. It accepts TOML bytes plus a pinned source identity and returns a Serde-serializable projection explicitly labelled `manifest_declared`. It records workspace patterns, package identity/inheritance, dependency kinds and target predicates, feature declarations, explicit target declarations and build-script declaration state. Workspace-inherited defaults that are not locally declared remain unknown.
 
-Two non-executable TOML fixtures and ten test definitions were added. No Cargo invocation, build script, procedural macro, compiler, repository test or candidate program was run. Workspace globs and feature expressions are not expanded, implicit targets are not inferred, and compiler-resolved semantics are not claimed. The CLI now exposes the library through the `cargo-manifest` subcommand, with explicit revision/tree/path/blob pins.
+Two non-executable TOML fixtures and ten test definitions were added for the Cargo projector. Nine more tests cover the Rust syntax projector. No Cargo invocation, build script, procedural macro, compiler, repository test or candidate program was run. Workspace globs and feature expressions are not expanded, implicit targets are not inferred, and compiler-resolved semantics are not claimed. The CLI exposes it through the `cargo-manifest` subcommand, with explicit revision/tree/path/blob pins. A second `rust-file` subcommand emits syntax-extracted facts from one Rust file under equivalent source pins.
 
 ## 8. Decision
 
 Pursue DIES as a first-class Symthaea research and engineering discipline, but keep EGDDM as its common map representation and keep the existing owner boundaries intact.
 
-The practical next engineering milestone is D1: a read-only Rust source projector with explicit authority labels, followed by D2 temporal replay. The highest-value research milestone is a preregistered, matched DynaMapBench evaluation that demonstrates whether maps improve decisions and independently verified capability outcomes—not merely whether they make better diagrams.
+D1 now has two read-only entry points: a Cargo manifest projector and a Rust syntax projector. The latter records inline module scope, declarations, signatures, imports, visibility, attributes and item-position macro syntax, while preserving unresolved module, import, cfg and macro semantics as limitations. Both CLI modes require exact source identity pins, but do not authenticate them. The next engineering milestone is to join file-level facts into deterministic repository snapshots with source-region identities and configuration-world boundaries, then implement D2 temporal replay. The highest-value research milestone is a preregistered, matched DynaMapBench evaluation that demonstrates whether maps improve decisions and independently verified capability outcomes—not merely whether they make better diagrams.
 
 The test of success is not that Symthaea can describe her own architecture. It is that she can identify a real gap, select a justified experiment, predict its result, respect authority and safety constraints, and learn from an independently verified outcome.
