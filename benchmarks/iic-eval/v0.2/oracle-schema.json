@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/iic-eval/v0.2/oracle-schema.json",
+  "title": "IIC-Eval known-answer oracle v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_version",
+    "synthetic",
+    "status",
+    "claim_ceiling",
+    "cases"
+  ],
+  "properties": {
+    "corpus_version": {
+      "const": "0.2"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "status": {
+      "const": "development_known_answers_not_independently_adjudicated"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "expected_candidates",
+          "required_questions",
+          "prohibited_inferences"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^IIC-[0-9]{3}$"
+          },
+          "expected_candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "candidate_ref",
+                "source_document_id",
+                "verbatim_span",
+                "modality",
+                "conditions",
+                "adjudication_state"
+              ],
+              "properties": {
+                "candidate_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_document_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "verbatim_span": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "modality": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "adjudication_state": {
+                  "enum": [
+                    "candidate",
+                    "in_conflict",
+                    "unresolved"
+                  ]
+                }
+              }
+            }
+          },
+          "required_questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "prohibited_inferences": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
