@@ -102,6 +102,8 @@ pub struct MusicXmlNotationEvaluationReportV1 {
     pub chord_anchor_relation: MusicXmlNotationMetricV1,
     pub voice_staff_identity: MusicXmlNotationMetricV1,
     pub instrument_references: MusicXmlNotationMetricV1,
+    pub instrument_reference_resolution: MusicXmlNotationMetricV1,
+    pub performance_directives: MusicXmlNotationMetricV1,
     pub sound_tie_annotations: MusicXmlNotationMetricV1,
     pub visual_tie_annotations: MusicXmlNotationMetricV1,
     pub tuplet_notations: MusicXmlNotationMetricV1,
@@ -725,6 +727,8 @@ struct Accumulator {
     chord_anchor_relation: MusicXmlNotationCountsV1,
     voice_staff_identity: MusicXmlNotationCountsV1,
     instrument_references: MusicXmlNotationCountsV1,
+    instrument_reference_resolution: MusicXmlNotationCountsV1,
+    performance_directives: MusicXmlNotationCountsV1,
     sound_tie_annotations: MusicXmlNotationCountsV1,
     visual_tie_annotations: MusicXmlNotationCountsV1,
     tuplet_notations: MusicXmlNotationCountsV1,
@@ -789,6 +793,18 @@ impl Accumulator {
     }
 }
 
+fn instrument_ids_resolve(
+    graph: &MusicXmlPartNotationGraphV1,
+    instrument_ids: &[String],
+) -> bool {
+    let Some(metadata) = graph.part_metadata.as_ref() else {
+        return false;
+    };
+    instrument_ids
+        .iter()
+        .all(|instrument_id| metadata.score_instrument_ids.contains(instrument_id))
+}
+
 fn compare_graph_pair(
     reference: &MusicXmlPartNotationGraphV1,
     prediction: &MusicXmlPartNotationGraphV1,
@@ -825,6 +841,8 @@ fn compare_graph_pair(
     let mut correct_flags = 0;
     let mut correct_voice_staff = 0;
     let mut correct_instruments = 0;
+    let mut correct_instrument_resolution = 0;
+    let mut correct_performance_directives = 0;
     let mut correct_sound_ties = 0;
     let mut correct_visual_ties = 0;
     let mut correct_tuplets = 0;
@@ -871,8 +889,21 @@ fn compare_graph_pair(
         { correct_flags += 1; }
         if gold_event.voice == pred_event.voice && gold_event.staff == pred_event.staff
         { correct_voice_staff += 1; }
-        if gold_event.instrument_ids == pred_event.instrument_ids
-        { correct_instruments += 1; }
+        if gold_event.instrument_ids == pred_event.instrument_ids {
+            correct_instruments += 1;
+            if !gold_event.instrument_ids.is_empty()
+                && instrument_ids_resolve(reference, &gold_event.instrument_ids)
+                && instrument_ids_resolve(prediction, &pred_event.instrument_ids)
+            {
+                correct_instrument_resolution += 1;
+            }
+        }
+        if gold_event.time_only == pred_event.time_only
+            && gold_event.attack_divisions == pred_event.attack_divisions
+            && gold_event.release_divisions == pred_event.release_divisions
+        {
+            correct_performance_directives += 1;
+        }
         if gold_event.sound_ties == pred_event.sound_ties
         { correct_sound_ties += 1; }
         if gold_event.visual_ties == pred_event.visual_ties
@@ -953,6 +984,14 @@ fn compare_graph_pair(
     accum.chord_anchor_relation.add_assign(&metric_from_correct(correct_chord_relations, gold_total, pred_total).counts);
     accum.voice_staff_identity.add_assign(&metric_from_correct(correct_voice_staff, gold_total, pred_total).counts);
     accum.instrument_references.add_assign(&metric_from_correct(correct_instruments, gold_total, pred_total).counts);
+    let gold_instrumented = gold.note_events.iter().filter(|event| !event.instrument_ids.is_empty()).count();
+    let pred_instrumented = predicted.note_events.iter().filter(|event| !event.instrument_ids.is_empty()).count();
+    accum.instrument_reference_resolution.add_assign(&metric_from_correct(
+        correct_instrument_resolution, gold_instrumented, pred_instrumented
+    ).counts);
+    accum.performance_directives.add_assign(&metric_from_correct(
+        correct_performance_directives, gold_total, pred_total
+    ).counts);
     accum.sound_tie_annotations.add_assign(&metric_from_correct(correct_sound_ties, gold_total, pred_total).counts);
     accum.visual_tie_annotations.add_assign(&metric_from_correct(correct_visual_ties, gold_total, pred_total).counts);
     accum.tuplet_notations.add_assign(&metric_from_correct(correct_tuplets, gold_total, pred_total).counts);
