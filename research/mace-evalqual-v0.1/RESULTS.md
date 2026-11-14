@@ -137,3 +137,12 @@ The current public PR branch carries the reference service, client, locking impl
 This implementation validates a benchmark adapter's declared fixture catalogue, exact input-byte bindings, typed three-axis outcomes and paired metamorphic relations. It does not launch or sandbox tasks; verify grader behavior in a real benchmark; prove task/oracle semantics; authenticate producers; establish oracle independence; observe all OS/API/filesystem/network events; or qualify the durable one-shot broker.
 
 No benchmark leaderboard, SOTA, deployment-safety or production-readiness result is claimed.
+
+
+## 14 November 2026 — concurrent history linearizability
+
+Added `effectbridge/linearizability_test.go` as a dependency-free executable sequential specification and backtracking history checker. Each of 128 concurrent histories launches four overlapping operations against one idempotency key: append intent A, fence intent A, reconcile the key, and append changed intent B. The checker searches all candidate sequential orders while enforcing real-time precedence (an operation that returned before another was invoked must linearize first). It verifies the observed receipt kind, duplicate flag, conflict/fenced result and reconciliation status against the model, then closes and reopens the journal and verifies that the single terminal decision is unchanged.
+
+Local run against the assembled MACE v0.2 source snapshot (Go 1.23.2, Linux/amd64): the new test passed; `go test -race -count=3 ./effectbridge -run TestConcurrentEffectFenceLookupHistoriesAreLinearizable` passed; `go vet ./...` passed; and `go test -count=1 ./...` passed. This test was run against the assembled local snapshot, not a clean replay of the exact public PR checkout. The public branch now contains the test; hosted CI status must be checked separately.
+
+Claim boundary: this is a bounded history checker for the single-process JSONL journal interface. It is not a formal proof, not exhaustive over all possible schedules, and not a test of network partitions, multi-host consensus, SQLite's transaction implementation, or hardware power loss. The next stronger layer is to export captured histories into an independent linearizability checker and model the protocol in TLA+/PlusCal, then run fault-injected service histories against a real destination.
