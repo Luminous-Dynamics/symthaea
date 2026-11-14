@@ -259,6 +259,16 @@ fn audit_cohort(
         if !sum.is_finite() || (sum - 1.0).abs() > tolerance {
             return Err(Disposition::Rejected);
         }
+        if cohort.measurement_basis == "specimen_count_fraction"
+            && sample.fractions.iter().filter(|fraction| fraction.fraction == 1.0).count() != 1
+        {
+            return Err(Disposition::Rejected);
+        }
+        if cohort.measurement_basis == "specimen_count_fraction"
+            && sample.fractions.iter().any(|fraction| fraction.fraction != 0.0 && fraction.fraction != 1.0)
+        {
+            return Err(Disposition::Rejected);
+        }
     }
 
     if !cohort.unclassifiable_specimen_ids.is_empty()
@@ -596,6 +606,13 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
         let case = fixture.cases.iter().find(|case| case.id == "many-specimens-one-lot").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn specimen_count_fraction_requires_one_hot_specimen_classification() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "count-fraction-must-be-one-hot").expect("case exists");
+        assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Rejected);
     }
 
     #[test]
