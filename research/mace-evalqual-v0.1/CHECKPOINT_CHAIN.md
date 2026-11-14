@@ -80,3 +80,8 @@ The repository's public test script includes the package in `go test ./...` and 
 
 
 The public verifier now has an optional cross-implementation test that verifies the same published signing preimage and Ed25519 signature with OpenSSL's CLI. This is independent crypto-provider interoperability evidence, not an independent implementation of the checkpoint state machine. The test skips explicitly where OpenSSL is absent; the mandatory Go vector test still runs.
+
+
+## Join checkpoint to the observed destination
+
+The reference API includes `AcceptObserved`, which requires the independently observed database ID, journal sequence and journal-head digest to match the signed checkpoint before it advances `TrustedState`. This removes a common integration mistake: verifying a valid signature but forgetting to compare it with the database snapshot being audited. The observer must obtain all three observed values from one coherent transaction snapshot. `AcceptObserved` cannot upgrade the observer's trust domain or prove events outside its coverage.
