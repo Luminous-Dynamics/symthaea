@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::plasma_claim_scope::{decide, Disposition as ClaimDisposition, ScopeEvidence};
+use crate::plasma_equivalence_design::{validate_bridge, Disposition as DesignDisposition, EquivalenceDesignReceipt};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,6 +28,7 @@ struct EndpointEvidence {
     candidate_specimen_ids: Vec<String>,
     baseline_receipt: ScopeEvidence,
     candidate_receipt: ScopeEvidence,
+    equivalence_design: EquivalenceDesignReceipt,
 }
 
 #[derive(Debug, Deserialize)]
@@ -245,6 +247,21 @@ fn audit_case(case: &CompositionCase) -> Decision {
         {
             return rejected("baseline and candidate observation identities or raw-data artifacts are reused");
         }
+
+        match validate_bridge(
+            &evidence.equivalence_design,
+            endpoint,
+            baseline,
+            candidate,
+        ).disposition {
+            DesignDisposition::Pass => {}
+            DesignDisposition::Blocked => {
+                saw_blocked = true;
+            }
+            DesignDisposition::Rejected => {
+                return rejected("preregistered equivalence-design receipt is not bound to the exact endpoint observations or fails the study-design contract");
+            }
+        }
     }
 
     if saw_blocked {
@@ -263,7 +280,7 @@ fn read_fixture(path: &Path) -> Result<Fixture> {
 
 pub fn run(path: &Path) -> Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-evidence-composition-fixture-v0.1" {
+    if fixture.schema_version != "plasma-evidence-composition-fixture-v0.2" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -312,12 +329,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_evidence_composition_fixture_v0_1.json");
+        include_str!("../../data/research/plasma_evidence_composition_fixture_v0_2.json");
 
     #[test]
     fn frozen_composition_fixture_matches_all_expected_dispositions() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid composition fixture JSON");
-        assert_eq!(fixture.schema_version, "plasma-evidence-composition-fixture-v0.1");
+        assert_eq!(fixture.schema_version, "plasma-evidence-composition-fixture-v0.2");
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
@@ -327,6 +344,22 @@ mod tests {
                 "composition mismatch for {}",
                 case.id
             );
+        }
+    }
+
+    #[test]
+    fn every_transfer_endpoint_requires_a_bound_preregistered_design_receipt() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid composition fixture JSON");
+        for case in &fixture.cases {
+            for evidence in &case.endpoint_evidence {
+                let decision = validate_bridge(
+                    &evidence.equivalence_design,
+                    &evidence.endpoint,
+                    &evidence.baseline_receipt,
+                    &evidence.candidate_receipt,
+                );
+                assert_ne!(decision.disposition, DesignDisposition::Blocked, "{}", case.id);
+            }
         }
     }
 
