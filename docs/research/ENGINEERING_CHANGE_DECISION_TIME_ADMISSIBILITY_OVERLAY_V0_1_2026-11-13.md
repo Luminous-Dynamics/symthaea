@@ -74,6 +74,19 @@ The machine-readable companion `ENGINEERING_CHANGE_DECISION_TIME_OVERLAY_V0_1.js
 
 These controls should be instantiated across material, component/lot, calibration, requirement, manufacturing-process, standards and supplier-deviation changes where the underlying source owner can supply the required evidence. Avoid multiplying near-identical mutations and then counting them as independent design families.
 
+
+
+### TDA-010 — Distributed evidence frontier and partial-order causality
+
+A decision may combine records from multiple conductors, repositories or asynchronous source services. A single wall-clock K is still retained as the declared temporal boundary, but it does not by itself prove which distributed events were included or causally ordered. A source's local sequence number is meaningful only within that source; equal, larger or smaller indices from different conductors are not comparable.
+
+For multi-source cases, the overlay binds:
+- Mycelix #2631 `EvidenceFrontierV1` reference/digest and exact source-set commitment;
+- Mycelix #5843 causal-history receipt, per-conductor local order and evidence-backed cross-conductor edges;
+- Mycelix #5923 source/dependency completeness where applicable.
+
+An incomplete or unknown causal cut cannot support `system_availability=available` or `run_context_presence=included`. This composes existing owners and creates no new vector-clock, event-log or causal-history service.
+
 ## 5. Non-compensatory gates and metrics
 
 Add the following hard gates to the existing six preregistered gates:
