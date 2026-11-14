@@ -52,21 +52,21 @@ The crate also exposes a pure read-only Rust API:
 
 ## Epistemic temporal event replay
 
-The standalone \`temporal_replay\` module adds an actor-aware append-only event ledger. It distinguishes effective/valid time, source observation time, per-actor availability time, and ledger recording time. Events are pinned to a repository revision, tree OID and configuration-world digest. Replay supports as-of actor-knowledge reconstruction, optional ledger-recorded cutoffs, retrospective corrections, proposals that do not mutate observed facts, and serializable suffix-replay checkpoints.
+The standalone `temporal_replay` module adds an actor-aware append-only event ledger. It distinguishes effective/valid time, source observation time, per-actor availability time, and ledger recording time. Events are pinned to a repository revision, tree OID and configuration-world digest. Replay supports as-of actor-knowledge reconstruction, optional ledger-recorded cutoffs, retrospective corrections, proposals that do not mutate observed facts, and serializable suffix-replay checkpoints.
 
 Commands:
 
     cargo run -- temporal-ledger path/to/temporal-event-ledger.json
     cargo run -- temporal-replay path/to/temporal-event-ledger.json path/to/replay-query.json
 
-Public Rust APIs include \`start_replay_cursor\`, \`resume_replay_cursor\`, \`serialize_replay_cursor\`, \`deserialize_replay_cursor\`, \`replay_ledger\` and \`replay_incremental\`. The clean replay is the reference projection; a resumed cursor must produce the same canonical projection for the same frozen ledger and query.
+Public Rust APIs include `start_replay_cursor`, `resume_replay_cursor`, `serialize_replay_cursor`, `deserialize_replay_cursor`, `replay_ledger` and `replay_incremental`. The clean replay is the reference projection; a resumed cursor must produce the same canonical projection for the same frozen ledger and query.
 
 Event and query contracts:
 - [Temporal event-ledger schema](../../docs/research/temporal-event-ledger-v0.1.schema.json)
 - [Temporal replay-query schema](../../docs/research/temporal-replay-query-v0.1.schema.json)
 - [Replay design, semantics and DynaMapBench D2 targets](../../docs/research/TEMPORAL_EPISTEMIC_REPLAY_V0_1_2026-11-14.md)
 
-Synthetic fixtures are under \`docs/development-map/fixtures/temporal-*\`. They distinguish actor knowledge, ledger-as-recorded history and retrospective restatement. Availability proof references are supplied inputs, not authenticated receipts. Event and checkpoint hashes detect content mutation only when their digests are retained; they do not establish source authenticity, event-stream completeness, actor access, trusted time, Git-object existence or authority. The prototype does not promote CI/test/independent-qualification claims.
+Synthetic fixtures are under `docs/development-map/fixtures/temporal-*`. They distinguish actor knowledge, ledger-as-recorded history and retrospective restatement. Availability proof references are supplied inputs, not authenticated receipts. Event and checkpoint hashes detect content mutation only when their digests are retained; they do not establish source authenticity, event-stream completeness, actor access, trusted time, Git-object existence or authority. The prototype does not promote CI/test/independent-qualification claims.
 
 ## What it checks
 
