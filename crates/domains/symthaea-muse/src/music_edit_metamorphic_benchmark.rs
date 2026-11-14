@@ -305,6 +305,8 @@ pub enum MusicEditMetamorphicAssessmentIssueV1 {
     InvalidNumericRule(String),
     NonIdentityRuleForInvariant(String),
     MissingCategoryMapping(String),
+    UnmappedObservationProperty(String),
+    InvalidCategoryMap(String),
     SerializationError,
 }
 
@@ -431,10 +433,53 @@ pub fn evaluate_music_edit_metamorphic_pair_v1(
 
     if mapping.schema_version != "mel-music-edit-metamorphic-property-map-v1"
         || mapping.properties.is_empty()
-        || !mapping.properties.windows(2).all(|w| w[0].property_id < w[1].property_id)
+        || !mapping.properties.windows(2).all(|w| {
+            !w[0].property_id.trim().is_empty()
+                && w[0].property_id < w[1].property_id
+        })
+        || mapping.properties.last().is_some_and(|entry| entry.property_id.trim().is_empty())
     {
         issues.push(MusicEditMetamorphicAssessmentIssueV1::InvalidPropertyMapping);
     }
+
+    let mapped_ids: std::collections::BTreeSet<&str> =
+        mapping.properties.iter().map(|entry| entry.property_id.as_str()).collect();
+    for observation in [base, transformed] {
+        for property in &observation.properties {
+            if !mapped_ids.contains(property.property_id.as_str()) {
+                issues.push(MusicEditMetamorphicAssessmentIssueV1::UnmappedObservationProperty(
+                    property.property_id.clone(),
+                ));
+            }
+        }
+    }
+    for entry in &mapping.properties {
+        if let Rule::CategoryMap { values } = &entry.rule {
+            if values.is_empty()
+                || !values.windows(2).all(|window| {
+                    window[0].source_value < window[1].source_value
+                })
+                || values.iter().any(|mapping| {
+                    mapping.source_value.trim().is_empty()
+                        || mapping.transformed_value.trim().is_empty()
+                })
+            {
+                issues.push(MusicEditMetamorphicAssessmentIssueV1::InvalidCategoryMap(
+                    entry.property_id.clone(),
+                ));
+            }
+            if pair.expected_relation == Relation::Invariant
+                && values.iter().any(|mapping| {
+                    mapping.source_value != mapping.transformed_value
+                })
+            {
+                issues.push(MusicEditMetamorphicAssessmentIssueV1::NonIdentityRuleForInvariant(
+                    entry.property_id.clone(),
+                ));
+            }
+        }
+    }
+
     let mapping_sha256 = music_edit_metamorphic_property_mapping_digest_v1(mapping)
         .map_err(|_| vec![MusicEditMetamorphicAssessmentIssueV1::SerializationError])?;
     if pair.property_mapping_sha256.as_deref() != Some(mapping_sha256.as_str()) {
@@ -708,6 +753,66 @@ mod tests {
         transformed.protected_invariants_satisfied = false;
         let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
         assert!(!result.passed);
+    }
+
+    #[test]
+    fn evaluator_rejects_an_observed_property_omitted_from_mapping() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let map = mapping(1.0, 0.0, 0.0);
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 64.0);
+        let mut transformed = observation(&pair, &pair_sha, false, 64.0);
+        transformed.properties.push(MusicEditMetamorphicPropertyObservationV1 {
+            property_id: "unmapped-loudness".to_owned(),
+            evidence: MusicEditMetamorphicEvidenceV1::Acoustic,
+            value: MusicEditMetamorphicValueV1::Numeric {
+                value: -20.0,
+                unit: "dBFS".to_owned(),
+            },
+        });
+        transformed.properties.sort_by(|a, b| a.property_id.cmp(&b.property_id));
+        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed)
+            .unwrap_err()
+            .contains(&MusicEditMetamorphicAssessmentIssueV1::UnmappedObservationProperty(
+                "unmapped-loudness".to_owned(),
+            )));
+    }
+
+    #[test]
+    fn invariant_category_maps_must_be_identity_and_canonical() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let map = MusicEditMetamorphicPropertyMappingV1 {
+            schema_version: "mel-music-edit-metamorphic-property-map-v1".to_owned(),
+            properties: vec![MusicEditMetamorphicPropertyRuleEntryV1 {
+                property_id: "instrument".to_owned(),
+                rule: MusicEditMetamorphicPropertyRuleV1::CategoryMap {
+                    values: vec![
+                        MusicEditMetamorphicCategoryMapV1 {
+                            source_value: "flute".to_owned(),
+                            transformed_value: "oboe".to_owned(),
+                        },
+                        MusicEditMetamorphicCategoryMapV1 {
+                            source_value: "oboe".to_owned(),
+                            transformed_value: "oboe".to_owned(),
+                        },
+                    ],
+                },
+            }],
+        };
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 64.0);
+        let transformed = observation(&pair, &pair_sha, false, 64.0);
+        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed)
+            .unwrap_err()
+            .iter()
+            .any(|issue| matches!(
+                issue,
+                MusicEditMetamorphicAssessmentIssueV1::NonIdentityRuleForInvariant(_)
+            )));
     }
 
     #[test]
