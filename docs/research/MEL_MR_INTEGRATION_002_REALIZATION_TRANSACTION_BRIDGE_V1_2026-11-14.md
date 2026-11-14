@@ -348,3 +348,35 @@ Melothaea is competitive when it can demonstrate, on matched tasks:
 - causal collaboration and durable authorship/branch lineage that a one-shot generation leaderboard does not measure.
 
 The defensible claim is therefore **best available creative backend + strongest independently verified editing/collaboration workflow**, not a single universal “best music model.”
+
+
+## 16. Rust bridge integration and EVAL-040 acceptance gate
+
+The offline implementation is being introduced as a thin adapter on top of EVAL-040, not as a parallel transaction engine.
+
+The integration has three distinct identities:
+
+1. **Trusted expected realization identity:** request ID/digest, capability-manifest digest, upstream realization-receipt digest, backend and adapter IDs/versions, and output modality. These values must be obtained from the upstream MEL-REAL request/manifest/receipt verification and the frozen caller context.
+2. **Bridge receipt:** the backend/adapter execution trace, control observations, exact source/candidate binding and receipt digest. A self-sealed receipt is only a content commitment; it cannot choose its own trusted expected identities.
+3. **Actual candidate bytes:** re-hashed at the transaction boundary and compared with both the bridge receipt and the EVAL-040 candidate artifact digest and verified byte-materialization evidence.
+
+EVAL-040 now has a task-specific evidence kind, `RealizationExecution`. A policy for a candidate produced by a qualified realizer must include this kind in its canonical `required_evidence` list. The five existing core requirements remain globally mandatory; this new gate is explicitly selected for workflows that use a realizer. The bridge can produce a Verified record only for Completed or ReconciledCompleted output with independently observed bytes. Submitted, Failed, OutcomeUnknown and unresolved states cannot be converted into verified realization evidence.
+
+The resulting evidence record binds:
+- source-lineage digest;
+- candidate artifact digest;
+- realization bridge receipt digest;
+- verified-binding report digest;
+- replay-verifier build digest.
+
+The caller inserts this record into the candidate attempt before invoking EVAL-040's final `Accept | Repair | Abstain | Reject` evaluator. A transaction whose policy requires RealizationExecution must abstain while the record is pending or absent. EVAL-040 remains the sole cumulative budget/terminal-decision authority; the bridge only verifies execution identities and reports the number of submissions.
+
+The current implementation branch authors tests for the following additional controls:
+- resealed receipt cannot substitute a different expected capability manifest;
+- bounded hard controls require an explicit digest-committed fidelity bound;
+- completed/reconciled provider events retain the exact submission identity;
+- a reconciled-completed result can be accepted without issuing a second provider call;
+- an unresolved result cannot create a Verified EVAL-040 realization record;
+- the final EVAL-040 decision abstains until that record is present.
+
+This is still source-level work. A workflow being queued, skipped or absent is not a pass; only an exact-head successful test/format/Clippy artifact can qualify the code.
