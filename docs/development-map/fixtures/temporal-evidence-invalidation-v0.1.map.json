@@ -1,0 +1,925 @@
+{
+  "schema_version": "0.1.0",
+  "map_id": "synthetic:temporal-evidence-invalidation-v0.1",
+  "repository": {
+    "canonical_name": "synthetic/dynmap-evidence-api",
+    "visibility": "public",
+    "default_branch": "synthetic-main"
+  },
+  "snapshot": {
+    "revision": "3333333333333333333333333333333333333333",
+    "tree_digest": "4444444444444444444444444444444444444444",
+    "tree_digest_algorithm": "git_tree_oid_sha1",
+    "observed_at": "2026-11-13T10:00:00Z",
+    "parent_snapshot": null,
+    "source_event_high_watermark": "event-009",
+    "configuration_world": {
+      "os": "linux",
+      "target": "x86_64-unknown-linux-gnu",
+      "features": []
+    }
+  },
+  "extractor": {
+    "name": "manual-synthetic-temporal-fixture",
+    "version": "0.1.0",
+    "digest": null
+  },
+  "nodes": [
+    {
+      "id": "fixture:project",
+      "type": "project",
+      "label": "Synthetic Evidence API",
+      "claim_state": "observed",
+      "attributes": {
+        "purpose": "demonstrate revision-scoped evidence invalidation"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/project",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "fixture:capability",
+      "type": "capability",
+      "label": "Verify contract-conforming event receipts",
+      "claim_state": "observed",
+      "attributes": {
+        "requirement": "Reject receipts that violate the currently supported API contract."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/requirements/receipt-verification",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "fixture:contract-v2",
+      "type": "interface",
+      "label": "Receipt API contract v2",
+      "claim_state": "observed",
+      "attributes": {
+        "version": "2",
+        "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "introduced_at": "2222222222222222222222222222222222222222",
+        "scope": "receipt verification"
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/contracts/receipt-v2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "2222222222222222222222222222222222222222",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "fixture:test-source-v1",
+      "type": "test",
+      "label": "Receipt contract test at revision A",
+      "claim_state": "observed",
+      "attributes": {
+        "path": "tests/contract.rs",
+        "test_scope": "contract-v1",
+        "source_revision": "1111111111111111111111111111111111111111",
+        "notes": "The test file remains unchanged at revision B; its tested contract dependency changes."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/tests/contract-v1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "1111111111111111111111111111111111111111",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "fixture:evidence-v1",
+      "type": "evidence",
+      "label": "Test evidence E1: contract-v1 passed at A",
+      "claim_state": "observed",
+      "attributes": {
+        "result": "passed",
+        "test_node": "fixture:test-source-v1",
+        "tested_contract": "v1",
+        "run_revision": "1111111111111111111111111111111111111111",
+        "world": "x86_64-unknown-linux-gnu;features=[]",
+        "test_file_path": "tests/contract.rs"
+      },
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/evidence/E1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "1111111111111111111111111111111111111111",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "stale",
+        "supersedes": null,
+        "invalidated_by": "event-005",
+        "reason": "Contract dependency changed from v1 to v2; old evidence remains historical but no longer qualifies current contract v2."
+      }
+    },
+    {
+      "id": "fixture:test-source-v2",
+      "type": "test",
+      "label": "Receipt contract test at revision C",
+      "claim_state": "observed",
+      "attributes": {
+        "path": "tests/contract.rs",
+        "test_scope": "contract-v2",
+        "source_revision": "3333333333333333333333333333333333333333",
+        "notes": "Updated test source now covers contract-v2."
+      },
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/tests/contract-v2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "fixture:evidence-v2",
+      "type": "evidence",
+      "label": "Test evidence E2: contract-v2 passed at C",
+      "claim_state": "observed",
+      "attributes": {
+        "result": "passed",
+        "test_node": "fixture:test-source-v2",
+        "tested_contract": "v2",
+        "run_revision": "3333333333333333333333333333333333333333",
+        "world": "x86_64-unknown-linux-gnu;features=[]",
+        "test_file_path": "tests/contract.rs"
+      },
+      "provenance": {
+        "authority": "runtime_observed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/evidence/E2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "fixture:action-v3",
+      "type": "development_action",
+      "label": "Proposed receipt contract v3 change",
+      "claim_state": "proposed",
+      "attributes": {
+        "status": "proposed",
+        "expected_impact": [
+          "fixture:contract-v2",
+          "fixture:test-source-v2",
+          "fixture:evidence-v2"
+        ],
+        "acceptance": "new v3 contract tests and qualified evidence at a future exact revision",
+        "explicitly_not_executed": true
+      },
+      "provenance": {
+        "authority": "proposed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/proposals/contract-v3",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-001",
+      "from": "fixture:project",
+      "relation": "contains",
+      "to": "fixture:capability",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/001",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "edge-002",
+      "from": "fixture:capability",
+      "relation": "requires",
+      "to": "fixture:contract-v2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/002",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "edge-003",
+      "from": "fixture:capability",
+      "relation": "tested_by",
+      "to": "fixture:test-source-v2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/003",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "edge-004",
+      "from": "fixture:test-source-v2",
+      "relation": "validates",
+      "to": "fixture:contract-v2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/004",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "edge-005",
+      "from": "fixture:evidence-v2",
+      "relation": "observed_by",
+      "to": "fixture:test-source-v2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/005",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    },
+    {
+      "id": "edge-006",
+      "from": "fixture:evidence-v1",
+      "relation": "invalidates",
+      "to": "fixture:contract-v2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/006",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "2222222222222222222222222222222222222222",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "superseded",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": "Historical evidence no longer applies to current contract version."
+      }
+    },
+    {
+      "id": "edge-007",
+      "from": "fixture:action-v3",
+      "relation": "affects",
+      "to": "fixture:contract-v2",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/edges/007",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "lifecycle": {
+        "state": "current",
+        "supersedes": null,
+        "invalidated_by": null,
+        "reason": null
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "event-001",
+      "kind": "repository_revision_observed",
+      "occurred_at": "2026-11-10T10:00:00Z",
+      "observed_at": "2026-11-10T10:00:00Z",
+      "effective_revision": "1111111111111111111111111111111111111111",
+      "prior_revision": null,
+      "targets": [
+        "fixture:project"
+      ],
+      "state_effect": "no_state_change",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/revision-A",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "1111111111111111111111111111111111111111",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "label": "baseline contract-v1 state"
+      }
+    },
+    {
+      "id": "event-002",
+      "kind": "test_evidence_recorded",
+      "occurred_at": "2026-11-10T10:00:00Z",
+      "observed_at": "2026-11-10T10:00:00Z",
+      "effective_revision": "1111111111111111111111111111111111111111",
+      "prior_revision": null,
+      "targets": [
+        "fixture:test-source-v1",
+        "fixture:evidence-v1"
+      ],
+      "state_effect": "observes",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/run-E1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "1111111111111111111111111111111111111111",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "evidence_id": "E1",
+        "result": "passed",
+        "contract_version": "1",
+        "test_path": "tests/contract.rs",
+        "world": "x86_64-unknown-linux-gnu;features=[]"
+      }
+    },
+    {
+      "id": "event-003",
+      "kind": "repository_revision_observed",
+      "occurred_at": "2026-11-11T10:00:00Z",
+      "observed_at": "2026-11-11T10:00:00Z",
+      "effective_revision": "2222222222222222222222222222222222222222",
+      "prior_revision": "1111111111111111111111111111111111111111",
+      "targets": [
+        "fixture:project"
+      ],
+      "state_effect": "no_state_change",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/revision-B",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "2222222222222222222222222222222222222222",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "label": "new contract revision"
+      }
+    },
+    {
+      "id": "event-004",
+      "kind": "contract_changed",
+      "occurred_at": "2026-11-11T10:00:00Z",
+      "observed_at": "2026-11-11T10:00:00Z",
+      "effective_revision": "2222222222222222222222222222222222222222",
+      "prior_revision": "1111111111111111111111111111111111111111",
+      "targets": [
+        "fixture:contract-v2",
+        "fixture:capability"
+      ],
+      "state_effect": "changes",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/contract-v2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "2222222222222222222222222222222222222222",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "from_version": "1",
+        "to_version": "2",
+        "change": "Receipt validation semantics changed; test file has not yet been updated."
+      }
+    },
+    {
+      "id": "event-005",
+      "kind": "evidence_invalidated",
+      "occurred_at": "2026-11-11T10:00:00Z",
+      "observed_at": "2026-11-11T10:00:00Z",
+      "effective_revision": "2222222222222222222222222222222222222222",
+      "prior_revision": "1111111111111111111111111111111111111111",
+      "targets": [
+        "fixture:evidence-v1"
+      ],
+      "state_effect": "invalidates",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/invalidate-E1",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "2222222222222222222222222222222222222222",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "evidence_id": "E1",
+        "reason": "tested contract v1; current contract is v2",
+        "history_retained": true
+      }
+    },
+    {
+      "id": "event-006",
+      "kind": "repository_revision_observed",
+      "occurred_at": "2026-11-12T10:00:00Z",
+      "observed_at": "2026-11-12T10:00:00Z",
+      "effective_revision": "3333333333333333333333333333333333333333",
+      "prior_revision": "2222222222222222222222222222222222222222",
+      "targets": [
+        "fixture:project"
+      ],
+      "state_effect": "no_state_change",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/revision-C",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "label": "test updated for contract-v2"
+      }
+    },
+    {
+      "id": "event-007",
+      "kind": "source_changed",
+      "occurred_at": "2026-11-12T10:00:00Z",
+      "observed_at": "2026-11-12T10:00:00Z",
+      "effective_revision": "3333333333333333333333333333333333333333",
+      "prior_revision": "2222222222222222222222222222222222222222",
+      "targets": [
+        "fixture:test-source-v2"
+      ],
+      "state_effect": "changes",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/test-v2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "path": "tests/contract.rs",
+        "change": "test now covers contract-v2"
+      }
+    },
+    {
+      "id": "event-008",
+      "kind": "test_evidence_recorded",
+      "occurred_at": "2026-11-12T10:00:00Z",
+      "observed_at": "2026-11-12T10:00:00Z",
+      "effective_revision": "3333333333333333333333333333333333333333",
+      "prior_revision": "2222222222222222222222222222222222222222",
+      "targets": [
+        "fixture:test-source-v2",
+        "fixture:evidence-v2"
+      ],
+      "state_effect": "observes",
+      "provenance": {
+        "authority": "source_declared",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/run-E2",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "evidence_id": "E2",
+        "result": "passed",
+        "contract_version": "2",
+        "test_path": "tests/contract.rs",
+        "world": "x86_64-unknown-linux-gnu;features=[]"
+      }
+    },
+    {
+      "id": "event-009",
+      "kind": "development_action_proposed",
+      "occurred_at": "2026-11-13T10:00:00Z",
+      "observed_at": "2026-11-13T10:00:00Z",
+      "effective_revision": "3333333333333333333333333333333333333333",
+      "prior_revision": null,
+      "targets": [
+        "fixture:action-v3"
+      ],
+      "state_effect": "proposes",
+      "provenance": {
+        "authority": "proposed",
+        "sources": [
+          {
+            "kind": "other",
+            "uri": "synthetic://dynmap/history/proposal-v3",
+            "digest": null
+          }
+        ],
+        "extracted_by": {
+          "name": "manual-synthetic-temporal-fixture",
+          "version": "0.1.0",
+          "digest": null
+        },
+        "observed_at": "2026-11-13T10:00:00Z",
+        "valid_for_revision": "3333333333333333333333333333333333333333",
+        "valid_for_world": "x86_64-unknown-linux-gnu;features=[]",
+        "limitations": [
+          "Public synthetic known-answer fixture; not production repository evidence."
+        ]
+      },
+      "payload": {
+        "action": "upgrade contract v2 to v3",
+        "executed": false,
+        "changes_current_snapshot": false
+      }
+    }
+  ],
+  "limitations": [
+    "Synthetic public fixture. Hash-like identifiers are scenario placeholders, not actual Git object identities or cryptographic digests.",
+    "Events are authored as known-answer expected data; no repository code was run.",
+    "This fixture is not a sealed benchmark task or independent evaluation result."
+  ]
+}
