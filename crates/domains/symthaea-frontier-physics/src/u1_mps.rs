@@ -150,6 +150,9 @@ pub enum U1MpsError {
     DuplicateTeBDHamiltonianBond {
         bond_index: usize,
     },
+    InvalidAdaptivePolicy(&'static str),
+    InvalidAdaptiveTimeStep(f64),
+    AdaptiveGlobalErrorUnqualified,
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -317,6 +320,16 @@ impl core::fmt::Display for U1MpsError {
             Self::DuplicateTeBDHamiltonianBond { bond_index } => write!(
                 f,
                 "Hamiltonian contains more than one local term for bond {bond_index}"
+            ),
+            Self::InvalidAdaptivePolicy(name) => {
+                write!(f, "invalid adaptive TEBD policy field {name}")
+            }
+            Self::InvalidAdaptiveTimeStep(value) => {
+                write!(f, "adaptive TEBD requires a positive finite time step, got {value}")
+            }
+            Self::AdaptiveGlobalErrorUnqualified => write!(
+                f,
+                "adaptive TEBD requires globally qualified canonical-gauge compression receipts"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
