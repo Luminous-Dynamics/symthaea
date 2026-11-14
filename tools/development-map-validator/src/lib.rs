@@ -1,3 +1,5 @@
+pub mod cargo_manifest;
+
 //! Read-only structural and temporal contract checks for EGDDM snapshots.
 //!
 //! This module intentionally does not execute repository-controlled code,
