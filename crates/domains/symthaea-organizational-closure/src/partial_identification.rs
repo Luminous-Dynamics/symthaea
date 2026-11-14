@@ -673,9 +673,29 @@ pub fn evaluate_partial_identification(
             push_finding(&mut findings, PartialIdentificationFindingCode::EmptyExperimentId,
                 None, Some(experiment.id.clone()), "experiment ID is empty");
         }
-        if !scenario.graph.variables.contains(&experiment.intervened_variable) {
-            push_finding(&mut findings, PartialIdentificationFindingCode::UnknownIntervenedVariable,
-                None, Some(experiment.id.clone()), "experiment intervenes on an undeclared variable");
+        if experiment.intervened_variables.is_empty() {
+            push_finding(&mut findings, PartialIdentificationFindingCode::EmptyExperimentInterventions,
+                None, Some(experiment.id.clone()), "experiment must declare at least one intervention variable");
+        }
+        for variable in &experiment.intervened_variables {
+            if !scenario.graph.variables.contains(variable) {
+                push_finding(&mut findings, PartialIdentificationFindingCode::UnknownIntervenedVariable,
+                    None, Some(experiment.id.clone()), "experiment intervenes on an undeclared variable");
+            }
+            if experiment.measured_variables.contains(variable) {
+                push_finding(&mut findings, PartialIdentificationFindingCode::ExperimentIntervenesOnMeasuredVariable,
+                    None, Some(experiment.id.clone()), "experiment cannot both intervene on and measure the same variable");
+            }
+        }
+        if experiment.measured_variables.is_empty() {
+            push_finding(&mut findings, PartialIdentificationFindingCode::EmptyMeasuredVariableSet,
+                None, Some(experiment.id.clone()), "experiment must declare at least one measured variable");
+        }
+        for variable in &experiment.measured_variables {
+            if !scenario.graph.variables.contains(variable) {
+                push_finding(&mut findings, PartialIdentificationFindingCode::UnknownMeasuredVariable,
+                    None, Some(experiment.id.clone()), "experiment measures an undeclared variable");
+            }
         }
         if experiments.insert(experiment.id.clone(), experiment).is_some() {
             push_finding(&mut findings, PartialIdentificationFindingCode::DuplicateExperimentId,
@@ -750,6 +770,9 @@ pub fn evaluate_partial_identification(
             oracle_optimal_experiment_ids: Vec::new(),
             zero_potency_experiment_count: 0,
             selected_zero_potency_count: 0,
+            path_interception_candidate_count: 0,
+            path_interception_confirmed_count: 0,
+            path_interception_disagreement_count: 0,
             findings,
         };
     }
@@ -854,6 +877,9 @@ pub fn evaluate_partial_identification(
             oracle_optimal_experiment_ids: Vec::new(),
             zero_potency_experiment_count: 0,
             selected_zero_potency_count: 0,
+            path_interception_candidate_count: 0,
+            path_interception_confirmed_count: 0,
+            path_interception_disagreement_count: 0,
             findings,
         };
     }
@@ -884,6 +910,9 @@ pub fn evaluate_partial_identification(
             oracle_optimal_experiment_ids: Vec::new(),
             zero_potency_experiment_count: 0,
             selected_zero_potency_count: 0,
+            path_interception_candidate_count: 0,
+            path_interception_confirmed_count: 0,
+            path_interception_disagreement_count: 0,
             findings,
         };
     }
