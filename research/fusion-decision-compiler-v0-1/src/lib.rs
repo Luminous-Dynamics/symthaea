@@ -1138,6 +1138,136 @@ mod tests {
     }
 
     #[test]
+    fn frozen_feccomp_corpus_matches_actual_compiler_dispositions() {
+        const CORPUS: &str = include_str!("../fixtures/fecomp-cases-v1.tsv");
+
+        let mut checked = 0usize;
+        for line in CORPUS.lines().map(str::trim) {
+            if line.is_empty() || line.starts_with('#') || line == "case_id|expected|mutation" {
+                continue;
+            }
+
+            let fields: Vec<&str> = line.split('|').collect();
+            assert_eq!(fields.len(), 3, "malformed fixture row: {line}");
+            let [case_id, expected, mutation] = [fields[0], fields[1], fields[2]];
+            let mut source = candidate();
+
+            match mutation {
+                "none" => {}
+                "missing_service_boundary" => source.service_boundary_ref = None,
+                "unsupported_regime" => {
+                    source.solver_runs[0].supported_regimes = vec!["thermal-arc".to_string()];
+                }
+                "out_of_domain" => {
+                    source.solver_runs[0].applicability = Applicability::OutOfDomain;
+                }
+                "unknown_applicability" => {
+                    source.solver_runs[0].applicability = Applicability::Unknown;
+                }
+                "nonconverged" => {
+                    source.solver_runs[0].convergence = Convergence::NonConverged;
+                }
+                "nonzero_exit" => source.solver_runs[0].exit_code = Some(2),
+                "missing_observable" => {
+                    source.solver_runs[0].output_observables = vec!["psi".to_string()];
+                }
+                "missing_energy_gate" => {
+                    source.hard_gates.retain(|gate| gate.kind != HardGateKind::EnergyBoundary);
+                }
+                "replacement_failed" => {
+                    let gate = source.hard_gates.iter_mut()
+                        .find(|gate| gate.kind == HardGateKind::ReplacementAccess).unwrap();
+                    gate.state = GateState::Fail;
+                    gate.reason_code = Some("replacement-envelope-failed".to_string());
+                }
+                "material_unknown" => {
+                    let gate = source.hard_gates.iter_mut()
+                        .find(|gate| gate.kind == HardGateKind::MaterialApplicability).unwrap();
+                    gate.state = GateState::Unknown;
+                    gate.reason_code = Some("material-domain-unknown".to_string());
+                }
+                "claim_class_mismatch" => source.claims.push(ClaimRequest {
+                    claim_id: "fixture-claim".to_string(),
+                    subject_ref: source.candidate_id.clone(),
+                    subject_revision: source.candidate_revision.clone(),
+                    evidence_id: "evidence-1".to_string(),
+                    requested_class: ClaimClass::Measured,
+                }),
+                "claim_revision_mismatch" => source.claims.push(ClaimRequest {
+                    claim_id: "fixture-claim".to_string(),
+                    subject_ref: source.candidate_id.clone(),
+                    subject_revision: "stale-design-r6".to_string(),
+                    evidence_id: "evidence-1".to_string(),
+                    requested_class: ClaimClass::Synthetic,
+                }),
+                "shared_dependency" => {
+                    let mut second = solver_run("run-b", 'e', 'f');
+                    second.dependencies.dataset_group =
+                        source.solver_runs[0].dependencies.dataset_group.clone();
+                    source.solver_runs.push(second);
+                }
+                "unknown_dependency" => {
+                    let mut second = solver_run("run-b", 'e', 'f');
+                    second.dependencies.assumption_group = None;
+                    source.solver_runs.push(second);
+                }
+                "no_solver_runs" => source.solver_runs.clear(),
+                "bad_geometry_digest" => source.geometry_sha256 = "not-a-digest".to_string(),
+                "dangling_evidence" => {
+                    source.hard_gates[0].evidence_ids = vec!["missing-evidence".to_string()];
+                }
+                "dependency_invalidation" => {
+                    let edges = vec![
+                        DependencyEdge { upstream: "material".to_string(), downstream: "component".to_string() },
+                        DependencyEdge { upstream: "component".to_string(), downstream: "decision".to_string() },
+                    ];
+                    let affected = affected_by_change(&["material".to_string()], &edges);
+                    assert_eq!(affected, vec!["component".to_string(), "decision".to_string(), "material".to_string()]);
+                }
+                "dependency_cycle" => {
+                    let edges = vec![
+                        DependencyEdge { upstream: "a".to_string(), downstream: "b".to_string() },
+                        DependencyEdge { upstream: "b".to_string(), downstream: "c".to_string() },
+                        DependencyEdge { upstream: "c".to_string(), downstream: "a".to_string() },
+                    ];
+                    let affected = affected_by_change(&["a".to_string()], &edges);
+                    assert_eq!(affected, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+                }
+                "solver_revision_mismatch" => {
+                    source.solver_runs[0].candidate_revision = "design-r6".to_string();
+                }
+                "solver_geometry_mismatch" => {
+                    source.solver_runs[0].geometry_sha256 = sha('e');
+                }
+                "unsupported_observable" => {
+                    source.solver_runs[0].supported_observables = vec!["psi".to_string()];
+                }
+                "service_boundary_unresolved" => {
+                    source.service_boundary_ref = Some("missing-boundary-record".to_string());
+                }
+                "service_boundary_scope" => {
+                    source.evidence[0].scope_ref = "component-geometry".to_string();
+                }
+                other => panic!("unknown fixture mutation {other} in {case_id}"),
+            }
+
+            let actual = match compile_candidate(&source) {
+                Ok(build) => match build.disposition {
+                    CandidateDisposition::EligibleForFurtherEngineeringReview => "REVIEW",
+                    CandidateDisposition::Blocked => "BLOCKED",
+                    CandidateDisposition::Indeterminate => "INDETERMINATE",
+                },
+                Err(_) => "REJECT",
+            };
+
+            assert_eq!(actual, expected, "fixture case {case_id} ({mutation})");
+            checked += 1;
+        }
+
+        assert_eq!(checked, 25, "all frozen FECOMP-0 cases must execute");
+    }
+
+    #[test]
     fn dependency_cycles_terminate_and_remain_deterministic() {
         let edges = vec![
             DependencyEdge {
