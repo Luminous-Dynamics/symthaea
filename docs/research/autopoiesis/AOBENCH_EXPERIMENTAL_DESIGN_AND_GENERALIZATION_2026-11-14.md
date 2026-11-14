@@ -24,6 +24,8 @@ Recent 2026 benchmarks make this distinction concrete:
 
 These results are complementary, not directly rankable. The benchmarks differ in task, model, budget, environment, oracle and metric. AOBench must not treat their headline scores as one common leaderboard.
 
+One result deserves special attention: Causal-Discovery-Bench reports that increasing the resource budget by 125× moved one model's structure-identification success from 17% to 78%, but the analysis found that the agent still rarely ran properly controlled experiments. More budget can therefore mask poor experimental design by enabling broader candidate exploration. AOBench must report controlled-intervention rate, variable-control adequacy, information gain per cost, achieved power and oracle regret—not just final discovery accuracy.
+
 ## 2. Paradigm shift: from inference quality to evidence-acquisition competence
 
 An organizationally intelligent system must be able to:
