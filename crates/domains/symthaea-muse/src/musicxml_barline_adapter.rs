@@ -41,6 +41,152 @@ pub enum MusicXmlMeasureAdapterError {
     DuplicatePartId { id: String },
     PartMetadata(String),
     ForeignNamespaceCoreElement { element: String, namespace: String },
+    MissingPartList,
+    UnknownTimewisePart { id: String },
+    IncompleteTimewiseMeasure { measure_number: String, part_id: String },
+    DuplicateTimewisePart { measure_number: String, part_id: String },
+}
+
+/// Original source-node pair for one part's music data in one measure.
+///
+/// In partwise documents, container and content are the same <measure> node.
+/// In timewise documents, container is the outer <measure> and content is
+/// its nested <part>. Keeping both preserves measure-level attributes and
+/// part-local ordered music data without serializing/reparsing the XML.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct MusicXmlMeasureInputV1<'a, 'input> {
+    pub(crate) container: roxmltree::Node<'a, 'input>,
+    pub(crate) content: roxmltree::Node<'a, 'input>,
+}
+
+struct MusicXmlPartInputV1<'a, 'input> {
+    part_id: String,
+    measures: Vec<MusicXmlMeasureInputV1<'a, 'input>>,
+}
+
+fn collect_part_inputs<'a, 'input>(
+    root: roxmltree::Node<'a, 'input>,
+) -> Result<Vec<MusicXmlPartInputV1<'a, 'input>>, MusicXmlMeasureAdapterError> {
+    if root.has_tag_name("score-partwise") {
+        let parts: Vec<_> = root
+            .children()
+            .filter(|node| node.has_tag_name("part"))
+            .collect();
+        if parts.is_empty() {
+            return Err(MusicXmlMeasureAdapterError::NoParts);
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        let mut output = Vec::with_capacity(parts.len());
+        for part in parts {
+            let part_id = part
+                .attribute("id")
+                .filter(|value| !value.trim().is_empty())
+                .ok_or(MusicXmlMeasureAdapterError::MissingPartId)?
+                .to_string();
+            if !seen.insert(part_id.clone()) {
+                return Err(MusicXmlMeasureAdapterError::DuplicatePartId {
+                    id: part_id,
+                });
+            }
+            let measures = part
+                .children()
+                .filter(|node| node.has_tag_name("measure"))
+                .map(|measure| MusicXmlMeasureInputV1 {
+                    container: measure,
+                    content: measure,
+                })
+                .collect();
+            output.push(MusicXmlPartInputV1 { part_id, measures });
+        }
+        return Ok(output);
+    }
+
+    if !root.has_tag_name("score-timewise") {
+        return Err(MusicXmlMeasureAdapterError::UnsupportedRoot {
+            root: root.tag_name().name().to_string(),
+        });
+    }
+    let part_list = root
+        .children()
+        .find(|node| node.has_tag_name("part-list"))
+        .ok_or(MusicXmlMeasureAdapterError::MissingPartList)?;
+    let declarations: Vec<String> = part_list
+        .children()
+        .filter(|node| node.has_tag_name("score-part"))
+        .map(|node| {
+            node.attribute("id")
+                .filter(|value| !value.trim().is_empty())
+                .map(str::to_string)
+                .ok_or(MusicXmlMeasureAdapterError::MissingPartId)
+        })
+        .collect::<Result<_, _>>()?;
+    if declarations.is_empty() {
+        return Err(MusicXmlMeasureAdapterError::NoParts);
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for part_id in &declarations {
+        if !seen.insert(part_id.clone()) {
+            return Err(MusicXmlMeasureAdapterError::DuplicatePartId {
+                id: part_id.clone(),
+            });
+        }
+    }
+
+    let measures: Vec<_> = root
+        .children()
+        .filter(|node| node.has_tag_name("measure"))
+        .collect();
+    if measures.is_empty() {
+        return Err(MusicXmlMeasureAdapterError::NoParts);
+    }
+    let mut output: Vec<MusicXmlPartInputV1<'a, 'input>> = declarations
+        .iter()
+        .map(|part_id| MusicXmlPartInputV1 {
+            part_id: part_id.clone(),
+            measures: Vec::with_capacity(measures.len()),
+        })
+        .collect();
+
+    for measure in measures {
+        let measure_number = measure.attribute("number").unwrap_or("").to_string();
+        let mut blocks = std::collections::BTreeMap::new();
+        for part in measure.children().filter(|node| node.has_tag_name("part")) {
+            let part_id = part
+                .attribute("id")
+                .filter(|value| !value.trim().is_empty())
+                .ok_or(MusicXmlMeasureAdapterError::MissingPartId)?
+                .to_string();
+            if !seen.contains(&part_id) {
+                return Err(MusicXmlMeasureAdapterError::UnknownTimewisePart {
+                    id: part_id,
+                });
+            }
+            if blocks.insert(part_id.clone(), part).is_some() {
+                return Err(MusicXmlMeasureAdapterError::DuplicateTimewisePart {
+                    measure_number,
+                    part_id,
+                });
+            }
+        }
+        for part_input in &mut output {
+            let Some(content) = blocks.remove(&part_input.part_id) else {
+                return Err(MusicXmlMeasureAdapterError::IncompleteTimewiseMeasure {
+                    measure_number,
+                    part_id: part_input.part_id.clone(),
+                });
+            };
+            part_input.measures.push(MusicXmlMeasureInputV1 {
+                container: measure,
+                content,
+            });
+        }
+        if !blocks.is_empty() {
+            return Err(MusicXmlMeasureAdapterError::UnknownTimewisePart {
+                id: blocks.keys().next().cloned().unwrap_or_default(),
+            });
+        }
+    }
+    Ok(output)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
