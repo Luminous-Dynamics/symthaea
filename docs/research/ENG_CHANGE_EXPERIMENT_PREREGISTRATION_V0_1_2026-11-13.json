@@ -98,7 +98,9 @@
     "zero_future_knowledge_leakage_at_decision_frontier",
     "zero_retroactive_historical_state_rewrite",
     "zero_substitution_between_event_valid_publication_receipt_ingestion_index_and_context_times",
-    "unknown_temporal_availability_or_validity_never_forced_to_pass"
+    "unknown_temporal_availability_or_validity_never_forced_to_pass",
+    "zero_cross_conductor_total_order_inference_from_wall_clock_or_foreign_local_indices",
+    "no_system_available_or_run_context_included_when_required_causal_cut_is_incomplete"
   ],
   "metrics": {
     "accuracy": [
@@ -132,7 +134,10 @@
       "source_available_vs_system_visible_vs_run_context_classification_accuracy",
       "indeterminate_detection_and_forced_resolution_rate",
       "historical_replay_equality_under_late_arrival_and_correction_permutations",
-      "clock_order_error_rate"
+      "clock_order_error_rate",
+      "required_causal_frontier_completeness_and_source_set_coverage",
+      "false_cross_conductor_total_order_rate",
+      "incomplete_causal_join_indeterminate_detection_rate"
     ]
   },
   "analysis": {
@@ -249,14 +254,22 @@
     "markdown": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md",
     "machine_readable": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_OVERLAY_V0_1.json",
     "lifecycle_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
-    "cases": 9,
+    "cases": 10,
     "status": "blueprint_only_unadjudicated_unscored",
     "gold_record_compatibility": {
       "status": "blocking_prerequisite_before_temporal_gold_adjudication",
       "current_gold_schema": "strict_additionalProperties_false_without_structured_temporal_fields",
       "notes_are_sufficient": false,
       "required_change": "versioned optional nested temporal-evidence extension or independently validated content-addressed companion record bound to existing gold record",
-      "existing_dispositions_unchanged": true
+      "existing_dispositions_unchanged": true,
+      "schema_version": "change-impact-gold-record-v1.1-with-causal-frontier-binding"
+    },
+    "causal_frontier": {
+      "status": "reference_existing_owner_outputs_no_new_causal_history_contract",
+      "evidence_frontier_owner": "https://github.com/Luminous-Dynamics/mycelix/issues/2631",
+      "multiconductor_causal_history_owner": "https://github.com/Luminous-Dynamics/mycelix/issues/5843",
+      "dependency_completeness_owner": "https://github.com/Luminous-Dynamics/mycelix/issues/5923",
+      "rule": "multi-source decision frontiers require a content-bound EvidenceFrontierV1 source set and complete independently verified causal-history receipt; timestamps and local indices cannot mint cross-conductor causal order"
     }
   },
   "temporal_owner_composition": {
