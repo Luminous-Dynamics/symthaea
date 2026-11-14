@@ -442,5 +442,506 @@
   "claim_ceiling": [
     "Exact finite-dimensional algebra conformance for Equations (4), (13), (15) and (16) on one synthetic plant/controller instance.",
     "This fixture does not establish stable rational realizability, interval generator containment, Theorem 3 assumptions, SDP feasibility, controller synthesis or robust stability."
-  ]
+  ],
+  "schur_complement_conformance": {
+    "source_identity": "Q=[[Pi22+M^T*Pi12+Pi12^T*M, M^T],[M,-Pi11^-1]]",
+    "reduced_schur_identity": "S + M^T*Pi11*M",
+    "feasible_case": {
+      "Pi11": [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "Pi12": [
+        [
+          {
+            "numerator": "0.25",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "Pi22": [
+        [
+          {
+            "numerator": "-3",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "-2",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "M": [
+        [
+          {
+            "numerator": "0.5",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0.3333333333333333",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "expected": {
+        "Pi11_leading_principal_minors": [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        ],
+        "S": [
+          [
+            {
+              "numerator": "-2.75",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-2",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "reduced_schur": [
+          [
+            {
+              "numerator": "-2.25",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-1.8888888888888888",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "Q": [
+          [
+            {
+              "numerator": "-2.75",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.3333333333333333",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.3333333333333333",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "Q_leading_principal_minors": [
+          {
+            "numerator": "-11",
+            "denominator": "4"
+          },
+          {
+            "numerator": "11",
+            "denominator": "2"
+          },
+          {
+            "numerator": "-9",
+            "denominator": "4"
+          },
+          {
+            "numerator": "17",
+            "denominator": "8"
+          }
+        ],
+        "Q_negative_definite": true,
+        "reduced_schur_negative_definite": true
+      }
+    },
+    "infeasible_case": {
+      "Pi11": [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "Pi12": [
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "Pi22": [
+        [
+          {
+            "numerator": "-0.2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "-0.2",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "M": [
+        [
+          {
+            "numerator": "0.5",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0.5",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "expected": {
+        "S": [
+          [
+            {
+              "numerator": "-0.2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-0.2",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "reduced_schur": [
+          [
+            {
+              "numerator": "0.3",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.3",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "Q": [
+          [
+            {
+              "numerator": "-0.2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-0.2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.5",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0.5",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-0.5",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "Q_determinant": {
+          "numerator": "9",
+          "denominator": "400"
+        },
+        "Q_leading_principal_minors": [
+          {
+            "numerator": "-1",
+            "denominator": "5"
+          },
+          {
+            "numerator": "1",
+            "denominator": "25"
+          },
+          {
+            "numerator": "3",
+            "denominator": "100"
+          },
+          {
+            "numerator": "9",
+            "denominator": "400"
+          }
+        ],
+        "Q_negative_definite": false,
+        "reduced_schur_negative_definite": false,
+        "wrong_sign_reduced_schur": [
+          [
+            {
+              "numerator": "-0.7",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "-0.7",
+              "denominator": "1"
+            }
+          ]
+        ],
+        "wrong_sign_would_misclassify_as_feasible": true
+      }
+    }
+  }
 }
