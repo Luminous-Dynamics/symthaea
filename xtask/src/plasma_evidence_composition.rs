@@ -45,7 +45,7 @@ struct CompositionCase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Disposition {
+pub(super) enum Disposition {
     Pass,
     Blocked,
     Rejected,
