@@ -1100,6 +1100,157 @@ mod tests {
         assert_eq!(result.length_qualified_output_per_input_ppm, 418_800);
     }
 
+    fn exercise_distribution_case(case_id: &str) -> Decision {
+        let method = method();
+        let mut specimen = distribution(
+            &method,
+            "incoming-001",
+            ProcessState::PreProcessReferenceFibre,
+        );
+        match case_id {
+            "FM-001-VALID-MASS-WEIGHTED" => {}
+            "FM-002-NUMBER-WEIGHTED" => {
+                specimen.weighting_basis = WeightingBasis::NumberWeighted;
+            }
+            "FM-003-MATERIAL-OUT-OF-SCOPE" => {
+                specimen.material_class = MaterialClass::Polyester;
+            }
+            "FM-004-LOCAL-VALIDATION-MISSING" => {
+                specimen.process_state = ProcessState::RecoveredAfterOpening;
+            }
+            "FM-005-CALIBRATION-EXPIRED" => {
+                specimen.calibration.as_mut().unwrap().valid_until_ns = 99;
+            }
+            "FM-006-CALIBRATION-INSTRUMENT-MISMATCH" => {
+                specimen.calibration.as_mut().unwrap().instrument_id =
+                    "another-instrument".to_owned();
+            }
+            "FM-007-BIN-GAP" => {
+                specimen.bins[1].lower_bound_um += 100;
+            }
+            "FM-008-BIN-OVERLAP" => {
+                specimen.bins[1].lower_bound_um -= 100;
+            }
+            "FM-009-FRACTION-NOT-CLOSED" => {
+                specimen.unclassified_fraction_ppm = 10_000;
+            }
+            "FM-010-PSEUDOREPLICATED-SUBSAMPLES" => {
+                specimen.sample_plan.independent_subsample_ids[2] =
+                    specimen.sample_plan.independent_subsample_ids[0].clone();
+            }
+            "FM-011-THRESHOLD-STRADDLE" => {
+                specimen.bins[0].upper_bound_um = 10_000;
+                specimen.bins[1].lower_bound_um = 10_000;
+                specimen.bins[1].upper_bound_um = 15_000;
+                specimen.bins[2].lower_bound_um = 15_000;
+            }
+            "FM-012-INSUFFICIENT-ACQUISITIONS" => {
+                specimen.sample_plan.acquisition_ids.pop();
+            }
+            other => panic!("unknown distribution corpus case {other}"),
+        }
+        assess_distribution(&specimen, &method, &criterion()).decision
+    }
+
+    fn exercise_bridge_case(case_id: &str) -> bool {
+        let a = method();
+        let mut b = method();
+        b.method_id = "PHOTOELECTRIC-X".to_owned();
+        match case_id {
+            "FM-013-CROSS-METHOD-PAIRED-BRIDGE" => {
+                assess_method_bridge(&bridge(&a, &b), &a, &b)
+                    .equivalent_for_declared_metric
+            }
+            "FM-014-BRIDGE-TOO-FEW-PAIRS" => {
+                let mut candidate = bridge(&a, &b);
+                candidate.paired_specimens.pop();
+                assess_method_bridge(&candidate, &a, &b)
+                    .equivalent_for_declared_metric
+            }
+            "FM-015-BRIDGE-MARGIN-EXCEEDED" => {
+                let mut candidate = bridge(&a, &b);
+                candidate.paired_specimens[0].method_b_fraction_ppm = 760_000;
+                assess_method_bridge(&candidate, &a, &b)
+                    .equivalent_for_declared_metric
+            }
+            other => panic!("unknown bridge corpus case {other}"),
+        }
+    }
+
+    fn exercise_process_case(case_id: &str) -> Decision {
+        let method = method();
+        let input = distribution(
+            &method,
+            "incoming-lot",
+            ProcessState::PreProcessReferenceFibre,
+        );
+        let mut output = distribution(
+            &method,
+            "output-lot",
+            ProcessState::RecoveredAfterOpening,
+        );
+        output.parent_lot_id = "incoming-lot".to_owned();
+        output.source_process_trial_id = Some("trial-001".to_owned());
+        output.local_scope_validation = Some(local_scope_validation(&method));
+        match case_id {
+            "FM-016-OUTPUT-LOT-TRIAL-MISMATCH" => {
+                output.source_process_trial_id = Some("different-trial".to_owned());
+            }
+            other => panic!("unknown process corpus case {other}"),
+        }
+        let comparison = ProcessComparison {
+            incoming_lot_id: "incoming-lot".to_owned(),
+            output_lot_id: "output-lot".to_owned(),
+            process_trial_evidence_id: "trial-001".to_owned(),
+            incoming_mass_mg: 100_000,
+            output_mass_mg: 60_000,
+            incoming_distribution: input,
+            output_distribution: output,
+        };
+        assess_process_comparison(&comparison, &method, &criterion()).decision
+    }
+
+    #[test]
+    fn synthetic_corpus_drives_all_method_scope_and_lineage_regressions() {
+        const CORPUS: &str = include_str!("../fixtures/metrology-cases-v0.1.json");
+        const SCHEMA: &str = include_str!("../bundle.schema.json");
+        let corpus: serde_json::Value = serde_json::from_str(CORPUS).unwrap();
+        let schema: serde_json::Value = serde_json::from_str(SCHEMA).unwrap();
+        assert_eq!(corpus["schema_version"], "0.1.0");
+        assert_eq!(corpus["corpus_id"], "TEXTILE-FIBRE-METROLOGY-CASES-001");
+        assert_eq!(corpus["fixture_class"], "synthetic");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        assert_eq!(corpus["cases"].as_array().unwrap().len(), 16);
+
+        let mut seen = BTreeSet::new();
+        for case in corpus["cases"].as_array().unwrap() {
+            let case_id = case["case_id"].as_str().unwrap();
+            assert!(seen.insert(case_id), "duplicate corpus case {case_id}");
+            let operation = case["operation"].as_str().unwrap();
+            let expected = case["expected"].as_str().unwrap();
+            let actual = match operation {
+                "assess_distribution" => {
+                    exercise_distribution_case(case_id) == match expected {
+                        "qualified" => Decision::Qualified,
+                        "insufficient_evidence" => Decision::InsufficientEvidence,
+                        "rejected" => Decision::Rejected,
+                        other => panic!("unknown distribution expectation {other}"),
+                    }
+                }
+                "assess_method_bridge" => {
+                    exercise_bridge_case(case_id) == (expected == "equivalent")
+                }
+                "assess_process_comparison" => {
+                    exercise_process_case(case_id) == Decision::InsufficientEvidence
+                        && expected == "insufficient_evidence"
+                }
+                other => panic!("unknown corpus operation {other}"),
+            };
+            assert!(actual, "corpus expectation failed for {case_id}");
+        }
+        assert_eq!(seen.len(), 16);
+    }
+
     #[test]
     fn process_comparison_rejects_borrowed_output_lot_or_trial() {
         let method = method();
