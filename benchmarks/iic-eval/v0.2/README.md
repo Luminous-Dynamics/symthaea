@@ -57,3 +57,6 @@ This seed does not establish semantic correctness, requirement completeness, leg
 ## Decision-time evidence coverage
 
 Case IIC-010 asks for two views with different effective times but the same later knowledge time. The oracle maps each temporal query to the candidate versions required to reconstruct it. The evaluator reports the proportion of temporal query slices for which all required candidate references were recovered. This adapts temporal coverage from retrieval benchmarks to decision reconstruction: retrieving a current source is insufficient if an earlier decision-time rule is missing.
+
+
+See [Decision-time evidence coverage research](./DECISION_TIME_COVERAGE.md) for the distinction between temporal retrieval coverage and evidence completeness for a specific decision.
