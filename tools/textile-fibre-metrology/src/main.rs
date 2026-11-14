@@ -5,7 +5,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
 use textile_fibre_metrology::{
     assess_distribution, DistributionAssessment, FibreLengthDistribution, MethodDefinition,
     ReceiverCriterion,
@@ -27,19 +26,10 @@ struct OutputBundle {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() != 3 || args[1] != "verify" {
-        return Err(
-            "usage: textile-fibre-metrology verify --input BUNDLE.json".to_owned()
-        );
+    if args.len() != 4 || args[1] != "verify" || args[2] != "--input" {
+        return Err("usage: textile-fibre-metrology verify --input BUNDLE.json".to_owned());
     }
-    let input_index = args
-        .iter()
-        .position(|arg| arg == "--input")
-        .ok_or_else(|| "missing --input BUNDLE.json".to_owned())?;
-    let input_path = args
-        .get(input_index + 1)
-        .ok_or_else(|| "missing value after --input".to_owned())?;
-    let _ = PathBuf::from(input_path);
+    let input_path = &args[3];
     let bytes = fs::read(input_path)
         .map_err(|error| format!("cannot read input bundle: {error}"))?;
     let bundle: InputBundle = serde_json::from_slice(&bytes)
