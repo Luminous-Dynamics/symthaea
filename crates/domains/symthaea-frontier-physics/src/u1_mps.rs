@@ -4431,7 +4431,7 @@ mod tests {
         assert!(receipt.maximum_right_isometry_residual <= 1.0e-10);
         assert!(receipt.factorization_max_residual <= 1.0e-10);
         assert!(receipt.relative_norm_drift <= 1.0e-10);
-        assert!(receipt.qualifies(1.0e-10));
+        assert!(receipt.qualifies(1.0e-10), "canonical receipt: {receipt:?}");
         assert!(receipt.exterior_operator_norm_product_upper_bound() >= 1.0);
         assert_eq!(state.total_charge(), 2);
         assert!(state.selection_rule_residual() <= 1.0e-10);
