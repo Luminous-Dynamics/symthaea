@@ -910,7 +910,7 @@ mod tests {
         let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
         let base = observation(&pair, &pair_sha, true, 60.0);
         let transformed = observation(&pair, &pair_sha, false, 63.0);
-        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed).unwrap();
         assert!(result.passed);
         assert_eq!(result.residuals[1].numeric_residual, Some(0.0));
     }
@@ -924,7 +924,7 @@ mod tests {
         let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
         let base = observation(&pair, &pair_sha, true, 60.0);
         let transformed = observation(&pair, &pair_sha, false, 64.0);
-        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed).unwrap();
         assert!(!result.passed);
         assert!(!result.relation_satisfied);
     }
@@ -939,13 +939,13 @@ mod tests {
         let base = observation(&pair, &pair_sha, true, 64.0);
         let mut transformed = observation(&pair, &pair_sha, false, 64.0);
         transformed.protected_invariants_satisfied = false;
-        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed).unwrap();
         assert!(!result.passed);
     }
 
     #[test]
     fn evaluator_rejects_an_observed_property_omitted_from_mapping() {
-        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let (mut pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Invariant);
         let map = mapping(1.0, 0.0, 0.0);
         pair.property_mapping_sha256 =
             Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
@@ -961,7 +961,7 @@ mod tests {
             },
         });
         transformed.properties.sort_by(|a, b| a.property_id.cmp(&b.property_id));
-        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed)
+        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed)
             .unwrap_err()
             .contains(&MusicEditMetamorphicAssessmentIssueV1::UnmappedObservationProperty(
                 "unmapped-loudness".to_owned(),
@@ -970,7 +970,7 @@ mod tests {
 
     #[test]
     fn invariant_category_maps_must_be_identity_and_canonical() {
-        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let (mut pair, transform_receipt) = pair_with_transform_receipt(MusicEditMetamorphicRelationV1::Invariant);
         let map = MusicEditMetamorphicPropertyMappingV1 {
             schema_version: "mel-music-edit-metamorphic-property-map-v1".to_owned(),
             properties: vec![MusicEditMetamorphicPropertyRuleEntryV1 {
@@ -994,7 +994,7 @@ mod tests {
         let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
         let base = observation(&pair, &pair_sha, true, 64.0);
         let transformed = observation(&pair, &pair_sha, false, 64.0);
-        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed)
+        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed)
             .unwrap_err()
             .iter()
             .any(|issue| matches!(
@@ -1026,7 +1026,7 @@ mod tests {
         let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
         let base = observation(&pair, &pair_sha, true, 440.0);
         let transformed = observation(&pair, &pair_sha, false, 445.0);
-        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).is_err());
+        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &transform_receipt, &map, &base, &transformed).is_err());
     }
 
     #[test]
