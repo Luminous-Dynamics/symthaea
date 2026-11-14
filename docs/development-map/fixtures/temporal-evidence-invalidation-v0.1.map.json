@@ -22,7 +22,7 @@
   "extractor": {
     "name": "manual-synthetic-temporal-fixture",
     "version": "0.1.0",
-    "digest": null
+    "build_digest": null
   },
   "nodes": [
     {
