@@ -334,6 +334,38 @@ mod tests {
     }
 
     #[test]
+    fn failure_classification_rejects_unknown_pattern_code() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0]["composition_evidence"]["baseline_failure_classifications"][0]["patterns"][0]["designation"] = Value::String("NOT-A-STANDARD-CODE".to_owned());
+        assert_eq!(audit_case(&row, &data), Disposition::Rejected);
+    }
+
+    #[test]
+    fn failure_classification_rejects_percentages_that_do_not_sum_to_one_hundred() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0]["composition_evidence"]["baseline_failure_classifications"][0]["patterns"][0]["percentage"] = Value::from(80.0);
+        assert_eq!(audit_case(&row, &data), Disposition::Rejected);
+    }
+
+    #[test]
+    fn failure_classification_cannot_smuggle_an_acceptability_assessment() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0]["composition_evidence"]["failure_mode_analysis"]["acceptability_assessment"] = Value::String("acceptable".to_owned());
+        assert_eq!(audit_case(&row, &data), Disposition::Rejected);
+    }
+
+    #[test]
+    fn failure_classification_specimen_cluster_mismatch_rejects() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0]["composition_evidence"]["baseline_failure_classifications"][0]["cluster_id"] = Value::String("UNRELATED-LOT".to_owned());
+        assert_eq!(audit_case(&row, &data), Disposition::Rejected);
+    }
+
+    #[test]
     fn baseline_joint_strength_requires_method_scope_receipt() {
         let data = fixture();
         let mut row = case(&data, "material-lot-bridged").clone();
