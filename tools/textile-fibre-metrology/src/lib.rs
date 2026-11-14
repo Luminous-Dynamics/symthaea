@@ -1137,8 +1137,8 @@ mod tests {
                 specimen.unclassified_fraction_ppm = 10_000;
             }
             "FM-010-PSEUDOREPLICATED-SUBSAMPLES" => {
-                specimen.sample_plan.independent_subsample_ids[2] =
-                    specimen.sample_plan.independent_subsample_ids[0].clone();
+                let reused_id = specimen.sample_plan.independent_subsample_ids[0].clone();
+                specimen.sample_plan.independent_subsample_ids[2] = reused_id;
             }
             "FM-011-THRESHOLD-STRADDLE" => {
                 specimen.bins[0].upper_bound_um = 10_000;
@@ -1216,13 +1216,37 @@ mod tests {
     fn synthetic_corpus_drives_all_method_scope_and_lineage_regressions() {
         const CORPUS: &str = include_str!("../fixtures/metrology-cases-v0.1.json");
         const SCHEMA: &str = include_str!("../bundle.schema.json");
+        const PROFILES: &str = include_str!("../fixtures/method-profiles.example.json");
         let corpus: serde_json::Value = serde_json::from_str(CORPUS).unwrap();
         let schema: serde_json::Value = serde_json::from_str(SCHEMA).unwrap();
+        let profiles: serde_json::Value = serde_json::from_str(PROFILES).unwrap();
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-FIBRE-METROLOGY-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
         assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
         assert_eq!(corpus["cases"].as_array().unwrap().len(), 16);
+        assert_eq!(profiles["schema_version"], "0.1.0");
+        let method_profiles = profiles["profiles"].as_array().unwrap();
+        assert_eq!(method_profiles.len(), 3);
+        let photoelectric = method_profiles
+            .iter()
+            .find(|profile| profile["method_id"] == "ASTM-D1447-26")
+            .unwrap();
+        assert!(
+            !photoelectric["allowed_process_states"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|state| state == "recovered_after_opening")
+        );
+        let single_fibre = method_profiles
+            .iter()
+            .find(|profile| profile["method_id"] == "ISO-6989-1981")
+            .unwrap();
+        assert_eq!(
+            single_fibre["supported_weighting_bases"][0],
+            "number_weighted"
+        );
 
         let mut seen = BTreeSet::new();
         for case in corpus["cases"].as_array().unwrap() {
