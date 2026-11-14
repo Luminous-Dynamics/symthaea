@@ -780,14 +780,14 @@ pub fn evaluate_event_order(
             let order = compare_decision_events(trigger_event, effect_event, &by_id, qualification);
             effect_orders.insert(effect_event.event_id.clone(), order);
             match order {
-                EventOrder::Before => {}
-                EventOrder::After => {
+                EventOrder::Before => {
                     critical_failure = true;
                     reasons.insert(format!(
                         "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:{}",
                         effect_event.event_id
                     ));
                 }
+                EventOrder::After => {}
                 EventOrder::Overlapping => {
                     indeterminate = true;
                     reasons.insert(format!(
@@ -845,13 +845,14 @@ pub fn evaluate_event_order(
         if event.kind == DecisionEventKind::OperationStarted {
             if let (Some(trigger_event), Some(_operation_id)) = (trigger, &event.operation_id) {
                 match compare_decision_events(trigger_event, event, &by_id, qualification) {
-                    EventOrder::After => {
+                    EventOrder::Before => {
                         critical_failure = true;
                         reasons.insert(format!(
                             "OPERATION_STARTED_AFTER_STOP_TRIGGER:{}",
                             event.event_id
                         ));
                     }
+                    EventOrder::After => {}
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
                         reasons.insert(format!(
@@ -886,10 +887,11 @@ pub fn evaluate_event_order(
             }
             if let Some(trigger_event) = trigger {
                 match compare_decision_events(trigger_event, event, &by_id, qualification) {
-                    EventOrder::After => {
+                    EventOrder::Before => {
                         critical_failure = true;
                         reasons.insert(format!("RETRY_AFTER_STOP_TRIGGER:{operation_id}"));
                     }
+                    EventOrder::After => {}
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
                         reasons.insert(format!("RETRY_STOP_ORDER_UNRESOLVED:{operation_id}"));
