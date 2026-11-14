@@ -28,11 +28,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.1";
+    "mel-mr-eval-017-counterfactual-influence-v0.2";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
     "mel-mr-eval-017-repeatability-calibration-v0.1";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
-const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1\0";
+const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v2\0";
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -445,8 +445,13 @@ pub struct CounterfactualInfluenceReport {
 }
 
 /// Exact artifacts and audio supplied to the paired measurement. The caller
-/// must create the counterfactual schedule by changing only the declared event;
-/// this module binds the bytes but does not independently parse the schedule.
+/// supplies the exact serialized baseline and counterfactual Scores plus
+/// expected primary MIDI pitch vectors derived from those typed Scores by the
+/// qualified score adapter. Renderer bindings must have been minted against
+/// those exact score bytes and pitch vectors. This module independently checks
+/// the performed-event lineage and protected-event obligations; it does not
+/// prove that the two typed Scores differ only in the intended musical property.
+
 pub struct CounterfactualInfluenceInput<'view, 'audio> {
     pub source_event_id: &'view str,
     pub intervention: EventIntervention,
@@ -459,8 +464,11 @@ pub struct CounterfactualInfluenceInput<'view, 'audio> {
     pub counterfactual_performed_event_map_bytes: &'view [u8],
     pub expected_score_event_count: usize,
     /// Expected MIDI pitch indexed by canonical source Score event index.
+    /// Must be derived from the exact typed source Score.
     pub expected_primary_midi_by_score_index: &'view [u8],
     /// Expected primary MIDI pitches derived from the exact counterfactual Score.
+    /// A qualified symbolic Score-transform verifier remains responsible for
+    /// proving the Score-level operation contract.
     pub counterfactual_expected_primary_midi_by_score_index: &'view [u8],
     pub baseline_schedule_bytes: &'view [u8],
     pub counterfactual_schedule_bytes: &'view [u8],
