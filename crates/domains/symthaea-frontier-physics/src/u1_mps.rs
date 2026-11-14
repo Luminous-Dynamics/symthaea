@@ -629,6 +629,7 @@ fn left_canonicalize_site(
         let column_count = block.ncols();
         let decomposition =
             block
+                .clone()
                 .try_svd(true, true, tolerance, max_iterations)
                 .ok_or(U1MpsError::SvdFailed {
                     rows: row_count,
@@ -826,6 +827,7 @@ fn right_canonicalize_site(
         let column_count = block.ncols();
         let decomposition =
             block
+                .clone()
                 .try_svd(true, true, tolerance, max_iterations)
                 .ok_or(U1MpsError::SvdFailed {
                     rows: row_count,
@@ -2883,8 +2885,9 @@ impl U1TeBDLayer {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
+        left_isometry_residual, right_isometry_residual, ComplexU1Mps,
+        U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
+        U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
         U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
