@@ -1,0 +1,140 @@
+{
+  "document_type": "retrieval_exploration_benchmark_oracle",
+  "schema_version": "0.1.0",
+  "benchmark_id": "DYNRETR-001",
+  "fixture_id": "DYNRETR-SYN-BATCH-001",
+  "status": "public_synthetic_known_answer",
+  "expected_dispositions": [
+    {
+      "case_id": "DYNRETR-SYN-001",
+      "disposition": "retrieve",
+      "relevant_regions": [
+        "r1",
+        "r2",
+        "r3"
+      ],
+      "forbidden_regions": []
+    },
+    {
+      "case_id": "DYNRETR-SYN-002",
+      "disposition": "abstain",
+      "relevant_regions": [],
+      "forbidden_regions": [
+        "r6",
+        "r7",
+        "r8"
+      ]
+    },
+    {
+      "case_id": "DYNRETR-SYN-003",
+      "disposition": "abstain",
+      "relevant_regions": [],
+      "forbidden_regions": [
+        "r9",
+        "r10"
+      ]
+    },
+    {
+      "case_id": "DYNRETR-SYN-004",
+      "disposition": "retrieve",
+      "relevant_regions": [
+        "r11",
+        "r13"
+      ],
+      "forbidden_regions": [
+        "r12"
+      ]
+    },
+    {
+      "case_id": "DYNRETR-SYN-005",
+      "disposition": "retrieve",
+      "relevant_regions": [
+        "r14",
+        "r16"
+      ],
+      "forbidden_regions": [
+        "r15"
+      ]
+    },
+    {
+      "case_id": "DYNRETR-SYN-006",
+      "disposition": "retrieve",
+      "relevant_regions": [
+        "r17",
+        "r18",
+        "r19",
+        "r20"
+      ],
+      "forbidden_regions": [
+        "r21"
+      ]
+    },
+    {
+      "case_id": "DYNRETR-SYN-007",
+      "disposition": "retrieve",
+      "relevant_regions": [
+        "r22",
+        "r23"
+      ],
+      "forbidden_regions": [
+        "r24",
+        "r25"
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "DYNRETR-NC-01",
+      "mutation": "Return every candidate region including lexical decoys.",
+      "expected": "penalize_precision_and_context_efficiency"
+    },
+    {
+      "id": "DYNRETR-NC-02",
+      "mutation": "Return r6/r7/r8 as a protobuf migration answer in the natural no-gold case.",
+      "expected": "reject_false_answer"
+    },
+    {
+      "id": "DYNRETR-NC-03",
+      "mutation": "Treat a wrong-repository counterfactual no-gold as a positive retrieval hit.",
+      "expected": "score_counterfactual_no_gold_separately_and_reject"
+    },
+    {
+      "id": "DYNRETR-NC-04",
+      "mutation": "Include inactive payments-v2 region r12 in the default-world answer.",
+      "expected": "reject_configuration_world_leakage"
+    },
+    {
+      "id": "DYNRETR-NC-05",
+      "mutation": "Include stale revision r15 as current implementation evidence.",
+      "expected": "reject_temporal_revision_leakage"
+    },
+    {
+      "id": "DYNRETR-NC-06",
+      "mutation": "Omit non-local caller r19 and feature declaration r20 from the change-impact query.",
+      "expected": "penalize_critical_context_recall"
+    },
+    {
+      "id": "DYNRETR-NC-07",
+      "mutation": "Rank UI badge r24/r25 above the cryptographic primitive and invariant test.",
+      "expected": "penalize_lexical_decoy_susceptibility"
+    },
+    {
+      "id": "DYNRETR-NC-08",
+      "mutation": "Exceed token or line budget to achieve full recall.",
+      "expected": "reject_budget_violation"
+    }
+  ],
+  "metrics": [
+    "file/region/line precision recall F1",
+    "MRR and nDCG",
+    "Recall@k under fixed token and line budgets",
+    "context yield at 8K tokens and fixed line count",
+    "irrelevant and duplicate context fractions",
+    "critical-span omission rate",
+    "wrong-revision and inactive-world leakage rate",
+    "natural no-gold and counterfactual no-gold abstention precision",
+    "latency and token cost",
+    "downstream resolution under matched context budget"
+  ],
+  "claim_ceiling": "Public synthetic known-answer oracle only. It does not establish tokenizer costs, retriever performance, external benchmark reproduction, downstream repair gains or industry superiority."
+}
