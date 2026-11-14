@@ -45,11 +45,12 @@ Each source event records:
 - exact rational performed duration (or none for a grace note);
 - exactly one event kind: written pitch spelling (step, exact source alter string, octave), rest (including measure-rest flag/display pitch), or unpitched event (display pitch);
 - grace attributes (slash, steal time, make time), cue and chord-member flags;
+- note-level `time-only`, signed `attack` and `release` annotations retained as source divisions strings, separate from canonical score offset/duration;
 - chord-member anchor ordinal, voice, staff and instrument IDs;
 - written type/dot count and exact time-modification actual/normal ratio;
 - sound tie records and visual tie records as separate fields;
 - tuplet notation source subtrees, beam/stem/notehead/accidental records;
-- full note subtree as a typed source tree, including articulation/ornament and extension annotations.
+- full note subtree as a typed source tree, including articulation/ornament and extension annotations, with element and attribute namespace URIs (not just local names).
 
 Chord members share their immediately preceding base note's onset and do not advance the cursor. Grace chords are supported without fabricating a non-zero duration. A chord member longer than its base note, or without a resolvable base, makes the event layer Unknown.
 
@@ -74,7 +75,7 @@ Other measure-level elements are not silently discarded. Directions (including d
 
 A signed `<offset>` is converted from divisions into exact rational quarter-note beats relative to the current measure cursor. The resulting position must remain inside the explicit measure span; malformed, overflowing or out-of-measure offsets withhold the complete event layer as Unknown. These are source-preservation events, not a claim that every direction or harmony element is executable during playback.
 
-Opaque source subtrees preserve ordered element children, ordered attributes, exact text-node values and the lexical interleaving of text nodes with child elements. The typed tree does not preserve comments, processing instructions, namespace prefixes, entity spelling or insignificant formatting. It is a structured semantic view, not a lossless XML serializer. The original uploaded XML remains the authoritative byte artifact.
+Opaque source subtrees preserve element local names plus namespace URIs, attribute local names plus namespace URIs, child order, decoded text-node values and the interleaving of text nodes with child elements. The typed tree does not preserve comments, processing instructions, namespace prefixes, entity spelling, attribute lexical order as a semantic guarantee, or insignificant formatting. It is a structured semantic view, not a lossless XML serializer. The original uploaded XML remains the authoritative byte artifact.
 
 ### Fail-closed and compatibility behavior
 
@@ -94,7 +95,7 @@ Resource budgets:
 
 ## Tests authored
 
-### Notation-event parser (17 tests)
+### Notation-event parser (18 tests)
 
 - rest and measure-rest, grace, cue, unpitched, microtonal pitch spelling, voice/staff and instrument ID;
 - chord member onset anchoring and no cursor advance;
@@ -102,7 +103,8 @@ Resource budgets:
 - sound tie versus visual tied notation, with slur/articulation retained in the source tree;
 - score-order key/clef attribute changes at exact beat offsets;
 - backup/forward movement across simultaneous voices;
-- source order and unknown extension retention;
+- source order, unknown extension retention and namespace URI disambiguation for repeated local element/attribute names;
+- note-level time-only, attack and release annotations retained independently from notated timing;
 - event extent beyond the explicit measure span withholds all partial events;
 - ambiguous chord / invalid duration fail-closed behavior;
 - grace-chord grouping;
@@ -111,7 +113,7 @@ Resource budgets:
 - positioned direction/harmony/sound events with signed offsets;
 - out-of-measure auxiliary offsets fail closed.
 
-### Integrated graph (34 adapter tests total)
+### Integrated graph (36 adapter tests total)
 
 New integration tests verify:
 - notation events are part of the per-part graph and graph commitment;
