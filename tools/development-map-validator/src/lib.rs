@@ -1,10 +1,10 @@
-pub mod cargo_manifest;
-
 //! Read-only structural and temporal contract checks for EGDDM snapshots.
 //!
 //! This module intentionally does not execute repository-controlled code,
 //! resolve external source URIs, authenticate signatures, or implement the
 //! full JSON Schema 2020-12 specification.
+
+pub mod cargo_manifest;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
