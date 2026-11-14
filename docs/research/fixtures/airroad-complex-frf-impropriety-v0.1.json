@@ -281,5 +281,766 @@
     "Exact-rational scalar complex covariance and complementary covariance reference only.",
     "The improper/proper distributions are synthetic, not measured AIRROAD noise.",
     "No Gaussianity, physical pseudo-covariance, confidence coverage, deterministic hard set, IQC or robust stability claim is established."
-  ]
+  ],
+  "mimo_two_coordinate_case": {
+    "vectorization_order": [
+      "f0:Re(z0)",
+      "f1:Re(z1)",
+      "f0:Im(z0)",
+      "f1:Im(z1)"
+    ],
+    "identity_bindings": {
+      "campaign_id": "complex-frf-campaign-001",
+      "model_identity": "sha256:complex-frf-model-v0.1",
+      "acquisition_id": "complex-frf-acquisition-001",
+      "sample_clock_identity": "complex-frf-clock-001"
+    },
+    "real_covariance": [
+      [
+        {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "properness_evidence": "tested_improper",
+    "expected": {
+      "covariance": [
+        [
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "2"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ]
+      ],
+      "complementary_covariance": [
+        [
+          {
+            "re": {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          }
+        ]
+      ],
+      "augmented_covariance": [
+        [
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ]
+      ],
+      "real_covariance_determinant": {
+        "numerator": "5353",
+        "denominator": "256"
+      },
+      "augmented_covariance_determinant": {
+        "numerator": "5353",
+        "denominator": "16"
+      },
+      "augmented_leading_principal_minors": [
+        {
+          "numerator": "5",
+          "denominator": "1"
+        },
+        {
+          "numerator": "99",
+          "denominator": "4"
+        },
+        {
+          "numerator": "295",
+          "denominator": "4"
+        },
+        {
+          "numerator": "5353",
+          "denominator": "16"
+        }
+      ],
+      "is_proper": false
+    }
+  },
+  "mimo_proper_control_case": {
+    "vectorization_order": [
+      "f0:Re(z0)",
+      "f1:Re(z1)",
+      "f0:Im(z0)",
+      "f1:Im(z1)"
+    ],
+    "identity_bindings": {
+      "campaign_id": "complex-frf-campaign-001",
+      "model_identity": "sha256:complex-frf-model-v0.1",
+      "acquisition_id": "complex-frf-acquisition-001",
+      "sample_clock_identity": "complex-frf-clock-001"
+    },
+    "real_covariance": [
+      [
+        {
+          "numerator": "5",
+          "denominator": "2"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "5",
+          "denominator": "2"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "5",
+          "denominator": "2"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "5",
+          "denominator": "2"
+        }
+      ]
+    ],
+    "properness_evidence": "explicit_test_pass",
+    "expected": {
+      "covariance": [
+        [
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "2"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ]
+      ],
+      "complementary_covariance": [
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ]
+      ],
+      "augmented_covariance": [
+        [
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "1",
+              "denominator": "2"
+            }
+          }
+        ],
+        [
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          },
+          {
+            "re": {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "-1",
+              "denominator": "2"
+            }
+          },
+          {
+            "re": {
+              "numerator": "5",
+              "denominator": "1"
+            },
+            "im": {
+              "numerator": "undefined",
+              "denominator": "1"
+            }
+          }
+        ]
+      ],
+      "real_covariance_determinant": {
+        "numerator": "9801",
+        "denominator": "256"
+      },
+      "augmented_covariance_determinant": {
+        "numerator": "9801",
+        "denominator": "16"
+      },
+      "augmented_leading_principal_minors": [
+        {
+          "numerator": "5",
+          "denominator": "1"
+        },
+        {
+          "numerator": "99",
+          "denominator": "4"
+        },
+        {
+          "numerator": "495",
+          "denominator": "4"
+        },
+        {
+          "numerator": "9801",
+          "denominator": "16"
+        }
+      ],
+      "is_proper": true
+    }
+  },
+  "same_mimo_ordinary_covariance_different_joint_law": true
 }
