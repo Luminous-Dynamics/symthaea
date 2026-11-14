@@ -151,6 +151,7 @@ pub enum U1MpsError {
         layer_sites: usize,
         state_sites: usize,
     },
+    TruncationLedgerStateMismatch,
     CanonicalGaugeNotQualified {
         residual: f64,
         tolerance: f64,
@@ -319,6 +320,10 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "TEBD layer was built for {layer_sites} sites, state has {state_sites}"
             ),
+            Self::TruncationLedgerStateMismatch => write!(
+                f,
+                "truncation ledger is bound to a different input MPS state"
+            ),
             Self::CanonicalGaugeNotQualified {
                 residual,
                 tolerance,
@@ -452,28 +457,83 @@ pub struct ComplexU1Mps {
 /// Sites [0,bond) are left-isometric and sites (bond+1,N) are right-isometric.
 #[derive(Debug, Clone, PartialEq)]
 pub struct U1CanonicalGaugeReceipt {
-    pub bond: usize,
-    pub site_count: usize,
-    pub total_charge: i32,
-    pub left_isometry_residuals: Vec<(usize, f64)>,
-    pub right_isometry_residuals: Vec<(usize, f64)>,
-    pub maximum_left_isometry_residual: f64,
-    pub maximum_right_isometry_residual: f64,
-    pub left_exterior_operator_norm_upper_bound: f64,
-    pub right_exterior_operator_norm_upper_bound: f64,
-    pub factorization_max_residual: f64,
-    pub factorization_l2_residual: f64,
-    pub state_reconstruction_l2_residual: f64,
-    pub exact_zero_singular_values_omitted: usize,
-    pub selection_rule_residual: f64,
-    pub input_norm_squared: f64,
-    pub output_norm_squared: f64,
-    pub relative_norm_drift: f64,
-    pub qualified: bool,
+    bond: usize,
+    site_count: usize,
+    total_charge: i32,
+    left_isometry_residuals: Vec<(usize, f64)>,
+    right_isometry_residuals: Vec<(usize, f64)>,
+    maximum_left_isometry_residual: f64,
+    maximum_right_isometry_residual: f64,
+    left_exterior_operator_norm_upper_bound: f64,
+    right_exterior_operator_norm_upper_bound: f64,
+    factorization_max_residual: f64,
+    factorization_l2_residual: f64,
+    state_reconstruction_l2_residual: f64,
+    exact_zero_singular_values_omitted: usize,
+    selection_rule_residual: f64,
+    input_norm_squared: f64,
+    output_norm_squared: f64,
+    relative_norm_drift: f64,
+    qualified: bool,
 }
 
 impl U1CanonicalGaugeReceipt {
-    pub fn qualifies(&self, tolerance: f64) -> bool {
+    pub fn bond(&self) -> usize { self.bond }
+    fn state_fingerprint(&self) -> u128 {
+        // FNV-1a 128-bit fingerprint over dimensions, charge labels and exact
+        // IEEE-754 tensor bits. This binds a continuation ledger to the exact
+        // MPS value without retaining a second full state in memory.
+        // It is an integrity/misuse check, not a cryptographic authenticator.
+        let mut hash = 0x6c62272e07bb014262b821756295c58du128;
+        const PRIME: u128 = 0x0000000001000000000000000000013b;
+        let mut mix = |value: u64| {
+            for byte in value.to_le_bytes() {
+                hash ^= u128::from(byte);
+                hash = hash.wrapping_mul(PRIME);
+            }
+        };
+        mix(self.total_charge as u64);
+        mix(self.tensors.len() as u64);
+        for tensor in &self.tensors {
+            mix(tensor.left_dimension() as u64);
+            mix(tensor.right_dimension() as u64);
+            for charge in &tensor.left_charges { mix(*charge as u64); }
+            for charge in &tensor.right_charges { mix(*charge as u64); }
+            for value in &tensor.data {
+                mix(value.re.to_bits());
+                mix(value.im.to_bits());
+            }
+        }
+        hash
+    }
+
+    pub fn site_count(&self) -> usize { self.site_count }
+    pub fn total_charge(&self) -> i32 { self.total_charge }
+    pub fn left_isometry_residuals(&self) -> &[(usize, f64)] { &self.left_isometry_residuals }
+    pub fn right_isometry_residuals(&self) -> &[(usize, f64)] { &self.right_isometry_residuals }
+    pub fn maximum_left_isometry_residual(&self) -> f64 { self.maximum_left_isometry_residual }
+    pub fn maximum_right_isometry_residual(&self) -> f64 { self.maximum_right_isometry_residual }
+    pub fn left_exterior_operator_norm_upper_bound(&self) -> f64 {
+        self.left_exterior_operator_norm_upper_bound
+    }
+    pub fn right_exterior_operator_norm_upper_bound(&self) -> f64 {
+        self.right_exterior_operator_norm_upper_bound
+    }
+    pub fn factorization_max_residual(&self) -> f64 { self.factorization_max_residual }
+    pub fn factorization_l2_residual(&self) -> f64 { self.factorization_l2_residual }
+    pub fn state_reconstruction_l2_residual(&self) -> f64 {
+        self.state_reconstruction_l2_residual
+    }
+    pub fn exact_zero_singular_values_omitted(&self) -> usize {
+        self.exact_zero_singular_values_omitted
+    }
+    pub fn selection_rule_residual(&self) -> f64 { self.selection_rule_residual }
+    pub fn input_norm_squared(&self) -> f64 { self.input_norm_squared }
+    pub fn output_norm_squared(&self) -> f64 { self.output_norm_squared }
+    pub fn relative_norm_drift(&self) -> f64 { self.relative_norm_drift }
+    pub fn is_qualified(&self) -> bool { self.qualified }
+
+    pub fn qualifies(&self, tolerance: f64) -> bool {(&self, tolerance: f64) -> bool {
         tolerance.is_finite()
             && tolerance > 0.0
             && self.site_count >= 2
@@ -2856,17 +2916,18 @@ impl U1TwoSiteState {
 /// precondition, so global qualification remains false.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct U1MpsTruncationLedger {
-    pub gate_count: usize,
-    pub accumulated_discarded_weight: f64,
-    pub cumulative_local_l2_error_bound: f64,
-    pub cumulative_canonicalization_l2_error_bound: f64,
-    pub cumulative_gate_quality_l2_error_bound: f64,
-    pub cumulative_hamiltonian_projection_l2_error_bound: f64,
-    pub cumulative_projection_l2_error_bound: f64,
-    pub maximum_single_gate_relative_discarded_weight: f64,
-    pub canonical_gauge_receipt_count: usize,
-    pub global_state_error_bound_qualified: bool,
-    pub global_state_error_bound_upper: Option<f64>,
+    gate_count: usize,
+    accumulated_discarded_weight: f64,
+    cumulative_local_l2_error_bound: f64,
+    cumulative_canonicalization_l2_error_bound: f64,
+    cumulative_gate_quality_l2_error_bound: f64,
+    cumulative_hamiltonian_projection_l2_error_bound: f64,
+    cumulative_projection_l2_error_bound: f64,
+    maximum_single_gate_relative_discarded_weight: f64,
+    canonical_gauge_receipt_count: usize,
+    global_state_error_bound_qualified: bool,
+    global_state_error_bound_upper: Option<f64>,
+    input_state_fingerprint: Option<u128>,
 }
 
 fn gate_quality_error_bounds_from_residuals(
@@ -2923,6 +2984,34 @@ fn gate_quality_error_bounds(
 
 
 impl U1MpsTruncationLedger {
+    pub fn gate_count(&self) -> usize { self.gate_count }
+    pub fn accumulated_discarded_weight(&self) -> f64 { self.accumulated_discarded_weight }
+    pub fn cumulative_local_l2_error_bound(&self) -> f64 { self.cumulative_local_l2_error_bound }
+    pub fn cumulative_canonicalization_l2_error_bound(&self) -> f64 {
+        self.cumulative_canonicalization_l2_error_bound
+    }
+    pub fn cumulative_gate_quality_l2_error_bound(&self) -> f64 {
+        self.cumulative_gate_quality_l2_error_bound
+    }
+    pub fn cumulative_hamiltonian_projection_l2_error_bound(&self) -> f64 {
+        self.cumulative_hamiltonian_projection_l2_error_bound
+    }
+    pub fn cumulative_projection_l2_error_bound(&self) -> f64 {
+        self.cumulative_projection_l2_error_bound
+    }
+    pub fn maximum_single_gate_relative_discarded_weight(&self) -> f64 {
+        self.maximum_single_gate_relative_discarded_weight
+    }
+    pub fn canonical_gauge_receipt_count(&self) -> usize {
+        self.canonical_gauge_receipt_count
+    }
+    pub fn global_state_error_bound_qualified(&self) -> bool {
+        self.global_state_error_bound_qualified
+    }
+    pub fn global_state_error_bound_upper(&self) -> Option<f64> {
+        self.global_state_error_bound_upper
+    }
+
     fn record_local(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
@@ -2956,7 +3045,7 @@ impl U1MpsTruncationLedger {
 
     /// Record local tensor truncation diagnostics without claiming a global
     /// state-vector bound.
-    pub fn record(
+    fn record(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
     ) -> Result<(), U1MpsError> {
@@ -2969,7 +3058,7 @@ impl U1MpsTruncationLedger {
     /// Compatibility helper for callers that have already established an
     /// exactly unitary, charge-conserving two-site gate. Production TEBD should
     /// use record_with_canonical_gauge_and_gate so gate defects are included.
-    pub fn record_with_canonical_gauge(
+    fn record_with_canonical_gauge(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
         receipt: &U1CanonicalGaugeReceipt,
@@ -2989,7 +3078,7 @@ impl U1MpsTruncationLedger {
     /// Record a truncation with a measured mixed-canonical gauge receipt and
     /// explicitly measured gate quality. The matrix residuals are converted
     /// into conservative operator-error bounds before they enter the ledger.
-    pub fn record_with_canonical_gauge_and_gate(
+    fn record_with_canonical_gauge_and_gate(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
         receipt: &U1CanonicalGaugeReceipt,
@@ -3288,6 +3377,13 @@ impl U1TeBDLayer {
                 state_sites: input.site_count(),
             });
         }
+        if let Some(expected_fingerprint) = truncation_ledger.input_state_fingerprint {
+            if expected_fingerprint != input.state_fingerprint() {
+                return Err(U1MpsError::TruncationLedgerStateMismatch);
+            }
+        } else if truncation_ledger.gate_count != 0 {
+            return Err(U1MpsError::TruncationLedgerStateMismatch);
+        }
         let input_norm_squared = input.norm_squared(policy.tolerance)?;
         let input_total_charge = input.total_charge;
         let mut state = input.clone();
@@ -3351,6 +3447,7 @@ impl U1TeBDLayer {
         }
 
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        truncation_ledger.input_state_fingerprint = Some(state.state_fingerprint());
         let global_l2_bound_qualified = truncation_ledger.global_state_error_bound_qualified;
         Ok(U1TeBDLayerResult {
             output_selection_rule_residual: state.selection_rule_residual(),
