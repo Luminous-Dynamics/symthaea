@@ -11,6 +11,9 @@ Dependency-free deterministic validator for a proposed sewing-assembly operation
 - Seam allowance and interface tolerance bounds in integer micrometres.
 - Predecessor references, duplicate/self dependencies and cycles.
 - Manual-versus-machine declaration consistency.
+- Human-review and evidence requirements for irreversible operations.
+- Required part/interface references for join-like operations, including explicit membership of every interface part.
+- Human-review gating for synthetic or operator-declared machine profiles and unknown edge orientation; unknown machine capability basis blocks automated handoff.
 - Operation-kind support in the referenced machine profile.
 - A deterministic topological order for a structurally valid acyclic operation graph.
 
@@ -33,7 +36,7 @@ cargo test --manifest-path tools/atelier-sewing-plan-core/Cargo.toml --locked
 cargo clippy --manifest-path tools/atelier-sewing-plan-core/Cargo.toml --locked --all-targets -- -D warnings
 ```
 
-Twelve unit tests are authored, including unknown predecessor versus cycle classification. They have not been compiled or executed in the current authoring environment because the Rust toolchain is unavailable.
+Eighteen unit tests are authored, including unknown predecessor versus cycle classification, irreversible-step review/evidence, machine-profile evidence maturity, interface-part completeness and seam-orientation checks. They have not been compiled or executed in the current authoring environment because the Rust toolchain is unavailable.
 
 ## Ownership
 
