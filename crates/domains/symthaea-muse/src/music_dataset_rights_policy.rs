@@ -691,7 +691,7 @@ mod tests {
                 license_text_sha256: LICENSE_SHA.to_owned(),
                 rights_holder_ref: Some("synthetic-rights-holder-ref".to_owned()),
                 source_revision: Some("synthetic-license-revision-v1".to_owned()),
-                retrieved_at_utc: Some("2026-11-14".to_owned()),
+                retrieved_at_utc: Some("2026-11-14T00:00:00Z".to_owned()),
                 inherited_from: None,
             },
             permissions,
@@ -901,6 +901,19 @@ mod tests {
         assert!(receipt.reasons.iter().any(|reason| {
             reason.code == RightsDecisionReasonCodeV1::MissingHumanReviewReceipt
         }));
+    }
+
+    #[test]
+    fn invalid_utc_review_timestamp_rejects() {
+        let mut item = component("invalid-review-time", "CC-BY-4.0", permissive_permissions());
+        item.human_review.as_mut().unwrap().reviewed_at_utc = "yesterday".to_owned();
+        let rights = bundle(vec![item]);
+        assert!(validate_music_component_rights_bundle_v1(&rights).contains(
+            &RightsPolicyIssueV1::InvalidUtcTimestamp {
+                component_id: "invalid-review-time".to_owned(),
+                field: "reviewed_at_utc"
+            }
+        ));
     }
 
     #[test]
