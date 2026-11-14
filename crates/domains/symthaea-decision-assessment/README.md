@@ -56,3 +56,32 @@ From the workspace root:
     cargo fmt --all -- --check
 
 These commands are the intended local verification path. Do not describe them as passed until run against the exact branch head and recorded in a reproducible receipt.
+
+
+## Partial-order stop/effect event traces
+
+The crate also exposes `evaluate_event_order` for qualified event traces. Unlike the existing single-harness ACT/HOLD step counter, this evaluator classifies event order as:
+
+- `before`: the first event is established to precede the second;
+- `after`: the first event is established to follow the second;
+- `overlapping`: qualified clock intervals overlap without a decisive causal or same-domain sequence relation;
+- `unknown`: no qualified source establishes an order;
+- `inconsistent`: qualified ordering sources contradict one another.
+
+In `EventOrderReport.effect_orders`, each relation is **effect relative to stop trigger**: `before` means the effect preceded the trigger, while `after` is a critical post-trigger effect. Overlapping, unknown or inconsistent order blocks further irreversible actions.
+
+Operation start, cancellation request, cancellation acknowledgement, unknown outcome, exact reconciliation and retry are separate event kinds. A cancellation acknowledgement is not a terminal operation outcome. A retry requires an exact `not_applied` reconciliation ordered before that retry. If an operation outcome remains unknown, the operation remains pending and new mutations are blocked.
+
+The evaluator consumes event/clock/causal-order and operation-outcome qualifications from their owners. It does not authenticate signatures, qualify clocks, prove trace completeness, execute cancellation, authorize effects, or replace the event/history owners.
+
+The frozen synthetic fixture is `benchmarks/engineering-change-impact/action-event-order-v0.1.json` (10 event traces). Its standalone Rust integration reference test also checks canonical trace digests, a separately expressed ordering relation, and invariance under reverse delivery order.
+
+Run the composition tests from the workspace root:
+
+```sh
+cargo test -p symthaea-decision-assessment
+cargo clippy -p symthaea-decision-assessment --all-targets -- -D warnings
+cargo fmt --all -- --check
+```
+
+These tests are authored but are not qualified as passed until executed at the exact branch head.
