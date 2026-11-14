@@ -385,6 +385,29 @@ The fixture is public and deliberately not a sealed benchmark. Its identifiers a
 
 A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection, temporal invalidation fixture and decision-time admissibility fixture were checked against the v0.1 contract's required fields, enumerations, provenance/lifecycle structure, event targets, edge endpoints, decision-time cutoffs and local references. The selected structural checks reported **zero findings across all four maps**. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
 
+### Four-repository adoption and federated index — 2026-11-14
+
+Four bounded, repository-local source projections now exist on separate draft branches:
+
+| Project | Local map | Pinned source revision | Initial graph |
+|---|---|---|---:|
+| Symthaea | `docs/development-map/readme-and-workstreams-v0.1.json` | `dcffe1060ece4815cf42548a8f646cec4f075535` | 13 nodes / 18 edges |
+| Mycelix | `docs/development-map/source-declared-maturity-v0.1.json` | `6089a68430a501c51934c2c4107061c2a2cb5565` | 17 nodes / 14 edges |
+| Symtropy | `docs/development-map/source-declared-architecture-v0.1.json` | `aea5d824b31dd949c7b24680d27c9041d025db85` | 20 nodes / 29 edges |
+| Sol Atlas | `docs/development-map/source-declared-demo-architecture-v0.1.json` | `1af10d891410cce31c1d4037e7c7129c16db5834` | 24 nodes / 32 edges |
+
+Project review tracks:
+- Symthaea: [#12024](https://github.com/Luminous-Dynamics/symthaea/pull/12024)
+- Mycelix: [#6133](https://github.com/Luminous-Dynamics/mycelix/pull/6133), tracked by [#6132](https://github.com/Luminous-Dynamics/mycelix/issues/6132)
+- Symtropy: [#5134](https://github.com/Luminous-Dynamics/symtropy/pull/5134), tracked by [#5132](https://github.com/Luminous-Dynamics/symtropy/issues/5132)
+- Sol Atlas: [#792](https://github.com/Luminous-Dynamics/sol-atlas-leptos/pull/792), tracked by [#791](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/791)
+
+A federated pointer index is added at `docs/development-map/luminous-ecosystem-index-v0.1.json` (5 nodes / 9 edges). It pins the four local map file digests and their mapped repository revisions, but does not copy their graph internals. Its five cross-project compatibility edges are explicitly `source_declared_only`; exact API/schema versions and integration receipts are not established by those declarations. The index is a public four-project view, not a global map of private repositories.
+
+The index's host snapshot identifies the Symthaea branch revision immediately before the index artifact was added; the index does not attempt to hash itself into its own source snapshot. Refresh the index whenever a project map branch head, mapped source revision, or map blob changes.
+
+The initial projections include no code execution, builds, tests, dataset downloads, physics simulations, WebGL, Holochain operations or deployment actions. Reported test counts, performance figures, research results, maturity claims and integration narratives remain source-declared. Each local map owns its evidence and authority; the index is navigation/federation metadata only.
+
 ## 8. Runner-independent work and safety boundary
 
 Safe now: architecture and schema authoring, static parsing of repository metadata/source, public Git-history analysis, manual source-anchored capability inventories, benchmark protocol, synthetic fixtures, static consistency checks and read-only map generation.
