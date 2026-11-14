@@ -35,7 +35,8 @@
         "required": [
           "case_id",
           "candidates",
-          "unresolved_questions"
+          "unresolved_questions",
+          "prohibited_inference_flags"
         ],
         "properties": {
           "case_id": {
@@ -101,6 +102,13 @@
             }
           },
           "unresolved_questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "prohibited_inference_flags": {
             "type": "array",
             "items": {
               "type": "string",
