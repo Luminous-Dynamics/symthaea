@@ -13,8 +13,10 @@ use crate::barline_eval::{MeasureSpan, RationalBeat};
 use serde::{Deserialize, Serialize};
 
 pub const MUSICXML_NOTATION_EVENTS_SCHEMA_V1: &str = "muse-musicxml-notation-events-v1";
-pub const MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1: &str =
+pub const LEGACY_MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1: &str =
     "musicxml-partwise-source-ordered-exact-quarter-beats-v1";
+pub const MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1: &str =
+    "musicxml-partwise-timewise-source-ordered-exact-quarter-beats-v2";
 
 const MAX_NOTATION_EVENTS_PER_PART: usize = 200_000;
 const MAX_SOURCE_TREE_DEPTH: usize = 32;
