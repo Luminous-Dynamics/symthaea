@@ -171,3 +171,38 @@ The failure-composition S0 auditor now accepts either:
 The baseline and candidate classifications must use the same exact method, edition, evidence kind, material class, geometry, endpoint, claim and ontology. Cross-ontology comparison is REJECTED until a separately reviewed mapping receipt is implemented. No silent category mapping is allowed.
 
 Updated frozen fixtures: claim scope v0.4 (59 cases), failure composition v0.2 (47 cases). Independent exact-branch replay: 59/59 and 47/47.
+
+
+## 2026-11-14 — profile-specific typed claim contract (#12105)
+
+The current transfer evidence model had a global required endpoint list that applied the same outcomes to every material profile. This is too coarse. A PP rigid-plastic single-lap profile, an FRP-to-FRP profile, an SMC-FRP classification profile and an aluminum thick-adherend constitutive-response profile do not require the same methods or evidence types.
+
+New S0 branch: `research/plasma-profile-contract-v0-1`.
+
+Implementation:
+- `xtask/src/plasma_profile_contract.rs`
+- `data/research/plasma_profile_contract_fixture_v0_1.json`
+- command: `cargo run -p xtask -- plasma-profile-contract-audit`
+
+The profile contract binds a canonical SHA-256 to profile identity, material pair, joint geometry, intended use and a frozen list of required/optional claim families. Each claim names explicit method-evidence roles (method ID, exact edition, evidence kind, material class, geometry, endpoint and requested claim). The audit composes the shared method-to-claim registry and rejects a role whose scope does not match the typed claim family.
+
+Initial claim families:
+- `joint_strength`: admitted joint-strength test methods only, with method scope matching the profile's material pair and joint geometry;
+- `failure_pattern`: ISO 10365 general failure-pattern or D5573 SMC-FRP classification only;
+- `adhesive_constitutive_response`: D5656 only, on its aluminum thick-adherend scope;
+- `surface_state`: wettability observation under its own protocol, never a joint-strength proxy;
+- `conditioned_measurement`: separate conditioning-practice and post-conditioning measurement receipts tied to the same specimen IDs.
+
+The fixture includes **27 synthetic cases** (8 PASS, 3 BLOCKED, 16 REJECTED), including:
+- PP profile with required D3163 strength and optional ISO failure classification omitted without blocking;
+- FRP-to-FRP profile using D5868 and ISO 10365;
+- D5573 accepted only for the SMC-FRP-specific profile;
+- D5656 accepted only as adhesive constitutive response;
+- aged-strength evidence requiring both a conditioning protocol and a post-condition strength test on the same specimens;
+- wrong method for material/geometry, failure-classification/strength proxy substitutions, missing required claims, optional claims, undeclared roles/claims, duplicate evidence, duplicate raw artifact, and profile digest mismatch.
+
+Latest source and fixture were fetched from the exact branch and independently replayed in JavaScript: **27/27** expected dispositions matched, including recomputation of the canonical profile SHA-256 over the exact serialized profile content.
+
+This is a profile-contract audit, not yet a replacement of the old global required-endpoint list inside the legacy #12006 transfer command. The next integration step is to make the transfer decision consume this profile receipt while preserving its existing bounded-scope, individual bridge and multi-factor interaction gates.
+
+Validation boundary: seven Rust tests are authored but not executed; Rust formatting, compilation, Clippy and exact-head CI are not verified. No physical joint strength, transfer equivalence, aging performance, product acceptance or production release is claimed.
