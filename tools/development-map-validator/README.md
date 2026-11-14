@@ -59,7 +59,7 @@ Commands:
     cargo run -- temporal-ledger path/to/temporal-event-ledger.json
     cargo run -- temporal-replay path/to/temporal-event-ledger.json path/to/replay-query.json
 
-Public Rust APIs include `start_replay_cursor`, `resume_replay_cursor`, `append_event`, `serialize_replay_cursor`, `deserialize_replay_cursor`, `replay_ledger` and `replay_incremental`. The clean replay is the reference projection; a resumed cursor must produce the same canonical projection for the same frozen ledger and query.
+Public Rust APIs include `append_event` (atomic append with validation/rollback), `start_replay_cursor`, `resume_replay_cursor`, `append_event`, `serialize_replay_cursor`, `deserialize_replay_cursor`, `replay_ledger` and `replay_incremental`. The clean replay is the reference projection; a resumed cursor must produce the same canonical projection for the same frozen ledger and query.
 
 Event and query contracts:
 - [Temporal event-ledger schema](../../docs/research/temporal-event-ledger-v0.1.schema.json)
