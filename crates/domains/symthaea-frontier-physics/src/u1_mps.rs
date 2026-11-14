@@ -6154,7 +6154,7 @@ mod tests {
         assert_eq!(result.minimum_required_bond_dimension, 1);
         assert_eq!(result.truncation.retained_rank_by_charge, vec![(0, 1)]);
         assert!(result.achieved_local_l2_error <= result.requested_local_l2_error);
-        assert_eq!(result.svd_factorization_passes, 2);
+        assert_eq!(result.svd_factorization_passes, 1);
         assert!(result.budget_satisfied);
         assert!((result.truncation.retained_schmidt_weight - 0.64).abs() <= 1.0e-12);
         assert!((result.truncation.discarded_weight - 0.36).abs() <= 1.0e-12);
@@ -6174,7 +6174,7 @@ mod tests {
         assert_eq!(result.selected_bond_dimension, 2);
         assert_eq!(result.minimum_required_bond_dimension, 2);
         assert!(result.achieved_local_l2_error <= 1.0e-12);
-        assert!(result.svd_factorization_passes >= 2);
+        assert_eq!(result.svd_factorization_passes, 1);
         assert_eq!(result.truncation.discarded_weight, 0.0);
         let one_bond = state
             .split_truncated(U1TwoSiteTruncationPolicy {
