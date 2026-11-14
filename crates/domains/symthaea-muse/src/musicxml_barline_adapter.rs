@@ -437,6 +437,10 @@ pub struct MusicXmlMeasureLocatorV1 {
     pub non_controlling: bool,
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Complete measure map, typed barline events and playback controls for a part.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartNotationGraphV1 {
@@ -458,6 +462,10 @@ pub struct MusicXmlPartNotationGraphV1 {
     /// the source omitted a matching part-list entry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub part_metadata: Option<MusicXmlPartMetadataV1>,
+    /// Explicitly records that the part-metadata layer was emitted, even when
+    /// no <part-list> declaration exists. Older graphs omit this marker.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub part_metadata_layer_present: bool,
 }
 
 /// Parse score-partwise into exact per-part measure maps plus typed barline
@@ -555,6 +563,7 @@ pub fn parse_musicxml_part_notation_graph(
                     playback_controls,
                     notation_events,
                     part_metadata,
+                    part_metadata_layer_present: true,
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
@@ -574,6 +583,7 @@ pub fn parse_musicxml_part_notation_graph(
                 playback_controls: Vec::new(),
                 notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
                 part_metadata,
+                part_metadata_layer_present: true,
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
                 part_id: part_id.to_string(),
@@ -624,16 +634,21 @@ pub fn validate_musicxml_notation_graph_replay(
     if replayed.len() != supplied.len() {
         return Ok(false);
     }
-    // Existing imports persisted the v1 graph before notation_events existed.
-    // Their deserialized sentinel means the event layer was never committed;
-    // compare the historical graph projection rather than invalidating its
-    // receipt merely because a newer parser can now extract more fields.
+    // Older v1 graphs predate both the notation-event layer and part-list
+    // metadata. MUSE-MIR-018 then introduced notation events before the
+    // part-metadata layer was added. Preserve both historical shapes while
+    // requiring every graph emitted by the current parser to commit metadata
+    // presence explicitly (even when the source has no <part-list>).
     for (current, stored) in replayed.iter_mut().zip(supplied) {
         if crate::musicxml_notation_events::is_legacy_missing_notation_events(
             &stored.notation_events,
         ) {
             current.notation_events =
                 crate::musicxml_notation_events::legacy_missing_notation_events();
+        }
+        if !stored.part_metadata_layer_present {
+            current.part_metadata = None;
+            current.part_metadata_layer_present = false;
         }
     }
     Ok(replayed == supplied)
@@ -2022,6 +2037,8 @@ mod tests {
         ).unwrap().remove(0);
         graph.notation_events =
             crate::musicxml_notation_events::legacy_missing_notation_events();
+        graph.part_metadata_layer_present = false;
+        graph.part_metadata = None;
         let json = serde_json::to_value(&graph).unwrap();
         assert!(
             json.get("notation_events").is_none(),
@@ -2124,6 +2141,60 @@ mod tests {
             xml.as_bytes(), "sha256:no-part-list", "score-clock"
         ).unwrap().remove(0);
         assert!(graph.part_metadata.is_none());
+    }
+
+
+    #[test]
+    fn graph_replay_preserves_mir018_receipts_created_before_part_metadata_layer() {
+        let xml = r#"<score-partwise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name>
+                <score-instrument id="P1-I1"><instrument-name>Flute</instrument-name></score-instrument>
+            </score-part></part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:mir018-before-part-metadata", "score-clock"
+        ).unwrap().remove(0);
+        assert!(graph.part_metadata.is_some());
+        graph.part_metadata = None;
+        graph.part_metadata_layer_present = false;
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "sha256:mir018-before-part-metadata",
+            "score-clock",
+            &[graph.clone()],
+        ).unwrap());
+        let json = serde_json::to_value(&graph).unwrap();
+        assert!(json.get("part_metadata_layer_present").is_none());
+        assert!(json.get("part_metadata").is_none());
+    }
+
+    #[test]
+    fn new_graph_replay_rejects_removed_part_metadata_even_when_set_to_none() {
+        let xml = r#"<score-partwise>
+            <part-list><score-part id="P1"><part-name>Flute</part-name>
+                <score-instrument id="P1-I1"><instrument-name>Flute</instrument-name></score-instrument>
+            </score-part></part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:new-part-metadata", "score-clock"
+        ).unwrap().remove(0);
+        assert!(graph.part_metadata_layer_present);
+        assert!(graph.part_metadata.is_some());
+        graph.part_metadata = None;
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "sha256:new-part-metadata",
+            "score-clock",
+            &[graph],
+        ).unwrap());
     }
 
 }
