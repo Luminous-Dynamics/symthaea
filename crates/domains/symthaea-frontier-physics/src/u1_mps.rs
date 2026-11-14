@@ -6374,4 +6374,29 @@ mod tests {
         assert!(audit.dense_logical_bytes > 0);
     }
 
+
+    #[test]
+    fn packed_storage_shows_metadata_inclusive_savings_for_many_charge_sectors() {
+        let charges = vec![0, 0, 1, 1, 2, 2, 3, 3];
+        let mut values = vec![Complex64::new(0.0, 0.0); charges.len() * 2 * charges.len()];
+        for left in 0..charges.len() {
+            for physical in 0..2 {
+                for right in 0..charges.len() {
+                    if charges[right] == charges[left] + physical as i32 {
+                        let index = (left * 2 + physical) * charges.len() + right;
+                        values[index] = Complex64::new((index + 1) as f64 / 100.0, 0.0);
+                    }
+                }
+            }
+        }
+        let dense = U1MpsTensor::new(charges.clone(), charges, values).unwrap();
+        let packed = U1MpsPackedTensor::from_dense(&dense, 1.0e-12).unwrap();
+        let audit = packed.storage_audit().unwrap();
+        assert!(audit.packed_value_bytes < audit.dense_value_bytes);
+        assert!(audit.logical_savings_bytes > 0);
+        assert!(audit.logical_savings_fraction > 0.0);
+        assert!(audit.logical_savings_fraction < 1.0);
+        assert_eq!(packed.to_dense().unwrap(), dense);
+    }
+
 }
