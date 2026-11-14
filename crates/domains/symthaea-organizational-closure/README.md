@@ -19,13 +19,13 @@ The report predicate is VerificationReport::qualifies_functional_self_maintenanc
 
 ## Run
 
-From the workspace root:
+From the package directory (this is an independently locked nested Cargo workspace):
 
 ```bash
-cargo fmt -p symthaea-organizational-closure -- --check
-cargo check --locked -p symthaea-organizational-closure --all-targets
-cargo test --locked -p symthaea-organizational-closure
-cargo clippy --locked -p symthaea-organizational-closure --all-targets -- -D warnings
+cargo fmt --all -- --check
+cargo check --locked --all-targets
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
 ```
 
 The focused workflow is .github/workflows/aobench-runtime.yml.
