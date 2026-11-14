@@ -353,4 +353,38 @@ Reported evidence and conditions:
 
 ISO confirms **ISO 23247-5:2026** (Digital thread for digital twin) was published in June 2026. It describes connectivity, management and maintenance of manufacturing digital twins across design, planning, production and testing. Official source: https://www.iso.org/standard/87425.html
 
-Do not assert the publication status or normative requirements of ISO 23247-6:2026 from the Part 5 record. Verify Part 6 independently before citing it as published or using it as a conformance basis. In any case, these documents guide manufacturing digital-thread composition; they do not certify marine design, model validity or vessel safety.
+ISO 23247-6:2026 was independently verified as published on 14 July 2026. It addresses digital-twin composition and identifies integrated, unified and federated compositions, with guidance for interoperation among different parties. Official ISO record: https://www.iso.org/standard/87426.html. Part 5 addresses the manufacturing digital thread across product lifecycle activities. These standards guide manufacturing digital-thread/composition design; they do not certify marine design, hydrodynamic model validity, seaworthiness or vessel safety.
+
+
+## 13. October 2026 tug EMS SOTA: event-triggered control and hybrid storage
+
+**New comparator:** Gao, Wu and Tian, *Energy management strategy for hybrid tugboats based on operating condition recognition and event-triggered mechanism*, Ocean Engineering, DOI https://doi.org/10.1016/j.oceaneng.2026.127569, published 15 October 2026. Bibliographic record: https://trid.trb.org/View/2763148
+
+The study proposes a diesel–battery–supercapacitor hybrid architecture and a hierarchical event-triggered EMS:
+
+- Weighted K-means recognizes four operating conditions: standby, sailing, manoeuvring and working, using load statistics, engine imbalance/correlation and spectral entropy.
+- Supercapacitors buffer high-frequency power demand; the abstract reports battery-power peaks falling from approximately 1,800 kW to 1,100 kW during rapid load fluctuations.
+- The event-triggered controller updates parameters only when its trigger conditions require them.
+- Reported equivalent fuel consumption is 415.1 kg versus 447.2 kg for the rule-based REMS comparator (a 32.1 kg / approximately 7.18% difference for the study's evaluated sequence).
+- The paper reports 225 controller updates, 97.0% fewer than REMS and GA, and 0.0372 s per-step computation time.
+- It also reports average diesel-engine load rate increasing from 49.9% to 53.7%, with terminal battery SOC near 45%; the abstract reports a 40.1% reduction in battery-power standard deviation versus GA.
+
+**Evidence boundary:** these are study-specific simulation results using representative tug load data and the authors' diesel–battery–supercapacitor topology. They do not establish full-scale operational fuel savings, battery life, class-approved control, or superiority over the methanol TD3 study. Do not pool the 7.18% result with the TD3 paper's 18.5% / 10.2% / 7.3% figures: architectures, controllers, duty cycles and study protocols differ.
+
+### Updated competitive experiment
+
+Retain the February 2026 TD3 reproduction as one comparator arm and add the October 2026 event-triggered hierarchical controller as another. Compare, on identical admitted plant maps and mission blocks:
+
+1. tuned rule-based and engine load-following baselines;
+2. ECMS and adaptive-ECMS;
+3. DDPG and TD3;
+4. deployable MPC / robust MPC;
+5. event-triggered hierarchical EMS with battery-only storage;
+6. event-triggered hierarchical EMS with battery + supercapacitor;
+7. offline dynamic programming as a clairvoyant reference on short, fully known cycles.
+
+Separate the controller contribution from the storage-architecture contribution. Use a factorial comparison where possible: same controller across battery-only and battery-supercapacitor plants, and same plant across controller families. Charge supercapacitor mass, converter losses, thermal management, capex, maintenance and replacement to lifecycle results.
+
+Additional metrics: battery peak/RMS current and power, high-frequency energy share, supercapacitor throughput/thermal state, DC bus ripple/sag and recovery where qualified, engine starts/ramp/low-load hours, trigger count and false/missed triggers, CPU time and worst-case execution time, job completion, reserve, final SOC, degradation uncertainty and lifecycle cost.
+
+The paradigm opportunity is **control update policy co-designed with energy-storage physics**: a controller may obtain better response and lower compute burden by separating slow energy scheduling from fast transient buffering. This is a hypothesis to test, not an assumed winner.
