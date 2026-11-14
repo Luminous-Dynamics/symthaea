@@ -1384,11 +1384,34 @@ fn part_metadata_dimensions(
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct MusicXmlNotationMatchSetV1 {
+    pub note_pairs: Vec<(usize, usize)>,
+    pub auxiliary_pairs: Vec<(usize, usize)>,
+    pub attribute_pairs: Vec<(usize, usize)>,
+    pub cursor_pairs: Vec<(usize, usize)>,
+}
+
+/// Public MIR-019 report API. The shared internal evaluation performs matching
+/// once; correction-ledger consumers use the companion API below to receive
+/// those same pairs rather than running a second aligner.
 pub fn evaluate_musicxml_notation_graphs(
     reference: &MusicXmlPartNotationGraphV1,
     prediction: &MusicXmlPartNotationGraphV1,
     config: MusicXmlNotationEvaluationConfigV1,
 ) -> Result<MusicXmlNotationEvaluationReportV1, MusicXmlNotationEvaluationErrorV1> {
+    evaluate_musicxml_notation_graphs_with_matches(reference, prediction, config)
+        .map(|(report, _matches)| report)
+}
+
+pub(crate) fn evaluate_musicxml_notation_graphs_with_matches(
+    reference: &MusicXmlPartNotationGraphV1,
+    prediction: &MusicXmlPartNotationGraphV1,
+    config: MusicXmlNotationEvaluationConfigV1,
+) -> Result<
+    (MusicXmlNotationEvaluationReportV1, MusicXmlNotationMatchSetV1),
+    MusicXmlNotationEvaluationErrorV1,
+> {
     if !rational_is_canonical(config.position_tolerance)
         || !rational_is_canonical(config.duration_tolerance)
     {
@@ -1604,7 +1627,15 @@ pub fn evaluate_musicxml_notation_graphs(
     };
     report.report_sha256 = report_commitment(&report)
         .map_err(|_| MusicXmlNotationEvaluationErrorV1::SerializationFailed)?;
-    Ok(report)
+    Ok((
+        report,
+        MusicXmlNotationMatchSetV1 {
+            note_pairs,
+            auxiliary_pairs,
+            attribute_pairs,
+            cursor_pairs,
+        },
+    ))
 }
 
 /// Recompute all dimensions and the domain-separated commitment. A changed
