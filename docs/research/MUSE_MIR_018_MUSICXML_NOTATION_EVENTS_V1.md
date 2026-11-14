@@ -81,6 +81,7 @@ Opaque source subtrees preserve element local names plus namespace URIs, attribu
 
 - The event layer emits all events or `Unknown`; it never leaks a partial event list.
 - Invalid divisions/durations, cursor underflow/overflow, unresolved chord anchors, offsets outside the explicit measure span and event/source-tree budget exhaustion produce Unknown.
+- The notation-event parser matches MusicXML core elements by namespace and local name. Foreign extension elements with colliding names remain opaque auxiliary source nodes. The older measure/barline graph parser has a fail-closed preflight for such collisions and refuses the graph rather than misreading an extension as a note, measure, divisions, or cursor command.
 - A measure map can remain Supported while its notation-event layer is Unknown; consumers must read both status values independently.
 - Existing Score importer signatures and note-only MIDI metrics are unchanged.
 - New graph commitments include note/rest events, attribute events, auxiliary events and cursor moves, including ordered mixed content in retained source trees.
@@ -114,7 +115,7 @@ Resource budgets:
 - positioned direction/harmony/sound events with signed offsets;
 - out-of-measure auxiliary offsets fail closed.
 
-### Integrated graph (36 adapter tests total)
+### Integrated graph (37 adapter tests total)
 
 New integration tests verify:
 - notation events are part of the per-part graph and graph commitment;
@@ -123,7 +124,8 @@ New integration tests verify:
 - unsupported mid-measure meter change does not leak partial notation events;
 - part-list names, abbreviations, score-instrument IDs and MIDI instrument declarations bind to the correct part;
 - a mutation to part-list instrument metadata is rejected by graph replay;
-- documents without a matching part-list entry do not invent instrument metadata.
+- documents without a matching part-list entry do not invent instrument metadata;
+- a foreign-namespace extension called ext:note is rejected by the measure/barline graph preflight instead of being misinterpreted as score content.
 
 ### Muse Studio summary
 
