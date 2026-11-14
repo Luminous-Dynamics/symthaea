@@ -204,7 +204,7 @@ These are properties to test, not guarantees the current prototype already satis
 
 Build a small standalone Rust mapper that reads a frozen repository tree and never executes repository-controlled code.
 
-- Parse Cargo manifests as data; extract workspace/package identity, members, dependencies, optional dependencies, feature declarations, targets and declared build-script presence.
+- Parse Cargo manifests as data; extract workspace/package identity, members, dependencies, optional dependencies, feature declarations, targets and declared build-script presence. The initial library projector and explicit `cargo-manifest` JSON CLI mode are now authored.
 - Parse Rust syntax into source spans, modules, imports, declarations, public APIs, tests and conditional compilation attributes.
 - Treat syntax-extracted edges and manifest-declared edges as such. Do not label them compiler-resolved.
 - Do not run build scripts, procedural macros, tests, cargo check, arbitrary commands or repository code.
@@ -250,7 +250,7 @@ These are source changes and authored checks. The tests have not been compiled o
 
 A pure read-only library module is now present at `tools/development-map-validator/src/cargo_manifest.rs`. It accepts TOML bytes plus a pinned source identity and returns a Serde-serializable projection explicitly labelled `manifest_declared`. It records workspace patterns, package identity/inheritance, dependency kinds and target predicates, feature declarations, explicit target declarations and build-script declaration state. Workspace-inherited defaults that are not locally declared remain unknown.
 
-Two non-executable TOML fixtures and ten test definitions were added. No Cargo invocation, build script, procedural macro, compiler, repository test or candidate program was run. Workspace globs and feature expressions are not expanded, implicit targets are not inferred, and compiler-resolved semantics are not claimed. The CLI does not yet expose this library API.
+Two non-executable TOML fixtures and ten test definitions were added. No Cargo invocation, build script, procedural macro, compiler, repository test or candidate program was run. Workspace globs and feature expressions are not expanded, implicit targets are not inferred, and compiler-resolved semantics are not claimed. The CLI now exposes the library through the `cargo-manifest` subcommand, with explicit revision/tree/path/blob pins.
 
 ## 8. Decision
 
