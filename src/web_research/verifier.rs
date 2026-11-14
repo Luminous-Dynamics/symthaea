@@ -59,7 +59,8 @@ pub struct SourceEvidence {
     pub source_type: ResearchSource,
     /// Relevant text from the source
     pub relevant_text: String,
-    /// Does this source support the claim?
+    /// Explicit claim stance. None means no claim-level assessment was made.
+    /// Source relevance, extraction quality, and credibility must not populate it.
     pub supports: Option<bool>,
     /// Similarity score to the claim (0.0 - 1.0)
     pub similarity: f32,
@@ -172,10 +173,8 @@ impl EpistemicVerifier {
                     total_contradict_score += credibility * source.similarity;
                 }
                 None => {
-                    // Neutral/unclear - slight support if similarity is high
-                    if source.similarity > 0.7 {
-                        total_support_score += credibility * source.similarity * 0.3;
-                    }
+                    // Unassessed evidence is not support or contradiction.
+                    // Relevance and source credibility cannot establish claim stance.
                 }
             }
         }
@@ -209,7 +208,8 @@ impl EpistemicVerifier {
                 domain: self.extract_domain(&r.url),
                 source_type: r.source_type,
                 relevant_text: r.summary.clone(),
-                supports: Some(r.confidence > 0.5),
+                // Result confidence and relevance do not determine claim stance.
+                supports: None,
                 similarity: r.relevance,
                 credibility: r.confidence,
             })
@@ -412,6 +412,45 @@ mod tests {
         let result = verifier.verify_claim("Rust provides memory safety", &context);
         assert_eq!(result.status, EpistemicStatus::HighConfidence);
         assert!(result.confidence > 0.8);
+    }
+
+    #[test]
+    fn unassessed_relevant_source_is_not_counted_as_support() {
+        let verifier = EpistemicVerifier::new();
+        let context = VerificationContext {
+            sources: vec![SourceEvidence {
+                url: "https://example.org/relevant".to_string(),
+                domain: "example.org".to_string(),
+                source_type: ResearchSource::Academic,
+                relevant_text: "A highly relevant passage whose stance has not been assessed."
+                    .to_string(),
+                supports: None,
+                similarity: 1.0,
+                credibility: 1.0,
+            }],
+            query: "Does the source support the claim?".to_string(),
+            domain: "research".to_string(),
+        };
+
+        let result = verifier.verify_claim("The claim", &context);
+        assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+        assert!(result.supporting_sources.is_empty());
+        assert!(result.contradicting_sources.is_empty());
+    }
+
+    #[test]
+    fn result_confidence_does_not_become_claim_stance() {
+        let verifier = EpistemicVerifier::new();
+        let mut source = WebResearchResult::default();
+        source.url = "https://example.org/relevant".to_string();
+        source.summary = "Highly relevant source summary".to_string();
+        source.relevance = 1.0;
+        source.confidence = 0.99;
+        source.epistemic_status = EpistemicStatus::HighConfidence;
+
+        let result = verifier.verify_from_results("The claim", &[source]);
+        assert_eq!(result.status, EpistemicStatus::InsufficientEvidence);
+        assert!(result.supporting_sources.is_empty());
     }
 
     #[test]
