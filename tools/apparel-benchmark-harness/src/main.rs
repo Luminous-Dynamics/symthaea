@@ -16,6 +16,8 @@ const SEMANTIC_PATH: &str =
     "docs/research/fixtures/apparel_engineering_thread_v0_1/semantic_cases.example.json";
 const SOURCES_PATH: &str =
     "docs/research/fixtures/apparel_engineering_thread_v0_1/benchmark_sources_2026-11-12.json";
+const SEWING_SCHEMA_PATH: &str = "schemas/sewing-assembly-plan.schema.json";
+const SEWING_INSTANCE_PATH: &str = "examples/sewing-assembly-plan.overshirt.example.json";
 
 #[derive(Debug)]
 struct Inputs {
@@ -23,6 +25,8 @@ struct Inputs {
     instance: PathBuf,
     semantic_cases: PathBuf,
     source_manifest: PathBuf,
+    sewing_schema: PathBuf,
+    sewing_instance: PathBuf,
     expected_head: String,
     output: PathBuf,
 }
@@ -500,6 +504,8 @@ fn parse_args() -> Result<Inputs, Box<dyn Error>> {
         "--instance",
         "--semantic-cases",
         "--source-manifest",
+        "--sewing-schema",
+        "--sewing-instance",
         "--expected-head",
         "--out",
     ];
@@ -540,6 +546,8 @@ fn parse_args() -> Result<Inputs, Box<dyn Error>> {
         instance: resolve("--instance", INSTANCE_PATH),
         semantic_cases: resolve("--semantic-cases", SEMANTIC_PATH),
         source_manifest: resolve("--source-manifest", SOURCES_PATH),
+        sewing_schema: resolve("--sewing-schema", SEWING_SCHEMA_PATH),
+        sewing_instance: resolve("--sewing-instance", SEWING_INSTANCE_PATH),
         expected_head,
         output: resolve("--out", "/tmp/apparel-engineering-receipt.json"),
     })
@@ -559,6 +567,8 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
     let (instance_bytes, instance) = read_json(&inputs.instance)?;
     let (semantic_bytes, semantic) = read_json(&inputs.semantic_cases)?;
     let (source_bytes, sources) = read_json(&inputs.source_manifest)?;
+    let (sewing_schema_bytes, sewing_schema) = read_json(&inputs.sewing_schema)?;
+    let (sewing_instance_bytes, sewing_instance) = read_json(&inputs.sewing_instance)?;
 
     validate_schema_document(&schema).map_err(|error| format!("schema: {error}"))?;
     validate_instance(&schema, &instance)
@@ -569,6 +579,10 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
         .map_err(|errors| format!("semantic corpus errors: {}", errors.join("; ")))?;
     let source_count = validate_source_manifest(&sources)
         .map_err(|errors| format!("source manifest errors: {}", errors.join("; ")))?;
+    validate_schema_document(&sewing_schema)
+        .map_err(|error| format!("sewing plan schema: {error}"))?;
+    validate_instance(&sewing_schema, &sewing_instance)
+        .map_err(|errors| format!("sewing plan instance schema errors: {}", errors.join("; ")))?;
 
     let receipt = json!({
         "receipt_version": "0.1.0",
@@ -607,6 +621,16 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
             "source_count": source_count,
             "ingestion_or_reproduction_claim": "none"
         },
+        "sewing_plan_contract": {
+            "schema_path": inputs.sewing_schema.display().to_string(),
+            "schema_sha256": sha256(&sewing_schema_bytes),
+            "instance_path": inputs.sewing_instance.display().to_string(),
+            "instance_sha256": sha256(&sewing_instance_bytes),
+            "draft_2020_12_meta_schema_validated": true,
+            "example_instance_valid": true,
+            "physical_qualification": "not_qualified",
+            "actuation_authority": "none"
+        },
         "claim_ceiling": "Synthetic contract validation only; no physical product, manufacturing, recycling, safety, environmental, or regulatory qualification."
     });
 
@@ -635,6 +659,18 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sewing_plan_inputs() -> (Value, Value) {
+        let schema: Value = serde_json::from_str(include_str!(
+            "../../../schemas/sewing-assembly-plan.schema.json"
+        ))
+        .expect("sewing plan schema parses");
+        let instance: Value = serde_json::from_str(include_str!(
+            "../../../examples/sewing-assembly-plan.overshirt.example.json"
+        ))
+        .expect("sewing plan example parses");
+        (schema, instance)
+    }
 
     fn example_inputs() -> (Value, Value, Value, Value) {
         let schema: Value = serde_json::from_str(include_str!(
@@ -667,6 +703,34 @@ mod tests {
         assert_eq!((negative, positive), (26, 4));
         let source_count = validate_source_manifest(&sources).unwrap();
         assert_eq!(source_count, array(&sources, "sources").len());
+    }
+
+    #[test]
+    fn sewing_plan_schema_and_overshirt_fixture_validate() {
+        let (schema, instance) = sewing_plan_inputs();
+        validate_schema_document(&schema).expect("sewing plan schema is valid Draft 2020-12");
+        validate_instance(&schema, &instance)
+            .expect("synthetic sewing plan fixture validates");
+    }
+
+    #[test]
+    fn sewing_plan_schema_rejects_unknown_root_property() {
+        let (schema, mut instance) = sewing_plan_inputs();
+        instance
+            .as_object_mut()
+            .unwrap()
+            .insert("unreviewed_machine_command".into(), json!("RUN"));
+        assert!(validate_instance(&schema, &instance).is_err());
+    }
+
+    #[test]
+    fn sewing_plan_schema_rejects_missing_operation_predecessors() {
+        let (schema, mut instance) = sewing_plan_inputs();
+        instance["operations"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("predecessor_ids");
+        assert!(validate_instance(&schema, &instance).is_err());
     }
 
     #[test]
