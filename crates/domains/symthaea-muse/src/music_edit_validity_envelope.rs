@@ -944,6 +944,9 @@ mod tests {
         let mut envelope = valid_envelope();
         envelope.operation = MusicEditOperationV1::Staccato;
         envelope.requested_change.clear();
+        envelope.protected_invariants.retain(|constraint| {
+            constraint.property != MusicEditValidityPropertyV1::DurationTicks
+        });
         envelope.requested_change.push(MusicEditValidityConstraintV1 {
             constraint_id: "change.articulation".to_owned(),
             property: MusicEditValidityPropertyV1::Articulation,
@@ -1228,21 +1231,29 @@ mod tests {
         let mut envelope = valid_envelope();
         envelope.operation = MusicEditOperationV1::ReplaceDrums;
         envelope.target_scope = MusicEditTargetScopeV1::DrumKit;
-        envelope.requested_change[0].property = MusicEditValidityPropertyV1::DrumKitIdentity;
-        envelope.requested_change[0].allowed_values = vec!["kit-a".to_owned(), "kit-b".to_owned()];
-        envelope.requested_change.push(MusicEditValidityConstraintV1 {
-            constraint_id: "change.from-kit".to_owned(),
-            property: MusicEditValidityPropertyV1::DrumKitIdentity,
-            scope: MusicEditValidityScopeV1::TargetPart,
-            relation: MusicEditValidityRelationV1::DifferentFrom,
-            expected_value: Some("kit-original".to_owned()),
-            allowed_values: Vec::new(),
-            minimum: None,
-            maximum: None,
-            unit: None,
-            evidence: MusicEditValidityEvidenceV1::Symbolic,
-            rationale: "the replacement kit differs from the original kit".to_owned(),
-        });
+        let mut kit_identity = constraint(
+            "change.kit-identity",
+            MusicEditValidityPropertyV1::DrumKitIdentity,
+            MusicEditValidityScopeV1::TargetPart,
+            MusicEditValidityRelationV1::MemberOfSet,
+        );
+        kit_identity.allowed_values = vec!["kit-a".to_owned(), "kit-b".to_owned()];
+        envelope.requested_change = vec![
+            kit_identity,
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.from-kit".to_owned(),
+                property: MusicEditValidityPropertyV1::DrumKitIdentity,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::DifferentFrom,
+                expected_value: Some("kit-original".to_owned()),
+                allowed_values: Vec::new(),
+                minimum: None,
+                maximum: None,
+                unit: None,
+                evidence: MusicEditValidityEvidenceV1::Symbolic,
+                rationale: "the replacement kit differs from the original kit".to_owned(),
+            },
+        ];
         envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
         envelope.protected_invariants.push(constraint(
             "protect.drum-events",
@@ -1266,6 +1277,9 @@ mod tests {
         let mut envelope = valid_envelope();
         envelope.operation = MusicEditOperationV1::Staccato;
         envelope.requested_change.clear();
+        envelope.protected_invariants.retain(|constraint| {
+            constraint.property != MusicEditValidityPropertyV1::DurationTicks
+        });
         envelope.requested_change.extend([
             MusicEditValidityConstraintV1 {
                 constraint_id: "change.articulation".to_owned(),
