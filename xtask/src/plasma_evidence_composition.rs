@@ -206,6 +206,12 @@ fn audit_case(case: &CompositionCase) -> Decision {
             return rejected("baseline and candidate observations do not use the same method/edition/evidence/endpoint/claim contract");
         }
 
+        if baseline.material_pair_class != candidate.material_pair_class
+            || baseline.geometry != candidate.geometry
+        {
+            return rejected("baseline and candidate material-pair class or specimen geometry differ; same method family does not establish cross-configuration equivalence");
+        }
+
         for receipt in [baseline, candidate] {
             match decide(receipt).disposition {
                 ClaimDisposition::Supported => {}
@@ -340,6 +346,15 @@ mod tests {
             .find(|case| case.id == "missing-required-endpoint-receipt")
             .expect("case exists");
         assert_eq!(audit_case(case).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn same_standard_family_does_not_authorize_cross_material_pair_transfer() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid composition fixture JSON");
+        let case = fixture.cases.iter()
+            .find(|case| case.id == "frp-pair-class-change-rejects-transfer")
+            .expect("case exists");
+        assert_eq!(audit_case(case).disposition, Disposition::Rejected);
     }
 
     #[test]
