@@ -451,10 +451,13 @@ fn validate_failure_arm(
     if samples.is_empty() || !nonempty(&evidence.id) {
         return Err(Disposition::Blocked);
     }
-    if evidence.method_id != "ASTM_D5573"
-        || evidence.edition != "D5573-99R19"
-        || evidence.material_pair_class != "frp_smc_joint"
-        || evidence.geometry != "failure_surface_classification"
+    if evidence.method_id != "ASTM_D5573" || evidence.edition != "D5573-99R19" {
+        return Err(Disposition::Blocked);
+    }
+    if evidence.material_pair_class != "frp_smc_joint" {
+        return Err(Disposition::Blocked);
+    }
+    if evidence.geometry != "failure_surface_classification"
         || evidence.endpoint != "frp_joint_failure_mode_classification"
         || evidence.requested_claim != "failure_mode_classification_reference"
     {
