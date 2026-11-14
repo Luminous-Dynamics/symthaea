@@ -8,7 +8,7 @@
   "counts_expected": {
     "PASS": 6,
     "BLOCKED": 7,
-    "REJECTED": 15
+    "REJECTED": 16
   },
   "cases": [
     {
@@ -1508,6 +1508,61 @@
       },
       "expected_disposition": "BLOCKED",
       "rationale": "An unregistered fault class has no qualified containment semantics."
+    },
+    {
+      "id": "UNREPORTED_ISOLATED_CELL",
+      "claim": "DEGRADED_SERVICE",
+      "topology_id": "FIVE_CELL_SYNTHETIC_TOPOLOGY_V0",
+      "service_contract_id": "NORMALIZED_USEFUL_OUTPUT_SYNTHETIC_V0",
+      "declared_cell_count": 5,
+      "cells": [
+        {
+          "cell_id": "C1",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C2",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C3",
+          "state": "ACTIVE",
+          "normalized_output": 0.95
+        },
+        {
+          "cell_id": "C4",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        },
+        {
+          "cell_id": "C5",
+          "state": "ISOLATED",
+          "normalized_output": 0
+        }
+      ],
+      "diagnostics_complete": true,
+      "shared_utilities": {
+        "power": "IN_RANGE",
+        "gas": "IN_RANGE",
+        "cooling": "IN_RANGE"
+      },
+      "neighbor_response": "WITHIN_ENVELOPE",
+      "uniformity_required": true,
+      "minimum_useful_output": 2.8,
+      "observed_useful_output": 2.8499999999999996,
+      "quality_endpoint_pass": true,
+      "fault": {
+        "kind": "INDEPENDENT_CELL_FAILURE",
+        "affected_cell_ids": [
+          "C5"
+        ],
+        "injection_confirmed": true,
+        "containment_verified": true
+      },
+      "expected_disposition": "REJECTED",
+      "rationale": "A second isolated cell is omitted from the affected-cell list; every isolated cell must be reconciled to the declared fault receipt."
     }
   ]
 }
