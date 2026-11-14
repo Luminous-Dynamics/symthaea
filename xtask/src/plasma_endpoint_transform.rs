@@ -16,10 +16,12 @@ struct SpecimenCluster {
 #[serde(deny_unknown_fields)]
 struct AgingExposure {
     profile_id: String,
+    exposure_receipt_id: String,
     protocol_id: String,
     protocol_sha256: String,
     exposure_receipt_sha256: String,
     conditions_sha256: String,
+    conditioning_method_receipt: ScopeEvidence,
     temperature_c: f64,
     relative_humidity_pct: f64,
     duration_hours: f64,
@@ -66,6 +68,7 @@ struct EndpointGraph {
     output_endpoint: String,
     transform_id: String,
     transform_version: String,
+    formula_id: String,
     transform_sha256: String,
     preregistered_at: i64,
     first_outcome_available_at: i64,
@@ -242,7 +245,10 @@ fn validate_aging_exposure(node: &ObservationNode) -> std::result::Result<(), Di
     let Some(exposure) = &node.aging_exposure else {
         return Err(Disposition::Blocked);
     };
-    if !nonempty(&exposure.profile_id) || !nonempty(&exposure.protocol_id) {
+    if !nonempty(&exposure.profile_id)
+        || !nonempty(&exposure.exposure_receipt_id)
+        || !nonempty(&exposure.protocol_id)
+    {
         return Err(Disposition::Blocked);
     }
     if !sha256_shape(&exposure.protocol_sha256)
@@ -250,6 +256,24 @@ fn validate_aging_exposure(node: &ObservationNode) -> std::result::Result<(), Di
         || !sha256_shape(&exposure.conditions_sha256)
     {
         return Err(Disposition::Blocked);
+    }
+    if !same_string_members(
+        &exposure.conditioning_method_receipt.specimen_ids,
+        &node.receipt.specimen_ids,
+    ) {
+        return Err(Disposition::Rejected);
+    }
+    let method = &exposure.conditioning_method_receipt;
+    if !matches!(method.method_id.as_str(), "ASTM_D1151" | "ASTM_D1183")
+        || method.evidence_kind != "conditioning_practice"
+        || method.requested_claim != "conditioning_protocol_reference"
+    {
+        return Err(Disposition::Rejected);
+    }
+    match decide(method).disposition {
+        ScopeDisposition::Supported => {}
+        ScopeDisposition::Blocked => return Err(Disposition::Blocked),
+        ScopeDisposition::Rejected => return Err(Disposition::Rejected),
     }
     if !exposure.temperature_c.is_finite()
         || !exposure.relative_humidity_pct.is_finite()
@@ -336,9 +360,18 @@ fn validate_aged_retention(nodes: &[&ObservationNode]) -> std::result::Result<()
     let base_exposure = ba.aging_exposure.as_ref().ok_or(Disposition::Blocked)?;
     let candidate_exposure = ca.aging_exposure.as_ref().ok_or(Disposition::Blocked)?;
     if base_exposure.profile_id != candidate_exposure.profile_id
+        || base_exposure.exposure_receipt_id == candidate_exposure.exposure_receipt_id
+        || base_exposure.exposure_receipt_sha256 == candidate_exposure.exposure_receipt_sha256
         || base_exposure.protocol_id != candidate_exposure.protocol_id
         || base_exposure.protocol_sha256 != candidate_exposure.protocol_sha256
         || base_exposure.conditions_sha256 != candidate_exposure.conditions_sha256
+        || !same_method_scope(
+            &base_exposure.conditioning_method_receipt,
+            &candidate_exposure.conditioning_method_receipt,
+        )
+        || base_exposure.conditioning_method_receipt.id == candidate_exposure.conditioning_method_receipt.id
+        || base_exposure.conditioning_method_receipt.raw_data_sha256
+            == candidate_exposure.conditioning_method_receipt.raw_data_sha256
         || !close(base_exposure.temperature_c, candidate_exposure.temperature_c)
         || !close(base_exposure.relative_humidity_pct, candidate_exposure.relative_humidity_pct)
         || !close(base_exposure.duration_hours, candidate_exposure.duration_hours)
@@ -394,10 +427,14 @@ fn validate_failure_fraction(
     {
         return Err(Disposition::Blocked);
     }
-    if graph.analysis.analysis_profile != "two_proportion_tost_v1" {
+    // A generic two-proportion score interval does not account for the declared
+    // manufacturing-cluster structure or establish an equivalence design.
+    // Keep this endpoint BLOCKED until Statistics registers and validates a
+    // cluster-aware proportion-equivalence profile and its independent reference.
+    if graph.analysis.analysis_profile != "clustered_two_proportion_equivalence_pending_v1" {
         return Err(Disposition::Blocked);
     }
-    Ok(())
+    Err(Disposition::Blocked)
 }
 
 fn same_method_scope(left: &ScopeEvidence, right: &ScopeEvidence) -> bool {
@@ -426,6 +463,9 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
     if graph.changed_after_outcome || graph.preregistered_at >= graph.first_outcome_available_at {
         return rejected("endpoint transform or analysis plan was not frozen before outcome availability");
     }
+    if !nonempty(&graph.formula_id) {
+        return blocked("a transform formula identifier is required");
+    }
     if graph.inputs.is_empty() {
         return blocked("endpoint graph has no source observations");
     }
@@ -433,6 +473,15 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
     let Some(roles) = expected_roles(graph) else {
         return rejected("endpoint transform/output combination is not in the versioned S0 registry");
     };
+    let expected_formula = match graph.transform_id.as_str() {
+        "unit_preserving_strength_projection_v1" => "identity_strength_unit_projection_v1",
+        "aged_strength_retention_ratio_v1" => "mean_aged_strength_over_mean_unaged_strength_v1",
+        "predeclared_failure_mode_fraction_v1" => "target_modes_over_classified_specimens_v1",
+        _ => unreachable!("transform registry checked above"),
+    };
+    if graph.formula_id != expected_formula {
+        return rejected("formula identifier does not match the registered endpoint transformation");
+    }
     if graph.inputs.len() != roles.len() {
         return blocked("endpoint graph does not contain the exact required number of source observations");
     }
@@ -465,6 +514,25 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
         }
         source_ids.push(node.receipt.id.clone());
         source_digests.push(raw_digest.to_owned());
+        if let Some(exposure) = &node.aging_exposure {
+            let condition_receipt = &exposure.conditioning_method_receipt;
+            if !receipt_ids.insert(condition_receipt.id.as_str()) {
+                return rejected("conditioning-method receipt ID is reused");
+            }
+            let Some(condition_raw_digest) = condition_receipt.raw_data_sha256.as_deref() else {
+                return blocked("conditioning-method observation has no raw-data digest");
+            };
+            if !raw_digests.insert(condition_raw_digest.to_ascii_lowercase()) {
+                return rejected("conditioning-method raw-data artifact is reused");
+            }
+            source_ids.push(condition_receipt.id.clone());
+            source_digests.push(condition_raw_digest.to_owned());
+            if !receipt_ids.insert(exposure.exposure_receipt_id.as_str()) {
+                return rejected("aging exposure receipt ID is reused");
+            }
+            source_ids.push(exposure.exposure_receipt_id.clone());
+            source_digests.push(exposure.exposure_receipt_sha256.clone());
+        }
         nodes.push(node);
     }
 
@@ -472,6 +540,16 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
         if !role_set.contains(role) {
             return blocked("a required source observation role is missing");
         }
+    }
+
+    let required_ceiling = match graph.transform_id.as_str() {
+        "unit_preserving_strength_projection_v1" => "comparative_joint_strength_observation_only",
+        "aged_strength_retention_ratio_v1" => "aged_strength_retention_observation_only",
+        "predeclared_failure_mode_fraction_v1" => "failure_mode_fraction_observation_only_not_acceptability",
+        _ => unreachable!("transform registry checked above"),
+    };
+    if graph.analysis.claim_ceiling != required_ceiling {
+        return rejected("derived claim ceiling exceeds or differs from the registered transform ceiling");
     }
 
     let transform_check = match graph.transform_id.as_str() {
@@ -519,6 +597,15 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
     {
         return rejected("analysis result does not bind the exact transform and source observation receipts");
     }
+    let expected_unit = match graph.transform_id.as_str() {
+        "unit_preserving_strength_projection_v1" => "MPa",
+        "aged_strength_retention_ratio_v1" => "ratio",
+        "predeclared_failure_mode_fraction_v1" => "proportion",
+        _ => unreachable!("transform registry checked above"),
+    };
+    if analysis.quantity_unit != expected_unit {
+        return rejected("analysis result quantity unit does not match the derived endpoint");
+    }
     if !close(analysis.confidence_level, 0.90)
         || !analysis.margin_lower.is_finite()
         || !analysis.margin_upper.is_finite()
@@ -540,16 +627,6 @@ pub(super) fn audit_graph(graph: &EndpointGraph) -> Decision {
     let outcome = if equivalent { "EQUIVALENCE_ESTABLISHED" } else { "EQUIVALENCE_NOT_ESTABLISHED" };
     if analysis.outcome != outcome {
         return rejected("analysis outcome contradicts its declared interval and margin");
-    }
-
-    let required_ceiling = match graph.transform_id.as_str() {
-        "unit_preserving_strength_projection_v1" => "comparative_joint_strength_observation_only",
-        "aged_strength_retention_ratio_v1" => "aged_strength_retention_observation_only",
-        "predeclared_failure_mode_fraction_v1" => "failure_mode_fraction_observation_only_not_acceptability",
-        _ => unreachable!("transform registry checked above"),
-    };
-    if analysis.claim_ceiling != required_ceiling {
-        return rejected("derived claim ceiling exceeds or differs from the registered transform ceiling");
     }
 
     Decision {
