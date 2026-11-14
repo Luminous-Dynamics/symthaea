@@ -366,7 +366,6 @@ fn validate_case(case: &Case) -> Vec<String> {
     let mut cavitation_digests = BTreeSet::new();
     let mut coherence_case_ids = BTreeSet::new();
     let mut coherence_report_digests = BTreeSet::new();
-    let mut vibration_trace_digests = BTreeSet::new();
 
     for window in &case.windows {
         let identity = format!("{}::{}", window.run_id, window.window_id);
@@ -421,9 +420,6 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         if !is_sha256(&coh.report_sha256) || !coherence_report_digests.insert(coh.report_sha256.clone()) {
             errors.push(format!("{identity}: malformed or reused coherence report digest"));
-        }
-        if !vibration_trace_digests.insert(coh.vibration_raw_trace_sha256.clone()) {
-            errors.push(format!("{identity}: vibration raw-trace digest is reused across joined windows"));
         }
         if coh.vibration_raw_trace_sha256 == coh.pressure_raw_trace_sha256 {
             errors.push(format!("{identity}: pressure and vibration raw-trace digests must be distinct"));
@@ -482,18 +478,28 @@ fn validate_case(case: &Case) -> Vec<String> {
             if (recomposed - band.pressure_psd_pa2_per_hz).abs() > allowed {
                 errors.push(format!("{identity} / {}: coherent plus residual PSD does not recover measured pressure PSD", band.band_id));
             }
-            for (lower, upper, value, label) in [
+            let intervals = [
                 (band.coherence_lower_bound, band.coherence_upper_bound, band.coherence_magnitude_squared, "coherence"),
                 (band.vibration_reference_coherent_pressure_psd_lower_bound, band.vibration_reference_coherent_pressure_psd_upper_bound, band.vibration_reference_coherent_pressure_psd_pa2_per_hz, "coherent PSD"),
                 (band.non_coherent_residual_pressure_psd_lower_bound, band.non_coherent_residual_pressure_psd_upper_bound, band.non_coherent_residual_pressure_psd_pa2_per_hz, "residual PSD"),
-            ] {
-                match (lower, upper) {
-                    (Some(lo), Some(hi)) if lo.is_finite() && hi.is_finite() && lo >= 0.0 && lo <= value && value <= hi && (label != "coherence" || hi <= 1.0 + 1.0e-9) => {}
-                    _ => errors.push(format!("{identity} / {}: {label} must have an ordered conservative marginal interval", band.band_id)),
+            ];
+            match band.uncertainty_status.as_str() {
+                "marginal_interval_envelope_available" => {
+                    for (lower, upper, value, label) in intervals {
+                        match (lower, upper) {
+                            (Some(lo), Some(hi))
+                                if lo.is_finite()
+                                    && hi.is_finite()
+                                    && lo >= 0.0
+                                    && lo <= value
+                                    && value <= hi
+                                    && (label != "coherence" || hi <= 1.0 + 1.0e-9) => {}
+                            _ => errors.push(format!("{identity} / {}: {label} must have an ordered conservative marginal interval", band.band_id)),
+                        }
+                    }
                 }
-            }
-            if band.uncertainty_status != "marginal_interval_envelope_available" {
-                errors.push(format!("{identity} / {}: uncertainty-unresolved coherence output is not eligible", band.band_id));
+                "coherent_residual_interval_unresolved" => {}
+                _ => errors.push(format!("{identity} / {}: unsupported uncertainty status", band.band_id)),
             }
             if band.phase_status != "phase_resolved_within_declared_limit" && band.phase_status != "phase_unresolved" {
                 errors.push(format!("{identity} / {}: unsupported phase status", band.band_id));
@@ -567,13 +573,16 @@ fn validate_cross_record_identity(case: &Case) -> (bool, Vec<String>) {
             }
         }
         let phase_unresolved_in_bands = coh.bands.iter().any(|band| band.phase_status == "phase_unresolved");
+        let uncertainty_unresolved_in_bands = coh.bands.iter().any(|band| band.uncertainty_status == "coherent_residual_interval_unresolved");
         match coh.disposition.as_str() {
-            "COHERENCE_ESTIMATE_ONLY" if !phase_unresolved_in_bands => {}
-            "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" if phase_unresolved_in_bands => {}
-            "COHERENCE_ESTIMATE_ONLY" | "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" => {
-                reasons.push(format!("{}: coherence report disposition conflicts with per-band phase status", window.window_id));
+            "COHERENCE_ESTIMATE_ONLY" if !phase_unresolved_in_bands && !uncertainty_unresolved_in_bands => {}
+            "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" if phase_unresolved_in_bands && !uncertainty_unresolved_in_bands => {}
+            "UNCERTAINTY_UNRESOLVED" if uncertainty_unresolved_in_bands => {
+                reasons.push(format!("{}: coherence uncertainty is unresolved", window.window_id));
             }
-            "UNCERTAINTY_UNRESOLVED" => reasons.push(format!("{}: coherence uncertainty is unresolved", window.window_id)),
+            "COHERENCE_ESTIMATE_ONLY" | "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED" | "UNCERTAINTY_UNRESOLVED" => {
+                reasons.push(format!("{}: coherence report disposition conflicts with per-band phase/uncertainty status", window.window_id));
+            }
             "INVALID" => reasons.push(format!("{}: parent coherence report is invalid", window.window_id)),
             _ => reasons.push(format!("{}: parent coherence report is incomplete or unsupported", window.window_id)),
         }
@@ -1143,6 +1152,42 @@ mod tests {
     fn reused_coherence_report_digest_is_invalid() {
         let mut input = case();
         input.windows[1].coherence.report_sha256 = input.windows[0].coherence.report_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn one_continuous_vibration_trace_may_back_multiple_windowed_reports() {
+        let mut input = case();
+        measured(&mut input);
+        let shared_trace = input.windows[0].coherence.vibration_raw_trace_sha256.clone();
+        for window in input.windows.iter_mut().skip(1) {
+            window.coherence.vibration_raw_trace_sha256 = shared_trace.clone();
+        }
+        assert_eq!(audit(&input).disposition, "CONDITIONED_SUMMARY_ONLY");
+    }
+
+    #[test]
+    fn uncertainty_unresolved_parent_window_is_incomplete_not_invalid() {
+        let mut input = case();
+        measured(&mut input);
+        let band = &mut input.windows[0].coherence.bands[0];
+        band.uncertainty_status = "coherent_residual_interval_unresolved".to_string();
+        band.coherence_lower_bound = None;
+        band.coherence_upper_bound = None;
+        band.vibration_reference_coherent_pressure_psd_lower_bound = None;
+        band.vibration_reference_coherent_pressure_psd_upper_bound = None;
+        band.non_coherent_residual_pressure_psd_lower_bound = None;
+        band.non_coherent_residual_pressure_psd_upper_bound = None;
+        input.windows[0].coherence.disposition = "UNCERTAINTY_UNRESOLVED".to_string();
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports[0].excluded_uncertainty_unresolved, 1);
+    }
+
+    #[test]
+    fn unresolved_band_bounds_with_resolved_parent_disposition_are_invalid() {
+        let mut input = case();
+        input.windows[0].coherence.bands[0].uncertainty_status = "coherent_residual_interval_unresolved".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
