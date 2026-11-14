@@ -240,9 +240,17 @@ On 2026-11-14, the standalone development-map-validator received a DTEA hardenin
 - Equality at the start/end boundary is accepted under closed-interval semantics.
 - An explicit validity_completeness declaration distinguishes a known open interval edge (complete with a null bound) from incomplete applicability (incomplete).
 - Incomplete effective-time applicability cannot justify consulted evidence; it can remain explicitly excluded.
-- Five additional Rust test definitions were authored, bringing the source to **59 authored tests**, and the public DTEA expected-results fixture now contains **21 negative controls**.
+- Five DTEA hardening test definitions were authored, bringing the validator suite to 59. A further ten test definitions cover the Cargo manifest projection, bringing the standalone crate total to **69 authored tests**. The public DTEA expected-results fixture contains **21 negative controls**.
 
 These are source changes and authored checks. The tests have not been compiled or executed. Exact-head CI workflows were observed as skipped, not passed. Full JSON Schema 2020-12 validation, runtime replay, independent benchmark qualification and #10064 isolation qualification remain outstanding. No real Mycelix authorization record is authenticated by the synthetic DTEA fixture.
+
+
+
+### D1 Cargo manifest projection — authored, not qualified
+
+A pure read-only library module is now present at `tools/development-map-validator/src/cargo_manifest.rs`. It accepts TOML bytes plus a pinned source identity and returns a Serde-serializable projection explicitly labelled `manifest_declared`. It records workspace patterns, package identity/inheritance, dependency kinds and target predicates, feature declarations, explicit target declarations and build-script declaration state. Workspace-inherited defaults that are not locally declared remain unknown.
+
+Two non-executable TOML fixtures and ten test definitions were added. No Cargo invocation, build script, procedural macro, compiler, repository test or candidate program was run. Workspace globs and feature expressions are not expanded, implicit targets are not inferred, and compiler-resolved semantics are not claimed. The CLI does not yet expose this library API.
 
 ## 8. Decision
 
