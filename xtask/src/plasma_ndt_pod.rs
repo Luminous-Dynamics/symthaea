@@ -14,6 +14,7 @@ struct SpecimenObservation {
     defect_class: Option<String>,
     defect_size_mm: Option<f64>,
     truth_method_id: String,
+    truth_protocol_sha256: String,
     truth_artifact_sha256: String,
     truth_adjudication_ref: String,
     blinded_to_truth: bool,
@@ -31,6 +32,18 @@ struct SpecimenObservation {
 struct AnalysisPlan {
     plan_id: String,
     plan_sha256: String,
+    profile_sha256: String,
+    material_pair_class: String,
+    joint_geometry: String,
+    defect_class: String,
+    defect_size_metric: String,
+    inspection_protocol_sha256: String,
+    sensor_setup_sha256: String,
+    calibration_receipt_sha256: String,
+    decision_threshold_sha256: String,
+    scan_plan_sha256: String,
+    ground_truth_method_id: String,
+    ground_truth_protocol_sha256: String,
     analysis_profile: String,
     analysis_method_ref: String,
     independent_unit: String,
@@ -56,7 +69,15 @@ struct AnalysisResult {
     result_id: String,
     result_sha256: String,
     plan_sha256: String,
+    profile_sha256: String,
     specimen_manifest_sha256: String,
+    inspection_protocol_sha256: String,
+    sensor_setup_sha256: String,
+    calibration_receipt_sha256: String,
+    decision_threshold_sha256: String,
+    scan_plan_sha256: String,
+    defect_size_metric: String,
+    critical_defect_size_mm: f64,
     analysis_profile: String,
     defect_class: String,
     defect_specimen_count: usize,
@@ -85,6 +106,8 @@ struct Study {
     environment_profile_id: String,
     defect_class: String,
     defect_size_metric: String,
+    ground_truth_method_id: String,
+    ground_truth_protocol_sha256: String,
     inspection_method_id: String,
     inspection_protocol_id: String,
     inspection_protocol_sha256: String,
@@ -181,6 +204,7 @@ fn audit_study(study: &Study) -> Decision {
         study.defect_size_metric.as_str(),
         study.inspection_method_id.as_str(),
         study.inspection_protocol_id.as_str(),
+        study.ground_truth_method_id.as_str(),
         study.equipment_id.as_str(),
     ] {
         if !nonempty(value) {
@@ -192,6 +216,7 @@ fn audit_study(study: &Study) -> Decision {
     }
     for digest in [
         study.profile_sha256.as_str(),
+        study.ground_truth_protocol_sha256.as_str(),
         study.inspection_protocol_sha256.as_str(),
         study.sensor_setup_sha256.as_str(),
         study.calibration_receipt_sha256.as_str(),
@@ -212,12 +237,39 @@ fn audit_study(study: &Study) -> Decision {
         plan.plan_id.as_str(),
         plan.analysis_method_ref.as_str(),
         plan.claim_ceiling.as_str(),
+        plan.material_pair_class.as_str(),
+        plan.joint_geometry.as_str(),
+        plan.defect_class.as_str(),
+        plan.defect_size_metric.as_str(),
+        plan.ground_truth_method_id.as_str(),
     ]
     .iter()
     .all(|value| nonempty(value))
         || !sha256_shape(&plan.plan_sha256)
+        || !sha256_shape(&plan.profile_sha256)
+        || !sha256_shape(&plan.inspection_protocol_sha256)
+        || !sha256_shape(&plan.sensor_setup_sha256)
+        || !sha256_shape(&plan.calibration_receipt_sha256)
+        || !sha256_shape(&plan.decision_threshold_sha256)
+        || !sha256_shape(&plan.scan_plan_sha256)
+        || !sha256_shape(&plan.ground_truth_protocol_sha256)
     {
-        return blocked("analysis plan identity or digest is missing");
+        return blocked("analysis plan identity, profile, inspection or ground-truth digest is missing");
+    }
+    if plan.profile_sha256 != study.profile_sha256
+        || plan.material_pair_class != study.material_pair_class
+        || plan.joint_geometry != study.joint_geometry
+        || plan.defect_class != study.defect_class
+        || plan.defect_size_metric != study.defect_size_metric
+        || plan.inspection_protocol_sha256 != study.inspection_protocol_sha256
+        || plan.sensor_setup_sha256 != study.sensor_setup_sha256
+        || plan.calibration_receipt_sha256 != study.calibration_receipt_sha256
+        || plan.decision_threshold_sha256 != study.decision_threshold_sha256
+        || plan.scan_plan_sha256 != study.scan_plan_sha256
+        || plan.ground_truth_method_id != study.ground_truth_method_id
+        || plan.ground_truth_protocol_sha256 != study.ground_truth_protocol_sha256
+    {
+        return rejected("analysis plan does not bind the exact profile, inspection, calibration, threshold, scan and ground-truth configuration");
     }
     if plan.analysis_profile != "hit_miss_pod_v1" {
         return blocked("only the registered hit/miss POD profile is supported by this audit");
@@ -321,8 +373,14 @@ fn audit_study(study: &Study) -> Decision {
         }
         if !nonempty(&specimen.truth_method_id)
             || !nonempty(&specimen.truth_adjudication_ref)
+            || !sha256_shape(&specimen.truth_protocol_sha256)
         {
-            return blocked("independent ground-truth method or adjudication reference is missing");
+            return blocked("independent ground-truth method, protocol digest or adjudication reference is missing");
+        }
+        if specimen.truth_method_id != study.ground_truth_method_id
+            || specimen.truth_protocol_sha256 != study.ground_truth_protocol_sha256
+        {
+            return rejected("specimen ground-truth method or protocol differs from the preregistered truth reference");
         }
 
         match specimen.truth_state.as_str() {
@@ -394,7 +452,15 @@ fn audit_study(study: &Study) -> Decision {
         return blocked("POD analysis result identity or digest is missing");
     }
     if result.plan_sha256 != plan.plan_sha256
+        || result.profile_sha256 != study.profile_sha256
         || result.specimen_manifest_sha256 != study.specimen_manifest_sha256
+        || result.inspection_protocol_sha256 != study.inspection_protocol_sha256
+        || result.sensor_setup_sha256 != study.sensor_setup_sha256
+        || result.calibration_receipt_sha256 != study.calibration_receipt_sha256
+        || result.decision_threshold_sha256 != study.decision_threshold_sha256
+        || result.scan_plan_sha256 != study.scan_plan_sha256
+        || result.defect_size_metric != study.defect_size_metric
+        || (result.critical_defect_size_mm - plan.critical_defect_size_mm).abs() > 1e-9
         || result.analysis_profile != plan.analysis_profile
         || result.defect_class != study.defect_class
         || result.defect_specimen_count != defect_count
@@ -446,17 +512,7 @@ impl Disposition {
 }
 
 fn audit_case(case: &Case) -> Decision {
-    let result = audit_study(&case.study);
-    if result.disposition.as_str() != case.expected_disposition
-        || result.outcome != case.expected_outcome
-    {
-        return Decision {
-            disposition: Disposition::Rejected,
-            outcome: result.outcome,
-            reason: "fixture expectation does not match the audit result",
-        };
-    }
-    result
+    audit_study(&case.study)
 }
 
 fn read_fixture(path: &Path) -> Result<Fixture> {
