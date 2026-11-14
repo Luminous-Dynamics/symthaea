@@ -1291,7 +1291,7 @@ mod tests {
         let mut input = case();
         measured(&mut input);
         for index in 0..20 {
-            let mut extra = window(0, 100 + index, true, 1.0);
+            let mut extra = window(0, 1_000 + index, true, 1.0);
             extra.coherence.evidence_kind = EvidenceKind::Measured;
             input.windows.push(extra);
         }
