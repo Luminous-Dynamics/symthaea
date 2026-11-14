@@ -12,7 +12,7 @@ struct Fixture {
     cases: Vec<LifecycleCase>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct LifecycleCase {
     id: String,
@@ -24,7 +24,7 @@ struct LifecycleCase {
     rationale: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct QualificationGeneration {
     passport_id: String,
@@ -43,7 +43,7 @@ struct QualificationGeneration {
     claims: Vec<PassportClaim>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct PassportClaim {
     claim_id: String,
@@ -79,7 +79,7 @@ struct LifecycleEvent {
     authority_ref: String,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct ExpectedClaimState {
     generation_id: String,
@@ -682,6 +682,38 @@ mod tests {
         assert_eq!(result.disposition, AuditDisposition::Pass);
         assert!(result.claim_states.iter().any(|s| s.claim_id == "bond_strength" && s.state == "SUSPENDED"));
         assert!(result.claim_states.iter().any(|s| s.claim_id == "wettability" && s.state == "CURRENT"));
+    }
+
+    #[test]
+    fn unrelated_event_does_not_suspend_unrelated_claims() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid lifecycle fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "unrelated-calibration-does-not-overinvalidate").expect("case exists");
+        let result = audit_case(case);
+        assert_eq!(result.disposition, AuditDisposition::Pass);
+        assert!(result.claim_states.iter().all(|state| state.state == "CURRENT"));
+    }
+
+    #[test]
+    fn input_permutation_preserves_event_replay_and_claim_states() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid lifecycle fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "new-generation-supersedes-predecessor").expect("case exists");
+        let expected = audit_case(case);
+        let mut permuted = case.clone();
+        permuted.generations.reverse();
+        permuted.events.reverse();
+        let actual = audit_case(&permuted);
+        assert_eq!(actual.disposition, expected.disposition);
+        assert_eq!(actual.claim_states, expected.claim_states);
+    }
+
+    #[test]
+    fn source_retraction_revokes_only_its_claim() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid lifecycle fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "retracted-bond-source-revokes-dependent-claim").expect("case exists");
+        let result = audit_case(case);
+        assert_eq!(result.disposition, AuditDisposition::Pass);
+        assert!(result.claim_states.iter().any(|state| state.claim_id == "bond_strength" && state.state == "REVOKED"));
+        assert!(result.claim_states.iter().any(|state| state.claim_id == "wettability" && state.state == "CURRENT"));
     }
 
     #[test]
