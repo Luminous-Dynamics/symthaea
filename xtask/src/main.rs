@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod plasma_life;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -35,6 +36,11 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Audit the plasma bond-life evidence and accelerated-transfer fixture.
+    PlasmaLifeAudit {
+        #[arg(long, default_value = "data/research/plasma_life_fixture_v0_1.json")]
+        fixture: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -71,6 +77,18 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::PlasmaLifeAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() {
+                fixture
+            } else {
+                root.join(fixture)
+            };
+            plasma_life::run_audit(&fixture_path)?;
+        }
         Commands::RhnSweep {
             dims,
             objects,
