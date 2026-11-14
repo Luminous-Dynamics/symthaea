@@ -564,7 +564,7 @@ fn validate_decision_evidence_list(
                 match parsed {
                     Ok(source_observed) => {
                         if let Some(available) = available.as_ref() {
-                            if source_observed > *available {
+                            if &source_observed > available {
                                 report.error(
                                     "DTEA-EVIDENCE-006",
                                     format!("{entry_path}.source_observed_at"),
@@ -660,7 +660,7 @@ fn validate_decision_payload(
             );
         }
         match occurred_at.and_then(|value| DateTime::parse_from_rfc3339(value).ok()) {
-            Some(event_time) if event_time == *decision_at => {}
+            Some(event_time) if &event_time == decision_at => {}
             Some(_) => report.error(
                 "DTEA-TIME-002",
                 format!("{path}.decision_at"),
