@@ -118,3 +118,8 @@ To detect a coordinated rewrite, compare the observed journal head with a previo
 
 This is a caller-supplied checkpoint comparison, not remote signing or key custody. The local prototype does not issue, sign, retain or protect the external checkpoint. A digest stored beside the database is not independent. A production E3/E4 design needs an independently administered checkpoint source (for example, a signed remote receipt or transparency log), key-management separation and rollback/fork detection.
 
+
+
+## Signed checkpoint chain
+
+The detached Ed25519 checkpoint contract and cross-language test vector now appear in [CHECKPOINT_CHAIN.md](CHECKPOINT_CHAIN.md). This extends the earlier caller-supplied expected-head concept with signature verification and a monotonic predecessor chain. It remains a protocol/verifier building block: the local Go verifier is a separate companion artifact, and the public PR does not deploy a witness, key custody, transparency log or protected external trust-state service. Its consumer cursor must be stored outside the database and outside the database administrator's trust domain.
