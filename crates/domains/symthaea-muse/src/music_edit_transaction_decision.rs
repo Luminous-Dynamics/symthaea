@@ -569,28 +569,10 @@ pub fn evaluate_music_edit_transaction_v1(
         if attempt.outcome != MusicEditAttemptOutcomeV1::CandidateReady {
             continue;
         }
-        let mut all_verified = true;
-        let mut hard_rejection = false;
-        for kind in &transaction.required_evidence {
-            match required_record(attempt, *kind).map(|record| record.state) {
-                Some(MusicEditEvidenceStateV1::Verified) => {}
-                Some(MusicEditEvidenceStateV1::Rejected) => {
-                    let record = required_record(attempt, *kind).expect("record was matched");
-                    match record.failure_class {
-                        Some(MusicEditEvidenceFailureClassV1::HardGate) => {
-                            hard_rejection = true;
-                        }
-                        Some(MusicEditEvidenceFailureClassV1::Integrity) => {
-                            hard_rejection = true;
-                        }
-                        _ => all_verified = false,
-                    }
-                }
-                Some(MusicEditEvidenceStateV1::NotRun)
-                | Some(MusicEditEvidenceStateV1::Pending)
-                | None => all_verified = false,
-            }
-        }
+        let all_verified = transaction.required_evidence.iter().all(|kind| {
+            required_record(attempt, *kind)
+                .is_some_and(|record| record.state == MusicEditEvidenceStateV1::Verified)
+        });
         if all_verified {
             return make_receipt(
                 transaction,
@@ -601,8 +583,6 @@ pub fn evaluate_music_edit_transaction_v1(
             )
             .map_err(|issue| vec![issue]);
         }
-        // This does not terminate evaluation: a later candidate may be valid.
-        let _ = hard_rejection;
     }
 
     let Some(last) = last_attempt else {
@@ -618,10 +598,6 @@ pub fn evaluate_music_edit_transaction_v1(
 
     let mut hard_rejection = last.outcome == MusicEditAttemptOutcomeV1::HardInvalid;
     let mut repairable = last.outcome == MusicEditAttemptOutcomeV1::RepairableFailure;
-    let mut unresolved = matches!(
-        last.outcome,
-        MusicEditAttemptOutcomeV1::OutcomeUnknown | MusicEditAttemptOutcomeV1::Failed
-    );
     let mut reasons = Vec::new();
 
     if hard_rejection {
@@ -633,14 +609,12 @@ pub fn evaluate_music_edit_transaction_v1(
                 state: MusicEditEvidenceStateV1::NotRun,
                 ..
             }) => {
-                unresolved = true;
                 reasons.push(MusicEditDecisionReasonV1::EvidenceMissing);
             }
             Some(MusicEditEvidenceRecordV1 {
                 state: MusicEditEvidenceStateV1::Pending,
                 ..
             }) => {
-                unresolved = true;
                 reasons.push(MusicEditDecisionReasonV1::EvidencePending);
             }
             Some(MusicEditEvidenceRecordV1 {
@@ -672,7 +646,6 @@ pub fn evaluate_music_edit_transaction_v1(
                 failure_class: Some(MusicEditEvidenceFailureClassV1::Unresolved),
                 ..
             }) => {
-                unresolved = true;
                 reasons.push(MusicEditDecisionReasonV1::RequiredEvidenceUnresolved);
             }
             Some(MusicEditEvidenceRecordV1 {
@@ -684,7 +657,6 @@ pub fn evaluate_music_edit_transaction_v1(
                 failure_class: None,
                 ..
             }) => {
-                unresolved = true;
                 reasons.push(MusicEditDecisionReasonV1::RequiredEvidenceUnresolved);
             }
         }
@@ -704,7 +676,9 @@ pub fn evaluate_music_edit_transaction_v1(
         if repairable {
             reasons.push(MusicEditDecisionReasonV1::BudgetExhausted);
         }
-        let fallback = if last.outcome == MusicEditAttemptOutcomeV1::OutcomeUnknown {
+        let fallback = if repairable {
+            MusicEditDecisionReasonV1::BudgetExhausted
+        } else if last.outcome == MusicEditAttemptOutcomeV1::OutcomeUnknown {
             MusicEditDecisionReasonV1::OutcomeUnknown
         } else if last.outcome == MusicEditAttemptOutcomeV1::Failed {
             MusicEditDecisionReasonV1::ExecutionFailed
@@ -713,7 +687,6 @@ pub fn evaluate_music_edit_transaction_v1(
         } else {
             MusicEditDecisionReasonV1::EvidenceMissing
         };
-        let _ = unresolved;
         (MusicEditDecisionActionV1::Abstain, fallback)
     };
     reasons.push(reason);
