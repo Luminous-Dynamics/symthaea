@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn no_acquisition_policy_never_recommends_a_purchase() {
+    fn no_acquisition_policy_reports_uncovered_need_instead_of_recommending_purchase() {
         let needs = vec![need("rain")];
         let choices = vec![choice("raincoat", &["rain"], ChoiceOrigin::Purchase, 6000, 15)];
         let result = search_exact(
@@ -470,6 +470,31 @@ mod tests {
     }
 
     #[test]
+    fn no_purchase_policy_can_still_allow_borrowing() {
+        let needs = vec![need("formal")];
+        let choices = vec![
+            choice("borrowed-jacket", &["formal"], ChoiceOrigin::Borrowed, 0, 15),
+            choice("retail-jacket", &["formal"], ChoiceOrigin::Purchase, 5000, 10),
+        ];
+        let result = search_exact(
+            &needs,
+            &choices,
+            WardrobePolicy {
+                allow_borrowing: true,
+                allow_renting: false,
+                allow_second_hand: false,
+                allow_purchase: false,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
+        )
+        .unwrap();
+        assert_eq!(result.pareto_plans.len(), 1);
+        assert_eq!(result.pareto_plans[0].selected_choice_ids, vec!["borrowed-jacket"]);
+        assert_eq!(result.pareto_plans[0].metrics.added_items, 1);
+    }
+
+    #[test]
     fn repair_and_purchase_alternatives_remain_on_the_pareto_frontier() {
         let needs = vec![need("weather-protection")];
         let choices = vec![
@@ -480,7 +505,10 @@ mod tests {
             &needs,
             &choices,
             WardrobePolicy {
-                allow_additions: true,
+                allow_borrowing: true,
+                allow_renting: true,
+                allow_second_hand: true,
+                allow_purchase: true,
                 allow_made_to_order: true,
                 currency_code: "ZAR".to_owned(),
             },
@@ -595,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn made_to_order_can_be_blocked_without_blocking_other_additions() {
+    fn made_to_order_can_be_blocked_while_second_hand_remains_allowed() {
         let needs = vec![need("weather")];
         let choices = vec![
             choice("second-hand-coat", &["weather"], ChoiceOrigin::SecondHand, 1800, 30),
@@ -605,7 +633,10 @@ mod tests {
             &needs,
             &choices,
             WardrobePolicy {
-                allow_additions: true,
+                allow_borrowing: true,
+                allow_renting: true,
+                allow_second_hand: true,
+                allow_purchase: true,
                 allow_made_to_order: false,
                 currency_code: "ZAR".to_owned(),
             },
