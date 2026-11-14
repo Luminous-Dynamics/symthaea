@@ -8,10 +8,10 @@
 #![forbid(unsafe_code)]
 
 use super::joint_metrology_adapter::{
-    AssuranceDisposition, JointMetrologyEvidence, JointMetrologyReport, QualificationDisposition,
+    JointMetrologyEvidence, JointMetrologyReport, QualificationDisposition,
     UpstreamEnergyDisposition, qualify_joint_metrology,
 };
-use super::{EventStamp, ReplayDisposition, replay_mission};
+use super::{AssuranceDisposition, EventStamp, ReplayDisposition, replay_mission};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest, Sha256};
@@ -554,14 +554,25 @@ mod tests {
     }
 }
 
+/// Independently supplied clock authority; the packet cannot establish this relation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClockAuthorityBinding {
+    SameMonotonicClock {
+        clock_id: String,
+        boot_epoch: u64,
+    },
+    Unknown {
+        reason_code: String,
+    },
+}
+
 /// Independently supplied identities not stored as fields on MissionTrace.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JointReceiptAuthorityBindings {
     pub mission_trace_digest: String,
     pub assurance_receipt_digest: String,
     pub terminal_receipt_digest: String,
-    pub same_clock_id: String,
-    pub boot_epoch: u64,
+    pub clock_relation: ClockAuthorityBinding,
 }
 
 /// Result of independently validating and joining one v0.1 packet.
@@ -704,21 +715,22 @@ fn bind_stamp(
 fn bind_interval(
     root: &JsonValue,
     path: &[&'static str],
-    expected: (u64, u64),
+    lower_value: u64,
+    upper_value: u64,
 ) -> Result<(), WireError> {
     let mut lower = path.to_vec();
     lower.push("lower_ns");
     bind_u64(
         "measurement.lower_ns",
         path_u64_string(root, &lower)?,
-        expected.0,
+        lower_value,
     )?;
     let mut upper = path.to_vec();
     upper.push("upper_ns");
     bind_u64(
         "measurement.upper_ns",
         path_u64_string(root, &upper)?,
-        expected.1,
+        upper_value,
     )
 }
 
@@ -779,7 +791,7 @@ fn verify_edges(root: &JsonValue) -> Result<(), WireError> {
         {
             return Err(WireError::BindingMismatch {
                 field: format!("causal_edges[{index}]"),
-                expected: format!("{:?}", (events[index], events[index + 1])),
+                expected: format!("{:?}", (&events[index], &events[index + 1])),
                 observed: format!("{:?}", (from_id, from_sequence, to_id, to_sequence)),
             });
         }
@@ -807,11 +819,20 @@ pub fn verify_and_join_joint_receipt(
             "terminal_receipt_digest",
             authority.terminal_receipt_digest.as_str(),
         ),
-        ("same_clock_id", authority.same_clock_id.as_str()),
     ] {
         if value.trim().is_empty() {
             return Err(WireError::InvalidField(field));
         }
+    }
+
+    match &authority.clock_relation {
+        ClockAuthorityBinding::SameMonotonicClock { clock_id, .. } if clock_id.trim().is_empty() => {
+            return Err(WireError::InvalidField("clock_relation.clock_id"));
+        }
+        ClockAuthorityBinding::Unknown { reason_code } if reason_code.trim().is_empty() => {
+            return Err(WireError::InvalidField("clock_relation.reason_code"));
+        }
+        _ => {}
     }
 
     let verified = validate_receipt(packet)?;
@@ -1227,27 +1248,27 @@ pub fn verify_and_join_joint_receipt(
 
     // v0.1 single-clock profile: require the caller's clock identity before
     // any numeric age is accepted. Unknown mapping must carry null AoI.
-    match authority.clock_relation {
-        ClockAuthorityBinding::SameMonotonicClock => {
+    match &authority.clock_relation {
+        ClockAuthorityBinding::SameMonotonicClock { clock_id, boot_epoch } => {
             bind_text(
                 "clock_relation.kind",
-                &path_string(&root, &["clock_relation", "kind"])?,
+                &path_string(&root, &["clock_relation", "kind"] )?,
                 "same_monotonic_clock_verified",
             )?;
             bind_text(
                 "clock_relation.id",
-                &path_string(&root, &["clock_relation", "clock_id"])?,
-                &authority.same_clock_id,
+                &path_string(&root, &["clock_relation", "clock_id"] )?,
+                clock_id,
             )?;
             bind_u64(
                 "clock_relation.epoch",
-                path_u64_string(&root, &["clock_relation", "boot_epoch"])?,
-                authority.boot_epoch,
+                path_u64_string(&root, &["clock_relation", "boot_epoch"] )?,
+                *boot_epoch,
             )?;
-            if observation.stamp.clock_id != authority.same_clock_id
-                || application.stamp.clock_id != authority.same_clock_id
-                || observation.stamp.boot_epoch != authority.boot_epoch
-                || application.stamp.boot_epoch != authority.boot_epoch
+            if observation.stamp.clock_id != *clock_id
+                || application.stamp.clock_id != *clock_id
+                || observation.stamp.boot_epoch != *boot_epoch
+                || application.stamp.boot_epoch != *boot_epoch
             {
                 return Err(WireError::InvalidField("clock_authority_binding"));
             }
@@ -1267,7 +1288,7 @@ pub fn verify_and_join_joint_receipt(
                 &path_string(
                     &root,
                     &["measurements", "source_to_actuator_aoi", "disposition"],
-                )?,
+                ) ?,
                 "Qualified",
             )?;
             bind_interval(
@@ -1277,28 +1298,34 @@ pub fn verify_and_join_joint_receipt(
                 aoi.1,
             )?;
         }
-        ClockAuthorityBinding::Unknown => {
+        ClockAuthorityBinding::Unknown { reason_code } => {
             bind_text(
                 "clock_relation.kind",
-                &path_string(&root, &["clock_relation", "kind"])?,
+                &path_string(&root, &["clock_relation", "kind"] )?,
                 "unknown",
+            )?;
+            bind_text(
+                "clock_relation.reason_code",
+                &path_string(&root, &["clock_relation", "reason_code"] )?,
+                reason_code,
             )?;
             bind_text(
                 "aoi.disposition",
                 &path_string(
                     &root,
                     &["measurements", "source_to_actuator_aoi", "disposition"],
-                )?,
+                ) ?,
                 "Unknown",
             )?;
             if !matches!(
-                path_value(&root, &["measurements", "source_to_actuator_aoi", "value"])?,
+                path_value(&root, &["measurements", "source_to_actuator_aoi", "value"]) ?,
                 JsonValue::Null
             ) {
                 return Err(WireError::InvalidField("aoi.value"));
             }
         }
     }
+
     let onset = evidence
         .motion_onset
         .as_ref()
@@ -1336,7 +1363,7 @@ pub fn verify_and_join_joint_receipt(
         )?;
     }
 
-    validate_edges(&root)?;
+    verify_edges(&root)?;
 
     bind_text(
         "thermal.transition_id",
