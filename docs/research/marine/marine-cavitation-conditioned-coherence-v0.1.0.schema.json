@@ -502,12 +502,17 @@
           "maximum": 1
         },
         "coherence_lower_bound": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
         },
         "coherence_upper_bound": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "maximum": 1
         },
@@ -516,11 +521,17 @@
           "minimum": 0
         },
         "vibration_reference_coherent_pressure_psd_lower_bound": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "vibration_reference_coherent_pressure_psd_upper_bound": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "non_coherent_residual_pressure_psd_pa2_per_hz": {
@@ -528,11 +539,17 @@
           "minimum": 0
         },
         "non_coherent_residual_pressure_psd_lower_bound": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "non_coherent_residual_pressure_psd_upper_bound": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "uncertainty_status": {
