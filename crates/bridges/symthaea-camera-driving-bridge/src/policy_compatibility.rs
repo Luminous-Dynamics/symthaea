@@ -171,6 +171,9 @@ impl CameraDrivingPolicyManifest {
         }
 
         let receipt: &DrivingObservationReceipt = &observation.receipt;
+        if receipt.schema_version != crate::RECEIPT_SCHEMA_VERSION {
+            return Err(CameraPolicyCompatibilityError::ReceiptCommitmentMismatch);
+        }
         if receipt.receipt_sha256 != crate::digest_receipt(receipt) {
             return Err(CameraPolicyCompatibilityError::ReceiptCommitmentMismatch);
         }
@@ -241,7 +244,7 @@ impl CameraDrivingPolicyManifest {
             privilege_profile: self.privilege_profile,
             bridge_receipt_sha256: receipt.receipt_sha256.clone(),
             fused_policy_input_sha256: receipt.fused_policy_input_sha256.clone(),
-            compatibility: "INPUT_AND_ARTIFACT_COMPATIBLE_ONLY",
+            compatibility: "INPUT_AND_ARTIFACT_COMPATIBLE_ONLY".to_owned(),
             controller_invoked: false,
             actuator_command_emitted: false,
             operational_authority_granted: false,
@@ -260,7 +263,7 @@ pub struct CameraPolicyCompatibilityReceipt {
     pub privilege_profile: CameraPolicyPrivilegeProfile,
     pub bridge_receipt_sha256: String,
     pub fused_policy_input_sha256: String,
-    pub compatibility: &'static str,
+    pub compatibility: String,
     pub controller_invoked: bool,
     pub actuator_command_emitted: bool,
     pub operational_authority_granted: bool,
