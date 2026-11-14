@@ -1041,10 +1041,29 @@ mod tests {
     }
 
     #[test]
-    fn open_circuit_source_current_cannot_be_waived_by_manifest_edit() {
+    fn open_circuit_trace_rejects_measured_source_current() {
         let mut value = fixture_value();
-        value["protocol"]["standby_mode"] = json!("regulated_voltage_hold");
+        value["artifacts"][0]["relative_path"] = json!(
+            "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/negative_open_circuit_source_current.csv"
+        );
+        value["artifacts"][0]["sha256"] =
+            json!("20b69db84bdf0a8c0696c907ea515b6b18311f26ee44532e68712d664f3c89bd");
+        value["artifacts"][0]["byte_length"] = json!(242);
         let error = audit_value(value).unwrap_err().to_string();
-        assert!(error.contains("protocol artifact does not match manifest field standby_mode"));
+        assert!(error.contains("open-circuit trace contains non-zero external source current"));
+    }
+
+    #[test]
+    fn regenerative_load_current_is_not_clipped_or_rejected() {
+        let mut value = fixture_value();
+        value["artifacts"][6]["relative_path"] = json!(
+            "fixtures/energy/electrochemical-capacitor/trace_receipt_v0_1/load_call_01_regenerative.csv"
+        );
+        value["artifacts"][6]["sha256"] =
+            json!("e9c4207ab62370dd7824cb8fea367e06449bebb2cf7820c83fb377ac02945d83");
+        value["artifacts"][6]["byte_length"] = json!(42);
+        let receipt: Receipt = serde_json::from_value(value).unwrap();
+        let report = audit_receipt(&root(), &receipt).unwrap();
+        assert_eq!(report.event_count, 2);
     }
 }
