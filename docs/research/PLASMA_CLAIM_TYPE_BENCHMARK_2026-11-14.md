@@ -390,3 +390,14 @@ A valid evidence chain for an aged FRP joint could therefore require:
 6. a separate durability/transfer claim whose statistics, censoring and uncertainty are assessed by the owners in #11971 and #12002.
 
 No single document or endpoint can stand in for this complete chain.
+
+
+## 2026-11-14 — v0.3 adds constitutive response and failure classification
+
+The versioned claim registry has been extended with two exact-edition entries:
+- ASTM D5656/D5656M-26: adhesive shear stress-strain characterization on aluminum thick-adherend specimens. Its claim ceiling is constitutive response, not substrate-specific adhesion or single-lap joint strength.
+- ASTM D5573-99R19: SMC FRP failure-mode classification practice. Its claim ceiling is descriptive classification; it does not establish acceptability.
+
+The plasma method ontology now contains `classification_practice` as an explicit evidence kind. Non-aluminum D5656 use and non-SMC D5573 generalization are BLOCKED pending separate applicability evidence. The v0.3 fixture has 52 cases and independently replays 52/52.
+
+See `docs/research/PLASMA_METHOD_EVIDENCE_PLANES_2026-11-14.md` for standard scope, the three evidence planes, 2026 plasma literature and benchmark targets.
