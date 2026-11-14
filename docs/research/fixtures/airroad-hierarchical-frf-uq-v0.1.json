@@ -9,8 +9,20 @@
   "topology_identity": "sha256:two-port-topology-v0.1",
   "frequency_unit": "normalized_frequency",
   "frequencies": [
-    {"frequency_id": "f0", "value": {"numerator": "1", "denominator": "4"}},
-    {"frequency_id": "f1", "value": {"numerator": "3", "denominator": "4"}}
+    {
+      "frequency_id": "f0",
+      "value": {
+        "numerator": "1",
+        "denominator": "4"
+      }
+    },
+    {
+      "frequency_id": "f1",
+      "value": {
+        "numerator": "3",
+        "denominator": "4"
+      }
+    }
   ],
   "periods": [
     {
@@ -18,38 +30,99 @@
       "campaign_id": "campaign-hfrf-001",
       "acquisition_id": "acquisition-multisine-001",
       "frequency_values": [
-        {"frequency_id": "f0", "value": {"numerator": "2", "denominator": "1"}},
-        {"frequency_id": "f1", "value": {"numerator": "3", "denominator": "1"}}
-      ]
+        {
+          "frequency_id": "f0",
+          "value": {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        },
+        {
+          "frequency_id": "f1",
+          "value": {
+            "numerator": "3",
+            "denominator": "1"
+          }
+        }
+      ],
+      "model_identity": "sha256:hierarchical-frf-model-v0.1",
+      "topology_identity": "sha256:two-port-topology-v0.1"
     },
     {
       "period_id": "period-2",
       "campaign_id": "campaign-hfrf-001",
       "acquisition_id": "acquisition-multisine-001",
       "frequency_values": [
-        {"frequency_id": "f0", "value": {"numerator": "0", "denominator": "1"}},
-        {"frequency_id": "f1", "value": {"numerator": "2", "denominator": "1"}}
-      ]
+        {
+          "frequency_id": "f0",
+          "value": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        },
+        {
+          "frequency_id": "f1",
+          "value": {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        }
+      ],
+      "model_identity": "sha256:hierarchical-frf-model-v0.1",
+      "topology_identity": "sha256:two-port-topology-v0.1"
     },
     {
       "period_id": "period-3",
       "campaign_id": "campaign-hfrf-001",
       "acquisition_id": "acquisition-multisine-001",
       "frequency_values": [
-        {"frequency_id": "f0", "value": {"numerator": "1", "denominator": "1"}},
-        {"frequency_id": "f1", "value": {"numerator": "1", "denominator": "1"}}
-      ]
+        {
+          "frequency_id": "f0",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        },
+        {
+          "frequency_id": "f1",
+          "value": {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        }
+      ],
+      "model_identity": "sha256:hierarchical-frf-model-v0.1",
+      "topology_identity": "sha256:two-port-topology-v0.1"
     }
   ],
   "calibration": {
     "nuisance_id": "calibration-gain-common-001",
     "scope": "fixed_across_periods_and_frequencies_within_campaign",
     "sensitivity": [
-      {"numerator": "1", "denominator": "1"},
-      {"numerator": "2", "denominator": "1"}
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "2",
+        "denominator": "1"
+      }
     ],
-    "variance": {"numerator": "1", "denominator": "100"},
-    "random_source_model": "zero_mean_shared_calibration_coordinate"
+    "variance": {
+      "numerator": "1",
+      "denominator": "100"
+    },
+    "random_source_model": "zero_mean_shared_calibration_coordinate",
+    "frequency_bindings": [
+      {
+        "frequency_id": "f0",
+        "nuisance_id": "calibration-gain-common-001"
+      },
+      {
+        "frequency_id": "f1",
+        "nuisance_id": "calibration-gain-common-001"
+      }
+    ]
   },
   "composition": {
     "period_noise_calibration_cross_covariance": "declared_zero",
@@ -62,63 +135,141 @@
   },
   "expected": {
     "mean": [
-      {"numerator": "1", "denominator": "1"},
-      {"numerator": "2", "denominator": "1"}
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "2",
+        "denominator": "1"
+      }
     ],
     "deviations": [
       [
-        {"numerator": "1", "denominator": "1"},
-        {"numerator": "1", "denominator": "1"}
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
       ],
       [
-        {"numerator": "-1", "denominator": "1"},
-        {"numerator": "0", "denominator": "1"}
+        {
+          "numerator": "-1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
       ],
       [
-        {"numerator": "0", "denominator": "1"},
-        {"numerator": "-1", "denominator": "1"}
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "1"
+        }
       ]
     ],
     "period_covariance": [
       [
-        {"numerator": "1", "denominator": "3"},
-        {"numerator": "1", "denominator": "6"}
+        {
+          "numerator": "1",
+          "denominator": "3"
+        },
+        {
+          "numerator": "1",
+          "denominator": "6"
+        }
       ],
       [
-        {"numerator": "1", "denominator": "6"},
-        {"numerator": "1", "denominator": "3"}
+        {
+          "numerator": "1",
+          "denominator": "6"
+        },
+        {
+          "numerator": "1",
+          "denominator": "3"
+        }
       ]
     ],
-    "period_covariance_determinant": {"numerator": "1", "denominator": "12"},
+    "period_covariance_determinant": {
+      "numerator": "1",
+      "denominator": "12"
+    },
     "calibration_covariance": [
       [
-        {"numerator": "1", "denominator": "100"},
-        {"numerator": "1", "denominator": "50"}
+        {
+          "numerator": "1",
+          "denominator": "100"
+        },
+        {
+          "numerator": "1",
+          "denominator": "50"
+        }
       ],
       [
-        {"numerator": "1", "denominator": "50"},
-        {"numerator": "1", "denominator": "25"}
+        {
+          "numerator": "1",
+          "denominator": "50"
+        },
+        {
+          "numerator": "1",
+          "denominator": "25"
+        }
       ]
     ],
     "total_covariance": [
       [
-        {"numerator": "103", "denominator": "300"},
-        {"numerator": "14", "denominator": "75"}
+        {
+          "numerator": "103",
+          "denominator": "300"
+        },
+        {
+          "numerator": "14",
+          "denominator": "75"
+        }
       ],
       [
-        {"numerator": "14", "denominator": "75"},
-        {"numerator": "28", "denominator": "75"}
+        {
+          "numerator": "14",
+          "denominator": "75"
+        },
+        {
+          "numerator": "28",
+          "denominator": "75"
+        }
       ]
     ],
-    "total_covariance_determinant": {"numerator": "7", "denominator": "75"},
+    "total_covariance_determinant": {
+      "numerator": "7",
+      "denominator": "75"
+    },
     "diagonal_only_counterfactual": [
       [
-        {"numerator": "103", "denominator": "300"},
-        {"numerator": "0", "denominator": "1"}
+        {
+          "numerator": "103",
+          "denominator": "300"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
       ],
       [
-        {"numerator": "0", "denominator": "1"},
-        {"numerator": "28", "denominator": "75"}
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "28",
+          "denominator": "75"
+        }
       ]
     ],
     "cross_frequency_covariance_nonzero": true,
@@ -126,16 +277,46 @@
     "common_offset_does_not_change_centered_covariance": true
   },
   "negative_controls": [
-    {"id": "fewer-than-two-periods", "expected": "reject"},
-    {"id": "wrong-sample-covariance-denominator", "expected": "reject"},
-    {"id": "uncentered-covariance", "expected": "reject"},
-    {"id": "calibration-id-mismatch-between-frequencies", "expected": "reject-dependency"},
-    {"id": "stale-acquisition-identity", "expected": "not-evaluable"},
-    {"id": "lost-cross-frequency-covariance", "expected": "reject-joint-law"},
-    {"id": "unknown-period-calibration-cross-covariance", "expected": "do-not-add"},
-    {"id": "covariance-promoted-to-hard-set", "expected": "reject-claim-class"},
-    {"id": "repeated-periods-claim-to-identify-fixed-calibration", "expected": "reject"},
-    {"id": "hard-model-error-converted-to-covariance", "expected": "reject-claim-class"}
+    {
+      "id": "fewer-than-two-periods",
+      "expected": "reject"
+    },
+    {
+      "id": "wrong-sample-covariance-denominator",
+      "expected": "reject"
+    },
+    {
+      "id": "uncentered-covariance",
+      "expected": "reject"
+    },
+    {
+      "id": "calibration-id-mismatch-between-frequencies",
+      "expected": "reject-dependency"
+    },
+    {
+      "id": "stale-acquisition-identity",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "lost-cross-frequency-covariance",
+      "expected": "reject-joint-law"
+    },
+    {
+      "id": "unknown-period-calibration-cross-covariance",
+      "expected": "do-not-add"
+    },
+    {
+      "id": "covariance-promoted-to-hard-set",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "repeated-periods-claim-to-identify-fixed-calibration",
+      "expected": "reject"
+    },
+    {
+      "id": "hard-model-error-converted-to-covariance",
+      "expected": "reject-claim-class"
+    }
   ],
   "claim_ceiling": [
     "Exact-rational sample-covariance and hierarchical composition reference only.",
