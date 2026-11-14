@@ -115,6 +115,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     let gold = index_unique(oracle_cases, "case_id", "oracle")?;
     let outputs = index_unique(results, "case_id", "submission")?;
 
+    if inputs.len() < 40 {
+        return Err(err("IIC-Eval v0.2 requires at least forty development cases"));
+    }
     if inputs.len() != gold.len() || inputs.keys().any(|id| !gold.contains_key(id)) {
         return Err(err("corpus and oracle case identifiers are not a one-to-one match"));
     }
@@ -341,11 +344,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     let recall = if total_gold == 0 { 0.0 } else { true_positive as f64 / total_gold as f64 };
     let f1 = if precision + recall == 0.0 { 0.0 } else { 2.0 * precision * recall / (precision + recall) };
     let attr_denominator = matched_attributes.max(1) as f64;
-    let (_, _, _, question_precision, question_recall, question_f1) =
-        exact_list_metrics(
-            &(0..total_required_questions).map(|_| String::new()).collect::<Vec<_>>(),
-            &(0..total_reported_questions).map(|_| String::new()).collect::<Vec<_>>()
-        );
     let question_precision = if total_reported_questions == 0 {
         if total_required_questions == 0 { 1.0 } else { 0.0 }
     } else { matched_required_questions as f64 / total_reported_questions as f64 };
@@ -410,7 +408,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         "interpretation_limits":[
             "Exact source-span matching is a structural proxy; it does not establish semantic equivalence.",
             "The development oracle is not independently adjudicated.",
-            "Required clarification questions and prohibited inferences require expert adjudication and are not scored by this evaluator.",
+            "Clarification-question and prohibited-inference scores use exact text matching as a conservative lexical proxy; paraphrase equivalence requires human adjudication.",
+            "A prohibited-inference acknowledgement is self-reported and does not by itself prove that the candidate avoided the prohibited inference.",
             "No legal, authority, safety, or production-readiness conclusion follows from this report."
         ]
     });
@@ -427,7 +426,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::span_matches;
+    use super::{exact_list_metrics, span_matches};
 
     #[test]
     fn required_question_matching_reports_exact_precision_and_recall() {
