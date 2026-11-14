@@ -16,9 +16,10 @@ The crate has its own Cargo workspace so it is not implicitly pulled into Symtha
 
 ## Supported document types
 
-The CLI autodetects:
+The CLI supports:
 - **Map snapshots**: graph identity, node/edge shape, provenance, lifecycle, event references, evidence invalidation, authority promotion and decision-time evidence availability.
 - **Retrieval/exploration cases and oracles**: per-case source revision/tree pins, fixed token/line budgets, candidate-region identity, availability, configuration-world and temporal-scope checks, distinct natural vs wrong-repository no-gold dispositions, and oracle relevant/forbidden-span consistency.
+- **Cargo.toml** via the explicit `cargo-manifest` subcommand: workspace/package declarations, dependency kinds and target predicates, feature declarations, explicit targets and build-script declarations are preserved as manifest-declared facts.
 - **Federation manifests v0.1.0 and v0.1.1**: unique project/repository/map identities, exact map-blob and artifact-commit pins, source-repository references, relationship endpoints, shared-contract bindings, hub self-map identity and claim/authority consistency. V0.1.1 additionally requires a two-sided compatibility receipt before an edge may be independently qualified.
 
 For federation manifests, a successful structural check does **not** fetch member repositories or prove that the pinned Git objects exist. It checks the manifest's internal references and identity formats only. Fetch each map by its exact artifact commit and compare the resulting blob OID independently when constructing or refreshing a federation.
@@ -62,7 +63,7 @@ The crate also exposes a pure read-only Rust API:
 
 This is **not** a full JSON Schema 2020-12 implementation. It does not authenticate Git object IDs or external file digests, dereference source URIs, verify signatures, prove event-stream completeness, execute repository code, run tests, inspect CI, or independently adjudicate an assertion. A structural pass means only that the supplied JSON satisfies this validator's local contract checks.
 
-The validator never executes commands from a repository or follows links from a snapshot. It reads one JSON file and produces deterministic diagnostics.
+The validator never executes commands from a repository or follows links from a snapshot. Its JSON validation mode reads one JSON file and produces deterministic diagnostics. Its Cargo mode parses one TOML file as data and emits a deterministic JSON projection; it does not run Cargo, execute build scripts, expand macros, resolve workspace globs or verify supplied Git object IDs.
 
 ## Status
 
