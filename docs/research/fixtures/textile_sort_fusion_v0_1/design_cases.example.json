@@ -147,6 +147,22 @@
         "disposition": "incomplete",
         "reason": "FabricStructureUnknown"
       }
+    },
+    {
+      "case_id": "DESIGN-019-NONWOVEN-BONDING-MISSING",
+      "mutation": "Nonwoven component is missing its bonding process, so opening behaviour remains unresolved.",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "FabricStructureMissingNonwovenBonding"
+      }
+    },
+    {
+      "case_id": "DESIGN-020-LAMINATED-SUBSTRATE-MISSING",
+      "mutation": "Laminated component has no reference to its substrate construction and cannot be stratified for opening.",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "FabricStructureMissingLaminationDetails"
+      }
     }
   ]
 }
