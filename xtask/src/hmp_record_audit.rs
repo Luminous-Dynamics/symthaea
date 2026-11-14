@@ -491,7 +491,37 @@ mod tests {
     #[test]
     fn hmp_bench_fixture_requires_all_registered_tracks() {
         let mut fixture = bench_fixture();
-        fixture["cases"].as_array_mut().expect("cases array").pop();
+        fixture["cases"]
+            .as_array_mut()
+            .expect("cases array")
+            .retain(|case| case["track"].as_str() != Some("HMP-CORRECT"));
+        assert!(audit_benchmark(&fixture).is_err());
+    }
+
+    #[test]
+    fn citation_only_grant_must_not_authorize_training() {
+        let fixture = bench_fixture();
+        let rights_case = fixture["cases"]
+            .as_array()
+            .expect("cases array")
+            .iter()
+            .find(|case| case["case_id"] == "HMP-RIGHTS-SYN-002")
+            .expect("citation-only rights case");
+        assert_eq!(rights_case["permission"]["permitted_uses"], json!(["cite"]));
+        assert!(
+            rights_case["permission"]["prohibited_uses"]
+                .as_array()
+                .expect("prohibited_uses array")
+                .iter()
+                .any(|operation| operation == "train")
+        );
+        audit_benchmark(&fixture).expect("scoped citation grant should pass fixture audit");
+    }
+
+    #[test]
+    fn granted_community_rights_require_permission_reference() {
+        let mut fixture = bench_fixture();
+        fixture["cases"][9]["permission"]["permission_reference"] = Value::Null;
         assert!(audit_benchmark(&fixture).is_err());
     }
 
