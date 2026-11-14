@@ -267,7 +267,6 @@ def real_covariance_of_mean(
         [value / denominator for value in row]
         for row in covariance
     ]
-    real_mean = [value for z_value in average for value in ()]
     real_mean = [value[0] for value in average] + [
         value[1] for value in average
     ]
@@ -415,12 +414,18 @@ def validate_identity(data: dict[str, Any]) -> None:
     coordinate_ids = [item["coordinate_id"] for item in data["coordinates"]]
     if len(coordinate_ids) != len(set(coordinate_ids)):
         raise ValueError("coordinate IDs must be unique")
-    if len(coordinate_ids) != len(data["vectorization_order"]):
-        raise ValueError("coordinate count and vectorization order disagree")
-    if data["vectorization_order"] != [
+    if len(coordinate_ids) * 2 != len(data["vectorization_order"]):
+        raise ValueError("real/imag vectorization order must cover two entries per complex coordinate")
+    expected_order = [
         "f0:Re(z0)", "f1:Re(z1)", "f0:Im(z0)", "f1:Im(z1)"
-    ]:
+    ]
+    if data["vectorization_order"] != expected_order:
         raise ValueError("unsupported or changed vectorization order")
+    if any(
+        len(period["values"]) != len(coordinate_ids)
+        for period in data["periods"]
+    ):
+        raise ValueError("period coordinate count does not match acquisition passport")
 
 
 def validate_properness_claim(
@@ -503,7 +508,6 @@ def run_negative_controls(data: dict[str, Any], raw_rows: list[list[ComplexQ]]) 
     else:
         raise AssertionError("changed vectorization order was accepted")
 
-    duplicate_cov = data["expected"]["complex_covariance"]
     duplicate_p = data["expected"]["complementary_covariance"]
     try:
         validate_properness_claim(
