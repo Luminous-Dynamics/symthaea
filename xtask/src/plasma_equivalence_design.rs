@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -483,6 +484,52 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
         equivalence: outcome,
         reason: "frozen design, independent-unit grouping, method receipts, actual sample manifest and analysis-result lineage are structurally consistent; numerical validity is not certified",
     }
+}
+
+pub(super) fn matches_transfer_sample_mapping(
+    receipt: &EquivalenceDesignReceipt,
+    baseline: &[SampleIdentity],
+    candidate: &[SampleIdentity],
+) -> bool {
+    fn pairs(samples: &[SampleIdentity]) -> Option<HashSet<(&str, &str)>> {
+        let mut out = HashSet::new();
+        for sample in samples {
+            if sample.specimen_id.trim().is_empty()
+                || sample.cluster_id.trim().is_empty()
+                || !out.insert((sample.specimen_id.as_str(), sample.cluster_id.as_str()))
+            {
+                return None;
+            }
+        }
+        Some(out)
+    }
+
+    pairs(&receipt.baseline_samples)
+        .zip(pairs(baseline))
+        .is_some_and(|(left, right)| left == right)
+        && pairs(&receipt.candidate_samples)
+            .zip(pairs(candidate))
+            .is_some_and(|(left, right)| left == right)
+}
+
+pub(super) fn matches_transfer_interval(
+    receipt: &EquivalenceDesignReceipt,
+    interval: &Value,
+) -> bool {
+    let Some(margin) = interval.get("margin").and_then(Value::as_f64) else {
+        return false;
+    };
+    let Some(upper_abs) = interval.get("upper_abs_difference_bound").and_then(Value::as_f64) else {
+        return false;
+    };
+    let Some(confidence) = interval.get("confidence_level").and_then(Value::as_f64) else {
+        return false;
+    };
+    close(receipt.margin_lower, -margin)
+        && close(receipt.margin_upper, margin)
+        && close(receipt.confidence_level, confidence)
+        && close(receipt.analysis_result.ci_lower, -upper_abs)
+        && close(receipt.analysis_result.ci_upper, upper_abs)
 }
 
 pub(super) fn validate_bridge(

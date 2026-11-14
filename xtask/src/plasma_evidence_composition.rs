@@ -1,10 +1,11 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::plasma_claim_scope::{decide, Disposition as ClaimDisposition, ScopeEvidence};
-use crate::plasma_equivalence_design::{validate_bridge, Disposition as DesignDisposition, EquivalenceDesignReceipt};
+use crate::plasma_equivalence_design::{matches_transfer_interval, matches_transfer_sample_mapping, validate_bridge, Disposition as DesignDisposition, EquivalenceDesignReceipt, SampleIdentity};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -44,7 +45,7 @@ struct CompositionCase {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Disposition {
+pub(super) enum Disposition {
     Pass,
     Blocked,
     Rejected,
@@ -89,6 +90,118 @@ fn intersects(left: &[String], right: &[String]) -> bool {
 
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmbeddedTransferComposition {
+    transfer_bridge_artifact_sha256: String,
+    composition: CompositionCase,
+}
+
+pub(super) fn audit_transfer_bridge(
+    embedded: &Value,
+    bridge: &Value,
+    material_pair_class: &str,
+    geometry: &str,
+) -> Disposition {
+    let blocked = Disposition::Blocked;
+    let rejected = Disposition::Rejected;
+    let Ok(envelope) = serde_json::from_value::<EmbeddedTransferComposition>(embedded.clone()) else {
+        return blocked;
+    };
+    let Some(evidence) = bridge.get("evidence") else {
+        return blocked;
+    };
+    let Some(artifact_sha) = evidence.get("artifact_sha256").and_then(Value::as_str) else {
+        return blocked;
+    };
+    if !is_sha256(artifact_sha) || !is_sha256(&envelope.transfer_bridge_artifact_sha256) {
+        return blocked;
+    }
+    if artifact_sha != envelope.transfer_bridge_artifact_sha256 {
+        return rejected;
+    }
+
+    let Some(baseline_ids) = string_list(evidence.get("baseline_specimen_ids")) else {
+        return blocked;
+    };
+    let Some(candidate_ids) = string_list(evidence.get("candidate_specimen_ids")) else {
+        return blocked;
+    };
+    let Some(baseline_groups) = string_list(evidence.get("baseline_independence_groups")) else {
+        return blocked;
+    };
+    let Some(candidate_groups) = string_list(evidence.get("candidate_independence_groups")) else {
+        return blocked;
+    };
+    let Some(baseline_samples_value) = evidence.get("baseline_sample_clusters") else {
+        return blocked;
+    };
+    let Some(candidate_samples_value) = evidence.get("candidate_sample_clusters") else {
+        return blocked;
+    };
+    let Ok(baseline_samples) = serde_json::from_value::<Vec<SampleIdentity>>(baseline_samples_value.clone()) else {
+        return blocked;
+    };
+    let Ok(candidate_samples) = serde_json::from_value::<Vec<SampleIdentity>>(candidate_samples_value.clone()) else {
+        return blocked;
+    };
+
+    if !unique_nonempty(&baseline_ids)
+        || !unique_nonempty(&candidate_ids)
+        || !unique_nonempty(&baseline_groups)
+        || !unique_nonempty(&candidate_groups)
+    {
+        return rejected;
+    }
+    let baseline_sample_ids: Vec<String> = baseline_samples.iter().map(|s| s.specimen_id.clone()).collect();
+    let candidate_sample_ids: Vec<String> = candidate_samples.iter().map(|s| s.specimen_id.clone()).collect();
+    let baseline_sample_groups: Vec<String> = baseline_samples.iter().map(|s| s.cluster_id.clone()).collect();
+    let candidate_sample_groups: Vec<String> = candidate_samples.iter().map(|s| s.cluster_id.clone()).collect();
+    if !same_members(&baseline_ids, &baseline_sample_ids)
+        || !same_members(&candidate_ids, &candidate_sample_ids)
+        || !same_members(&baseline_groups, &baseline_sample_groups)
+        || !same_members(&candidate_groups, &candidate_sample_groups)
+    {
+        return rejected;
+    }
+
+    if envelope.composition.baseline_profile.material_pair_class != material_pair_class
+        || envelope.composition.candidate_profile.material_pair_class != material_pair_class
+        || envelope.composition.baseline_profile.geometry != geometry
+        || envelope.composition.candidate_profile.geometry != geometry
+    {
+        return rejected;
+    }
+
+    let intervals = evidence.get("intervals").and_then(Value::as_array);
+    let Some(strength_interval) = intervals.and_then(|rows| rows.iter().find(|row| {
+        row.get("endpoint").and_then(Value::as_str) == Some("initial_lap_shear_mpa")
+    })) else {
+        return blocked;
+    };
+
+    if envelope.composition.endpoint_evidence.len() != 1 {
+        return rejected;
+    }
+    let endpoint = &envelope.composition.endpoint_evidence[0];
+    if endpoint.endpoint != "apparent_shear_strength"
+        || !same_members(&baseline_ids, &endpoint.baseline_specimen_ids)
+        || !same_members(&candidate_ids, &endpoint.candidate_specimen_ids)
+    {
+        return rejected;
+    }
+    if !matches_transfer_sample_mapping(
+        &endpoint.equivalence_design,
+        &baseline_samples,
+        &candidate_samples,
+    ) || !matches_transfer_interval(&endpoint.equivalence_design, strength_interval)
+    {
+        return rejected;
+    }
+
+    audit_case(&envelope.composition).disposition
 }
 
 fn audit_case(case: &CompositionCase) -> Decision {
