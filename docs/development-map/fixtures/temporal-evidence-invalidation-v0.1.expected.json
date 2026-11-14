@@ -1,0 +1,88 @@
+{
+  "fixture_id": "synthetic:temporal-evidence-invalidation-v0.1",
+  "status": "design_only_public_known_answer",
+  "map_path": "docs/development-map/fixtures/temporal-evidence-invalidation-v0.1.map.json",
+  "expected_snapshots": [
+    {
+      "revision": "1111111111111111111111111111111111111111",
+      "evidence": {
+        "E1": "current",
+        "E2": "absent"
+      },
+      "contract": "v1"
+    },
+    {
+      "revision": "2222222222222222222222222222222222222222",
+      "evidence": {
+        "E1": "stale",
+        "E2": "absent"
+      },
+      "contract": "v2"
+    },
+    {
+      "revision": "3333333333333333333333333333333333333333",
+      "evidence": {
+        "E1": "stale",
+        "E2": "current"
+      },
+      "contract": "v2",
+      "proposed_actions": {
+        "contract_v3": "proposed_not_observed"
+      }
+    }
+  ],
+  "invariants": [
+    "Evidence qualification is scoped to the exact contract version, repository revision, test artifact and configuration world.",
+    "Changing contract semantics invalidates previous evidence applicability even when the test file path is unchanged.",
+    "Invalidation changes the present applicability state but does not erase the historical evidence event.",
+    "A later passing run under the new contract can qualify only the exact new revision and declared world.",
+    "A proposed future change must not mutate the observed current snapshot or be represented as an executed result.",
+    "Unknown, skipped, missing or mismatched evidence never becomes pass by inference."
+  ],
+  "negative_controls": [
+    {
+      "id": "NC-01",
+      "attack": "Promote E1 to current at revision B without a new run.",
+      "expected": "reject_false_current"
+    },
+    {
+      "id": "NC-02",
+      "attack": "Treat a skipped workflow as a passed test.",
+      "expected": "reject_unqualified_outcome"
+    },
+    {
+      "id": "NC-03",
+      "attack": "Reuse E2 when the target triple differs from its recorded world.",
+      "expected": "reject_world_mismatch"
+    },
+    {
+      "id": "NC-04",
+      "attack": "Mark proposed contract-v3 work as observed and mutate current snapshot.",
+      "expected": "reject_proposal_as_observation"
+    },
+    {
+      "id": "NC-05",
+      "attack": "Delete E1 from history after invalidation.",
+      "expected": "reject_history_erasure"
+    },
+    {
+      "id": "NC-06",
+      "attack": "Keep E1 current because tests/contract.rs path string is unchanged.",
+      "expected": "reject_path_identity_as_scope_equivalence"
+    },
+    {
+      "id": "NC-07",
+      "attack": "Reuse E1 for a changed evaluator version without independent regrade.",
+      "expected": "reject_evaluator_scope_mismatch"
+    }
+  ],
+  "metrics": [
+    "temporal-state accuracy by revision",
+    "false-current rate",
+    "historical-event retention",
+    "world/scope mismatch rejection",
+    "proposal-vs-observation classification accuracy",
+    "incremental-replay versus clean-rebuild state equality"
+  ],
+  "claim_ceiling": "Known-answer design fixture only; no implementation, benchmark performance, runtime, security or SOTA claim."
+}
