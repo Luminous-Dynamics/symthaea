@@ -75,6 +75,10 @@ Auxiliary events match on element family and score position. Attribute events ma
 | Duration presence | Whether both events carry a performed duration |
 | Performed duration | Absolute rational quarter-beat error distribution and within-tolerance rate |
 | Written value | Exact note type and dot-count accuracy |
+| Grace semantics | Grace presence plus slash, steal-time and make-time attributes |
+| Cue semantics | Exact cue-note marker accuracy |
+| Chord membership | Exact chord-member flag accuracy |
+| Chord anchor | Whether each chord member points to the matched prediction of its reference base note |
 | Voice/staff/instrument | Accuracy only where reference identity exists; missing-reference and unexpected-prediction counts separately |
 | Sound ties | Exact sound-tie semantics |
 | Visual ties | Exact visual tied notation semantics |
@@ -116,9 +120,10 @@ The hashes establish content consistency, not the identity of the parser, truth 
 - noncanonical/discontinuous measure map and malformed event order refuse scoring;
 - report replay rejects changed graphs and tampered metrics;
 - event, candidate-comparison and augmenting-path work budgets fail closed;
-- augmenting-path matching reaches maximum cardinality where a greedy first pairing would fail.
+- augmenting-path matching reaches maximum cardinality where a greedy first pairing would fail;
+- grace slash/steal-time, cue flags, chord-member flags and chord-anchor relationships are independently scored.
 
-Tests are authored, not compiled or run.
+Twenty focused tests are authored, not compiled or run; the latest test independently mutates grace, cue, chord-member and chord-anchor semantics.
 
 ## External comparison and honest SOTA strategy
 
@@ -148,7 +153,7 @@ The opportunity is not to maximize one score. It is to make score-transcription 
 
 ## Verification boundary
 
-- Tests are authored but not compiled or executed.
+- Twenty tests are authored but not compiled or executed.
 - No local cargo, rustc or rustfmt toolchain is available in the authoring environment.
 - No exact-head CI pass, vendor benchmark reproduction, annotated-holdout result, human correction-time study, MIREX MV2H parity or SOTA win is claimed.
 - The focused workflow `.github/workflows/muse-musicxml-notation.yml` is already present on this PR's target base branch. It includes the evaluator module path and a dedicated test command; the first exact-head execution is still pending and must be observed rather than inferred.
