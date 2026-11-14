@@ -1970,11 +1970,11 @@ mod tests {
             RationalBeat::new(1, 3).unwrap()
         );
         assert!(matches!(
-            graph.notation_events.note_events[1].kind,
+            &graph.notation_events.note_events[1].kind,
             crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
         ));
         assert!(matches!(
-            graph.notation_events.note_events[2].kind,
+            &graph.notation_events.note_events[2].kind,
             crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Unpitched { .. }
         ));
         assert_eq!(graph.notation_events.attribute_events.len(), 3);
