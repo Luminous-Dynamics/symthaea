@@ -808,6 +808,24 @@ mod tests {
     }
 
     #[test]
+    fn derived_results_must_bind_exact_input_manifests() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint derivation fixture");
+        let retention = fixture.cases.iter().find(|case| case.id == "retention-input-manifest-digest-mismatch").expect("case exists");
+        let failure = fixture.cases.iter().find(|case| case.id == "failure-fraction-input-manifest-digest-mismatch").expect("case exists");
+        assert_eq!(audit_case(retention).disposition, Disposition::Rejected);
+        assert_eq!(audit_case(failure).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn multi_rater_classifications_require_and_accept_adjudication_receipts() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint derivation fixture");
+        let missing = fixture.cases.iter().find(|case| case.id == "multi-rater-disagreement-without-adjudication").expect("case exists");
+        let adjudicated = fixture.cases.iter().find(|case| case.id == "valid-failure-fraction-with-adjudicated-raters").expect("case exists");
+        assert_eq!(audit_case(missing).disposition, Disposition::Blocked);
+        assert_eq!(audit_case(adjudicated).disposition, Disposition::Pass);
+    }
+
+    #[test]
     fn aged_retention_uses_distinct_destructive_cohorts() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint derivation fixture");
         let case = fixture.cases.iter().find(|case| case.id == "valid-aged-strength-retention").expect("case exists");
