@@ -134,6 +134,9 @@ pub struct MusicXmlNotationEventV1 {
     pub time_only: Option<String>,
     pub attack_divisions: Option<String>,
     pub release_divisions: Option<String>,
+    /// Active divisions-per-quarter scale for attack/release offsets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performance_offset_divisions: Option<i64>,
     /// None for grace notes without a performed duration.
     pub performed_duration: Option<RationalBeat>,
     pub kind: MusicXmlNotationEventKindV1,
@@ -588,6 +591,10 @@ fn parse_part_events(
                     time_only: element.attribute("time-only").map(str::to_string),
                     attack_divisions: element.attribute("attack").map(str::to_string),
                     release_divisions: element.attribute("release").map(str::to_string),
+                    performance_offset_divisions: (element.attribute("attack").is_some()
+                        || element.attribute("release").is_some())
+                        .then_some(divisions)
+                        .flatten(),
                     performed_duration,
                     kind,
                     is_grace,
