@@ -184,6 +184,7 @@ This finite evaluator will not be a general solution to partial identification i
 ## 12. References
 
 - [Maringgele & Etesami (2026), *Optimal Experiments for Partial Causal Effect Identification*, NeurIPS 2026](https://arxiv.org/abs/2605.06993)
+- [Published reference implementation of path-interception and ID-based pruning](https://github.com/tmaringgele/optimal-experiments-partial-id) — used as a design comparator; the AOBench Rust implementation is an independent, bounded port and does not copy the Python source.
 - [Causal-Discovery-Bench](https://arxiv.org/abs/2611.09934)
 - [ACED-Bench](https://arxiv.org/abs/2610.14381)
 - [ACDB](https://arxiv.org/abs/2609.31675)
