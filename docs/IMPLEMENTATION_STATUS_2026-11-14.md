@@ -16,7 +16,7 @@
 
 ## User-facing preset catalogue
 
-The starter library contains 17 JSON presets: five functional/hybrid starting points plus 12 style directions. Each preset is an editable starting configuration and not a claim of fit, material performance, environmental advantage, protective function or universal desirability. Heritage references require user-supplied or rights-cleared source material; modest and adaptive preferences remain user-defined.
+The public research branch now contains all 17 JSON presets: five functional/hybrid starting points plus 12 style directions, alongside the design-preset and garment-design-brief JSON Schemas and the synthetic overshirt example. Each preset is an editable starting configuration and not a claim of fit, material performance, environmental advantage, protective function or universal desirability. Heritage references require user-supplied or rights-cleared source material; modest and adaptive preferences remain user-defined.
 
 ## Rust implementation
 
