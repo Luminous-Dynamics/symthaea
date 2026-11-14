@@ -339,6 +339,38 @@
         "disposition": "ineligible",
         "reason": "DuplicateEvidenceIdentity"
       }
+    },
+    {
+      "case_id": "ROUTE-043-FIBRE-HISTOGRAM-GAP-OR-TAIL-OMISSION",
+      "mutation": "Fibre-length bins have a gap or omit the open-ended upper tail while their mass fractions appear to close.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthDistribution"
+      }
+    },
+    {
+      "case_id": "ROUTE-044-LENGTH-UNCERTAINTY-OVERLAPS-RECEIVER-FLOOR",
+      "mutation": "A measured bin nominally above the receiving fibre-length floor falls below the floor after applying declared relative expanded uncertainty.",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthBelowPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-045-SAMPLE-MASS-BELOW-RECEIVER-PROTOCOL",
+      "mutation": "Fibre-length sample mass or independent replicate count is below the receiving sampling protocol.",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "FibreLengthSamplingBelowPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-046-COVERAGE-BELOW-RECEIVER-PROTOCOL",
+      "mutation": "Expanded-uncertainty coverage probability is below the receiving sampling protocol.",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "FibreLengthCoverageBelowPolicy"
+      }
     }
   ]
 }
