@@ -24,6 +24,7 @@ pub mod assay;
 pub mod experiment_design;
 pub mod identity;
 pub mod model_refinement;
+pub mod observational_views;
 pub mod reconfiguration;
 pub mod semantic_continuity;
 pub mod viability;
@@ -43,6 +44,12 @@ pub use experiment_design::{
     ExperimentTrial, HypothesisId, MechanismHypothesis, ProbeId,
     SequentialExperimentReport, SequentialExperimentScenario, SequentialExperimentTrace,
     TrialInformationAssessment, evaluate_sequential_experiment,
+};
+pub use observational_views::{
+    IdentificationRegime, MatchedObservationalViewReport, MatchedObservationalViews,
+    ObservationTable, ObservationalViewFinding, ObservationalViewFindingCode,
+    ObservationalViewPolicy, ObservationalViewQualification, RegimeColumnPolicy,
+    RegimeObservationalView, validate_matched_observational_views,
 };
 pub use model_refinement::{
     CandidateMechanismModel, ModelAdequacyDecision, ModelAdequacyScenario,
