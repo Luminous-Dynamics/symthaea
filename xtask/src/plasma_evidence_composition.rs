@@ -365,6 +365,26 @@ mod tests {
     }
 
     #[test]
+    fn design_receipt_cannot_be_substituted_from_another_endpoint_observation() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid composition fixture JSON");
+        let valid = fixture.cases.iter()
+            .find(|case| case.id == "valid-rigid-plastic-d3163")
+            .expect("valid rigid-plastic case exists");
+        let other = fixture.cases.iter()
+            .find(|case| case.id == "valid-frp-to-frp-d5868")
+            .expect("valid FRP case exists");
+        let evidence = &valid.endpoint_evidence[0];
+        let other_baseline = &other.endpoint_evidence[0].baseline_receipt;
+        let decision = validate_bridge(
+            &evidence.equivalence_design,
+            &evidence.endpoint,
+            other_baseline,
+            &evidence.candidate_receipt,
+        );
+        assert_eq!(decision.disposition, DesignDisposition::Rejected);
+    }
+
+    #[test]
     fn wrong_test_method_cannot_supply_a_transfer_endpoint() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid composition fixture JSON");
         let case = fixture.cases.iter()
