@@ -21,6 +21,8 @@ The released point-identification scaffold derives four views from one determini
 
 The paper also studies a **Hidden Confounding (HC)** stress view that exposes only (X,T,Y), with U withheld. It scores point predictions against the target effect as a stress test, not as a point-identification regime. Separately, its partial-identification companion uses three matched views: Manski bounds (X,T,Y), monotone-IV bounds (X,I,T,Y), and sensitivity bounds (X,T,Y). These share the same realized observed data, context/query split, query units and target CATE within that companion SCM; the paper uses binary potential outcomes and 40 additional worlds. It reports endpoint errors for the Manski, IV and sensitivity identified sets, with TabPFN-v3.5-based bound estimators obtaining the lowest endpoint RMSE in those evaluated settings.
 
+The paper's construction audit is instructive: it checks 200 view tables across 40 worlds and 400 within-world view pairs, then validates 44,960 unit-level potential-outcome identities. It reports zero shared-field mismatches, zero master-projection mismatches, zero query-order mismatches, a maximum |Y(1)-Y(0)-tau(X)| discrepancy of 1.55e-15, and zero discrepancy for the saved Stay target and the 2x Move target. These are the paper's construction results, not AOBench results; AOBench uses them to define what our own fixture audit must verify.
+
 The public point-estimation configuration uses 40 deterministic paired worlds, 1,024 context rows, 100 query rows and 50 baseline covariates. Its SCM cycles through five CATE families: linear, quadratic interaction, threshold piecewise, Fourier/nonstationary and shallow MLP. Each estimator receives only the variables allowed by its view; query factual treatment/outcome and potential outcomes / true effects are withheld. Prediction artifacts are aligned by exact query unit_id. The headline CATE metric is decomposed into ATE-error squared plus centered sPEHE squared, with bootstrap uncertainty computed at the SCM-world level (10,000 replicates in the released configuration). The paper additionally evaluates semi-synthetic ACIC/LaLonde-style data and real-world null-effect tests using pre-treatment outcomes from randomized trials.
 
 The paper reports that no tested causal foundation model consistently wins across all observational regimes; rankings change with the available identifying information. A modular predictive model plus regime-specific identification procedures is competitive and outperforms several CFMs on some views. Its structural response experiments also distinguish *Stay* (the underlying target effect is preserved) from *Move* (the target effect genuinely changes).
@@ -152,7 +154,9 @@ This is a defensible path to a stronger benchmark: not a claim to beat CausalIDV
 
 ## 10. First executable increment
 
-The nested Rust package now contains `src/observational_views.rs`, exported from its public crate root. It is a matched-view **data-contract validator**, not a causal-identification engine.
+The nested Rust package now contains two complementary modules, both exported from its public crate root:
+- `src/observational_views.rs`: matched-view **data-contract validator**, not a causal-identification engine.
+- `src/world_projection_audit.rs`: evaluator-only **master-world construction audit**, kept separate from every agent-facing payload.
 
 The default policy *requires* the four point-identification regimes:
 - BD context: X, U, T, Y; query: X, U.
@@ -166,7 +170,7 @@ The validator also supports optional regime policies matching the paper's additi
 - Monotone-IV bounds context: X, I, T, Y; query: X, I.
 - Sensitivity bounds context: X, T, Y; query: X.
 
-These four additional regimes are available in the API but are not required by the default policy. An evaluation manifest must explicitly request them and freeze their respective identifying/bounding assumptions. The point-estimation HC stress view must not be confused with the partial-identification HC/Manski/sensitivity task.
+These four additional regimes are available in the API but are not required by the default policy. An evaluation manifest must explicitly request them and freeze their respective identifying/bounding assumptions. The point-estimation HC stress view must not be confused with the partial-identification companion's distinct bound estimands.
 
 It checks:
 - all required regimes exist exactly once;
@@ -181,6 +185,10 @@ It checks:
 Fifteen deterministic unit tests cover a valid four-view set, target-effect leakage, query T/Y leakage, changed query ordering, SCM/estimand digest mismatch, missing regime, duplicate regime, malformed/non-finite columns, context/query overlap, unexpected columns, shared context-value drift, shared query-value drift, cross-view feature-dimension mismatch, the optional HC view, and the three partial-identification companion allowlists.
 
 This validator proves only that the supplied serialized view matches its declared data contract. It does not authenticate the SCM digest, prove the observation source is truthful, or establish the back-door/front-door/IV/proximal assumptions. Those require separate oracle/evidence contracts. No Rust compiler, test or Clippy pass is claimed until exact-head qualification completes.
+
+The companion world-projection audit compares every estimator-visible column with a separately held master-world projection, checks exact context/query IDs and shared field values, verifies Y(1)-Y(0)=tau(X) within a frozen tolerance, and optionally validates Stay/Move target arrays (Stay preserves tau; Move scales tau by the registered factor). Its oracle/master projection is deliberately not part of the serialized agent input. Eight deterministic tests cover exact construction, view-column corruption, query-column corruption, potential-outcome identity, Stay mismatch, Move mismatch, master-query alignment and optional Stay/Move controls.
+
+Together these modules provide 23 deterministic unit tests for input contracts and evaluator-side construction integrity. They still do not prove causal assumptions, authenticate real-world data sources or qualify effect estimators. No Rust compiler, test or Clippy pass is claimed until exact-head qualification completes.
 
 ## 11. Claim boundary
 
