@@ -2,6 +2,7 @@
   "protocol_id": "SYNTH-EDLC-SEQ-PROTOCOL-001",
   "sequence_profile_id": "SYNTH-EDLC-SEQ-PROFILE-001",
   "standby_mode": "open_circuit",
+  "device_boundary": "complete_device",
   "event_order": [
     "CALL-01",
     "CALL-02"
