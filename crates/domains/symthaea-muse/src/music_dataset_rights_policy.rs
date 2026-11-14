@@ -836,6 +836,31 @@ mod tests {
     }
 
     #[test]
+    fn human_reviewed_component_without_review_record_is_blocked() {
+        let mut item = component("missing-review", "CC-BY-4.0", permissive_permissions());
+        item.human_review = None;
+        let rights = bundle(vec![item]);
+        let receipt =
+            evaluate_music_rights_use_v1(&rights, &request(RightsPurposeV1::Evaluation)).unwrap();
+        assert_eq!(receipt.status, RightsDecisionStatusV1::Blocked);
+        assert!(receipt.reasons.iter().any(|reason| {
+            reason.code == RightsDecisionReasonCodeV1::MissingHumanReviewReceipt
+        }));
+    }
+
+    #[test]
+    fn malformed_human_review_record_rejects() {
+        let mut item = component("invalid-review", "CC-BY-4.0", permissive_permissions());
+        item.human_review.as_mut().unwrap().rationale.clear();
+        let rights = bundle(vec![item]);
+        assert!(validate_music_component_rights_bundle_v1(&rights).contains(
+            &RightsPolicyIssueV1::InvalidHumanReviewRecord {
+                component_id: "invalid-review".to_owned()
+            }
+        ));
+    }
+
+    #[test]
     fn public_release_requires_explicit_distribution() {
         let rights = bundle(vec![component(
             "audio",
