@@ -8,6 +8,8 @@ on:
       - "crates/domains/symthaea-materials/**"
       - "tools/textile-dataset-intake/**"
       - "docs/research/TEXTILE_SORT_FUSION_001.md"
+      - "docs/research/TEXTILE_DESIGN_TO_RECOVERY_BENCHMARK_001.md"
+      - "docs/research/TEXTILE_MATERIAL_FLOW_001.md"
       - "docs/research/fixtures/textile_sort_fusion_v0_1/**"
       - ".github/workflows/textile-sensing-contract.yml"
       - "Cargo.toml"
