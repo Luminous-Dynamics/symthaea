@@ -148,6 +148,12 @@ pub fn audit_record(record: &Value) -> Result<()> {
         );
     }
 
+    if access_class == "reference_only"
+        && permitted.iter().any(|operation| operation != "cite")
+    {
+        bail!("reference_only records may authorize citation only");
+    }
+
     if matches!(access_class, "community_controlled" | "restricted") {
         required_string(rights, "authority_reference", "record.rights")?;
         if permission_status == "granted" {
@@ -422,6 +428,26 @@ mod tests {
         record["rights"]["permitted_uses"] = json!([]);
         audit_record(&record).expect("pending record may exist but cannot authorize use");
     }
+    #[test]
+    fn reference_only_record_rejects_non_citation_operations() {
+        let mut record = fixture();
+        record["rights"]["access_class"] = json!("reference_only");
+        record["rights"]["permitted_uses"] = json!(["read"]);
+        assert!(audit_record(&record).is_err());
+    }
+
+    #[test]
+    fn reference_only_record_can_allow_citation_only() {
+        let mut record = fixture();
+        record["rights"]["access_class"] = json!("reference_only");
+        record["rights"]["permitted_uses"] = json!(["cite"]);
+        record["rights"]["prohibited_uses"] = json!([
+            "read", "display", "index", "retrieve", "summarize", "translate",
+            "adapt", "train", "redistribute", "export", "preserve"
+        ]);
+        audit_record(&record).expect("reference-only citation grant should pass");
+    }
+
 
     #[test]
     fn synthetic_hmp_bench_fixture_has_unique_cases_and_expected_controls() {
