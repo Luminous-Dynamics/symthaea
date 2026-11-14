@@ -1,15 +1,15 @@
-name: U1 two-site gate source harness
+name: U1 MPS truncation and error ledger source harness
 
 on:
   push:
     branches:
-      - research/u1-charge-block-two-site-split-20261113
+      - research/u1-mps-truncation-ledger-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
       - .github/workflows/u1-two-site-gates.yml
   pull_request:
     branches:
-      - research/u1-two-site-gates-20261113
+      - research/u1-charge-block-two-site-split-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
       - .github/workflows/u1-two-site-gates.yml
@@ -18,12 +18,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: u1-charge-block-two-site-split-${{ github.event.pull_request.number || github.ref }}
+  group: u1-mps-truncation-ledger-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
   source-harness:
-    name: Rust 1.96 U1 charge-block two-site split exact-source validation
+    name: Rust 1.96 U1 truncation ledger exact-source validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
           cp crates/domains/symthaea-frontier-physics/src/u1_mps.rs "$harness/src/lib.rs"
           cat > "$harness/Cargo.toml" <<'EOF'
           [package]
-          name = "u1-charge-block-two-site-split-validation"
+          name = "u1-mps-truncation-ledger-validation"
           version = "0.1.0"
           edition = "2024"
 
