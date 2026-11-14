@@ -83,7 +83,7 @@ enum Commands {
     },
     /// Audit bounded plasma qualification transfer with mandatory method/design evidence composition.
     PlasmaTransferAudit {
-        #[arg(long, default_value = "data/research/plasma_transfer_fixture_v0_2.json")]
+        #[arg(long, default_value = "data/research/plasma_transfer_fixture_v0_3.json")]
         fixture: PathBuf,
     },
     GenerateManifest {
