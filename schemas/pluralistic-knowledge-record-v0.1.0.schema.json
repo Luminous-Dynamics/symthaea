@@ -526,6 +526,38 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "access_class": {
+                "const": "reference_only"
+              }
+            },
+            "required": [
+              "access_class"
+            ]
+          }
+        },
+        "required": [
+          "rights"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rights": {
+            "properties": {
+              "permitted_uses": {
+                "items": {
+                  "const": "cite"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }
