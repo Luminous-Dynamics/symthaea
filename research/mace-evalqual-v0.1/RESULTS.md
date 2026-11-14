@@ -107,6 +107,31 @@ The filesystem observer records its limitations in the coverage result: it trust
 
 These checks are still standalone package evidence. No combined exact-PR-checkout replay, GitHub Actions run, disposable remote-service adapter, actual database transaction-log comparison or broker experiment is claimed.
 
+
+## Destination-side effect-or-fence experiment
+
+The new `effectbridge` Go package and `mace-effectsvc` command provide a local destination-side protocol fixture.
+
+- The service uses a single-writer append-only JSONL journal, hash-chained records, exact intent digests, Linux non-blocking `flock`, parent-directory sync on open, and `fsync` per terminal record.
+- `POST /v1/effects` durably commits an effect or returns the same receipt for an exact duplicate; a changed intent under the same key conflicts.
+- `GET /v1/reconcile/{key}` returns an existing effect/fence, `not_found_unfenced`, or journal-indeterminate. An ordinary absence never proves non-execution.
+- `PUT /v1/fence/{key}` linearizes with effect dispatch and durably commits a tombstone that rejects later requests for the exact idempotency key/intent.
+- The client maps a transport failure to unknown/indeterminate and does not auto-retry a non-idempotent dispatch. A lost fence acknowledgement can be resolved by repeating the same idempotent fence.
+- Local expanded tests include eight independent client processes, process restart after remote success with lost acknowledgement, process ownership exclusion, dispatch/fence concurrency, fence-ack loss and recovery, and 10,000 seeded protocol operations compared with a separate finite-state reference model.
+
+**The 10,000 figure is generated sequential protocol operations, not 10,000 independent crash/restart schedules.** The service's modeled business effect is its journal commit; no separate business database is integrated. Process kill/restart is not a power-loss/device-durability test.
+
+Local expanded-source verification (Go 1.23.2 / Linux amd64):
+- Root evaluator package: 16 tests.
+- observerlab: 9 tests.
+- effectbridge: 24 tests.
+- Total across this local assembled snapshot: 49 named test functions.
+- `go test -count=1 ./...`, race detector, `go vet`, three CLI builds and `verify.sh`: pass.
+- effectbridge statement coverage: 62.1%.
+- Draft 2020-12 effectbridge schema: metaschema check and 11 semantic fixtures pass. These exercise request, effect receipt, fence receipt, found, fenced, ordinary absence and indeterminate states, plus invalid status/receipt combinations.
+
+The current public PR branch carries the reference service, client, locking implementation, CLI, schema and a focused conformance test file. The expanded local test source is larger than that focused public test file. No hosted workflow or exact combined PR-head replay is claimed. The portable source archive is a local snapshot, not a substitute for public commit history.
+
 ## Claim boundary
 
 This implementation validates a benchmark adapter's declared fixture catalogue, exact input-byte bindings, typed three-axis outcomes and paired metamorphic relations. It does not launch or sandbox tasks; verify grader behavior in a real benchmark; prove task/oracle semantics; authenticate producers; establish oracle independence; observe all OS/API/filesystem/network events; or qualify the durable one-shot broker.
