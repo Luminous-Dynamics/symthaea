@@ -1,0 +1,61 @@
+name: AOBench Runtime Qualification
+
+on:
+  push:
+    branches:
+      - main
+      - research/aobench-runtime-verifier-*
+    paths:
+      - "crates/domains/symthaea-organizational-closure/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/aobench-runtime.yml"
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-organizational-closure/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/aobench-runtime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aobench-runtime-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Runtime verifier (exact package)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-aobench-runtime-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-aobench-runtime-
+
+      - name: Format check
+        run: cargo fmt -p symthaea-organizational-closure -- --check
+
+      - name: Compile all package targets
+        run: cargo check --locked -p symthaea-organizational-closure --all-targets
+
+      - name: Run deterministic verifier tests
+        run: cargo test --locked -p symthaea-organizational-closure
+
+      - name: Strict package Clippy
+        run: cargo clippy --locked -p symthaea-organizational-closure --all-targets -- -D warnings
