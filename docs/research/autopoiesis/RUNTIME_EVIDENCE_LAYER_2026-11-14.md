@@ -13,7 +13,7 @@ It deliberately qualifies only **functional self-maintenance** under a frozen co
 
 ## 2. Package surface
 
-The initial crate is dependency-light and uses workspace \`serde\` and \`sha2\`.
+The crate is a nested, independently locked Cargo workspace using exact \`serde\` and \`sha2\` versions. This keeps package qualification independent of unrelated root-workspace dev dependencies.
 
 Core types:
 
@@ -91,13 +91,13 @@ A digest proves content identity relative to the bytes supplied to the verifier;
 
 ## 6. Commands
 
-From the repository root:
+From \`crates/domains/symthaea-organizational-closure/\`:
 
 \`\`\`bash
-cargo fmt -p symthaea-organizational-closure -- --check
-cargo check --locked -p symthaea-organizational-closure --all-targets
-cargo test --locked -p symthaea-organizational-closure
-cargo clippy --locked -p symthaea-organizational-closure --all-targets -- -D warnings
+cargo fmt --all -- --check
+cargo check --locked --all-targets
+cargo test --locked
+cargo clippy --locked --all-targets -- -D warnings
 \`\`\`
 
 These commands have not yet been executed in this environment. Do not interpret source presence or authored fixtures as a pass.
