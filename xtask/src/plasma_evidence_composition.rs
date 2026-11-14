@@ -387,7 +387,10 @@ fn read_fixture(path: &Path) -> Result<Fixture> {
 
 pub fn run(path: &Path) -> Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-evidence-composition-fixture-v0.2" {
+    if !matches!(
+        fixture.schema_version.as_str(),
+        "plasma-evidence-composition-fixture-v0.2" | "plasma-transfer-composition-fixture-v0.1"
+    ) {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
