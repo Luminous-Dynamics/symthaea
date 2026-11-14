@@ -34,8 +34,9 @@ end
 local_gate(term, tau) = exp(-im * tau * local_hamiltonian(term))
 
 function make_itensor_gate(term, sites, tau)
-    left = sites[term.bond]
-    right = sites[term.bond + 1]
+    # Fixture bond indices are zero-based; ITensor site indices are one-based.
+    left = sites[term.bond + 1]
+    right = sites[term.bond + 2]
     id_left = op("Id", left)
     id_right = op("Id", right)
     n_left = 0.5 * id_left - op("Sz", left)
@@ -128,7 +129,7 @@ function continuous_oracle(case, initial)
         left = Matrix{ComplexF64}(I, 1, 1)
         right = Matrix{ComplexF64}(I, 1, 1)
         for site in 1:n
-            if site < bond
+            if site <= bond
                 left = kron(left, identity)
             elseif site > bond + 1
                 right = kron(right, identity)
