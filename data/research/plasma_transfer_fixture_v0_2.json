@@ -1,0 +1,3949 @@
+{
+  "schema_version": "plasma-transfer-fixture-v0.2",
+  "required_factors": [
+    "substrate_grade",
+    "substrate_supplier",
+    "substrate_lot",
+    "adhesive_system",
+    "adhesive_batch",
+    "plasma_head",
+    "gas_mix",
+    "gas_purity_pct",
+    "line_speed_mm_s",
+    "treatment_to_bond_min",
+    "ambient_rh_pct",
+    "fixture_id"
+  ],
+  "required_endpoints": [
+    "initial_lap_shear_mpa",
+    "aged_strength_retention",
+    "failure_mode_fraction"
+  ],
+  "minimum_confidence_level": 0.95,
+  "qualification_scope": {
+    "substrate_grade": {
+      "allowed_values": [
+        "PP-GRADE-A"
+      ]
+    },
+    "substrate_supplier": {
+      "allowed_values": [
+        "SUP-A",
+        "SUP-B"
+      ]
+    },
+    "substrate_lot": {
+      "allowed_values": [
+        "LOT-001",
+        "LOT-002",
+        "LOT-003"
+      ]
+    },
+    "adhesive_system": {
+      "allowed_values": [
+        "ADH-A"
+      ]
+    },
+    "adhesive_batch": {
+      "allowed_values": [
+        "ADHLOT-001",
+        "ADHLOT-002"
+      ]
+    },
+    "plasma_head": {
+      "allowed_values": [
+        "HEAD-A",
+        "HEAD-B"
+      ]
+    },
+    "gas_mix": {
+      "allowed_values": [
+        "AIR",
+        "N2"
+      ]
+    },
+    "gas_purity_pct": {
+      "min": 99,
+      "max": 100
+    },
+    "line_speed_mm_s": {
+      "min": 200,
+      "max": 500
+    },
+    "treatment_to_bond_min": {
+      "min": 0,
+      "max": 30
+    },
+    "ambient_rh_pct": {
+      "min": 20,
+      "max": 65
+    },
+    "fixture_id": {
+      "allowed_values": [
+        "FIX-A",
+        "FIX-B"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "unchanged-profile",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [],
+      "expected_disposition": "PASS",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      },
+      "baseline_composition_case_id": "TC-unchanged-profile"
+    },
+    {
+      "id": "material-lot-bridged",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-material-lot-bridged-substrate_lot"
+        }
+      ],
+      "expected_disposition": "PASS",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "material-lot-no-bridge",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "supplier-bridged",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-bridged-substrate_supplier-2",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+            "baseline_specimen_ids": [
+              "supplier-bridged-substrate_supplier-B1",
+              "supplier-bridged-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-bridged-substrate_supplier-C1",
+              "supplier-bridged-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-bridged-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-bridged-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-bridged-substrate_supplier"
+        }
+      ],
+      "expected_disposition": "PASS",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "supplier-and-head-without-joint",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-without-joint-substrate_supplier-3",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+            "baseline_specimen_ids": [
+              "supplier-and-head-without-joint-substrate_supplier-B1",
+              "supplier-and-head-without-joint-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-without-joint-substrate_supplier-C1",
+              "supplier-and-head-without-joint-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-without-joint-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-without-joint-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-without-joint-plasma_head-4",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+            "baseline_specimen_ids": [
+              "supplier-and-head-without-joint-plasma_head-B1",
+              "supplier-and-head-without-joint-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-without-joint-plasma_head-C1",
+              "supplier-and-head-without-joint-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-without-joint-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-without-joint-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "supplier-and-head-with-joint",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-substrate_supplier-5",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-substrate_supplier-B1",
+              "supplier-and-head-with-joint-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-substrate_supplier-C1",
+              "supplier-and-head-with-joint-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-substrate_supplier"
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-plasma_head-6",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-plasma_head-B1",
+              "supplier-and-head-with-joint-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-plasma_head-C1",
+              "supplier-and-head-with-joint-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-plasma_head"
+        },
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            },
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-JOINT-7",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-JOINT-B1",
+              "supplier-and-head-with-joint-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-JOINT-C1",
+              "supplier-and-head-with-joint-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-plasma_head+substrate_supplier"
+        }
+      ],
+      "expected_disposition": "PASS",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "line-speed-outside-envelope",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 520,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "line_speed_mm_s": {
+              "from": 300,
+              "to": 520
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-line-speed-outside-envelope-line_speed_mm_s-8",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+            "baseline_specimen_ids": [
+              "line-speed-outside-envelope-line_speed_mm_s-B1",
+              "line-speed-outside-envelope-line_speed_mm_s-B2"
+            ],
+            "candidate_specimen_ids": [
+              "line-speed-outside-envelope-line_speed_mm_s-C1",
+              "line-speed-outside-envelope-line_speed_mm_s-C2"
+            ],
+            "baseline_independence_groups": [
+              "line-speed-outside-envelope-line_speed_mm_s-BG"
+            ],
+            "candidate_independence_groups": [
+              "line-speed-outside-envelope-line_speed_mm_s-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "delay-missing-aged-endpoint",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 20,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "treatment_to_bond_min": {
+              "from": 10,
+              "to": 20
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-delay-missing-aged-endpoint-treatment_to_bond_min-9",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+            "baseline_specimen_ids": [
+              "delay-missing-aged-endpoint-treatment_to_bond_min-B1",
+              "delay-missing-aged-endpoint-treatment_to_bond_min-B2"
+            ],
+            "candidate_specimen_ids": [
+              "delay-missing-aged-endpoint-treatment_to_bond_min-C1",
+              "delay-missing-aged-endpoint-treatment_to_bond_min-C2"
+            ],
+            "baseline_independence_groups": [
+              "delay-missing-aged-endpoint-treatment_to_bond_min-BG"
+            ],
+            "candidate_independence_groups": [
+              "delay-missing-aged-endpoint-treatment_to_bond_min-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "interval-crosses-equivalence-margin",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-interval-crosses-equivalence-margin-substrate_lot-10",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+            "baseline_specimen_ids": [
+              "interval-crosses-equivalence-margin-substrate_lot-B1",
+              "interval-crosses-equivalence-margin-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "interval-crosses-equivalence-margin-substrate_lot-C1",
+              "interval-crosses-equivalence-margin-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "interval-crosses-equivalence-margin-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "interval-crosses-equivalence-margin-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.7,
+                "upper_abs_difference_bound": 1.2,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "interval-proves-outside-margin",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-interval-proves-outside-margin-substrate_lot-11",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+            "baseline_specimen_ids": [
+              "interval-proves-outside-margin-substrate_lot-B1",
+              "interval-proves-outside-margin-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "interval-proves-outside-margin-substrate_lot-C1",
+              "interval-proves-outside-margin-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "interval-proves-outside-margin-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "interval-proves-outside-margin-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 1.2,
+                "upper_abs_difference_bound": 1.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "overlapping-sample-identity",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-overlapping-sample-identity-substrate_lot-12",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+            "baseline_specimen_ids": [
+              "overlapping-sample-identity-substrate_lot-B1",
+              "overlapping-sample-identity-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "overlapping-sample-identity-substrate_lot-B1",
+              "overlapping-sample-identity-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "overlapping-sample-identity-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "overlapping-sample-identity-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "overlapping-independence-groups",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-overlapping-independence-groups-substrate_lot-13",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+            "baseline_specimen_ids": [
+              "overlapping-independence-groups-substrate_lot-B1",
+              "overlapping-independence-groups-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "overlapping-independence-groups-substrate_lot-C1",
+              "overlapping-independence-groups-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "overlapping-independence-groups-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "overlapping-independence-groups-substrate_lot-BG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "invalid-artifact-digest",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-invalid-artifact-digest-substrate_lot-14",
+            "artifact_sha256": "nope",
+            "baseline_specimen_ids": [
+              "invalid-artifact-digest-substrate_lot-B1",
+              "invalid-artifact-digest-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "invalid-artifact-digest-substrate_lot-C1",
+              "invalid-artifact-digest-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "invalid-artifact-digest-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "invalid-artifact-digest-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "untracked-factor-change",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A",
+        "untracked_surface_state": "KNOWN"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A",
+        "untracked_surface_state": "UNCONTROLLED"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-untracked-factor-change-substrate_lot-15",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000000f",
+            "baseline_specimen_ids": [
+              "untracked-factor-change-substrate_lot-B1",
+              "untracked-factor-change-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "untracked-factor-change-substrate_lot-C1",
+              "untracked-factor-change-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "untracked-factor-change-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "untracked-factor-change-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "untracked_surface_state": {
+              "from": "KNOWN",
+              "to": "UNCONTROLLED"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-untracked-factor-change-untracked_surface_state-16",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000010",
+            "baseline_specimen_ids": [
+              "untracked-factor-change-untracked_surface_state-B1",
+              "untracked-factor-change-untracked_surface_state-B2"
+            ],
+            "candidate_specimen_ids": [
+              "untracked-factor-change-untracked_surface_state-C1",
+              "untracked-factor-change-untracked_surface_state-C2"
+            ],
+            "baseline_independence_groups": [
+              "untracked-factor-change-untracked_surface_state-BG"
+            ],
+            "candidate_independence_groups": [
+              "untracked-factor-change-untracked_surface_state-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            },
+            "untracked_surface_state": {
+              "from": "KNOWN",
+              "to": "UNCONTROLLED"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-untracked-factor-change-JOINT-17",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000011",
+            "baseline_specimen_ids": [
+              "untracked-factor-change-JOINT-B1",
+              "untracked-factor-change-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "untracked-factor-change-JOINT-C1",
+              "untracked-factor-change-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "untracked-factor-change-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "untracked-factor-change-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "b96011b12b17086f9dbe69f3a2526827d764645762760e2dfa18994b0a55662f",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "three-factor-only-pairwise-bridge",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "N2",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-only-pairwise-bridge-substrate_supplier-18",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000012",
+            "baseline_specimen_ids": [
+              "three-factor-only-pairwise-bridge-substrate_supplier-B1",
+              "three-factor-only-pairwise-bridge-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-only-pairwise-bridge-substrate_supplier-C1",
+              "three-factor-only-pairwise-bridge-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-only-pairwise-bridge-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-only-pairwise-bridge-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-only-pairwise-bridge-plasma_head-19",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000013",
+            "baseline_specimen_ids": [
+              "three-factor-only-pairwise-bridge-plasma_head-B1",
+              "three-factor-only-pairwise-bridge-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-only-pairwise-bridge-plasma_head-C1",
+              "three-factor-only-pairwise-bridge-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-only-pairwise-bridge-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-only-pairwise-bridge-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "gas_mix": {
+              "from": "AIR",
+              "to": "N2"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-only-pairwise-bridge-gas_mix-20",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000014",
+            "baseline_specimen_ids": [
+              "three-factor-only-pairwise-bridge-gas_mix-B1",
+              "three-factor-only-pairwise-bridge-gas_mix-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-only-pairwise-bridge-gas_mix-C1",
+              "three-factor-only-pairwise-bridge-gas_mix-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-only-pairwise-bridge-gas_mix-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-only-pairwise-bridge-gas_mix-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            },
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-only-pairwise-bridge-JOINT-21",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+            "baseline_specimen_ids": [
+              "three-factor-only-pairwise-bridge-JOINT-B1",
+              "three-factor-only-pairwise-bridge-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-only-pairwise-bridge-JOINT-C1",
+              "three-factor-only-pairwise-bridge-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-only-pairwise-bridge-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-only-pairwise-bridge-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "three-factor-exact-joint-bridge",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "N2",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-exact-joint-bridge-substrate_supplier-22",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+            "baseline_specimen_ids": [
+              "three-factor-exact-joint-bridge-substrate_supplier-B1",
+              "three-factor-exact-joint-bridge-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-exact-joint-bridge-substrate_supplier-C1",
+              "three-factor-exact-joint-bridge-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-exact-joint-bridge-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-exact-joint-bridge-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-three-factor-exact-joint-bridge-substrate_supplier"
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-exact-joint-bridge-plasma_head-23",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+            "baseline_specimen_ids": [
+              "three-factor-exact-joint-bridge-plasma_head-B1",
+              "three-factor-exact-joint-bridge-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-exact-joint-bridge-plasma_head-C1",
+              "three-factor-exact-joint-bridge-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-exact-joint-bridge-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-exact-joint-bridge-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-three-factor-exact-joint-bridge-plasma_head"
+        },
+        {
+          "dimensions": {
+            "gas_mix": {
+              "from": "AIR",
+              "to": "N2"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-exact-joint-bridge-gas_mix-24",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000018",
+            "baseline_specimen_ids": [
+              "three-factor-exact-joint-bridge-gas_mix-B1",
+              "three-factor-exact-joint-bridge-gas_mix-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-exact-joint-bridge-gas_mix-C1",
+              "three-factor-exact-joint-bridge-gas_mix-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-exact-joint-bridge-gas_mix-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-exact-joint-bridge-gas_mix-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-three-factor-exact-joint-bridge-gas_mix"
+        },
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            },
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            },
+            "gas_mix": {
+              "from": "AIR",
+              "to": "N2"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-three-factor-exact-joint-bridge-JOINT-25",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000019",
+            "baseline_specimen_ids": [
+              "three-factor-exact-joint-bridge-JOINT-B1",
+              "three-factor-exact-joint-bridge-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "three-factor-exact-joint-bridge-JOINT-C1",
+              "three-factor-exact-joint-bridge-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "three-factor-exact-joint-bridge-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "three-factor-exact-joint-bridge-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-three-factor-exact-joint-bridge-gas_mix+plasma_head+substrate_supplier"
+        }
+      ],
+      "expected_disposition": "PASS",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "confidence-below-profile-threshold",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-confidence-below-profile-threshold-substrate_supplier-26",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001a",
+            "baseline_specimen_ids": [
+              "confidence-below-profile-threshold-substrate_supplier-B1",
+              "confidence-below-profile-threshold-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "confidence-below-profile-threshold-substrate_supplier-C1",
+              "confidence-below-profile-threshold-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "confidence-below-profile-threshold-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "confidence-below-profile-threshold-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.9
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.9
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.9
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "missing-failure-mode-endpoint",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 20,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "treatment_to_bond_min": {
+              "from": 10,
+              "to": 20
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-missing-failure-mode-endpoint-treatment_to_bond_min-27",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001b",
+            "baseline_specimen_ids": [
+              "missing-failure-mode-endpoint-treatment_to_bond_min-B1",
+              "missing-failure-mode-endpoint-treatment_to_bond_min-B2"
+            ],
+            "candidate_specimen_ids": [
+              "missing-failure-mode-endpoint-treatment_to_bond_min-C1",
+              "missing-failure-mode-endpoint-treatment_to_bond_min-C2"
+            ],
+            "baseline_independence_groups": [
+              "missing-failure-mode-endpoint-treatment_to_bond_min-BG"
+            ],
+            "candidate_independence_groups": [
+              "missing-failure-mode-endpoint-treatment_to_bond_min-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "supplier-outside-qualified-scope",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-X",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-X"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-outside-qualified-scope-substrate_supplier-28",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001c",
+            "baseline_specimen_ids": [
+              "supplier-outside-qualified-scope-substrate_supplier-B1",
+              "supplier-outside-qualified-scope-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-outside-qualified-scope-substrate_supplier-C1",
+              "supplier-outside-qualified-scope-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-outside-qualified-scope-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-outside-qualified-scope-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "stale-factor-mapping",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "STALE-VALUE",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-stale-factor-mapping-substrate_lot-29",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001d",
+            "baseline_specimen_ids": [
+              "stale-factor-mapping-substrate_lot-B1",
+              "stale-factor-mapping-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "stale-factor-mapping-substrate_lot-C1",
+              "stale-factor-mapping-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "stale-factor-mapping-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "stale-factor-mapping-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "duplicate-bridge-artifact",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-duplicate-bridge-artifact-substrate_supplier-30",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
+            "baseline_specimen_ids": [
+              "duplicate-bridge-artifact-substrate_supplier-B1",
+              "duplicate-bridge-artifact-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "duplicate-bridge-artifact-substrate_supplier-C1",
+              "duplicate-bridge-artifact-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "duplicate-bridge-artifact-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "duplicate-bridge-artifact-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-duplicate-bridge-artifact-plasma_head-31",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
+            "baseline_specimen_ids": [
+              "duplicate-bridge-artifact-plasma_head-B1",
+              "duplicate-bridge-artifact-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "duplicate-bridge-artifact-plasma_head-C1",
+              "duplicate-bridge-artifact-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "duplicate-bridge-artifact-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "duplicate-bridge-artifact-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        },
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            },
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-duplicate-bridge-artifact-JOINT-32",
+            "artifact_sha256": "000000000000000000000000000000000000000000000000000000000000001e",
+            "baseline_specimen_ids": [
+              "duplicate-bridge-artifact-JOINT-B1",
+              "duplicate-bridge-artifact-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "duplicate-bridge-artifact-JOINT-C1",
+              "duplicate-bridge-artifact-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "duplicate-bridge-artifact-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "duplicate-bridge-artifact-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Synthetic known-answer control.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "baseline-profile-hash-mismatch",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Baseline qualification receipt digest does not match the exact baseline profile.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "missing-baseline-qualification-receipt",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "No source-bound qualification receipt exists for the baseline profile."
+    },
+    {
+      "id": "baseline-qualification-missing-endpoint",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The baseline qualification does not cover all required product endpoints.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa"
+        ]
+      }
+    },
+    {
+      "id": "baseline-outside-qualified-scope",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-X",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-X",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [],
+      "expected_disposition": "REJECTED",
+      "rationale": "The source profile is not inside the declared qualification scope.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "484d79aa7bbc79037cd5518a00046a4e421a0ff577c77df4f41b36bd5f6e9d8a",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "bridge-reuses-baseline-qualification-artifact",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Bridge evidence reuses the baseline qualification artifact identity.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "pass-interval-without-composition",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          }
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Legacy interval bridge passes, but no bound method-qualified composition case is supplied.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "composition-case-from-another-transfer",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-material-lot-bridged-substrate_lot"
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Composition receipt is tied to a different transfer case ID.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "same-composition-reused-across-bridges",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-substrate_supplier-5",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-substrate_supplier-B1",
+              "supplier-and-head-with-joint-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-substrate_supplier-C1",
+              "supplier-and-head-with-joint-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-substrate_supplier"
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-plasma_head-6",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-plasma_head-B1",
+              "supplier-and-head-with-joint-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-plasma_head-C1",
+              "supplier-and-head-with-joint-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-substrate_supplier"
+        },
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            },
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-JOINT-7",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-JOINT-B1",
+              "supplier-and-head-with-joint-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-JOINT-C1",
+              "supplier-and-head-with-joint-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-plasma_head+substrate_supplier"
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "One method/design receipt cannot be reused to qualify different bridge dimension sets.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "joint-design-substituted-for-single-factor",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-B",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-B",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-substrate_supplier-5",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-substrate_supplier-B1",
+              "supplier-and-head-with-joint-substrate_supplier-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-substrate_supplier-C1",
+              "supplier-and-head-with-joint-substrate_supplier-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-substrate_supplier-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-substrate_supplier-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-plasma_head+substrate_supplier"
+        },
+        {
+          "dimensions": {
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-plasma_head-6",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-plasma_head-B1",
+              "supplier-and-head-with-joint-plasma_head-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-plasma_head-C1",
+              "supplier-and-head-with-joint-plasma_head-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-plasma_head-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-plasma_head-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-plasma_head"
+        },
+        {
+          "dimensions": {
+            "substrate_supplier": {
+              "from": "SUP-A",
+              "to": "SUP-B"
+            },
+            "plasma_head": {
+              "from": "HEAD-A",
+              "to": "HEAD-B"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-supplier-and-head-with-joint-JOINT-7",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+            "baseline_specimen_ids": [
+              "supplier-and-head-with-joint-JOINT-B1",
+              "supplier-and-head-with-joint-JOINT-B2"
+            ],
+            "candidate_specimen_ids": [
+              "supplier-and-head-with-joint-JOINT-C1",
+              "supplier-and-head-with-joint-JOINT-C2"
+            ],
+            "baseline_independence_groups": [
+              "supplier-and-head-with-joint-JOINT-BG"
+            ],
+            "candidate_independence_groups": [
+              "supplier-and-head-with-joint-JOINT-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-supplier-and-head-with-joint-plasma_head+substrate_supplier"
+        }
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A joint multi-factor composition/design receipt cannot be substituted for a single-factor bridge.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "unchanged-profile-without-baseline-composition",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [],
+      "expected_disposition": "BLOCKED",
+      "rationale": "An unchanged recipe is not a current qualification without a bound baseline method/design receipt.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    },
+    {
+      "id": "transfer-design-no-equivalence",
+      "baseline_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-001",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "candidate_profile": {
+        "substrate_grade": "PP-GRADE-A",
+        "substrate_supplier": "SUP-A",
+        "substrate_lot": "LOT-002",
+        "adhesive_system": "ADH-A",
+        "adhesive_batch": "ADHLOT-001",
+        "plasma_head": "HEAD-A",
+        "gas_mix": "AIR",
+        "gas_purity_pct": 99.9,
+        "line_speed_mm_s": 300,
+        "treatment_to_bond_min": 10,
+        "ambient_rh_pct": 45,
+        "fixture_id": "FIX-A"
+      },
+      "bridges": [
+        {
+          "dimensions": {
+            "substrate_lot": {
+              "from": "LOT-001",
+              "to": "LOT-002"
+            }
+          },
+          "evidence": {
+            "protocol_id": "PROTO-material-lot-bridged-substrate_lot-1",
+            "artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+            "baseline_specimen_ids": [
+              "material-lot-bridged-substrate_lot-B1",
+              "material-lot-bridged-substrate_lot-B2"
+            ],
+            "candidate_specimen_ids": [
+              "material-lot-bridged-substrate_lot-C1",
+              "material-lot-bridged-substrate_lot-C2"
+            ],
+            "baseline_independence_groups": [
+              "material-lot-bridged-substrate_lot-BG"
+            ],
+            "candidate_independence_groups": [
+              "material-lot-bridged-substrate_lot-CG"
+            ],
+            "intervals": [
+              {
+                "endpoint": "initial_lap_shear_mpa",
+                "margin": 1,
+                "lower_abs_difference_bound": 0.05,
+                "upper_abs_difference_bound": 0.4,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "aged_strength_retention",
+                "margin": 0.05,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.02,
+                "confidence_level": 0.95
+              },
+              {
+                "endpoint": "failure_mode_fraction",
+                "margin": 0.1,
+                "lower_abs_difference_bound": 0.01,
+                "upper_abs_difference_bound": 0.04,
+                "confidence_level": 0.95
+              }
+            ]
+          },
+          "composition_case_id": "TC-transfer-design-no-equivalence"
+        }
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Legacy interval bridge passes, but the linked method-qualified study result does not establish equivalence.",
+      "baseline_qualification": {
+        "qualification_id": "BASE-QUAL-PP-A-2026-001",
+        "protocol_id": "BASE-QUAL-PROTOCOL-0",
+        "profile_sha256": "09203579202ef65f03a9d4bc4697cc052e5a38d46dd366506c3e6c54ce4ca000",
+        "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "specimen_ids": [
+          "BASE-QUAL-S1",
+          "BASE-QUAL-S2"
+        ],
+        "independence_group": "BASE-QUAL-2026-GROUP-A",
+        "qualified_endpoints": [
+          "initial_lap_shear_mpa",
+          "aged_strength_retention",
+          "failure_mode_fraction"
+        ]
+      }
+    }
+  ],
+  "material_scope_registry": {
+    "PP-GRADE-A": {
+      "material_pair_class": "rigid_plastic_pair",
+      "geometry": "single_lap"
+    }
+  }
+}

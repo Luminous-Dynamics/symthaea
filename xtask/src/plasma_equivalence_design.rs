@@ -110,6 +110,16 @@ pub(super) struct EquivalenceDesignReceipt {
     baseline_method_receipt: ScopeEvidence,
     candidate_method_receipt: ScopeEvidence,
     analysis_result: EquivalenceAnalysisResult,
+    #[serde(default)]
+    transfer_case_id: Option<String>,
+    #[serde(default)]
+    transfer_bridge_id: Option<String>,
+    #[serde(default)]
+    baseline_profile_sha256: Option<String>,
+    #[serde(default)]
+    candidate_profile_sha256: Option<String>,
+    #[serde(default)]
+    bridge_dimension_keys: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -485,6 +495,67 @@ pub(super) fn audit_receipt(receipt: &EquivalenceDesignReceipt) -> Decision {
     }
 }
 
+pub(super) fn validate_transfer_binding(
+    receipt: &EquivalenceDesignReceipt,
+    transfer_case_id: &str,
+    transfer_bridge_id: &str,
+    baseline_profile_sha256: &str,
+    candidate_profile_sha256: &str,
+    bridge_dimension_keys: &[String],
+    endpoint: &str,
+    baseline_method_receipt: &ScopeEvidence,
+    candidate_method_receipt: &ScopeEvidence,
+) -> Decision {
+    let decision = validate_bridge(
+        receipt,
+        endpoint,
+        baseline_method_receipt,
+        candidate_method_receipt,
+    );
+    if decision.disposition != Disposition::Pass {
+        return decision;
+    }
+    if decision.equivalence != "EQUIVALENCE_ESTABLISHED" {
+        return Decision {
+            disposition: Disposition::Blocked,
+            equivalence: decision.equivalence,
+            reason: "the design/result record is structurally valid, but its interval does not establish equivalence for transfer",
+        };
+    }
+    let Some(case_id) = receipt.transfer_case_id.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks transfer-case identity" };
+    };
+    let Some(bridge_id) = receipt.transfer_bridge_id.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks transfer-bridge identity" };
+    };
+    let Some(base_digest) = receipt.baseline_profile_sha256.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks exact baseline profile digest" };
+    };
+    let Some(candidate_digest) = receipt.candidate_profile_sha256.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks exact candidate bridge profile digest" };
+    };
+    let Some(keys) = receipt.bridge_dimension_keys.as_deref() else {
+        return Decision { disposition: Disposition::Blocked, equivalence: "NOT_EVALUATED", reason: "design receipt lacks explicit bridge dimension set" };
+    };
+    let mut actual_keys = keys.to_vec();
+    let mut expected_keys = bridge_dimension_keys.to_vec();
+    actual_keys.sort();
+    expected_keys.sort();
+    if case_id != transfer_case_id
+        || bridge_id != transfer_bridge_id
+        || base_digest != baseline_profile_sha256
+        || candidate_digest != candidate_profile_sha256
+        || actual_keys != expected_keys
+    {
+        return Decision {
+            disposition: Disposition::Rejected,
+            equivalence: "NOT_EVALUATED",
+            reason: "study design is bound to a different transfer case, bridge dimension set or exact profile digest",
+        };
+    }
+    decision
+}
+
 pub(super) fn validate_bridge(
     receipt: &EquivalenceDesignReceipt,
     endpoint: &str,
@@ -638,6 +709,31 @@ mod tests {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
         let case = fixture.cases.iter().find(|case| case.id == "power-assumption-digest-mismatch").expect("case exists");
         assert_eq!(audit_receipt(&case.receipt).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn transfer_binding_blocks_a_valid_design_without_equivalence() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
+        let case = fixture.cases.iter().find(|case| case.id == "valid-design-but-interval-outside-margin").expect("case exists");
+        let mut receipt = case.receipt.clone();
+        receipt.transfer_case_id = Some("TRANSFER-1".to_owned());
+        receipt.transfer_bridge_id = Some("TRANSFER-1::substrate_lot".to_owned());
+        receipt.baseline_profile_sha256 = Some("11".repeat(32));
+        receipt.candidate_profile_sha256 = Some("22".repeat(32));
+        receipt.bridge_dimension_keys = Some(vec!["substrate_lot".to_owned()]);
+        let decision = validate_transfer_binding(
+            &receipt,
+            "TRANSFER-1",
+            "TRANSFER-1::substrate_lot",
+            &"11".repeat(32),
+            &"22".repeat(32),
+            &["substrate_lot".to_owned()],
+            &receipt.endpoint_id,
+            &receipt.baseline_method_receipt,
+            &receipt.candidate_method_receipt,
+        );
+        assert_eq!(decision.disposition, Disposition::Blocked);
+        assert_eq!(decision.equivalence, "EQUIVALENCE_NOT_ESTABLISHED");
     }
 
     #[test]
