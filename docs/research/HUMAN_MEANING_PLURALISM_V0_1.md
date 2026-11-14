@@ -88,6 +88,8 @@ These are complementary reference points, not one unified scoreboard. Dataset re
 
 ## 7. Industry comparison protocol
 
+The dated, current-model roster and matched tournament protocol are maintained in [HMP-Bench: Industry Baseline Matrix, 2026-11-14](HMP_BENCHMARK_BASELINE_MATRIX_2026-11-14.md). Refresh model aliases and provider terms before each run.
+
 Evaluate the same frozen items, prompts, tools, retrieval corpus and rubric across: (1) named frontier API models; (2) strong open-weight checkpoints; (3) retrieval-augmented variants; (4) classical/statistical or rule-based baselines where relevant; (5) Symthaea with and without domain evidence; and (6) qualified human annotators/domain experts.
 
 Record exact provider/model/checkpoint, date, settings, quantization, tool access, cost, latency and energy/runtime. Use paired tests, bootstrap confidence intervals, repeated runs for stochastic systems, blinded scoring and a locked test set. Report inter-rater agreement. No “better than SOTA” claim until the matched comparison is run and independently reproduced.
@@ -123,7 +125,7 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 ## 10. Execution sequence
 
 1. Publish the four RFCs and shared schema/fixture; obtain independent review.
-2. Add deterministic schema validation and permission negative-control tests.
+2. Use the initial Rust semantic audit (`cargo run -p xtask -- hmp-record-audit`) and its negative-control tests; add a standards-compliant JSON Schema 2020-12 validator before claiming full schema validation.
 3. Create hand-authored synthetic benchmark cases.
 4. Curate a small public-source pilot with explicit reuse rights and expert/community review; keep restricted content outside the public corpus.
 5. Run matched model baselines and publish per-track metrics.
@@ -140,6 +142,7 @@ Set task-specific numeric thresholds after a calibration-only pilot and before b
 | Sol-Atlas ingestion/catalog integration | Not implemented by this RFC |
 | Symtropy simulation runner | Not implemented by this RFC |
 | Symthaea evaluation runner | Not implemented by this RFC |
+| Symthaea `xtask hmp-record-audit` | Implemented on this research branch; Cargo tests not yet run |
 | Human/community validation | Not performed |
 | SOTA comparison | Not performed |
 
