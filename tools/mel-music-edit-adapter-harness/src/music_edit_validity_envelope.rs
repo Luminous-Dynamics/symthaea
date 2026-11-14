@@ -372,11 +372,20 @@ fn validate_operation_contract(
             }
         }
         O::ExtractInstrument => {
-            if !(has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::EqualTo)
-                || has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::MemberOfSet))
-                || !has_requested(envelope, P::EventPresence, S::TargetPart, R::Present)
-            {
+            let identity_bound = has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::EqualTo)
+                || has_requested(envelope, P::InstrumentIdentity, S::TargetPart, R::MemberOfSet);
+            let target_present = has_requested(envelope, P::EventPresence, S::TargetPart, R::Present);
+            let non_target_absent = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::EventPresence
+                    && constraint.scope == S::UnaffectedParts
+                    && constraint.relation == R::Absent
+                    && matches!(constraint.evidence, E::Acoustic | E::Combined)
+            });
+            if !identity_bound || !target_present {
                 issues.push(missing(P::InstrumentIdentity));
+            }
+            if !non_target_absent {
+                issues.push(missing(P::EventPresence));
             }
         }
         O::DoubleInstrument => {
@@ -384,6 +393,9 @@ fn validate_operation_contract(
                 || !has_requested(envelope, P::EventLineage, S::EditedSupport, R::Present)
             {
                 issues.push(missing(P::InstrumentIdentity));
+            }
+            if !has_protected(envelope, P::EventLineage, S::TargetPart, R::NoChange) {
+                issues.push(missing(P::EventLineage));
             }
         }
         O::RemoveDrums => {
@@ -409,11 +421,20 @@ fn validate_operation_contract(
             }
         }
         O::ExtractDrums => {
-            if !(has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::EqualTo)
-                || has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::MemberOfSet))
-                || !has_requested(envelope, P::EventPresence, S::TargetPart, R::Present)
-            {
+            let identity_bound = has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::EqualTo)
+                || has_requested(envelope, P::DrumKitIdentity, S::TargetPart, R::MemberOfSet);
+            let target_present = has_requested(envelope, P::EventPresence, S::TargetPart, R::Present);
+            let non_drum_absent = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::EventPresence
+                    && constraint.scope == S::UnaffectedParts
+                    && constraint.relation == R::Absent
+                    && matches!(constraint.evidence, E::Acoustic | E::Combined)
+            });
+            if !identity_bound || !target_present {
                 issues.push(missing(P::DrumKitIdentity));
+            }
+            if !non_drum_absent {
+                issues.push(missing(P::EventPresence));
             }
         }
         O::Staccato | O::Legato => {
@@ -465,7 +486,14 @@ fn validate_operation_contract(
                     && constraint.unit.as_deref() == Some("cents")
                     && matches!(constraint.evidence, E::Acoustic | E::Combined)
             });
-            if !has_cent_tolerance {
+            let anchors_a440 = envelope.requested_change.iter().any(|constraint| {
+                constraint.property == P::TuningCents
+                    && constraint.scope == scope
+                    && constraint.relation == R::EqualTo
+                    && constraint.expected_value.as_deref() == Some("A4=440Hz")
+                    && matches!(constraint.evidence, E::Acoustic | E::Combined)
+            });
+            if !has_cent_tolerance || !anchors_a440 {
                 issues.push(missing(P::TuningCents));
             }
             if !has_protected(envelope, P::MelodyPitch, scope, R::NoChange) {
@@ -901,6 +929,91 @@ mod tests {
         envelope.dataset_version = "latest".to_owned();
         assert!(validate_music_edit_validity_envelope_v1(&envelope)
             .contains(&MusicEditValidityEnvelopeIssueV1::MutableVersion));
+    }
+
+
+    #[test]
+    fn drum_replacement_requires_kit_identity_and_preserved_event_lineage() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::ReplaceDrums;
+        envelope.target_scope = MusicEditTargetScopeV1::DrumKit;
+        envelope.requested_change[0].property = MusicEditValidityPropertyV1::DrumKitIdentity;
+        envelope.requested_change[0].allowed_values = vec!["kit-a".to_owned(), "kit-b".to_owned()];
+        envelope.requested_change.push(MusicEditValidityConstraintV1 {
+            constraint_id: "change.from-kit".to_owned(),
+            property: MusicEditValidityPropertyV1::DrumKitIdentity,
+            scope: MusicEditValidityScopeV1::TargetPart,
+            relation: MusicEditValidityRelationV1::DifferentFrom,
+            expected_value: Some("kit-original".to_owned()),
+            allowed_values: Vec::new(),
+            minimum: None,
+            maximum: None,
+            unit: None,
+            evidence: MusicEditValidityEvidenceV1::Symbolic,
+            rationale: "the replacement kit differs from the original kit".to_owned(),
+        });
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.protected_invariants.push(constraint(
+            "protect.drum-events",
+            MusicEditValidityPropertyV1::EventLineage,
+            MusicEditValidityScopeV1::TargetPart,
+            MusicEditValidityRelationV1::NoChange,
+        ));
+        envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+    }
+
+    #[test]
+    fn tuning_correction_requires_a440_anchor_cent_tolerance_and_pitch_protection() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::TuningCorrection440;
+        envelope.requested_change.clear();
+        envelope.requested_change.extend([
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.a440-anchor".to_owned(),
+                property: MusicEditValidityPropertyV1::TuningCents,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::EqualTo,
+                expected_value: Some("A4=440Hz".to_owned()),
+                allowed_values: Vec::new(),
+                minimum: None,
+                maximum: None,
+                unit: None,
+                evidence: MusicEditValidityEvidenceV1::Acoustic,
+                rationale: "the tuning reference is concert A at 440 Hz".to_owned(),
+            },
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.cent-tolerance".to_owned(),
+                property: MusicEditValidityPropertyV1::TuningCents,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::WithinRange,
+                expected_value: None,
+                allowed_values: Vec::new(),
+                minimum: Some(-2.0),
+                maximum: Some(2.0),
+                unit: Some("cents".to_owned()),
+                evidence: MusicEditValidityEvidenceV1::Acoustic,
+                rationale: "the corrected result must fall within two cents of the reference".to_owned(),
+            },
+        ]);
+        envelope.protected_invariants.push(constraint(
+            "protect.equal-tempered-note",
+            MusicEditValidityPropertyV1::MelodyPitch,
+            MusicEditValidityScopeV1::TargetPart,
+            MusicEditValidityRelationV1::NoChange,
+        ));
+        envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+
+        envelope.requested_change[0].expected_value = Some("MIDI-69".to_owned());
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::TuningCorrection440,
+                property: MusicEditValidityPropertyV1::TuningCents,
+            }
+        ));
     }
 
     #[test]
