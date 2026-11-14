@@ -335,8 +335,7 @@ pub fn compose_preset_stack(
                 PresetConflictKind::ConflictingObjectiveWeight,
                 &metric,
                 all_sources_u16(&values),
-                "competing objective weights require an explicit user choice; do not sum",
-                                or normalize them",
+                "competing objective weights require an explicit user choice; do not sum or normalize them",
             ));
         } else if let Some((weight, sources)) = values.into_iter().next() {
             objective_weights.insert(
