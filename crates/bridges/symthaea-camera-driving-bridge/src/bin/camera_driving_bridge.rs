@@ -18,7 +18,7 @@ use symthaea_camera_driving_bridge::{
     BridgeConfig, CameraDrivingBridge, CapturedDrivingObservation, DrivingObservationReceipt,
     DrivingRunIdentity, RECEIPT_SCHEMA_VERSION, UpstreamCameraObservation,
 };
-use symthaea_vehicle::VehicleState;
+use symthaea_vehicle::{VehicleController, VehicleConfig, VehicleState};
 use symthaea_vision_manifold::VisionConfig;
 
 const MAX_EPISODE_OBSERVATIONS: usize = 100_000;
@@ -437,6 +437,47 @@ mod tests {
         receipt.observation_id = receipt.calculated_observation_id();
         receipt.receipt_sha256 = receipt.calculated_receipt_sha256();
         receipt
+    }
+
+    #[test]
+    fn fused_camera_input_is_accepted_by_a_fresh_untrained_vehicle_controller() {
+        // This is an API/representation compatibility check only. The controller
+        // is newly initialized, has no learned driving competence, and its output
+        // is never sent to a simulator or actuator.
+        let pixels = vec![127_u8; 16 * 16 * 3];
+        let mut state = VehicleState::cruising(4.0);
+        state.timestamp = 0.01;
+        let upstream = test_upstream_receipt(&pixels, 1, 1, 10_000);
+        let mut bridge = CameraDrivingBridge::try_new(
+            test_bridge_config(),
+            VisionConfig::default(),
+        )
+        .unwrap();
+        let fused = bridge
+            .observe(CapturedDrivingObservation {
+                sequence: 1,
+                timestamp_us: 10_000,
+                vehicle_state_timestamp_us: 10_000,
+                pixels: &pixels,
+                width: 16,
+                height: 16,
+                channels: 3,
+                vehicle_state: &state,
+                upstream,
+            })
+            .unwrap();
+
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("untrained-visual-policy-smoke-test");
+        let mut controller = VehicleController::new(&genesis, &VehicleConfig::default());
+        let proposal = controller.forward(&fused.policy_input, 0.01);
+
+        assert!(proposal.steering.is_finite());
+        assert!(proposal.throttle.is_finite());
+        assert!(proposal.brake.is_finite());
+        assert!((-1.0..=1.0).contains(&proposal.steering));
+        assert!((0.0..=1.0).contains(&proposal.throttle));
+        assert!((0.0..=1.0).contains(&proposal.brake));
     }
 
     #[test]
