@@ -10,6 +10,7 @@ on:
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_correction_ledger.rs"
       - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
@@ -18,6 +19,7 @@ on:
     branches:
       - "research/melothaea-musicxml-notation-events-v1"
       - "research/melothaea-score-event-evaluator-v4"
+      - "research/melothaea-score-correction-ledger-v2"
     paths:
       - ".github/workflows/muse-musicxml-notation.yml"
       - "Cargo.toml"
@@ -72,23 +74,27 @@ jobs:
           rustfmt --edition 2024 --config skip_children=true --check \
             crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
             crates/domains/symthaea-muse/src/musicxml_notation_eval.rs \
+            crates/domains/symthaea-muse/src/musicxml_correction_ledger.rs \
             crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
             crates/domains/symthaea-muse/src/bin/muse_studio.rs \
             crates/domains/symthaea-muse/src/lib.rs \
             crates/domains/symthaea-muse-protocol/src/lib.rs \
             crates/domains/symthaea-muse-ui/src/add_music_page.rs
 
-      - name: Test multidimensional MusicXML score evaluator
-        run: "cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::"
-
       - name: Test MusicXML notation-event parser
-        run: "cargo test --locked -p symthaea-muse --features theory musicxml_notation_events::tests::"
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_notation_events::tests::
 
       - name: Test MusicXML measure/barline graph and replay
-        run: "cargo test --locked -p symthaea-muse --features theory musicxml_barline_adapter::tests::"
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_barline_adapter::tests::
+
+      - name: Test multidimensional MusicXML score-event evaluator
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::
+
+      - name: Test measure-localized MusicXML correction ledger
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_correction_ledger::tests::
 
       - name: Test Muse Studio graph persistence and coverage summary
-        run: "cargo test --locked -p symthaea-muse --features studio --bin muse_studio notation_summary_tests::"
+        run: cargo test --locked -p symthaea-muse --features studio --bin muse_studio notation_summary_tests::
 
       - name: Check Add Music UI for wasm
         run: cargo check --locked -p symthaea-muse-ui --target wasm32-unknown-unknown

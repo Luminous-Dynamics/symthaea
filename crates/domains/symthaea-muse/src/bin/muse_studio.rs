@@ -6255,7 +6255,6 @@ mod notation_summary_tests {
         );
     }
 
-
     #[test]
     fn musicxml_graph_artifact_verification_replays_source_and_rejects_tampering() {
         let xml = br#"<score-partwise><part id="P1"><measure number="1">
@@ -6338,6 +6337,4 @@ mod notation_summary_tests {
             Some(ImportedNotationArtifact::MusicXmlGraph(_))
         ));
     }
-
 }
-

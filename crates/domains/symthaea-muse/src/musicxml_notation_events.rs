@@ -417,9 +417,9 @@ fn parse_part_events(
                 chord_anchor = None;
                 for attribute in element.children().filter(|node| node.is_element()) {
                     let source = source_node(attribute, 0, &mut source_tree_nodes)?;
-                    let score_offset = measure_start
-                        .checked_add(cursor)
-                        .map_err(|_| ParseEventError::Unknown("attribute score offset overflow".into()))?;
+                    let score_offset = measure_start.checked_add(cursor).map_err(|_| {
+                        ParseEventError::Unknown("attribute score offset overflow".into())
+                    })?;
                     if attribute.tag_name().namespace() == namespace {
                         attribute_events.push(MusicXmlAttributeEventV1 {
                             source_order,
@@ -624,8 +624,8 @@ fn parse_part_events(
                     release_divisions: element.attribute("release").map(str::to_string),
                     performance_offset_divisions: (element.attribute("attack").is_some()
                         || element.attribute("release").is_some())
-                        .then_some(divisions)
-                        .flatten(),
+                    .then_some(divisions)
+                    .flatten(),
                     performed_duration,
                     kind,
                     is_grace,
@@ -1304,7 +1304,6 @@ mod tests {
         ));
     }
 
-
     #[test]
     fn event_extent_beyond_explicit_measure_span_withholds_all_events() {
         let xml = r#"<score-partwise><part id="P1"><measure number="1">
@@ -1435,7 +1434,6 @@ mod tests {
             MusicXmlNotationEventsStatusV1::Unknown { .. }
         ));
     }
-
 
     #[test]
     fn part_metadata_preserves_score_instrument_and_midi_setup() {
@@ -1610,18 +1608,12 @@ mod tests {
         supported(&events);
         assert_eq!(events.attribute_events.len(), 2);
         assert_eq!(events.auxiliary_events.len(), 2);
-        assert_eq!(
-            events.auxiliary_events[0].source.element,
-            "divisions"
-        );
+        assert_eq!(events.auxiliary_events[0].source.element, "divisions");
         assert_eq!(
             events.auxiliary_events[0].source.namespace_uri.as_deref(),
             Some("urn:example:attribute-extension")
         );
-        assert_eq!(
-            events.auxiliary_events[1].source.element,
-            "future-clef"
-        );
+        assert_eq!(events.auxiliary_events[1].source.element, "future-clef");
         assert_eq!(
             events.auxiliary_events[1].source.namespace_uri.as_deref(),
             Some("urn:example:attribute-extension")
