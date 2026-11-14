@@ -353,10 +353,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue describes design-only benchmark work; fixture existence and expected graph are not an executed semantic result."
+          "Issue describes design-only benchmark work; fixture existence and expected graph are not an executed semantic result.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -393,10 +394,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue is an open research/task-authoring plan; target metrics are prospective."
+          "Issue is an open research/task-authoring plan; target metrics are prospective.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -432,10 +434,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue describes benchmark design and prospective gates, not measured agent collaboration performance."
+          "Issue describes benchmark design and prospective gates, not measured agent collaboration performance.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -472,10 +475,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue is open; judge qualification targets are proposals, not achieved results."
+          "Issue is open; judge qualification targets are proposals, not achieved results.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -513,10 +517,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue reports a source-level security finding; this snapshot does not independently reproduce the sandbox audit."
+          "Issue reports a source-level security finding; this snapshot does not independently reproduce the sandbox audit.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -554,10 +559,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "This map proposal is itself an open workstream, not an implemented capability."
+          "This map proposal is itself an open workstream, not an implemented capability.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -805,10 +811,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue describes design-only benchmark work; fixture existence and expected graph are not an executed semantic result."
+          "Issue describes design-only benchmark work; fixture existence and expected graph are not an executed semantic result.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -838,10 +845,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue is an open research/task-authoring plan; target metrics are prospective."
+          "Issue is an open research/task-authoring plan; target metrics are prospective.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -871,10 +879,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue describes benchmark design and prospective gates, not measured agent collaboration performance."
+          "Issue describes benchmark design and prospective gates, not measured agent collaboration performance.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -904,10 +913,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue is open; judge qualification targets are proposals, not achieved results."
+          "Issue is open; judge qualification targets are proposals, not achieved results.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -937,10 +947,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "Issue reports a source-level security finding; this snapshot does not independently reproduce the sandbox audit."
+          "Issue reports a source-level security finding; this snapshot does not independently reproduce the sandbox audit.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -970,10 +981,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
         "limitations": [
-          "This map proposal is itself an open workstream, not an implemented capability."
+          "This map proposal is itself an open workstream, not an implemented capability.",
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
         ]
       },
       "lifecycle": {
@@ -1003,9 +1015,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
-        "limitations": []
+        "limitations": [
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
+        ]
       },
       "lifecycle": {
         "state": "current",
@@ -1034,9 +1048,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
-        "limitations": []
+        "limitations": [
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
+        ]
       },
       "lifecycle": {
         "state": "current",
@@ -1065,9 +1081,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
-        "limitations": []
+        "limitations": [
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
+        ]
       },
       "lifecycle": {
         "state": "current",
@@ -1096,9 +1114,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
-        "limitations": []
+        "limitations": [
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
+        ]
       },
       "lifecycle": {
         "state": "current",
@@ -1127,9 +1147,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
-        "limitations": []
+        "limitations": [
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
+        ]
       },
       "lifecycle": {
         "state": "current",
@@ -1158,9 +1180,11 @@
           "digest": null
         },
         "observed_at": "2026-11-14T07:07:00.000Z",
-        "valid_for_revision": "dcffe1060ece4815cf42548a8f646cec4f075535",
+        "valid_for_revision": null,
         "valid_for_world": null,
-        "limitations": []
+        "limitations": [
+          "Issue facts have their own observed timestamp and are not asserted to be valid only for the mapped repository commit."
+        ]
       },
       "lifecycle": {
         "state": "current",
