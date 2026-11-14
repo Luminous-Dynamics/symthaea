@@ -3053,7 +3053,7 @@
       "baseline_qualification": {
         "qualification_id": "BASE-QUAL-PP-A-2026-001",
         "protocol_id": "BASE-QUAL-PROTOCOL-0",
-        "profile_sha256": "913db88225d3030f1a2e65dc3d2713381b4ad3ec8ea8fe41cf3d3994c1c55156",
+        "profile_sha256": "484d79aa7bbc79037cd5518a00046a4e421a0ff577c77df4f41b36bd5f6e9d8a",
         "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
         "specimen_ids": [
           "BASE-QUAL-S1",
