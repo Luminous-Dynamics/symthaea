@@ -2728,6 +2728,18 @@ enum ImportedNotationArtifact {
     MidiMeasureMaps(Vec<u8>),
 }
 
+fn count_musicxml_source_elements(
+    node: &symthaea_muse::musicxml_notation_events::MusicXmlSourceNodeV1,
+    element_name: &str,
+) -> usize {
+    let current = if node.element == element_name { 1 } else { 0 };
+    current
+        + node.children
+            .iter()
+            .map(|child| count_musicxml_source_elements(child, element_name))
+            .sum::<usize>()
+}
+
 fn summarize_imported_notation_structure(
     source_sha256: &str,
     structure: symthaea_muse::symbolic_import::ImportedNotationStructureV1,
@@ -2789,10 +2801,8 @@ fn summarize_imported_notation_structure(
                 let declared_instrument_ids = if let Some(metadata) = &graph.part_metadata {
                     part_metadata_count += 1;
                     score_instrument_count += metadata.score_instrument_ids.len();
-                    midi_instrument_count += metadata.source_score_part.children
-                        .iter()
-                        .filter(|node| node.element == "midi-instrument")
-                        .count();
+                    midi_instrument_count +=
+                        count_musicxml_source_elements(&metadata.source_score_part, "midi-instrument");
                     metadata.score_instrument_ids.clone()
                 } else {
                     Vec::new()
