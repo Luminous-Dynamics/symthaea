@@ -9,6 +9,7 @@ on:
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_eval.rs"
       - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
@@ -80,6 +81,9 @@ jobs:
 
       - name: Test MusicXML measure/barline graph and replay
         run: cargo test --locked -p symthaea-muse --features theory musicxml_barline_adapter::tests::
+
+      - name: Test multidimensional MusicXML score-event evaluator
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_notation_eval::tests::
 
       - name: Test Muse Studio graph persistence and coverage summary
         run: cargo test --locked -p symthaea-muse --features studio --bin muse_studio notation_summary_tests::
