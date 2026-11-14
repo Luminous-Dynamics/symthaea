@@ -209,6 +209,8 @@ pub enum Finding {
     BridgeFractionOutsideScale,
     BridgeEquivalenceMarginExceeded,
     InvalidProcessMasses,
+    InputDistributionInsufficient,
+    OutputDistributionInsufficient,
     MaterialClassMismatch,
 }
 
@@ -682,10 +684,10 @@ pub fn assess_process_comparison(
     let input_assessment = assess_distribution(input, method, criterion);
     let output_assessment = assess_distribution(output, method, criterion);
     if input_assessment.decision != Decision::Qualified {
-        push_unique(&mut findings, Finding::MethodNotDirectlyComparable);
+        push_unique(&mut findings, Finding::InputDistributionInsufficient);
     }
     if output_assessment.decision != Decision::Qualified {
-        push_unique(&mut findings, Finding::ReceiverLengthFractionBelowPolicy);
+        push_unique(&mut findings, Finding::OutputDistributionInsufficient);
     }
 
     let output_fraction = output_assessment.qualifying_fraction_lower_ppm;
