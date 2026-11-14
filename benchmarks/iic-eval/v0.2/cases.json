@@ -195,6 +195,44 @@
           "content": "Maintain at least 20 m³ of emergency water reserve at each site. A reserve below 18 m³ requires immediate escalation. The target is measured at 06:00 local time on each operating day."
         }
       ]
+    },
+    {
+      "case_id": "IIC-010",
+      "category": "decision_time_temporal_coverage",
+      "description": "A policy was amended twice. Reconstruct the rule applicable at a historical effective time and the current rule without losing the intermediate version.",
+      "task": "Return a versioned, source-grounded reconstruction for (a) effective time 2026-02-15, known-at time 2026-11-14 and (b) effective time 2026-11-14, known-at time 2026-11-14. Preserve the full change lineage. Do not apply the current 30-day interval retroactively to the earlier query or erase the 60-day intermediate rule.",
+      "documents": [
+        {
+          "document_id": "INSPECTION-010-V1",
+          "version": "1",
+          "source_kind": "inspection_standard",
+          "language": "en",
+          "availability": "available",
+          "effective_from": "2025-01-01T00:00:00Z",
+          "effective_through": "2025-12-31T23:59:59Z",
+          "content": "From 1 January 2025 through 31 December 2025, fire extinguishers must be inspected every 90 days."
+        },
+        {
+          "document_id": "INSPECTION-010-V2",
+          "version": "2",
+          "source_kind": "amendment",
+          "language": "en",
+          "availability": "available",
+          "effective_from": "2026-01-01T00:00:00Z",
+          "effective_through": "2026-06-30T23:59:59Z",
+          "content": "Effective 1 January 2026, replace the 90-day inspection interval with a 60-day interval."
+        },
+        {
+          "document_id": "INSPECTION-010-V3",
+          "version": "3",
+          "source_kind": "amendment",
+          "language": "en",
+          "availability": "available",
+          "effective_from": "2026-07-01T00:00:00Z",
+          "effective_through": null,
+          "content": "Effective 1 July 2026, replace the 60-day inspection interval with a 30-day interval."
+        }
+      ]
     }
   ]
 }
