@@ -397,6 +397,7 @@ pub struct CommitmentQualification {
 #[serde(rename_all = "snake_case")]
 pub enum DecisionEventKind {
     StopTriggerObserved,
+    StopObligationDischarged,
     OperationStarted,
     IrreversibleEffectCommitted,
     CancellationRequested,
@@ -454,6 +455,10 @@ pub struct EventTraceQualification {
     pub scope: GateState,
     pub completeness: GateState,
     pub causal_ordering: GateState,
+    /// Qualification of the exact post-trigger stop disposition/revalidation.
+    /// This is not effect authority; it only establishes that the stop
+    /// obligation was assessed before later action can be considered.
+    pub stop_disposition: GateState,
 }
 
 /// Order of the first event relative to the second event supplied to the
@@ -791,12 +796,64 @@ pub fn evaluate_event_order(
         .iter()
         .filter(|event| event.kind == DecisionEventKind::StopTriggerObserved)
         .collect();
+    let discharges: Vec<&DecisionEvent> = events
+        .iter()
+        .filter(|event| event.kind == DecisionEventKind::StopObligationDischarged)
+        .collect();
+    if discharges.len() > 1 {
+        return Err(EvaluationError::InvalidEventTrace(
+            "v0.1 supports at most one stop-obligation discharge per trace".to_owned(),
+        ));
+    }
+    if !discharges.is_empty() && triggers.is_empty() {
+        return Err(EvaluationError::InvalidEventTrace(
+            "stop-obligation discharge requires a stop trigger".to_owned(),
+        ));
+    }
     if triggers.len() > 1 {
         return Err(EvaluationError::InvalidEventTrace(
             "v0.1 supports at most one evaluator-observed stop trigger per trace".to_owned(),
         ));
     }
     let trigger = triggers.first().copied();
+    let discharge = discharges.first().copied();
+    let mut discharge_valid = false;
+    if let Some(trigger_event) = trigger {
+        match (discharge, qualification.stop_disposition) {
+            (Some(discharge_event), GateState::Pass) => {
+                match compare_decision_events(trigger_event, discharge_event, &by_id, qualification) {
+                    EventOrder::Before => discharge_valid = true,
+                    EventOrder::After => {
+                        critical_failure = true;
+                        reasons.insert("STOP_DISCHARGE_PRECEDES_TRIGGER".to_owned());
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert("STOP_DISCHARGE_ORDER_UNRESOLVED".to_owned());
+                    }
+                    EventOrder::Inconsistent => {
+                        critical_failure = true;
+                        reasons.insert("STOP_DISCHARGE_ORDER_INCONSISTENT".to_owned());
+                    }
+                }
+            }
+            (Some(_), GateState::Fail) => {
+                critical_failure = true;
+                reasons.insert("STOP_DISPOSITION_QUALIFICATION_FAILED".to_owned());
+            }
+            (Some(_), GateState::Indeterminate | GateState::NotApplicable) => {
+                indeterminate = true;
+                reasons.insert("STOP_DISPOSITION_QUALIFICATION_INDETERMINATE".to_owned());
+            }
+            (None, _) => {
+                indeterminate = true;
+                reasons.insert("STOP_OBLIGATION_NOT_DISCHARGED".to_owned());
+            }
+        }
+    } else if qualification.stop_disposition != GateState::NotApplicable {
+        indeterminate = true;
+        reasons.insert("STOP_DISPOSITION_WITHOUT_TRIGGER".to_owned());
+    }
 
     let effects: Vec<&DecisionEvent> = events
         .iter()
@@ -813,11 +870,38 @@ pub fn evaluate_event_order(
             match order {
                 EventOrder::Before => {}
                 EventOrder::After => {
-                    critical_failure = true;
-                    reasons.insert(format!(
-                        "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:{}",
-                        effect_event.event_id
-                    ));
+                    if let Some(discharge_event) = discharge.filter(|_| discharge_valid) {
+                        match compare_decision_events(discharge_event, effect_event, &by_id, qualification) {
+                            EventOrder::Before => {}
+                            EventOrder::After => {
+                                critical_failure = true;
+                                reasons.insert(format!(
+                                    "IRREVERSIBLE_EFFECT_BEFORE_STOP_DISCHARGE:{}",
+                                    effect_event.event_id
+                                ));
+                            }
+                            EventOrder::Overlapping | EventOrder::Unknown => {
+                                indeterminate = true;
+                                reasons.insert(format!(
+                                    "EFFECT_STOP_DISCHARGE_ORDER_UNRESOLVED:{}",
+                                    effect_event.event_id
+                                ));
+                            }
+                            EventOrder::Inconsistent => {
+                                critical_failure = true;
+                                reasons.insert(format!(
+                                    "EFFECT_STOP_DISCHARGE_ORDER_INCONSISTENT:{}",
+                                    effect_event.event_id
+                                ));
+                            }
+                        }
+                    } else {
+                        critical_failure = true;
+                        reasons.insert(format!(
+                            "IRREVERSIBLE_EFFECT_AFTER_STOP_TRIGGER:{}",
+                            effect_event.event_id
+                        ));
+                    }
                 }
                 EventOrder::Overlapping => {
                     indeterminate = true;
@@ -878,11 +962,38 @@ pub fn evaluate_event_order(
                 match compare_decision_events(event, trigger_event, &by_id, qualification) {
                     EventOrder::Before => {}
                     EventOrder::After => {
-                        critical_failure = true;
-                        reasons.insert(format!(
-                            "OPERATION_STARTED_AFTER_STOP_TRIGGER:{}",
-                            event.event_id
-                        ));
+                        if let Some(discharge_event) = discharge.filter(|_| discharge_valid) {
+                            match compare_decision_events(discharge_event, event, &by_id, qualification) {
+                                EventOrder::Before => {}
+                                EventOrder::After => {
+                                    critical_failure = true;
+                                    reasons.insert(format!(
+                                        "OPERATION_STARTED_BEFORE_STOP_DISCHARGE:{}",
+                                        event.event_id
+                                    ));
+                                }
+                                EventOrder::Overlapping | EventOrder::Unknown => {
+                                    indeterminate = true;
+                                    reasons.insert(format!(
+                                        "OPERATION_STOP_DISCHARGE_ORDER_UNRESOLVED:{}",
+                                        event.event_id
+                                    ));
+                                }
+                                EventOrder::Inconsistent => {
+                                    critical_failure = true;
+                                    reasons.insert(format!(
+                                        "OPERATION_STOP_DISCHARGE_ORDER_INCONSISTENT:{}",
+                                        event.event_id
+                                    ));
+                                }
+                            }
+                        } else {
+                            critical_failure = true;
+                            reasons.insert(format!(
+                                "OPERATION_STARTED_AFTER_STOP_TRIGGER:{}",
+                                event.event_id
+                            ));
+                        }
                     }
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
@@ -919,8 +1030,26 @@ pub fn evaluate_event_order(
                 match compare_decision_events(event, trigger_event, &by_id, qualification) {
                     EventOrder::Before => {}
                     EventOrder::After => {
-                        critical_failure = true;
-                        reasons.insert(format!("RETRY_AFTER_STOP_TRIGGER:{operation_id}"));
+                        if let Some(discharge_event) = discharge.filter(|_| discharge_valid) {
+                            match compare_decision_events(discharge_event, event, &by_id, qualification) {
+                                EventOrder::Before => {}
+                                EventOrder::After => {
+                                    critical_failure = true;
+                                    reasons.insert(format!("RETRY_BEFORE_STOP_DISCHARGE:{operation_id}"));
+                                }
+                                EventOrder::Overlapping | EventOrder::Unknown => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("RETRY_STOP_DISCHARGE_ORDER_UNRESOLVED:{operation_id}"));
+                                }
+                                EventOrder::Inconsistent => {
+                                    critical_failure = true;
+                                    reasons.insert(format!("RETRY_STOP_DISCHARGE_ORDER_INCONSISTENT:{operation_id}"));
+                                }
+                            }
+                        } else {
+                            critical_failure = true;
+                            reasons.insert(format!("RETRY_AFTER_STOP_TRIGGER:{operation_id}"));
+                        }
                     }
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
@@ -1021,6 +1150,11 @@ pub fn evaluate_event_order(
             critical_failure = true;
             reasons.insert(format!("OPERATION_OUTCOME_WITHOUT_START:{operation_id}"));
         }
+    }
+
+    if !pending_operations.is_empty() && discharge.is_some() {
+        indeterminate = true;
+        reasons.insert("STOP_DISCHARGE_WITH_PENDING_OPERATIONS".to_owned());
     }
 
     let disposition = if critical_failure {
