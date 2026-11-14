@@ -179,7 +179,7 @@ The API supports two directions:
 - \`U1MpsObservableErrorTarget::compile_state_l2_error_budget\` converts a requested absolute expectation error into a sufficient global state-L2 budget.
 - \`U1MpsObservableErrorTarget::certify\` uses the qualified global ledger to return an expectation-error upper bound and whether the requested observable tolerance is met.
 
-The exact-state norm upper bound is caller-supplied and must be justified from the reference dynamics; for an exactly unitary reference trajectory, the initial state norm is sufficient. The approximate norm is measured from the actual MPS, without assuming it is normalized.
+The exact-state norm upper bound is caller-supplied and must be justified from the reference dynamics; for an exactly unitary reference trajectory, the initial state norm is sufficient. The approximate norm is measured from the actual MPS, without assuming it is normalized. The receipt explicitly sets `trotter_error_included = false`: for Strang TEBD it bounds the implementation relative to the discrete gate sequence, not the continuous-time Hamiltonian trajectory.
 
 **Important boundary:** this is an error-envelope/certification helper, not yet an observable evaluator. It does not implement arbitrary MPO expectation contraction or infer the observable operator norm. Applications must supply a valid norm upper bound (for a Pauli string, 1 is exact; for a weighted sum, the sum of absolute coefficient bounds is a simple conservative choice). An unqualified local truncation ledger is rejected; a zero operator is the trivial exact exception.
 
