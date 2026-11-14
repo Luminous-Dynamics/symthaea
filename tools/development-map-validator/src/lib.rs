@@ -1053,6 +1053,60 @@ pub fn validate_value(value: &Value) -> ValidationReport {
         }
     }
 
+    if let Some(event_values) = value.get("events").and_then(Value::as_array) {
+        for (index, event) in event_values.iter().enumerate() {
+            if event.get("kind").and_then(Value::as_str) != Some("decision_recorded") {
+                continue;
+            }
+            let event_path = format!("events[{index}]");
+            let Some(payload) = event.get("payload") else {
+                continue;
+            };
+            let Some(decision_at) = payload
+                .get("decision_at")
+                .and_then(Value::as_str)
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+            else {
+                continue;
+            };
+            if let Some(corrections) = payload.get("later_corrections").and_then(Value::as_array) {
+                for (correction_index, correction) in corrections.iter().enumerate() {
+                    let Some(correction_id) = correction.as_str() else {
+                        continue;
+                    };
+                    if !event_ids.contains(correction_id) {
+                        report.error(
+                            "DTEA-EVENT-004",
+                            format!("{event_path}.payload.later_corrections[{correction_index}]"),
+                            format!("unknown later-correction event {correction_id:?}"),
+                        );
+                        continue;
+                    }
+                    let correction_event = event_values.iter().find(|candidate| {
+                        candidate.get("id").and_then(Value::as_str) == Some(correction_id)
+                    });
+                    let correction_time = correction_event
+                        .and_then(|candidate| candidate.get("occurred_at"))
+                        .and_then(Value::as_str)
+                        .and_then(|value| DateTime::parse_from_rfc3339(value).ok());
+                    match correction_time {
+                        Some(correction_time) if correction_time > decision_at => {}
+                        Some(_) => report.error(
+                            "DTEA-EVENT-005",
+                            format!("{event_path}.payload.later_corrections[{correction_index}]"),
+                            "a later correction must have an effective occurred_at after decision_at",
+                        ),
+                        None => report.error(
+                            "DTEA-EVENT-006",
+                            format!("{event_path}.payload.later_corrections[{correction_index}]"),
+                            "later correction event requires a valid occurred_at timestamp",
+                        ),
+                    }
+                }
+            }
+        }
+    }
+
     for (node_id, meta) in &nodes {
         if let Some(event_id) = &meta.invalidated_by {
             if !event_ids.contains(event_id) {
@@ -1207,6 +1261,22 @@ mod tests {
             Value::String("2026-11-14T09:10:00Z".to_owned());
         let report = validate_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVIDENCE-006"));
+    }
+
+    #[test]
+    fn decision_later_correction_must_resolve_and_follow_decision_time() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][2]["payload"]["later_corrections"][0] = Value::String("missing:event".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVENT-004"));
+    }
+
+    #[test]
+    fn correction_effective_before_decision_is_not_a_later_correction() {
+        let mut value: Value = serde_json::from_str(DTEA_FIXTURE).expect("DTEA fixture JSON");
+        value["events"][4]["occurred_at"] = Value::String("2026-11-14T09:59:00Z".to_owned());
+        let report = validate_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DTEA-EVENT-005"));
     }
 
     #[test]
