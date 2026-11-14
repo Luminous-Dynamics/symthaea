@@ -159,10 +159,14 @@ pub struct MaterialFlowTotals {
     pub rejected_mass_mg: u128,
     /// Sum of terminal lots explicitly declared as waste.
     pub waste_mass_mg: u128,
+    /// Sum of terminal lots quarantined and not counted as recovered output.
+    pub quarantined_mass_mg: u128,
     /// Sum of terminal lots awaiting a receiver decision.
     pub awaiting_receiver_mass_mg: u128,
     /// Sum of event-declared unaccounted residual mass.
     pub unaccounted_mass_mg: u128,
+    /// Sum of declared event mass-measurement uncertainties.
+    pub uncertainty_mass_mg: u128,
 }
 
 /// Result of validating a material-flow ledger.
@@ -234,8 +238,10 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
         accepted_mass_mg: 0,
         rejected_mass_mg: 0,
         waste_mass_mg: 0,
+        quarantined_mass_mg: 0,
         awaiting_receiver_mass_mg: 0,
         unaccounted_mass_mg: 0,
+        uncertainty_mass_mg: 0,
     };
 
     if ledger.ledger_id.trim().is_empty() {
@@ -515,13 +521,31 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     );
                 }
             }
-            LotDisposition::Quarantined | LotDisposition::InProcess => {
+            LotDisposition::Quarantined => {
                 if lot.receiver_acceptance.is_some() {
                     add(
                         &mut findings,
                         "NONTERMINAL_LOT_HAS_RECEIVER_DECISION",
                         &lot.lot_id,
-                        "quarantined/in-process lots cannot carry final receiver acceptance",
+                        "quarantined lots cannot carry final receiver acceptance",
+                    );
+                }
+                if !add_total(&mut totals.quarantined_mass_mg, lot.mass_mg) {
+                    add(
+                        &mut findings,
+                        "MASS_TOTAL_OVERFLOW",
+                        &lot.lot_id,
+                        "quarantined mass total overflows u128",
+                    );
+                }
+            }
+            LotDisposition::InProcess => {
+                if lot.receiver_acceptance.is_some() {
+                    add(
+                        &mut findings,
+                        "NONTERMINAL_LOT_HAS_RECEIVER_DECISION",
+                        &lot.lot_id,
+                        "in-process lots cannot carry final receiver acceptance",
                     );
                 }
             }
@@ -751,6 +775,14 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                 "unaccounted mass total overflows u128",
             );
         }
+        if !add_total(&mut totals.uncertainty_mass_mg, event.uncertainty_mass_mg) {
+            add(
+                &mut findings,
+                "MASS_TOTAL_OVERFLOW",
+                &event.event_id,
+                "mass uncertainty total overflows u128",
+            );
+        }
     }
 
     for lot in &ledger.lots {
@@ -840,6 +872,40 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
             &ledger.ledger_id,
             "transformation lineage contains a cycle; process outputs cannot precede their producers",
         );
+    }
+
+    let terminal_mass = totals
+        .accepted_mass_mg
+        .checked_add(totals.rejected_mass_mg)
+        .and_then(|value| value.checked_add(totals.waste_mass_mg))
+        .and_then(|value| value.checked_add(totals.quarantined_mass_mg))
+        .and_then(|value| value.checked_add(totals.awaiting_receiver_mass_mg));
+    let ledger_accounted_mass = terminal_mass
+        .and_then(|value| value.checked_add(totals.unaccounted_mass_mg));
+    match ledger_accounted_mass {
+        Some(accounted) => {
+            let difference = totals.incoming_mass_mg.abs_diff(accounted);
+            if difference > totals.uncertainty_mass_mg {
+                add(
+                    &mut findings,
+                    "LEDGER_MASS_BALANCE_NOT_CLOSED",
+                    &ledger.ledger_id,
+                    format!(
+                        "incoming mass {} mg differs from terminal outputs plus unaccounted residual {} mg by {} mg, above aggregate uncertainty {} mg",
+                        totals.incoming_mass_mg,
+                        accounted,
+                        difference,
+                        totals.uncertainty_mass_mg
+                    ),
+                );
+            }
+        }
+        None => add(
+            &mut findings,
+            "LEDGER_MASS_TOTAL_OVERFLOW",
+            &ledger.ledger_id,
+            "terminal plus unaccounted material-flow mass overflows u128",
+        ),
     }
 
     findings.sort_by(|left, right| {
@@ -1091,6 +1157,25 @@ mod tests {
         let report = validate_material_flow(&ledger);
         assert!(!report.valid);
         assert!(report.findings.iter().any(|item| item.code == "LOT_CONSUMED_MORE_THAN_ONCE"));
+    }
+
+    #[test]
+    fn quarantined_terminal_mass_is_reported_separately() {
+        let mut ledger = sorting_split_ledger();
+        ledger.lots[1].disposition = LotDisposition::Quarantined;
+        let report = validate_material_flow(&ledger);
+        assert!(report.valid, "{:#?}", report.findings);
+        assert_eq!(report.totals.quarantined_mass_mg, 6_000);
+        assert_eq!(report.totals.accepted_mass_mg, 0);
+    }
+
+    #[test]
+    fn whole_ledger_conservation_catches_missing_terminal_mass() {
+        let mut ledger = sorting_split_ledger();
+        ledger.lots.retain(|lot| lot.lot_id != "poly-stream");
+        let report = validate_material_flow(&ledger);
+        assert!(!report.valid);
+        assert!(report.findings.iter().any(|item| item.code == "LEDGER_MASS_BALANCE_NOT_CLOSED"));
     }
 
     #[test]
