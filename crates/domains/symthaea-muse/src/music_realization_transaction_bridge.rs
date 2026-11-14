@@ -10,7 +10,8 @@
 
 use crate::music_edit_transaction_decision::{
     MusicEditAttemptOutcomeV1, MusicEditCandidateAttemptV1, MusicEditEvidenceKindV1,
-    MusicEditEvidenceStateV1, MusicEditTransactionV1, validate_music_edit_transaction_v1,
+    MusicEditEvidenceRecordV1, MusicEditEvidenceStateV1, MusicEditTransactionV1,
+    validate_music_edit_transaction_v1,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -19,6 +20,7 @@ use std::collections::BTreeSet;
 pub const MUSIC_REALIZATION_BRIDGE_SCHEMA_V1: &str =
     "mel-music-realization-transaction-bridge-v1";
 const RECEIPT_DOMAIN: &[u8] = b"luminous.mel.music-realization-transaction-bridge.v1";
+const BINDING_REPORT_DOMAIN: &[u8] = b"luminous.mel.music-realization-verified-binding-report.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -140,18 +142,82 @@ pub struct MusicRealizationBridgeReceiptV1 {
     pub receipt_sha256: String,
 }
 
+/// Trusted identity values obtained from the upstream realization verifier and
+/// the caller's frozen request/manifest. A self-sealed receipt cannot choose
+/// these expected values for itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MusicRealizationExpectedBindingV1 {
+    pub transaction_id: String,
+    pub attempt_id: String,
+    pub candidate_id: String,
+    pub source_lineage_sha256: String,
+    pub realization_request_id: String,
+    pub realization_request_sha256: String,
+    pub capability_manifest_sha256: String,
+    pub upstream_realization_receipt_sha256: String,
+    pub backend_id: String,
+    pub backend_version: String,
+    pub adapter_id: String,
+    pub adapter_version: String,
+    pub output_modality: MusicRealizationOutputModalityV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicRealizationVerifiedBindingV1 {
     pub transaction_id: String,
     pub attempt_id: String,
     pub candidate_id: String,
+    pub source_lineage_sha256: String,
+    pub realization_request_id: String,
     pub request_sha256: String,
     pub capability_manifest_sha256: String,
     pub upstream_realization_receipt_sha256: String,
+    pub realization_receipt_sha256: String,
+    pub backend_id: String,
+    pub backend_version: String,
+    pub adapter_id: String,
+    pub adapter_version: String,
+    pub output_modality: MusicRealizationOutputModalityV1,
     pub final_execution_state: MusicRealizerExecutionEventStateV1,
     pub submission_count: u64,
     pub observed_output_sha256: Option<String>,
     pub observed_output_byte_length: u64,
+    pub report_sha256: String,
+}
+
+impl MusicRealizationVerifiedBindingV1 {
+    /// Convert a completed, independently byte-verified binding into the
+    /// EVAL-040 evidence record. The caller supplies the qualified verifier
+    /// build digest and must include this record in the final transaction.
+    pub fn to_evidence_record(
+        &self,
+        replay_verifier_sha256: &str,
+    ) -> Result<MusicEditEvidenceRecordV1, MusicRealizationBridgeIssueV1> {
+        if !is_sha256(replay_verifier_sha256) {
+            return Err(MusicRealizationBridgeIssueV1::InvalidVerifierDigest);
+        }
+        if !matches!(
+            self.final_execution_state,
+            MusicRealizerExecutionEventStateV1::Completed
+                | MusicRealizerExecutionEventStateV1::ReconciledCompleted
+        ) {
+            return Err(MusicRealizationBridgeIssueV1::UnresolvedExecutionCannotBeVerified);
+        }
+        let Some(candidate_artifact_sha256) = self.observed_output_sha256.as_ref() else {
+            return Err(MusicRealizationBridgeIssueV1::UnresolvedExecutionCannotBeVerified);
+        };
+        Ok(MusicEditEvidenceRecordV1 {
+            kind: MusicEditEvidenceKindV1::RealizationExecution,
+            state: MusicEditEvidenceStateV1::Verified,
+            source_lineage_sha256: Some(self.source_lineage_sha256.clone()),
+            candidate_artifact_sha256: Some(candidate_artifact_sha256.clone()),
+            receipt_sha256: Some(self.realization_receipt_sha256.clone()),
+            report_sha256: Some(self.report_sha256.clone()),
+            replay_verifier_sha256: Some(replay_verifier_sha256.to_owned()),
+            failure_class: None,
+            reason_code: None,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,6 +236,9 @@ pub enum MusicRealizationBridgeIssueV1 {
     InvalidExecutionTransition,
     InvalidReconciliationBinding,
     ProviderRequestIdentityMismatch,
+    ExpectedBindingMismatch(&'static str),
+    InvalidVerifierDigest,
+    UnresolvedExecutionCannotBeVerified,
     MissingIdempotencyKeyForRetry,
     SubmissionBudgetUnderCounted,
     ExecutionOutcomeMismatch,
@@ -205,6 +274,19 @@ fn sha256_bytes(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn domain_digest<T: Serialize>(
+    domain: &[u8],
+    value: &T,
+) -> Result<String, MusicRealizationBridgeIssueV1> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|_| MusicRealizationBridgeIssueV1::SerializationError)?;
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update(b"\\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn receipt_digest(
