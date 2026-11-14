@@ -1537,6 +1537,53 @@ mod tests {
         midi
     }
 
+    /// Event 0 is transposed by +2 semitones; all other score events and
+    /// timing remain unchanged, and the source-event marker is retained.
+    fn transpose_event_zero_midi() -> Vec<u8> {
+        let mut track = Vec::new();
+        push_lineage_marker(&mut track, 0, 0);
+        push_delta_event(&mut track, 0, &[0x90, 62, 90]);
+        push_delta_event(&mut track, 1, &[0x80, 62, 0]);
+        push_lineage_marker(&mut track, 0, 1);
+        push_delta_event(&mut track, 0, &[0x90, 64, 90]);
+        push_delta_event(&mut track, 1, &[0x80, 64, 0]);
+        push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
+
+        let mut midi = vec![
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
+            0, 0,
+            0, 1,
+            1, 0xe0,
+        ];
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        midi.extend_from_slice(&track);
+        midi
+    }
+
+    /// The target is correctly transposed, but event 1 is also changed.
+    fn transpose_event_zero_and_mutate_event_one_midi() -> Vec<u8> {
+        let mut track = Vec::new();
+        push_lineage_marker(&mut track, 0, 0);
+        push_delta_event(&mut track, 0, &[0x90, 62, 90]);
+        push_delta_event(&mut track, 1, &[0x80, 62, 0]);
+        push_lineage_marker(&mut track, 0, 1);
+        push_delta_event(&mut track, 0, &[0x90, 65, 90]);
+        push_delta_event(&mut track, 1, &[0x80, 65, 0]);
+        push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
+
+        let mut midi = vec![
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
+            0, 0,
+            0, 1,
+            1, 0xe0,
+        ];
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        midi.extend_from_slice(&track);
+        midi
+    }
+
     /// Same declared removal of event 0, but event 1 is illegally transposed.
     /// The symbolic verifier must reject before acoustic metrics can bless it.
     fn without_event_zero_but_change_event_one_pitch() -> Vec<u8> {
@@ -1611,6 +1658,7 @@ mod tests {
     }
 
     const SCORE_BYTES: &[u8] = br#"{"score":"two-event-fixture"}"#;
+    const TRANSPOSED_SCORE_BYTES: &[u8] = br#"{"score":"two-event-transposed-fixture"}"#;
     const CONFIG_BYTES: &[u8] = br#"{"sample_rate_hz":48000,"fx":"fixed"}"#;
 
     struct BoundRender {
