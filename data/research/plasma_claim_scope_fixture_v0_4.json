@@ -1,0 +1,1127 @@
+{
+  "schema_version": "plasma-claim-scope-fixture-v0.4",
+  "cases": [
+    {
+      "id": "iso4587-in-scope-observation",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Exact edition, rigid-to-rigid single-lap geometry and tensile lap-shear endpoint.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-design-allowable-escalation",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "ISO 4587 explicitly says the procedure does not provide design information.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-calendar-life-escalation",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "service_lifetime",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A short-term lap-shear observation is not a service-life estimate.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d1002-comparative-metal-joint",
+      "method_id": "ASTM_D1002",
+      "edition": "D1002-26",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D1002-26 identifies its use as primarily comparative for metal-to-metal single-lap specimens.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d1002-polymer-scope-mismatch",
+      "method_id": "ASTM_D1002",
+      "edition": "D1002-26",
+      "material_pair_class": "polymer_to_polymer",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D1002-26 scope is metal-to-metal, not polymer-to-polymer.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d1002-design-allowable-escalation",
+      "method_id": "ASTM_D1002",
+      "edition": "D1002-26",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D1002-26 explicitly warns against using its apparent shear result as a design-allowable stress.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d3762-aluminium-wedge-screen",
+      "method_id": "ASTM_D3762",
+      "edition": "D3762-24",
+      "material_pair_class": "aluminum_to_aluminum",
+      "geometry": "wedge",
+      "endpoint": "qualitative_wedge_durability",
+      "requested_claim": "qualitative_surface_durability_screen",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D3762-24 supports qualitative wedge-test surface-durability discrimination and failure-mode evaluation.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d3762-fracture-strength-escalation",
+      "method_id": "ASTM_D3762",
+      "edition": "D3762-24",
+      "material_pair_class": "aluminum_to_aluminum",
+      "geometry": "wedge",
+      "endpoint": "qualitative_wedge_durability",
+      "requested_claim": "quantitative_fracture_strength",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D3762-24 explicitly is not a quantitative fracture-strength method.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d3762-polymer-suitability-review-unverified",
+      "method_id": "ASTM_D3762",
+      "edition": "D3762-24",
+      "material_pair_class": "polymer_to_polymer",
+      "geometry": "wedge",
+      "endpoint": "qualitative_wedge_durability",
+      "requested_claim": "qualitative_surface_durability_screen",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "suitability_review_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+      "expected_disposition": "BLOCKED",
+      "rationale": "The standard permits considering other materials with thickness/rigidity considerations, but S0 cannot authenticate or approve that suitability review.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d1002-unrecognized-edition",
+      "method_id": "ASTM_D1002",
+      "edition": "D1002-10R19",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "An unrecognized edition cannot inherit the currently pinned D1002-26 scope.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-missing-protocol-digest",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": null,
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Protocol identity alone is insufficient without a well-formed protocol digest reference.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-missing-raw-data-digest",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": null,
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The raw-data artifact digest reference is absent.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-duplicate-specimen-identities",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-DUP",
+        "SPEC-DUP"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Duplicated specimen identities prevent independent specimen accounting.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "water-contact-angle-wettability-only",
+      "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+      "edition": "protocol-defined-v1",
+      "material_pair_class": "material_surface",
+      "geometry": "sessile_drop",
+      "endpoint": "water_contact_angle",
+      "requested_claim": "wettability_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The protocol supports a wettability observation only.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "water-contact-angle-to-bond-strength",
+      "method_id": "WATER_CONTACT_ANGLE_PROTOCOL",
+      "edition": "protocol-defined-v1",
+      "material_pair_class": "material_surface",
+      "geometry": "sessile_drop",
+      "endpoint": "water_contact_angle",
+      "requested_claim": "bond_strength_from_contact_angle",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Contact angle is not a direct bond-strength measurement.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-endpoint-to-fatigue-life",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "fatigue_life",
+      "requested_claim": "fatigue_life",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "An ISO 4587 lap-shear endpoint does not establish fatigue life.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "unknown-model-only-method",
+      "method_id": "ML_MODEL_SCORE_ONLY",
+      "edition": "v0",
+      "material_pair_class": "unknown",
+      "geometry": "not_a_test",
+      "endpoint": "model_score",
+      "requested_claim": "model_generalization",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "A model score without a registered test method cannot be promoted into a physical measurement claim.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d1002-wrong-joint-geometry",
+      "method_id": "ASTM_D1002",
+      "edition": "D1002-26",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "double_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The geometry does not match the registered standard single-lap method.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "iso4587-malformed-raw-digest",
+      "method_id": "ISO_4587",
+      "edition": "ISO 4587:2003",
+      "material_pair_class": "rigid_to_rigid",
+      "geometry": "single_lap",
+      "endpoint": "tensile_lap_shear_strength",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-BASE",
+      "protocol_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+      "raw_data_sha256": "sha256:not-a-lowercase-hex-digest",
+      "specimen_ids": [
+        "SPEC-A",
+        "SPEC-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The raw-data digest reference does not have the required lowercase SHA-256 shape.",
+      "evidence_kind": "measurement"
+    },
+    {
+      "id": "astm-d3163-rigid-plastic-comparative",
+      "method_id": "ASTM_D3163",
+      "edition": "D3163-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "rigid_plastic_pair",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Active D3163-01R23 covers comparative single-lap shear tests for rigid plastic adherends."
+    },
+    {
+      "id": "astm-d3163-design-allowable-escalation",
+      "method_id": "ASTM_D3163",
+      "edition": "D3163-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "rigid_plastic_pair",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A rigid-plastic single-lap result does not become a structural design allowable."
+    },
+    {
+      "id": "astm-d3163-wrong-material-pair",
+      "method_id": "ASTM_D3163",
+      "edition": "D3163-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D3163 is scoped to rigid plastic adherends, not metal-to-metal."
+    },
+    {
+      "id": "astm-d3163-unrecognized-edition",
+      "method_id": "ASTM_D3163",
+      "edition": "D3163-01R14",
+      "evidence_kind": "measurement",
+      "material_pair_class": "rigid_plastic_pair",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "An older reaffirmation does not inherit the active D3163-01R23 registry entry."
+    },
+    {
+      "id": "astm-d5868-frp-to-frp-comparative",
+      "method_id": "ASTM_D5868",
+      "edition": "D5868-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_to_frp",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D5868 covers comparative lap-shear measurement for FRP-to-FRP joints."
+    },
+    {
+      "id": "astm-d5868-frp-to-metal-comparative",
+      "method_id": "ASTM_D5868",
+      "edition": "D5868-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D5868 covers FRP joined to metals as well as FRP-to-FRP."
+    },
+    {
+      "id": "astm-d5868-metal-only-mismatch",
+      "method_id": "ASTM_D5868",
+      "edition": "D5868-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "metal_to_metal",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5868 does not cover a metal-to-metal-only adherend pair."
+    },
+    {
+      "id": "astm-d5868-design-allowable-escalation",
+      "method_id": "ASTM_D5868",
+      "edition": "D5868-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_to_frp",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "An FRP single-lap apparent shear value is not a structural design allowable."
+    },
+    {
+      "id": "astm-d2093-preparation-reference",
+      "method_id": "ASTM_D2093",
+      "edition": "D2093-03R25",
+      "evidence_kind": "preparation_practice",
+      "material_pair_class": "plastic_adherend",
+      "geometry": "surface_preparation",
+      "endpoint": "plastic_surface_preparation_protocol",
+      "requested_claim": "preparation_protocol_reference",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D2093 is a plastic surface-preparation practice, not an adhesive strength test."
+    },
+    {
+      "id": "astm-d2093-misused-as-bond-strength",
+      "method_id": "ASTM_D2093",
+      "edition": "D2093-03R25",
+      "evidence_kind": "preparation_practice",
+      "material_pair_class": "plastic_adherend",
+      "geometry": "surface_preparation",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "bond_strength",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A surface-preparation practice cannot be promoted into bond-strength evidence."
+    },
+    {
+      "id": "astm-d1151-conditioning-reference",
+      "method_id": "ASTM_D1151",
+      "edition": "D1151-00R22",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "adhesive_bonded_specimens",
+      "geometry": "continuous_environmental_conditioning",
+      "endpoint": "moisture_temperature_exposure_protocol",
+      "requested_claim": "conditioning_protocol_reference",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D1151 defines continuous moisture/temperature exposure conditions; a separate strength test measures retained-strength response."
+    },
+    {
+      "id": "astm-d1151-service-life-escalation",
+      "method_id": "ASTM_D1151",
+      "edition": "D1151-00R22",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "adhesive_bonded_specimens",
+      "geometry": "continuous_environmental_conditioning",
+      "endpoint": "moisture_temperature_exposure_protocol",
+      "requested_claim": "service_lifetime",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A conditioning practice and finite exposure duration do not establish calendar service life."
+    },
+    {
+      "id": "astm-d1183-conditioning-reference",
+      "method_id": "ASTM_D1183",
+      "edition": "D1183-03R19",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "adhesive_bonded_specimens",
+      "geometry": "cyclic_environmental_conditioning",
+      "endpoint": "cyclic_temperature_humidity_exposure_protocol",
+      "requested_claim": "conditioning_protocol_reference",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D1183 defines cyclic accelerated laboratory-aging exposures, not field-life equivalence."
+    },
+    {
+      "id": "astm-d1183-service-life-escalation",
+      "method_id": "ASTM_D1183",
+      "edition": "D1183-03R19",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "adhesive_bonded_specimens",
+      "geometry": "cyclic_environmental_conditioning",
+      "endpoint": "cyclic_temperature_humidity_exposure_protocol",
+      "requested_claim": "service_lifetime",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Cyclic accelerated exposure does not itself predict calendar service lifetime."
+    },
+    {
+      "id": "astm-d4896-interpretation-guide-reference",
+      "method_id": "ASTM_D4896",
+      "edition": "D4896-01R24",
+      "evidence_kind": "interpretation_guide",
+      "material_pair_class": "single_lap_bonded_joint",
+      "geometry": "single_lap",
+      "endpoint": "single_lap_result_interpretation_guidance",
+      "requested_claim": "interpretation_guidance_reference",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D4896 is a guide for safe and appropriate interpretation of single-lap strength results."
+    },
+    {
+      "id": "astm-d4896-design-allowable-escalation",
+      "method_id": "ASTM_D4896",
+      "edition": "D4896-01R24",
+      "evidence_kind": "interpretation_guide",
+      "material_pair_class": "single_lap_bonded_joint",
+      "geometry": "single_lap",
+      "endpoint": "single_lap_result_interpretation_guidance",
+      "requested_claim": "design_allowable",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-01",
+        "METHOD-SPEC-02"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D4896 warns against using small single-lap strength values as structural design allowables."
+    },
+    {
+      "id": "astm-d3163-evidence-kind-mismatch",
+      "method_id": "ASTM_D3163",
+      "edition": "D3163-01R23",
+      "evidence_kind": "preparation_practice",
+      "material_pair_class": "rigid_plastic_pair",
+      "geometry": "single_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-03",
+        "METHOD-SPEC-04"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The evidence kind cannot relabel a test method as a preparation practice."
+    },
+    {
+      "id": "astm-d5868-wrong-geometry",
+      "method_id": "ASTM_D5868",
+      "edition": "D5868-01R23",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_to_frp",
+      "geometry": "double_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-03",
+        "METHOD-SPEC-04"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5868 is a single-lap FRP method; a double-lap geometry is outside the registered method scope."
+    },
+    {
+      "id": "astm-d1151-retained-strength-without-strength-test",
+      "method_id": "ASTM_D1151",
+      "edition": "D1151-00R22",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "adhesive_bonded_specimens",
+      "geometry": "continuous_environmental_conditioning",
+      "endpoint": "retained_strength_after_exposure",
+      "requested_claim": "method_observation",
+      "protocol_id": "PROTO-METHOD-REF",
+      "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "raw_data_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "specimen_ids": [
+        "METHOD-SPEC-03",
+        "METHOD-SPEC-04"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D1151 defines conditioning conditions; the retained-strength measurement must be supplied by a separate strength-test method."
+    },
+    {
+      "id": "astm-d5656-thick-adherend-response",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "measurement",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "adhesive_constitutive_response_observation",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-thick-adherend-response-A",
+        "astm-d5656-thick-adherend-response-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Exact 2026 thick-adherend method and aluminum specimen support adhesive shear stress-strain characterization only."
+    },
+    {
+      "id": "astm-d5656-substrate-adhesion-overclaim",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "measurement",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "substrate_adhesion_strength",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-substrate-adhesion-overclaim-A",
+        "astm-d5656-substrate-adhesion-overclaim-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5656 characterizes adhesive shear response, not adhesion to a particular substrate."
+    },
+    {
+      "id": "astm-d5656-bond-strength-from-constitutive-response",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "measurement",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "bond_strength_from_adhesive_constitutive_response",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-bond-strength-from-constitutive-response-A",
+        "astm-d5656-bond-strength-from-constitutive-response-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Constitutive response cannot be promoted to joint bond strength."
+    },
+    {
+      "id": "astm-d5656-lap-shear-endpoint-substitution",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "measurement",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-lap-shear-endpoint-substitution-A",
+        "astm-d5656-lap-shear-endpoint-substitution-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5656 does not produce the D3163/D5868 apparent single-lap shear endpoint."
+    },
+    {
+      "id": "astm-d5656-nonaluminum-applicability-blocked",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_to_frp",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "adhesive_constitutive_response_observation",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-nonaluminum-applicability-blocked-A",
+        "astm-d5656-nonaluminum-applicability-blocked-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The 2026 standard does not assume validity for non-aluminum adherends."
+    },
+    {
+      "id": "astm-d5656-unrecognized-edition",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-17",
+      "evidence_kind": "measurement",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "adhesive_constitutive_response_observation",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-unrecognized-edition-A",
+        "astm-d5656-unrecognized-edition-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "Historical or unrecognized D5656 editions do not inherit the current D5656/D5656M-26 registration."
+    },
+    {
+      "id": "astm-d5656-wrong-evidence-kind",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "conditioning_practice",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "thick_adherend_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "adhesive_constitutive_response_observation",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-wrong-evidence-kind-A",
+        "astm-d5656-wrong-evidence-kind-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A thick-adherend test method cannot be relabeled as an environmental conditioning practice."
+    },
+    {
+      "id": "astm-d5656-wrong-geometry",
+      "method_id": "ASTM_D5656_D5656M",
+      "edition": "D5656/D5656M-26",
+      "evidence_kind": "measurement",
+      "material_pair_class": "aluminum_thick_adherend_joint",
+      "geometry": "single_lap",
+      "endpoint": "adhesive_shear_stress_strain_response",
+      "requested_claim": "adhesive_constitutive_response_observation",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5656-wrong-geometry-A",
+        "astm-d5656-wrong-geometry-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5656's thick-adherend geometry cannot be replaced by an ordinary single-lap geometry."
+    },
+    {
+      "id": "astm-d5573-frp-smc-failure-classification",
+      "method_id": "ASTM_D5573",
+      "edition": "D5573-99R19",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "frp_smc_joint",
+      "geometry": "failure_surface_classification",
+      "endpoint": "frp_joint_failure_mode_classification",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5573-frp-smc-failure-classification-A",
+        "astm-d5573-frp-smc-failure-classification-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "D5573 supports descriptive classification of failure modes for its scoped SMC FRP joint family."
+    },
+    {
+      "id": "astm-d5573-failure-acceptability-overclaim",
+      "method_id": "ASTM_D5573",
+      "edition": "D5573-99R19",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "frp_smc_joint",
+      "geometry": "failure_surface_classification",
+      "endpoint": "frp_joint_failure_mode_classification",
+      "requested_claim": "failure_mode_acceptability",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5573-failure-acceptability-overclaim-A",
+        "astm-d5573-failure-acceptability-overclaim-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "D5573 expressly does not determine whether a specific failure mode is acceptable."
+    },
+    {
+      "id": "astm-d5573-strength-endpoint-substitution",
+      "method_id": "ASTM_D5573",
+      "edition": "D5573-99R19",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "frp_smc_joint",
+      "geometry": "failure_surface_classification",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "comparative_screening",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5573-strength-endpoint-substitution-A",
+        "astm-d5573-strength-endpoint-substitution-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A failure-mode classification practice is not a lap-shear strength test."
+    },
+    {
+      "id": "astm-d5573-general-frp-scope-blocked",
+      "method_id": "ASTM_D5573",
+      "edition": "D5573-99R19",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "frp_to_frp",
+      "geometry": "failure_surface_classification",
+      "endpoint": "frp_joint_failure_mode_classification",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5573-general-frp-scope-blocked-A",
+        "astm-d5573-general-frp-scope-blocked-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "General FRP applicability outside the specified SMC family needs a separately reviewed scope bridge."
+    },
+    {
+      "id": "astm-d5573-wrong-evidence-kind",
+      "method_id": "ASTM_D5573",
+      "edition": "D5573-99R19",
+      "evidence_kind": "measurement",
+      "material_pair_class": "frp_smc_joint",
+      "geometry": "failure_surface_classification",
+      "endpoint": "frp_joint_failure_mode_classification",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5573-wrong-evidence-kind-A",
+        "astm-d5573-wrong-evidence-kind-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A failure-mode classification practice cannot be presented as a measurement test method."
+    },
+    {
+      "id": "astm-d5573-unrecognized-edition",
+      "method_id": "ASTM_D5573",
+      "edition": "D5573-99R12",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "frp_smc_joint",
+      "geometry": "failure_surface_classification",
+      "endpoint": "frp_joint_failure_mode_classification",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "PROTO-ONTOLOGY-01",
+      "protocol_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "specimen_ids": [
+        "astm-d5573-unrecognized-edition-A",
+        "astm-d5573-unrecognized-edition-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The previous reaffirmation does not inherit the active D5573-99R19 registration."
+    },
+    {
+      "id": "iso-10365-general-bonded-assembly-pattern",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:2022",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "bonded_assembly",
+      "geometry": "failure_surface_classification",
+      "endpoint": "bonded_assembly_failure_pattern_designation",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "iso-10365-general-bonded-assembly-pattern-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-general-bonded-assembly-pattern-A",
+        "iso-10365-general-bonded-assembly-pattern-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "ISO 10365:2022 designates main failure patterns for bonded assemblies regardless of adherend and adhesive."
+    },
+    {
+      "id": "iso-10365-mixed-pattern-percentages",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:2022",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "bonded_assembly",
+      "geometry": "failure_surface_classification",
+      "endpoint": "bonded_assembly_failure_pattern_designation",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "iso-10365-mixed-pattern-percentages-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-mixed-pattern-percentages-A",
+        "iso-10365-mixed-pattern-percentages-B"
+      ],
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The general ontology permits mixed-pattern percentage reporting when more than one failure pattern occurs."
+    },
+    {
+      "id": "iso-10365-acceptability-overclaim",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:2022",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "bonded_assembly",
+      "geometry": "failure_surface_classification",
+      "endpoint": "bonded_assembly_failure_pattern_designation",
+      "requested_claim": "failure_mode_acceptability",
+      "protocol_id": "iso-10365-acceptability-overclaim-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-acceptability-overclaim-A",
+        "iso-10365-acceptability-overclaim-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "ISO failure-pattern designation does not itself establish product-specific acceptability."
+    },
+    {
+      "id": "iso-10365-old-edition",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:1992",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "bonded_assembly",
+      "geometry": "failure_surface_classification",
+      "endpoint": "bonded_assembly_failure_pattern_designation",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "iso-10365-old-edition-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-old-edition-A",
+        "iso-10365-old-edition-B"
+      ],
+      "expected_disposition": "BLOCKED",
+      "rationale": "The withdrawn 1992 edition does not inherit the active ISO 10365:2022 registry."
+    },
+    {
+      "id": "iso-10365-wrong-kind",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:2022",
+      "evidence_kind": "measurement",
+      "material_pair_class": "bonded_assembly",
+      "geometry": "failure_surface_classification",
+      "endpoint": "bonded_assembly_failure_pattern_designation",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "iso-10365-wrong-kind-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-wrong-kind-A",
+        "iso-10365-wrong-kind-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "A classification standard cannot be relabelled as a strength measurement."
+    },
+    {
+      "id": "iso-10365-strength-endpoint-substitution",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:2022",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "bonded_assembly",
+      "geometry": "failure_surface_classification",
+      "endpoint": "apparent_shear_strength",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "iso-10365-strength-endpoint-substitution-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-strength-endpoint-substitution-A",
+        "iso-10365-strength-endpoint-substitution-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "Failure-pattern designation is not lap-shear strength."
+    },
+    {
+      "id": "iso-10365-wrong-material-class",
+      "method_id": "ISO_10365",
+      "edition": "ISO 10365:2022",
+      "evidence_kind": "classification_practice",
+      "material_pair_class": "frp_smc_joint",
+      "geometry": "failure_surface_classification",
+      "endpoint": "bonded_assembly_failure_pattern_designation",
+      "requested_claim": "failure_mode_classification_reference",
+      "protocol_id": "iso-10365-wrong-material-class-PROTOCOL",
+      "protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "raw_data_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "specimen_ids": [
+        "iso-10365-wrong-material-class-A",
+        "iso-10365-wrong-material-class-B"
+      ],
+      "expected_disposition": "REJECTED",
+      "rationale": "The ISO registry uses the general bonded_assembly scope class, not the D5573-specific SMC FRP class."
+    }
+  ]
+}
