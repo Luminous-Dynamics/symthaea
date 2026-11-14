@@ -3044,7 +3044,19 @@ impl U1MpsTruncationLedger {
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound = self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
+        if !diagnostics.reconstruction_l2_residual.is_finite()
+            || diagnostics.reconstruction_l2_residual < 0.0
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site reconstruction residual in truncation ledger",
+            ));
+        }
+        // Use the measured pre/post two-site tensor residual, not merely the
+        // ideal discarded Schmidt weight. The measured residual also includes
+        // finite-precision factorization error and tolerated forbidden-sector
+        // components that are absent from the Schmidt-weight sum.
+        let next_bound =
+            self.cumulative_local_l2_error_bound + diagnostics.reconstruction_l2_residual;
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
@@ -3186,7 +3198,7 @@ impl U1MpsTruncationLedger {
             return Ok(());
         }
 
-        let projection_error = diagnostics.discarded_weight.sqrt()
+        let projection_error = diagnostics.reconstruction_l2_residual
             * receipt.exterior_operator_norm_product_upper_bound();
         let canonicalization_error = receipt.state_reconstruction_l2_residual;
         // Canonicalization and prior-state errors occur before G and must be
@@ -3420,7 +3432,7 @@ impl U1TeBDLayer {
             let prior_global_bound = truncation_ledger.global_state_error_bound_upper;
             let (gate_operator_norm_upper, gate_quality_error_upper_bound) =
                 gate_quality_error_bounds(&entry.gate, gauge_receipt.output_norm_squared)?;
-            let global_projection_error_upper_bound = truncation.discarded_weight.sqrt()
+            let global_projection_error_upper_bound = truncation.reconstruction_l2_residual
                 * gauge_receipt.exterior_operator_norm_product_upper_bound();
             truncation_ledger.record_with_canonical_gauge_and_gate(
                 &truncation,
@@ -3435,7 +3447,7 @@ impl U1TeBDLayer {
                 .map(|after| after - propagated_prior_bound);
             let global_l2_error_bound_after_gate =
                 truncation_ledger.global_state_error_bound_upper;
-            let local_projection_error_upper_bound = truncation.discarded_weight.sqrt();
+            let local_projection_error_upper_bound = truncation.reconstruction_l2_residual;
             let hamiltonian_projection_operator_error_upper_bound =
                 entry.gate.hamiltonian_projection_error_operator_upper_bound();
             let hamiltonian_projection_error_upper_bound =
