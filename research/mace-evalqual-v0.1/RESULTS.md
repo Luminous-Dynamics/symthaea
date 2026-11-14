@@ -206,3 +206,8 @@ Added `checkpoints/openssl_interop_test.go`. Where OpenSSL CLI is installed, the
 ## 14 November 2026 — checkpoint-to-observed-head join
 
 Added `ObservedHead` and `AcceptObserved` to the public checkpoint verifier. It checks that the observed database identity, journal sequence and journal-head digest match the detached signed checkpoint before applying monotonic sequence/predecessor rules. Four tests cover the valid join and rejection of a mismatched database, journal sequence and digest. The observer must produce the three values from one coherent snapshot; this API prevents an omitted comparison but cannot establish observer independence or downstream effect coverage.
+
+
+## 14 November 2026 — signed checkpoint and observed-head join
+
+The public `checkpoints` package now exposes `AcceptObserved` in addition to `AcceptNext`. The new API requires the observed database identity, journal sequence and head digest to match the signed checkpoint before it advances the monotonic state. Four focused tests cover successful binding and rejection of a mismatched database, sequence or head. The test count for the checkpoint package is now 21, including the optional OpenSSL 3.5.5 interoperability test. The caller still supplies and securely persists the trusted cursor outside the destination DB/admin domain.
