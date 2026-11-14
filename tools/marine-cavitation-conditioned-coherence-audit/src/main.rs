@@ -1270,6 +1270,18 @@ mod tests {
     }
 
     #[test]
+    fn under_sampled_run_remains_visible_but_is_excluded_from_campaign_aggregate() {
+        let mut input = case();
+        measured(&mut input);
+        input.windows.retain(|window| !(window.run_id == "run-0" && window.window_id == "window-0-1"));
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports.len(), 2);
+        assert_eq!(report.aggregate_band_reports[0].independent_runs_with_both_cohorts, 1);
+        assert!((report.aggregate_band_reports[0].cavitation_present_equal_run_weighted_mean_coherence.unwrap() - 0.75).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn swapping_annotations_moves_membership_without_changing_per_window_metrics() {
         let mut input = case();
         measured(&mut input);
