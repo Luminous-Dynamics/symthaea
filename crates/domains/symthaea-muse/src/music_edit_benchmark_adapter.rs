@@ -1022,14 +1022,14 @@ fn validate_music_edit_artifact_map_v1(
     }
 
     for row in &manifest.rows {
-        if let Some(paths) = mapped.get(row.sample_id.as_str()) {
-            if row.source_symbolic_sha256.is_some() != paths.source_symbolic_path.is_some() {
-                issues.push(
-                    MusicEditMaterializationIssueV1::SymbolicArtifactPresenceMismatch {
-                        sample_id: row.sample_id.clone(),
-                    },
-                );
-            }
+        if let Some(paths) = mapped.get(row.sample_id.as_str())
+            && row.source_symbolic_sha256.is_some() != paths.source_symbolic_path.is_some()
+        {
+            issues.push(
+                MusicEditMaterializationIssueV1::SymbolicArtifactPresenceMismatch {
+                    sample_id: row.sample_id.clone(),
+                },
+            );
         }
     }
 
@@ -1111,17 +1111,29 @@ fn resolve_materialization_path(
     Ok(canonical_candidate)
 }
 
-fn verify_and_hash_materialization_artifact(
-    canonical_root: &Path,
-    sample_id: Option<&str>,
-    source_lineage_sha256: Option<&str>,
+struct MusicEditMaterializationArtifactRequestV1<'a> {
+    sample_id: Option<&'a str>,
+    source_lineage_sha256: Option<&'a str>,
     split: Option<MusicEditSplitV1>,
     role: MusicEditMaterializedArtifactRoleV1,
-    relative_path: &str,
-    expected_sha256: &str,
+    relative_path: &'a str,
+    expected_sha256: &'a str,
+}
+
+fn verify_and_hash_materialization_artifact(
+    canonical_root: &Path,
+    request: MusicEditMaterializationArtifactRequestV1<'_>,
     limits: MusicEditMaterializationLimitsV1,
     total_bytes: &mut u64,
 ) -> Result<MusicEditMaterializedArtifactV1, MusicEditMaterializationIssueV1> {
+    let MusicEditMaterializationArtifactRequestV1 {
+        sample_id,
+        source_lineage_sha256,
+        split,
+        role,
+        relative_path,
+        expected_sha256,
+    } = request;
     if !is_materialization_sha256(expected_sha256) {
         return Err(MusicEditMaterializationIssueV1::DigestMismatch {
             sample_id: sample_id.map(str::to_owned),
@@ -1497,12 +1509,14 @@ pub fn materialize_music_edit_dataset_v1(
         artifacts.push(
             verify_and_hash_materialization_artifact(
                 &canonical_root,
-                None,
-                None,
-                None,
-                MusicEditMaterializedArtifactRoleV1::RightsEvidence,
-                path,
-                digest,
+                MusicEditMaterializationArtifactRequestV1 {
+                    sample_id: None,
+                    source_lineage_sha256: None,
+                    split: None,
+                    role: MusicEditMaterializedArtifactRoleV1::RightsEvidence,
+                    relative_path: path,
+                    expected_sha256: digest,
+                },
                 limits,
                 &mut total_bytes,
             )
@@ -1516,12 +1530,14 @@ pub fn materialize_music_edit_dataset_v1(
         artifacts.push(
             verify_and_hash_materialization_artifact(
                 &canonical_root,
-                None,
-                None,
-                None,
-                MusicEditMaterializedArtifactRoleV1::AccessEvidence,
-                path,
-                digest,
+                MusicEditMaterializationArtifactRequestV1 {
+                    sample_id: None,
+                    source_lineage_sha256: None,
+                    split: None,
+                    role: MusicEditMaterializedArtifactRoleV1::AccessEvidence,
+                    relative_path: path,
+                    expected_sha256: digest,
+                },
                 limits,
                 &mut total_bytes,
             )
@@ -1543,12 +1559,14 @@ pub fn materialize_music_edit_dataset_v1(
         let mut add_artifact = |role, path: &str, digest: &str| {
             verify_and_hash_materialization_artifact(
                 &canonical_root,
-                sample_id,
-                lineage,
-                split,
-                role,
-                path,
-                digest,
+                MusicEditMaterializationArtifactRequestV1 {
+                    sample_id,
+                    source_lineage_sha256: lineage,
+                    split,
+                    role,
+                    relative_path: path,
+                    expected_sha256: digest,
+                },
                 limits,
                 &mut total_bytes,
             )
