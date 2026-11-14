@@ -2071,4 +2071,58 @@ mod tests {
         assert!(graph.notation_events.attribute_events.is_empty());
     }
 
+
+    #[test]
+    fn graph_preserves_part_list_instrument_identity_and_binds_it_to_notes() {
+        let xml = r#"<score-partwise>
+            <part-list>
+                <score-part id="P1">
+                    <part-name>Violin I</part-name>
+                    <part-abbreviation>Vln. I</part-abbreviation>
+                    <score-instrument id="P1-I1"><instrument-name>Violin</instrument-name></score-instrument>
+                    <midi-instrument id="P1-I1">
+                        <midi-channel>1</midi-channel><midi-program>41</midi-program>
+                    </midi-instrument>
+                </score-part>
+            </part-list>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><instrument id="P1-I1"/><voice>1</voice><staff>1</staff></note>
+            </measure></part>
+        </score-partwise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:part-metadata", "score-clock"
+        ).unwrap();
+        let graph = &graphs[0];
+        let metadata = graph.part_metadata.as_ref().unwrap();
+        assert_eq!(metadata.source_part_id, "P1");
+        assert_eq!(metadata.part_name.as_deref(), Some("Violin I"));
+        assert_eq!(metadata.part_abbreviation.as_deref(), Some("Vln. I"));
+        assert_eq!(metadata.score_instrument_ids, vec!["P1-I1"]);
+        assert_eq!(graph.notation_events.note_events[0].instrument_ids, vec!["P1-I1"]);
+        let digest = musicxml_notation_graph_commitment(graph).unwrap();
+        assert_eq!(digest.len(), 64);
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "sha256:part-metadata", "score-clock", &graphs
+        ).unwrap());
+
+        let mut tampered = graphs.clone();
+        tampered[0].part_metadata.as_mut().unwrap().part_name = Some("Viola".into());
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "sha256:part-metadata", "score-clock", &tampered
+        ).unwrap());
+    }
+
+    #[test]
+    fn graph_without_part_list_explicitly_has_no_part_metadata() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:no-part-list", "score-clock"
+        ).unwrap().remove(0);
+        assert!(graph.part_metadata.is_none());
+    }
+
 }
