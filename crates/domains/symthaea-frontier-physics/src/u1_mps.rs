@@ -3359,6 +3359,26 @@ impl U1TeBDStrangStepper {
         dt: f64,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TeBDStepResult, U1MpsError> {
+        self.apply_with_ledger(
+            input,
+            dt,
+            policy,
+            U1MpsTruncationLedger::default(),
+        )
+    }
+
+    /// Apply one Strang step while continuing an existing error ledger.
+    ///
+    /// Pass the ledger from the prior time step to keep the global state-vector
+    /// bound cumulative across the full evolution. A fresh ledger is a new
+    /// qualification segment and does not include earlier time steps.
+    pub fn apply_with_ledger(
+        &self,
+        input: &ComplexU1Mps,
+        dt: f64,
+        policy: U1TwoSiteTruncationPolicy,
+        initial_ledger: U1MpsTruncationLedger,
+    ) -> Result<U1TeBDStepResult, U1MpsError> {
         if !dt.is_finite() {
             return Err(U1MpsError::NonFiniteContraction("TEBD Strang time step"));
         }
@@ -3389,7 +3409,7 @@ impl U1TeBDStrangStepper {
         let odd = U1TeBDLayer::new(self.site_count, 1, odd_full_gates)?;
         let even_last = U1TeBDLayer::new(self.site_count, 0, even_half_gates)?;
 
-        let first = even_first.apply(input, policy)?;
+        let first = even_first.apply_with_ledger(input, policy, initial_ledger)?;
         let second = odd.apply_with_ledger(
             &first.state,
             policy,
