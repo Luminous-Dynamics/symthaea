@@ -78,7 +78,8 @@ A central map may discover a relationship; it cannot grant authority to another 
 | SWE-CI (2026) | Longitudinal maintenance tasks over histories averaging 233 days and 71 commits | Add sustained evolution and cumulative regression checks |
 | SWE-Maintain (2026) | 100 three-event maintenance episodes across 50 repositories; paired developer-history vs agent-history comparisons | Measure whether EGDDM recommendations improve future maintainability, not just immediate patch acceptance |
 | FeatureLoop (2026) | 61 human-reviewed tasks from 34 repositories with evolving requirements and cumulative checks | Add multi-stage capability evolution with human review and preservation of earlier requirements |
-| SWE-Milestone | Continuous development across a milestone DAG rather than isolated issue fixes | Use milestone-level quality and cumulative acceptance as an outcome measure |
+| SWE-Milestone | Continuous development across a milestone DAG and real release histories; its public leaderboard exposes resolve, precision, recall, cost, output-token and elapsed-time metrics | Use milestone-level quality and cumulative acceptance as an outcome measure; compare cost and time, not score alone |
+| MLOps-Bench (2026) | 212 validated production-ML tasks across 31 repositories, six lifecycle stages plus end-to-end; the published ACL edition reports 27.3% task solves and 67.1% of tests passed for its best evaluated agent | Use as a lifecycle/production engineering baseline where the repository domain overlaps; record paper version because an earlier arXiv version reports different figures |
 | SWE Atlas | 284-task suite spanning codebase Q&A, test writing and refactoring | Compare engineering-loop performance, not only edit success |
 | Artificial Analysis Coding Agent Index v2.1 | Equal-weight composite of FrontierCode-AA 2.0 (132 tasks), Terminal-Bench 4.1 (66 tasks) and SWE-Atlas-QnA-AA (124 tasks), with efficiency reporting | Treat as an industry reference, not as a substitute for EGDDM's evidence, temporal and authority tracks |
 | AgentAbstain | 263 paired tasks across 42 environments, explicitly testing act/abstain contrasts | Adapt paired one-delta design to engineering evidence, authority and irreversible-effect decisions |
@@ -168,6 +169,7 @@ A recommendation is not a causal effect. For D7, use randomized assignment where
 - SWE Atlas (2026): https://scale.com/blog/swe-atlas-complete
 - Artificial Analysis Coding Agent Index v2.1 methodology: https://artificialanalysis.ai/methodology/coding-agents-benchmarking
 - AgentAbstain (2026): https://arxiv.org/abs/2607.10059 and https://agentabstain.github.io/
-- SWE-Milestone: https://swe-milestone.github.io/
+- SWE-Milestone: https://swe-milestone.com/
+- MLOps-Bench (published ACL Findings edition): https://aclanthology.org/2026.findings-emnlp.1402/
 
 The central scientific claim remains unproven until EGDDM is compared under these matched protocols. A map that is more detailed is not necessarily a better engineering system. A better system makes fewer unsupported claims, asks for less but better evidence, predicts effects more accurately, preserves hard boundaries, and improves independently verified outcomes over time.
