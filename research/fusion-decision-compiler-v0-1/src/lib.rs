@@ -113,6 +113,15 @@ pub struct HardGate {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelUse {
+    EngineeringScreening,
+    SingleStepPrediction,
+    OpenLoopRollout,
+    OptimizationInsideSurrogate,
+    ReferenceSolverEvaluation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Applicability {
     InDeclaredDomain,
     OutOfDomain,
@@ -144,6 +153,7 @@ pub struct SolverRun {
     pub geometry_sha256: String,
     pub supported_regimes: Vec<String>,
     pub supported_observables: Vec<String>,
+    pub supported_uses: Vec<ModelUse>,
     pub applicability: Applicability,
     pub exit_code: Option<i32>,
     pub convergence: Convergence,
@@ -162,6 +172,7 @@ pub struct CandidateInput {
     /// Missing service boundary is unknown, never an implicit zero.
     pub service_boundary_ref: Option<String>,
     pub required_regime: String,
+    pub required_model_use: ModelUse,
     pub required_observables: Vec<String>,
     pub evidence: Vec<EvidenceRef>,
     pub claims: Vec<ClaimRequest>,
@@ -200,6 +211,7 @@ pub struct GateFinding {
 pub enum SolverFindingState {
     CompletedWithinDeclaredProfile,
     UnsupportedRegime,
+    UnsupportedUse,
     UnsupportedObservable,
     OutOfDomain,
     ApplicabilityUnknown,
@@ -361,6 +373,7 @@ pub fn compile_candidate(
             SolverFindingState::CompletedWithinDeclaredProfile => {}
             SolverFindingState::UnsupportedRegime
             | SolverFindingState::UnsupportedObservable
+            | SolverFindingState::UnsupportedUse
             | SolverFindingState::OutOfDomain
             | SolverFindingState::FailedExecution
             | SolverFindingState::NonConverged => {
@@ -415,6 +428,10 @@ fn evaluate_solver_run(candidate: &CandidateInput, run: &SolverRun) -> SolverFin
 
     if !run.supported_regimes.contains(&candidate.required_regime) {
         return finding(SolverFindingState::UnsupportedRegime);
+    }
+
+    if !run.supported_uses.contains(&candidate.required_model_use) {
+        return finding(SolverFindingState::UnsupportedUse);
     }
 
     if candidate
@@ -784,6 +801,7 @@ mod tests {
             objective_id: "service-objective-v1".to_string(),
             service_boundary_ref: Some("grid-export-boundary-v1".to_string()),
             required_regime: "tokamak-equilibrium".to_string(),
+            required_model_use: ModelUse::SingleStepPrediction,
             required_observables: vec!["psi".to_string(), "q95".to_string()],
             evidence,
             claims: Vec::new(),
@@ -801,6 +819,7 @@ mod tests {
             geometry_sha256: sha('b'),
             supported_regimes: vec!["tokamak-equilibrium".to_string()],
             supported_observables: vec!["psi".to_string(), "q95".to_string()],
+            supported_uses: vec![ModelUse::SingleStepPrediction],
             applicability: Applicability::InDeclaredDomain,
             exit_code: Some(0),
             convergence: Convergence::Converged,
@@ -916,6 +935,18 @@ mod tests {
         source.solver_runs[0].supported_observables = vec!["psi".to_string()];
         let build = compile_candidate(&source).unwrap();
         assert_eq!(build.disposition, CandidateDisposition::Blocked);
+    }
+
+    #[test]
+    fn one_step_model_is_not_implicitly_qualified_for_open_loop_rollout() {
+        let mut source = candidate();
+        source.required_model_use = ModelUse::OpenLoopRollout;
+        let build = compile_candidate(&source).unwrap();
+        assert_eq!(build.disposition, CandidateDisposition::Blocked);
+        assert_eq!(
+            build.solver_findings[0].state,
+            SolverFindingState::UnsupportedUse
+        );
     }
 
     #[test]
@@ -1241,6 +1272,9 @@ mod tests {
                 }
                 "unsupported_observable" => {
                     source.solver_runs[0].supported_observables = vec!["psi".to_string()];
+                }
+                "unsupported_model_use" => {
+                    source.required_model_use = ModelUse::OpenLoopRollout;
                 }
                 "service_boundary_unresolved" => {
                     source.service_boundary_ref = Some("missing-boundary-record".to_string());
