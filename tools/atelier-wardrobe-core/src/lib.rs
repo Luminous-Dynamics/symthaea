@@ -437,7 +437,11 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: false,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
         );
         assert_eq!(
             result,
@@ -479,7 +483,11 @@ mod tests {
         let result = search_exact(
             &needs,
             &[protected, formal],
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: false,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 1);
@@ -492,7 +500,11 @@ mod tests {
         let result = search_exact(
             &[need("office")],
             &[choice("shirt", &["wedding"], ChoiceOrigin::Owned, 0, 0)],
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: false,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
         );
         assert_eq!(
             result,
@@ -540,7 +552,11 @@ mod tests {
             search_exact(
                 &needs,
                 &[protected],
-                WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() }
+                WardrobePolicy {
+                    allow_additions: false,
+                    allow_made_to_order: false,
+                    currency_code: "ZAR".to_owned(),
+                }
             ),
             Err(WardrobeError::ProtectedAdditionForbidden {
                 choice_id: "new-coat".to_owned(),
@@ -558,7 +574,11 @@ mod tests {
         let result = search_exact(
             &needs,
             &choices,
-            WardrobePolicy { allow_additions: true, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: true,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
         )
         .unwrap();
         assert_eq!(result.pareto_plans.len(), 1);
@@ -574,7 +594,11 @@ mod tests {
             search_exact(
                 &needs,
                 &choices,
-                WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() }
+                WardrobePolicy {
+                    allow_additions: false,
+                    allow_made_to_order: false,
+                    currency_code: "ZAR".to_owned(),
+                }
             ),
             Err(WardrobeError::NoFeasiblePlan {
                 uncovered_need_ids: vec!["rain".to_owned()],
@@ -630,7 +654,11 @@ mod tests {
         let result = search_exact(
             &[],
             &[protected],
-            WardrobePolicy { allow_additions: false, allow_made_to_order: false, currency_code: "ZAR".to_owned() },
+            WardrobePolicy {
+                allow_additions: false,
+                allow_made_to_order: false,
+                currency_code: "ZAR".to_owned(),
+            },
         )
         .unwrap();
         assert_eq!(result.pareto_plans[0].selected_choice_ids, vec!["archive-coat"]);
