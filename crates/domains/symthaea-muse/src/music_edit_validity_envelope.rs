@@ -818,7 +818,10 @@ mod tests {
         assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
         envelope.target_scope = MusicEditTargetScopeV1::Mixture;
         assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
-            &MusicEditValidityEnvelopeIssueV1::OperationScopeMismatch(MusicEditOperationV1::Crescendo)
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::Crescendo,
+                property: MusicEditValidityPropertyV1::DynamicContour,
+            }
         ));
     }
 

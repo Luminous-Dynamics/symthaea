@@ -13,6 +13,15 @@
   "target_selector_sha256": "0404040404040404040404040404040404040404040404040404040404040404",
   "requested_change": [
     {
+      "constraint_id": "change.from-original",
+      "property": "instrument_identity",
+      "scope": "target_part",
+      "relation": "different_from",
+      "expected_value": "clarinet",
+      "evidence": "symbolic",
+      "rationale": "The replacement must differ from the source instrument identity."
+    },
+    {
       "constraint_id": "change.instrument",
       "property": "instrument_identity",
       "scope": "target_part",
@@ -41,6 +50,14 @@
       "relation": "no_change",
       "evidence": "symbolic",
       "rationale": "Melodic pitch content outside the selected part remains protected."
+    },
+    {
+      "constraint_id": "protect.part-lineage",
+      "property": "event_lineage",
+      "scope": "target_part",
+      "relation": "no_change",
+      "evidence": "symbolic",
+      "rationale": "The replacement preserves the source part's event lineage."
     }
   ],
   "permitted_variations": [
