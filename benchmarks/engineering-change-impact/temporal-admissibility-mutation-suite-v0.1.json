@@ -1,0 +1,316 @@
+{
+  "schema_version": "luminous.eng-change-gold-temporal-mutation-suite.v0.1",
+  "status": "test_vectors_not_gold_labels",
+  "data_class": "synthetic_schema_and_evaluator_test_vectors",
+  "target_schema": "benchmarks/engineering-change-impact/gold-record-v1.1.schema.json",
+  "evaluator_boundary": "Structural outcomes are schema-test expectations; chronology, exact-reference, rights and independence outcomes require the independent semantic evaluator.",
+  "positive_controls": [
+    {
+      "id": "TEMP-GOLD-POS-001",
+      "intent": "Known target T and decision frontier K; exact source version and captured digest; source availability, ingestion and materialization before K; context inclusion bound to exact run manifest; rights permitted at decision and replay; two distinct synthetic assessor records with matching labels. The independent assessor labels also include evidence_validity_at_target_time=valid, and the final temporal adjudication records agreement separately from the engineering disposition.",
+      "expected_structural_result": "valid",
+      "expected_semantic_result": "must_be_adjudicated_from_frozen_test_evidence",
+      "status": "synthetic_only",
+      "fixture_path": "examples/engineering-change-impact/gold-record-v1.1.temporal.synthetic.json"
+    }
+  ],
+  "structural_negative_controls": [
+    {
+      "id": "TEMP-GOLD-NEG-001",
+      "mutation": "Set target_world_time.state=unknown but retain target_world_time.instant.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-002",
+      "mutation": "Set a validity bound state=unknown while retaining an instant.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-003",
+      "mutation": "Set source_version.bytes_state=captured without artifact_digest or byte_capture_evidence_ref.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-004",
+      "mutation": "Claim system_availability=available while acquisition_ingestion is not observed.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-005",
+      "mutation": "Claim run_context_presence=included while run_context_inclusion is not included and bound to a run manifest.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-006",
+      "mutation": "Claim rights_at_decision=permitted while the rights assessment is prohibited or unknown.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-007",
+      "mutation": "Include temporal_admissibility but omit temporal_admissibility_label from either assessor record.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-008",
+      "mutation": "Claim source_availability=admissible while both source_publication and issuer_availability are unknown/not established.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-009",
+      "mutation": "Set target_world_time.state=unknown while outcome.evidence_validity_at_target_time=valid or invalid.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-010",
+      "mutation": "Select multi_source_causal_partial_order while causal_frontier.required=false or state=not_required.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-011",
+      "mutation": "Mark a required causal frontier complete while omitting an evidence-frontier digest, causal-history digest, source-set digest, verifier digest or verification receipt reference.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-012",
+      "mutation": "Set source_version.identity_state=unknown while outcome.source_availability=admissible.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-013",
+      "mutation": "Set evidence_validity_at_target_time=valid/invalid while either validity bound is Unknown or interval_evidence_ref is absent.",
+      "expected": "schema_reject"
+    }
+  ],
+  "semantic_negative_controls": [
+    {
+      "id": "TEMP-GOLD-SEM-001",
+      "mutation": "Move source_publication/issuer_availability after K while leaving outcome=admissible.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-002",
+      "mutation": "Move acquisition_ingestion or required derived_materialization after K while leaving system_availability=available.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-003",
+      "mutation": "Use a run manifest that does not contain the exact evidence_ref, version_ref and artifact_digest.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-004",
+      "mutation": "Record correction or supersession relation materialization after K but use it to rewrite the K projection.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-005",
+      "mutation": "Rights grant begins after K but outcome asserts permitted_at_decision.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-006",
+      "mutation": "Rights are revoked before replay/query but outcome asserts permitted_at_replay.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-007",
+      "mutation": "Clock uncertainty spans K but outcome asserts a definite before/after relation without qualified bound proof.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-008",
+      "mutation": "Two assessor records use the same person under different assessor_ref strings.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-009",
+      "mutation": "Assessor temporal labels disagree while temporal_adjudication.state=consensus.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-010",
+      "mutation": "Modify the temporal object after sealing without a superseding adjudication and new seal.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-011",
+      "mutation": "Compare local monotonic sequence numbers from different conductors or sort their wall-clock timestamps to claim a cross-conductor happens-before relation.",
+      "expected": "semantic_reject_or_indeterminate"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-012",
+      "mutation": "Use a scalar global maximum, sum or height as a complete causal frontier while a required source/conductor event or join is missing.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-013",
+      "mutation": "The causal-history receipt source set does not match the exact EvidenceFrontierV1 source-set digest.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-014",
+      "mutation": "Causal frontier is required but incomplete/unknown while system_availability=available or run_context_presence=included.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-015",
+      "mutation": "A causal edge has no evidence reference, a cycle exists, or a projection is not causally after its independently validated receipt.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-016",
+      "mutation": "Treat an EPCIS recordTime (repository bookkeeping/record-retrieval time) as the time the real-world event occurred, or use eventTime alone as proof that the event was available to the decision process by K.",
+      "expected": "semantic_reject_or_indeterminate",
+      "note": "Keep event occurrence assertion, repository receipt, publisher availability and decision-process acquisition as distinct temporal facts."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-017",
+      "mutation": "A query requires evidence from pre-change, change-window and post-change periods, but the retrieved set contains only one period; the candidate nevertheless declares temporal coverage complete.",
+      "expected": "coverage_fail",
+      "note": "Report Temporal Coverage@k and Temporal Precision@k; relevance in one period does not compensate for missing required periods."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-018",
+      "mutation": "The declared source inventory or source-set digest omits a required source/conductor, while the candidate claims complete evidence coverage or a complete decision frontier.",
+      "expected": "semantic_reject",
+      "note": "A frontier is complete only relative to a frozen and independently qualified source inventory; a cutoff is not corpus completeness."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-019",
+      "mutation": "Two event-time uncertainty intervals overlap or have incompatible clock bounds, but the candidate invents a strict BEFORE/AFTER or cross-source happens-before edge.",
+      "expected": "semantic_reject_or_indeterminate",
+      "note": "Preserve concurrency/incomparability unless a verified causal edge or disjoint qualified intervals justify order."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-020",
+      "mutation": "The candidate labels a dependency as causally influential solely from temporal succession, correlation or a co-occurrence pattern, without a justified causal mechanism, intervention or independently admissible causal edge.",
+      "expected": "semantic_reject_or_unproven",
+      "note": "Observed order, causal partial order and causal effect are different claims; score them separately."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-021",
+      "mutation": "A bitemporal replay at K imports a later correction, supersession, retraction or source-version remapping that was not published, received and materialized by K.",
+      "expected": "semantic_reject",
+      "note": "Later knowledge may correct the present view but must not silently rewrite the historical decision-time projection."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-022",
+      "mutation": "The candidate reports full Temporal Coverage@k using only retrieved/easy bins as the denominator, omitting required bins or hard negatives from the frozen query specification.",
+      "expected": "coverage_accounting_fail",
+      "note": "The denominator is the evaluator-frozen required temporal-bin universe, not the candidate's retrieved set."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-023",
+      "mutation": "An action was authorized when planned, but the principal's role, permission, profile or target scope was revoked/changed before execution; the system executes without a fresh authorization check.",
+      "expected": "effect_gate_reject",
+      "note": "Decision-time evidence admissibility does not grant action-time authority. Recheck scope and authorization at the effect boundary."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-024",
+      "mutation": "A client carries a cached MCP tool inventory from profile A and invokes it against profile B or a substituted endpoint without binding the exact tenant/profile/endpoint/tool-set identity and rechecking permissions.",
+      "expected": "effect_gate_reject_or_quarantine",
+      "note": "Aras InnovatorEdge 2.4 documents multiple profiles with independent endpoints, Access Points, tool sets and enablement; this is a conformance/security test scenario, not a claim of vendor vulnerability."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-025",
+      "mutation": "Promote a structurally valid, acyclic multi-conductor causal-history DAG to an authenticated causal-proof or real-world truth claim without independently resolving each edge evidence reference to the exact source/action bytes, accepted validator record, receiving-conductor identity, DNA/cell lineage and verifier identity.",
+      "expected": "semantic_reject_or_incomplete",
+      "note": "A structural partial-order audit establishes internal consistency under its declared graph semantics; it does not authenticate the evidence references or prove the asserted physical event."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-026",
+      "mutation": "A DSSE/in-toto role signature verifies relative to a caller-supplied trust-policy byte digest, but the policy is not authenticated by a pinned root; the evaluator labels the result root-authenticated, globally trusted, currently authorized or physically true.",
+      "expected": "claim_ceiling_reject",
+      "note": "ROLE_AUTHENTICATED_RELATIVE_TO_SUPPLIED_POLICY is not ROOT_AUTHENTICATED_POLICY_SNAPSHOT, SCITT transparency, current permission or event truth."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-027",
+      "mutation": "A SCITT/COSE envelope is parsed and its opaque-byte SHA-256 commitment matches, but COSE signature, transparency-service identity and VDS receipt proof are not verified; the record is nevertheless reported as authenticated SCITT inclusion.",
+      "expected": "semantic_reject_or_incomplete",
+      "note": "Envelope parsing and byte commitment do not verify the signature, issuer, transparency service or verifiable-data-structure proof."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-028",
+      "mutation": "Use a key that is revoked under the current trust policy to authorize a new current decision, or accept a historical signature without trusted-time evidence and the exact historical policy snapshot/epoch.",
+      "expected": "semantic_reject_or_indeterminate",
+      "note": "Current authorization and historical authentication are separate outcomes; missing historical trusted time or policy evidence cannot default to historical success."
+    }
+  ],
+  "invariants": [
+    "V1_non_temporal_records_remain_valid_under_the_pinned_V1_schema",
+    "V1_1_records_use_the_V1_1_schema_id_and_schema_version",
+    "absence_of_temporal_admissibility_is_not_temporal_pass",
+    "all_existing_ten_engineering_dispositions_remain_unchanged",
+    "all_temporal_admissibility_fields_are_inside_the_sealed_gold_record",
+    "schema_validity_does_not_prove_timestamp_truth_source_truth_assessor_independence_or_authority",
+    "world_validity_at_T_is_separate_from_source_availability_by_K",
+    "a_K_admissibility_pass_does_not_imply_that_evidence_is_valid_at_T",
+    "timestamp_cutoff_alone_does_not_claim_source_set_or_corpus_completeness",
+    "wall_clock_timestamp_sorting_never_mints_cross_conductor_causal_edges",
+    "local_monotonic_indices_are_compared_only_within_their_own_conductor",
+    "missing_cross_conductor_causal_join_is_incomplete_or_unknown_not_pass",
+    "causal_frontier_binding_reuses_Mycelix_EPI_008_and_PULSE_MULTICONDUCTOR_OWNERS",
+    "multi_source_system_availability_requires_a_complete_verified_causal_cut_when_declared_required",
+    "event_occurrence_time_is_not_repository_record_time_or_decision_process_availability",
+    "temporal_coverage_denominator_is_the_frozen_required_time_bin_universe",
+    "source_set_completeness_is_relative_to_a_frozen_source_inventory_not_a_cutoff",
+    "overlapping_clock_uncertainty_preserves_incomparability_unless_a_verified_edge_exists",
+    "temporal_succession_or_correlation_alone_does_not_establish_causal_influence",
+    "later_corrections_do_not_rewrite_a_historical_decision_frontier_projection",
+    "decision_time_admissibility_never_substitutes_for_action_time_authorization",
+    "cached_tool_inventories_are_bound_to_exact_profile_endpoint_tool_set_and_scope",
+    "structural_causal_DAG_consistency_does_not_authenticate_edge_evidence_or_real_world_truth",
+    "signature_valid_relative_to_supplied_policy_does_not_imply_root_authenticated_policy",
+    "COSE_SCITT_envelope_parse_and_byte_commitment_do_not_verify_signature_or_transparency_receipt",
+    "current_key_revocation_and_historical_signature_authenticity_are_separate_adjudication_axes"
+  ],
+  "evaluation_extensions": {
+    "schema_version": "luminous.eng-change-decision-replay-evaluation.v0.1",
+    "status": "preregistered_metrics_not_results",
+    "metrics": [
+      {
+        "id": "temporal_coverage_at_k",
+        "definition": "Required evaluator-frozen temporal bins with at least one admissible, claim-relevant evidence item divided by all bins frozen by the evaluator."
+      },
+      {
+        "id": "temporal_precision_at_k",
+        "definition": "Retrieved items admissible for the requested decision frontier and target-time semantics divided by all retrieved items."
+      },
+      {
+        "id": "future_knowledge_leakage_rate",
+        "definition": "Decision claims supported by evidence whose required availability, ingestion or materialization exceeds K divided by all evidence-supported decision claims; critical target is zero."
+      },
+      {
+        "id": "causal_order_false_edge_rate",
+        "definition": "Asserted cross-source causal-order edges lacking a valid independent causal-frontier receipt divided by all asserted cross-source causal-order edges."
+      },
+      {
+        "id": "source_inventory_coverage",
+        "definition": "Required source roles covered by the frozen evidence frontier divided by all evaluator-declared required source roles."
+      },
+      {
+        "id": "historical_replay_fidelity",
+        "definition": "Exact agreement between the frozen K projection and independently reconstructed evidence, disposition and obligation outputs."
+      },
+      {
+        "id": "false_current_critical_count",
+        "definition": "Count of critical claim-evidence pairs incorrectly represented as current/applicable; non-compensatory."
+      },
+      {
+        "id": "accepted_decision_cost",
+        "definition": "Fully burdened human, model, tool, review and rework cost per independently accepted decision; report absolute and matched-baseline ratios."
+      }
+    ],
+    "scoring_rule": "Hard safety, provenance and authority gates are reported before quality and economics. No weighted aggregate may compensate for a critical false-current, future-leakage, false-causal-edge or unauthorized-effect failure.",
+    "baseline_arms": [
+      "human_only_process",
+      "native_plm_workflow",
+      "keyword_or_bm25_retrieval",
+      "temporal_rag_without_causal_frontier",
+      "model_only",
+      "model_plus_pinned_evidence",
+      "symthaea_plus_existing_mycelix_frontier_owners"
+    ],
+    "status_note": "Targets and baselines are preregistration only. No vendor tenant, candidate run, human gold labels or physical evidence is claimed."
+  }
+}
