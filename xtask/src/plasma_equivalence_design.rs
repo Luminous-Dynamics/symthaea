@@ -830,6 +830,55 @@ mod tests {
     }
 
     #[test]
+    fn aged_retention_design_binds_unaged_conditioning_and_exposure_sources() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../data/research/plasma_endpoint_transform_fixture_v0_1.json"))
+                .expect("valid endpoint transform fixture");
+        let case = fixture["cases"].as_array().expect("cases").iter()
+            .find(|case| case["id"] == "valid-aged-retention-four-cohort-graph")
+            .expect("aged retention case exists");
+        let receipt: EquivalenceDesignReceipt =
+            serde_json::from_value(case["graph"]["design_receipt"].clone())
+                .expect("valid aged retention design receipt");
+        assert_eq!(audit_receipt(&receipt).disposition, Disposition::Pass);
+        assert_eq!(receipt.additional_source_bindings.len(), 6);
+    }
+
+    #[test]
+    fn missing_unaged_design_source_binding_blocks_retention() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../data/research/plasma_endpoint_transform_fixture_v0_1.json"))
+                .expect("valid endpoint transform fixture");
+        let case = fixture["cases"].as_array().expect("cases").iter()
+            .find(|case| case["id"] == "valid-aged-retention-four-cohort-graph")
+            .expect("aged retention case exists");
+        let mut value = case["graph"]["design_receipt"].clone();
+        let bindings = value["additional_source_bindings"].as_array_mut().expect("bindings");
+        bindings.retain(|binding| binding["role"] != "baseline_unaged_strength");
+        let receipt: EquivalenceDesignReceipt =
+            serde_json::from_value(value).expect("partial aged retention receipt parses");
+        assert_eq!(audit_receipt(&receipt).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn unaged_design_source_must_preserve_its_arm_lot_mapping() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../../data/research/plasma_endpoint_transform_fixture_v0_1.json"))
+                .expect("valid endpoint transform fixture");
+        let case = fixture["cases"].as_array().expect("cases").iter()
+            .find(|case| case["id"] == "valid-aged-retention-four-cohort-graph")
+            .expect("aged retention case exists");
+        let mut value = case["graph"]["design_receipt"].clone();
+        let binding = value["additional_source_bindings"].as_array_mut().expect("bindings").iter_mut()
+            .find(|binding| binding["role"] == "baseline_unaged_strength").expect("unaged binding");
+        binding["samples"][0]["cluster_id"] = serde_json::Value::String("UNRELATED-LOT".to_owned());
+        let receipt: EquivalenceDesignReceipt =
+            serde_json::from_value(value).expect("mismatched aged retention receipt parses");
+        assert_eq!(audit_receipt(&receipt).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn power_assumptions_are_bound_to_the_frozen_plan() {    #[test]
     fn power_assumptions_are_bound_to_the_frozen_plan() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid equivalence design fixture");
         let case = fixture.cases.iter().find(|case| case.id == "power-assumption-digest-mismatch").expect("case exists");
