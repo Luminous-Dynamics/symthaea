@@ -61,9 +61,9 @@ cargo run -p xtask -- edlc-trace-evidence-audit
 cargo test -p xtask edlc_trace_evidence
 ```
 
-There are 19 authored unit tests covering known-answer integrity, digest mismatch, byte length, duplicate artifact ID/path, required roles, path traversal, timebase consistency, calibration validity, device identity, event order, first/later readiness-profile rules, event ordering, CSV row count and profile role linkage.
+There are 20 authored unit tests covering known-answer integrity, digest mismatch, byte length, duplicate artifact ID/path, required roles, path traversal, timebase consistency, calibration validity, device identity, event order, first/later readiness-profile rules, event ordering, CSV row count and profile role linkage.
 
-These tests are authored, not executed in this environment. The fixture is synthetic and its device/instrument/certificate values are deliberately fictional. It proves receipt arithmetic and integrity rules only.
+These tests are authored, not executed in this environment. The fixture is synthetic and its device/instrument/certificate values are deliberately fictional. Independently re-fetched all nine positive artifacts and both negative/control files from the branch and recomputed their SHA-256 digests and byte lengths; all eleven matched their committed values. This verifies the current repository bytes against the fixture metadata, not laboratory origin or authenticity. It proves receipt arithmetic and integrity rules only.
 
 ## 5. External published-data admission
 
