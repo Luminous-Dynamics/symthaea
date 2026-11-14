@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCR² v15 Synthetic Causal Reflex Scenarios",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "description", "scenarios"],
+  "properties": {
+    "schema_version": {"const": "mcr2-causal-reflex-scenarios-v0.1"},
+    "description": {"type": "string", "minLength": 1},
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/scenario"}
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id", "horizon_ticks", "initial_margin_milli", "hazard_start_tick",
+        "loss_per_tick_milli", "mitigation_per_tick_milli", "observed_precursor_tick",
+        "sham_precursor_tick", "time_to_boundary_lower_ticks", "predictive_latency_ticks",
+        "reactive_latency_ticks", "reserve_ticks", "reactive_threshold_milli",
+        "compute_cost_units", "compute_budget_units", "intervention_cost_units",
+        "evidence_qualified", "task_context_matches"
+      ],
+      "properties": {
+        "scenario_id": {"type": "string", "minLength": 1},
+        "horizon_ticks": {"type": "integer", "minimum": 1},
+        "initial_margin_milli": {"type": "integer", "minimum": 0},
+        "hazard_start_tick": {"type": ["integer", "null"], "minimum": 0},
+        "loss_per_tick_milli": {"type": "integer", "minimum": 0},
+        "mitigation_per_tick_milli": {"type": "integer", "minimum": 0},
+        "observed_precursor_tick": {"type": ["integer", "null"], "minimum": 0},
+        "sham_precursor_tick": {"type": ["integer", "null"], "minimum": 0},
+        "time_to_boundary_lower_ticks": {"type": ["integer", "null"], "minimum": 0},
+        "predictive_latency_ticks": {"type": "integer", "minimum": 0},
+        "reactive_latency_ticks": {"type": "integer", "minimum": 0},
+        "reserve_ticks": {"type": "integer", "minimum": 0},
+        "reactive_threshold_milli": {"type": "integer", "minimum": 0},
+        "compute_cost_units": {"type": "integer", "minimum": 0},
+        "compute_budget_units": {"type": "integer", "minimum": 0},
+        "intervention_cost_units": {"type": "integer", "minimum": 0},
+        "evidence_qualified": {"type": "boolean"},
+        "task_context_matches": {"type": "boolean"}
+      }
+    }
+  }
+}
