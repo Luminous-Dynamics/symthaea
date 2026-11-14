@@ -46,6 +46,7 @@ pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod hydrodynamics;
+pub mod maritime_adapter;
 pub mod mission;
 pub mod navigation_bridge;
 pub mod navigation_estimator;
@@ -60,6 +61,7 @@ pub mod types;
 
 pub use controller::AuvController;
 pub use encoder::AuvHdcEncoder;
+pub use maritime_adapter::{AuvMaritimeContext, to_maritime_state};
 pub use mission::{AuvCommsPolicy, AuvMission, MissionMetrics, MissionTracker, Waypoint};
 pub use navigation_bridge::{AuvNavigationBridge, UnderwaterNavigationSample};
 pub use navigation_estimator::{AuvNavigationEstimate, AuvNavigationEstimator};
