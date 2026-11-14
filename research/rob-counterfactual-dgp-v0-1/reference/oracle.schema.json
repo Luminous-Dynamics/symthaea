@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/research/rob-counterfactual-dgp-v0-1/reference/oracle.schema.json",
+  "title": "MCR2 v17 evaluator-only oracle record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["episode_id", "block_id", "assigned_policy", "pre_assignment_stratum", "reference_event_time", "candidate_event_time", "competing_event_time", "reference_potential_outcome", "candidate_potential_outcome", "intervention_applied_under_assigned_policy", "endpoint_observed_probability", "followup_complete_by_horizon", "assigned_policy_outcome"],
+  "properties": {
+    "episode_id": {"type": "string", "minLength": 1},
+    "block_id": {"type": "string", "minLength": 1},
+    "assigned_policy": {"enum": ["reference_safe", "anticipatory_safe"]},
+    "pre_assignment_stratum": {"enum": ["high", "low"]},
+    "reference_event_time": {"type": "number", "exclusiveMinimum": 0},
+    "candidate_event_time": {"type": "number", "exclusiveMinimum": 0},
+    "competing_event_time": {"type": ["number", "null"], "exclusiveMinimum": 0},
+    "reference_potential_outcome": {"enum": ["boundary_event", "competing_event", "event_free"]},
+    "candidate_potential_outcome": {"enum": ["boundary_event", "competing_event", "event_free"]},
+    "intervention_applied_under_assigned_policy": {"type": "boolean"},
+    "endpoint_observed_probability": {"type": "number", "minimum": 0, "maximum": 1},
+    "followup_complete_by_horizon": {"type": "boolean"},
+    "assigned_policy_outcome": {"enum": ["boundary_event", "competing_event", "event_free"]}
+  }
+}

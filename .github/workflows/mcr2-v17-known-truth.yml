@@ -1,0 +1,31 @@
+name: MCR2 v17 known-truth DGP
+
+on:
+  pull_request:
+    paths:
+      - "research/rob-counterfactual-dgp-v0-1/**"
+      - ".github/workflows/mcr2-v17-known-truth.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install JSON Schema validator
+        run: python -m pip install "jsonschema>=4,<5"
+      - name: Run regression suite
+        working-directory: research/rob-counterfactual-dgp-v0-1/reference
+        run: python -m unittest discover -v
+      - name: Generate a bounded smoke corpus
+        working-directory: research/rob-counterfactual-dgp-v0-1/reference
+        run: python run_benchmark.py --blocks 64 --write-data --output report-smoke.json
+      - name: Validate observed and evaluator-only artifacts
+        working-directory: research/rob-counterfactual-dgp-v0-1/reference
+        run: python validate_schema_samples.py
