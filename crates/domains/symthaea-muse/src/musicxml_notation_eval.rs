@@ -17,7 +17,9 @@ use crate::musicxml_notation_events::{
     MUSICXML_NOTATION_EVENTS_SCHEMA_V1,
     MusicXmlNotationEventKindV1,
     MusicXmlNotationEventsStatusV1,
+    MusicXmlPartMetadataV1,
     MusicXmlPartNotationEventsV1,
+    MusicXmlSourceNodeV1,
 };
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -94,6 +96,15 @@ pub struct MusicXmlNotationEvaluationReportV1 {
     pub prediction_graph_sha256: String,
     pub reference_note_event_count: usize,
     pub prediction_note_event_count: usize,
+    /// False when either input predates the explicit part-metadata layer.
+    pub part_metadata_layer_covered: bool,
+    pub part_metadata_presence: MusicXmlNotationMetricV1,
+    pub part_metadata_name_abbreviation: MusicXmlNotationAccuracyV1,
+    pub score_instrument_ids: MusicXmlNotationAccuracyV1,
+    pub midi_instrument_setup: MusicXmlNotationAccuracyV1,
+    pub part_metadata_source_subtree: MusicXmlNotationAccuracyV1,
+    pub part_metadata_reference_absent_count: usize,
+    pub part_metadata_unexpected_count: usize,
     pub note_event_presence: MusicXmlNotationMetricV1,
     pub note_onset_error: MusicXmlNotationErrorDistributionV1,
     pub written_pitch_spelling: MusicXmlNotationAccuracyV1,
@@ -1010,6 +1021,14 @@ struct ReportBodyV1<'a> {
     prediction_graph_sha256: &'a str,
     reference_note_event_count: usize,
     prediction_note_event_count: usize,
+    part_metadata_layer_covered: bool,
+    part_metadata_presence: &'a MusicXmlNotationMetricV1,
+    part_metadata_name_abbreviation: &'a MusicXmlNotationAccuracyV1,
+    score_instrument_ids: &'a MusicXmlNotationAccuracyV1,
+    midi_instrument_setup: &'a MusicXmlNotationAccuracyV1,
+    part_metadata_source_subtree: &'a MusicXmlNotationAccuracyV1,
+    part_metadata_reference_absent_count: usize,
+    part_metadata_unexpected_count: usize,
     note_event_presence: &'a MusicXmlNotationMetricV1,
     note_onset_error: &'a MusicXmlNotationErrorDistributionV1,
     written_pitch_spelling: &'a MusicXmlNotationAccuracyV1,
@@ -1064,6 +1083,14 @@ fn report_commitment(
         prediction_graph_sha256: &report.prediction_graph_sha256,
         reference_note_event_count: report.reference_note_event_count,
         prediction_note_event_count: report.prediction_note_event_count,
+        part_metadata_layer_covered: report.part_metadata_layer_covered,
+        part_metadata_presence: &report.part_metadata_presence,
+        part_metadata_name_abbreviation: &report.part_metadata_name_abbreviation,
+        score_instrument_ids: &report.score_instrument_ids,
+        midi_instrument_setup: &report.midi_instrument_setup,
+        part_metadata_source_subtree: &report.part_metadata_source_subtree,
+        part_metadata_reference_absent_count: report.part_metadata_reference_absent_count,
+        part_metadata_unexpected_count: report.part_metadata_unexpected_count,
         note_event_presence: &report.note_event_presence,
         note_onset_error: &report.note_onset_error,
         written_pitch_spelling: &report.written_pitch_spelling,
@@ -1110,6 +1137,129 @@ fn report_commitment(
 /// Note event presence is matched by event family and score onset only. Exact
 /// pitch spelling, duration, written value, tie, tuplet, staff and source-tree
 /// correctness are then reported independently among the matched pairs.
+#[derive(Debug, Clone)]
+struct PartMetadataDimensionsV1 {
+    layer_covered: bool,
+    presence: MusicXmlNotationMetricV1,
+    name_abbreviation: MusicXmlNotationAccuracyV1,
+    score_instrument_ids: MusicXmlNotationAccuracyV1,
+    midi_instrument_setup: MusicXmlNotationAccuracyV1,
+    source_subtree: MusicXmlNotationAccuracyV1,
+    reference_absent_count: usize,
+    unexpected_count: usize,
+}
+
+fn collect_source_nodes_named(
+    node: &MusicXmlSourceNodeV1,
+    element_name: &str,
+    output: &mut Vec<MusicXmlSourceNodeV1>,
+) {
+    if node.element == element_name {
+        output.push(node.clone());
+    }
+    for child in &node.children {
+        collect_source_nodes_named(child, element_name, output);
+    }
+}
+
+fn midi_instrument_setups(metadata: &MusicXmlPartMetadataV1) -> Vec<MusicXmlSourceNodeV1> {
+    let mut output = Vec::new();
+    collect_source_nodes_named(
+        &metadata.source_score_part,
+        "midi-instrument",
+        &mut output,
+    );
+    output
+}
+
+fn optional_metadata_accuracy<T: PartialEq>(
+    reference: Option<&T>,
+    prediction: Option<&T>,
+) -> MusicXmlNotationAccuracyV1 {
+    match reference {
+        Some(reference) => accuracy(
+            1,
+            usize::from(prediction.is_some_and(|prediction| prediction == reference)),
+        ),
+        None => accuracy(0, 0),
+    }
+}
+
+fn part_metadata_dimensions(
+    reference: &MusicXmlPartNotationGraphV1,
+    prediction: &MusicXmlPartNotationGraphV1,
+) -> PartMetadataDimensionsV1 {
+    // Historical graphs did not emit the part-metadata field. Their absence
+    // is unknown coverage, not a genuine "no part-list" observation.
+    let layer_covered =
+        reference.part_metadata_layer_present && prediction.part_metadata_layer_present;
+    if !layer_covered {
+        return PartMetadataDimensionsV1 {
+            layer_covered: false,
+            presence: metric(0, 0, 0),
+            name_abbreviation: accuracy(0, 0),
+            score_instrument_ids: accuracy(0, 0),
+            midi_instrument_setup: accuracy(0, 0),
+            source_subtree: accuracy(0, 0),
+            reference_absent_count: 0,
+            unexpected_count: 0,
+        };
+    }
+
+    let gold = reference.part_metadata.as_ref();
+    let predicted = prediction.part_metadata.as_ref();
+    let reference_count = usize::from(gold.is_some());
+    let prediction_count = usize::from(predicted.is_some());
+    let true_positives = usize::from(gold.is_some() && predicted.is_some());
+    let (name_abbreviation, score_instrument_ids, midi_instrument_setup, source_subtree) =
+        match (gold, predicted) {
+            (Some(gold), Some(predicted)) => (
+                optional_metadata_accuracy(
+                    Some(&(gold.part_name.as_ref(), gold.part_abbreviation.as_ref())),
+                    Some(&(predicted.part_name.as_ref(), predicted.part_abbreviation.as_ref())),
+                ),
+                optional_metadata_accuracy(
+                    Some(&gold.score_instrument_ids),
+                    Some(&predicted.score_instrument_ids),
+                ),
+                optional_metadata_accuracy(
+                    Some(&midi_instrument_setups(gold)),
+                    Some(&midi_instrument_setups(predicted)),
+                ),
+                optional_metadata_accuracy(
+                    Some(&gold.source_score_part),
+                    Some(&predicted.source_score_part),
+                ),
+            ),
+            (Some(gold), None) => (
+                optional_metadata_accuracy::<(Option<&String>, Option<&String>)>(
+                    Some(&(gold.part_name.as_ref(), gold.part_abbreviation.as_ref())),
+                    None,
+                ),
+                optional_metadata_accuracy(Some(&gold.score_instrument_ids), None),
+                optional_metadata_accuracy(Some(&midi_instrument_setups(gold)), None),
+                optional_metadata_accuracy(Some(&gold.source_score_part), None),
+            ),
+            (None, _) => (
+                accuracy(0, 0),
+                accuracy(0, 0),
+                accuracy(0, 0),
+                accuracy(0, 0),
+            ),
+        };
+
+    PartMetadataDimensionsV1 {
+        layer_covered: true,
+        presence: metric(reference_count, prediction_count, true_positives),
+        name_abbreviation,
+        score_instrument_ids,
+        midi_instrument_setup,
+        source_subtree,
+        reference_absent_count: usize::from(gold.is_none()),
+        unexpected_count: usize::from(gold.is_none() && predicted.is_some()),
+    }
+}
+
 pub fn evaluate_musicxml_notation_graphs(
     reference: &MusicXmlPartNotationGraphV1,
     prediction: &MusicXmlPartNotationGraphV1,
@@ -1251,6 +1401,8 @@ pub fn evaluate_musicxml_notation_graphs(
         config.position_tolerance,
     )?;
 
+    let part_metadata = part_metadata_dimensions(reference, prediction);
+
     let mut report = MusicXmlNotationEvaluationReportV1 {
         schema: MUSICXML_NOTATION_EVALUATION_SCHEMA_V1.into(),
         algorithm: MUSICXML_NOTATION_EVALUATION_ALGORITHM_V1.into(),
@@ -1262,6 +1414,14 @@ pub fn evaluate_musicxml_notation_graphs(
         prediction_graph_sha256,
         reference_note_event_count: gold.note_events.len(),
         prediction_note_event_count: predicted.note_events.len(),
+        part_metadata_layer_covered: part_metadata.layer_covered,
+        part_metadata_presence: part_metadata.presence,
+        part_metadata_name_abbreviation: part_metadata.name_abbreviation,
+        score_instrument_ids: part_metadata.score_instrument_ids,
+        midi_instrument_setup: part_metadata.midi_instrument_setup,
+        part_metadata_source_subtree: part_metadata.source_subtree,
+        part_metadata_reference_absent_count: part_metadata.reference_absent_count,
+        part_metadata_unexpected_count: part_metadata.unexpected_count,
         note_event_presence: metric(
             gold.note_events.len(),
             predicted.note_events.len(),
