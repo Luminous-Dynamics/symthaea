@@ -24,7 +24,7 @@ Each accepted subgoal also binds a stable accepted-output digest. The same physi
 
 ## Outputs
 
-Per subgoal: outcome, independent acceptance, safe acceptance, physical/option state join, continuation-qualified result, continuation Unknown, required mandatory successors and feasible successor count.
+Per subgoal: outcome, independent acceptance, safe acceptance, physical/option state join, continuation-qualified result, continuation Unknown, the exact required mandatory successor IDs, the exact feasible successor IDs supported by Qualified or Insufficient evidence, and their counts. Unknown continuation evidence publishes no feasible IDs; it cannot turn an unverified claim into a capability count.
 
 Per mission: scheduled subgoals, native completions, safe accepted subgoals, successful-but-unsafe outcomes, continuation-qualified subgoals, Unknowns, longest safe prefix, longest continuation-qualified prefix, mandatory safe completion and mandatory continuation completion.
 
@@ -40,4 +40,4 @@ The reference does not compute viability, option sets, route connectivity, physi
     cargo test --locked --manifest-path research/rob-continuation-qualified-progress-001/reference/Cargo.toml
     cargo clippy --locked --manifest-path research/rob-continuation-qualified-progress-001/reference/Cargo.toml --all-targets -- -D warnings
 
-20 synthetic known-answer/adversarial tests are authored; qualification requires the exact-head Rust 1.96 workflow.
+23 synthetic known-answer/adversarial tests are authored. They include exact successor-identity preservation, Unknown evidence non-promotion and a mission-size overflow guard. Qualification requires the exact-head Rust 1.96 workflow.
