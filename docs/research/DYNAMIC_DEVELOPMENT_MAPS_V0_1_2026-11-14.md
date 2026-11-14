@@ -350,7 +350,7 @@ Report confidence intervals, per-relation/task-family breakdowns, cost, latency,
 
 A standalone Rust crate has been authored at `tools/development-map-validator/`. It is deliberately outside the root workspace, has its own Cargo workspace, reads one JSON file, and never follows source URLs or executes repository commands. Its current contract checks include graph references, provenance/lifecycle shape, evidence invalidation/supersession, authority promotion, event targets, containment cycles, and decision-time evidence availability. It uses RFC 3339 timestamp parsing for decision-time comparisons.
 
-The crate includes unit tests for the public temporal fixtures and adversarial mutations. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
+The crate includes 14 authored unit-test cases for the public temporal fixtures and adversarial mutations. **The Rust source and tests have not been compiled or executed.** The crate is unqualified until issue #10064's execution boundary permits a safe run; authored test count is not a passing test result.
 
 A second public known-answer fixture now exists:
 
@@ -383,7 +383,7 @@ The provisional snapshot schema now accepts an optional event slice with separat
 
 The fixture is public and deliberately not a sealed benchmark. Its identifiers are synthetic placeholders, not real Git object hashes or cryptographic attestations.
 
-A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection and synthetic temporal fixture were then checked against the v0.1 contract's required fields, enumerations, provenance/lifecycle structure, event targets, edge endpoints and local references. The selected structural checks reported **zero findings across all three maps**. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
+A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection, temporal invalidation fixture and decision-time admissibility fixture were checked against the v0.1 contract's required fields, enumerations, provenance/lifecycle structure, event targets, edge endpoints, decision-time cutoffs and local references. The selected structural checks reported **zero findings across all four maps**. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
 
 ## 8. Runner-independent work and safety boundary
 
