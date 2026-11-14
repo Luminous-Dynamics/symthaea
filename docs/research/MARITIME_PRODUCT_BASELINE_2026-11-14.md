@@ -69,7 +69,7 @@ Never combine these into one unlabeled energy number.
 | Candidate / source | Publicly stated values | Evidence class | Important caveats |
 |---|---|---|---|
 | TNPA new tug deliveries (June 2024) | 60-tonne bollard pull; first four of seven delivered for Durban and East London | Port-authority statement | Procurement / delivery reference, not a standardized public test dataset. Exact tug model configuration, test procedure and mission records are still needed. |
-| Damen RSD Tug 2513 Electric | 70 t bollard pull; 24.73 m LOA; 13.13 m beam; 6.50 m max draft; 12 kn; fully charged in 2 hours per product page | Manufacturer specification | Verify exact product sheet and whether charging time is for a defined shore-power installation. Do not interpret charge time as mission endurance. |
+| Damen RSD Tug 2513 Electric | 70 t bollard pull astern; 24.73 m LOA; 13.13 m beam; 6.50 m max draft; 12 kn; product sheet lists maximum battery capacity 2,782 kWh; product page says fully charged in 2 hours | Manufacturer specification | Bollard-pull direction is explicitly astern in the product sheet; do not relabel as ahead pull. Verify charging-power / installation conditions. Do not interpret charge time as mission endurance. |
 | Damen RSD Tug 2513 diesel | 80 t bollard pull; 24.73 m LOA; 13.13 m beam; 6.2 m max draft; 12.6 kn | Manufacturer specification | Same nominal platform dimensions do not mean equal displacement, propulsion, draft, pull test or mission capability. |
 | Crowley eWolf | 6.2 MWh main propulsion battery; 2 × 2,100 kW electric motors; 12 kn; 70 short-ton bollard pull (estimated in cited specification) | Project / manufacturer specification | 70 short tons is approximately 63.5 metric tonnes. The cited value is marked estimated; do not label it a 70 metric-tonne tug or independent measured result. |
 
@@ -77,6 +77,7 @@ Primary source links:
 
 - TNPA 12 June 2024 media statement: https://www.transnetnationalportsauthority.net/Corporate%20Affairs/Press%20Releases/Media%20Statement%20-%20TNPA%20welcomes%20delivery%20of%20four%20new%20tugboats.pdf
 - Damen RSD-E 2513 Electric: https://www.damen.com/vessels/tugs/electric-tugs/rsd-tug-2513-electric
+- Damen RSD-E 2513 Electric product sheet (states 70 t bollard pull astern and maximum 2,782 kWh battery capacity): https://media.damen.com/image/upload/v1655475611/catalogue/tugs/electic-tugs/rsd-e-2513/product-sheet-rsd-tug-2513-electric.pdf
 - Damen RSD 2513: https://www.damen.com/vessels/tugs/rsd-tugs/rsd-tug-2513
 - Crowley eWolf specification sheet: https://www.marinelog.com/wp-content/uploads/2021/07/THS-08240-eWolf.pdf
 
