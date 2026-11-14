@@ -337,20 +337,20 @@
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "5"
           },
           "im": {
-            "numerator": "5",
+            "numerator": "0",
             "denominator": "1"
           }
         },
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           },
           "im": {
-            "numerator": "10",
+            "numerator": "0",
             "denominator": "1"
           }
         }
@@ -359,20 +359,20 @@
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           },
           "im": {
-            "numerator": "10",
+            "numerator": "0",
             "denominator": "1"
           }
         },
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "5"
           },
           "im": {
-            "numerator": "5",
+            "numerator": "0",
             "denominator": "1"
           }
         }
@@ -387,7 +387,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         },
         {
@@ -397,7 +397,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         }
       ],
@@ -409,7 +409,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         },
         {
@@ -419,7 +419,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         }
       ]
@@ -429,20 +429,20 @@
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "5"
           },
           "im": {
-            "numerator": "5",
+            "numerator": "0",
             "denominator": "1"
           }
         },
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           },
           "im": {
-            "numerator": "10",
+            "numerator": "0",
             "denominator": "1"
           }
         },
@@ -453,7 +453,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         },
         {
@@ -463,7 +463,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         }
       ],
@@ -471,20 +471,20 @@
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           },
           "im": {
-            "numerator": "10",
+            "numerator": "0",
             "denominator": "1"
           }
         },
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "5"
           },
           "im": {
-            "numerator": "5",
+            "numerator": "0",
             "denominator": "1"
           }
         },
@@ -495,7 +495,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "10"
           }
         },
         {
@@ -505,49 +505,7 @@
           },
           "im": {
             "numerator": "1",
-            "denominator": "1"
-          }
-        }
-      ],
-      [
-        {
-          "re": {
-            "numerator": "0",
-            "denominator": "1"
-          },
-          "im": {
-            "numerator": "-1",
-            "denominator": "1"
-          }
-        },
-        {
-          "re": {
-            "numerator": "0",
-            "denominator": "1"
-          },
-          "im": {
-            "numerator": "-1",
-            "denominator": "1"
-          }
-        },
-        {
-          "re": {
-            "numerator": "1",
-            "denominator": "1"
-          },
-          "im": {
-            "numerator": "5",
-            "denominator": "1"
-          }
-        },
-        {
-          "re": {
-            "numerator": "1",
-            "denominator": "1"
-          },
-          "im": {
-            "numerator": "10",
-            "denominator": "1"
+            "denominator": "10"
           }
         }
       ],
@@ -559,7 +517,7 @@
           },
           "im": {
             "numerator": "-1",
-            "denominator": "1"
+            "denominator": "10"
           }
         },
         {
@@ -569,26 +527,68 @@
           },
           "im": {
             "numerator": "-1",
+            "denominator": "10"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "5"
+          },
+          "im": {
+            "numerator": "0",
             "denominator": "1"
           }
         },
         {
           "re": {
             "numerator": "1",
+            "denominator": "10"
+          },
+          "im": {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        }
+      ],
+      [
+        {
+          "re": {
+            "numerator": "0",
             "denominator": "1"
           },
           "im": {
-            "numerator": "10",
+            "numerator": "-1",
+            "denominator": "10"
+          }
+        },
+        {
+          "re": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "im": {
+            "numerator": "-1",
+            "denominator": "10"
+          }
+        },
+        {
+          "re": {
+            "numerator": "1",
+            "denominator": "10"
+          },
+          "im": {
+            "numerator": "0",
             "denominator": "1"
           }
         },
         {
           "re": {
             "numerator": "1",
-            "denominator": "1"
+            "denominator": "5"
           },
           "im": {
-            "numerator": "5",
+            "numerator": "0",
             "denominator": "1"
           }
         }
