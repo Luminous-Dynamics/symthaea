@@ -199,7 +199,7 @@ The ACT/HOLD step counter is adequate for a single sequential harness but does n
 - A retry is accepted by the bounded evaluator only when the exact prior operation is qualified NOT_APPLIED and that reconciliation is ordered before the retry.
 - Event-array order is never used as chronology; reversed-delivery controls must replay identically.
 
-The companion synthetic fixture is `benchmarks/engineering-change-impact/action-event-order-v0.1.json`: ten cases cover definitely-before and definitely-after effects, overlapping clock intervals, unknown order, cancellation without final outcome, exact NOT_APPLIED reconciliation, retry before reconciliation, causal resolution of overlapping clocks, contradictory ordering, and reverse delivery.
+The companion synthetic fixture is `benchmarks/engineering-change-impact/action-event-order-v0.1.json`: eleven cases cover definitely-before and definitely-after effects, overlapping clock intervals, unknown order, cancellation without final outcome, exact NOT_APPLIED reconciliation, retry before reconciliation, causal resolution of overlapping clocks, contradictory ordering, and reverse delivery.
 
 The event trace digest is domain-separated with `symthaea.engineering-decision.event-trace.v0.1`, commits the qualified trace state plus all event records sorted by event ID, and is checked against the standard SHA-256 test vectors by the authoring reference. The independent Rust integration test recomputes the digest and ordering relation and checks exact dispositions/reason codes and delivery permutation invariance.
 
@@ -218,3 +218,6 @@ This is a non-authoritative chronology/reconciliation assessment. It does not pr
 | BEFORE / AFTER / OVERLAPPING / UNKNOWN classification | ≥95% on blinded held-out traces |
 
 A zero-failure synthetic suite is a falsification gate, not a population reliability estimate. Independent trace lineages and cluster-aware sampling are required for population claims.
+
+
+A stop trigger also remains active until a distinct `StopObligationDischarged` event is qualified by the stop-disposition owner and established to occur after the trigger. A post-trigger operation start, retry or irreversible effect is not accepted merely because it appears after the trigger in the event array; it must be definitely after that qualified discharge. A discharge is not accepted while any started operation remains unreconciled. This avoids treating "no post-trigger effect was observed" as equivalent to "the system is requalified to resume."
