@@ -1848,6 +1848,8 @@ pub struct U1TwoSiteHamiltonian {
     matrix: [[Complex64; 4]; 4],
     hermiticity_residual: f64,
     charge_conservation_residual: f64,
+    /// Frobenius residual from the closest Hermitian block-diagonal U(1) model.
+    projection_residual_frobenius: f64,
 }
 
 impl U1TwoSiteHamiltonian {
@@ -1902,10 +1904,34 @@ impl U1TwoSiteHamiltonian {
             });
         }
 
+        let mut projected = [[Complex64::new(0.0, 0.0); 4]; 4];
+        projected[0][0] = Complex64::new(matrix[0][0].re, 0.0);
+        projected[3][3] = Complex64::new(matrix[3][3].re, 0.0);
+        projected[1][1] = Complex64::new(matrix[1][1].re, 0.0);
+        projected[2][2] = Complex64::new(matrix[2][2].re, 0.0);
+        let projected_coupling = 0.5 * (matrix[1][2] + matrix[2][1].conj());
+        projected[1][2] = projected_coupling;
+        projected[2][1] = projected_coupling.conj();
+        let projection_residual_frobenius = matrix
+            .iter()
+            .zip(projected.iter())
+            .flat_map(|(row, projected_row)| {
+                row.iter().zip(projected_row.iter())
+            })
+            .map(|(value, projected_value)| (*value - *projected_value).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        if !projection_residual_frobenius.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian symmetry/Hermiticity projection residual",
+            ));
+        }
+
         Ok(Self {
             matrix,
             hermiticity_residual,
             charge_conservation_residual,
+            projection_residual_frobenius,
         })
     }
 
@@ -1919,6 +1945,10 @@ impl U1TwoSiteHamiltonian {
 
     pub fn charge_conservation_residual(&self) -> f64 {
         self.charge_conservation_residual
+    }
+
+    pub fn projection_residual_frobenius(&self) -> f64 {
+        self.projection_residual_frobenius
     }
 
     /// Compute exp(-i dt H) analytically, block-by-block in the U(1) sectors.
@@ -1946,7 +1976,7 @@ impl U1TwoSiteHamiltonian {
         let h33 = self.matrix[3][3].re;
         let mean = 0.5 * (h11 + h22);
         let difference = 0.5 * (h11 - h22);
-        let coupling = self.matrix[1][2];
+        let coupling = 0.5 * (self.matrix[1][2] + self.matrix[2][1].conj());
         let radius = (difference * difference + coupling.norm_sqr()).sqrt();
         let angle = dt * radius;
         let cosine = angle.cos();
@@ -1968,7 +1998,22 @@ impl U1TwoSiteHamiltonian {
         gate[2][2] =
             phase_single * (Complex64::new(cosine, 0.0) - imaginary_factor * difference);
 
-        U1TwoSiteGate::new(gate, gate_tolerance)
+        let gate = U1TwoSiteGate::new(gate, gate_tolerance)?;
+        let hamiltonian_norm = self
+            .matrix
+            .iter()
+            .flatten()
+            .map(|value| value.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let projected_norm = (h00 * h00
+            + h33 * h33
+            + (h11 * h11 + h22 * h22 + 2.0 * coupling.norm_sqr()))
+            .sqrt();
+        let exponential_growth = (dt.abs() * hamiltonian_norm.max(projected_norm)).exp();
+        let projection_operator_error_upper_bound =
+            dt.abs() * self.projection_residual_frobenius * exponential_growth;
+        gate.with_hamiltonian_projection_error(projection_operator_error_upper_bound)
     }
 }
 
