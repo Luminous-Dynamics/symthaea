@@ -300,6 +300,38 @@ mod tests {
             assert_eq!(audit_case(row, &data).as_str(), row["expected_disposition"].as_str().expect("expected"));
         }
     }
+    #[test]
+    fn missing_embedded_composition_blocks_transfer() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0].as_object_mut().expect("bridge object").remove("composition_evidence");
+        assert_eq!(audit_case(&row, &data), Disposition::Blocked);
+    }
+
+    #[test]
+    fn bridge_artifact_substitution_rejects_transfer() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0]["composition_evidence"]["transfer_bridge_artifact_sha256"] = Value::String("d".repeat(64));
+        assert_eq!(audit_case(&row, &data), Disposition::Rejected);
+    }
+
+    #[test]
+    fn specimen_cluster_mapping_substitution_rejects_transfer() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["bridges"][0]["evidence"]["baseline_sample_clusters"][0]["cluster_id"] = Value::String("UNRELATED-LOT".to_owned());
+        assert_eq!(audit_case(&row, &data), Disposition::Rejected);
+    }
+
+    #[test]
+    fn baseline_joint_strength_requires_method_scope_receipt() {
+        let data = fixture();
+        let mut row = case(&data, "material-lot-bridged").clone();
+        row["baseline_qualification"].as_object_mut().expect("baseline qualification").remove("method_scope_receipts");
+        assert_eq!(audit_case(&row, &data), Disposition::Blocked);
+    }
+
     #[test] fn unchanged_profile_passes() {
         let data = fixture();
         assert_eq!(audit_case(case(&data, "unchanged-profile"), &data), Disposition::Pass);
