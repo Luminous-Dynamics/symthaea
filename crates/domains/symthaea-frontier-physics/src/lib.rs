@@ -25,4 +25,5 @@ pub mod quantum_darwinism;
 pub mod quantum_error_correction;
 pub mod stochastic_qed;
 pub mod tensor_networks;
+pub mod u1_mps;
 pub mod topological_qft;
