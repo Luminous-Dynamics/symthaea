@@ -229,6 +229,16 @@ fn add_total(target: &mut u128, value: u64) -> bool {
     }
 }
 
+fn ratio_ppm_ceil(value: u64, denominator: u128) -> Option<u128> {
+    if denominator == 0 {
+        return None;
+    }
+    let scaled = u128::from(value).checked_mul(u128::from(MATERIAL_FLOW_FRACTION_SCALE_PPM))?;
+    scaled
+        .checked_add(denominator - 1)
+        .map(|numerator| numerator / denominator)
+}
+
 /// Validate lot identity, exact producers/consumers, lineage DAG, timestamps,
 /// receiver acceptance and per-event mass conservation.
 pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport {
@@ -779,9 +789,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                 "event input mass must be positive",
             );
         } else {
-            let unaccounted_ppm = u128::from(event.unaccounted_mass_mg)
-                .saturating_mul(u128::from(MATERIAL_FLOW_FRACTION_SCALE_PPM))
-                / input_total;
+            let unaccounted_ppm = ratio_ppm_ceil(event.unaccounted_mass_mg, input_total)
+                .unwrap_or(u128::MAX);
             if unaccounted_ppm > u128::from(event.max_unaccounted_ppm) {
                 add(
                     &mut findings,
@@ -793,9 +802,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                     ),
                 );
             }
-            let uncertainty_ppm = u128::from(event.uncertainty_mass_mg)
-                .saturating_mul(u128::from(MATERIAL_FLOW_FRACTION_SCALE_PPM))
-                / input_total;
+            let uncertainty_ppm = ratio_ppm_ceil(event.uncertainty_mass_mg, input_total)
+                .unwrap_or(u128::MAX);
             if uncertainty_ppm > u128::from(event.max_uncertainty_ppm) {
                 add(
                     &mut findings,
@@ -1249,6 +1257,65 @@ mod tests {
         let report = validate_material_flow(&ledger);
         assert!(!report.valid);
         assert!(report.findings.iter().any(|item| item.code == "LEDGER_MASS_BALANCE_NOT_CLOSED"));
+    }
+
+    #[test]
+    fn residual_and_uncertainty_ppm_thresholds_round_up() {
+        let mut residual = MaterialFlowLedger {
+            ledger_id: "rounding-residual".to_owned(),
+            lots: vec![
+                incoming_lot("input", 3, "inventory-input", 'a'),
+                output_lot("output", 2, "event", LotDisposition::AwaitingReceiver),
+            ],
+            events: vec![event(
+                "event",
+                FlowProcess::Sorting,
+                &["input"],
+                &["output"],
+                1,
+                0,
+                "event-evidence",
+                'b',
+                20,
+            )],
+            claim_ceiling: "synthetic".to_owned(),
+        };
+        residual.events[0].max_unaccounted_ppm = 333_333;
+        residual.events[0].max_uncertainty_ppm = 0;
+        assert!(
+            validate_material_flow(&residual)
+                .findings
+                .iter()
+                .any(|item| item.code == "UNACCOUNTED_MASS_ABOVE_POLICY")
+        );
+
+        let mut uncertainty = MaterialFlowLedger {
+            ledger_id: "rounding-uncertainty".to_owned(),
+            lots: vec![
+                incoming_lot("input", 3, "inventory-input", 'a'),
+                output_lot("output", 3, "event", LotDisposition::AwaitingReceiver),
+            ],
+            events: vec![event(
+                "event",
+                FlowProcess::Sorting,
+                &["input"],
+                &["output"],
+                0,
+                1,
+                "event-evidence",
+                'b',
+                20,
+            )],
+            claim_ceiling: "synthetic".to_owned(),
+        };
+        uncertainty.events[0].max_unaccounted_ppm = 0;
+        uncertainty.events[0].max_uncertainty_ppm = 333_333;
+        assert!(
+            validate_material_flow(&uncertainty)
+                .findings
+                .iter()
+                .any(|item| item.code == "MASS_UNCERTAINTY_ABOVE_POLICY")
+        );
     }
 
     #[test]
