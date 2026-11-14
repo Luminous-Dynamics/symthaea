@@ -615,10 +615,12 @@ fn audit_failure_fraction(
     {
         return blocked("failure-mode endpoint/taxonomy/design identity is missing");
     }
+    if taxonomy_id != "ASTM-D5573-SMC-TAXONOMY-v1" {
+        return blocked("failure-mode taxonomy is unknown or not registered for the scoped D5573 SMC family");
+    }
     if endpoint_id != "failure_mode_fraction"
         || estimand != "candidate_minus_baseline_specimen_fraction"
         || quantity_unit != "fraction"
-        || taxonomy_id != "ASTM-D5573-SMC-TAXONOMY-v1"
         || category_id != "adhesive_failure"
         || denominator_policy != "all_tested_specimens_including_unknown"
         || !matches!(grouping_scheme, "independent_arms" | "paired_by_cluster")
