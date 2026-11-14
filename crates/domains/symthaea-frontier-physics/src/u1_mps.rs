@@ -1999,17 +1999,6 @@ impl U1TwoSiteHamiltonian {
             phase_single * (Complex64::new(cosine, 0.0) - imaginary_factor * difference);
 
         let gate = U1TwoSiteGate::new(gate, gate_tolerance)?;
-        let hamiltonian_norm = self
-            .matrix
-            .iter()
-            .flatten()
-            .map(|value| value.norm_sqr())
-            .sum::<f64>()
-            .sqrt();
-        let projected_norm = (h00 * h00
-            + h33 * h33
-            + (h11 * h11 + h22 * h22 + 2.0 * coupling.norm_sqr()))
-            .sqrt();
         // Duhamel's bound for H = H_projected + Delta, with H_projected
         // Hermitian and ||Delta||_2 <= ||Delta||_F:
         // ||exp(-i H dt)-exp(-i H_projected dt)||
@@ -2020,7 +2009,6 @@ impl U1TwoSiteHamiltonian {
         let exponential_growth = (dt.abs() * projection_residual).exp();
         let projection_operator_error_upper_bound =
             dt.abs() * projection_residual * exponential_growth;
-        let _ = (hamiltonian_norm, projected_norm);
         gate.with_hamiltonian_projection_error(projection_operator_error_upper_bound)
     }
 }
@@ -5003,6 +4991,51 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn gate_quality_operator_bound_accounts_for_entrywise_to_spectral_norm_conversion() {
+        // In the {|01>, |10>} sector choose G = sqrt(I + a * ones).
+        // The max entry of G†G-I is a, while its spectral norm is 2a.
+        let a: f64 = 0.02;
+        let delta = (1.0 + 2.0 * a).sqrt() - 1.0;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        matrix[0][0] = Complex64::new(1.0, 0.0);
+        matrix[3][3] = Complex64::new(1.0, 0.0);
+        matrix[1][1] = Complex64::new(1.0 + 0.5 * delta, 0.0);
+        matrix[1][2] = Complex64::new(0.5 * delta, 0.0);
+        matrix[2][1] = Complex64::new(0.5 * delta, 0.0);
+        matrix[2][2] = Complex64::new(1.0 + 0.5 * delta, 0.0);
+        let gate = U1TwoSiteGate::new(matrix, 0.1).unwrap();
+        assert!((gate.unitarity_residual() - a).abs() <= 1.0e-12);
+
+        let (operator_norm_upper, quality_error_upper) =
+            super::gate_quality_error_bounds(&gate, 1.0).unwrap();
+        let actual_operator_norm = (1.0 + 2.0 * a).sqrt();
+        assert!(operator_norm_upper >= actual_operator_norm);
+        assert!(quality_error_upper >= actual_operator_norm - 1.0);
+        assert!(operator_norm_upper.is_finite());
+        assert!(quality_error_upper.is_finite());
+    }
+
+    #[test]
+    fn hamiltonian_projection_error_uses_deltas_own_duhamel_growth_bound() {
+        let delta: f64 = 0.05;
+        let dt: f64 = 2.0;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        // A small anti-Hermitian component makes H differ from its Hermitian
+        // U(1)-preserving projection by exactly |delta| in Frobenius norm.
+        matrix[0][0] = Complex64::new(0.0, delta);
+        let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 0.2).unwrap();
+        let gate = hamiltonian.evolution_gate(dt, 1.0e-12).unwrap();
+        let expected = dt.abs() * delta * (dt.abs() * delta).exp();
+        assert!(
+            (gate.hamiltonian_projection_error_operator_upper_bound() - expected).abs()
+                <= 1.0e-12
+        );
+        // The true scalar-channel amplitude error is exp(delta*dt)-1.
+        let true_error = (delta * dt).exp() - 1.0;
+        assert!(gate.hamiltonian_projection_error_operator_upper_bound() >= true_error);
+    }
 
     #[test]
     fn two_site_hamiltonian_exponential_matches_analytic_single_excitation_rabi_gate() {
