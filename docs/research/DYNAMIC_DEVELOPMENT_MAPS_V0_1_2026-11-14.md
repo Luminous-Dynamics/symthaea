@@ -334,6 +334,8 @@ The provisional snapshot schema now accepts an optional event slice with separat
 
 The fixture is public and deliberately not a sealed benchmark. Its identifiers are synthetic placeholders, not real Git object hashes or cryptographic attestations.
 
+A follow-up schema-shape audit normalized the distinction between top-level `extractor.build_digest` and per-claim `provenance.extracted_by.digest`. The Symthaea self-map, Mycelix maturity projection and synthetic temporal fixture were then checked against the v0.1 contract's required fields, enumerations, provenance/lifecycle structure, event targets, edge endpoints and local references. The selected structural checks reported **zero findings across all three maps**. This is not a full JSON Schema 2020-12 implementation or meta-schema validation; CI/schema-consumer validation remains pending.
+
 ## 8. Runner-independent work and safety boundary
 
 Safe now: architecture and schema authoring, static parsing of repository metadata/source, public Git-history analysis, manual source-anchored capability inventories, benchmark protocol, synthetic fixtures, static consistency checks and read-only map generation.
