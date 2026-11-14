@@ -155,6 +155,30 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    MpoLeftBoundary {
+        dimension: usize,
+        flux: Option<i32>,
+    },
+    MpoRightBoundary {
+        dimension: usize,
+        flux: Option<i32>,
+    },
+    MpoBondFluxMismatch {
+        bond: usize,
+    },
+    MpoChargeSelectionRule {
+        site: usize,
+        left_flux: i32,
+        output_physical: usize,
+        input_physical: usize,
+        right_flux: i32,
+        amplitude: f64,
+        tolerance: f64,
+    },
+    MpoSiteCountMismatch {
+        mpo_sites: usize,
+        mps_sites: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -325,6 +349,36 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
+            ),
+            Self::MpoLeftBoundary { dimension, flux } => write!(
+                f,
+                "MPO left boundary must be one zero-flux state, got dimension {dimension}, flux {flux:?}"
+            ),
+            Self::MpoRightBoundary { dimension, flux } => write!(
+                f,
+                "MPO right boundary must be one zero-flux state, got dimension {dimension}, flux {flux:?}"
+            ),
+            Self::MpoBondFluxMismatch { bond } => {
+                write!(f, "MPO right/left flux labels disagree on bond {bond}")
+            }
+            Self::MpoChargeSelectionRule {
+                site,
+                left_flux,
+                output_physical,
+                input_physical,
+                right_flux,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "MPO U(1) flux rule failed at site {site}: fL={left_flux}, out={output_physical}, in={input_physical}, fR={right_flux}, forbidden amplitude={amplitude}, tolerance={tolerance}"
+            ),
+            Self::MpoSiteCountMismatch {
+                mpo_sites,
+                mps_sites,
+            } => write!(
+                f,
+                "MPO has {mpo_sites} sites but MPS has {mps_sites}"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
