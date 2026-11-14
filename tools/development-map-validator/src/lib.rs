@@ -3540,6 +3540,33 @@ mod tests {
     }
 
     #[test]
+    fn retrieval_available_region_must_match_case_revision() {
+        let mut value: Value = serde_json::from_str(DYNRETR_CASE).expect("DYNRETR case JSON");
+        value["cases"][0]["candidate_regions"][0]["source_revision"] =
+            Value::String("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned());
+        let report = validate_retrieval_case_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNRETR-SNAPSHOT-003"));
+    }
+
+    #[test]
+    fn retrieval_stale_region_must_not_match_case_revision() {
+        let mut value: Value = serde_json::from_str(DYNRETR_CASE).expect("DYNRETR case JSON");
+        value["cases"][4]["candidate_regions"][1]["source_revision"] =
+            value["cases"][4]["repository_revision"].clone();
+        let report = validate_retrieval_case_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNRETR-SNAPSHOT-004"));
+    }
+
+    #[test]
+    fn retrieval_inactive_configuration_must_be_inactive_in_case_world() {
+        let mut value: Value = serde_json::from_str(DYNRETR_CASE).expect("DYNRETR case JSON");
+        value["cases"][3]["configuration_world"]["features"] =
+            Value::Array(vec![Value::String("payments-v2".to_owned())]);
+        let report = validate_retrieval_case_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "DYNRETR-WORLD-002"));
+    }
+
+    #[test]
     fn retrieval_exploration_oracle_satisfies_local_contract() {
         let report = validate_document_json(DYNRETR_ORACLE).expect("DYNRETR oracle JSON");
         assert!(report.is_valid(), "{:#?}", report.diagnostics);
