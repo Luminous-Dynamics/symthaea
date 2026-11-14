@@ -277,6 +277,9 @@ pub enum ValidationError {
     ClaimRevisionMismatch(String),
     ClaimClassMismatch(String),
     DuplicateRequiredObservable(String),
+    MissingServiceBoundaryEvidence(String),
+    ServiceBoundaryScopeMismatch(String),
+    ServiceBoundarySubjectMismatch(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -410,20 +413,15 @@ fn evaluate_solver_run(candidate: &CandidateInput, run: &SolverRun) -> SolverFin
         state,
     };
 
-    if !run
-        .supported_regimes
-        .iter()
-        .any(|regime| regime == &candidate.required_regime)
-    {
+    if !run.supported_regimes.contains(&candidate.required_regime) {
         return finding(SolverFindingState::UnsupportedRegime);
     }
 
-    if candidate.required_observables.iter().any(|required| {
-        !run
-            .supported_observables
-            .iter()
-            .any(|supported| supported == required)
-    }) {
+    if candidate
+        .required_observables
+        .iter()
+        .any(|required| !run.supported_observables.contains(required))
+    {
         return finding(SolverFindingState::UnsupportedObservable);
     }
 
@@ -447,12 +445,11 @@ fn evaluate_solver_run(candidate: &CandidateInput, run: &SolverRun) -> SolverFin
         Convergence::Converged => {}
     }
 
-    if candidate.required_observables.iter().any(|required| {
-        !run
-            .output_observables
-            .iter()
-            .any(|output| output == required)
-    }) {
+    if candidate
+        .required_observables
+        .iter()
+        .any(|required| !run.output_observables.contains(required))
+    {
         return finding(SolverFindingState::MissingOutput);
     }
 
@@ -473,6 +470,30 @@ fn validate_candidate(candidate: &CandidateInput) -> Vec<ValidationError> {
 
     if !is_sha256(&candidate.geometry_sha256) {
         errors.push(ValidationError::InvalidSha256("geometry_sha256"));
+    }
+
+    if let Some(boundary_ref) = candidate.service_boundary_ref.as_deref()
+        && !boundary_ref.trim().is_empty()
+    {
+        match candidate.evidence.iter().find(|item| item.id == boundary_ref) {
+            None => errors.push(ValidationError::MissingServiceBoundaryEvidence(
+                boundary_ref.to_string(),
+            )),
+            Some(evidence) => {
+                if evidence.scope_ref != HardGateKind::EnergyBoundary.scope_ref() {
+                    errors.push(ValidationError::ServiceBoundaryScopeMismatch(
+                        boundary_ref.to_string(),
+                    ));
+                }
+                if evidence.subject_ref != candidate.candidate_id
+                    || evidence.subject_revision != candidate.candidate_revision
+                {
+                    errors.push(ValidationError::ServiceBoundarySubjectMismatch(
+                        boundary_ref.to_string(),
+                    ));
+                }
+            }
+        }
     }
 
     let mut evidence_ids = BTreeSet::new();
@@ -635,19 +656,19 @@ fn validate_candidate(candidate: &CandidateInput) -> Vec<ValidationError> {
 
 fn pairwise_dependence_findings(runs: &[SolverRun]) -> Vec<DependenceFinding> {
     let mut findings = Vec::new();
-    for first in 0..runs.len() {
-        for second in (first + 1)..runs.len() {
-            let a = &runs[first].dependencies;
-            let b = &runs[second].dependencies;
+    for (first_index, first_run) in runs.iter().enumerate() {
+        for second_run in runs.iter().skip(first_index + 1) {
+            let a = &first_run.dependencies;
+            let b = &second_run.dependencies;
             let shared = same_declared_group(&a.dataset_group, &b.dataset_group)
                 || same_declared_group(&a.code_group, &b.code_group)
                 || same_declared_group(&a.assumption_group, &b.assumption_group);
-            let unknown = a.dataset_group.is_none()
-                || b.dataset_group.is_none()
-                || a.code_group.is_none()
-                || b.code_group.is_none()
-                || a.assumption_group.is_none()
-                || b.assumption_group.is_none();
+            let unknown = is_unknown_group(&a.dataset_group)
+                || is_unknown_group(&b.dataset_group)
+                || is_unknown_group(&a.code_group)
+                || is_unknown_group(&b.code_group)
+                || is_unknown_group(&a.assumption_group)
+                || is_unknown_group(&b.assumption_group);
 
             let disposition = if shared {
                 PairwiseDependence::CommonModeSharedDependency
@@ -658,8 +679,8 @@ fn pairwise_dependence_findings(runs: &[SolverRun]) -> Vec<DependenceFinding> {
             };
 
             findings.push(DependenceFinding {
-                first_run_id: runs[first].run_id.clone(),
-                second_run_id: runs[second].run_id.clone(),
+                first_run_id: first_run.run_id.clone(),
+                second_run_id: second_run.run_id.clone(),
                 disposition,
             });
         }
@@ -668,7 +689,11 @@ fn pairwise_dependence_findings(runs: &[SolverRun]) -> Vec<DependenceFinding> {
 }
 
 fn same_declared_group(first: &Option<String>, second: &Option<String>) -> bool {
-    matches!((first, second), (Some(a), Some(b)) if a == b)
+    matches!((first, second), (Some(a), Some(b)) if !a.trim().is_empty() && a == b)
+}
+
+fn is_unknown_group(group: &Option<String>) -> bool {
+    group.as_deref().is_none_or(|value| value.trim().is_empty())
 }
 
 /// Return the changed nodes and all transitive downstream dependants.
@@ -724,7 +749,11 @@ mod tests {
             .iter()
             .enumerate()
             .map(|(index, kind)| EvidenceRef {
-                id: format!("evidence-{index}"),
+                id: if *kind == HardGateKind::EnergyBoundary {
+                    "grid-export-boundary-v1".to_string()
+                } else {
+                    format!("evidence-{index}")
+                },
                 subject_ref: candidate_id.clone(),
                 subject_revision: candidate_revision.clone(),
                 scope_ref: kind.scope_ref().to_string(),
@@ -740,7 +769,11 @@ mod tests {
                 kind: *kind,
                 state: GateState::Pass,
                 reason_code: None,
-                evidence_ids: vec![format!("evidence-{index}")],
+                evidence_ids: vec![if *kind == HardGateKind::EnergyBoundary {
+                    "grid-export-boundary-v1".to_string()
+                } else {
+                    format!("evidence-{index}")
+                }],
             })
             .collect();
 
@@ -929,7 +962,7 @@ mod tests {
             claim_id: "claim-measured-1".to_string(),
             subject_ref: source.candidate_id.clone(),
             subject_revision: source.candidate_revision.clone(),
-            evidence_id: "evidence-0".to_string(),
+            evidence_id: "evidence-1".to_string(),
             requested_class: ClaimClass::Measured,
         });
         let errors = compile_candidate(&source).unwrap_err();
