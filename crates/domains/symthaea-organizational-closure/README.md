@@ -11,7 +11,8 @@ This crate verifies a bounded functional self-maintenance contract:
 - artifact versions are immutable and keyed by component ID plus version;
 - SHA-256 is recomputed over the stored bytes;
 - a downstream consumer must reference the exact earlier verified output and producer execution;
-- external dependency observations must use the process allow-list;
+- required external dependencies must produce an explicit runtime observation; optional dependencies may be absent;
+- observed dependencies must use the process allow-list and available observations need a receipt digest;
 - failed, abstained or interrupted events cannot expose committed outputs;
 - required regenerative components need both verified producer and consumer evidence.
 
