@@ -203,6 +203,9 @@ fn validate_node(node: &ObservationNode) -> std::result::Result<(), Disposition>
     if !unique_strings(&mapped) || !same_string_members(&mapped, &node.receipt.specimen_ids) {
         return Err(Disposition::Rejected);
     }
+    // This is only a nontrivial anti-pseudoreplication floor. It is not a
+    // sample-size, power, or statistical-adequacy threshold; the preregistered
+    // design receipt carries the declared minima, and Statistics owns adequacy.
     if clusters.len() < 3 {
         return Err(Disposition::Blocked);
     }
@@ -813,6 +816,17 @@ mod tests {
     fn unsupported_d5573_material_family_is_blocked() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
         let case = fixture.cases.iter().find(|case| case.id == "d5573-general-frp-scope-not-admitted").expect("case exists");
+        assert_eq!(audit_graph(&case.graph).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn many_coupons_from_one_lot_do_not_count_as_independent_clusters() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid endpoint transform fixture");
+        let case = fixture.cases.iter()
+            .find(|case| case.id == "many-coupons-one-lot-do-not-replicate-clusters")
+            .expect("case exists");
+        assert_eq!(case.graph.inputs[0].receipt.specimen_ids.len(), 10);
+        assert_eq!(cluster_set(&case.graph.inputs[0]).len(), 1);
         assert_eq!(audit_graph(&case.graph).disposition, Disposition::Blocked);
     }
 
