@@ -14,7 +14,7 @@
 //! The resulting interval is a deterministic envelope under the declared
 //! input bounds. It is not a probabilistic forecast or physical validation.
 
-use super::{Evidence, PolarDiagram, PolarError, TackSide, evidence_gate, signed_angle_deg};
+use super::{Evidence, PlanStatus, PolarDiagram, PolarError, TackSide, evidence_gate, signed_angle_deg};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScalarInterval {
