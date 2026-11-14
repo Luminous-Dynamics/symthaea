@@ -14,7 +14,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt;
 use super::joint_metrology_adapter::{
-    AssuranceDisposition, EnergyClosureDisposition, JointMetrologyEvidence,
+    AssuranceDisposition, JointMetrologyEvidence,
     JointMetrologyReport, QualificationDisposition, UpstreamEnergyDisposition,
     qualify_joint_metrology,
 };
@@ -405,7 +405,7 @@ pub fn validate_receipt(input: &[u8]) -> Result<ValidatedReceipt, WireError> {
 mod tests {
     use super::*;
 
-    const GOLDEN_PACKET: &str = include_str!("../../fixtures/joint_receipt_v0_1_complete.json");
+    const GOLDEN_PACKET: &str = include_str!("../fixtures/joint_receipt_v0_1_complete.json");
     const GOLDEN_DIGEST: &str = "cb19e0327c2f47c895eae4e49a89c9f8f9c9918e080d52b201d98b1a794823b8";
 
     #[test]
