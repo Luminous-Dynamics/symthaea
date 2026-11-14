@@ -52,9 +52,8 @@ pub use semantic_continuity::{
 };
 pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
-    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode,
-    ReconfigurationPolicy, ReconfigurationQualification, ReconfigurationReport,
-    evaluate_reconfiguration,
+    ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode, ReconfigurationPolicy,
+    ReconfigurationQualification, ReconfigurationReport, evaluate_reconfiguration,
 };
 
 macro_rules! string_id {
