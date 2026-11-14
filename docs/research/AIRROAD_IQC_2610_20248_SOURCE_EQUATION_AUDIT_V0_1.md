@@ -271,7 +271,35 @@ This is a scoped assumption of its stochastic branch, not a requirement of IQC t
 
 The paper reports 247 logarithmically spaced measured frequencies, ten independent multisine realizations each repeated ten times, an approximately 95.45% (2-sigma) stochastic generator region, and a 740-point logarithmic interpolation/display grid. The exact sequence length and sampling frequency are withheld. Its Section 5.4 also omits inter-frequency weighting-filter behavior for simplicity. AIRROAD must report these limitations and must not claim to reproduce the wirebonder experiment without its data/setup.
 
-## 6. Exact scalar source-equation conformance fixture
+## 6. Schur-complement source conformance
+
+Equation (20) is checked independently of the RCF/LFT fixture. For real-symmetric matrices the source block is
+[
+Q=\begin{bmatrix}
+S&M^T\\M&-\Pi_{11}^{-1}
+\end{bmatrix},\quad
+S=\Pi_{22}+M^T\Pi_{12}+\Pi_{12}^TM,
+]
+and the Schur-reduced matrix is
+[
+S+M^T\Pi_{11}M.
+]
+Since (-\Pi_{11}^{-1}\prec0) for (\Pi_{11}\succ0), the full block is strictly negative definite exactly when this reduced matrix is strictly negative definite. The verifier checks both via exact rational leading principal minors.
+
+The feasible 2×2 case uses:
+[
+\Pi_{11}=\operatorname{diag}(2,1),\quad
+\Pi_{12}=\operatorname{diag}(1/4,0),\quad
+\Pi_{22}=\operatorname{diag}(-3,-2),\quad
+M=\operatorname{diag}(1/2,1/3).
+]
+It yields (S=\operatorname{diag}(-11/4,-2)) and the Schur reduction (\operatorname{diag}(-9/4,-17/9)\prec0). The full 4×4 block has leading principal minors (-11/4,11/2,-9/4,17/8), so it is strictly negative definite.
+
+The infeasible control uses (\Pi_{11}=2I), (\Pi_{12}=0), (\Pi_{22}=-(1/5)I), (M=(1/2)I). The correct Schur reduction is (+(3/10)I), so the full block is indefinite. **Reversing the Schur-complement sign** produces (-(7/10)I\prec0), a false feasibility result. This is a deliberate negative control for the exact sign in Equation (20).
+
+The verifier rejects any substitution of non-strict negativity for the paper's strict (\prec0) condition. This fixture is algebraic conformance only; it does not imply a controller has been synthesized.
+
+## 7. Exact scalar source-equation conformance fixture
 
 Use a scalar \(1\times1\) generalized-plant instance:
 \[
@@ -303,7 +331,7 @@ A port-order or sign error changes this equality and must fail the exact oracle.
 
 The fixture verifies algebra only. It does not check stable rational realizability for a nonconstant plant, the full matrix-valued LFT theorem, any interval generator inclusion, or robust stability.
 
-## 7. Independent review checklist
+## 8. Independent review checklist
 
 Before the next synthesis increment:
 - [ ] independently review equations (13)–(20), including the left/right coprime convention and LFT block order;
@@ -315,6 +343,6 @@ Before the next synthesis increment:
 - [ ] review source assumptions on frequency-independent circular complex Gaussian samples before adapting with \(C/P\);
 - [ ] have a second reviewer sign the equation/dimension audit before using source-derived constraints for AIRROAD claims.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
 This is a primary-source transcription ledger and scalar identity test. It does not implement the full generalized-plant generator path, controller iteration, finite-data SDP, continuous-frequency certificate, physical FRF, robust stability, performance, wirebonder reproduction or airworthiness.
