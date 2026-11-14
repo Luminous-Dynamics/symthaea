@@ -297,6 +297,8 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
     }
 
 
+    let mut evidence_ids = BTreeSet::<&str>::new();
+    let mut evidence_digests = BTreeSet::<&str>::new();
     let mut incoming_lot_count = 0_usize;
     let mut terminal_lot_count = 0_usize;
     let mut consumer_by_lot = BTreeMap::<&str, &str>::new();
@@ -322,6 +324,14 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "DUPLICATE_EVIDENCE_ID",
                         &lot.lot_id,
                         "evidence IDs must be unique across inventory, events and receiver decisions",
+                    );
+                }
+                if !evidence_digests.insert(inventory_evidence.sha256.as_str()) {
+                    add(
+                        &mut findings,
+                        "DUPLICATE_EVIDENCE_DIGEST",
+                        &lot.lot_id,
+                        "distinct evidence records cannot reuse the same source bytes",
                     );
                 }
                 if !add_total(&mut totals.incoming_mass_mg, lot.mass_mg) {
@@ -462,6 +472,15 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                         "receiver acceptance must have its own unique evidence ID",
                     );
                 }
+                if !evidence_digests.insert(acceptance.evidence.sha256.as_str()) {
+                    receiver_valid = false;
+                    add(
+                        &mut findings,
+                        "DUPLICATE_EVIDENCE_DIGEST",
+                        &lot.lot_id,
+                        "receiver acceptance must reference distinct source bytes",
+                    );
+                }
                 if receiver_valid
                     && expected_outcome == AcceptanceOutcome::Accepted
                     && !add_total(&mut totals.accepted_mass_mg, lot.mass_mg)
@@ -586,6 +605,14 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
                 "DUPLICATE_EVIDENCE_ID",
                 &event.event_id,
                 "event evidence ID is duplicated within the ledger",
+            );
+        }
+        if !evidence_digests.insert(event.evidence.sha256.as_str()) {
+            add(
+                &mut findings,
+                "DUPLICATE_EVIDENCE_DIGEST",
+                &event.event_id,
+                "distinct process events cannot reuse the same source bytes",
             );
         }
         if event.max_unaccounted_ppm > MATERIAL_FLOW_FRACTION_SCALE_PPM as u32
@@ -837,8 +864,7 @@ pub fn validate_material_flow(ledger: &MaterialFlowLedger) -> MaterialFlowReport
         for input_id in &event.input_lot_ids {
             if let Some(lot) = lots.get(input_id.as_str()) {
                 if let LotOrigin::EventOutput { event_id: producer_id } = &lot.origin {
-                    if producer_id != &event.event_id
-                        && events.contains_key(producer_id.as_str())
+                    if events.contains_key(producer_id.as_str())
                         && edges.entry(producer_id.as_str()).or_default().insert(event.event_id.as_str())
                     {
                         *indegree.entry(event.event_id.as_str()).or_default() += 1;
@@ -1254,6 +1280,31 @@ mod tests {
     }
 
     #[test]
+    fn event_consuming_its_own_output_is_rejected_as_a_self_cycle() {
+        let mut ledger = sorting_split_ledger();
+        ledger.lots = vec![output_lot(
+            "self-lot",
+            10_000,
+            "self-event",
+            LotDisposition::InProcess,
+        )];
+        ledger.events = vec![event(
+            "self-event",
+            FlowProcess::MechanicalOpening,
+            &["self-lot"],
+            &["self-lot"],
+            0,
+            0,
+            "self-event-evidence",
+            'c',
+            20,
+        )];
+        let report = validate_material_flow(&ledger);
+        assert!(!report.valid);
+        assert!(report.findings.iter().any(|item| item.code == "EVENT_GRAPH_CYCLE"));
+    }
+
+    #[test]
     fn synthetic_or_simulated_process_evidence_cannot_qualify_physical_flow() {
         let mut ledger = sorting_split_ledger();
         ledger.events[0].evidence.tier = EvidenceTier::Simulation;
@@ -1391,5 +1442,6 @@ mod tests {
         let report = validate_material_flow(&ledger);
         assert!(!report.valid);
         assert!(report.findings.iter().any(|item| item.code == "RECEIVER_EVIDENCE_REUSES_BASIS_BYTES"));
+        assert!(report.findings.iter().any(|item| item.code == "DUPLICATE_EVIDENCE_DIGEST"));
     }
 }
