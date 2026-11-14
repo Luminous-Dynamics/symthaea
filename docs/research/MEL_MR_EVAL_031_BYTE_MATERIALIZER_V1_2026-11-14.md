@@ -27,7 +27,7 @@ A deterministic receipt binds the complete materialization result. Its integrity
 - Exact byte-identical source/target audio under distinct lineage IDs rejects as a conservative duplicate signal.
 - Domain-separated deterministic receipt with relative paths only; no host absolute paths are included.
 - Standalone command example writes a receipt only after materialization and structural replay succeed.
-- Eight authored adversarial/positive test functions cover successful receipt, source mutation, traversal/missing map, symlink, rights-evidence mutation, receipt/map tampering, exact cross-lineage duplicate and size limits.
+- Ten authored adversarial/positive test functions cover successful receipt, source mutation, traversal/missing map, symlink, rights-evidence mutation, receipt/map tampering, exact cross-lineage duplicate and size limits.
 
 ## Explicit limits
 
@@ -52,7 +52,7 @@ Prospective targets (not measurements): at least 95% target-property success on 
 
 ## Validation state
 
-The production adapter extension, schemas, synthetic map fixture, CLI example, standalone harness and workflow integration are part of this implementation tranche. Eight materializer test functions are authored. Compilation, formatting, tests and Clippy are not claimed until the exact-head Rust 1.96 workflow finishes. No local Rust execution result is asserted.
+The production adapter extension, schemas, synthetic map fixture, CLI example, standalone harness and workflow integration are part of this implementation tranche. Ten materializer test functions are authored. Compilation, formatting, tests and Clippy are not claimed until the exact-head Rust 1.96 workflow finishes. No local Rust execution result is asserted.
 
 ## Next boundary
 
