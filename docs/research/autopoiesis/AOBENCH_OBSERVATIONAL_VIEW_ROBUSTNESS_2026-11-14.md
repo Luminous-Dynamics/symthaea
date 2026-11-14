@@ -146,11 +146,33 @@ This is a defensible path to a stronger benchmark: not a claim to beat CausalIDV
 7. Add matched CFM, classical and modular baselines with frozen checkpoint/config SHAs.
 8. Use world-level clustered uncertainty and family-disjoint sealed SCMs before any SOTA claim.
 
-## Claim boundary
+## 10. First executable increment
+
+The nested Rust package now contains `src/observational_views.rs`, exported from its public crate root. It is a matched-view **data-contract validator**, not a causal-identification engine.
+
+The default policy encodes the upstream four-regime column allowlists:
+- BD context: X, U, T, Y; query: X, U.
+- FD context: X, M, T, Y; query: X, M.
+- IV context: X, I, T, Y; query: X, I.
+- PROX context: X, Z_P, W_P, T, Y; query: X, Z_P, W_P.
+
+It checks:
+- all required regimes exist exactly once;
+- all regimes share the same SCM and estimand digests;
+- context and query unit IDs are unique, disjoint and identically ordered across views;
+- column names match the frozen per-regime allowlist;
+- query factual treatment/outcome and evaluator-only columns (tau, Y0/Y1, M0/M1, T0/T1, true effect, oracle fields) never enter the estimator view;
+- each column has the correct row count, consistent vector dimensions and finite values.
+
+Ten deterministic unit tests cover a valid four-view set, target-effect leakage, query T/Y leakage, changed query ordering, SCM/estimand digest mismatch, missing regime, duplicate regime, malformed/non-finite columns, context/query overlap and unexpected columns.
+
+This validator proves only that the supplied serialized view matches its declared data contract. It does not authenticate the SCM digest, prove the observation source is truthful, or establish the back-door/front-door/IV/proximal assumptions. Those require separate oracle/evidence contracts. No Rust compiler, test or Clippy pass is claimed until exact-head qualification completes.
+
+## 11. Claim boundary
 
 Cross-view robustness on synthetic SCMs does not prove real-world identification assumptions. The regime, graph, estimand, target population and data-view contracts must be frozen and independently reviewed. Real-world null controls and semi-synthetic datasets add evidence, but do not turn benchmark performance into universal causal truth.
 
-## References
+## 12. References
 
 - [Jung et al. (2026), CausalIDView paper](https://arxiv.org/abs/2609.36881)
 - [CausalIDView reproducibility scaffold](https://github.com/MLAI-Yonsei/CausalIDView)
