@@ -53,6 +53,8 @@ ITensorMPS creates `S=1/2` sites with `conserve_qns=true`, encodes excitation 0 
 
 The ITensor runner exports a dense state for N<=12. The full dense continuous-time Hamiltonian oracle is restricted to N<=10 to bound memory. Larger cases emit QN structural-conservation, norm, max-link-dimension and expectation-value measurements without allocating a dense vector.
 
+The Symthaea runner exports dense states and discrete-circuit oracles for N<=12. Its current full dense Hamiltonian exponential is deliberately capped at N<=8; larger cases still report the production MPS receipts and dense-discrete results when N<=12, but no continuous-time matrix exponential.
+
 ## Comparison rules
 
 - **Fixed-bond track:** same max bond, cutoff disabled, same exact local gates and order. Record native cutoff semantics.
