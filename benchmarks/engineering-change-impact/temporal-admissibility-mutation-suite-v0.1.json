@@ -210,6 +210,30 @@
       "mutation": "A client carries a cached MCP tool inventory from profile A and invokes it against profile B or a substituted endpoint without binding the exact tenant/profile/endpoint/tool-set identity and rechecking permissions.",
       "expected": "effect_gate_reject_or_quarantine",
       "note": "Aras InnovatorEdge 2.4 documents multiple profiles with independent endpoints, Access Points, tool sets and enablement; this is a conformance/security test scenario, not a claim of vendor vulnerability."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-025",
+      "mutation": "Promote a structurally valid, acyclic multi-conductor causal-history DAG to an authenticated causal-proof or real-world truth claim without independently resolving each edge evidence reference to the exact source/action bytes, accepted validator record, receiving-conductor identity, DNA/cell lineage and verifier identity.",
+      "expected": "semantic_reject_or_incomplete",
+      "note": "A structural partial-order audit establishes internal consistency under its declared graph semantics; it does not authenticate the evidence references or prove the asserted physical event."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-026",
+      "mutation": "A DSSE/in-toto role signature verifies relative to a caller-supplied trust-policy byte digest, but the policy is not authenticated by a pinned root; the evaluator labels the result root-authenticated, globally trusted, currently authorized or physically true.",
+      "expected": "claim_ceiling_reject",
+      "note": "ROLE_AUTHENTICATED_RELATIVE_TO_SUPPLIED_POLICY is not ROOT_AUTHENTICATED_POLICY_SNAPSHOT, SCITT transparency, current permission or event truth."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-027",
+      "mutation": "A SCITT/COSE envelope is parsed and its opaque-byte SHA-256 commitment matches, but COSE signature, transparency-service identity and VDS receipt proof are not verified; the record is nevertheless reported as authenticated SCITT inclusion.",
+      "expected": "semantic_reject_or_incomplete",
+      "note": "Envelope parsing and byte commitment do not verify the signature, issuer, transparency service or verifiable-data-structure proof."
+    },
+    {
+      "id": "TEMP-GOLD-SEM-028",
+      "mutation": "Use a key that is revoked under the current trust policy to authorize a new current decision, or accept a historical signature without trusted-time evidence and the exact historical policy snapshot/epoch.",
+      "expected": "semantic_reject_or_indeterminate",
+      "note": "Current authorization and historical authentication are separate outcomes; missing historical trusted time or policy evidence cannot default to historical success."
     }
   ],
   "invariants": [
@@ -234,7 +258,11 @@
     "temporal_succession_or_correlation_alone_does_not_establish_causal_influence",
     "later_corrections_do_not_rewrite_a_historical_decision_frontier_projection",
     "decision_time_admissibility_never_substitutes_for_action_time_authorization",
-    "cached_tool_inventories_are_bound_to_exact_profile_endpoint_tool_set_and_scope"
+    "cached_tool_inventories_are_bound_to_exact_profile_endpoint_tool_set_and_scope",
+    "structural_causal_DAG_consistency_does_not_authenticate_edge_evidence_or_real_world_truth",
+    "signature_valid_relative_to_supplied_policy_does_not_imply_root_authenticated_policy",
+    "COSE_SCITT_envelope_parse_and_byte_commitment_do_not_verify_signature_or_transparency_receipt",
+    "current_key_revocation_and_historical_signature_authenticity_are_separate_adjudication_axes"
   ],
   "evaluation_extensions": {
     "schema_version": "luminous.eng-change-decision-replay-evaluation.v0.1",
