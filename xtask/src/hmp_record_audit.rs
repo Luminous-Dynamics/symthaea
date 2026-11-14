@@ -446,6 +446,39 @@ mod tests {
         assert_eq!(tracks.len(), 6, "each starter case should cover a distinct track");
     }
 
+    fn bench_fixture() -> Value {
+        serde_json::from_str(include_str!(
+            "../../research-fixtures/hmp-bench/synthetic-adversarial-v0.1.0.json"
+        ))
+        .expect("synthetic HMP-Bench fixture must be valid JSON")
+    }
+
+    #[test]
+    fn hmp_bench_fixture_passes_integrity_audit() {
+        assert_eq!(audit_benchmark(&bench_fixture()).expect("fixture should pass"), 6);
+    }
+
+    #[test]
+    fn rights_negative_control_rejects_any_allowed_operation() {
+        let mut fixture = bench_fixture();
+        fixture["cases"][4]["permission"]["permitted_uses"] = json!(["read"]);
+        assert!(audit_benchmark(&fixture).is_err());
+    }
+
+    #[test]
+    fn hmp_bench_fixture_rejects_duplicate_case_ids() {
+        let mut fixture = bench_fixture();
+        fixture["cases"][1]["case_id"] = fixture["cases"][0]["case_id"].clone();
+        assert!(audit_benchmark(&fixture).is_err());
+    }
+
+    #[test]
+    fn hmp_bench_fixture_requires_all_registered_tracks() {
+        let mut fixture = bench_fixture();
+        fixture["cases"].as_array_mut().expect("cases array").pop();
+        assert!(audit_benchmark(&fixture).is_err());
+    }
+
     #[test]
     fn schema_header_uses_draft_2020_12() {
         let schema: Value = serde_json::from_str(include_str!(
