@@ -185,3 +185,48 @@ A schema pass is not a physical test. A topologically valid operation graph is n
 - NIR-SORT dataset descriptor: https://doi.org/10.1038/s41597-026-07434-6
 - European Commission textile DPP: https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/textile-apparel_en
 - GreenCape South African voluntary circular textile initiative: https://greencape.co.za/library/developing-a-voluntary-circular-textile-initiative-for-south-africa-potential-pathways-and-value-proposition/
+
+
+## 9. Everyday wear: comfort, durability and lived garment service (14 November 2026)
+
+A new application workstream is now tracked as [Symthaea #12157 — EVERYDAY-WEAR-001](https://github.com/Luminous-Dynamics/symthaea/issues/12157). It composes the existing textile qualification, material inverse-design, personal garment studio, pattern/3D interoperability, sewing-plan, spatial, cloth-physics and Mycelix lifecycle owners rather than creating parallel engines.
+
+### Research update
+
+**ISO 11092:2026, third edition (May 2026)** specifies the sweating guarded-hotplate ("skin model") method for thermal resistance (Rct) and water-vapour resistance (Ret), including multilayer assemblies. Its own introduction emphasizes that clothing comfort depends on interacting, time-dependent heat and mass transfer. This is an important material-characterization anchor, not a universal comfort score or a direct wearer-comfort test.
+
+Official standard: https://www.iso.org/standard/85998.html
+
+ASTM's current textile methods catalogue includes distinct methods for air permeability (D737), abrasion (D4966), pilling (D4970), tensile strength (D5034), tear strength (D1424/D5587), seam-related properties and dimensional stability. Select methods by garment/material scope and pin the exact edition; do not treat one test as a proxy for overall garment durability.
+
+ASTM catalogue: https://store.astm.org/products-services/standards-and-publications/standards/textile-standards.html
+
+A 2024 study proposing physical garment durability protocols demonstrates why testing must be product-specific: its jeans and T-shirt protocols use different combinations of abrasion, bursting/tensile strength, pilling, seam strength, spirality, dimensional stability and visual assessment. Repeated domestic laundering and visual inspection are part of the evidence, not optional decoration.
+
+Study: https://doi.org/10.1016/j.clrc.2024.100245
+
+### Competitive correction
+
+Do not claim novelty for "breathable", "moisture-wicking", "durable" or "comfortable" fabric selection. These are established textile engineering concerns and individual test methods already exist. The proposed differentiation is the complete evidence path from wearer-authored requirements through garment geometry, material/construction alternatives, measured textile and garment tests, controlled wearer trials, service-life observations, repair and lifecycle records.
+
+### New benchmark lane: EverydayWearBench
+
+Keep material-coupon tests, whole-garment physical tests, instrumented task trials, wearer-reported comfort, care burden and observed service-life outcomes separate. Use a randomized crossover wearer evaluation where feasible; report subgroup and lower-tail outcomes, missingness and adverse events. Compare garments under matched wearer, size, activity, ambient conditions, wash history and price/garment class.
+
+The first bounded demonstrator is the existing non-PPE woven overshirt. Separate material comparisons (fixed pattern/construction) from fit/construction comparisons (controlled materials) to avoid confounding. Climate profiles should be measured envelopes—hot/dry, hot/humid, cool/dry, cold/wet, high solar exposure and indoor/outdoor transitions—not country stereotypes. Johannesburg may be one pilot context, not the universal baseline.
+
+### Explicit metric boundaries
+
+- Rct/Ret, air permeability and moisture behavior are material/assembly properties under defined test conditions, not subjective comfort.
+- Abrasion/pilling/tensile/tear/seam/dimensional-change results describe specific failure modes, not total service life.
+- A successful standing fit does not establish seated, bending, reaching, dressing or walking comfort.
+- A supplier fibre label or visual classifier does not establish independently measured composition.
+- Accelerated laundering or abrasion does not establish years of real-world wear without validated correlation.
+- "Water repellent" does not establish a complete garment is rainproof.
+- Simulated performance is not physical or wearer evidence.
+
+### Proposed hypotheses
+
+The new issue records proposed targets only: zero accepted hard-constraint violations; zero unsupported comfort/durability/weather/composition claims; 20% reduction in selected rework/failure events; 20% improvement in a preregistered durability-retention endpoint without degrading wearer acceptance; and at least 15% improvement in a declared comfort or mobility profile without material lower-tail harm. These are not measured results, standards or industry benchmarks.
+
+Issue and full protocol: https://github.com/Luminous-Dynamics/symthaea/issues/12157
