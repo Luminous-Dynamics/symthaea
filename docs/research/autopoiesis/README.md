@@ -6,8 +6,10 @@ This directory contains the research specification and operational model for AOB
 
 1. [AOBench specification](AOBENCH_SPEC_2026-11-13.md) — benchmark tracks, metrics, baselines, protocol and staged implementation.
 2. [Organizational closure model](ORGANIZATIONAL_CLOSURE_MODEL_2026-11-13.md) — definitions, system boundaries, runtime evidence, causal interventions and claim limits.
+3. [Intervention integrity specification](AOBENCH_INTERVENTION_INTEGRITY_2026-11-14.md) — delivery, isolation, trial interference, causal estimands and independent oracle qualification.
+4. [AOBENCH-006 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/12067) — intervention validity and causal attribution.
 3. [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980).
-4. [MEL-AUTO-001 runtime regeneration work](https://github.com/Luminous-Dynamics/symthaea/issues/10098), which is the implementation foundation to reuse.
+5. [MEL-AUTO-001 runtime regeneration work](https://github.com/Luminous-Dynamics/symthaea/issues/10098), which is the implementation foundation to reuse.
 
 ## Current evidence status
 
