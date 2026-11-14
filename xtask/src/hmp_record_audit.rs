@@ -306,17 +306,33 @@ pub fn audit_benchmark(fixture: &Value) -> Result<usize> {
                 bail!("HMP-RIGHTS case must exercise restricted or community-controlled access");
             }
             let status = required_string(rights, "permission_status", "permission")?;
-            if !matches!(status, "denied" | "withdrawn" | "pending") {
-                bail!("HMP-RIGHTS negative control must not have granted permission");
+            if !VALID_PERMISSION_STATES.contains(&status) {
+                bail!("HMP-RIGHTS permission_status is unknown: {status}");
             }
-            let allowed = rights
-                .get("permitted_uses")
-                .and_then(Value::as_array)
-                .context("HMP-RIGHTS permission.permitted_uses must be an array")?;
-            if !allowed.is_empty() {
-                bail!("HMP-RIGHTS denied/pending/withdrawn fixture must have zero permitted_uses");
+
+            let allowed = check_use_list(rights, "permitted_uses", "permission")?;
+            let prohibited = check_use_list(rights, "prohibited_uses", "permission")?;
+            if let Some(overlap) = allowed.intersection(&prohibited).next() {
+                bail!("HMP-RIGHTS operation cannot be both permitted and prohibited: {overlap}");
             }
-            non_empty_string_array(rights, "prohibited_uses", "permission")?;
+            if status != "granted" && !allowed.is_empty() {
+                bail!("HMP-RIGHTS non-granted permission must have zero permitted_uses");
+            }
+            if status == "granted" {
+                required_string(rights, "authority_reference", "permission")?;
+                required_string(rights, "permission_reference", "permission")?;
+            }
+
+            let required_denied =
+                non_empty_string_array(rights, "required_denied_operations", "permission")?;
+            for operation in required_denied {
+                if allowed.contains(operation) {
+                    bail!("HMP-RIGHTS operation {operation} is marked required-denied but permitted");
+                }
+                if !prohibited.contains(operation) {
+                    bail!("HMP-RIGHTS operation {operation} must appear in prohibited_uses");
+                }
+            }
         }
     }
 
@@ -417,7 +433,7 @@ mod tests {
         let cases = fixture["cases"]
             .as_array()
             .expect("benchmark cases must be an array");
-        assert_eq!(cases.len(), 6, "pilot fixture case count changed");
+        assert_eq!(cases.len(), 10, "synthetic starter fixture case count changed");
 
         let mut ids = BTreeSet::new();
         let mut tracks = BTreeSet::new();
@@ -455,7 +471,7 @@ mod tests {
 
     #[test]
     fn hmp_bench_fixture_passes_integrity_audit() {
-        assert_eq!(audit_benchmark(&bench_fixture()).expect("fixture should pass"), 6);
+        assert_eq!(audit_benchmark(&bench_fixture()).expect("fixture should pass"), 10);
     }
 
     #[test]
