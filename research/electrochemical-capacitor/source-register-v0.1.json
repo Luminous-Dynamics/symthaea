@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
-  "as_of": "2026-11-13",
-  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-14; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline. New dynamic-load and operando-characterization sources are classified as research comparators, not commercial SOTA or Luminous results.",
+  "as_of": "2026-11-14",
+  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-14; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline. New dynamic-load and operando-characterization sources are classified as research comparators, not commercial SOTA or Luminous results. Added two versioned public raw-data dataset records on 2026-11-14; the DataverseNO dataset is CC0, while the Zenodo record's explicit licence was not established from the inspected metadata and is not eligible for redistribution until verified.",
   "sources": [
     {
       "id": "IEA-GEVO-2026",
@@ -303,6 +303,34 @@
       "prohibited_inference": "Review, not a primary EDLC device performance dataset or evidence that any particular Luminous diagnostic stack is validated.",
       "journal": "Coordination Chemistry Reviews",
       "authors": "Fang Yuan et al."
+    },
+    {
+      "id": "DATAVERSE-CARBON-ENERGY-RAW-2026",
+      "title": "Electrochemical and Structural Data of Carbon-Based Materials for Energy Storage",
+      "url": "https://doi.org/10.18710/F4NFMJ",
+      "doi": "10.18710/F4NFMJ",
+      "publisher": "DataverseNO / University of South-Eastern Norway",
+      "authors": "Guoli Zhang; Chenglu Wei",
+      "published": "2026-05-08",
+      "dataset_version": "1.0",
+      "evidence_class": "public_research_dataset",
+      "license": "CC0 1.0 Universal",
+      "permitted_use": "External raw-data reproduction after local file checksum and header verification. Version 1.0 lists 26 public files including CV, GCD, EIS, cycling, XRD, Raman, SEM and BET files. Selected file-level records: CyclicVoltammetry_PCNS_TemperatureComparison_50mVs.csv, MD5 42631fe50e35001dfcfd474f99db37dd; GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv, MD5 88bc3dc26bd37971d7ca4a80ed79f290; ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv, MD5 4ef9d5efe0519c599a03b6527511c54c.",
+      "prohibited_inference": "Materials / electrochemical characterization dataset, not a full EDLC module, installed system, standby-reliability or sequential-reserve benchmark. Do not infer module Wh/kg, Wh/L, power, service availability, physical calibration provenance or Luminous performance. Preserve dataset version and each file's own DOI/MD5; verify downloaded bytes and actual CSV columns before analysis."
+    },
+    {
+      "id": "ZENODO-TIO2-AC-FLEX-SUPERCAP-2026",
+      "title": "Dataset for publication: Charge-storage evolution of TiO2 ALD-coated AC flexible supercapacitors over long-term cycling",
+      "url": "https://doi.org/10.5281/zenodo.22106814",
+      "doi": "10.5281/zenodo.22106814",
+      "publisher": "Zenodo",
+      "authors": "Remuel Isaac Vitto; Hamed Pourkheirollah; Jari Keskinen; Paul Berger; Matti Mäntysalo",
+      "published": "2026-08-26",
+      "dataset_version": "v2",
+      "evidence_class": "public_research_dataset",
+      "license": "not verified from inspected public record; no redistribution until verified",
+      "permitted_use": "External reproducibility candidate. Deposit describes pristine activated-carbon and TiO2 ALD-coated symmetric flexible supercapacitors (60 and 100 ALD cycles), GCD long-term cycling to 10,000 cycles at low/high current density, CV at varying scan rates, Trasatti analysis and before/after MACCOR raw data. File inventory includes 0.1 A/g and 1.0 A/g long-term cycling, CV, MACCOR data before/after long-term cycling, and analysis/graph archives.",
+      "prohibited_inference": "Do not redistribute or mirror until the dataset's explicit licence/terms are confirmed. Flexible research devices are not commercial EDLC modules or installed systems; cycle retention and electrode/cell results do not establish standby-service or repeated-call reliability. Preserve the exact version and file checksums after licensed retrieval."
     }
   ]
 }
