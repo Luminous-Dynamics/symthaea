@@ -1,0 +1,50 @@
+name: Marine sailcraft P0 contract
+
+on:
+  push:
+    branches: ["research/marine-sail-autonomy-v0-1"]
+    paths:
+      - "crates/domains/symthaea-sailcraft/**"
+      - ".github/workflows/marine-sailcraft-p0.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-sailcraft/**"
+      - ".github/workflows/marine-sailcraft-p0.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-sailcraft-p0-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Confirm exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Format
+        run: cargo fmt --check -p symthaea-sailcraft
+      - name: Unit tests
+        run: cargo test --locked -p symthaea-sailcraft
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sailcraft --all-targets -- -D warnings
