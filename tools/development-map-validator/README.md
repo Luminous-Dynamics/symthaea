@@ -20,6 +20,7 @@ The CLI supports:
 - **Map snapshots**: graph identity, node/edge shape, provenance, lifecycle, event references, evidence invalidation, authority promotion and decision-time evidence availability.
 - **Retrieval/exploration cases and oracles**: per-case source revision/tree pins, fixed token/line budgets, candidate-region identity, availability, configuration-world and temporal-scope checks, distinct natural vs wrong-repository no-gold dispositions, and oracle relevant/forbidden-span consistency.
 - **Cargo.toml** via the explicit `cargo-manifest` subcommand: workspace/package declarations, dependency kinds and target predicates, feature declarations, explicit targets and build-script declarations are preserved as manifest-declared facts.
+- **Rust source** via the explicit `rust-file` subcommand: modules, declarations, functions, traits, methods, imports, visibility, attributes and opaque item-position macro syntax are preserved as syntax-extracted facts.
 - **Federation manifests v0.1.0 and v0.1.1**: unique project/repository/map identities, exact map-blob and artifact-commit pins, source-repository references, relationship endpoints, shared-contract bindings, hub self-map identity and claim/authority consistency. V0.1.1 additionally requires a two-sided compatibility receipt before an edge may be independently qualified.
 
 For federation manifests, a successful structural check does **not** fetch member repositories or prove that the pinned Git objects exist. It checks the manifest's internal references and identity formats only. Fetch each map by its exact artifact commit and compare the resulting blob OID independently when constructing or refreshing a federation.
@@ -34,7 +35,7 @@ The crate also exposes a pure read-only Rust API:
 - The caller must provide the exact repository, revision, tree OID, manifest path and blob OID. The parser validates identity syntax but does not authenticate the Git objects.
 - It preserves literal workspace member patterns, workspace dependency aliases, package inheritance declarations, normal/dev/build and target-specific dependencies, optional/default-feature declarations, feature expressions, explicit targets and build-script declarations.
 - It does not expand workspace globs or feature expressions, resolve inherited workspace values, infer implicit targets without a separate source-tree view, run Cargo, inspect or execute build scripts, expand procedural macros, or invoke repository code.
-- This is a library API only; the current CLI does not yet expose a Cargo manifest subcommand.
+- The Cargo and Rust syntax projectors are library APIs plus explicit CLI subcommands. Neither output is compiler-resolved or cryptographically authenticated.
 
 ## What it checks
 
@@ -63,8 +64,8 @@ The crate also exposes a pure read-only Rust API:
 
 This is **not** a full JSON Schema 2020-12 implementation. It does not authenticate Git object IDs or external file digests, dereference source URIs, verify signatures, prove event-stream completeness, execute repository code, run tests, inspect CI, or independently adjudicate an assertion. A structural pass means only that the supplied JSON satisfies this validator's local contract checks.
 
-The validator never executes commands from a repository or follows links from a snapshot. Its JSON validation mode reads one JSON file and produces deterministic diagnostics. Its Cargo mode parses one TOML file as data and emits a deterministic JSON projection; it does not run Cargo, execute build scripts, expand macros, resolve workspace globs or verify supplied Git object IDs.
+The validator never executes commands from a repository or follows links from a snapshot. Its JSON validation mode reads one JSON file and produces deterministic diagnostics. Its Cargo mode parses one TOML file as data and emits a deterministic JSON projection; it does not run Cargo, execute build scripts, expand features, resolve workspace globs or verify supplied Git object IDs. Its Rust mode parses one Rust source file into syntax facts; it does not follow out-of-line modules, expand macros, resolve imports, evaluate cfg attributes or claim source-line spans/compiler semantics.
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Sixty-nine Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases plus 10 Cargo-projection cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). Seventy-eight Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases and 9 Rust-syntax cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
