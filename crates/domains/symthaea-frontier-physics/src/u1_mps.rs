@@ -1879,7 +1879,7 @@ impl U1TwoSiteGate {
         let off_diagonal = minus_i * sinc_factor * z;
         matrix[1][1] = phase * diagonal_a;
         matrix[1][2] = phase * off_diagonal;
-        matrix[2][1] = phase * off_diagonal.conj();
+        matrix[2][1] = phase * (minus_i * sinc_factor * z.conj());
         matrix[2][2] = phase * diagonal_d;
 
         let gate = Self::new(matrix, tolerance)?;
