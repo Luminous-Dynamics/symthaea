@@ -1,0 +1,154 @@
+{
+  "schema": "luminous.airroad.mimo_finite_sample_frf_admissibility.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_experiment_design",
+  "claim_class": "statistical_estimator_admissibility",
+  "campaign_id": "airroad-mimo-finite-sample-001",
+  "acquisition_id": "airroad-multisine-design-001",
+  "model_identity": "sha256:mimo-finite-sample-design-v0.1",
+  "topology_identity": "sha256:two-input-two-output-v0.1",
+  "frequency_unit": "cycles_per_sample",
+  "sample_clock": {
+    "clock_identity": "sample-clock-001",
+    "relation_status": "exact_rational",
+    "sample_period_identity": "sample-period-001"
+  },
+  "dimensions": {
+    "n_inputs": 2,
+    "n_outputs": 2,
+    "experiments": 2,
+    "positive_frequency_lines": 2,
+    "samples_per_experiment": 15
+  },
+  "stationarity": {
+    "status": "declared_synthetic_true",
+    "evidence_identity": "synthetic-stationarity-assumption-001"
+  },
+  "noise": {
+    "mean": "zero",
+    "temporal_model": "iid_white",
+    "experiment_model": "independent",
+    "output_covariance": [
+      [
+        {"numerator": "1", "denominator": "1"},
+        {"numerator": "0", "denominator": "1"}
+      ],
+      [
+        {"numerator": "0", "denominator": "1"},
+        {"numerator": "1", "denominator": "1"}
+      ]
+    ]
+  },
+  "frequency_lines": [
+    {"frequency_id": "f1", "cycles_per_sample": {"numerator": "1", "denominator": "5"}},
+    {"frequency_id": "f2", "cycles_per_sample": {"numerator": "1", "denominator": "3"}}
+  ],
+  "input_design": {
+    "dc_offset_matrix_a0": [
+      [
+        {"numerator": "1", "denominator": "1"},
+        {"numerator": "0", "denominator": "1"}
+      ],
+      [
+        {"numerator": "0", "denominator": "1"},
+        {"numerator": "1", "denominator": "1"}
+      ]
+    ],
+    "frequency_matrices": [
+      {
+        "frequency_id": "f1",
+        "amplitudes": [
+          [
+            {"numerator": "1", "denominator": "1"},
+            {"numerator": "1", "denominator": "1"}
+          ],
+          [
+            {"numerator": "1", "denominator": "1"},
+            {"numerator": "1", "denominator": "1"}
+          ]
+        ],
+        "phase_signs": [[1, 1], [1, -1]],
+        "a_l": [
+          [
+            {"numerator": "1", "denominator": "2"},
+            {"numerator": "1", "denominator": "2"}
+          ],
+          [
+            {"numerator": "1", "denominator": "2"},
+            {"numerator": "-1", "denominator": "2"}
+          ]
+        ]
+      },
+      {
+        "frequency_id": "f2",
+        "amplitudes": [
+          [
+            {"numerator": "1", "denominator": "1"},
+            {"numerator": "1", "denominator": "1"}
+          ],
+          [
+            {"numerator": "1", "denominator": "1"},
+            {"numerator": "1", "denominator": "1"}
+          ]
+        ],
+        "phase_signs": [[1, 1], [1, -1]],
+        "a_l": [
+          [
+            {"numerator": "1", "denominator": "2"},
+            {"numerator": "1", "denominator": "2"}
+          ],
+          [
+            {"numerator": "1", "denominator": "2"},
+            {"numerator": "-1", "denominator": "2"}
+          ]
+        ]
+      }
+    ]
+  },
+  "expected": {
+    "signed_alias_residues": [
+      {"numerator": "0", "denominator": "1"},
+      {"numerator": "1", "denominator": "5"},
+      {"numerator": "4", "denominator": "5"},
+      {"numerator": "1", "denominator": "3"},
+      {"numerator": "2", "denominator": "3"}
+    ],
+    "alias_residues_distinct": true,
+    "determinants": {
+      "a0": {"numerator": "1", "denominator": "1"},
+      "a1": {"numerator": "-1", "denominator": "2"},
+      "a2": {"numerator": "-1", "denominator": "2"}
+    },
+    "sample_count_condition": true,
+    "whole_period_counts": [
+      {"numerator": "3", "denominator": "1"},
+      {"numerator": "5", "denominator": "1"}
+    ],
+    "ls_unbiasedness_eligible": true,
+    "theorem_2_covariance_eligible": true,
+    "frequency_decorrelation_eligible": true,
+    "continuous_frequency_adequacy": "not_established"
+  },
+  "negative_controls": [
+    {"id": "fewer-experiments-than-inputs", "expected": "reject"},
+    {"id": "rank-deficient-dc-offset-matrix", "expected": "reject"},
+    {"id": "rank-deficient-frequency-amplitude-matrix", "expected": "reject"},
+    {"id": "zero-frequency-amplitude", "expected": "reject"},
+    {"id": "positive-negative-alias-collision", "expected": "reject"},
+    {"id": "nyquist-positive-negative-collision", "expected": "reject"},
+    {"id": "integer-shift-alias-collision", "expected": "reject"},
+    {"id": "sample-count-not-greater-than-two-m", "expected": "reject"},
+    {"id": "no-spectral-leakage-not-satisfied", "expected": "unbiased-eligible-decorrelation-ineligible"},
+    {"id": "stationarity-not-established", "expected": "not-evaluable"},
+    {"id": "unknown-sample-clock-relation", "expected": "not-evaluable"},
+    {"id": "clock-identity-mismatch", "expected": "not-evaluable"},
+    {"id": "statistical-covariance-promoted-to-hard-set", "expected": "reject-claim-class"},
+    {"id": "knotwise-frf-promoted-to-continuous-band", "expected": "reject-claim-class"}
+  ],
+  "claim_ceiling": [
+    "Exact-rational finite-sample multisine design admissibility reference only.",
+    "Stationarity and noise model are stipulated synthetic assumptions.",
+    "No FRF values or covariance matrix are estimated by this reference.",
+    "No physical acquisition, continuous-frequency model adequacy, IQC, robust stability or airworthiness claim is established."
+  ]
+}
