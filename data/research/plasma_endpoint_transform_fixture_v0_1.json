@@ -8260,6 +8260,416 @@
       "expected_disposition": "REJECTED",
       "expected_outcome": "NOT_EVALUATED",
       "rationale": "D5656 constitutive response cannot replace direct joint-level apparent-shear strength evidence."
+    },
+    {
+      "id": "many-coupons-one-lot-do-not-replicate-clusters",
+      "graph": {
+        "graph_id": "MANY-COUPONS-ONE-LOT",
+        "output_endpoint": "initial_lap_shear_mpa",
+        "transform_id": "unit_preserving_strength_projection_v1",
+        "transform_version": "v1",
+        "transform_sha256": "0000000000000000000000000000000000000000000000000000000000002002",
+        "preregistered_at": 100,
+        "first_outcome_available_at": 200,
+        "changed_after_outcome": false,
+        "inputs": [
+          {
+            "role": "baseline_strength",
+            "receipt": {
+              "id": "baseline_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002000",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "MANY-BASE-S01",
+                "MANY-BASE-S02",
+                "MANY-BASE-S03",
+                "MANY-BASE-S04",
+                "MANY-BASE-S05",
+                "MANY-BASE-S06",
+                "MANY-BASE-S07",
+                "MANY-BASE-S08",
+                "MANY-BASE-S09",
+                "MANY-BASE-S10"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "MANY-BASE-S01",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S02",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S03",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S04",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S05",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S06",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S07",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S08",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S09",
+                "cluster_id": "LOT-BASE-ONLY"
+              },
+              {
+                "specimen_id": "MANY-BASE-S10",
+                "cluster_id": "LOT-BASE-ONLY"
+              }
+            ],
+            "aging_exposure": null
+          },
+          {
+            "role": "candidate_strength",
+            "receipt": {
+              "id": "candidate_strength-RECEIPT",
+              "method_id": "ASTM_D3163",
+              "edition": "D3163-01R23",
+              "evidence_kind": "measurement",
+              "material_pair_class": "rigid_plastic_pair",
+              "geometry": "single_lap",
+              "endpoint": "apparent_shear_strength",
+              "requested_claim": "comparative_screening",
+              "protocol_id": "PLASMA-PROTOCOL-01",
+              "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+              "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002001",
+              "suitability_review_sha256": null,
+              "specimen_ids": [
+                "MANY-CAND-S01",
+                "MANY-CAND-S02",
+                "MANY-CAND-S03",
+                "MANY-CAND-S04",
+                "MANY-CAND-S05",
+                "MANY-CAND-S06",
+                "MANY-CAND-S07",
+                "MANY-CAND-S08",
+                "MANY-CAND-S09",
+                "MANY-CAND-S10"
+              ]
+            },
+            "specimen_clusters": [
+              {
+                "specimen_id": "MANY-CAND-S01",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S02",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S03",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S04",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S05",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S06",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S07",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S08",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S09",
+                "cluster_id": "LOT-CAND-ONLY"
+              },
+              {
+                "specimen_id": "MANY-CAND-S10",
+                "cluster_id": "LOT-CAND-ONLY"
+              }
+            ],
+            "aging_exposure": null
+          }
+        ],
+        "classification_taxonomy_id": null,
+        "classification_taxonomy_sha256": null,
+        "target_failure_modes": [],
+        "analysis": {
+          "result_id": "MANY-COUPONS-ONE-LOT-RESULT",
+          "result_sha256": "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe",
+          "graph_id": "MANY-COUPONS-ONE-LOT",
+          "design_id": "MANY-COUPONS-ONE-LOT-DESIGN",
+          "design_sha256": "fbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfb",
+          "plan_sha256": "fcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfc",
+          "transform_sha256": "0000000000000000000000000000000000000000000000000000000000002002",
+          "graph_sha256": "fdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfd",
+          "analysis_profile": "two_sample_tost_v1",
+          "analysis_method_ref": "symthaea-statistics:two-sample-tost",
+          "quantity_unit": "MPa",
+          "confidence_level": 0.9,
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "interval_lower": -0.03,
+          "interval_upper": 0.04,
+          "source_receipt_ids": [
+            "baseline_strength-RECEIPT",
+            "candidate_strength-RECEIPT"
+          ],
+          "source_artifact_digests": [
+            "0000000000000000000000000000000000000000000000000000000000002000",
+            "0000000000000000000000000000000000000000000000000000000000002001"
+          ],
+          "outcome": "EQUIVALENCE_ESTABLISHED",
+          "claim_ceiling": "comparative_joint_strength_observation_only"
+        },
+        "formula_id": "identity_strength_unit_projection_v1",
+        "design_receipt": {
+          "design_id": "MANY-COUPONS-ONE-LOT-DESIGN",
+          "plan_sha256": "fcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfc",
+          "endpoint_id": "initial_lap_shear_mpa",
+          "estimand": "initial_lap_shear_mpa_candidate_minus_baseline",
+          "quantity_unit": "MPa",
+          "analysis_profile": "two_sample_tost_v1",
+          "grouping_scheme": "independent_arms",
+          "independent_unit": "material_lot",
+          "margin_lower": -0.1,
+          "margin_upper": 0.1,
+          "alpha": 0.05,
+          "confidence_level": 0.9,
+          "frozen_at": 100,
+          "first_outcome_available_at": 200,
+          "design_changed_after_outcome": false,
+          "planned_min_baseline_specimens": 3,
+          "planned_min_candidate_specimens": 3,
+          "planned_min_baseline_clusters": 3,
+          "planned_min_candidate_clusters": 3,
+          "max_specimen_attrition_rate": 0.25,
+          "max_cluster_attrition_rate": 0.25,
+          "target_power": 0.8,
+          "target_precision_half_width": 0.05,
+          "power_receipt": {
+            "receipt_id": "GRAPH-DIRECT-01-DESIGN-POWER",
+            "calculation_sha256": "000000000000000000000000000000000000000000000000000000000000a004",
+            "plan_sha256": "fcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfc",
+            "design_id": "MANY-COUPONS-ONE-LOT-DESIGN",
+            "endpoint_id": "initial_lap_shear_mpa",
+            "independent_unit": "material_lot",
+            "grouping_scheme": "independent_arms",
+            "planned_baseline_clusters": 3,
+            "planned_candidate_clusters": 3,
+            "target_power": 0.8,
+            "target_precision_half_width": 0.05,
+            "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a003",
+            "effect_under_alternative": 0.02,
+            "variance_low": 0.01,
+            "variance_central": 0.02,
+            "variance_high": 0.04,
+            "method_ref": "symthaea-statistics:planning-receipt-v1",
+            "claim_ceiling": "planning_only"
+          },
+          "baseline_samples": [
+            {
+              "specimen_id": "MANY-BASE-S01",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S02",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S03",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S04",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S05",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S06",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S07",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S08",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S09",
+              "cluster_id": "LOT-BASE-ONLY"
+            },
+            {
+              "specimen_id": "MANY-BASE-S10",
+              "cluster_id": "LOT-BASE-ONLY"
+            }
+          ],
+          "candidate_samples": [
+            {
+              "specimen_id": "MANY-CAND-S01",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S02",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S03",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S04",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S05",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S06",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S07",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S08",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S09",
+              "cluster_id": "LOT-CAND-ONLY"
+            },
+            {
+              "specimen_id": "MANY-CAND-S10",
+              "cluster_id": "LOT-CAND-ONLY"
+            }
+          ],
+          "excluded_samples": [],
+          "sample_manifest_sha256": "fafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafa",
+          "baseline_method_receipt": {
+            "id": "baseline_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002000",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "MANY-BASE-S01",
+              "MANY-BASE-S02",
+              "MANY-BASE-S03",
+              "MANY-BASE-S04",
+              "MANY-BASE-S05",
+              "MANY-BASE-S06",
+              "MANY-BASE-S07",
+              "MANY-BASE-S08",
+              "MANY-BASE-S09",
+              "MANY-BASE-S10"
+            ]
+          },
+          "candidate_method_receipt": {
+            "id": "candidate_strength-RECEIPT",
+            "method_id": "ASTM_D3163",
+            "edition": "D3163-01R23",
+            "evidence_kind": "measurement",
+            "material_pair_class": "rigid_plastic_pair",
+            "geometry": "single_lap",
+            "endpoint": "apparent_shear_strength",
+            "requested_claim": "comparative_screening",
+            "protocol_id": "PLASMA-PROTOCOL-01",
+            "protocol_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "raw_data_sha256": "0000000000000000000000000000000000000000000000000000000000002001",
+            "suitability_review_sha256": null,
+            "specimen_ids": [
+              "MANY-CAND-S01",
+              "MANY-CAND-S02",
+              "MANY-CAND-S03",
+              "MANY-CAND-S04",
+              "MANY-CAND-S05",
+              "MANY-CAND-S06",
+              "MANY-CAND-S07",
+              "MANY-CAND-S08",
+              "MANY-CAND-S09",
+              "MANY-CAND-S10"
+            ]
+          },
+          "analysis_result": {
+            "result_id": "GRAPH-DIRECT-01-RESULT",
+            "result_sha256": "0000000000000000000000000000000000000000000000000000000000002006",
+            "design_id": "MANY-COUPONS-ONE-LOT-DESIGN",
+            "plan_sha256": "fcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfc",
+            "endpoint_id": "initial_lap_shear_mpa",
+            "analysis_profile": "two_sample_tost_v1",
+            "margin_lower": -0.1,
+            "margin_upper": 0.1,
+            "alpha": 0.05,
+            "confidence_level": 0.9,
+            "sample_manifest_sha256": "fafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafa",
+            "baseline_sample_count": 10,
+            "candidate_sample_count": 10,
+            "baseline_cluster_count": 1,
+            "candidate_cluster_count": 1,
+            "ci_lower": -0.03,
+            "ci_upper": 0.04,
+            "outcome": "EQUIVALENCE_ESTABLISHED"
+          },
+          "assumptions_sha256": "000000000000000000000000000000000000000000000000000000000000a003",
+          "effect_under_alternative": 0.02,
+          "variance_low": 0.01,
+          "variance_central": 0.02,
+          "variance_high": 0.04,
+          "randomization_plan_ref": "GRAPH-DIRECT-01-DESIGN-RANDOMIZATION",
+          "analysis_plan_ref": "GRAPH-DIRECT-01-DESIGN-ANALYSIS",
+          "exclusion_protocol_ref": "GRAPH-DIRECT-01-DESIGN-EXCLUSION",
+          "time_source_ref": "TRUSTED-EXPERIMENT-CLOCK-01",
+          "endpoint_transform_id": "unit_preserving_strength_projection_v1",
+          "observation_endpoint_id": "apparent_shear_strength",
+          "endpoint_transform_sha256": "0000000000000000000000000000000000000000000000000000000000002002",
+          "receipt_sha256": "fbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfbfb"
+        }
+      },
+      "expected_disposition": "BLOCKED",
+      "expected_outcome": "NOT_EVALUATED",
+      "rationale": "Ten coupons per arm are drawn from one lot each; coupon count does not satisfy the preregistered minimum of three independent material lots."
     }
   ]
 }
