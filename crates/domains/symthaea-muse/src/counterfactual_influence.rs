@@ -2197,4 +2197,219 @@ mod tests {
             CounterfactualInfluenceError::NonFiniteSample
         );
     }
+
+    #[test]
+    fn exact_two_semitone_transposition_preserves_target_lineage_and_other_events() {
+        let mut baseline_samples = vec![0.0f32; 128];
+        baseline_samples[0..50].fill(0.25);
+        baseline_samples[50..100].fill(0.15);
+        let mut transposed_samples = baseline_samples.clone();
+        transposed_samples[0..50].fill(0.20);
+
+        let baseline_midi_bytes = baseline_midi();
+        let transposed_midi = transpose_event_zero_midi();
+        let anchor = build_render("transpose-baseline", &baseline_midi_bytes, &baseline_samples);
+        let anchor_evidence = verify_bound_render(&anchor, &baseline_samples, None);
+
+        let noops = [
+            build_render("transpose-noop-1", &baseline_midi_bytes, &baseline_samples),
+            build_render("transpose-noop-2", &baseline_midi_bytes, &baseline_samples),
+            build_render("transpose-noop-3", &baseline_midi_bytes, &baseline_samples),
+        ];
+        let noop_evidence: Vec<_> = noops
+            .iter()
+            .map(|render| verify_bound_render(render, &baseline_samples, None))
+            .collect();
+        let noop_audio: Vec<_> = (0..noops.len())
+            .map(|_| audio(&baseline_samples))
+            .collect();
+        let calibration = calibrate_repeatability(
+            &audio(&baseline_samples),
+            &noop_audio,
+            SCORE_BYTES,
+            &anchor.map_bytes,
+            &baseline_midi_bytes,
+            &anchor_evidence,
+            &noop_evidence,
+            &config(),
+        )
+        .unwrap();
+        let calibration = verify_repeatability_calibration(
+            &calibration,
+            &audio(&baseline_samples),
+            &noop_audio,
+            SCORE_BYTES,
+            &anchor.map_bytes,
+            &baseline_midi_bytes,
+            &anchor_evidence,
+            &noop_evidence,
+        )
+        .unwrap();
+
+        let transposed = build_render_with_score(
+            "transpose-target",
+            &transposed_midi,
+            &transposed_samples,
+            TRANSPOSED_SCORE_BYTES,
+            &[62, 64],
+        );
+        let transposed_evidence = verify_bound_render(&transposed, &transposed_samples, None);
+        let baseline_audio_view = audio(&baseline_samples);
+        let transposed_audio_view = audio(&transposed_samples);
+        let input = CounterfactualInfluenceInput {
+            source_event_id: "score_event_index:0",
+            intervention: EventIntervention::Transpose { semitones: 2 },
+            source_score_bytes: SCORE_BYTES,
+            counterfactual_score_bytes: TRANSPOSED_SCORE_BYTES,
+            performed_event_map_bytes: &anchor.map_bytes,
+            counterfactual_performed_event_map_bytes: &transposed.map_bytes,
+            expected_score_event_count: 2,
+            expected_primary_midi_by_score_index: &[60, 64],
+            counterfactual_expected_primary_midi_by_score_index: &[62, 64],
+            baseline_schedule_bytes: &baseline_midi_bytes,
+            counterfactual_schedule_bytes: &transposed_midi,
+            baseline_renderer_evidence: &anchor_evidence,
+            counterfactual_renderer_evidence: &transposed_evidence,
+            baseline_audio: &baseline_audio_view,
+            counterfactual_audio: &transposed_audio_view,
+        };
+
+        let report = measure_counterfactual_influence(&input, &calibration).unwrap();
+        assert_eq!(
+            report.intervention,
+            EventIntervention::Transpose { semitones: 2 }
+        );
+        assert_eq!(
+            report.counterfactual_score_sha256,
+            sha256_hex(TRANSPOSED_SCORE_BYTES)
+        );
+        assert_eq!(
+            report.counterfactual_expected_primary_pitches_sha256,
+            sha256_hex(&[62, 64])
+        );
+        assert_eq!(
+            report.counterfactual_renderer_receipt_sha256,
+            transposed_evidence.receipt_sha256()
+        );
+        assert!(verify_counterfactual_influence(&report, &input, &calibration).unwrap());
+    }
+
+    #[test]
+    fn transposition_rejects_wrong_delta_and_collateral_non_target_change() {
+        let samples = vec![0.0f32; 128];
+        let baseline_midi_bytes = baseline_midi();
+        let baseline = build_render("transpose-reject-baseline", &baseline_midi_bytes, &samples);
+        let baseline_evidence = verify_bound_render(&baseline, &samples, None);
+        let noops = [
+            build_render("transpose-reject-noop-1", &baseline_midi_bytes, &samples),
+            build_render("transpose-reject-noop-2", &baseline_midi_bytes, &samples),
+            build_render("transpose-reject-noop-3", &baseline_midi_bytes, &samples),
+        ];
+        let noop_evidence: Vec<_> = noops
+            .iter()
+            .map(|render| verify_bound_render(render, &samples, None))
+            .collect();
+        let noop_audio: Vec<_> = (0..noops.len()).map(|_| audio(&samples)).collect();
+        let calibration = verify_repeatability_calibration(
+            &calibrate_repeatability(
+                &audio(&samples),
+                &noop_audio,
+                SCORE_BYTES,
+                &baseline.map_bytes,
+                &baseline_midi_bytes,
+                &baseline_evidence,
+                &noop_evidence,
+                &config(),
+            )
+            .unwrap(),
+            &audio(&samples),
+            &noop_audio,
+            SCORE_BYTES,
+            &baseline.map_bytes,
+            &baseline_midi_bytes,
+            &baseline_evidence,
+            &noop_evidence,
+        )
+        .unwrap();
+
+        // This is a real +3 MIDI alteration and its renderer evidence matches
+        // the corresponding target Score; it must not satisfy a requested +2.
+        let wrong_delta_midi = transpose_event_zero_midi_with_notes(63, 64);
+        let wrong_delta = build_render_with_score(
+            "transpose-reject-wrong-delta",
+            &wrong_delta_midi,
+            &samples,
+            TRANSPOSED_SCORE_BYTES,
+            &[63, 64],
+        );
+        let wrong_delta_evidence = verify_bound_render(&wrong_delta, &samples, None);
+        let same_audio = audio(&samples);
+        let wrong_delta_input = CounterfactualInfluenceInput {
+            source_event_id: "score_event_index:0",
+            intervention: EventIntervention::Transpose { semitones: 2 },
+            source_score_bytes: SCORE_BYTES,
+            counterfactual_score_bytes: TRANSPOSED_SCORE_BYTES,
+            performed_event_map_bytes: &baseline.map_bytes,
+            counterfactual_performed_event_map_bytes: &wrong_delta.map_bytes,
+            expected_score_event_count: 2,
+            expected_primary_midi_by_score_index: &[60, 64],
+            counterfactual_expected_primary_midi_by_score_index: &[63, 64],
+            baseline_schedule_bytes: &baseline_midi_bytes,
+            counterfactual_schedule_bytes: &wrong_delta_midi,
+            baseline_renderer_evidence: &baseline_evidence,
+            counterfactual_renderer_evidence: &wrong_delta_evidence,
+            baseline_audio: &same_audio,
+            counterfactual_audio: &same_audio,
+        };
+        assert_eq!(
+            measure_counterfactual_influence(&wrong_delta_input, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::InvalidIntervention
+        );
+
+        // A correct target transposition cannot compensate for an unrelated
+        // event mutation elsewhere in the same counterfactual arrangement.
+        let collateral_midi = transpose_event_zero_and_mutate_event_one_midi();
+        let collateral = build_render_with_score(
+            "transpose-reject-collateral",
+            &collateral_midi,
+            &samples,
+            TRANSPOSED_SCORE_BYTES,
+            &[62, 65],
+        );
+        let collateral_evidence = verify_bound_render(&collateral, &samples, None);
+        let collateral_input = CounterfactualInfluenceInput {
+            source_event_id: "score_event_index:0",
+            intervention: EventIntervention::Transpose { semitones: 2 },
+            source_score_bytes: SCORE_BYTES,
+            counterfactual_score_bytes: TRANSPOSED_SCORE_BYTES,
+            performed_event_map_bytes: &baseline.map_bytes,
+            counterfactual_performed_event_map_bytes: &collateral.map_bytes,
+            expected_score_event_count: 2,
+            expected_primary_midi_by_score_index: &[60, 64],
+            counterfactual_expected_primary_midi_by_score_index: &[62, 65],
+            baseline_schedule_bytes: &baseline_midi_bytes,
+            counterfactual_schedule_bytes: &collateral_midi,
+            baseline_renderer_evidence: &baseline_evidence,
+            counterfactual_renderer_evidence: &collateral_evidence,
+            baseline_audio: &same_audio,
+            counterfactual_audio: &same_audio,
+        };
+        assert_eq!(
+            measure_counterfactual_influence(&collateral_input, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::InvalidIntervention
+        );
+    }
+
+    #[test]
+    fn transpose_rejects_zero_and_midi_pitch_overflow() {
+        assert_eq!(
+            validate_intervention(&EventIntervention::Transpose { semitones: 0 }).unwrap_err(),
+            CounterfactualInfluenceError::InvalidIntervention
+        );
+        assert_eq!(
+            expected_transposed_primary_pitches(&[127, 64], 0, 1).unwrap_err(),
+            CounterfactualInfluenceError::InvalidIntervention
+        );
+    }
+
 }
