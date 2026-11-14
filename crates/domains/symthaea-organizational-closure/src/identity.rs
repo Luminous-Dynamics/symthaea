@@ -11,6 +11,7 @@
 //! consciousness claim. Stochastic approximate relations are a separate
 //! future extension and must consume a qualified statistical assay report.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Stable identifier for one state in a finite transition model.
@@ -88,7 +89,8 @@ impl TransitionSystem {
 /// Simulation preserves every registered baseline transition in the
 /// candidate; the candidate may have additional behavior. Bisimulation also
 /// requires every candidate transition to be matched by the baseline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RelationMode {
     Simulation,
     Bisimulation,
@@ -114,7 +116,8 @@ impl Default for ContinuityPolicy {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ContinuityQualification {
     Preserved,
     NotPreserved,
