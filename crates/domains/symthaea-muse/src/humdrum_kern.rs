@@ -808,7 +808,7 @@ mod tests {
             ("B".into(), 3, None),
             ("C".into(), 4, None),
             ("C".into(), 5, Some(1)),
-            ("D".into(), 1, Some(-1)),
+            ("D".into(), 2, Some(-1)),
         ]);
     }
 
@@ -932,4 +932,51 @@ mod tests {
         tampered.spines[0].events[0].score_offset = RationalBeat::new(1, 1).unwrap();
         assert!(!validate_humdrum_kern_replay(source.as_bytes(), "kern-test-clock", &tampered).unwrap());
     }
+
+    #[test]
+    fn unsupported_or_missing_reciprocal_and_pitch_syntax_is_rejected() {
+        for token in ["c", "x", "4h", "4c#-", "4cn#"] {
+            let source = format!("**kern\\n{token}\\n*-\\n");
+            assert!(
+                parse_humdrum_kern(source.as_bytes(), "clock").is_err(),
+                "token should be rejected by the conservative V1 parser: {token}"
+            );
+        }
+    }
+
+    #[test]
+    fn incomplete_trailing_measure_does_not_get_inferred_from_meter_or_cursor() {
+        let score = parse("**kern\\n*M4/4\\n=1\\n4c\\n4d\\n*-\\n");
+        assert!(matches!(
+            score.spines[0].measure_map.status,
+            MeasureMapStatus::Unknown { .. }
+        ));
+        assert!(score.spines[0].measure_map.measures.is_empty());
+    }
+
+    #[test]
+    fn unterminated_spines_and_records_after_termination_are_rejected() {
+        assert_eq!(
+            parse_humdrum_kern(b"**kern\\n4c\\n", "clock"),
+            Err(HumdrumKernError::MissingSpineTermination)
+        );
+        assert_eq!(
+            parse_humdrum_kern(b"**kern\\n*-\\n4c\\n", "clock"),
+            Err(HumdrumKernError::RecordAfterTermination { line_number: 3 })
+        );
+    }
+
+    #[test]
+    fn strict_tab_delimited_spine_width_is_enforced_on_interpretations_and_comments() {
+        for source in [
+            "**kern\\t**kern\\n*M4/4\\n*-\\t*-\\n",
+            "**kern\\t**kern\\n!only-one-local-comment\\n*-\\t*-\\n",
+        ] {
+            assert!(matches!(
+                parse_humdrum_kern(source.as_bytes(), "clock"),
+                Err(HumdrumKernError::InconsistentSpineCount { .. })
+            ));
+        }
+    }
+
 }
