@@ -5090,6 +5090,43 @@ mod tests {
     }
 
     #[test]
+    fn strang_stepper_continues_global_error_ledger_across_time_steps() {
+        let coupling = 0.8;
+        let stepper = U1TeBDStrangStepper::new(
+            3,
+            vec![
+                U1TeBDHamiltonianTerm::new(0, nearest_neighbour_hopping_term(coupling)),
+                U1TeBDHamiltonianTerm::new(1, nearest_neighbour_hopping_term(coupling)),
+            ],
+        )
+        .unwrap();
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 1,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let first = stepper.apply(&input, 0.25, policy).unwrap();
+        let first_bound = first.truncation_ledger.global_state_error_bound_upper.unwrap();
+        assert_eq!(first.truncation_ledger.gate_count, 3);
+        let second = stepper
+            .apply_with_ledger(
+                &first.state,
+                0.25,
+                policy,
+                first.truncation_ledger.clone(),
+            )
+            .unwrap();
+        assert_eq!(second.truncation_ledger.gate_count, 6);
+        assert!(second.global_l2_bound_qualified);
+        assert!(second.truncation_ledger.global_state_error_bound_upper.unwrap() >= first_bound);
+        assert_eq!(
+            second.truncation_ledger.canonical_gauge_receipt_count,
+            6
+        );
+    }
+
+    #[test]
     fn strang_stepper_rejects_duplicate_and_out_of_range_hamiltonian_bonds() {
         let hamiltonian = nearest_neighbour_hopping_term(0.3);
         assert!(matches!(
