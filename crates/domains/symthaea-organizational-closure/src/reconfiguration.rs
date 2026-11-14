@@ -10,7 +10,7 @@
 use crate::{
     ComponentClass, ComponentId, DependencyId, OrganizationSpec, ProcessId,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Whether an input/output/dependency relationship is mandatory or optional.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -100,6 +100,10 @@ pub struct ReconfigurationPolicy {
     pub allowed_process_removals: BTreeSet<ProcessId>,
     pub allowed_process_contract_changes: BTreeSet<ProcessId>,
     pub allowed_executable_identity_changes: BTreeSet<ProcessId>,
+    /// Exact process version expected for every added process or version change.
+    pub approved_process_versions: BTreeMap<ProcessId, crate::ProcessVersion>,
+    /// Exact executable digest expected for every added process or executable change.
+    pub approved_executable_digests: BTreeMap<ProcessId, crate::ContentDigest>,
     pub protected_components: BTreeSet<ComponentId>,
     pub protected_processes: BTreeSet<ProcessId>,
     pub max_structural_edits: usize,
@@ -128,6 +132,8 @@ pub enum ReconfigurationFindingCode {
     ProtectedProcessMutation,
     ProcessContractChangeNotAllowed,
     ExecutableIdentityChangeNotAllowed,
+    ProcessVersionNotApproved,
+    ExecutableDigestNotApproved,
     UnknownProcessInput,
     UnknownProcessOutput,
     ProtectedInputEdgeRemoved,
@@ -376,6 +382,23 @@ pub fn evaluate_reconfiguration(
                 "process addition is not present in the frozen allowlist",
             );
         }
+        let process = &candidate.processes[process_id];
+        if policy.approved_process_versions.get(process_id) != Some(&process.version) {
+            finding(
+                &mut findings,
+                ReconfigurationFindingCode::ProcessVersionNotApproved,
+                Some(process_id.0.clone()),
+                "new process version does not match the frozen approved version",
+            );
+        }
+        if policy.approved_executable_digests.get(process_id) != Some(&process.executable_digest) {
+            finding(
+                &mut findings,
+                ReconfigurationFindingCode::ExecutableDigestNotApproved,
+                Some(process_id.0.clone()),
+                "new process executable digest does not match the frozen approved digest",
+            );
+        }
     }
 
     for process_id in &diff.removed_processes {
@@ -403,9 +426,27 @@ pub fn evaluate_reconfiguration(
             diff.changed_process_contracts.push(process_id.clone());
             if before.version != after.version {
                 diff.changed_process_versions.push(process_id.clone());
+                if policy.approved_process_versions.get(process_id) != Some(&after.version) {
+                    finding(
+                        &mut findings,
+                        ReconfigurationFindingCode::ProcessVersionNotApproved,
+                        Some(process_id.0.clone()),
+                        "changed process version does not match the frozen approved version",
+                    );
+                }
             }
             if before.executable_digest != after.executable_digest {
                 diff.changed_executable_identities.push(process_id.clone());
+                if policy.approved_executable_digests.get(process_id)
+                    != Some(&after.executable_digest)
+                {
+                    finding(
+                        &mut findings,
+                        ReconfigurationFindingCode::ExecutableDigestNotApproved,
+                        Some(process_id.0.clone()),
+                        "changed executable digest does not match the frozen approved digest",
+                    );
+                }
             }
             if policy.protected_processes.contains(process_id) {
                 finding(
@@ -632,6 +673,11 @@ mod tests {
             ..ReconfigurationPolicy::default()
         };
         policy.allowed_process_additions.insert("repair".into());
+        policy.approved_process_versions.insert("repair".into(), "v1".into());
+        policy.approved_executable_digests.insert(
+            "repair".into(),
+            ContentDigest::of(b"repair"),
+        );
 
         let report = evaluate_reconfiguration(&before, &after, &policy);
         assert!(report.qualifies_candidate(), "{:?}", report.findings);
@@ -825,10 +871,38 @@ mod tests {
             ..ReconfigurationPolicy::default()
         };
         policy.allowed_process_contract_changes.insert("refresh".into());
+        policy.approved_executable_digests.insert(
+            "refresh".into(),
+            ContentDigest::of(b"new-executable"),
+        );
         let report = evaluate_reconfiguration(&before, &after, &policy);
         assert!(!report.qualifies_candidate());
         assert!(report.findings.iter().any(|item| {
             item.code == ReconfigurationFindingCode::ExecutableIdentityChangeNotAllowed
+        }));
+    }
+
+    #[test]
+    fn changed_executable_digest_must_match_approved_digest() {
+        let before = baseline();
+        let mut after = before.clone();
+        let changed = ContentDigest::of(b"actual-candidate-executable");
+        after.processes.get_mut(&ProcessId::from("refresh")).unwrap().executable_digest =
+            changed;
+        let mut policy = ReconfigurationPolicy {
+            max_structural_edits: 10,
+            ..ReconfigurationPolicy::default()
+        };
+        policy.allowed_process_contract_changes.insert("refresh".into());
+        policy.allowed_executable_identity_changes.insert("refresh".into());
+        policy.approved_executable_digests.insert(
+            "refresh".into(),
+            ContentDigest::of(b"different-approved-executable"),
+        );
+        let report = evaluate_reconfiguration(&before, &after, &policy);
+        assert!(!report.qualifies_candidate());
+        assert!(report.findings.iter().any(|item| {
+            item.code == ReconfigurationFindingCode::ExecutableDigestNotApproved
         }));
     }
 
