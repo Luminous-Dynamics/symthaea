@@ -5,6 +5,7 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/music_edit_validity_envelope.rs"
       - "crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs"
+      - "crates/domains/symthaea-muse/src/music_reference_adjudication.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "tools/mel-music-edit-adapter-harness/**"
       - "benchmarks/mel/schemas/music-edit-validity-envelope-v1.schema.json"
