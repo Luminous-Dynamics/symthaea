@@ -451,6 +451,8 @@ fn validate_operation_contract(
                     && constraint.scope == S::TargetPart
                     && constraint.relation == R::WithinRange
                     && constraint.unit.as_deref() == Some("ticks")
+                    && constraint.minimum.is_some_and(|minimum| minimum >= 1.0 && minimum.fract() == 0.0)
+                    && constraint.maximum.is_some_and(|maximum| maximum >= 1.0 && maximum.fract() == 0.0)
                     && matches!(constraint.evidence, E::Symbolic | E::Combined)
             });
             if !has_articulation {
@@ -484,6 +486,8 @@ fn validate_operation_contract(
                     && constraint.scope == scope
                     && constraint.relation == R::WithinRange
                     && constraint.unit.as_deref() == Some("cents")
+                    && constraint.minimum.is_some_and(|minimum| minimum <= 0.0)
+                    && constraint.maximum.is_some_and(|maximum| maximum >= 0.0)
                     && matches!(constraint.evidence, E::Acoustic | E::Combined)
             });
             let anchors_a440 = envelope.requested_change.iter().any(|constraint| {
@@ -961,6 +965,45 @@ mod tests {
         ));
         envelope.protected_invariants.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
         assert!(validate_music_edit_validity_envelope_v1(&envelope).is_empty());
+    }
+
+
+    #[test]
+    fn articulation_duration_bounds_must_use_positive_integer_ticks() {
+        let mut envelope = valid_envelope();
+        envelope.operation = MusicEditOperationV1::Staccato;
+        envelope.requested_change.clear();
+        envelope.requested_change.extend([
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.articulation".to_owned(),
+                property: MusicEditValidityPropertyV1::Articulation,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::EqualTo,
+                expected_value: Some("staccato".to_owned()),
+                allowed_values: Vec::new(), minimum: None, maximum: None, unit: None,
+                evidence: MusicEditValidityEvidenceV1::Acoustic,
+                rationale: "audible staccato articulation".to_owned(),
+            },
+            MusicEditValidityConstraintV1 {
+                constraint_id: "change.duration".to_owned(),
+                property: MusicEditValidityPropertyV1::DurationTicks,
+                scope: MusicEditValidityScopeV1::TargetPart,
+                relation: MusicEditValidityRelationV1::WithinRange,
+                expected_value: None, allowed_values: Vec::new(),
+                minimum: Some(1.5), maximum: Some(120.0), unit: Some("ticks".to_owned()),
+                evidence: MusicEditValidityEvidenceV1::Symbolic,
+                rationale: "synthetic deliberately fractional tick range".to_owned(),
+            },
+        ]);
+        envelope.requested_change.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        envelope.references.clear();
+        envelope.reference_policy = MusicEditReferencePolicyV1::ConstraintOnly;
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
+                operation: MusicEditOperationV1::Staccato,
+                property: MusicEditValidityPropertyV1::DurationTicks,
+            }
+        ));
     }
 
     #[test]
