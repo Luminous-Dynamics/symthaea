@@ -325,7 +325,10 @@ impl core::fmt::Display for U1MpsError {
                 write!(f, "invalid adaptive TEBD policy field {name}")
             }
             Self::InvalidAdaptiveTimeStep(value) => {
-                write!(f, "adaptive TEBD requires a positive finite time step, got {value}")
+                write!(
+                    f,
+                    "adaptive TEBD requires a positive finite time step, got {value}"
+                )
             }
             Self::AdaptiveGlobalErrorUnqualified => write!(
                 f,
@@ -3085,8 +3088,6 @@ impl U1TeBDStrangStepper {
     }
 }
 
-
-
 /// Error budgets and step-size safeguards for an adaptive Strang controller.
 ///
 /// Time-discretization error is estimated by step doubling in the asymptotic
@@ -3346,15 +3347,13 @@ impl U1TeBDStrangStepper {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
+        U1TeBDAdaptivePolicy, U1TeBDGate, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
         U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
-        U1TwoSiteTruncationPolicy, U1TeBDAdaptivePolicy, left_isometry_residual,
-        right_isometry_residual,
+        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -4843,8 +4842,7 @@ mod tests {
 
     #[test]
     fn adaptive_strang_accepts_zero_hamiltonian_with_zero_estimated_error() {
-        let zero_hamiltonian =
-            U1TwoSiteHamiltonian::new(0.0, 0.0, 0.0, complex_zero()).unwrap();
+        let zero_hamiltonian = U1TwoSiteHamiltonian::new(0.0, 0.0, 0.0, complex_zero()).unwrap();
         let stepper = U1TeBDStrangStepper::new(
             2,
             vec![U1TeBDHamiltonianTerm {
@@ -4951,12 +4949,7 @@ mod tests {
         ));
 
         assert!(matches!(
-            stepper.attempt_adaptive_step(
-                &input,
-                1.1,
-                truncation,
-                adaptive_policy(1.0e-6)
-            ),
+            stepper.attempt_adaptive_step(&input, 1.1, truncation, adaptive_policy(1.0e-6)),
             Err(U1MpsError::InvalidAdaptiveTimeStep(1.1))
         ));
     }
