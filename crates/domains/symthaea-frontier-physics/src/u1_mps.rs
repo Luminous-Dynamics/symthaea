@@ -135,6 +135,17 @@ pub enum U1MpsError {
         relative_cutoff: f64,
         tolerance: f64,
     },
+    InvalidErrorBudget {
+        max_bond_dimension: usize,
+        maximum_absolute_local_l2_error: f64,
+        tolerance: f64,
+    },
+    TruncationBudgetUnreachable {
+        requested_absolute_l2_error: f64,
+        maximum_bond_dimension: usize,
+        minimum_required_bond_dimension: usize,
+        best_achievable_l2_error: f64,
+    },
     InvalidTeBDParity(u8),
     TeBDGateOutOfRange {
         bond_index: usize,
@@ -295,6 +306,23 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "invalid truncation policy: max_bond={max_bond_dimension}, relative_cutoff={relative_cutoff}, tolerance={tolerance}"
+            ),
+            Self::InvalidErrorBudget {
+                max_bond_dimension,
+                maximum_absolute_local_l2_error,
+                tolerance,
+            } => write!(
+                f,
+                "invalid absolute L2 error budget {maximum_absolute_local_l2_error} with max bond {max_bond_dimension} and tolerance {tolerance}"
+            ),
+            Self::TruncationBudgetUnreachable {
+                requested_absolute_l2_error,
+                maximum_bond_dimension,
+                minimum_required_bond_dimension,
+                best_achievable_l2_error,
+            } => write!(
+                f,
+                "local L2 error budget {requested_absolute_l2_error} is unreachable with max bond {maximum_bond_dimension}; minimum Schmidt rank is {minimum_required_bond_dimension}, best achievable error is {best_achievable_l2_error}"
             ),
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
@@ -2306,6 +2334,31 @@ pub struct U1TwoSiteTruncationDiagnostics {
     pub reconstruction_l2_residual: f64,
 }
 
+
+
+/// Absolute local two-site L2 error budget for adaptive Schmidt compression.
+///
+/// Unlike a relative cutoff, this policy is stated in output-state amplitude
+/// units. The implementation finds the smallest global rank across all charge
+/// sectors whose discarded Schmidt tail meets the budget, subject to a hard
+/// maximum bond dimension. It never renormalizes the compressed state.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TwoSiteErrorBudgetPolicy {
+    pub maximum_bond_dimension: usize,
+    pub maximum_absolute_local_l2_error: f64,
+    pub tolerance: f64,
+}
+
+/// Result of minimum-rank, error-budget-driven two-site compression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteBudgetedSplit {
+    pub diagnostics: U1TwoSiteTruncationDiagnostics,
+    pub requested_absolute_local_l2_error: f64,
+    pub achieved_absolute_local_l2_error: f64,
+    pub minimum_required_bond_dimension: usize,
+    pub budget_slack: f64,
+}
+
 impl U1TwoSiteState {
     /// Construct a checked two-site tensor with external virtual-charge labels.
     pub fn new(
@@ -2913,6 +2966,128 @@ impl U1TwoSiteState {
             reconstruction_l2_residual: reconstruction_squared.sqrt(),
         })
     }
+
+
+
+    /// Choose the smallest global Schmidt rank that satisfies an absolute L2
+    /// projection-error budget, failing closed when the hard bond cap is too
+    /// small or the measured reconstruction residual exceeds the budget.
+    ///
+    /// The Schmidt spectrum is collected across all intermediate U(1) charge
+    /// sectors and sorted globally. The minimum rank is the first k for which
+    /// the sum of squared discarded singular values is at most the budget
+    /// squared. The final result is checked against the measured two-site
+    /// reconstruction residual, which also captures floating-point
+    /// factorization error and tolerated forbidden-sector components.
+    ///
+    /// Numerical comparison slack is tolerance times the input norm. It is not
+    /// added to the reported achieved error and does not renormalize the output.
+    pub fn split_with_error_budget(
+        &self,
+        policy: U1TwoSiteErrorBudgetPolicy,
+    ) -> Result<U1TwoSiteBudgetedSplit, U1MpsError> {
+        if policy.maximum_bond_dimension == 0
+            || !policy.maximum_absolute_local_l2_error.is_finite()
+            || policy.maximum_absolute_local_l2_error < 0.0
+            || !policy.tolerance.is_finite()
+            || policy.tolerance <= 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget {
+                max_bond_dimension: policy.maximum_bond_dimension,
+                maximum_absolute_local_l2_error: policy.maximum_absolute_local_l2_error,
+                tolerance: policy.tolerance,
+            });
+        }
+
+        let exact = self.split_exact(policy.tolerance)?;
+        let rank = exact.retained_singular_values;
+        let mut singular_values = Vec::with_capacity(rank);
+        let mut total_weight = 0.0_f64;
+        for middle in 0..rank {
+            let mut squared = 0.0;
+            for physical in 0..2 {
+                for right in 0..exact.right_tensor.right_dimension() {
+                    squared += exact.right_tensor.get(middle, physical, right).norm_sqr();
+                }
+            }
+            let singular_value = squared.sqrt();
+            if !singular_value.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "error-budget Schmidt singular value",
+                ));
+            }
+            singular_values.push(singular_value);
+            total_weight += singular_value * singular_value;
+        }
+        if !total_weight.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "error-budget Schmidt weight",
+            ));
+        }
+        let input_norm = total_weight.sqrt();
+        if !input_norm.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "error-budget input norm",
+            ));
+        }
+        if input_norm <= 0.0 {
+            return Err(U1MpsError::ZeroDenseState);
+        }
+
+        singular_values.sort_by(f64::total_cmp);
+        singular_values.reverse();
+        let comparison_slack = policy.tolerance * input_norm;
+        let allowed_error = policy.maximum_absolute_local_l2_error + comparison_slack;
+        let allowed_squared = allowed_error * allowed_error;
+        let mut retained_weight = 0.0;
+        let mut minimum_required_bond_dimension = 0_usize;
+        while minimum_required_bond_dimension < singular_values.len()
+            && total_weight - retained_weight > allowed_squared
+        {
+            retained_weight += singular_values[minimum_required_bond_dimension].powi(2);
+            minimum_required_bond_dimension += 1;
+        }
+        minimum_required_bond_dimension = minimum_required_bond_dimension.max(1);
+
+        let achievable_rank = policy.maximum_bond_dimension.min(rank).max(1);
+        let requested_rank = minimum_required_bond_dimension.min(achievable_rank);
+        let diagnostics = self.split_truncated(U1TwoSiteTruncationPolicy {
+            max_bond_dimension: requested_rank,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: policy.tolerance,
+        })?;
+        let achieved = diagnostics.reconstruction_l2_residual;
+
+        if minimum_required_bond_dimension > policy.maximum_bond_dimension
+            || achieved > allowed_error
+        {
+            let best = if requested_rank == achievable_rank {
+                achieved
+            } else {
+                self.split_truncated(U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: achievable_rank,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: policy.tolerance,
+                })?
+                .reconstruction_l2_residual
+            };
+            return Err(U1MpsError::TruncationBudgetUnreachable {
+                requested_absolute_l2_error: policy.maximum_absolute_local_l2_error,
+                maximum_bond_dimension: policy.maximum_bond_dimension,
+                minimum_required_bond_dimension,
+                best_achievable_l2_error: best,
+            });
+        }
+
+        Ok(U1TwoSiteBudgetedSplit {
+            diagnostics,
+            requested_absolute_local_l2_error: policy.maximum_absolute_local_l2_error,
+            achieved_absolute_local_l2_error: achieved,
+            minimum_required_bond_dimension,
+            budget_slack: policy.maximum_absolute_local_l2_error - achieved,
+        })
+    }
+
 
     /// Return the four computational-basis amplitudes for open-boundary tensors.
     pub fn to_dense_two_qubit(&self) -> Result<[Complex64; 4], U1MpsError> {
@@ -3705,7 +3880,7 @@ mod tests {
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
         U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
         U1TeBDStepResult, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
-        U1TwoSiteState,
+        U1TwoSiteState, U1TwoSiteBudgetedSplit, U1TwoSiteErrorBudgetPolicy,
         U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
     };
@@ -5711,4 +5886,168 @@ mod tests {
         ));
         assert_eq!(state.to_dense(8).unwrap(), before);
     }
+
+    fn budget_test_state(scale: f64) -> U1TwoSiteState {
+        U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.8 * scale, 0.0),
+                Complex64::new(0.6 * scale, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            1.0e-12,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn error_budget_selects_minimum_global_rank_not_a_fixed_relative_cutoff() {
+        let state = budget_test_state(1.0);
+        let result: U1TwoSiteBudgetedSplit = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: 0.61,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.minimum_required_bond_dimension, 1);
+        assert_eq!(result.diagnostics.retained_singular_value_count, 1);
+        assert!((result.achieved_absolute_local_l2_error - 0.6).abs() <= 1.0e-12);
+        assert!((result.budget_slack - 0.01).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn error_budget_retains_an_extra_sector_when_the_requested_error_is_tighter() {
+        let state = budget_test_state(1.0);
+        let result = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: 0.59,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.minimum_required_bond_dimension, 2);
+        assert_eq!(result.diagnostics.retained_singular_value_count, 2);
+        assert!(result.achieved_absolute_local_l2_error <= 0.59 + 1.0e-12);
+    }
+
+    #[test]
+    fn error_budget_fails_closed_when_the_hard_bond_cap_cannot_meet_target() {
+        let state = budget_test_state(1.0);
+        assert!(matches!(
+            state.split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 1,
+                maximum_absolute_local_l2_error: 0.59,
+                tolerance: 1.0e-12,
+            }),
+            Err(U1MpsError::TruncationBudgetUnreachable {
+                requested_absolute_l2_error: 0.59,
+                maximum_bond_dimension: 1,
+                minimum_required_bond_dimension: 2,
+                best_achievable_l2_error,
+            }) if (best_achievable_l2_error - 0.6).abs() <= 1.0e-12
+        ));
+    }
+
+    #[test]
+    fn error_budget_is_scale_aware_and_reports_absolute_error() {
+        let state = budget_test_state(2.0);
+        let result = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 1,
+                maximum_absolute_local_l2_error: 1.21,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.minimum_required_bond_dimension, 1);
+        assert!((result.achieved_absolute_local_l2_error - 1.2).abs() <= 1.0e-12);
+        assert!(result.budget_slack >= 0.0);
+    }
+
+    #[test]
+    fn error_budget_rejects_nonfinite_negative_and_zero_capacity_policies() {
+        let state = budget_test_state(1.0);
+        for policy in [
+            U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 0,
+                maximum_absolute_local_l2_error: 0.1,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: -0.1,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: f64::NAN,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: 0.1,
+                tolerance: f64::INFINITY,
+            },
+        ] {
+            assert!(matches!(
+                state.split_with_error_budget(policy),
+                Err(U1MpsError::InvalidErrorBudget { .. })
+            ));
+        }
+    }
+
+
+    #[test]
+    fn error_budget_rejects_overflowed_schmidt_weight_as_nonfinite_not_zero() {
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0e200, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        assert!(matches!(
+            state.split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 2,
+                maximum_absolute_local_l2_error: 0.0,
+                tolerance: 1.0e-12,
+            }),
+            Err(U1MpsError::NonFiniteContraction("error-budget Schmidt weight"))
+        ));
+    }
+
+
+    #[test]
+    fn error_budget_accepts_zero_target_for_exact_product_pair() {
+        let state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        let result = state
+            .split_with_error_budget(U1TwoSiteErrorBudgetPolicy {
+                maximum_bond_dimension: 1,
+                maximum_absolute_local_l2_error: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.minimum_required_bond_dimension, 1);
+        assert!(result.achieved_absolute_local_l2_error <= 1.0e-12);
+        assert!(result.budget_slack >= -1.0e-12);
+    }
+
 }

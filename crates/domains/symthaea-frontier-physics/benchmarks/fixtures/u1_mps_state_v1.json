@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Source-authored: complex U1 MPS core, dense fixed-charge factorization, U1 local gates, exact charge-block split, global cutoff/bond-cap compression, mixed-canonical receipts, canonical/gate/model-projection/compression error ledger, analytic U1 Hamiltonian gates, deterministic even/odd TEBD layers and second-order even/odd/even Strang stepper. Consolidated exact-head Rust 1.96 harness pending.",
+  "execution_status": "Source-authored: complex U1 MPS core, dense fixed-charge factorization, U1 local gates, exact charge-block split, fixed cutoff/bond-cap compression, adaptive absolute local L2 error-budget compression, mixed-canonical receipts, canonical/gate/model-projection/compression error ledger, analytic U1 Hamiltonian gates and second-order Strang stepper. Consolidated exact-head Rust 1.96 harness pending.",
   "claim_ceiling": "Nearest-neighbour second-order Strang TEBD source is authored. The global L2 bound covers canonicalization, floating-gate defect, Hamiltonian-to-U1-model projection and Schmidt truncation under measured mixed-canonical assumptions. Trotter/time-discretization remains unqualified; no TDVP/MPO, matched performance, large-N advantage or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -332,6 +332,33 @@
         "strang_stepper_continues_global_error_ledger_across_time_steps"
       ],
       "claim_ceiling": "Nearest-neighbour second-order splitting only. Trotter error is not folded into the canonical/gate/model-projection/compression bound and remains unqualified pending step-refinement envelope or commutator bound."
+    },
+    "error_budgeted_compression": {
+      "status": "source_authored_runner_pending",
+      "api": "U1TwoSiteState::split_with_error_budget(U1TwoSiteErrorBudgetPolicy)",
+      "policy": {
+        "maximum_bond_dimension": "Hard global cap over all charge sectors.",
+        "maximum_absolute_local_l2_error": "Absolute two-site reconstruction L2 residual target in amplitude units.",
+        "minimum_rank": "Smallest global Schmidt rank whose discarded squared tail is at most the square of the requested L2 budget, with tolerance-scaled comparison slack.",
+        "achieved_error": "Measured reconstruction_l2_residual, including factorization and tolerated forbidden-sector residuals.",
+        "normalization": "No implicit renormalization."
+      },
+      "result_fields": [
+        "diagnostics",
+        "requested_absolute_local_l2_error",
+        "achieved_absolute_local_l2_error",
+        "minimum_required_bond_dimension",
+        "budget_slack"
+      ],
+      "failure": "TruncationBudgetUnreachable returns the requested error, maximum bond, minimum required rank and best achievable measured residual under the cap.",
+      "authored_tests": [
+        "error_budget_selects_minimum_global_rank_not_a_fixed_relative_cutoff",
+        "error_budget_retains_an_extra_sector_when_the_requested_error_is_tighter",
+        "error_budget_fails_closed_when_the_hard_bond_cap_cannot_meet_target",
+        "error_budget_is_scale_aware_and_reports_absolute_error",
+        "error_budget_rejects_nonfinite_negative_and_zero_capacity_policies"
+      ],
+      "claim_ceiling": "Local two-site residual budget only. Global-state budget interpretation requires the canonical-gauge and gate/model error receipts; time-discretization error remains separate."
     }
   },
   "known_answers": [
@@ -511,6 +538,19 @@
         "global error ratio approaches 4 under dt halving in asymptotic regime",
         "Trotter/time-discretization error remains separate from global canonical/gate/model-projection/compression bound"
       ]
+    },
+    {
+      "id": "MPS-2A",
+      "name": "Minimum-rank absolute-error-budgeted compression",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "smallest global Schmidt rank meets requested absolute local L2 budget",
+        "hard global bond cap is enforced across charge sectors",
+        "measured reconstruction residual, not only ideal tail weight, is checked",
+        "unreachable budget returns best achievable residual and minimum required rank",
+        "no implicit renormalization",
+        "scale-aware absolute error semantics"
+      ]
     }
   ],
   "negative_controls": [
@@ -562,7 +602,11 @@
     "Hamiltonian-to-U1 projection residual silently discarded",
     "reset global error ledger at each Strang layer or time step",
     "fold Trotter error into compression/gate-quality receipt without a separate method bound",
-    "claim second-order convergence from a single time-step result"
+    "claim second-order convergence from a single time-step result",
+    "error-budget controller silently exceeds maximum bond dimension",
+    "error-budget controller returns success when measured reconstruction residual exceeds the requested budget",
+    "error-budget controller renormalizes a subnormalized state without a receipt",
+    "error-budget controller uses per-charge rank caps instead of one global rank"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -638,7 +682,12 @@
     "strang_layer_parities",
     "strang_layer_bond_indices",
     "time_discretization_error_qualified",
-    "strang_step_refinement_error_ratio"
+    "strang_step_refinement_error_ratio",
+    "requested_absolute_local_l2_error",
+    "achieved_absolute_local_l2_error",
+    "minimum_required_bond_dimension",
+    "error_budget_slack",
+    "error_budget_unreachable_best_residual"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
@@ -649,9 +698,22 @@
         "gate_opts",
         "auto-mps swap+split for two-qubit gates",
         "norm-based fidelity_estimate",
-        "error_estimate"
+        "error_estimate",
+        "singular-value cutoff and max-bond controls; comparison target for accuracy-budget policy"
       ],
-      "fairness": "Same initial vector, gate sequence, qubit order, dtype, cutoff policy, bond cap, hardware and measurement checkpoints."
+      "fairness": "Same initial vector, gate sequence, qubit order, dtype, cutoff policy, bond cap, hardware and measurement checkpoints.",
+      "fidelity_and_error_semantics": "CircuitMPS fidelity_estimate and error_estimate are norm-based estimates tied to truncation. They are internal controls, not the independent oracle; use dense-state L2 and infidelity for N<=12.",
+      "modes": [
+        "CircuitMPS",
+        "CircuitMPSLazy",
+        "CircuitPermMPS"
+      ],
+      "special_cases": [
+        "auto-mps swaps and splits two-qubit gates",
+        "lazy/permutation MPS ordering must be included as separate baselines",
+        "CircuitMPSLazy supports delayed compression schedules; record compress_every and compression method separately.",
+        "CircuitPermMPS lazily tracks qubit/site ordering; record the logical-to-physical permutation and include the ordering-management cost."
+      ]
     },
     "itensor": {
       "reference": "https://docs.itensor.org/ITensorMPS/stable/tutorials/QN.html",
@@ -660,7 +722,9 @@
         "block-sparse tensor storage",
         "symmetry constraints propagated by QN-aware indices"
       ],
-      "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error."
+      "fairness": "Same problem instance and accuracy target; compare block sparsity, memory, time and error.",
+      "gpu_caveat": "ITensor QN support is Abelian, which matches U(1). Its current GPU documentation cautions that QN block-sparse GPU operations are less mature than dense GPU operations and may not work or may be slower; report CPU and GPU comparisons separately.",
+      "gpu_docs": "https://docs.itensor.org/ITensors/stable/RunningOnGPUs.html"
     },
     "differentiator": "Per-operation charge-sector receipts, separation of truncation sources and cumulative error accounting with explicit assumptions.",
     "quimb_lazy": {
@@ -692,6 +756,55 @@
       "Schmidt truncation/compression",
       "Trotter/time discretization (TEBD and TDVP)",
       "local Krylov/eigensolver residual (TDVP)"
-    ]
+    ],
+    "qiskit_aer": {
+      "reference": "https://qiskit.github.io/qiskit-aer/stubs/qiskit_aer.AerSimulator.html",
+      "capabilities": [
+        "matrix_product_state simulation method",
+        "optional maximum retained Schmidt rank",
+        "discarded squared Schmidt-weight truncation threshold",
+        "optional MPS log data exposing bond dimensions and discarded values"
+      ],
+      "fairness": "Translate the absolute L2 budget into measured dense-reference residual; do not equate Aer discarded-weight threshold directly with normalized-state L2 without matching input norm and normalization semantics.",
+      "truncation_semantics": "matrix_product_state_truncation_threshold discards the smallest Schmidt coefficients whose summed squares fall below the configured threshold. mps_log_data reports bond dimensions and discarded values. This is not a global state-L2 certificate."
+    },
+    "cutensornet": {
+      "reference": "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
+      "capabilities": [
+        "gate-split contraction and SVD truncation",
+        "absolute, relative and discarded-weight SVD cutoff modes in MPS projection workflows",
+        "distributed tensor SVD in supported decomposition paths"
+      ],
+      "caveats": [
+        "The 26.11 MPS factorization API describes the MPS feature as preview.",
+        "The documentation states distributed SVD is supported in decomposition APIs while gate-split does not currently support distributed tensors."
+      ],
+      "fairness": "Compare on supported hardware and exactly matched gate/state/error conditions; separate projection-MPS and direct gate-split workflows.",
+      "special_cases": [
+        "ProjectionMPS insertion exposes absolute/relative/discarded-weight cutoffs, SVD normalization and per-insertion SVD_MAX_EXTENT.",
+        "Keep normalization-preserving and no-renormalization runs in separate result tables.",
+        "Distributed tensor SVD in decomposition APIs is not the same as distributed gateSplit; gateSplit currently does not support distributed tensors."
+      ],
+      "match_controls": [
+        "bond extents",
+        "absolute/relative/discarded-weight truncation",
+        "SVD algorithm",
+        "GPU architecture",
+        "precision",
+        "SVD_S_NORMALIZATION"
+      ],
+      "docs": [
+        "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/overview.html",
+        "https://docs.nvidia.com/cuda/cuquantum/26.11.0/cutensornet/examples/mps.html"
+      ]
+    }
+  },
+  "benchmark_protocol": {
+    "dense_statevector_is_ground_truth_for_sites_lte_12": true,
+    "quimb_norm_estimate_not_ground_truth": true,
+    "aer_discarded_weight_not_global_l2": true,
+    "cutensornet_svd_normalization_must_be_logged": true,
+    "itensor_qn_gpu_cpu_runs_separated": true,
+    "cutoff_semantics_must_be_translated_to_measured_output_error": true
   }
 }
