@@ -1328,8 +1328,12 @@ fn validate_federation_member(
         }
     }
     if let Some(url) = map.get("artifact_url").and_then(Value::as_str) {
-        if !url.starts_with("https://github.com/") {
-            report.error("EGDDM-FEDERATION-003", format!("{map_path}.artifact_url"), "artifact_url must be a GitHub HTTPS URL");
+        let member_repo = value.get("repository_full_name").and_then(Value::as_str).unwrap_or_default();
+        let artifact_path = map.get("path").and_then(Value::as_str).unwrap_or_default();
+        let artifact_commit = map.get("artifact_commit_sha").and_then(Value::as_str).unwrap_or_default();
+        let expected_url = format!("https://github.com/{member_repo}/blob/{artifact_commit}/{artifact_path}");
+        if url != expected_url {
+            report.error("EGDDM-FEDERATION-003", format!("{map_path}.artifact_url"), "artifact_url must pin the exact repository, artifact commit and map path");
         }
     }
     for key in ["blob_oid", "artifact_commit_sha", "artifact_tree_oid"] {
@@ -1409,6 +1413,9 @@ fn validate_federation_relationship(
         .and_then(|v| string(v, &format!("{path}.from_project_id"), report));
     let to = field(value, "to_project_id", &path, report)
         .and_then(|v| string(v, &format!("{path}.to_project_id"), report));
+    if from.is_some() && from == to {
+        report.error("EGDDM-FEDERATION-027", &path, "federation relationship cannot be a self-edge");
+    }
     if let Some(from) = from {
         if !members.contains_key(from) {
             report.error("EGDDM-FEDERATION-009", format!("{path}.from_project_id"), format!("unknown project_id {from:?}"));
@@ -1512,9 +1519,14 @@ fn validate_federation_relationship(
                     report.error("EGDDM-REQUIRED-001", format!("{path}.contract_binding.contract_blob_oid"), "required field is missing");
                 }
                 if let Some(binding_status) = binding.get("status") {
-                    enum_value(binding_status, &format!("{path}.contract_binding.status"), &[
+                    let binding_status = enum_value(binding_status, &format!("{path}.contract_binding.status"), &[
                         "declared", "two_sided_match", "independently_conformance_tested",
                     ], report);
+                    if status.as_deref() == Some("independently_qualified")
+                        && binding_status.as_deref() != Some("independently_conformance_tested")
+                    {
+                        report.error("EGDDM-FEDERATION-028", format!("{path}.contract_binding.status"), "independently_qualified relationship requires independently_conformance_tested contract binding");
+                    }
                 } else {
                     report.error("EGDDM-REQUIRED-001", format!("{path}.contract_binding.status"), "required field is missing");
                 }
@@ -1647,7 +1659,7 @@ pub fn validate_federation_value(value: &Value) -> ValidationReport {
         let hub_blob = hub.get("self_map_blob_oid").and_then(Value::as_str);
         let hub_member = members.values().find(|(repository, _, _)| Some(repository.as_str()) == hub_repo);
         match hub_member {
-            Some((_, map_id, _)) if Some(map_id.as_str()) == hub_map_id => {
+            Some((_, map_id, subject_pin)) if Some(map_id.as_str()) == hub_map_id => {
                 let member_map = value.get("members")
                     .and_then(Value::as_array)
                     .and_then(|items| items.iter().find(|member| member.get("repository_full_name").and_then(Value::as_str) == hub_repo))
@@ -1656,6 +1668,14 @@ pub fn validate_federation_value(value: &Value) -> ValidationReport {
                     || member_map.and_then(|map| map.get("blob_oid")).and_then(Value::as_str) != hub_blob
                 {
                     report.error("EGDDM-FEDERATION-023", "$.hub", "hub self-map path/blob must match the hub repository's member map pin");
+                }
+                let expected_subject = format!(
+                    "{}:{}",
+                    hub.get("subject_revision").and_then(Value::as_str).unwrap_or_default(),
+                    hub.get("subject_tree_oid").and_then(Value::as_str).unwrap_or_default()
+                );
+                if subject_pin != &expected_subject {
+                    report.error("EGDDM-FEDERATION-026", "$.hub", "hub subject revision/tree must match the hub member map's source snapshot");
                 }
             }
             _ => report.error("EGDDM-FEDERATION-024", "$.hub", "hub must exactly match one member map by repository and map_id"),
@@ -1814,6 +1834,24 @@ mod tests {
         value["hub"]["self_map_blob_oid"] = Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
         let report = validate_federation_value(&value);
         assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-023"));
+    }
+
+    #[test]
+    fn federation_map_url_must_pin_artifact_commit_and_path() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["members"][1]["map"]["artifact_url"] =
+            Value::String("https://github.com/Luminous-Dynamics/mycelix/blob/main/docs/development-map/source-declared-maturity-v0.1.json".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-003"));
+    }
+
+    #[test]
+    fn federation_hub_subject_snapshot_must_match_hub_map() {
+        let mut value: Value = serde_json::from_str(FEDERATION_FIXTURE).expect("federation JSON");
+        value["hub"]["subject_revision"] =
+            Value::String("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned());
+        let report = validate_federation_value(&value);
+        assert!(report.diagnostics.iter().any(|d| d.code == "EGDDM-FEDERATION-026"));
     }
 
     #[test]
