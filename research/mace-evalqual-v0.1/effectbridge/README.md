@@ -73,3 +73,10 @@ Do not infer end-to-end exactly-once behavior from this test service. The target
 The JSONL reference now has a history-based linearizability test. It records invocation and return order for concurrent `Append`, `Fence` and `Lookup` operations, then backtracks over candidate sequential histories while preserving real-time precedence. The observed outcomes must match the reference state machine, including changed-intent conflicts and late-dispatch rejection. Each generated history is followed by close/reopen reconciliation.
 
 This is bounded executable conformance evidence for the local single-writer journal, not a proof of every schedule or of a distributed destination. It complements, rather than replaces, process-crash, observer-independence and native-database transaction qualification.
+
+
+## Bounded protocol-state exploration
+
+`modelcheck_test.go` exhaustively explores a finite two-intent abstraction of send, delayed delivery, destination serialization, receipt/business-row staging, atomic commit, rollback/crash and reconciliation. Its current state space is 68 reachable states / 200 transitions. The companion history checker validates concurrent `Append`, `Fence` and `Lookup` results against real-time precedence.
+
+These checks are deliberately bounded and independent of the storage implementation. They complement the concrete journal/SQLite tests; they do not prove the implementation, distributed liveness, multi-host safety or physical power-loss behavior.
