@@ -441,9 +441,14 @@ fn validate_conditioning(
     ) {
         return Err(Decision::rejected("aged-retention derivation requires a registered D1151 or D1183 conditioning-practice receipt"));
     }
+    let expected_geometry = if receipt.method_id == "ASTM_D1151" {
+        "continuous_environmental_conditioning"
+    } else {
+        "cyclic_environmental_conditioning"
+    };
     if receipt.requested_claim != "conditioning_protocol_reference"
         || receipt.material_pair_class != "adhesive_bonded_specimens"
-        || receipt.geometry != if receipt.method_id == "ASTM_D1151" { "continuous_environmental_conditioning" } else { "cyclic_environmental_conditioning" }
+        || receipt.geometry != expected_geometry
     {
         return Err(Decision::rejected("conditioning practice does not match the declared adhesive-bond specimen scope"));
     }
