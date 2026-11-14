@@ -19,7 +19,7 @@
 macro_rules! cognitive_accessors {
     ($(
         $(#[$meta:meta])*
-        $vis:vis fn $name:ident(& $self_:ident) -> $ret:ty { $($body:tt)+ }
+        $vis:vis fn $name:ident(& $self_:ident $(,)?) -> $ret:ty { $($body:tt)+ }
     )*) => {
         $(
             $(#[$meta])*
