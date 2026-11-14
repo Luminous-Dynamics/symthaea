@@ -313,6 +313,26 @@ A schema-valid observation is not automatically timely. The evaluator must compa
 
 The temporal outcome separately records `evidence_validity_at_target_time` as `valid`, `invalid`, `indeterminate`, `not_applicable` or `not_assessed`. An Unknown target time cannot be adjudicated as valid/invalid by the V1.1 schema. This is independent of whether the evidence source was available by K: a source may have been available at the decision frontier while not being valid for target time T, or valid at T while unavailable to the decision process by K.
 
+
+
+### Distributed-source decision frontiers: wall-clock labels are not causal cuts
+
+A wall-clock K remains useful for target/validity comparisons, but it is not necessarily a complete information frontier for a workflow that consumes multiple conductors, repositories, feeds or asynchronous evidence services. Two sources can be concurrent; clocks can be skewed; one conductor's local sequence number has no ordering relation to another conductor's local sequence number.
+
+V1.1 therefore requires an explicit `decision_frontier.ordering_model`:
+- `single_source_authoritative_clock_or_monotonic_sequence` — a single source/order domain; the causal-cut binding is explicitly `not_required`.
+- `multi_source_causal_partial_order` — a distributed source set; a verified causal history is required.
+- `hybrid_clock_plus_causal_partial_order` — wall-clock bounds are retained, but only explicit causal edges establish cross-source ordering.
+
+Where a causal cut is required, V1.1 binds references and digests to existing owner outputs; it does **not** define a new causal history, vector clock, event log or receipt service:
+- Mycelix [EPI-008 #2631](https://github.com/Luminous-Dynamics/mycelix/issues/2631) owns typed temporal assertions and `EvidenceFrontierV1`. Its contract explicitly distinguishes a cutoff from a complete corpus and forbids timestamp sorting from creating causal edges.
+- Mycelix [PULSE-MULTICONDUCTOR-EVIDENCE-001 #5843](https://github.com/Luminous-Dynamics/mycelix/issues/5843) owns per-conductor local order, explicit cross-conductor happens-before edges, partial-order concurrency and the independent causal-history verifier.
+- Mycelix [EMSR-PROV-003 #5923](https://github.com/Luminous-Dynamics/mycelix/issues/5923) owns time-qualified dependency hypergraph closure and completeness semantics.
+
+The complete binding includes exact evidence-frontier and causal-history references/digests, the source-set digest, verifier identity/digest and verification receipt reference. A required but incomplete/unknown causal cut cannot yield `system_availability=available` or `run_context_presence=included`. Do not compare raw authority indices across conductors; do not infer an edge from wall-clock order; missing joins remain INCOMPLETE/UNKNOWN.
+
+A single-source synthetic fixture explicitly declares its single-source ordering basis and `causal_frontier.required=false`. This is a schema fixture, not a claim that all industrial systems are single-source.
+
 ### Adjudicator requirements
 
 When `temporal_admissibility` is present, every assessor record must also contain `temporal_admissibility_label`. The evaluator must verify:
