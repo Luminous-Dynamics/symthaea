@@ -1161,20 +1161,20 @@ mod tests {
             "<step>C</step><octave>4</octave>",
             "<step>D</step><octave>4</octave>"
         ));
-        let config = MusicXmlCorrectionLedgerConfigV1::default();
+        let ledger_config = MusicXmlCorrectionLedgerConfigV1::default();
         let mut ledger = build_musicxml_correction_ledger(
-            &reference, &prediction, config(), config.clone()
+            &reference, &prediction, config(), ledger_config.clone()
         ).unwrap();
         assert!(validate_musicxml_correction_ledger_replay(
-            &reference,&prediction,config(),config.clone(),&ledger
+            &reference,&prediction,config(),ledger_config.clone(),&ledger
         ).unwrap());
         ledger.actions[0].field_path = "tampered".into();
         assert!(!validate_musicxml_correction_ledger_replay(
-            &reference,&prediction,config(),config.clone(),&ledger
+            &reference,&prediction,config(),ledger_config.clone(),&ledger
         ).unwrap());
         let changed = graph(&fixture().replace("<part-name>Violin</part-name>","<part-name>Cello</part-name>"));
         assert!(!validate_musicxml_correction_ledger_replay(
-            &changed,&prediction,config(),config,&build_musicxml_correction_ledger(
+            &changed,&prediction,config(),ledger_config,&build_musicxml_correction_ledger(
                 &reference,&prediction,config(),MusicXmlCorrectionLedgerConfigV1::default()
             ).unwrap()
         ).unwrap());
