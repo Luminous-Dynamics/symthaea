@@ -21,6 +21,8 @@ struct StrengthAggregate {
     scope_evidence: ScopeEvidence,
     samples: Vec<Sample>,
     mean_strength_mpa: f64,
+    conditioning_profile_id: Option<String>,
+    conditioning_profile_sha256: Option<String>,
     conditioning_receipt: Option<ScopeEvidence>,
 }
 
@@ -41,6 +43,8 @@ struct RetentionResult {
     plan_sha256: String,
     formula_sha256: String,
     input_manifest_sha256: String,
+    uncertainty_receipt_sha256: String,
+    analysis_profile: String,
     baseline_retention: f64,
     candidate_retention: f64,
     candidate_minus_baseline: f64,
@@ -70,6 +74,8 @@ struct FailureModeResult {
     plan_sha256: String,
     taxonomy_sha256: String,
     input_manifest_sha256: String,
+    uncertainty_receipt_sha256: String,
+    analysis_profile: String,
     baseline_numerator: usize,
     baseline_denominator: usize,
     candidate_numerator: usize,
@@ -257,7 +263,9 @@ fn validate_strength_aggregate(
 
     match (&aggregate.conditioning_receipt, require_conditioning) {
         (Some(conditioning), true) => {
-            if conditioning.method_id != "ASTM_D1151"
+            if aggregate.conditioning_profile_id.as_deref().is_none_or(str::is_empty)
+                || !aggregate.conditioning_profile_sha256.as_deref().is_some_and(sha256_shape)
+                || conditioning.method_id != "ASTM_D1151"
                 || conditioning.endpoint != "moisture_temperature_exposure_protocol"
                 || conditioning.requested_claim != "conditioning_protocol_reference"
                 || specimen_ids(&aggregate.samples)
@@ -269,7 +277,11 @@ fn validate_strength_aggregate(
         }
         (None, true) => return Err(Disposition::Blocked),
         (Some(_), false) => return Err(Disposition::Rejected),
-        (None, false) => {}
+        (None, false) => {
+            if aggregate.conditioning_profile_id.is_some() || aggregate.conditioning_profile_sha256.is_some() {
+                return Err(Disposition::Rejected);
+            }
+        }
     }
     Ok(())
 }
@@ -377,6 +389,9 @@ fn audit_retention(
         || !sha256_shape(&result.plan_sha256)
         || !sha256_shape(&result.formula_sha256)
         || !sha256_shape(&result.input_manifest_sha256)
+        || !sha256_shape(&input_manifest_sha256)
+        || !sha256_shape(&uncertainty_receipt_sha256)
+        || !sha256_shape(&result.uncertainty_receipt_sha256)
     {
         return blocked("retention formula, plan, input-manifest or result digest is missing/malformed");
     }
@@ -388,6 +403,10 @@ fn audit_retention(
     }
     if result.design_id != design_id || result.plan_sha256 != plan_sha256
         || result.formula_sha256 != formula_sha256
+        || result.input_manifest_sha256 != input_manifest_sha256
+        || result.uncertainty_receipt_sha256 != uncertainty_receipt_sha256
+        || result.analysis_profile != uncertainty_method_id
+        || uncertainty_method_id != "cluster_bootstrap_diff_of_retention_v1"
     {
         return rejected("retention result is not bound to the frozen design/formula receipt");
     }
@@ -405,7 +424,25 @@ fn audit_retention(
         Err(Disposition::Pass) => unreachable!(),
     };
 
-    if baseline.initial.scope_evidence.method_id != candidate.initial.scope_evidence.method_id
+    let baseline_clusters = cluster_ids(&baseline.initial.samples);
+    let candidate_clusters = cluster_ids(&candidate.initial.samples);
+    let baseline_specimens: HashSet<&str> = specimen_ids(&baseline.initial.samples)
+        .union(&specimen_ids(&baseline.aged.samples)).copied().collect();
+    let candidate_specimens: HashSet<&str> = specimen_ids(&candidate.initial.samples)
+        .union(&specimen_ids(&candidate.aged.samples)).copied().collect();
+    if !baseline_clusters.is_disjoint(&candidate_clusters)
+        || !baseline_specimens.is_disjoint(&candidate_specimens)
+    {
+        return rejected("baseline and candidate retention cohorts reuse a specimen or independent manufacturing cluster");
+    }
+
+    if baseline.initial.scope_evidence.method_id != baseline.aged.scope_evidence.method_id
+        || baseline.initial.scope_evidence.edition != baseline.aged.scope_evidence.edition
+        || baseline.initial.scope_evidence.protocol_id != baseline.aged.scope_evidence.protocol_id
+        || baseline.initial.scope_evidence.protocol_sha256 != baseline.aged.scope_evidence.protocol_sha256
+        || baseline.aged.conditioning_profile_id != candidate.aged.conditioning_profile_id
+        || baseline.aged.conditioning_profile_sha256 != candidate.aged.conditioning_profile_sha256
+        || baseline.initial.scope_evidence.method_id != candidate.initial.scope_evidence.method_id
         || baseline.initial.scope_evidence.edition != candidate.initial.scope_evidence.edition
         || baseline.initial.scope_evidence.material_pair_class != candidate.initial.scope_evidence.material_pair_class
         || baseline.initial.scope_evidence.geometry != candidate.initial.scope_evidence.geometry
@@ -413,6 +450,8 @@ fn audit_retention(
         || baseline.aged.scope_evidence.edition != candidate.aged.scope_evidence.edition
         || baseline.aged.scope_evidence.material_pair_class != candidate.aged.scope_evidence.material_pair_class
         || baseline.aged.scope_evidence.geometry != candidate.aged.scope_evidence.geometry
+        || candidate.initial.scope_evidence.protocol_id != candidate.aged.scope_evidence.protocol_id
+        || candidate.initial.scope_evidence.protocol_sha256 != candidate.aged.scope_evidence.protocol_sha256
     {
         return rejected("baseline/candidate strength observations do not share the same method and joint scope");
     }
@@ -561,6 +600,9 @@ fn audit_failure_fraction(
     if !sha256_shape(taxonomy_sha256) || !sha256_shape(plan_sha256)
         || !sha256_shape(&result.result_sha256) || !sha256_shape(&result.plan_sha256)
         || !sha256_shape(&result.taxonomy_sha256) || !sha256_shape(&result.input_manifest_sha256)
+        || !sha256_shape(input_manifest_sha256)
+        || !sha256_shape(uncertainty_receipt_sha256)
+        || !sha256_shape(&result.uncertainty_receipt_sha256)
     {
         return blocked("failure taxonomy, plan, manifest or result digest is missing/malformed");
     }
@@ -575,6 +617,10 @@ fn audit_failure_fraction(
     }
     if result.design_id != design_id || result.plan_sha256 != plan_sha256
         || result.taxonomy_sha256 != taxonomy_sha256
+        || result.input_manifest_sha256 != input_manifest_sha256
+        || result.uncertainty_receipt_sha256 != uncertainty_receipt_sha256
+        || result.analysis_profile != uncertainty_method_id
+        || uncertainty_method_id != "cluster_bootstrap_diff_of_fractions_v1"
     {
         return rejected("failure-mode result is not bound to the frozen design and taxonomy");
     }
@@ -623,6 +669,8 @@ fn audit_failure_fraction(
         || result.ci_lower > result.ci_upper
         || !result.margin_lower.is_finite() || !result.margin_upper.is_finite()
         || result.margin_lower >= result.margin_upper
+        || result.ci_lower < -1.0 || result.ci_upper > 1.0
+        || result.margin_lower < -1.0 || result.margin_upper > 1.0
     {
         return rejected("failure-mode fraction interval or margins are invalid");
     }
@@ -652,7 +700,8 @@ fn audit_case(case: &Case) -> Decision {
         EndpointPayload::FailureModeFraction {
             endpoint_id, estimand, quantity_unit, taxonomy_id, taxonomy_sha256, category_id,
             denominator_policy, grouping_scheme, design_id, plan_sha256, frozen_at,
-            first_outcome_available_at, minimum_independent_clusters, baseline_scope_evidence,
+            first_outcome_available_at, minimum_independent_clusters, input_manifest_sha256,
+            uncertainty_method_id, uncertainty_receipt_sha256, baseline_scope_evidence,
             candidate_scope_evidence, baseline, candidate, result,
         } => audit_failure_fraction(
             endpoint_id, estimand, quantity_unit, taxonomy_id, taxonomy_sha256, category_id,
