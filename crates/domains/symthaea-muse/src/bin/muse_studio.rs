@@ -2767,6 +2767,10 @@ fn summarize_imported_notation_structure(
             let mut visual_tie_count = 0usize;
             let mut voice_assignment_count = 0usize;
             let mut staff_assignment_count = 0usize;
+            let mut part_metadata_count = 0usize;
+            let mut score_instrument_count = 0usize;
+            let mut midi_instrument_count = 0usize;
+            let mut unresolved_note_instrument_reference_count = 0usize;
             for graph in &graphs {
                 match &graph.map.status {
                     symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
@@ -2782,6 +2786,17 @@ fn summarize_imported_notation_structure(
                         notation_unknown_part_count += 1;
                     }
                 }
+                let declared_instrument_ids = if let Some(metadata) = &graph.part_metadata {
+                    part_metadata_count += 1;
+                    score_instrument_count += metadata.score_instrument_ids.len();
+                    midi_instrument_count += metadata.source_score_part.children
+                        .iter()
+                        .filter(|node| node.element == "midi-instrument")
+                        .count();
+                    metadata.score_instrument_ids.clone()
+                } else {
+                    Vec::new()
+                };
                 measure_count += graph.map.measures.len();
                 barline_event_count += graph.barline_events.len();
                 non_controlling_measure_count +=
@@ -2791,6 +2806,11 @@ fn summarize_imported_notation_structure(
                 notation_attribute_event_count += graph.notation_events.attribute_events.len();
                 notation_cursor_move_count += graph.notation_events.cursor_moves.len();
                 for event in &graph.notation_events.note_events {
+                    for instrument_id in &event.instrument_ids {
+                        if !declared_instrument_ids.contains(instrument_id) {
+                            unresolved_note_instrument_reference_count += 1;
+                        }
+                    }
                     if matches!(
                         &event.kind,
                         symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Unpitched { .. }
@@ -2873,6 +2893,10 @@ fn summarize_imported_notation_structure(
                     visual_tie_count,
                     voice_assignment_count,
                     staff_assignment_count,
+                    part_metadata_count,
+                    score_instrument_count,
+                    midi_instrument_count,
+                    unresolved_note_instrument_reference_count,
                     unavailable_part_ids,
                     explanation,
                 },
@@ -2942,6 +2966,10 @@ fn summarize_imported_notation_structure(
                     visual_tie_count: 0,
                     voice_assignment_count: 0,
                     staff_assignment_count: 0,
+                    part_metadata_count: 0,
+                    score_instrument_count: 0,
+                    midi_instrument_count: 0,
+                    unresolved_note_instrument_reference_count: 0,
                     unavailable_part_ids,
                     explanation: None,
                 },
@@ -2980,6 +3008,10 @@ fn summarize_imported_notation_structure(
                 visual_tie_count: 0,
                 voice_assignment_count: 0,
                 staff_assignment_count: 0,
+                part_metadata_count: 0,
+                score_instrument_count: 0,
+                midi_instrument_count: 0,
+                unresolved_note_instrument_reference_count: 0,
                 unavailable_part_ids: Vec::new(),
                 explanation: Some(reason),
             },
