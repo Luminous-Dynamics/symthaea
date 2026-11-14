@@ -501,6 +501,130 @@ pub struct ComplexU1Mps {
     dense_svd_rank_by_charge_and_cut: Option<Vec<Vec<(i32, usize)>>>,
 }
 
+
+
+/// One site of a U(1)-charge-conserving matrix-product operator.
+///
+/// Data layout is ((left * 4) + output_physical * 2 + input_physical) * right_dim + right.
+/// Virtual indices carry charge flux. The local rule is
+/// flux_right = flux_left + q(output) - q(input).
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1MpoTensor {
+    left_fluxes: Vec<i32>,
+    right_fluxes: Vec<i32>,
+    data: Vec<Complex64>,
+}
+
+impl U1MpoTensor {
+    pub fn new(
+        left_fluxes: Vec<i32>,
+        right_fluxes: Vec<i32>,
+        data: Vec<Complex64>,
+    ) -> Result<Self, U1MpsError> {
+        if left_fluxes.is_empty() {
+            return Err(U1MpsError::EmptyBond {
+                site: 0,
+                side: "MPO left",
+            });
+        }
+        if right_fluxes.is_empty() {
+            return Err(U1MpsError::EmptyBond {
+                site: 0,
+                side: "MPO right",
+            });
+        }
+        let expected = left_fluxes
+            .len()
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(right_fluxes.len()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        if data.len() != expected {
+            return Err(U1MpsError::EntryCount {
+                expected,
+                actual: data.len(),
+            });
+        }
+        for (index, value) in data.iter().enumerate() {
+            if !value.re.is_finite() || !value.im.is_finite() {
+                return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+            }
+        }
+        Ok(Self {
+            left_fluxes,
+            right_fluxes,
+            data,
+        })
+    }
+
+    pub fn left_dimension(&self) -> usize {
+        self.left_fluxes.len()
+    }
+
+    pub fn right_dimension(&self) -> usize {
+        self.right_fluxes.len()
+    }
+
+    pub fn left_fluxes(&self) -> &[i32] {
+        &self.left_fluxes
+    }
+
+    pub fn right_fluxes(&self) -> &[i32] {
+        &self.right_fluxes
+    }
+
+    pub fn data(&self) -> &[Complex64] {
+        &self.data
+    }
+
+    pub fn get(
+        &self,
+        left: usize,
+        output_physical: usize,
+        input_physical: usize,
+        right: usize,
+    ) -> Complex64 {
+        self.data[((left * 4 + output_physical * 2 + input_physical)
+            * self.right_dimension())
+            + right]
+    }
+
+    fn maximum_forbidden_amplitude(&self) -> (f64, usize, usize, usize, usize) {
+        let mut maximum = 0.0_f64;
+        let mut witness = (0, 0, 0, 0);
+        for left in 0..self.left_dimension() {
+            for output_physical in 0..2 {
+                for input_physical in 0..2 {
+                    let expected_flux = self.left_fluxes[left]
+                        + output_physical as i32
+                        - input_physical as i32;
+                    for right in 0..self.right_dimension() {
+                        if self.right_fluxes[right] != expected_flux {
+                            let amplitude =
+                                self.get(left, output_physical, input_physical, right).norm();
+                            if amplitude > maximum {
+                                maximum = amplitude;
+                                witness = (left, output_physical, input_physical, right);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        (maximum, witness.0, witness.1, witness.2, witness.3)
+    }
+}
+
+/// Exact open-boundary U(1)-conserving MPO with zero net external flux.
+///
+/// Applying this operator preserves total excitation number. The implementation
+/// deliberately performs no bond truncation or compression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1MpoOperator {
+    tensors: Vec<U1MpoTensor>,
+    selection_rule_residual: f64,
+    tolerance: f64,
+}
+
 /// Measured mixed-canonical gauge receipt for a two-site center at a bond.
 ///
 /// Sites [0,bond) are left-isometric and sites (bond+1,N) are right-isometric.
