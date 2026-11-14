@@ -146,6 +146,10 @@ pub enum MusicEditValidityEnvelopeIssueV1 {
     ReferenceLineageMismatch(String), ValidAlternativeNotValidated(String),
     ValidatedReferenceMissingReview(String), InvalidReviewRecord(String),
     NegativeControlNotInvalid(String), RequiredAlternativeMissing,
+    ConflictingConstraintSections {
+        property: MusicEditValidityPropertyV1,
+        scope: MusicEditValidityScopeV1,
+    },
     OperationScopeMismatch(MusicEditOperationV1),
     MissingOperationRequirement { operation: MusicEditOperationV1, property: MusicEditValidityPropertyV1 },
     InvalidEnvelope, SerializationError,
@@ -319,6 +323,56 @@ fn operation_scope_valid(envelope: &MusicEditValidityEnvelopeV1) -> bool {
             matches!(envelope.target_scope, T::Instrument | T::Mixture)
         }
     }
+}
+
+fn validate_cross_section_conflicts(
+    envelope: &MusicEditValidityEnvelopeV1,
+) -> Vec<MusicEditValidityEnvelopeIssueV1> {
+    use MusicEditValidityRelationV1 as R;
+
+    let mut issues = Vec::new();
+    let overlaps = |left: &MusicEditValidityConstraintV1,
+                    right: &MusicEditValidityConstraintV1| {
+        left.property == right.property && left.scope == right.scope
+    };
+    let mut add_conflict = |property, scope| {
+        let issue = MusicEditValidityEnvelopeIssueV1::ConflictingConstraintSections {
+            property,
+            scope,
+        };
+        if !issues.contains(&issue) {
+            issues.push(issue);
+        }
+    };
+
+    for requested in &envelope.requested_change {
+        let protected_conflict = envelope.protected_invariants.iter().any(|protected| {
+            overlaps(requested, protected)
+                && protected.relation == R::NoChange
+                && requested.relation != R::NoChange
+        });
+        let forbidden_conflict = envelope.forbidden_changes.iter().any(|forbidden| {
+            overlaps(requested, forbidden)
+                && forbidden.relation == R::NoChange
+                && requested.relation != R::NoChange
+        });
+        if protected_conflict || forbidden_conflict {
+            add_conflict(requested.property, requested.scope);
+        }
+    }
+
+    for permitted in &envelope.permitted_variations {
+        let protected_conflict = envelope.protected_invariants.iter().any(|protected| {
+            overlaps(permitted, protected) && protected.relation == R::NoChange
+        });
+        let forbidden_conflict = envelope.forbidden_changes.iter().any(|forbidden| {
+            overlaps(permitted, forbidden) && forbidden.relation == R::NoChange
+        });
+        if protected_conflict || forbidden_conflict {
+            add_conflict(permitted.property, permitted.scope);
+        }
+    }
+    issues
 }
 
 /// Enforces a minimal semantic contract per declared operation. These checks
@@ -699,6 +753,7 @@ pub fn validate_music_edit_validity_envelope_v1(
     {
         issues.push(MusicEditValidityEnvelopeIssueV1::RequiredAlternativeMissing);
     }
+    issues.extend(validate_cross_section_conflicts(envelope));
     issues.extend(validate_operation_contract(envelope));
     issues
 }
@@ -1278,6 +1333,31 @@ mod tests {
             &MusicEditValidityEnvelopeIssueV1::MissingOperationRequirement {
                 operation: MusicEditOperationV1::TuningCorrection440,
                 property: MusicEditValidityPropertyV1::TuningCents,
+            }
+        ));
+    }
+
+    #[test]
+    fn permitted_variation_cannot_overlap_a_protected_no_change_invariant() {
+        let mut envelope = valid_envelope();
+        envelope.permitted_variations.push(MusicEditValidityConstraintV1 {
+            constraint_id: "variation.harmony".to_owned(),
+            property: MusicEditValidityPropertyV1::Harmony,
+            scope: MusicEditValidityScopeV1::Composition,
+            relation: MusicEditValidityRelationV1::WithinRange,
+            expected_value: None,
+            allowed_values: Vec::new(),
+            minimum: Some(0.0),
+            maximum: Some(1.0),
+            unit: Some("normalized".to_owned()),
+            evidence: MusicEditValidityEvidenceV1::Symbolic,
+            rationale: "deliberately conflicting synthetic variation".to_owned(),
+        });
+        envelope.permitted_variations.sort_by(|a, b| a.constraint_id.cmp(&b.constraint_id));
+        assert!(validate_music_edit_validity_envelope_v1(&envelope).contains(
+            &MusicEditValidityEnvelopeIssueV1::ConflictingConstraintSections {
+                property: MusicEditValidityPropertyV1::Harmony,
+                scope: MusicEditValidityScopeV1::Composition,
             }
         ));
     }

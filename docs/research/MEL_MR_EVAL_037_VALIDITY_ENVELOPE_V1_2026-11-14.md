@@ -29,7 +29,7 @@ A candidate edit should ultimately pass hard obligations and protected invariant
 - Typed envelope identity, immutable envelope/dataset versions, benchmark track, sample, source lineage, split, operation, target scope and selector commitment.
 - Separate typed arrays for requested changes, protected invariants, permitted variations and forbidden changes.
 - Constraint relations for equality, difference, ranges, member/not-member sets, presence/absence, no-change and monotonic contours.
-- Canonical ordering of constraint identifiers, allowed values and references.
+- Canonical ordering of constraint identifiers, allowed values and references, plus cross-section conflict rejection for requested/protected/permitted/forbidden properties.
 - Multiple references with roles: valid alternative, demonstration and negative control.
 - Explicit reference adequacy: Validated, Ambiguous, Inaudible, Invalid or Unreviewed.
 - Valid alternatives require a review record commitment, reviewer-set commitment, at least two reviewers and an independence attestation. These commitments/attestations are provenance fields; they do not cryptographically authenticate reviewers or prove legal/ethical approval.
@@ -37,7 +37,7 @@ A candidate edit should ultimately pass hard obligations and protected invariant
 - Constraint-only policy allows evaluation without any paired target; the alternative-required policy fails closed without a reviewed valid alternative.
 - Operation-specific contract checks require part identity, event lineage, pitch, onset and duration preservation for instrument replacement; kit identity, event lineage and rhythm preservation for drum replacement, target/non-target acoustic presence obligations for extraction, positive integer score-tick duration plus acoustic articulation obligations for staccato/legato, explicitly scoped acoustic contour evidence for crescendo/decrescendo, and both an A4=440 Hz anchor and a zero-cent-spanning acoustic tolerance for tuning correction.
 - Domain-separated SHA-256 envelope commitment.
-- Twenty-one authored Rust tests cover multiple alternatives, constraint-only operation, missing alternatives, unreviewed alternatives, lineage substitution, negative-control promotion, duplicate obligations, invalid ranges, digest sensitivity, mutable versions, canonical ordering, no-op obligations, instrument/drum replacement, articulation, dynamic contour and cent-level tuning contracts.
+- Twenty-two authored Rust tests cover multiple alternatives, constraint-only operation, missing alternatives, unreviewed alternatives, lineage substitution, negative-control promotion, duplicate obligations, invalid ranges, digest sensitivity, mutable versions, canonical ordering, no-op obligations, instrument/drum replacement, articulation, dynamic contour and cent-level tuning contracts.
 
 ## What this is not
 
