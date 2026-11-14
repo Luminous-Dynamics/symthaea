@@ -286,6 +286,8 @@ pub enum FindingCode {
     SpecificationKeyMismatch,
     DeclaredProducerMissing,
     DeclaredConsumerMissing,
+    DeclaredInvalidInputClass,
+    DeclaredInvalidOutputClass,
     UnknownComponent,
     UnknownProcess,
     ProcessVersionMismatch,
@@ -434,6 +436,16 @@ pub fn verify_trace(
                 );
             } else {
                 *declared_consumers.entry(component_id.clone()).or_default() += 1;
+                if organization.components.get(component_id).is_some_and(|component| {
+                    component.class == ComponentClass::ExternalResource
+                }) {
+                    report.push(
+                        FindingCode::DeclaredInvalidInputClass,
+                        None,
+                        Some(component_id.clone()),
+                        format!("process {} models an external resource as an internal artifact input", process.id.0),
+                    );
+                }
             }
         }
         for component_id in process
@@ -450,6 +462,19 @@ pub fn verify_trace(
                 );
             } else {
                 *declared_producers.entry(component_id.clone()).or_default() += 1;
+                if organization.components.get(component_id).is_some_and(|component| {
+                    !matches!(
+                        component.class,
+                        ComponentClass::RegenerativeInternal | ComponentClass::EvidenceArtifact
+                    )
+                }) {
+                    report.push(
+                        FindingCode::DeclaredInvalidOutputClass,
+                        None,
+                        Some(component_id.clone()),
+                        format!("process {} declares output of a non-regenerable component", process.id.0),
+                    );
+                }
             }
         }
     }
@@ -874,8 +899,8 @@ pub fn verify_trace(
 
     for component_id in &required_regenerative {
         let produced_and_consumed = verified_outputs.iter().any(|(version_id, artifact)| {
-            version_id.component_id == *component_id
-                && matches!(artifact.origin, ArtifactOrigin::Produced { .. })
+            &version_id.component_id == component_id
+                && matches!(&artifact.origin, ArtifactOrigin::Produced { .. })
                 && consumed_versions.contains(version_id)
         });
 
