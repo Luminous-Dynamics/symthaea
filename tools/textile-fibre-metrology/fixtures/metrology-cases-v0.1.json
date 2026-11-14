@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "TEXTILE-FIBRE-METROLOGY-CASES-001",
+  "fixture_class": "synthetic",
+  "claim_ceiling": "Contract regression only; no real fibre measurements or receiver acceptance.",
+  "cases": [
+    {
+      "case_id": "FM-001-VALID-MASS-WEIGHTED",
+      "operation": "assess_distribution",
+      "expected": "qualified"
+    },
+    {
+      "case_id": "FM-002-NUMBER-WEIGHTED",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-003-MATERIAL-OUT-OF-SCOPE",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-004-LOCAL-VALIDATION-MISSING",
+      "operation": "assess_distribution",
+      "expected": "insufficient_evidence"
+    },
+    {
+      "case_id": "FM-005-CALIBRATION-EXPIRED",
+      "operation": "assess_distribution",
+      "expected": "insufficient_evidence"
+    },
+    {
+      "case_id": "FM-006-CALIBRATION-INSTRUMENT-MISMATCH",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-007-BIN-GAP",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-008-BIN-OVERLAP",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-009-FRACTION-NOT-CLOSED",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-010-PSEUDOREPLICATED-SUBSAMPLES",
+      "operation": "assess_distribution",
+      "expected": "rejected"
+    },
+    {
+      "case_id": "FM-011-THRESHOLD-STRADDLE",
+      "operation": "assess_distribution",
+      "expected": "insufficient_evidence"
+    },
+    {
+      "case_id": "FM-012-INSUFFICIENT-ACQUISITIONS",
+      "operation": "assess_distribution",
+      "expected": "insufficient_evidence"
+    },
+    {
+      "case_id": "FM-013-CROSS-METHOD-PAIRED-BRIDGE",
+      "operation": "assess_method_bridge",
+      "expected": "equivalent"
+    },
+    {
+      "case_id": "FM-014-BRIDGE-TOO-FEW-PAIRS",
+      "operation": "assess_method_bridge",
+      "expected": "not_equivalent"
+    },
+    {
+      "case_id": "FM-015-BRIDGE-MARGIN-EXCEEDED",
+      "operation": "assess_method_bridge",
+      "expected": "not_equivalent"
+    },
+    {
+      "case_id": "FM-016-OUTPUT-LOT-TRIAL-MISMATCH",
+      "operation": "assess_process_comparison",
+      "expected": "insufficient_evidence"
+    }
+  ]
+}

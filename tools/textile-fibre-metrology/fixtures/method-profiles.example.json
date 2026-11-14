@@ -1,0 +1,80 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_class": "method_profile_examples",
+  "claim_ceiling": "Example profile declarations only; local measurement validation and laboratory competence are not demonstrated.",
+  "profiles": [
+    {
+      "method_id": "ASTM-D1440-07-R2024",
+      "version": "2024",
+      "citation": "ASTM D1440-07(2024) — Length and Length Distribution of Cotton Fibers (Array Method); https://store.astm.org/d1440-07.html",
+      "allowed_materials": [
+        "cotton"
+      ],
+      "allowed_process_states": [
+        "pre_process_reference_fibre",
+        "loose_recovered_fibre",
+        "recovered_after_opening"
+      ],
+      "supported_weighting_bases": [
+        "mass_weighted"
+      ],
+      "minimum_independent_subsamples": 3,
+      "minimum_acquisitions": 2,
+      "resolution_um": 100,
+      "calibration_required": true,
+      "local_validation_required_states": [
+        "loose_recovered_fibre",
+        "recovered_after_opening"
+      ]
+    },
+    {
+      "method_id": "ASTM-D1447-26",
+      "version": "2026",
+      "citation": "ASTM D1447-26 — Length and Length Uniformity of Cotton Fibers by Photoelectric Measurement; https://www.intertekinform.com/en-au/standards/astm-d-1447-2026-141222_saig_astm_astm_4059938/",
+      "allowed_materials": [
+        "cotton"
+      ],
+      "allowed_process_states": [
+        "pre_process_reference_fibre",
+        "loose_virgin_fibre"
+      ],
+      "supported_weighting_bases": [
+        "mass_weighted"
+      ],
+      "minimum_independent_subsamples": 3,
+      "minimum_acquisitions": 2,
+      "resolution_um": 100,
+      "calibration_required": true,
+      "local_validation_required_states": []
+    },
+    {
+      "method_id": "ISO-6989-1981",
+      "version": "1981",
+      "citation": "ISO 6989:1981 — Determination of length and length distribution of staple fibres by measurement of single fibres; https://www.iso.org/cms/live/live/en/sites/isoorg/contents/data/standard/01/35/13551.html",
+      "allowed_materials": [
+        "cotton",
+        "polyester",
+        "regenerated_cellulose",
+        "wool",
+        "polyamide",
+        "elastane"
+      ],
+      "allowed_process_states": [
+        "loose_virgin_fibre",
+        "loose_recovered_fibre",
+        "recovered_after_opening"
+      ],
+      "supported_weighting_bases": [
+        "number_weighted"
+      ],
+      "minimum_independent_subsamples": 3,
+      "minimum_acquisitions": 2,
+      "resolution_um": 100,
+      "calibration_required": true,
+      "local_validation_required_states": [
+        "loose_recovered_fibre",
+        "recovered_after_opening"
+      ]
+    }
+  ]
+}
