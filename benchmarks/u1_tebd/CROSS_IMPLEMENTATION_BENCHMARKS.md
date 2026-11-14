@@ -43,6 +43,15 @@ Choose a target measured state error (initial targets: (10^{-4},10^{-6},10^{-8})
 
 Quimb supports relative-singular-value (`rel`) and relative-discarded-squared-weight (`rsum2`) modes, among others. These are different contracts. ITensor's cutoff is a truncation-error threshold on its SVD/TEBD path. Do not compare raw cutoff scalars across these libraries without translating them through the measured discarded weight and dense-state error.
 
+
+### Quimb eager versus lazy compression track
+
+For each matched fixture, run:
+- \`CircuitMPS\` eager gate-split compression (the TEBD-like reference).
+- \`CircuitMPSLazy\` with sub-MPO gate application and periodic compression. Sweep \`compress_every ∈ {1,2,4,8}\` and compression \`method ∈ {dm,direct,src}\` where supported.
+
+The lazy path must flush pending gates before the final dense oracle, norm, charge, and fidelity measurements. Timing includes only the same ordered gate submissions and the library's configured automatic compression triggered by those submissions; final-state materialization and dense-oracle calculation are outside the timed region and are reported separately. For \`src\`, cutoff is not a meaningful control in the same way as SVD-based methods; use a fixed bond cap and separately report the resulting measured error. The primary comparison is the Pareto frontier in runtime, peak memory, and measured dense-state error, not a comparison of raw cutoff numbers.
+
 ## Oracle and error decomposition
 
 For (N\le12), compute two independent references:
