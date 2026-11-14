@@ -47,9 +47,9 @@ The v0.1.1 manifest currently contains 11 directional relationship statements. T
 
 ## Validation tool
 
-The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, federation manifests v0.1.0/v0.1.1, and DYNRETR fixed-budget retrieval/exploration cases.
+The standalone read-only Rust prototype is in [`tools/development-map-validator`](../../tools/development-map-validator/README.md). It has authored structural and adversarial tests for map snapshots, decision-time evidence, development-trajectory planning, federation manifests v0.1.0/v0.1.1, DYNRETR fixed-budget retrieval/exploration cases, and a pure Cargo manifest projection library.
 
-**The Rust source and its 59 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
+**The Rust source and its 69 unit-test cases have not been compiled or executed.** The prototype does not fetch/authenticate source objects, verify signatures, run builds/tests, inspect CI, or independently qualify facts. A structural pass is not JSON Schema 2020-12 meta-validation or runtime compatibility proof.
 
 ## Retrieval benchmark fixture
 
@@ -68,3 +68,8 @@ The standalone read-only Rust prototype is in [`tools/development-map-validator`
 ## Claim boundary
 
 The federation is a directory of independent maps, not a merged graph or common authority. It does not establish that the four projects compile together, share compatible runtime contracts, pass end-to-end tests, or are jointly production-ready.
+
+
+## Read-only Cargo projection
+
+The validator crate now contains a library-only Cargo manifest projector at `src/cargo_manifest.rs`. It emits exact-anchor, `manifest_declared` facts for workspace patterns, package declarations, dependencies, target-specific dependencies, features, explicit targets and build-script declarations. It does not call Cargo, expand globs/features, resolve compiler semantics or execute build scripts. Ten test definitions cover virtual workspaces, packages, dependency kinds, target conditions, inherited declarations, build scripts and anchor failures; they are authored but not executed.
