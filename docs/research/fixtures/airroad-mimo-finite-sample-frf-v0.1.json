@@ -222,16 +222,16 @@
         "denominator": "5"
       },
       {
-        "numerator": "4",
-        "denominator": "5"
-      },
-      {
         "numerator": "1",
         "denominator": "3"
       },
       {
         "numerator": "2",
         "denominator": "3"
+      },
+      {
+        "numerator": "4",
+        "denominator": "5"
       }
     ],
     "alias_residues_distinct": true,
