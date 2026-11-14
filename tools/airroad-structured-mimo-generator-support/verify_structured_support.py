@@ -157,10 +157,7 @@ def validate_structural_contract(
     if not coordinates:
         raise ValueError("shared calibration coordinate bindings are missing")
     expected_frequency_ids = [
-        item["frequency_id"] for item in data["support_basis"].get(
-            "coordinate_frequency_bindings",
-            [{"frequency_id": "f0"}, {"frequency_id": "f1"}],
-        )
+        item["frequency_id"] for item in data["coordinates"]
     ]
     bound_frequency_ids = [item["frequency_id"] for item in coordinates]
     if bound_frequency_ids != expected_frequency_ids:
