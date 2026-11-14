@@ -42,7 +42,7 @@ Selected files discovered in the public manifest:
 | `GalvanostaticChargeDischarge_PCNS_TemperatureComparison_0.1Ag.csv` | 3.9 MB | `88bc3dc26bd37971d7ca4a80ed79f290` | GCD discharge integration and capacitance reproduction |
 | `ImpedanceSpectroscopy_PCNS_TemperatureComparison.csv` | 2.9 KB | `4ef9d5efe0519c599a03b6527511c54c` | EIS header/unit inspection and impedance-model fit |
 
-The MD5 values above are repository-provided file metadata, **not locally re-computed verification**. The files must be downloaded, byte-counted, hashed locally and their actual headers/units inspected before being admitted to the executable benchmark. Each file has its own persistent file identifier in DataverseNO; retain those identifiers when making derived records.
+The persistent file identifiers above are the file-level DOIs. The MD5 values are repository-provided checksums, **not locally re-computed verification**. The page also provides a per-file URL form `https://dataverse.no/api/access/datafile/:persistentId?persistentId=doi:10.18710/F4NFMJ/RREE4O`; the manifest records the corresponding file DOIs. The files must be downloaded, byte-counted, hashed locally and their actual headers/units inspected before being admitted to the executable benchmark. The container download attempt has not produced a local file yet, so the three files remain metadata-only candidates.
 
 The dataset is a material/electrochemical characterization resource. It is not a commercial module test. Do not infer complete-device energy density, installed-system power, standby service or sequential-reserve reliability.
 
@@ -54,9 +54,9 @@ The dataset is a material/electrochemical characterization resource. It is not a
 **Publication date:** 2026-08-26  
 **Repository:** Zenodo
 
-The record describes pristine activated-carbon and TiO2-ALD-coated symmetric flexible supercapacitors, including 60- and 100-cycle ALD variants. It lists long-term GCD cycling to 10,000 cycles at low and high applied current densities, CV at varying scan rates, Trasatti analysis, before/after MACCOR data and publication analysis files.
+The record describes pristine activated-carbon and TiO2-ALD-coated symmetric flexible supercapacitors, including 60- and 100-cycle ALD variants. It lists long-term GCD cycling to 10,000 cycles at low and high applied current densities, CV at varying scan rates, Trasatti analysis, before/after MACCOR data and publication analysis files. The versioned record lists these archive files and repository MD5 values: `0.1Ag Long-term Cycling.zip` (a4b3f9b0408c53726f631917056504a4), `1.0Ag Long-term Cycling.zip` (d15048417ce7f351fdf573c83edd8a36), `CV.zip` (edd70a94907c301b284e0965e80d5bf6), and pre-/post-ageing MACCOR archives (741e8d7c8d4099b1b5052606cc1e1a92 / 8e98f3445744d92cc3601d0d9ecbfcdf). These remain repository metadata, not locally re-computed checksums.
 
-**Rights gate:** the inspected deposit page does not establish an explicit licence clearly enough to authorize redistribution. Treat the dataset as discoverable and citeable metadata only until its current licence/terms are confirmed. Do not commit or mirror its raw files before that check. The Zenodo record is a research-device ageing comparator, not an installed-module or reserve-service benchmark.
+**Rights gate:** the public Zenodo Rights section did not expose a licence value at inspection time. Treat this dataset as discoverable and citeable metadata only until the licence/terms are confirmed. Do not commit or mirror raw archives before that check. The record is a research-device ageing comparator, not an installed-module or reserve-service benchmark.
 
 ## 4. Reproduction protocol
 
