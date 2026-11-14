@@ -93,6 +93,7 @@ const RULES: &[MethodRule] = &[
     MethodRule { method_id: "ASTM_D4896", edition: "D4896-01R24", evidence_kind: "interpretation_guide", material_pair_classes: &["single_lap_bonded_joint"], geometry: "single_lap", endpoint: "single_lap_result_interpretation_guidance", allowed_claims: &["interpretation_guidance_reference"], claim_ceiling: "guidance reference for interpreting single-lap adhesive-joint strength results; not a test measurement or design allowable" },
     MethodRule { method_id: "ASTM_D5656_D5656M", edition: "D5656/D5656M-26", evidence_kind: "measurement", material_pair_classes: &["aluminum_thick_adherend_joint"], geometry: "thick_adherend_lap", endpoint: "adhesive_shear_stress_strain_response", allowed_claims: &["adhesive_constitutive_response_observation"], claim_ceiling: "adhesive shear stress-strain, proportional-limit and shear-strain-at-failure characterization for the stated aluminum thick-adherend specimen; not substrate-specific adhesion strength or a design allowable" },
     MethodRule { method_id: "ASTM_D5573", edition: "D5573-99R19", evidence_kind: "classification_practice", material_pair_classes: &["frp_smc_joint"], geometry: "failure_surface_classification", endpoint: "frp_joint_failure_mode_classification", allowed_claims: &["failure_mode_classification_reference"], claim_ceiling: "descriptive classification of failure modes for the scoped SMC FRP adhesive joint; the practice does not judge acceptability, strength, product disposition or safety" },
+    MethodRule { method_id: "ISO_10365", edition: "ISO 10365:2022", evidence_kind: "classification_practice", material_pair_classes: &["bonded_assembly_any_adherend"], geometry: "failure_surface_classification", endpoint: "bonded_assembly_failure_pattern_classification", allowed_claims: &["failure_mode_classification_reference"], claim_ceiling: "designation of main failure patterns observed during mechanical tests of bonded assemblies, regardless of adherend/adhesive; descriptive classification only, not acceptability or product disposition" },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -224,7 +225,16 @@ pub(super) fn decide(case: &ScopeEvidence) -> Decision {
         );
     }
 
-    if !rule.material_pair_classes.contains(&case.material_pair_class.as_str()) {
+    if case.method_id == "ISO_10365" {
+        if case.material_pair_class.trim().is_empty()
+            || case.material_pair_class == "material_surface"
+        {
+            return blocked(
+                "ISO 10365 classification requires an identified bonded-assembly material-pair class",
+                rule.claim_ceiling,
+            );
+        }
+    } else if !rule.material_pair_classes.contains(&case.material_pair_class.as_str()) {
         return rejected(
             "material-pair class is outside the encoded scope of the exact method edition",
             rule.claim_ceiling,
@@ -298,7 +308,7 @@ fn read_fixture(path: &Path) -> anyhow::Result<Fixture> {
 
 pub fn run(path: &Path) -> anyhow::Result<()> {
     let fixture = read_fixture(path)?;
-    if fixture.schema_version != "plasma-claim-scope-fixture-v0.3" {
+    if fixture.schema_version != "plasma-claim-scope-fixture-v0.4" {
         bail!("unsupported fixture schema version: {}", fixture.schema_version);
     }
 
@@ -359,12 +369,12 @@ mod tests {
     use super::*;
 
     const FIXTURE: &str =
-        include_str!("../../data/research/plasma_claim_scope_fixture_v0_3.json");
+        include_str!("../../data/research/plasma_claim_scope_fixture_v0_4.json");
 
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
         let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
-        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.3");
+        assert_eq!(fixture.schema_version, "plasma-claim-scope-fixture-v0.4");
         assert!(!fixture.cases.is_empty());
 
         for case in &fixture.cases {
@@ -424,6 +434,24 @@ mod tests {
         let overclaim = fixture.cases.iter().find(|case| case.id == "astm-d5573-failure-acceptability-overclaim").expect("case exists");
         assert_eq!(decide(&ScopeEvidence::from(valid)).disposition, Disposition::Supported);
         assert_eq!(decide(&ScopeEvidence::from(overclaim)).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn iso_10365_is_material_general_but_requires_identified_bonded_assembly() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        for id in ["iso-10365-pp-joint-classification", "iso-10365-metal-joint-classification"] {
+            let case = fixture.cases.iter().find(|case| case.id == id).expect("case exists");
+            assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Supported, "{id}");
+        }
+        let missing = fixture.cases.iter().find(|case| case.id == "iso-10365-material-class-missing").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(missing)).disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn iso_10365_does_not_admit_failure_acceptability() {
+        let fixture: Fixture = serde_json::from_str(FIXTURE).expect("valid fixture JSON");
+        let case = fixture.cases.iter().find(|case| case.id == "iso-10365-acceptability-overclaim").expect("case exists");
+        assert_eq!(decide(&ScopeEvidence::from(case)).disposition, Disposition::Rejected);
     }
 
     #[test]
