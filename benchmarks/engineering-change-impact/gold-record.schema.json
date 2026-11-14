@@ -1,0 +1,591 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-change-impact/gold-record.schema.json",
+  "title": "Engineering Change Impact Gold Record V1",
+  "description": "Evaluator-only claim/evidence applicability adjudication record. This schema defines benchmark labels, not ETK authority, engineering approval, or evidence admission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "visibility",
+    "record_id",
+    "case_id",
+    "pair_id",
+    "claim_ref",
+    "evidence_ref",
+    "source_generation",
+    "target_generation",
+    "transformation_ref",
+    "source_evidence_class",
+    "dependency_contract",
+    "dependency_paths",
+    "expected_disposition",
+    "required_follow_up_obligations",
+    "criticality",
+    "rationale_codes",
+    "assessor_records",
+    "adjudication",
+    "seal_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "change-impact-gold-record-v1"
+    },
+    "visibility": {
+      "const": "evaluator_only"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_generation": {
+      "$ref": "#/$defs/generation"
+    },
+    "target_generation": {
+      "$ref": "#/$defs/generation"
+    },
+    "transformation_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transformation_digest": {
+      "$ref": "#/$defs/sha256Digest"
+    },
+    "source_evidence_class": {
+      "enum": [
+        "synthetic",
+        "analytical",
+        "simulated",
+        "measured",
+        "calibrated",
+        "physical_test",
+        "human_review",
+        "external_approval",
+        "mixed",
+        "unknown"
+      ]
+    },
+    "dependency_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_ref",
+        "revision"
+      ],
+      "properties": {
+        "contract_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    },
+    "dependency_paths": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dependencyPath"
+      }
+    },
+    "equivalence_witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_ref",
+        "witness_scope",
+        "claim_coverage"
+      ],
+      "properties": {
+        "witness_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "witness_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_coverage": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "profile_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "witness_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    },
+    "expected_disposition": {
+      "$ref": "#/$defs/disposition"
+    },
+    "required_follow_up_obligations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/followUpObligation"
+      }
+    },
+    "criticality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "hard_gate"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "critical_noncompensatory",
+            "major",
+            "minor",
+            "diagnostic"
+          ]
+        },
+        "hard_gate": {
+          "type": "boolean"
+        },
+        "consequence_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "rationale_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "IDENTITY_UNCHANGED",
+          "DEPENDENCY_OUTSIDE_PROVEN_NONIMPACT_CONE",
+          "QUALIFIED_EQUIVALENCE_COVERS_CLAIM",
+          "CLAIM_DEPENDENCY_CHANGED",
+          "REQUIREMENT_REVISION_CHANGED",
+          "ASSUMPTION_DRIFT",
+          "INTERFACE_FRAME_CHANGED",
+          "MATERIAL_PROPERTY_CHANGED",
+          "LOAD_OR_DUTY_CHANGED",
+          "PROCESS_CAPABILITY_CHANGED",
+          "MEASUREMENT_PROFILE_CHANGED",
+          "CONFIGURATION_GENERATION_CHANGED",
+          "DEPENDENCY_MODEL_INCOMPLETE",
+          "CONFLICTING_REFERENCE",
+          "UNSUPPORTED_ANALYSIS_CLASS",
+          "HISTORICAL_EVIDENCE_RETAINED",
+          "NEW_EVIDENCE_REQUIRED",
+          "EXTERNAL_APPROVAL_REQUIRED"
+        ]
+      }
+    },
+    "assessor_records": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/assessorRecord"
+      },
+      "uniqueItems": true,
+      "description": "At least two assessor records are required. The evaluator must additionally enforce unique assessor_ref identities and independence; JSON Schema alone cannot establish distinct people or independent access."
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "initial_agreement",
+        "rationale"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pending",
+            "consensus",
+            "third_party_resolved",
+            "unknown_impact_retained",
+            "not_adjudicable"
+          ]
+        },
+        "initial_agreement": {
+          "type": "boolean"
+        },
+        "adjudicator_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolution_rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjudication_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "seal_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "unsealed",
+            "sealed",
+            "superseded"
+          ]
+        },
+        "sealed_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "sealed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "supersedes_record_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seal_profile": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "evaluation_label_only_no_etk_authority_or_release"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_ref",
+        "semantic_snapshot_digest"
+      ],
+      "properties": {
+        "generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantic_snapshot_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "source_package_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "configuration_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "disposition": {
+      "enum": [
+        "PreservedByIdentity",
+        "PreservedByQualifiedEquivalence",
+        "PreservedByExactRecalculation",
+        "RequiresApplicabilityReview",
+        "RequiresVerification",
+        "RequiresPhysicalEvidence",
+        "RequiresHumanOrExternalApproval",
+        "NotPreserved",
+        "UnknownImpact",
+        "Unsupported"
+      ]
+    },
+    "dependencyPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path_id",
+        "relation_ref",
+        "relation_authority",
+        "semantic_role"
+      ],
+      "properties": {
+        "path_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_authority": {
+          "enum": [
+            "owner_contract",
+            "fixture_local_synthetic",
+            "derived_candidate",
+            "unresolved"
+          ]
+        },
+        "semantic_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_qualified_nonimpact_witness": {
+          "type": "boolean"
+        }
+      }
+    },
+    "followUpObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_type",
+        "owner_ref",
+        "reason",
+        "mandatory"
+      ],
+      "properties": {
+        "obligation_type": {
+          "enum": [
+            "applicability_review",
+            "verification",
+            "recalculation",
+            "physical_evidence",
+            "human_or_external_approval",
+            "clarification",
+            "unsupported_disposition"
+          ]
+        },
+        "owner_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mandatory": {
+          "type": "boolean"
+        },
+        "requirement_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification_method_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assessorRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessor_ref",
+        "domain_qualification",
+        "independent_disposition",
+        "rationale",
+        "supporting_refs",
+        "conflict_declared"
+      ],
+      "properties": {
+        "assessor_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_qualification": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "independent_disposition": {
+          "$ref": "#/$defs/disposition"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supporting_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "conflict_declared": {
+          "type": "boolean"
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "assessor_record_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "expected_disposition": {
+            "const": "PreservedByQualifiedEquivalence"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "equivalence_witness"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "criticality": {
+            "properties": {
+              "class": {
+                "const": "critical_noncompensatory"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "criticality": {
+            "properties": {
+              "hard_gate": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "seal_state": {
+            "properties": {
+              "state": {
+                "const": "sealed"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "seal_state": {
+            "required": [
+              "sealed_digest",
+              "sealed_at",
+              "seal_profile"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "state": {
+                "const": "third_party_resolved"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "required": [
+              "adjudicator_ref",
+              "resolution_rationale"
+            ],
+            "properties": {
+              "initial_agreement": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "state": {
+                "const": "consensus"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "initial_agreement": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
