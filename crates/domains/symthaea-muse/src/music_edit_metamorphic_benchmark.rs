@@ -191,6 +191,358 @@ pub fn music_edit_metamorphic_pair_digest_v1(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MusicEditMetamorphicEvidenceV1 { Symbolic, Acoustic, HumanAdjudication }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MusicEditMetamorphicValueV1 {
+    Numeric { value: f64, unit: String },
+    Category { value: String },
+    Boolean { value: bool },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicPropertyObservationV1 {
+    pub property_id: String,
+    pub evidence: MusicEditMetamorphicEvidenceV1,
+    pub value: MusicEditMetamorphicValueV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicObservationV1 {
+    pub schema_version: String,
+    pub pair_sha256: String,
+    pub sample_id: String,
+    pub source_lineage_sha256: String,
+    pub split: MusicEditSplitV1,
+    /// Must be derived from the independent operation verifier, not a model self-report.
+    pub obligation_satisfied: bool,
+    /// Must be derived from the independent protected-content verifier.
+    pub protected_invariants_satisfied: bool,
+    pub operation_report_sha256: String,
+    pub validity_report_sha256: String,
+    pub properties: Vec<MusicEditMetamorphicPropertyObservationV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MusicEditMetamorphicPropertyRuleV1 {
+    NumericAffine { scale: f64, offset: f64, tolerance: f64, unit: String },
+    CategoryMap { values: Vec<MusicEditMetamorphicCategoryMapV1> },
+    BooleanIdentity,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicCategoryMapV1 {
+    pub source_value: String,
+    pub transformed_value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicPropertyMappingV1 {
+    pub schema_version: String,
+    pub properties: Vec<MusicEditMetamorphicPropertyRuleEntryV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicEditMetamorphicPropertyRuleEntryV1 {
+    pub property_id: String,
+    pub rule: MusicEditMetamorphicPropertyRuleV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MusicEditMetamorphicResidualV1 {
+    pub property_id: String,
+    pub numeric_residual: Option<f64>,
+    pub tolerance: Option<f64>,
+    pub matched: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MusicEditMetamorphicAssessmentV1 {
+    pub schema_version: String,
+    pub pair_sha256: String,
+    pub base_observation_sha256: String,
+    pub transformed_observation_sha256: String,
+    pub property_mapping_sha256: String,
+    pub expected_relation: MusicEditMetamorphicRelationV1,
+    pub base_obligation_satisfied: bool,
+    pub transformed_obligation_satisfied: bool,
+    pub base_preservation_satisfied: bool,
+    pub transformed_preservation_satisfied: bool,
+    pub relation_satisfied: bool,
+    pub passed: bool,
+    pub residuals: Vec<MusicEditMetamorphicResidualV1>,
+    pub assessment_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MusicEditMetamorphicAssessmentIssueV1 {
+    NotEvaluableRelation,
+    WrongObservationSchema,
+    ObservationPairMismatch,
+    ObservationSampleMismatch,
+    ObservationLineageMismatch,
+    ObservationSplitMismatch,
+    InvalidEvidenceDigest(&'static str),
+    EmptyPropertyId,
+    DuplicateOrUnorderedProperties,
+    NonFiniteNumericValue(String),
+    MissingProperty(String),
+    PropertyEvidenceMismatch(String),
+    PropertyTypeMismatch(String),
+    NumericUnitMismatch(String),
+    InvalidPropertyMapping,
+    PropertyMappingDigestMismatch,
+    InvalidNumericRule(String),
+    NonIdentityRuleForInvariant(String),
+    MissingCategoryMapping(String),
+    SerializationError,
+}
+
+fn canonical_metamorphic_json_digest<T: Serialize>(
+    domain: &[u8],
+    value: &T,
+) -> Result<String, MusicEditMetamorphicAssessmentIssueV1> {
+    let bytes = serde_json::to_vec(value)
+        .map_err(|_| MusicEditMetamorphicAssessmentIssueV1::SerializationError)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous.mel.metamorphic-assessment.v1\0");
+    hasher.update(domain);
+    hasher.update(b"\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+pub fn music_edit_metamorphic_property_mapping_digest_v1(
+    mapping: &MusicEditMetamorphicPropertyMappingV1,
+) -> Result<String, MusicEditMetamorphicAssessmentIssueV1> {
+    canonical_metamorphic_json_digest(b"property-map", mapping)
+}
+
+fn validate_metamorphic_observation_v1(
+    pair: &MusicEditMetamorphicPairV1,
+    pair_sha256: &str,
+    observation: &MusicEditMetamorphicObservationV1,
+    base: bool,
+) -> Vec<MusicEditMetamorphicAssessmentIssueV1> {
+    let mut issues = Vec::new();
+    if observation.schema_version != "mel-music-edit-metamorphic-observation-v1" {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::WrongObservationSchema);
+    }
+    if observation.pair_sha256 != pair_sha256 {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::ObservationPairMismatch);
+    }
+    let expected_sample = if base { &pair.base_sample_id } else { &pair.transformed_sample_id };
+    if &observation.sample_id != expected_sample {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::ObservationSampleMismatch);
+    }
+    if observation.source_lineage_sha256 != pair.base_source_lineage_sha256 {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::ObservationLineageMismatch);
+    }
+    let expected_split = pair.base_split;
+    if observation.split != expected_split {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::ObservationSplitMismatch);
+    }
+    for (field, digest) in [
+        ("operation_report_sha256", observation.operation_report_sha256.as_str()),
+        ("validity_report_sha256", observation.validity_report_sha256.as_str()),
+    ] {
+        if !is_sha256(digest) {
+            issues.push(MusicEditMetamorphicAssessmentIssueV1::InvalidEvidenceDigest(field));
+        }
+    }
+    if !observation.properties.windows(2).all(|w| w[0].property_id < w[1].property_id) {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::DuplicateOrUnorderedProperties);
+    }
+    for property in &observation.properties {
+        if property.property_id.trim().is_empty() {
+            issues.push(MusicEditMetamorphicAssessmentIssueV1::EmptyPropertyId);
+        }
+        if let MusicEditMetamorphicValueV1::Numeric { value, unit } = &property.value {
+            if !value.is_finite() || unit.trim().is_empty() {
+                issues.push(MusicEditMetamorphicAssessmentIssueV1::NonFiniteNumericValue(
+                    property.property_id.clone(),
+                ));
+            }
+        }
+        if let MusicEditMetamorphicValueV1::Category { value } = &property.value {
+            if value.trim().is_empty() {
+                issues.push(MusicEditMetamorphicAssessmentIssueV1::EmptyPropertyId);
+            }
+        }
+    }
+    issues
+}
+
+/// Compare independently verified base/transformed edit observations under a typed
+/// property map. The relation can pass only if both edits satisfy their requested
+/// obligations and both preserve their declared protected content.
+pub fn evaluate_music_edit_metamorphic_pair_v1(
+    pair: &MusicEditMetamorphicPairV1,
+    mapping: &MusicEditMetamorphicPropertyMappingV1,
+    base: &MusicEditMetamorphicObservationV1,
+    transformed: &MusicEditMetamorphicObservationV1,
+) -> Result<MusicEditMetamorphicAssessmentV1, Vec<MusicEditMetamorphicAssessmentIssueV1>> {
+    use MusicEditMetamorphicRelationV1 as Relation;
+    use MusicEditMetamorphicValueV1 as Value;
+    use MusicEditMetamorphicPropertyRuleV1 as Rule;
+
+    let mut issues = Vec::new();
+    if !matches!(pair.expected_relation, Relation::Invariant | Relation::Equivariant) {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::NotEvaluableRelation);
+        return Err(issues);
+    }
+    let pair_sha256 = music_edit_metamorphic_pair_digest_v1(pair)
+        .map_err(|_| vec![MusicEditMetamorphicAssessmentIssueV1::SerializationError])?;
+    issues.extend(validate_metamorphic_observation_v1(pair, &pair_sha256, base, true));
+    issues.extend(validate_metamorphic_observation_v1(pair, &pair_sha256, transformed, false));
+
+    if mapping.schema_version != "mel-music-edit-metamorphic-property-map-v1"
+        || mapping.properties.is_empty()
+        || !mapping.properties.windows(2).all(|w| w[0].property_id < w[1].property_id)
+    {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::InvalidPropertyMapping);
+    }
+    let mapping_sha256 = music_edit_metamorphic_property_mapping_digest_v1(mapping)
+        .map_err(|_| vec![MusicEditMetamorphicAssessmentIssueV1::SerializationError])?;
+    if pair.property_mapping_sha256.as_deref() != Some(mapping_sha256.as_str()) {
+        issues.push(MusicEditMetamorphicAssessmentIssueV1::PropertyMappingDigestMismatch);
+    }
+
+    let mut residuals = Vec::new();
+    for entry in &mapping.properties {
+        let left = base.properties.iter().find(|p| p.property_id == entry.property_id);
+        let right = transformed.properties.iter().find(|p| p.property_id == entry.property_id);
+        let (Some(left), Some(right)) = (left, right) else {
+            issues.push(MusicEditMetamorphicAssessmentIssueV1::MissingProperty(
+                entry.property_id.clone(),
+            ));
+            continue;
+        };
+        if left.evidence != right.evidence {
+            issues.push(MusicEditMetamorphicAssessmentIssueV1::PropertyEvidenceMismatch(
+                entry.property_id.clone(),
+            ));
+            continue;
+        }
+
+        let mut matched = false;
+        let mut numeric_residual = None;
+        let mut tolerance = None;
+        match (&entry.rule, &left.value, &right.value) {
+            (Rule::NumericAffine { scale, offset, tolerance: tol, unit },
+             Value::Numeric { value: source, unit: source_unit },
+             Value::Numeric { value: actual, unit: actual_unit }) => {
+                if !scale.is_finite() || !offset.is_finite() || !tol.is_finite()
+                    || *tol < 0.0 || unit.trim().is_empty()
+                {
+                    issues.push(MusicEditMetamorphicAssessmentIssueV1::InvalidNumericRule(
+                        entry.property_id.clone(),
+                    ));
+                    continue;
+                }
+                if source_unit != unit || actual_unit != unit {
+                    issues.push(MusicEditMetamorphicAssessmentIssueV1::NumericUnitMismatch(
+                        entry.property_id.clone(),
+                    ));
+                    continue;
+                }
+                if pair.expected_relation == Relation::Invariant && (*scale != 1.0 || *offset != 0.0) {
+                    issues.push(MusicEditMetamorphicAssessmentIssueV1::NonIdentityRuleForInvariant(
+                        entry.property_id.clone(),
+                    ));
+                    continue;
+                }
+                let residual = actual - (source * scale + offset);
+                numeric_residual = Some(residual);
+                tolerance = Some(*tol);
+                matched = residual.abs() <= *tol;
+            }
+            (Rule::CategoryMap { values }, Value::Category { value: source }, Value::Category { value: actual }) => {
+                let expected = values.iter().find(|mapping| mapping.source_value == *source);
+                match expected {
+                    Some(mapping) => {
+                        if pair.expected_relation == Relation::Invariant
+                            && mapping.source_value != mapping.transformed_value
+                        {
+                            issues.push(MusicEditMetamorphicAssessmentIssueV1::NonIdentityRuleForInvariant(
+                                entry.property_id.clone(),
+                            ));
+                            continue;
+                        }
+                        matched = mapping.transformed_value == *actual;
+                    }
+                    None => {
+                        issues.push(MusicEditMetamorphicAssessmentIssueV1::MissingCategoryMapping(
+                            entry.property_id.clone(),
+                        ));
+                        continue;
+                    }
+                }
+            }
+            (Rule::BooleanIdentity, Value::Boolean { value: source }, Value::Boolean { value: actual }) => {
+                if *source != *actual {
+                    matched = false;
+                } else {
+                    matched = true;
+                }
+            }
+            _ => {
+                issues.push(MusicEditMetamorphicAssessmentIssueV1::PropertyTypeMismatch(
+                    entry.property_id.clone(),
+                ));
+                continue;
+            }
+        }
+        residuals.push(MusicEditMetamorphicResidualV1 {
+            property_id: entry.property_id.clone(),
+            numeric_residual,
+            tolerance,
+            matched,
+        });
+    }
+
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    let relation_satisfied = residuals.iter().all(|residual| residual.matched);
+    let mut assessment = MusicEditMetamorphicAssessmentV1 {
+        schema_version: "mel-music-edit-metamorphic-assessment-v1".to_owned(),
+        pair_sha256,
+        base_observation_sha256: canonical_metamorphic_json_digest(b"base-observation", base)
+            .map_err(|issue| vec![issue])?,
+        transformed_observation_sha256: canonical_metamorphic_json_digest(b"transformed-observation", transformed)
+            .map_err(|issue| vec![issue])?,
+        property_mapping_sha256: mapping_sha256,
+        expected_relation: pair.expected_relation,
+        base_obligation_satisfied: base.obligation_satisfied,
+        transformed_obligation_satisfied: transformed.obligation_satisfied,
+        base_preservation_satisfied: base.protected_invariants_satisfied,
+        transformed_preservation_satisfied: transformed.protected_invariants_satisfied,
+        relation_satisfied,
+        passed: base.obligation_satisfied
+            && transformed.obligation_satisfied
+            && base.protected_invariants_satisfied
+            && transformed.protected_invariants_satisfied
+            && relation_satisfied,
+        residuals,
+        assessment_sha256: String::new(),
+    };
+    assessment.assessment_sha256 =
+        canonical_metamorphic_json_digest(b"assessment", &assessment)
+            .map_err(|issue| vec![issue])?;
+    Ok(assessment)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,6 +575,122 @@ mod tests {
                 MusicEditMetamorphicRelationV1::NonInvariant | MusicEditMetamorphicRelationV1::AbstainExpected)
                 .then(|| "synthetic reason".to_owned()),
         }
+    }
+
+
+    fn observation(
+        pair: &MusicEditMetamorphicPairV1,
+        pair_sha: &str,
+        base: bool,
+        pitch: f64,
+    ) -> MusicEditMetamorphicObservationV1 {
+        MusicEditMetamorphicObservationV1 {
+            schema_version: "mel-music-edit-metamorphic-observation-v1".to_owned(),
+            pair_sha256: pair_sha.to_owned(),
+            sample_id: if base { pair.base_sample_id.clone() } else { pair.transformed_sample_id.clone() },
+            source_lineage_sha256: pair.base_source_lineage_sha256.clone(),
+            split: pair.base_split,
+            obligation_satisfied: true,
+            protected_invariants_satisfied: true,
+            operation_report_sha256: d(31),
+            validity_report_sha256: d(32),
+            properties: vec![
+                MusicEditMetamorphicPropertyObservationV1 {
+                    property_id: "target_pitch".to_owned(),
+                    evidence: MusicEditMetamorphicEvidenceV1::Symbolic,
+                    value: MusicEditMetamorphicValueV1::Numeric { value: pitch, unit: "midi".to_owned() },
+                },
+                MusicEditMetamorphicPropertyObservationV1 {
+                    property_id: "target_part_present".to_owned(),
+                    evidence: MusicEditMetamorphicEvidenceV1::Acoustic,
+                    value: MusicEditMetamorphicValueV1::Boolean { value: true },
+                },
+            ],
+        }
+    }
+
+    fn mapping(scale: f64, offset: f64, tolerance: f64) -> MusicEditMetamorphicPropertyMappingV1 {
+        MusicEditMetamorphicPropertyMappingV1 {
+            schema_version: "mel-music-edit-metamorphic-property-map-v1".to_owned(),
+            properties: vec![
+                MusicEditMetamorphicPropertyRuleEntryV1 {
+                    property_id: "target_part_present".to_owned(),
+                    rule: MusicEditMetamorphicPropertyRuleV1::BooleanIdentity,
+                },
+                MusicEditMetamorphicPropertyRuleEntryV1 {
+                    property_id: "target_pitch".to_owned(),
+                    rule: MusicEditMetamorphicPropertyRuleV1::NumericAffine {
+                        scale, offset, tolerance, unit: "midi".to_owned(),
+                    },
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn invariant_evaluator_requires_both_edits_and_property_relations_to_pass() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let map = mapping(1.0, 0.0, 0.0);
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 64.0);
+        let transformed = observation(&pair, &pair_sha, false, 64.0);
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        assert!(result.passed);
+        assert!(result.relation_satisfied);
+    }
+
+    #[test]
+    fn equivariant_evaluator_checks_declared_transposition_map() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Equivariant);
+        let map = mapping(1.0, 3.0, 0.01);
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 60.0);
+        let transformed = observation(&pair, &pair_sha, false, 63.0);
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        assert!(result.passed);
+        assert_eq!(result.residuals[1].numeric_residual, Some(0.0));
+    }
+
+    #[test]
+    fn relation_can_fail_even_when_both_edits_pass_individually() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Equivariant);
+        let map = mapping(1.0, 3.0, 0.01);
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 60.0);
+        let transformed = observation(&pair, &pair_sha, false, 64.0);
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        assert!(!result.passed);
+        assert!(!result.relation_satisfied);
+    }
+
+    #[test]
+    fn failed_protected_content_gate_prevents_metamorphic_pass() {
+        let mut pair = pair(MusicEditMetamorphicRelationV1::Invariant);
+        let map = mapping(1.0, 0.0, 0.0);
+        pair.property_mapping_sha256 =
+            Some(music_edit_metamorphic_property_mapping_digest_v1(&map).unwrap());
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 64.0);
+        let mut transformed = observation(&pair, &pair_sha, false, 64.0);
+        transformed.protected_invariants_satisfied = false;
+        let result = evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).unwrap();
+        assert!(!result.passed);
+    }
+
+    #[test]
+    fn noninvariant_pairs_are_not_scored_as_invariance() {
+        let pair = pair(MusicEditMetamorphicRelationV1::NonInvariant);
+        let map = mapping(1.0, 0.0, 0.0);
+        let pair_sha = music_edit_metamorphic_pair_digest_v1(&pair).unwrap();
+        let base = observation(&pair, &pair_sha, true, 440.0);
+        let transformed = observation(&pair, &pair_sha, false, 445.0);
+        assert!(evaluate_music_edit_metamorphic_pair_v1(&pair, &map, &base, &transformed).is_err());
     }
 
     #[test] fn invariant_pair_passes_and_commits() {
