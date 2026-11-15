@@ -111,7 +111,7 @@ pub struct PowerEnvelopeReport {
 /// - observations are independent with common, known standard deviation sigma;
 /// - the null mean is the working-model prediction;
 /// - the full discrepancy direction is known to the evaluator;
-/// - the test is the optimal two-sided matched-filter test for that direction;
+/// - the test is the one-sided likelihood-ratio test aligned with that known direction;
 /// - the design, alpha and stopping rule are fixed (no sequential peeking).
 ///
 /// This is an oracle diagnostic, not an operational adequacy test. Estimating
@@ -139,8 +139,8 @@ pub fn known_direction_power(
     }
 
     let noncentrality = squared_signal_to_noise.sqrt();
-    let critical_value = normal_quantile(1.0 - alpha / 2.0);
-    let power = two_sided_power(noncentrality, critical_value);
+    let critical_value = normal_quantile(1.0 - alpha);
+    let power = one_sided_power(noncentrality, critical_value);
 
     Ok(PowerResult {
         observations: expected_residuals.len(),
@@ -227,7 +227,7 @@ pub fn evaluate_power_envelope(
 ///
 /// None means no finite replicate count can reach the target (for example,
 /// a zero discrepancy). The calculation uses the same known-variance,
-/// two-sided Gaussian oracle as known_direction_power.
+/// one-sided Gaussian oracle as known_direction_power.
 pub fn minimum_replicates_for_power(
     expected_residual: f64,
     sigma: f64,
@@ -249,8 +249,8 @@ pub fn minimum_replicates_for_power(
         return Ok(Some(1));
     }
 
-    let critical_value = normal_quantile(1.0 - alpha / 2.0);
-    let power_at = |n: u64| two_sided_power(effect_size * (n as f64).sqrt(), critical_value);
+    let critical_value = normal_quantile(1.0 - alpha);
+    let power_at = |n: u64| one_sided_power(effect_size * (n as f64).sqrt(), critical_value);
 
     let mut high = 1_u64;
     while power_at(high) < target_power {
@@ -296,13 +296,11 @@ fn validate_target_power(alpha: f64, target: f64) -> Result<(), PowerError> {
     }
 }
 
-fn two_sided_power(noncentrality: f64, critical_value: f64) -> f64 {
+fn one_sided_power(noncentrality: f64, critical_value: f64) -> f64 {
     if noncentrality.is_infinite() {
         return 1.0;
     }
-    let lower_tail = normal_cdf(-critical_value - noncentrality);
-    let upper_tail = 1.0 - normal_cdf(critical_value - noncentrality);
-    (lower_tail + upper_tail).clamp(0.0, 1.0)
+    (1.0 - normal_cdf(critical_value - noncentrality)).clamp(0.0, 1.0)
 }
 
 /// Standard normal CDF using the Abramowitz-Stegun 7.1.26 approximation.
@@ -404,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn reversing_the_declared_discrepancy_does_not_change_two_sided_power() {
+    fn reversing_the_declared_discrepancy_does_not_change_one_sided_power() {
         let positive = known_direction_power(&[0.1, 0.2, 0.3], 0.15, 0.05).unwrap();
         let negative = known_direction_power(&[-0.1, -0.2, -0.3], 0.15, 0.05).unwrap();
         assert!((positive.power - negative.power).abs() < 1.0e-12);
@@ -424,11 +422,11 @@ mod tests {
         let count = minimum_replicates_for_power(0.24, 0.15, 0.05, 0.80)
             .unwrap()
             .unwrap();
-        assert_eq!(count, 4);
+        assert_eq!(count, 3);
+        let two = known_direction_power(&[0.24; 2], 0.15, 0.05).unwrap();
         let three = known_direction_power(&[0.24; 3], 0.15, 0.05).unwrap();
-        let four = known_direction_power(&[0.24; 4], 0.15, 0.05).unwrap();
-        assert!(three.power < 0.80);
-        assert!(four.power >= 0.80);
+        assert!(two.power < 0.80);
+        assert!(three.power >= 0.80);
     }
 
     #[test]
