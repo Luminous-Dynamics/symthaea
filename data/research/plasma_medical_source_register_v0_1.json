@@ -77,18 +77,21 @@
       "qualified_scope": "nipp_rd_iii_protocol_specific_breast_radiotherapy_prevention",
       "evidence_class": "CLINICAL_TRIAL_PROTOCOL",
       "study_design": "PHASE_III_RANDOMIZED_DOUBLE_BLIND_PLACEBO_CONTROLLED_PROTOCOL",
-      "publication_status": "PROTOCOL_ONLY_NO_RESULTS_IN_SOURCE",
-      "human_participants": null,
+      "publication_status": "PHASE_III_RECRUITMENT_COMPLETE_STUDY_CONTINUING_NO_PHASE_III_RESULTS_POSTED",
+      "human_participants": 141,
       "study_count": 1,
-      "claim_ceiling": "Existence and design of a Phase III clinical-trial protocol; no clinical outcome or efficacy claim.",
+      "claim_ceiling": "Existence and design of a Phase III clinical-trial protocol, with recruitment reported complete and final sample size 141; no Phase III clinical outcome or efficacy claim.",
       "allowed_claims": [
-        "TRIAL_PROTOCOL_EXISTS"
+        "TRIAL_PROTOCOL_EXISTS",
+        "TRIAL_RECRUITMENT_COMPLETE_STATUS"
       ],
       "source_url": "https://pubmed.ncbi.nlm.nih.gov/40108640/",
       "limitations": [
-        "This is a published protocol, not a result.",
-        "Prevention of radiation dermatitis is not cancer treatment.",
-        "Protocol existence does not establish trial completion, positive results, device authorization or clinical benefit."
+        "The registry update of 2026-10-08 reports recruitment complete and study continuing; no Phase III results are posted.",
+        "The planned sample size was 140 and the register reports final sample size 141.",
+        "This is prevention of radiation dermatitis during breast radiotherapy, not treatment of the tumour.",
+        "Earlier Phase I/II summaries in the registry are not Phase III outcome evidence.",
+        "Protocol and recruitment status do not establish clinical benefit, device authorization or routine clinical use."
       ]
     },
     {
@@ -177,6 +180,52 @@
         "It proposes volumetric RONS flux and redox-homeostatic status as complementary indices.",
         "The proposal is not a universal calibrated clinical dosing standard.",
         "Device, tissue, modality and biological-response heterogeneity remain substantial."
+      ]
+    },
+    {
+      "id": "VLU-CAPJ-RCT-HENARES-2026",
+      "modality": "DIRECT_CAP_APPJ_AIR",
+      "indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "qualified_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "evidence_class": "HUMAN_RANDOMIZED_CLINICAL_TRIAL",
+      "study_design": "PROSPECTIVE_RANDOMIZED_CONTROLLED_OPEN_LABEL_MULTICENTRE",
+      "publication_status": "PUBLISHED_RESULTS",
+      "human_participants": 60,
+      "study_count": 1,
+      "claim_ceiling": "Study-specific randomized comparative result: numerically greater wound-area reduction but no statistically significant superiority to standard care on the primary week-17 wound-area endpoint; immediate microbial-burden reductions were observed.",
+      "allowed_claims": [
+        "HUMAN_COMPARATIVE_RESULT_NOT_STATISTICALLY_SUPERIOR"
+      ],
+      "source_url": "https://doi.org/10.1097/GOX.0000000000007553",
+      "limitations": [
+        "60 adults with nonhealing venous leg ulcers were randomized in an open-label multicentre study.",
+        "At week 17, mean wound-area reduction was -72.9% with CAPJ versus -56.7% with standard care, but the difference was not statistically significant (P=0.30).",
+        "Complete healing was 42.9% versus 30.4% (P=0.361).",
+        "CAPJ produced significant immediate microbial-burden reductions at weeks 0 and 4.",
+        "No serious device-attributed adverse events were reported; transient pain-related sensations were the most frequent treatment-related effects.",
+        "This result is not evidence of equivalence or proof of no benefit, and does not transfer to other wound etiologies or CAP devices."
+      ]
+    },
+    {
+      "id": "KINPEN-MED-DEVICE-CATALOGUE-2026",
+      "modality": "DIRECT_APPJ_ARGON",
+      "indication": "CHRONIC_WOUNDS_AND_PATHOGEN_INDUCED_SKIN_DISEASES",
+      "qualified_scope": "kinpen_med_inptdat_catalogue_class_iia_power_below_3_5w_1mhz_argon_4_to_6_slm_temp_35_to_38c",
+      "evidence_class": "INSTITUTIONAL_DEVICE_CATALOGUE",
+      "study_design": "DEVICE_SPECIFICATION_CATALOGUE",
+      "publication_status": "CATALOGUE_RETRIEVED_2026_11_15",
+      "human_participants": null,
+      "study_count": null,
+      "claim_ceiling": "The institutional technology catalogue identifies kINPen MED as a commercially available Class IIa medical device and lists source specifications; catalogue data is not independent comparative clinical performance evidence.",
+      "allowed_claims": [
+        "DEVICE_CATALOGUE_SPECIFICATION_ONLY"
+      ],
+      "source_url": "https://www.inptdat.de/kinpen%C2%AE-med",
+      "limitations": [
+        "Catalogue-listed power is below 3.5 W at 1 MHz with argon flow 4–6 standard L/min and reported temperature 35–38 °C.",
+        "The catalogue describes a small-area plasma jet and identifies chronic wounds and pathogen-induced skin diseases as medical-use areas.",
+        "Catalogue specifications are not a matched head-to-head performance result or a Luminous measurement.",
+        "A device-specific class IIa statement from this catalogue is not a substitute for jurisdiction-specific authorization verification."
       ]
     }
   ]
