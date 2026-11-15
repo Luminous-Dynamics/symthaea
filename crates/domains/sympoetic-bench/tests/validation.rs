@@ -674,7 +674,8 @@ fn scorecard_requires_one_evidence_receipt_for_every_reported_metric() {
     assert!(validate_scorecard(&scorecard).is_err());
 
     let mut scorecard = base_scorecard();
-    scorecard.metric_evidence.push(scorecard.metric_evidence[0].clone());
+    let duplicate_receipt = scorecard.metric_evidence[0].clone();
+    scorecard.metric_evidence.push(duplicate_receipt);
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
@@ -689,17 +690,26 @@ fn scorecard_metric_receipt_value_must_match_the_reported_score() {
 fn scorecard_ratio_receipt_must_match_its_numerator_and_denominator() {
     let mut scorecard = base_scorecard();
     scorecard.scores.constraint_satisfaction = Some(0.8);
-    let receipt = scorecard
-        .metric_evidence
-        .iter_mut()
-        .find(|receipt| receipt.metric_name == "constraint_satisfaction")
-        .unwrap();
-    receipt.value = 0.8;
-    receipt.numerator = Some(8.0);
-    receipt.denominator = Some(10.0);
+    {
+        let receipt = scorecard
+            .metric_evidence
+            .iter_mut()
+            .find(|receipt| receipt.metric_name == "constraint_satisfaction")
+            .unwrap();
+        receipt.value = 0.8;
+        receipt.numerator = Some(8.0);
+        receipt.denominator = Some(10.0);
+    }
     validate_scorecard(&scorecard).unwrap();
 
-    receipt.denominator = Some(9.0);
+    {
+        let receipt = scorecard
+            .metric_evidence
+            .iter_mut()
+            .find(|receipt| receipt.metric_name == "constraint_satisfaction")
+            .unwrap();
+        receipt.denominator = Some(9.0);
+    }
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
