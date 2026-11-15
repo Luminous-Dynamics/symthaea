@@ -659,6 +659,55 @@ mod tests {
         }
     }
 
+    fn prismatic_artifact() -> SectionFamilyArtifact {
+        let spec = SectionHullSpec {
+            schema_version: 1,
+            candidate_id: "prismatic-known-answer-001".into(),
+            length_m: 100.0,
+            beam_m: 20.0,
+            draft_m: 6.0,
+            coordinate_frame: CoordinateFrame {
+                id: "ship-local".into(),
+                axis_convention: "x-forward,y-starboard,z-down".into(),
+                handedness: "right-handed".into(),
+            },
+            samples_per_segment: 1,
+            stations: vec![
+                SectionStation {
+                    x_over_length: 0.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: vec![
+                        SectionControlPoint {
+                            breadth_fraction: 0.0,
+                            depth_fraction: 1.0,
+                        },
+                        SectionControlPoint {
+                            breadth_fraction: 1.0,
+                            depth_fraction: 0.0,
+                        },
+                    ],
+                },
+                SectionStation {
+                    x_over_length: 1.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: vec![
+                        SectionControlPoint {
+                            breadth_fraction: 0.0,
+                            depth_fraction: 1.0,
+                        },
+                        SectionControlPoint {
+                            breadth_fraction: 1.0,
+                            depth_fraction: 0.0,
+                        },
+                    ],
+                },
+            ],
+        };
+        generate_section_artifact(&spec).unwrap()
+    }
+
     fn artifact() -> SectionFamilyArtifact {
         generate_section_artifact(&convex_spec()).unwrap()
     }
@@ -679,6 +728,19 @@ mod tests {
         assert_eq!(
             result.mesh_digest_blake3,
             result.candidate.geometry_digest_blake3
+        );
+    }
+
+    #[test]
+    fn triangular_prismatic_displacement_volume_matches_known_answer() {
+        let result = loft_waterplane_capped_hull(&prismatic_artifact(), profile()).unwrap();
+        assert_eq!(result.candidate.geometry.vertices.len(), 8);
+        assert_eq!(result.candidate.geometry.faces.len(), 12);
+        let volume = result.admission_report.metrics.signed_volume_m3.unwrap();
+        assert!((volume - 6_000.0).abs() < 1.0e-9);
+        assert_eq!(
+            result.admission_report.disposition,
+            Disposition::AdmissibleForProfile
         );
     }
 
