@@ -9,7 +9,7 @@ use symthaea_decision_assessment::event_order_v0_3::{
     generate_capture_clock_fault_schedule, generate_clock_mapping_fault_schedule, generate_clocked_observation_persistence_schedule,
     generate_delivery_schedule, project_bitemporal_event, replay_virtual_schedule, validate_schedule,
     ActionClockTimeReference, ActionEvidence, CancellationCommitOrder, CaptureClockFault, ClockMappingFault,
-    SchedulerDisposition, ScheduleAction, VirtualSchedule,
+    ScheduledAction, SchedulerDisposition, ScheduleAction, VirtualSchedule,
 };
 
 fn owner_qualified_resolutions(
@@ -211,24 +211,24 @@ proptest! {
         // For actions without a duplicated native clock field, an earlier
         // mapping in the same series is structurally known but stale at replay.
         let mut stale = schedule.clone();
-        let mut ordinal = stale.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let ordinal = stale.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
         let at_ns = stale.actions.iter().map(|item| item.at_ns).max().unwrap_or(0) + 1;
-        push_action(
-            &mut stale.actions,
-            &mut ordinal,
+        let target_action_id = format!("action-{ordinal:06}");
+        stale.actions.push(ScheduledAction {
+            action_id: target_action_id.clone(),
             at_ns,
-            ScheduleAction::EffectAttempted {
+            ordinal,
+            owner_time_ref: Some(ActionClockTimeReference {
+                clock_mapping_action_id: previous_mapping,
+                local_timestamp_ns: previous_timestamp,
+            }),
+            evidence: Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None }),
+            action: ScheduleAction::EffectAttempted {
                 operation_id: "owner-time-probe".to_owned(),
                 attempt_id: "stale-map-probe".to_owned(),
             },
-        );
-        let stale_action = stale.actions.last_mut().expect("probe action");
-        let target_action_id = stale_action.action_id.clone();
-        stale_action.owner_time_ref = Some(ActionClockTimeReference {
-            clock_mapping_action_id: previous_mapping,
-            local_timestamp_ns: previous_timestamp,
         });
-        stale_action.evidence = Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None });
+        let stale_action = stale.actions.last().expect("probe action");
         validate_schedule(&stale).expect("known prior map is structurally valid");
         let stale_report = replay_virtual_schedule(&stale).expect("stale map replay");
         prop_assert!(stale_report.records.iter().any(|record| {
@@ -237,23 +237,22 @@ proptest! {
         }));
 
         let mut missing = schedule;
-        let mut missing_ordinal = missing.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let missing_ordinal = missing.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
         let missing_at = missing.actions.iter().map(|item| item.at_ns).max().unwrap_or(0) + 1;
-        push_action(
-            &mut missing.actions,
-            &mut missing_ordinal,
-            missing_at,
-            ScheduleAction::EffectAttempted {
+        missing.actions.push(ScheduledAction {
+            action_id: format!("action-{missing_ordinal:06}"),
+            at_ns: missing_at,
+            ordinal: missing_ordinal,
+            owner_time_ref: Some(ActionClockTimeReference {
+                clock_mapping_action_id: "missing-clock-map".to_owned(),
+                local_timestamp_ns: timestamp_ns,
+            }),
+            evidence: Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None }),
+            action: ScheduleAction::EffectAttempted {
                 operation_id: "owner-time-probe".to_owned(),
                 attempt_id: "missing-map-probe".to_owned(),
             },
-        );
-        let missing_action = missing.actions.last_mut().expect("probe action");
-        missing_action.owner_time_ref = Some(ActionClockTimeReference {
-            clock_mapping_action_id: "missing-clock-map".to_owned(),
-            local_timestamp_ns: timestamp_ns,
         });
-        missing_action.evidence = Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None });
         prop_assert!(validate_schedule(&missing).is_err());
     }
 
