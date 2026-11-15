@@ -110,7 +110,7 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). One hundred and forty-five Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases, 10 Rust-syntax cases, 24 tree-inventory/tree-composition cases, 22 DynaMapBench manifest cases, 20 candidate temporal-replay cases and 6 independent-oracle cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). One hundred and fifty-four Rust unit-test cases are authored across the stacked D1/D2 candidate and independent-oracle crates (125 parent-branch cases, 23 candidate temporal-replay cases and 6 independent-oracle cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
 
 
 ## DynaMapBench manifest validation
