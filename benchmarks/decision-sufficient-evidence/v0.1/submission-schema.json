@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/decision-sufficient-evidence/v0.1/submission-schema.json",
+  "title": "Decision-sufficient evidence planner submission v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "system_id",
+    "build_sha",
+    "configuration_sha256",
+    "results"
+  ],
+  "properties": {
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "build_sha": {
+      "type": "string",
+      "minLength": 1
+    },
+    "configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "selected_request_ref",
+          "target_dimension",
+          "decision",
+          "reason_codes"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "pattern": "^VOI-[0-9]{3}$"
+          },
+          "selected_request_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "target_dimension": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
+            "enum": [
+              "ALLOW_SCOPED",
+              "ALLOW_PARTIAL",
+              "HOLD_FOR_RECONCILIATION",
+              "BLOCK",
+              "DEFER_OR_DECLINE"
+            ]
+          },
+          "reason_codes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

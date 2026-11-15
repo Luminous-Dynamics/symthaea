@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/decision-sufficient-evidence/v0.1/schema.json",
+  "title": "Decision-sufficient evidence acquisition corpus v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_version",
+    "synthetic",
+    "status",
+    "as_of",
+    "cases"
+  ],
+  "properties": {
+    "corpus_version": {
+      "const": "0.1"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "status": {
+      "const": "development"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension",
+        "consequence",
+        "disposition",
+        "rationale"
+      ],
+      "properties": {
+        "dimension": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consequence": {
+          "enum": [
+            "hard_blocker",
+            "material",
+            "noncritical"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "indeterminate",
+            "stale",
+            "contested",
+            "unavailable"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_ref",
+        "claim_dimension",
+        "disposition",
+        "competence",
+        "freshness",
+        "upstream_provider_ref"
+      ],
+      "properties": {
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_dimension": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": [
+            "supported",
+            "partial",
+            "contested",
+            "stale",
+            "unavailable",
+            "indeterminate"
+          ]
+        },
+        "competence": {
+          "enum": [
+            "competent",
+            "incompetent",
+            "unknown"
+          ]
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ]
+        },
+        "upstream_provider_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_ref",
+        "source_ref",
+        "resolves_dimensions",
+        "competence",
+        "freshness",
+        "availability",
+        "expected_information_gain",
+        "acquisition_cost_units",
+        "latency_minutes",
+        "disclosure_fields",
+        "permitted_disclosure_fields",
+        "upstream_provider_ref"
+      ],
+      "properties": {
+        "request_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolves_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "competence": {
+          "enum": [
+            "competent",
+            "incompetent",
+            "unknown"
+          ]
+        },
+        "freshness": {
+          "enum": [
+            "fresh",
+            "stale",
+            "unknown"
+          ]
+        },
+        "availability": {
+          "enum": [
+            "available",
+            "delayed",
+            "unavailable"
+          ]
+        },
+        "expected_information_gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "acquisition_cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "latency_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "disclosure_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "permitted_disclosure_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "upstream_provider_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "purpose",
+        "asset_ref",
+        "deadline_at",
+        "expected_benefit_units",
+        "authorized_to_proceed_with_partial_evidence"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asset_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "deadline_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expected_benefit_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "authorized_to_proceed_with_partial_evidence": {
+          "type": "boolean"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "case_family",
+        "description",
+        "decision",
+        "evidence_gaps",
+        "existing_evidence",
+        "candidate_requests"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "pattern": "^VOI-[0-9]{3}$"
+        },
+        "case_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "evidence_gaps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/gap"
+          }
+        },
+        "existing_evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        },
+        "candidate_requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/candidate"
+          }
+        }
+      }
+    }
+  }
+}

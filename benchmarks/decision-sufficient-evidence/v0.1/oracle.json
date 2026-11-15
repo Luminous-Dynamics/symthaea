@@ -1,0 +1,115 @@
+{
+  "oracle_version": "0.1",
+  "synthetic": true,
+  "status": "development_oracle_not_independently_adjudicated",
+  "claim_ceiling": "Synthetic engineering reference only. Not legal adjudication, source verification, financial advice or production authorization.",
+  "cases": [
+    {
+      "scenario_id": "VOI-001",
+      "expected_next_request_ref": "REQ-001-A",
+      "expected_target_dimension": "title",
+      "expected_decision": "HOLD_FOR_RECONCILIATION",
+      "required_reason_codes": [
+        "blocker.title.indeterminate",
+        "evidence.request.competent_fresh"
+      ],
+      "prohibited_request_refs": [
+        "REQ-001-B",
+        "REQ-001-C"
+      ]
+    },
+    {
+      "scenario_id": "VOI-002",
+      "expected_next_request_ref": "REQ-002-A",
+      "expected_target_dimension": "encumbrance",
+      "expected_decision": "HOLD_FOR_RECONCILIATION",
+      "required_reason_codes": [
+        "evidence.stale.not_sufficient",
+        "fresh_source.preferred"
+      ],
+      "prohibited_request_refs": [
+        "REQ-002-B"
+      ]
+    },
+    {
+      "scenario_id": "VOI-003",
+      "expected_next_request_ref": "REQ-003-B",
+      "expected_target_dimension": "title",
+      "expected_decision": "HOLD_FOR_RECONCILIATION",
+      "required_reason_codes": [
+        "evidence.common_cause",
+        "independent_source.required"
+      ],
+      "prohibited_request_refs": [
+        "REQ-003-A"
+      ]
+    },
+    {
+      "scenario_id": "VOI-004",
+      "expected_next_request_ref": "REQ-004-B",
+      "expected_target_dimension": "title",
+      "expected_decision": "HOLD_FOR_RECONCILIATION",
+      "required_reason_codes": [
+        "disclosure.minimum_necessary",
+        "source.competent"
+      ],
+      "prohibited_request_refs": [
+        "REQ-004-A"
+      ]
+    },
+    {
+      "scenario_id": "VOI-005",
+      "expected_next_request_ref": "ABSTAIN",
+      "expected_target_dimension": "operational_authority",
+      "expected_decision": "BLOCK",
+      "required_reason_codes": [
+        "authority.source.not_established",
+        "human_governance_adjudication_required"
+      ],
+      "prohibited_request_refs": [
+        "REQ-005-A",
+        "REQ-005-B"
+      ]
+    },
+    {
+      "scenario_id": "VOI-006",
+      "expected_next_request_ref": "ABSTAIN",
+      "expected_target_dimension": "condition",
+      "expected_decision": "DEFER_OR_DECLINE",
+      "required_reason_codes": [
+        "acquisition_cost_exceeds_benefit",
+        "safe_abstention"
+      ],
+      "prohibited_request_refs": [
+        "REQ-006-A",
+        "REQ-006-B"
+      ]
+    },
+    {
+      "scenario_id": "VOI-007",
+      "expected_next_request_ref": "REQ-007-A",
+      "expected_target_dimension": "condition",
+      "expected_decision": "ALLOW_SCOPED",
+      "required_reason_codes": [
+        "partial_action_permitted",
+        "unrelated_title_gap_not_blocking"
+      ],
+      "prohibited_request_refs": [
+        "REQ-007-B"
+      ]
+    },
+    {
+      "scenario_id": "VOI-008",
+      "expected_next_request_ref": "REQ-008-B",
+      "expected_target_dimension": "title",
+      "expected_decision": "HOLD_FOR_RECONCILIATION",
+      "required_reason_codes": [
+        "unavailable_is_not_negative",
+        "competent_delayed_source"
+      ],
+      "prohibited_request_refs": [
+        "REQ-008-A"
+      ]
+    }
+  ]
+}
