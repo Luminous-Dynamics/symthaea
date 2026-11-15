@@ -210,6 +210,8 @@ pub enum ReplayError {
     EmptyIdentifier(&'static str),
     #[error("SHA-256 field is not exactly 64 lowercase hexadecimal characters: {0}")]
     MalformedSha256(&'static str),
+    #[error("unsupported time unit for nanosecond fields: {0}")]
+    UnsupportedTimeUnit(String),
     #[error("event was produced without a clock advance: {0}")]
     MissingClock(String),
     #[error("event timestamp exceeds the latest virtual clock tick: {0}")]
@@ -269,6 +271,9 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(epoch, "epoch")?;
                 require_id(scale, "scale")?;
                 require_id(unit, "unit")?;
+                if unit != "nanoseconds" {
+                    return Err(ReplayError::UnsupportedTimeUnit(unit.clone()));
+                }
                 require_id(calibration_id, "calibration_id")?;
                 require_id(mapping_receipt_ref, "mapping_receipt_ref")?;
                 require_sha256(mapping_receipt_sha256, "mapping_receipt_sha256")?;
@@ -1244,6 +1249,22 @@ mod tests {
             SchedulerDisposition::Duplicate,
             SchedulerDisposition::ConflictingReconciliation,
         ]);
+    }
+
+    #[test]
+    fn nanosecond_clock_series_rejects_other_units() {
+        let mut schedule = generate_delivery_schedule(71, 2).expect("valid schedule");
+        if let Some(item) = schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::ClockAdvance { .. })
+        }) {
+            if let ScheduleAction::ClockAdvance { unit, .. } = &mut item.action {
+                *unit = "milliseconds".to_owned();
+            }
+        }
+        assert!(matches!(
+            validate_schedule(&schedule),
+            Err(ReplayError::UnsupportedTimeUnit(unit)) if unit == "milliseconds"
+        ));
     }
 
     #[test]
