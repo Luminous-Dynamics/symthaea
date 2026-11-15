@@ -14,6 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`manufacturing_metrics`]: checked, deterministic factory KPI calculations.
 //!
 //! ## Example
 //!
@@ -23,6 +24,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod manufacturing_metrics;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
@@ -30,3 +32,10 @@ pub mod queue;
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
 pub use queue::MM1;
+
+pub use manufacturing_metrics::{
+    bounded_ratio_ppm, calculate_oee, defects_per_100_units, first_pass_yield_ppm,
+    line_efficiency_ppm, material_yield_ppm, nearest_rank_percentile, otif_ppm, ratio_ppm,
+    traceability_coverage_ppm, DefectRatePer100, KpiError, OeeReport, PercentileResult,
+    RatioPpm, PPM_SCALE,
+};
