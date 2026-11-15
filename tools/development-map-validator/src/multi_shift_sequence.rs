@@ -234,12 +234,16 @@ fn assess_receipt(
     epoch: u64,
     decision_cutoff: &DateTime<FixedOffset>,
     current_state: &Value,
+    state_history: &[Value],
     obligation: &Obligation,
     minimum_observed_at: Option<&DateTime<FixedOffset>>,
 ) -> Result<ReceiptAssessment, String> {
     let label = format!("{kind} receipt");
     let obligation_id = required_str(receipt, "obligation_id", &label)?.to_owned();
     let source_epoch = required_u64(receipt, "source_epoch", &label)?;
+    let source_state = state_history
+        .get(source_epoch as usize)
+        .ok_or_else(|| format!("{label} source_epoch {source_epoch} has no bound state"))?;
     let outcome = required_str(receipt, "outcome", &label)?.to_owned();
     if !["pass", "fail", "unknown"].contains(&outcome.as_str()) {
         return Err(format!("{label} has unsupported outcome {outcome:?}"));
@@ -283,6 +287,9 @@ fn assess_receipt(
 
     let mut context_mismatch_dimensions = Vec::new();
     for dimension in &obligation.dependency_dimensions {
+        if context.get(dimension) != source_state.get(dimension) {
+            reasons.push(format!("receipt_source_context_mismatch:{dimension}"));
+        }
         if context.get(dimension) != current_state.get(dimension) {
             context_mismatch_dimensions.push(dimension.clone());
             reasons.push(format!("context_mismatch:{dimension}"));
@@ -342,6 +349,7 @@ fn assess_initial_receipts(
             1,
             first_event_time,
             baseline,
+            std::slice::from_ref(baseline),
             obligation,
             None,
         )?;
@@ -545,6 +553,13 @@ fn score_trace(
     let mut total_dependency_only = 0usize;
     let mut total_gold_only = 0usize;
     let mut previous_cutoff: Option<DateTime<FixedOffset>> = None;
+    let mut source_state_history = Vec::with_capacity(sequence.len() + 1);
+    source_state_history.push(
+        sequence.first()
+            .map(|item| item.1.clone())
+            .ok_or_else(|| "sequence must contain at least one source state".to_owned())?
+    );
+    source_state_history.extend(sequence.iter().map(|item| item.2.clone()));
 
     for (index, checkpoint) in checkpoints.iter().enumerate() {
         let epoch = index as u64 + 1;
@@ -613,6 +628,7 @@ fn score_trace(
                     epoch,
                     &decision_cutoff,
                     current_state,
+                    &source_state_history,
                     obligation,
                     if kind == "fresh" {
                         Some(event_available_at)
@@ -845,6 +861,7 @@ fn score_restoration_control(
             sequence_len as u64 + 1,
             &decision_cutoff,
             final_state,
+            std::slice::from_ref(final_state),
             obligation,
             None,
         )?;
