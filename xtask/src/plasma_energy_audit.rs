@@ -675,6 +675,578 @@ pub fn print_report(report: &AuditReport, as_json: bool) -> Result<()> {
     Ok(())
 }
 
+fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
+    let programme = root
+        .get("programme")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .with_context(|| format!("{display_name}: no non-empty programme"))?
+        .to_owned();
+    let claim_ceiling = root
+        .get("claim_ceiling")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .with_context(|| format!("{display_name}: no explicit claim ceiling"))?;
+    ensure!(
+        !claim_ceiling.trim().is_empty(),
+        "{display_name}: claim ceiling must not be empty"
+    );
+
+    let evidence_classes = root
+        .get("evidence_classes")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{display_name}: no evidence_classes array"))?;
+    let mut admitted_classes = BTreeSet::new();
+    for class in evidence_classes {
+        let class = class
+            .as_str()
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: empty/non-string evidence class"))?;
+        ensure!(
+            admitted_classes.insert(class.to_owned()),
+            "{display_name}: duplicate declared evidence class {class}"
+        );
+    }
+    ensure!(
+        !admitted_classes.is_empty(),
+        "{display_name}: no declared evidence classes"
+    );
+
+    let cases = root
+        .get("cases")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{display_name}: no cases array"))?;
+    ensure!(!cases.is_empty(), "{display_name}: no source cases");
+
+    let mut case_ids = BTreeSet::new();
+    for case in cases {
+        let case_id = case
+            .get("case_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: source case has no case_id"))?;
+        ensure!(
+            case_ids.insert(case_id.to_owned()),
+            "{display_name}: duplicate source case ID {case_id}"
+        );
+        let evidence_class = case
+            .get("evidence_class")
+            .and_then(Value::as_str)
+            .with_context(|| format!("{display_name}: case {case_id} has no evidence_class"))?;
+        ensure!(
+            admitted_classes.contains(evidence_class),
+            "{display_name}: case {case_id} uses undeclared evidence class {evidence_class}"
+        );
+        ensure!(
+            case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
+            "{display_name}: case {case_id} must explicitly preserve luminous_reproduction=false"
+        );
+        let source_url = case
+            .get("source")
+            .and_then(|source| source.get("url"))
+            .and_then(Value::as_str)
+            .filter(|url| has_http_authority(url))
+            .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL with a non-empty authority"))?;
+        ensure!(
+            !source_url.trim().is_empty(),
+            "{display_name}: case {case_id} has empty source URL"
+        );
+
+        if case_id == "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026" {
+            validate_co2_counterflow_operating_points(case, display_name)?;
+        }
+
+        if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
+            validate_nh3_operating_points(case, display_name)?;
+        }
+        if case_id == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026" {
+            validate_nh3_n2_vibrational_transfer_case(case, display_name)?;
+        }
+        let lane = case.get("lane").and_then(Value::as_str);
+        if lane == Some("METHANE_PYROLYSIS") {
+            let coproduct = case
+                .get("coproduct_accounting")
+                .with_context(|| {
+                    format!("{display_name}: methane-pyrolysis case {case_id} has no coproduct_accounting contract")
+                })?;
+            let policy = coproduct
+                .get("policy")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .with_context(|| {
+                    format!("{display_name}: methane-pyrolysis case {case_id} has no coproduct accounting policy")
+                })?;
+            ensure!(
+                matches!(
+                    policy,
+                    "NO_SOURCE_COPRODUCT_CREDIT_REPORTED"
+                        | "MODELED_CARBON_BLACK_SALES_REVENUE"
+                        | "AVOIDED_PRODUCT_CARBON_BLACK_CREDIT"
+                        | "REVIEW_LEVEL_NO_SPECIFIC_CREDIT_ASSUMPTION"
+                ),
+                "{display_name}: methane-pyrolysis case {case_id} has unsupported coproduct policy {policy}"
+            );
+            ensure!(
+                coproduct.get("credit_claim_status").and_then(Value::as_str)
+                    == Some("SOURCE_MODEL_ONLY"),
+                "{display_name}: methane-pyrolysis case {case_id} must label carbon credit as SOURCE_MODEL_ONLY"
+            );
+            ensure!(
+                coproduct
+                    .get("carbon_product_qualification_status")
+                    .and_then(Value::as_str)
+                    == Some("NOT_VALIDATED"),
+                "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-product grade to validated"
+            );
+            ensure!(
+                coproduct
+                    .get("carbon_market_capacity_status")
+                    .and_then(Value::as_str)
+                    == Some("NOT_VALIDATED"),
+                "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-market capacity to validated"
+            );
+            ensure!(
+                coproduct.get("offtake_status").and_then(Value::as_str) == Some("NOT_VALIDATED"),
+                "{display_name}: methane-pyrolysis case {case_id} must not infer verified offtake"
+            );
+            ensure!(
+                coproduct
+                    .get("realized_revenue_evidence")
+                    .and_then(Value::as_bool)
+                    == Some(false),
+                "{display_name}: methane-pyrolysis case {case_id} cannot claim realized carbon-black revenue"
+            );
+            ensure!(
+                coproduct
+                    .get("no_credit_baseline_required")
+                    .and_then(Value::as_bool)
+                    == Some(true),
+                "{display_name}: methane-pyrolysis case {case_id} must preserve a no-credit baseline"
+            );
+        }
+
+        if lane == Some("FUSION_DIRECT_ENERGY_CONVERSION")
+            || lane == Some("FUSION_FUEL_ENERGY_PARTITION")
+        {
+            let particle_origin = case
+                .get("particle_energy_origin")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .with_context(|| {
+                    format!("{display_name}: fusion DEC/fuel-partition case {case_id} has no explicit particle_energy_origin")
+                })?;
+            ensure!(
+                !particle_origin.trim().is_empty(),
+                "{display_name}: fusion DEC/fuel-partition case {case_id} has an empty particle_energy_origin"
+            );
+            ensure!(
+                case.get("fusion_born_output_demonstrated")
+                    .and_then(Value::as_bool)
+                    == Some(false),
+                "{display_name}: fusion DEC/fuel-partition case {case_id} must explicitly preserve fusion_born_output_demonstrated=false until source-matched conversion output is admitted"
+            );
+            ensure!(
+                case.get("comparison_status")
+                    .and_then(Value::as_str)
+                    .is_some(),
+                "{display_name}: fusion DEC/fuel-partition case {case_id} has no comparison_status"
+            );
+        }
+    }
+
+    let derived_checks: &[Value] = match root.get("derived_reference_checks") {
+        None => &[],
+        Some(value) => value.as_array().with_context(|| {
+            format!("{display_name}: derived_reference_checks must be an array")
+        })?,
+    };
+    let mut derived_check_ids = BTreeSet::new();
+    for check in derived_checks {
+        let check_id = check
+            .get("check_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: derived reference check has no check_id"))?;
+        ensure!(
+            derived_check_ids.insert(check_id.to_owned()),
+            "{display_name}: duplicate derived reference check ID {check_id}"
+        );
+
+        let evidence_class = check
+            .get("evidence_class")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| {
+                format!("{display_name}: derived check {check_id} has no evidence_class")
+            })?;
+        ensure!(
+            evidence_class.starts_with("DERIVED_ARITHMETIC_"),
+            "{display_name}: derived check {check_id} must use a DERIVED_ARITHMETIC evidence class"
+        );
+        ensure!(
+            check.get("luminous_measurement").and_then(Value::as_bool) == Some(false),
+            "{display_name}: derived check {check_id} must preserve luminous_measurement=false"
+        );
+        ensure!(
+            check
+                .get("inputs")
+                .and_then(Value::as_object)
+                .is_some_and(|value| !value.is_empty()),
+            "{display_name}: derived check {check_id} has no input values"
+        );
+        ensure!(
+            check
+                .get("derivation")
+                .and_then(Value::as_object)
+                .is_some_and(|value| !value.is_empty()),
+            "{display_name}: derived check {check_id} has no derivation values"
+        );
+        ensure!(
+            check
+                .get("interpretation")
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.trim().is_empty()),
+            "{display_name}: derived check {check_id} has no interpretation/claim ceiling"
+        );
+        if let Some(source_case_id) = check.get("source_case_id").and_then(Value::as_str) {
+            ensure!(
+                case_ids.contains(source_case_id),
+                "{display_name}: derived check {check_id} references unknown source case {source_case_id}"
+            );
+        }
+
+        if check_id == "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026" {
+            validate_nh3_energy_yield_check(check, display_name)?;
+        }
+    }
+
+    let benchmark_targets: &[Value] = match root.get("benchmark_targets") {
+        None => &[],
+        Some(value) => value
+            .as_array()
+            .with_context(|| format!("{display_name}: benchmark_targets must be an array"))?,
+    };
+    let mut benchmark_target_ids = BTreeSet::new();
+    for target in benchmark_targets {
+        let target_id = target
+            .get("target_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: benchmark target has no target_id"))?;
+        ensure!(
+            benchmark_target_ids.insert(target_id.to_owned()),
+            "{display_name}: duplicate benchmark target ID {target_id}"
+        );
+        ensure!(
+            target.get("status").and_then(Value::as_str) == Some("RESEARCH_TARGET_NOT_RESULT"),
+            "{display_name}: benchmark target {target_id} must be marked RESEARCH_TARGET_NOT_RESULT"
+        );
+        let lane = target
+            .get("lane")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: benchmark target {target_id} has no lane"))?;
+        let comparators = target
+            .get("comparator_case_ids")
+            .and_then(Value::as_array)
+            .filter(|value| !value.is_empty())
+            .with_context(|| {
+                format!("{display_name}: benchmark target {target_id} has no comparator_case_ids")
+            })?;
+        let mut comparator_ids = BTreeSet::new();
+        for comparator in comparators {
+            let comparator_id = comparator
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+                .with_context(|| {
+                    format!(
+                        "{display_name}: benchmark target {target_id} has an empty comparator ID"
+                    )
+                })?;
+            ensure!(
+                comparator_ids.insert(comparator_id.to_owned()),
+                "{display_name}: benchmark target {target_id} has duplicate comparator {comparator_id}"
+            );
+            ensure!(
+                case_ids.contains(comparator_id),
+                "{display_name}: benchmark target {target_id} references unknown comparator case {comparator_id}"
+            );
+        }
+        ensure!(
+            target
+                .get("metric_thresholds")
+                .and_then(Value::as_object)
+                .is_some_and(|value| !value.is_empty()),
+            "{display_name}: benchmark target {target_id} has no metric_thresholds"
+        );
+        let guards = target
+            .get("claim_guards")
+            .and_then(Value::as_object)
+            .filter(|value| !value.is_empty())
+            .with_context(|| {
+                format!("{display_name}: benchmark target {target_id} has no claim_guards")
+            })?;
+
+        match lane {
+            "AMMONIA_CRACKING" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: ammonia benchmark target {target_id} must bind all metrics to one operating point"
+                );
+                ensure!(
+                    guards
+                        .get("full_wall_plug_to_accepted_h2_boundary_required")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: ammonia benchmark target {target_id} must require full wall-plug-to-product accounting"
+                );
+                for key in [
+                    "ammonia_conversion_min_fraction",
+                    "hydrogen_energy_yield_min_g_H2_per_kWh",
+                    "hydrogen_production_rate_min_g_H2_per_hour",
+                ] {
+                    ensure!(
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value > 0.0),
+                        "{display_name}: ammonia benchmark target {target_id} has invalid or missing threshold {key}"
+                    );
+                }
+            }
+            "METHANE_PYROLYSIS" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: methane benchmark target {target_id} must bind metrics to one operating point"
+                );
+                ensure!(
+                    target
+                        .get("credit_policies")
+                        .and_then(Value::as_array)
+                        .is_some_and(|value| value
+                            .iter()
+                            .any(|item| item.as_str() == Some("NO_CREDIT"))),
+                    "{display_name}: methane benchmark target {target_id} must include a NO_CREDIT scenario"
+                );
+                ensure!(
+                    guards
+                        .get("no_credit_baseline_required")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: methane benchmark target {target_id} must require a no-credit baseline"
+                );
+                ensure!(
+                    guards
+                        .get(
+                            "avoided_product_credit_requires_independent_carbon_grade_qualification"
+                        )
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: methane benchmark target {target_id} must require independent carbon product qualification"
+                );
+                for key in [
+                    "methane_conversion_min_fraction",
+                    "hydrogen_selectivity_min_fraction",
+                    "levelized_cost_hydrogen_max_usd_per_kg",
+                ] {
+                    ensure!(
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value > 0.0),
+                        "{display_name}: methane benchmark target {target_id} has invalid or missing threshold {key}"
+                    );
+                }
+            }
+            "AMMONIA_SYNTHESIS" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: ammonia synthesis target {target_id} must bind metrics to one operating point"
+                );
+                for key in [
+                    "hydrogen_generation_energy_included",
+                    "plasma_and_electrolysis_electricity_included",
+                    "gas_feed_and_product_separation_energy_included",
+                    "accepted_nh3_product_purity_and_pressure_contract_required",
+                    "matched_haber_bosch_baseline_includes_hydrogen_energy",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: ammonia synthesis target {target_id} is missing required full-chain guard {key}"
+                    );
+                }
+                ensure!(
+                    metrics
+                        .get("ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh")
+                        .and_then(Value::as_f64)
+                        .is_some_and(|value| value.is_finite() && value > 0.0),
+                    "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
+                );
+            }
+            "AMMONIA_CRACKING_THERMAL_INTEGRATION" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: ammonia thermal-integration target {target_id} must bind all improvements to one operating point"
+                );
+                for (key, minimum) in [
+                    ("ammonia_conversion_min_fraction", 0.99),
+                    ("accepted_h2_production_rate_min_g_per_hour", 150.0),
+                    ("net_grid_specific_energy_reduction_min_fraction", 0.15),
+                ] {
+                    ensure!(
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value >= minimum),
+                        "{display_name}: ammonia thermal-integration target {target_id} has an insufficient or invalid threshold {key}"
+                    );
+                }
+                let residual = metrics
+                    .get("heat_balance_abs_residual_fraction_max")
+                    .and_then(Value::as_f64)
+                    .filter(|value| value.is_finite() && *value > 0.0 && *value <= 0.05);
+                ensure!(
+                    residual.is_some(),
+                    "{display_name}: ammonia thermal-integration target {target_id} must declare a positive heat-balance residual cap <= 5%"
+                );
+                for key in [
+                    "paired_no_recovery_baseline_same_feed_and_operating_point_required",
+                    "full_grid_to_accepted_h2_boundary_required",
+                    "recovered_heat_must_be_measured_and_useful_at_declared_process_interface",
+                    "insulation_or_recuperator_pressure_drop_and_all_auxiliaries_included",
+                    "thermal_storage_and_heat_exchanger_losses_included",
+                    "no_double_counting_of_recirculated_heat_or_reaction_enthalpy",
+                    "thermal_energy_balance_must_close_with_uncertainty",
+                    "product_purity_pressure_and_delivery_contract_unchanged",
+                    "duty_cycle_and_steady_state_duration_matched",
+                    "comparison_must_report_measurement_uncertainty_and_grouped_repeats",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: ammonia thermal-integration target {target_id} is missing required guard {key}"
+                    );
+                }
+            }
+            "AMMONIA_N2_VIBRATIONAL_TRANSFER" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                for key in [
+                    "all_required_evidence_gates_must_hold",
+                    "state_resolved_interface_population_or_qualified_operator_required",
+                    "discharge_to_interface_transfer_uncertainty_required",
+                    "isotope_attributed_product_control_required",
+                    "matched_thermal_and_electrical_controls_required",
+                    "full_grid_to_accepted_nh3_boundary_required",
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: N2 vibrational-transfer target {target_id} is missing required metric gate {key}"
+                    );
+                }
+                for key in [
+                    "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required",
+                    "modelled_state_temperature_remains_model_evidence",
+                    "measured_intermediate_and_quantitative_flux_remain_distinct_measurands",
+                    "plasma_only_and_electrolysis_only_controls_required",
+                    "isotope_product_attribution_required_for_nitrogen_source_claim",
+                    "catalyst_lot_and_surface_identity_must_match",
+                    "all_energy_inputs_and_accepted_product_separation_included",
+                    "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: N2 vibrational-transfer target {target_id} is missing claim guard {key}"
+                    );
+                }
+            }
+            "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: Power-to-X target {target_id} must bind cost and efficiency to one operating point"
+                );
+                for key in [
+                    "matched_syngas_composition_and_quality_required",
+                    "full_plant_grid_side_energy_boundary_required",
+                    "electricity_price_and_capacity_factor_scenario_required",
+                    "downstream_product_service_boundary_required",
+                    "unqualified_coproduct_credit_forbidden",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: Power-to-X target {target_id} is missing required guard {key}"
+                    );
+                }
+                for key in [
+                    "syngas_cost_eur_per_tonne_max",
+                    "plant_efficiency_min_fraction",
+                ] {
+                    ensure!(
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value > 0.0),
+                        "{display_name}: Power-to-X target {target_id} has invalid or missing threshold {key}"
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let controls = root
+        .get("negative_controls")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{display_name}: no negative_controls array"))?;
+    ensure!(!controls.is_empty(), "{display_name}: no negative controls");
+    let mut control_ids = BTreeSet::new();
+    for control in controls {
+        let control_id = control
+            .get("control_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: negative control has no control_id"))?;
+        ensure!(
+            control_ids.insert(control_id.to_owned()),
+            "{display_name}: duplicate negative-control ID {control_id}"
+        );
+        ensure!(
+            control
+                .get("expected_disposition")
+                .and_then(Value::as_str)
+                .is_some(),
+            "{display_name}: negative control {control_id} has no expected disposition"
+        );
+    }
+
+    Ok(SourceManifestSummary {
+        path: display_name.to_owned(),
+        programme,
+        case_count: cases.len(),
+        negative_control_count: controls.len(),
+        derived_reference_check_count: derived_checks.len(),
+        benchmark_target_count: benchmark_targets.len(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1803,7 +2375,7 @@ fn has_http_authority(url: &str) -> bool {
         return false;
     };
     let authority = remainder
-        .split(|character| character == '/' || character == '?' || character == '#')
+        .split(['/', '?', '#'])
         .next()
         .unwrap_or_default();
     !authority.is_empty() && !authority.chars().any(char::is_whitespace)
@@ -2266,576 +2838,4 @@ fn validate_nh3_n2_vibrational_transfer_case(case: &Value, display_name: &str) -
         "{context}: missing explicit statement that catalyst-interface state is not established"
     );
     Ok(())
-}
-
-fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
-    let programme = root
-        .get("programme")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .with_context(|| format!("{display_name}: no non-empty programme"))?
-        .to_owned();
-    let claim_ceiling = root
-        .get("claim_ceiling")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .with_context(|| format!("{display_name}: no explicit claim ceiling"))?;
-    ensure!(
-        !claim_ceiling.trim().is_empty(),
-        "{display_name}: claim ceiling must not be empty"
-    );
-
-    let evidence_classes = root
-        .get("evidence_classes")
-        .and_then(Value::as_array)
-        .with_context(|| format!("{display_name}: no evidence_classes array"))?;
-    let mut admitted_classes = BTreeSet::new();
-    for class in evidence_classes {
-        let class = class
-            .as_str()
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: empty/non-string evidence class"))?;
-        ensure!(
-            admitted_classes.insert(class.to_owned()),
-            "{display_name}: duplicate declared evidence class {class}"
-        );
-    }
-    ensure!(
-        !admitted_classes.is_empty(),
-        "{display_name}: no declared evidence classes"
-    );
-
-    let cases = root
-        .get("cases")
-        .and_then(Value::as_array)
-        .with_context(|| format!("{display_name}: no cases array"))?;
-    ensure!(!cases.is_empty(), "{display_name}: no source cases");
-
-    let mut case_ids = BTreeSet::new();
-    for case in cases {
-        let case_id = case
-            .get("case_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: source case has no case_id"))?;
-        ensure!(
-            case_ids.insert(case_id.to_owned()),
-            "{display_name}: duplicate source case ID {case_id}"
-        );
-        let evidence_class = case
-            .get("evidence_class")
-            .and_then(Value::as_str)
-            .with_context(|| format!("{display_name}: case {case_id} has no evidence_class"))?;
-        ensure!(
-            admitted_classes.contains(evidence_class),
-            "{display_name}: case {case_id} uses undeclared evidence class {evidence_class}"
-        );
-        ensure!(
-            case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
-            "{display_name}: case {case_id} must explicitly preserve luminous_reproduction=false"
-        );
-        let source_url = case
-            .get("source")
-            .and_then(|source| source.get("url"))
-            .and_then(Value::as_str)
-            .filter(|url| has_http_authority(url))
-            .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL with a non-empty authority"))?;
-        ensure!(
-            !source_url.trim().is_empty(),
-            "{display_name}: case {case_id} has empty source URL"
-        );
-
-        if case_id == "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026" {
-            validate_co2_counterflow_operating_points(case, display_name)?;
-        }
-
-        if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
-            validate_nh3_operating_points(case, display_name)?;
-        }
-        if case_id == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026" {
-            validate_nh3_n2_vibrational_transfer_case(case, display_name)?;
-        }
-        let lane = case.get("lane").and_then(Value::as_str);
-        if lane == Some("METHANE_PYROLYSIS") {
-            let coproduct = case
-                .get("coproduct_accounting")
-                .with_context(|| {
-                    format!("{display_name}: methane-pyrolysis case {case_id} has no coproduct_accounting contract")
-                })?;
-            let policy = coproduct
-                .get("policy")
-                .and_then(Value::as_str)
-                .filter(|value| !value.trim().is_empty())
-                .with_context(|| {
-                    format!("{display_name}: methane-pyrolysis case {case_id} has no coproduct accounting policy")
-                })?;
-            ensure!(
-                matches!(
-                    policy,
-                    "NO_SOURCE_COPRODUCT_CREDIT_REPORTED"
-                        | "MODELED_CARBON_BLACK_SALES_REVENUE"
-                        | "AVOIDED_PRODUCT_CARBON_BLACK_CREDIT"
-                        | "REVIEW_LEVEL_NO_SPECIFIC_CREDIT_ASSUMPTION"
-                ),
-                "{display_name}: methane-pyrolysis case {case_id} has unsupported coproduct policy {policy}"
-            );
-            ensure!(
-                coproduct.get("credit_claim_status").and_then(Value::as_str)
-                    == Some("SOURCE_MODEL_ONLY"),
-                "{display_name}: methane-pyrolysis case {case_id} must label carbon credit as SOURCE_MODEL_ONLY"
-            );
-            ensure!(
-                coproduct
-                    .get("carbon_product_qualification_status")
-                    .and_then(Value::as_str)
-                    == Some("NOT_VALIDATED"),
-                "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-product grade to validated"
-            );
-            ensure!(
-                coproduct
-                    .get("carbon_market_capacity_status")
-                    .and_then(Value::as_str)
-                    == Some("NOT_VALIDATED"),
-                "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-market capacity to validated"
-            );
-            ensure!(
-                coproduct.get("offtake_status").and_then(Value::as_str) == Some("NOT_VALIDATED"),
-                "{display_name}: methane-pyrolysis case {case_id} must not infer verified offtake"
-            );
-            ensure!(
-                coproduct
-                    .get("realized_revenue_evidence")
-                    .and_then(Value::as_bool)
-                    == Some(false),
-                "{display_name}: methane-pyrolysis case {case_id} cannot claim realized carbon-black revenue"
-            );
-            ensure!(
-                coproduct
-                    .get("no_credit_baseline_required")
-                    .and_then(Value::as_bool)
-                    == Some(true),
-                "{display_name}: methane-pyrolysis case {case_id} must preserve a no-credit baseline"
-            );
-        }
-
-        if lane == Some("FUSION_DIRECT_ENERGY_CONVERSION")
-            || lane == Some("FUSION_FUEL_ENERGY_PARTITION")
-        {
-            let particle_origin = case
-                .get("particle_energy_origin")
-                .and_then(Value::as_str)
-                .filter(|value| !value.trim().is_empty())
-                .with_context(|| {
-                    format!("{display_name}: fusion DEC/fuel-partition case {case_id} has no explicit particle_energy_origin")
-                })?;
-            ensure!(
-                !particle_origin.trim().is_empty(),
-                "{display_name}: fusion DEC/fuel-partition case {case_id} has an empty particle_energy_origin"
-            );
-            ensure!(
-                case.get("fusion_born_output_demonstrated")
-                    .and_then(Value::as_bool)
-                    == Some(false),
-                "{display_name}: fusion DEC/fuel-partition case {case_id} must explicitly preserve fusion_born_output_demonstrated=false until source-matched conversion output is admitted"
-            );
-            ensure!(
-                case.get("comparison_status")
-                    .and_then(Value::as_str)
-                    .is_some(),
-                "{display_name}: fusion DEC/fuel-partition case {case_id} has no comparison_status"
-            );
-        }
-    }
-
-    let derived_checks: &[Value] = match root.get("derived_reference_checks") {
-        None => &[],
-        Some(value) => value.as_array().with_context(|| {
-            format!("{display_name}: derived_reference_checks must be an array")
-        })?,
-    };
-    let mut derived_check_ids = BTreeSet::new();
-    for check in derived_checks {
-        let check_id = check
-            .get("check_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: derived reference check has no check_id"))?;
-        ensure!(
-            derived_check_ids.insert(check_id.to_owned()),
-            "{display_name}: duplicate derived reference check ID {check_id}"
-        );
-
-        let evidence_class = check
-            .get("evidence_class")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| {
-                format!("{display_name}: derived check {check_id} has no evidence_class")
-            })?;
-        ensure!(
-            evidence_class.starts_with("DERIVED_ARITHMETIC_"),
-            "{display_name}: derived check {check_id} must use a DERIVED_ARITHMETIC evidence class"
-        );
-        ensure!(
-            check.get("luminous_measurement").and_then(Value::as_bool) == Some(false),
-            "{display_name}: derived check {check_id} must preserve luminous_measurement=false"
-        );
-        ensure!(
-            check
-                .get("inputs")
-                .and_then(Value::as_object)
-                .is_some_and(|value| !value.is_empty()),
-            "{display_name}: derived check {check_id} has no input values"
-        );
-        ensure!(
-            check
-                .get("derivation")
-                .and_then(Value::as_object)
-                .is_some_and(|value| !value.is_empty()),
-            "{display_name}: derived check {check_id} has no derivation values"
-        );
-        ensure!(
-            check
-                .get("interpretation")
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.trim().is_empty()),
-            "{display_name}: derived check {check_id} has no interpretation/claim ceiling"
-        );
-        if let Some(source_case_id) = check.get("source_case_id").and_then(Value::as_str) {
-            ensure!(
-                case_ids.contains(source_case_id),
-                "{display_name}: derived check {check_id} references unknown source case {source_case_id}"
-            );
-        }
-
-        if check_id == "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026" {
-            validate_nh3_energy_yield_check(check, display_name)?;
-        }
-    }
-
-    let benchmark_targets: &[Value] = match root.get("benchmark_targets") {
-        None => &[],
-        Some(value) => value
-            .as_array()
-            .with_context(|| format!("{display_name}: benchmark_targets must be an array"))?,
-    };
-    let mut benchmark_target_ids = BTreeSet::new();
-    for target in benchmark_targets {
-        let target_id = target
-            .get("target_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: benchmark target has no target_id"))?;
-        ensure!(
-            benchmark_target_ids.insert(target_id.to_owned()),
-            "{display_name}: duplicate benchmark target ID {target_id}"
-        );
-        ensure!(
-            target.get("status").and_then(Value::as_str) == Some("RESEARCH_TARGET_NOT_RESULT"),
-            "{display_name}: benchmark target {target_id} must be marked RESEARCH_TARGET_NOT_RESULT"
-        );
-        let lane = target
-            .get("lane")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: benchmark target {target_id} has no lane"))?;
-        let comparators = target
-            .get("comparator_case_ids")
-            .and_then(Value::as_array)
-            .filter(|value| !value.is_empty())
-            .with_context(|| {
-                format!("{display_name}: benchmark target {target_id} has no comparator_case_ids")
-            })?;
-        let mut comparator_ids = BTreeSet::new();
-        for comparator in comparators {
-            let comparator_id = comparator
-                .as_str()
-                .filter(|value| !value.trim().is_empty())
-                .with_context(|| {
-                    format!(
-                        "{display_name}: benchmark target {target_id} has an empty comparator ID"
-                    )
-                })?;
-            ensure!(
-                comparator_ids.insert(comparator_id.to_owned()),
-                "{display_name}: benchmark target {target_id} has duplicate comparator {comparator_id}"
-            );
-            ensure!(
-                case_ids.contains(comparator_id),
-                "{display_name}: benchmark target {target_id} references unknown comparator case {comparator_id}"
-            );
-        }
-        ensure!(
-            target
-                .get("metric_thresholds")
-                .and_then(Value::as_object)
-                .is_some_and(|value| !value.is_empty()),
-            "{display_name}: benchmark target {target_id} has no metric_thresholds"
-        );
-        let guards = target
-            .get("claim_guards")
-            .and_then(Value::as_object)
-            .filter(|value| !value.is_empty())
-            .with_context(|| {
-                format!("{display_name}: benchmark target {target_id} has no claim_guards")
-            })?;
-
-        match lane {
-            "AMMONIA_CRACKING" => {
-                let metrics = target.get("metric_thresholds").expect("validated above");
-                ensure!(
-                    metrics
-                        .get("all_thresholds_must_hold_at_same_operating_point")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: ammonia benchmark target {target_id} must bind all metrics to one operating point"
-                );
-                ensure!(
-                    guards
-                        .get("full_wall_plug_to_accepted_h2_boundary_required")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: ammonia benchmark target {target_id} must require full wall-plug-to-product accounting"
-                );
-                for key in [
-                    "ammonia_conversion_min_fraction",
-                    "hydrogen_energy_yield_min_g_H2_per_kWh",
-                    "hydrogen_production_rate_min_g_H2_per_hour",
-                ] {
-                    ensure!(
-                        metrics
-                            .get(key)
-                            .and_then(Value::as_f64)
-                            .is_some_and(|value| value.is_finite() && value > 0.0),
-                        "{display_name}: ammonia benchmark target {target_id} has invalid or missing threshold {key}"
-                    );
-                }
-            }
-            "METHANE_PYROLYSIS" => {
-                let metrics = target.get("metric_thresholds").expect("validated above");
-                ensure!(
-                    metrics
-                        .get("all_thresholds_must_hold_at_same_operating_point")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: methane benchmark target {target_id} must bind metrics to one operating point"
-                );
-                ensure!(
-                    target
-                        .get("credit_policies")
-                        .and_then(Value::as_array)
-                        .is_some_and(|value| value
-                            .iter()
-                            .any(|item| item.as_str() == Some("NO_CREDIT"))),
-                    "{display_name}: methane benchmark target {target_id} must include a NO_CREDIT scenario"
-                );
-                ensure!(
-                    guards
-                        .get("no_credit_baseline_required")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: methane benchmark target {target_id} must require a no-credit baseline"
-                );
-                ensure!(
-                    guards
-                        .get(
-                            "avoided_product_credit_requires_independent_carbon_grade_qualification"
-                        )
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: methane benchmark target {target_id} must require independent carbon product qualification"
-                );
-                for key in [
-                    "methane_conversion_min_fraction",
-                    "hydrogen_selectivity_min_fraction",
-                    "levelized_cost_hydrogen_max_usd_per_kg",
-                ] {
-                    ensure!(
-                        metrics
-                            .get(key)
-                            .and_then(Value::as_f64)
-                            .is_some_and(|value| value.is_finite() && value > 0.0),
-                        "{display_name}: methane benchmark target {target_id} has invalid or missing threshold {key}"
-                    );
-                }
-            }
-            "AMMONIA_SYNTHESIS" => {
-                let metrics = target.get("metric_thresholds").expect("validated above");
-                ensure!(
-                    metrics
-                        .get("all_thresholds_must_hold_at_same_operating_point")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: ammonia synthesis target {target_id} must bind metrics to one operating point"
-                );
-                for key in [
-                    "hydrogen_generation_energy_included",
-                    "plasma_and_electrolysis_electricity_included",
-                    "gas_feed_and_product_separation_energy_included",
-                    "accepted_nh3_product_purity_and_pressure_contract_required",
-                    "matched_haber_bosch_baseline_includes_hydrogen_energy",
-                ] {
-                    ensure!(
-                        guards.get(key).and_then(Value::as_bool) == Some(true),
-                        "{display_name}: ammonia synthesis target {target_id} is missing required full-chain guard {key}"
-                    );
-                }
-                ensure!(
-                    metrics
-                        .get("ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh")
-                        .and_then(Value::as_f64)
-                        .is_some_and(|value| value.is_finite() && value > 0.0),
-                    "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
-                );
-            }
-            "AMMONIA_CRACKING_THERMAL_INTEGRATION" => {
-                let metrics = target.get("metric_thresholds").expect("validated above");
-                ensure!(
-                    metrics
-                        .get("all_thresholds_must_hold_at_same_operating_point")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: ammonia thermal-integration target {target_id} must bind all improvements to one operating point"
-                );
-                for (key, minimum) in [
-                    ("ammonia_conversion_min_fraction", 0.99),
-                    ("accepted_h2_production_rate_min_g_per_hour", 150.0),
-                    ("net_grid_specific_energy_reduction_min_fraction", 0.15),
-                ] {
-                    ensure!(
-                        metrics
-                            .get(key)
-                            .and_then(Value::as_f64)
-                            .is_some_and(|value| value.is_finite() && value >= minimum),
-                        "{display_name}: ammonia thermal-integration target {target_id} has an insufficient or invalid threshold {key}"
-                    );
-                }
-                let residual = metrics
-                    .get("heat_balance_abs_residual_fraction_max")
-                    .and_then(Value::as_f64)
-                    .filter(|value| value.is_finite() && *value > 0.0 && *value <= 0.05);
-                ensure!(
-                    residual.is_some(),
-                    "{display_name}: ammonia thermal-integration target {target_id} must declare a positive heat-balance residual cap <= 5%"
-                );
-                for key in [
-                    "paired_no_recovery_baseline_same_feed_and_operating_point_required",
-                    "full_grid_to_accepted_h2_boundary_required",
-                    "recovered_heat_must_be_measured_and_useful_at_declared_process_interface",
-                    "insulation_or_recuperator_pressure_drop_and_all_auxiliaries_included",
-                    "thermal_storage_and_heat_exchanger_losses_included",
-                    "no_double_counting_of_recirculated_heat_or_reaction_enthalpy",
-                    "thermal_energy_balance_must_close_with_uncertainty",
-                    "product_purity_pressure_and_delivery_contract_unchanged",
-                    "duty_cycle_and_steady_state_duration_matched",
-                    "comparison_must_report_measurement_uncertainty_and_grouped_repeats",
-                ] {
-                    ensure!(
-                        guards.get(key).and_then(Value::as_bool) == Some(true),
-                        "{display_name}: ammonia thermal-integration target {target_id} is missing required guard {key}"
-                    );
-                }
-            }
-            "AMMONIA_N2_VIBRATIONAL_TRANSFER" => {
-                let metrics = target.get("metric_thresholds").expect("validated above");
-                for key in [
-                    "all_required_evidence_gates_must_hold",
-                    "state_resolved_interface_population_or_qualified_operator_required",
-                    "discharge_to_interface_transfer_uncertainty_required",
-                    "isotope_attributed_product_control_required",
-                    "matched_thermal_and_electrical_controls_required",
-                    "full_grid_to_accepted_nh3_boundary_required",
-                ] {
-                    ensure!(
-                        metrics.get(key).and_then(Value::as_bool) == Some(true),
-                        "{display_name}: N2 vibrational-transfer target {target_id} is missing required metric gate {key}"
-                    );
-                }
-                for key in [
-                    "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required",
-                    "modelled_state_temperature_remains_model_evidence",
-                    "measured_intermediate_and_quantitative_flux_remain_distinct_measurands",
-                    "plasma_only_and_electrolysis_only_controls_required",
-                    "isotope_product_attribution_required_for_nitrogen_source_claim",
-                    "catalyst_lot_and_surface_identity_must_match",
-                    "all_energy_inputs_and_accepted_product_separation_included",
-                    "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls",
-                ] {
-                    ensure!(
-                        guards.get(key).and_then(Value::as_bool) == Some(true),
-                        "{display_name}: N2 vibrational-transfer target {target_id} is missing claim guard {key}"
-                    );
-                }
-            }
-            "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
-                let metrics = target.get("metric_thresholds").expect("validated above");
-                ensure!(
-                    metrics
-                        .get("all_thresholds_must_hold_at_same_operating_point")
-                        .and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: Power-to-X target {target_id} must bind cost and efficiency to one operating point"
-                );
-                for key in [
-                    "matched_syngas_composition_and_quality_required",
-                    "full_plant_grid_side_energy_boundary_required",
-                    "electricity_price_and_capacity_factor_scenario_required",
-                    "downstream_product_service_boundary_required",
-                    "unqualified_coproduct_credit_forbidden",
-                ] {
-                    ensure!(
-                        guards.get(key).and_then(Value::as_bool) == Some(true),
-                        "{display_name}: Power-to-X target {target_id} is missing required guard {key}"
-                    );
-                }
-                for key in [
-                    "syngas_cost_eur_per_tonne_max",
-                    "plant_efficiency_min_fraction",
-                ] {
-                    ensure!(
-                        metrics
-                            .get(key)
-                            .and_then(Value::as_f64)
-                            .is_some_and(|value| value.is_finite() && value > 0.0),
-                        "{display_name}: Power-to-X target {target_id} has invalid or missing threshold {key}"
-                    );
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let controls = root
-        .get("negative_controls")
-        .and_then(Value::as_array)
-        .with_context(|| format!("{display_name}: no negative_controls array"))?;
-    ensure!(!controls.is_empty(), "{display_name}: no negative controls");
-    let mut control_ids = BTreeSet::new();
-    for control in controls {
-        let control_id = control
-            .get("control_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: negative control has no control_id"))?;
-        ensure!(
-            control_ids.insert(control_id.to_owned()),
-            "{display_name}: duplicate negative-control ID {control_id}"
-        );
-        ensure!(
-            control
-                .get("expected_disposition")
-                .and_then(Value::as_str)
-                .is_some(),
-            "{display_name}: negative control {control_id} has no expected disposition"
-        );
-    }
-
-    Ok(SourceManifestSummary {
-        path: display_name.to_owned(),
-        programme,
-        case_count: cases.len(),
-        negative_control_count: controls.len(),
-        derived_reference_check_count: derived_checks.len(),
-        benchmark_target_count: benchmark_targets.len(),
-    })
 }
