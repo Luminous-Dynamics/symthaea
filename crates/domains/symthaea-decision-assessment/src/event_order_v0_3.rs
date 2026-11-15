@@ -3490,6 +3490,33 @@ mod tests {
         }
     }
 
+    #[derive(Deserialize)]
+    struct ActionHistoryFixtureInput {
+        fixture_version: String,
+        schedule: VirtualSchedule,
+        logical_operation_id: String,
+        time_resolutions: Vec<ActionHistoryTimeResolutionInput>,
+        owner_receipt_assessments: BTreeMap<String, OwnerReceiptAssessment>,
+        expected: ActionHistoryExpected,
+    }
+
+    #[derive(Deserialize)]
+    struct ActionHistoryTimeResolutionInput {
+        mapping_action_id: String,
+        local_timestamp_ns: u64,
+        qualified_time: QualifiedEventTime,
+    }
+
+    #[derive(Deserialize)]
+    struct ActionHistoryExpected {
+        disposition: String,
+        attempt_count: usize,
+        obligation_count: usize,
+        effect_commit_count: usize,
+        start_permitted_by_stop_contract: bool,
+        attempt_manifest_sha256: String,
+    }
+
     fn action_history_fixture() -> (
         VirtualSchedule,
         BTreeMap<(String, u64), QualifiedEventTime>,
@@ -4647,6 +4674,42 @@ mod tests {
         assert!(report.reason_codes.iter().any(|code| {
             code == "ATTEMPT_INVENTORY_COMPLETENESS_FAILED"
         }));
+    }
+
+    #[test]
+    fn frozen_v0_3_2_action_history_fixture_reconstructs_the_v0_2_contracts() {
+        let raw = include_str!("../../../../benchmarks/engineering-change-impact/event-order-v0.3.2-action-history-known-answer.json");
+        let fixture: ActionHistoryFixtureInput = serde_json::from_str(raw)
+            .expect("frozen v0.3.2 action-history fixture parses");
+        assert_eq!(fixture.fixture_version, "symthaea.event-order-action-history-fixture.v0.3.2");
+        validate_schedule(&fixture.schedule).expect("frozen action-history schedule validates");
+
+        let resolutions = fixture.time_resolutions.into_iter().map(|item| {
+            ((item.mapping_action_id, item.local_timestamp_ns), item.qualified_time)
+        }).collect::<BTreeMap<_, _>>();
+        let report = project_action_history(
+            &fixture.schedule,
+            &fixture.logical_operation_id,
+            &resolutions,
+            &fixture.owner_receipt_assessments,
+        ).expect("frozen action-history projection");
+        let disposition = match report.disposition {
+            EventTraceDisposition::Safe => "safe",
+            EventTraceDisposition::Indeterminate => "indeterminate",
+            EventTraceDisposition::CriticalFailure => "critical_failure",
+        };
+        assert_eq!(disposition, fixture.expected.disposition);
+        assert_eq!(report.attempts.len(), fixture.expected.attempt_count);
+        assert_eq!(report.obligations.len(), fixture.expected.obligation_count);
+        assert_eq!(report.effect_commits.len(), fixture.expected.effect_commit_count);
+        assert_eq!(
+            report.inventory.as_ref().map(|inventory| inventory.attempt_manifest_sha256.as_str()),
+            Some(fixture.expected.attempt_manifest_sha256.as_str()),
+        );
+        assert_eq!(
+            report.start_gate.as_ref().map(|gate| gate.start_permitted_by_stop_contract),
+            Some(fixture.expected.start_permitted_by_stop_contract),
+        );
     }
 
     #[test]
