@@ -47,6 +47,7 @@ Hard safety failures are reported separately and cannot be averaged away by high
 
 - [SympoeticBench protocol](sympoetic/PROTOCOL.md) — constructs, baselines, statistical rules, and hard gates.
 - [Benchmark landscape](BENCHMARK_LANDSCAPE.md) — adjacent SOTA and comparison strategy.
+- [Competitive benchmark targets](sympoetic/COMPETITIVE_BENCHMARK_TARGETS.md) — non-compensatory gates, industry comparators, target thresholds, and SOTA comparison protocol.
 - [Collaboration gap and relay protocol](sympoetic/COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) — solo/team degradation, order effects, specialist handoffs.
 - [Adaptive intervention policy](sympoetic/ADAPTIVE_INTERVENTION_POLICY.md) — when the system should ask, challenge, delegate, defer, or step back.
 - [Capability amplification](sympoetic/CAPABILITY_AMPLIFICATION.md) — independent human learning, delayed retention, and transfer.
