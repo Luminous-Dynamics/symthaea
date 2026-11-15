@@ -1465,8 +1465,8 @@ pub fn project_bitemporal_event(
 
     let observations: Vec<_> = schedule.actions.iter().filter(|action| {
         matches!(&action.action, ScheduleAction::EventObserved {
-            event_id: candidate, observer_id: observer, ..
-        } if candidate == event_id && observer == observer_id)
+            event_id: candidate, ..
+        } if candidate == event_id)
     }).collect();
     if observations.len() != 1 {
         return Ok(if observations.is_empty() {
@@ -1475,11 +1475,14 @@ pub fn project_bitemporal_event(
             projection_failure(ProjectionFault::Critical("FIRST_OBSERVATION_CARDINALITY_INVALID"))
         });
     }
+    if !matches!(&observations[0].action, ScheduleAction::EventObserved { observer_id: selected, .. } if selected == observer_id) {
+        return Ok(projection_failure(ProjectionFault::Indeterminate("SELECTED_OBSERVER_IS_NOT_FIRST_OBSERVER")));
+    }
 
     let persistence_records: Vec<_> = schedule.actions.iter().filter(|action| {
         matches!(&action.action, ScheduleAction::EventPersisted {
-            event_id: candidate, observer_id: observer, store_id: store, ..
-        } if candidate == event_id && observer == observer_id && store == store_id)
+            event_id: candidate, ..
+        } if candidate == event_id)
     }).collect();
     if persistence_records.len() != 1 {
         return Ok(if persistence_records.is_empty() {
@@ -1488,9 +1491,15 @@ pub fn project_bitemporal_event(
             projection_failure(ProjectionFault::Critical("DURABLE_RECORD_CARDINALITY_INVALID"))
         });
     }
+    if !matches!(&persistence_records[0].action, ScheduleAction::EventPersisted {
+        observer_id: selected_observer, store_id: selected_store, ..
+    } if selected_observer == observer_id && selected_store == store_id) {
+        return Ok(projection_failure(ProjectionFault::Indeterminate("SELECTED_STORE_IS_NOT_UNIQUE_DURABLE_RECORD")));
+    }
 
     let replay = replay_virtual_schedule(schedule)?;
     for (action, reason) in [
+        (&produced[0], "EVENT_PRODUCTION_NOT_ADMISSIBLE_IN_REPLAY"),
         (&observations[0], "OBSERVATION_NOT_ADMISSIBLE_IN_REPLAY"),
         (&persistence_records[0], "DURABLE_RECORD_NOT_ADMISSIBLE_IN_REPLAY"),
     ] {
@@ -1550,27 +1559,37 @@ pub fn project_bitemporal_event(
         ScheduleAction::EventProduced {
             clock_domain, clock_mapping_action_id, source_timestamp_ns, ..
         } => {
-            let mapping = schedule.actions.iter().find(|action| action.action_id == *clock_mapping_action_id);
-            match mapping.map(|action| &action.action) {
-                Some(ScheduleAction::ClockAdvance { mapping_receipt_ref, mapping_receipt_sha256, .. }) => {
-                    resolve_owner_qualified_time(
+            let mapping = schedule.actions.iter().find(|action| action.action_id == *clock_mapping_action_id)
+                .ok_or(ReplayError::InvalidCausalPredecessor(clock_mapping_action_id.clone()))?;
+            match &mapping.action {
+                ScheduleAction::ClockAdvance { mapping_receipt_ref, mapping_receipt_sha256, .. } => {
+                    match resolve_owner_qualified_time(
                         schedule, clock_mapping_action_id, *source_timestamp_ns, clock_domain,
                         mapping_receipt_ref, mapping_receipt_sha256, resolutions,
-                    ).ok()
+                    ) {
+                        Ok(value) => value,
+                        Err(fault) => return Ok(projection_failure(fault)),
+                    }
                 }
-                _ => None,
+                _ => return Ok(projection_failure(ProjectionFault::Critical("OCCURRENCE_MAPPING_REFERENCE_NOT_CLOCK_ADVANCE"))),
             }
         }
-        _ => None,
+        _ => unreachable!("filtered event-production action"),
     };
 
     let mut reasons = BTreeSet::new();
-    if occurred_at.is_none() {
-        reasons.insert("OCCURRENCE_TIME_NOT_OWNER_QUALIFIED".to_owned());
+    let occurrence_to_observation = compare_qualified_event_times(&occurred_at, &observed_time).order;
+    let occurrence_status = match occurrence_to_observation {
+        crate::EventOrder::Before | crate::EventOrder::Overlapping => None,
+        crate::EventOrder::Unknown => Some(ProjectionFault::Indeterminate("OCCURRENCE_OBSERVATION_ORDER_UNRESOLVED")),
+        crate::EventOrder::After | crate::EventOrder::Inconsistent => Some(ProjectionFault::Critical("OBSERVATION_PRECEDES_EVENT_OCCURRENCE")),
+    };
+    if let Some(fault) = occurrence_status {
+        return Ok(projection_failure(fault));
     }
 
-    let order = compare_qualified_event_times(&observed_time, &persisted_time).order;
-    let (disposition, capture_qualification) = match order {
+    let observation_to_persistence = compare_qualified_event_times(&observed_time, &persisted_time).order;
+    let (disposition, capture_qualification) = match observation_to_persistence {
         crate::EventOrder::Before => (EventTraceDisposition::Safe, GateState::Pass),
         crate::EventOrder::Overlapping | crate::EventOrder::Unknown => {
             reasons.insert("OBSERVATION_PERSISTENCE_ORDER_UNRESOLVED".to_owned());
