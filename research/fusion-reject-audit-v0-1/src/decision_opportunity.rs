@@ -126,6 +126,9 @@ pub enum DecisionOpportunityDisposition {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DecisionOpportunityStratumReport {
     pub stratum_id: String,
+    pub stratum_definition_sha256: String,
+    pub population_manifest_sha256: String,
+    pub selection_receipt_ref: String,
     pub population_size: u64,
     pub sample_size: u64,
     pub inclusion_probability: f64,
@@ -142,6 +145,11 @@ pub struct DecisionOpportunityStratumReport {
 pub struct DecisionOpportunityReport {
     pub decision_rule: &'static str,
     pub campaign_id: String,
+    pub frozen_universe_manifest_sha256: String,
+    pub accepted_manifest_sha256: String,
+    pub objective_manifest_sha256: String,
+    pub opportunity_rule_sha256: String,
+    pub incumbent_frontier_sha256: String,
     pub familywise_confidence_level: f64,
     pub target_opportunity_recall: f64,
     pub accepted_confirmed_opportunities: u64,
@@ -483,6 +491,9 @@ pub fn audit_decision_opportunities(
 
         strata_reports.push(DecisionOpportunityStratumReport {
             stratum_id: base_stratum.stratum_id.clone(),
+            stratum_definition_sha256: base_stratum.stratum_definition_sha256.clone(),
+            population_manifest_sha256: base_stratum.population_manifest_sha256.clone(),
+            selection_receipt_ref: base_stratum.selection_receipt_ref.clone(),
             population_size: population_u64,
             sample_size: sample_u64,
             inclusion_probability: if population_u64 == 0 {
@@ -516,6 +527,11 @@ pub fn audit_decision_opportunities(
     Ok(DecisionOpportunityReport {
         decision_rule: DECISION_RULE,
         campaign_id: plan.campaign_id.clone(),
+        frozen_universe_manifest_sha256: plan.base_plan.frozen_universe.manifest_sha256.clone(),
+        accepted_manifest_sha256: plan.base_plan.accepted.manifest_sha256.clone(),
+        objective_manifest_sha256: plan.objective_manifest_sha256.clone(),
+        opportunity_rule_sha256: plan.opportunity_rule_sha256.clone(),
+        incumbent_frontier_sha256: plan.incumbent_frontier_sha256.clone(),
         familywise_confidence_level: plan.base_plan.familywise_confidence_level,
         target_opportunity_recall: plan.target_opportunity_recall,
         accepted_confirmed_opportunities: accepted_opportunities,
@@ -987,14 +1003,13 @@ mod tests {
 
     #[test]
     fn candidate_identity_already_in_frontier_is_not_recounted() {
-        let mut test_plan = plan();
-        test_plan.rejected_evaluations[0].evaluations[0] =
-            feasible_eval("incumbent-a", 90.0, 0.90);
-        let errors = audit_decision_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            DecisionOpportunityError::RejectedSampleIdentityMismatch { .. }
-        )));
+        let evaluation = feasible_eval("incumbent-a", 90.0, 0.90);
+        assert!(!is_epsilon_frontier_extension(
+            &evaluation.candidate_id,
+            &evaluation.objectives,
+            &frontier(),
+            &definitions(),
+        ));
     }
 
     #[test]
