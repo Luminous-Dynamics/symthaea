@@ -103,6 +103,8 @@ pub enum ScheduleAction {
     },
     StopDischarged {
         obligation_id: String,
+        trigger_action_id: String,
+        policy_revision_action_id: String,
         policy_revision: String,
         receipt_ref: String,
         receipt_sha256: String,
@@ -336,8 +338,13 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(obligation_id, "obligation_id")?;
                 require_id(policy_revision, "policy_revision")?;
             }
-            ScheduleAction::StopDischarged { obligation_id, policy_revision, receipt_ref, receipt_sha256 } => {
+            ScheduleAction::StopDischarged {
+                obligation_id, trigger_action_id, policy_revision_action_id,
+                policy_revision, receipt_ref, receipt_sha256,
+            } => {
                 require_id(obligation_id, "obligation_id")?;
+                require_id(trigger_action_id, "trigger_action_id")?;
+                require_id(policy_revision_action_id, "policy_revision_action_id")?;
                 require_id(policy_revision, "policy_revision")?;
                 require_id(receipt_ref, "receipt_ref")?;
                 require_sha256(receipt_sha256, "stop_discharge_receipt_sha256")?;
@@ -405,6 +412,13 @@ pub fn canonical_schedule_sha256(schedule: &VirtualSchedule) -> Result<String, R
     Ok(sha256_domain_hex(b"symthaea.event-order.schedule.v0.3|", &canonical_schedule_bytes(schedule)?))
 }
 
+#[derive(Debug, Clone)]
+struct StopReplayState {
+    trigger_action_id: String,
+    policy_revision_action_id: String,
+    policy_revision: String,
+}
+
 /// Replay a schedule in virtual time. The output records schedule intent and
 /// scheduler disposition. It is not an event-order safety verdict; callers
 /// pass the resulting observations to the v0.2 evaluator.
@@ -421,9 +435,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut persisted = BTreeSet::<(String, String)>::new();
     let mut cancel_requests = BTreeSet::<(String, String)>::new();
     let mut cancel_acknowledgements = BTreeSet::<(String, String)>::new();
-    let mut stop_triggers = BTreeSet::<String>::new();
+    let mut stop_triggers = BTreeMap::<String, StopReplayState>::new();
     let mut stop_discharges = BTreeSet::<String>::new();
-    let mut stop_policies = BTreeMap::<String, String>::new();
     let mut attempts = BTreeSet::<(String, String)>::new();
     let mut committed_attempts = BTreeSet::<(String, String)>::new();
     let mut reconciled_attempts = BTreeSet::<(String, String)>::new();
@@ -527,27 +540,36 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 }
             }
             ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
-                if stop_triggers.insert(obligation_id.clone()) {
-                    stop_policies.insert(obligation_id.clone(), policy_revision.clone());
-                    SchedulerDisposition::Applied
-                } else {
+                if stop_triggers.contains_key(obligation_id) {
                     SchedulerDisposition::PreconditionViolation
+                } else {
+                    stop_triggers.insert(obligation_id.clone(), StopReplayState {
+                        trigger_action_id: scheduled.action_id.clone(),
+                        policy_revision_action_id: scheduled.action_id.clone(),
+                        policy_revision: policy_revision.clone(),
+                    });
+                    SchedulerDisposition::Applied
                 }
             }
             ScheduleAction::StopPolicyRevised { obligation_id, policy_revision } => {
-                if stop_triggers.contains(obligation_id) {
-                    stop_policies.insert(obligation_id.clone(), policy_revision.clone());
+                if let Some(state) = stop_triggers.get_mut(obligation_id) {
+                    state.policy_revision = policy_revision.clone();
+                    state.policy_revision_action_id = scheduled.action_id.clone();
                     stop_discharges.remove(obligation_id);
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
                 }
             }
-            ScheduleAction::StopDischarged { obligation_id, policy_revision, .. } => {
-                if stop_triggers.contains(obligation_id)
-                    && stop_policies.get(obligation_id) == Some(policy_revision)
-                    && stop_discharges.insert(obligation_id.clone())
-                {
+            ScheduleAction::StopDischarged {
+                obligation_id, trigger_action_id, policy_revision_action_id, policy_revision, ..
+            } => {
+                let exact_binding = stop_triggers.get(obligation_id).is_some_and(|state| {
+                    state.trigger_action_id == *trigger_action_id
+                        && state.policy_revision_action_id == *policy_revision_action_id
+                        && state.policy_revision == *policy_revision
+                });
+                if exact_binding && stop_discharges.insert(obligation_id.clone()) {
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
@@ -981,23 +1003,33 @@ mod tests {
         let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
         let t = 20_000;
         let obligation = "stop-revision-test";
+        let trigger_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::StopTriggered {
             obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::StopDischarged {
-            obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
+            obligation_id: obligation.to_owned(), trigger_action_id: trigger_action_id.clone(),
+            policy_revision_action_id: trigger_action_id.clone(), policy_revision: "policy-v1".to_owned(),
             receipt_ref: "receipt-v1".to_owned(), receipt_sha256: "a".repeat(64),
         });
+        let revised_policy_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::StopPolicyRevised {
             obligation_id: obligation.to_owned(), policy_revision: "policy-v2".to_owned(),
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::StopDischarged {
-            obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
+            obligation_id: obligation.to_owned(), trigger_action_id: trigger_action_id.clone(),
+            policy_revision_action_id: trigger_action_id.clone(), policy_revision: "policy-v1".to_owned(),
             receipt_ref: "stale-receipt".to_owned(), receipt_sha256: "b".repeat(64),
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 4, ScheduleAction::StopDischarged {
-            obligation_id: obligation.to_owned(), policy_revision: "policy-v2".to_owned(),
-            receipt_ref: "receipt-v2".to_owned(), receipt_sha256: "c".repeat(64),
+            obligation_id: obligation.to_owned(), trigger_action_id: "substituted-trigger".to_owned(),
+            policy_revision_action_id: revised_policy_action_id.clone(), policy_revision: "policy-v2".to_owned(),
+            receipt_ref: "substituted-trigger".to_owned(), receipt_sha256: "c".repeat(64),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 5, ScheduleAction::StopDischarged {
+            obligation_id: obligation.to_owned(), trigger_action_id: trigger_action_id.clone(),
+            policy_revision_action_id: revised_policy_action_id, policy_revision: "policy-v2".to_owned(),
+            receipt_ref: "receipt-v2".to_owned(), receipt_sha256: "d".repeat(64),
         });
         let report = replay_virtual_schedule(&schedule).expect("replay");
         let discharge_dispositions: Vec<_> = report.records.iter().filter_map(|record| {
@@ -1009,6 +1041,7 @@ mod tests {
         }).collect();
         assert_eq!(discharge_dispositions, vec![
             SchedulerDisposition::Applied,
+            SchedulerDisposition::PreconditionViolation,
             SchedulerDisposition::PreconditionViolation,
             SchedulerDisposition::Applied,
         ]);
@@ -1104,8 +1137,10 @@ mod tests {
         push_action(&mut schedule.actions, &mut ordinal, 20_000, ScheduleAction::StopTriggered {
             obligation_id: "digest-stop".to_owned(), policy_revision: "policy-1".to_owned(),
         });
+        let trigger_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, 20_001, ScheduleAction::StopDischarged {
-            obligation_id: "digest-stop".to_owned(), policy_revision: "policy-1".to_owned(),
+            obligation_id: "digest-stop".to_owned(), trigger_action_id: trigger_action_id.clone(),
+            policy_revision_action_id: trigger_action_id, policy_revision: "policy-1".to_owned(),
             receipt_ref: "receipt".to_owned(), receipt_sha256: "z".repeat(64),
         });
         assert!(matches!(validate_schedule(&schedule), Err(ReplayError::MalformedSha256("stop_discharge_receipt_sha256"))));
