@@ -52,7 +52,8 @@ Receipt output is written only to a new path. The receipt binds the exact Git he
 - This benchmark tests the measurement and analysis pipeline under specified synthetic mechanisms, not psi or AIA.
 - SplitMix64 is deterministic synthetic fixture randomness only. It is not cryptographic and cannot choose real experimental targets.
 - The global conditional method assumes target labels are exchangeable across the whole campaign under the null.
-- The block-conditional method assumes exchangeability only within the preregistered blocks. If the target generator uses other structure, that structure must be modeled in a new scenario and declared before analysis.
+- The block-conditional method assumes exchangeability only within the preregistered blocks. The v0.1 manifest freezes ten equal contiguous blocks for both profiles: 730 trials per four-choice block and 630 trials per five-choice block. Block boundaries are determined by trial index before any target/response stream is scored; they cannot be selected or shifted after inspecting outcomes.
+- If the target generator uses other structure, that structure must be modeled in a new scenario and declared before analysis.
 - The conditional normal approximation must not be treated as a validated confirmatory test solely because this synthetic benchmark passes.
 - Failures and inflated naive rates are successful diagnostic outcomes when the declared expected behaviour is observed.
 - Real target signature verification, beacon freshness, response chronology and independent timestamp witnesses remain separate gates in SCI-PSI-003.
