@@ -155,7 +155,7 @@ A pooled treatment effect is insufficient. Report treatment-control independent-
 
 ## 6. Creative quality and diversity
 
-Use blinded domain experts and domain-specific rubrics. Separate:
+Use blinded domain experts and domain-specific rubrics. Report raw agreement separately from nominal Cohen's kappa (two raters) or Krippendorff's alpha (multiple raters/missing labels). Preserve negative coefficients and report undefined estimates as unavailable. Agreement does not prove rubric validity. Separate:
 - Technical correctness.
 - Usefulness and feasibility.
 - Originality/novelty.
