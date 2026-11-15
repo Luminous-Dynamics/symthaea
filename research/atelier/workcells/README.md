@@ -268,3 +268,41 @@ The ambition is not "highest nominal garments per hour". It is a production netw
 - [JACK Technology 2026 company filing](https://static.cninfo.com.cn/finalpage/2026-04-29/1225226963.PDF)
 - [Apparel sewing-line TQM case study (2024)](https://doi.org/10.1155/2024/6697213)
 - [Apparel OEE, lean and digital integration case study](https://onlinelibrary.wiley.com/doi/full/10.1002/eng2.70162)
+
+
+## South African deployment and funding evidence
+
+### Localisation is a market hypothesis to validate, not booked demand
+
+A 2026 Localisation Support Fund / BMA feasibility study reports that retail groups surveyed indicated willingness to source up to **81 million additional garments per year locally by 2030**, with an estimated R7.9 billion annual manufacturing output *if realised*. This is a sector opportunity estimate, not confirmed demand for Atelier, a purchase order, or a guaranteed market share. The study highlights T-shirts, denim and athleisure as major opportunities, and identifies production-management/industrial-engineering skills, upstream fabric conversion, and washing/finishing capacity as constraints.
+
+For Atelier, use this as a reason to validate AO-01/K-01 product-market fit and local supplier capability—not to size a factory to the headline volume. Start by converting retailer conversations into product/category-specific specifications, target costs, order sizes, delivery windows, payment terms and written offtake evidence.
+
+Source: [Localisation Support Fund — Feasibility of Garment Localisation under the R-CTFL Masterplan](https://www.lsf-sa.co.za/reports/feasibility-of-garment-localisation-under-the-r-ctfl-masterplan).
+
+### CTFLGP funding is conditional
+
+The current dtic CTFLGP page links the revised programme guideline marked **effective 9 July 2024**. That guideline states that the scheme replaces the older CTCP, is administered by the CTFLGP Desk at the IDC, may be amended by the dtic/Desk, and that approvals are subject to available funds.
+
+Under the linked Programme C Start-up section, the guideline describes:
+- an early-stage start-up route with a maximum two-year trading period;
+- qualifying capital equipment and working capital, excluding pre-feasibility studies and related costs;
+- a maximum R5 million per applicant;
+- an interest-free loan with a grant portion tied to the loan (75% for specified women-, youth- and disability-owned categories; 50% for specified black-male-owned businesses);
+- secured orders from a reputable registered entity and/or retailer, credible business plans or historical performance, and demonstrated ability to repay the loan.
+
+These 2024 terms are a **dated guideline reference**, not an eligibility determination or assurance that funding is currently open/available. Confirm the latest posted guideline, applicant eligibility, ownership definitions, required security, secured-order evidence, and funding availability directly with the CTFLGP Desk/IDC before including the incentive in a financial model. Do not present the grant portion independently of its linked loan.
+
+Sources:
+- [dtic — current CTFLGP programme page](https://www.thedtic.gov.za/financial-and-non-financial-support/incentives/clothing-textiles-footwear-and-leather-growth-programme-ctflgp/)
+- [dtic — linked revised CTFLGP guidelines (effective 9 July 2024)](https://www.thedtic.gov.za/wp-content/uploads/Guidelines.pdf)
+
+### Recommended commercial sequence
+
+1. Build product-cost and operation-level sourcing dossiers for the initial garment families.
+2. Verify local fabric, trims, CMT, cutting, finishing, inspection, repair and logistics capability with specific named providers.
+3. Convert prospective demand into written specifications and credible orders before sizing owned production capacity.
+4. Model partner-first vs owned-cell economics per operation, including yield, paid labour, freight, cash conversion cycle, quality hold, returns and supplier concentration.
+5. Treat grant/loan support as a conditional financing scenario; retain a no-incentive downside case.
+
+A South African microfactory proposal becomes materially stronger when it can show additional output and import replacement, measurable job/skills development, partner capability uplift, traceability, and credible order-backed demand—not merely that the technology is novel.
