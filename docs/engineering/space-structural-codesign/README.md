@@ -56,6 +56,16 @@ Relevant Symtropy owners:
 
 Symtropy [ENERGY-SYSTEMS-STUDIO-001 #2721](https://github.com/Luminous-Dynamics/symtropy/issues/2721) already establishes the general collaboration pattern in another domain: Symthaea proposes candidate architectures and policies; Symtropy executes deterministic twins and fault replay; Sol-Atlas supplies spatial/resource evidence; Mycelix preserves provenance and approvals. This space-structure programme specializes that pattern for structural model applicability, mesh/material/load identity and solver qualification. It does not replace or fork the generic integration pattern.
 
+
+### Structural baseline gates that remain draft-only
+
+As of 15 November 2026, two closely related Symthaea changes are still open draft PRs, not merged baseline capabilities:
+
+- [#6067 — fail-closed checked structural reference facade](https://github.com/Luminous-Dynamics/symthaea/pull/6067). Its checked-domain API must be reviewed and merged before claim-bearing consumers depend on it.
+- [#6081 — reaction-force dimensionality repair and proxy-semantics limits](https://github.com/Luminous-Dynamics/symthaea/pull/6081). This addresses a dimensional mismatch in the fabrication analytical path where a force-valued API had exposed stored energy. Until the correction is merged and qualified, do not use that legacy API as a force oracle.
+
+The space proposal emitter must consume only checked/qualified structural outputs, or label legacy/reference outputs as restricted. The existing built-in section/material presets are convenience defaults, not batch/process-conditioned material evidence. These are explicit dependency gates, not new replacement implementations.
+
 ## 3. Paradigm shifts
 
 ### 3.1 Candidate and fidelity are chosen together
