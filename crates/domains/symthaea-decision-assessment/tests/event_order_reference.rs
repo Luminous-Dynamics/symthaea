@@ -542,3 +542,156 @@ fn qualified_clock_and_causal_order_disagreement_is_not_silently_resolved() {
     assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
     assert!(report.block_irreversible_actions);
 }
+
+
+#[test]
+fn failed_stop_disposition_is_critical_even_when_discharge_is_missing() {
+    let data = fixture();
+    let case = data["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "EO-UNK-002")
+        .unwrap();
+    let events = parse_events(&case["events"]);
+    let mut qualification = parse_qualification(&case["qualification"]);
+    qualification.stop_disposition = GateState::Fail;
+
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report.block_irreversible_actions);
+    assert!(report
+        .reason_codes
+        .contains(&"STOP_DISPOSITION_QUALIFICATION_FAILED".to_owned()));
+
+    // A failed stop-disposition result without any stop trigger is still a
+    // failed owner qualification, not an innocuous not-applicable state.
+    let no_trigger = vec![DecisionEvent {
+        event_id: "standalone-observation".to_owned(),
+        kind: DecisionEventKind::UnrelatedObservation,
+        operation_id: None,
+        reconciled_outcome: None,
+        clock: None,
+        causal_predecessors: vec![],
+    }];
+    let mut no_trigger_qualification = baseline_qualification();
+    no_trigger_qualification.stop_disposition = GateState::Fail;
+    let no_trigger_report =
+        evaluate_event_order(&no_trigger, &no_trigger_qualification).unwrap();
+    assert_eq!(
+        no_trigger_report.disposition,
+        EventTraceDisposition::CriticalFailure
+    );
+    assert!(no_trigger_report
+        .reason_codes
+        .contains(&"STOP_DISPOSITION_QUALIFICATION_FAILED".to_owned()));
+}
+
+#[test]
+fn invalid_stop_discharge_receipt_cannot_be_used_as_a_safe_ordering_boundary() {
+    let data = fixture();
+    let case = data["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["id"] == "EO-POS-004")
+        .unwrap();
+    let events = parse_events(&case["events"]);
+    let mut qualification = parse_qualification(&case["qualification"]);
+    qualification.stop_disposition_receipt_sha256 = Some("f".repeat(63));
+
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report.block_irreversible_actions);
+    assert!(report
+        .reason_codes
+        .contains(&"STOP_DISPOSITION_RECEIPT_BINDING_INVALID".to_owned()));
+    assert!(report
+        .reason_codes
+        .contains(&"OPERATION_STARTED_AFTER_STOP_TRIGGER:op-start".to_owned()));
+}
+
+#[test]
+fn effect_cannot_precede_its_own_operation_start() {
+    let qualification = baseline_qualification();
+    let start = DecisionEvent {
+        event_id: "start".to_owned(),
+        kind: DecisionEventKind::OperationStarted,
+        operation_id: Some("OP-CHRONOLOGY".to_owned()),
+        reconciled_outcome: None,
+        clock: test_clock("clock-a", 2, 200),
+        causal_predecessors: vec![],
+    };
+    let effect = DecisionEvent {
+        event_id: "effect".to_owned(),
+        kind: DecisionEventKind::IrreversibleEffectCommitted,
+        operation_id: Some("OP-CHRONOLOGY".to_owned()),
+        reconciled_outcome: None,
+        clock: test_clock("clock-a", 1, 100),
+        causal_predecessors: vec![],
+    };
+    let outcome = DecisionEvent {
+        event_id: "outcome".to_owned(),
+        kind: DecisionEventKind::OperationOutcomeReconciled,
+        operation_id: Some("OP-CHRONOLOGY".to_owned()),
+        reconciled_outcome: Some(ReconciledOperationOutcome::Applied),
+        clock: test_clock("clock-a", 3, 300),
+        causal_predecessors: vec![],
+    };
+
+    let events = vec![start, effect, outcome];
+    let report = evaluate_event_order(&events, &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report
+        .reason_codes
+        .contains(&"EFFECT_PRECEDES_OPERATION_START:OP-CHRONOLOGY".to_owned()));
+
+    let mut reversed = events.clone();
+    reversed.reverse();
+    let reversed_report = evaluate_event_order(&reversed, &qualification).unwrap();
+    assert_eq!(reversed_report, report);
+}
+
+#[test]
+fn cancellation_acknowledgement_must_follow_a_matching_request() {
+    let qualification = baseline_qualification();
+    let start = DecisionEvent {
+        event_id: "start".to_owned(),
+        kind: DecisionEventKind::OperationStarted,
+        operation_id: Some("OP-CANCEL".to_owned()),
+        reconciled_outcome: None,
+        clock: test_clock("clock-a", 1, 100),
+        causal_predecessors: vec![],
+    };
+    let ack = DecisionEvent {
+        event_id: "cancel-ack".to_owned(),
+        kind: DecisionEventKind::CancellationAcknowledged,
+        operation_id: Some("OP-CANCEL".to_owned()),
+        reconciled_outcome: None,
+        clock: test_clock("clock-a", 2, 200),
+        causal_predecessors: vec![],
+    };
+    let request = DecisionEvent {
+        event_id: "cancel-request".to_owned(),
+        kind: DecisionEventKind::CancellationRequested,
+        operation_id: Some("OP-CANCEL".to_owned()),
+        reconciled_outcome: None,
+        clock: test_clock("clock-a", 3, 300),
+        causal_predecessors: vec![],
+    };
+    let outcome = DecisionEvent {
+        event_id: "outcome".to_owned(),
+        kind: DecisionEventKind::OperationOutcomeReconciled,
+        operation_id: Some("OP-CANCEL".to_owned()),
+        reconciled_outcome: Some(ReconciledOperationOutcome::NotApplied),
+        clock: test_clock("clock-a", 4, 400),
+        causal_predecessors: vec![],
+    };
+
+    let report =
+        evaluate_event_order(&[start, ack, request, outcome], &qualification).unwrap();
+    assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+    assert!(report
+        .reason_codes
+        .contains(&"CANCELLATION_ACK_WITHOUT_PRIOR_REQUEST:OP-CANCEL".to_owned()));
+}
