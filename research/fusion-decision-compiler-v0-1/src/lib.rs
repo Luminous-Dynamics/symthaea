@@ -6,6 +6,8 @@
 
 use std::collections::{BTreeSet, VecDeque};
 
+pub mod screening_funnel;
+
 pub const COMPILER_VERSION: &str = "fusion-decision-compiler/0.1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
