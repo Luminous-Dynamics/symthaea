@@ -80,6 +80,7 @@ The differentiator to test is not "better clock sync" or a universal distributed
 ## Known limitations / next increment
 
 - This first generator family emphasizes event production and network delivery/partition. Dedicated generators are still needed for calibration expiry/drift, cancel/commit races, crash between effect and durable reconciliation, policy revision, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
+- Observation and durable-persistence actions are currently ordered by simulator virtual time; they do not yet carry separate observer-clock and store-clock basis/epoch/timestamp evidence. The next increment must add these domains so the v0.2 bitemporal envelope can be populated without promoting simulator time into physical/owner time.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
 - The v0.3 scheduler is not yet wired to the v0.2 evaluator. That adapter and an independent oracle are the next critical step.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
