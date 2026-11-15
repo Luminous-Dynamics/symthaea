@@ -41,7 +41,12 @@ Sources:
 - EU Textile Ecosystem Platform, 29 June 2026: https://transition-pathways.europa.eu/textiles/best-practices/digitalisation-lever-sustainability-example-textile-microfactories
 - DITF: https://www.ditf.de/
 - Layout case, Engineering Proceedings, 5 March 2026: https://doi.org/10.3390/engproc2026128003
+- FDSM-guided apparel line-layout GA, International Journal of Clothing Science and Technology, 9 February 2026: https://doi.org/10.1108/IJCST-11-2024-0220
 - Pattern-driven machine allocation, International Journal of Clothing Science and Technology, 1 September 2026: https://doi.org/10.1108/IJCST-01-2026-0029
+- Cut-order planning with PSO/GA, Applied Soft Computing, March 2026: https://doi.org/10.1016/j.asoc.2026.114590
+- Multi-line garment scheduling with MILP/EGA, Procedia Computer Science, 2026: https://doi.org/10.1016/j.procs.2026.02.164
+- Green supplier selection and dynamic textile order allocation, 5 October 2026: https://sp.ftn.uns.ac.rs/index.php/ijiem/article/view/1976
+- Integrated SLP + discrete-event simulation + GA facility layout workflow, 21 July 2026: https://doi.org/10.3390/asi9070156
 - Lean garments review, International Journal of Advanced Manufacturing Technology, 15 March 2026: https://doi.org/10.1007/s00170-026-17713-6
 - Siemens / JACK Technology announcement, 11 June 2026: https://news.siemens.com/en-us/siemens-jack-technology/
 
@@ -341,15 +346,31 @@ The same platform describes Rodinia Generation's O-FACTORY as about 200 m² and 
 
 The 2026 SLP textile case reports 45% lower average travel time and 34% lower travel distance in its selected alternative for its own case. Atelier should measure the same concepts with From-To matrices and observed/material-flow traces, then report both absolute results and normalized improvement against a frozen baseline.
 
-### Pattern-driven machine allocation
+### Apparel-specific layout and machine-allocation research
 
-The September 2026 modular garment assembly paper uses pattern-derived seam workload and a genetic algorithm to allocate sewing machinery. Atelier should:
-- reproduce a transparent manual/SLP layout baseline;
-- use exact pattern operation graphs for work content;
-- compare simple heuristics;
-- compare exact solutions on small instances;
-- test genetic/multiobjective optimizers on larger instances;
-- independently verify feasibility and no-overlap/skill/capability constraints.
+There are now at least two distinct 2026 apparel research baselines that should not be conflated:
+
+1. **Fuzzy design-structure-matrix-guided GA (9 February 2026):** a shirt-production example uses component/process dependencies to derive assembly sequencing and then optimizes line layout. The publisher reports a 42% reduction in its target objective, 15.37% higher average workstation workload balance, four fewer machines, and 11 additional finished products per day in its FlexSim comparison. These are study-specific simulation results, not independently measured Atelier outcomes. Reproduce the paper's exact problem, objective and baseline before comparing. DOI: https://doi.org/10.1108/IJCST-11-2024-0220
+2. **Pattern-driven GA machine allocation (1 September 2026):** seam-level information from CAD patterns is aggregated into workstation workloads using machine-specific sewing speeds; a GA reallocates limited machines within a fixed modular assembly structure and is evaluated with deterministic event-based simulation under order insertions. This is a direct comparator for pattern-to-cell workload allocation, but it does not by itself solve facility layout, cutting, procurement, partner selection or physical machine qualification. DOI: https://doi.org/10.1108/IJCST-01-2026-0029
+
+Atelier should:
+- reproduce both task definitions and their baseline methods;
+- retain exact seam/operation identity and CAD revision;
+- compare manual allocation, FDSM constraints, simple heuristics, GA and exact small-instance solutions;
+- report machine count, workload balance, makespan, changeover and insertion recovery separately;
+- independently verify that every required operation, worker skill, machine capability and inspection gate remains assigned.
+
+### Cutting and multi-line scheduling research
+
+Two further 2026 papers expand the benchmark beyond sewing-cell assignment:
+
+- **Cut-order planning:** a March 2026 PSO/GA study formulates fabric, marker, cutting, shortage and overproduction costs and evaluates 32 scenarios. This gives Atelier a specific cutting/marker-planning comparator; a lower cutting cost must not be claimed if fabric grade, usable width, marker constraints or actual yield are not matched. DOI: https://doi.org/10.1016/j.asoc.2026.114590
+- **Multi-line garment scheduling:** a 2026 case study compares an enhanced genetic algorithm with a MILP benchmark for multi-line flow-shop scheduling, lot streaming and heterogeneous workforce assignment. Use MILP on small instances as an optimality oracle and report the GA's gap and runtime on larger ones. DOI: https://doi.org/10.1016/j.procs.2026.02.164
+- **Green supplier selection and dynamic order allocation (5 October 2026):** a textile-industry study addresses orders across multiple outsourcing entities and production departments, with green-supplier criteria applied through lexicographic tie-breaking. This directly supports benchmarking make/buy/partner allocation, but the environmental criteria must remain evidence-based and cannot compensate for an infeasible route. https://sp.ftn.uns.ac.rs/index.php/ijiem/article/view/1976
+
+### Cross-industry facility-layout workflow
+
+A 21 July 2026 facility-layout study integrates SLP, discrete-event simulation and a genetic algorithm, then re-simulates candidate configurations. Its transformer-manufacturing case reports approximately 35% lower material-handling costs and 2.46% higher monthly throughput. This is a useful method-level comparator outside apparel; do not transfer its percentages to garment production. DOI: https://doi.org/10.3390/asi9070156
 
 A higher ranked weighted score must never compensate for missing egress, unsafe conditions, unqualified processes or impossible material flow.
 
@@ -359,7 +380,7 @@ Siemens' 11 June 2026 announcement about Jack Technology targets efficiency impr
 
 ### South Africa
 
-The LSF's 2026 feasibility study reports retailer willingness to source up to 81 million additional garments locally by 2030, while noting constraints including skills, upstream fabric conversion/washing/finishing and price competitiveness. It indicates category-specific opportunities (including T-shirts, denim, athleisure and woven garments), not a guaranteed market for Atelier. The DTIC/IDC CTCP is a potential capability-upgrade route for eligible manufacturers/design houses working with CMT partners, subject to current programme rules.
+The LSF's 2026 feasibility study reports retailer willingness to source up to 81 million additional garments locally by 2030, while noting constraints including skills, upstream fabric conversion/washing/finishing and price competitiveness. It indicates category-specific opportunities (including T-shirts, denim, athleisure and woven garments), not a guaranteed market for Atelier. For public support, use the current dtic programme name **Clothing, Textiles, Footwear and Leather Growth Programme (CTFLGP)** rather than the legacy CTCP label: the dtic's revised guidelines state that CTFLGP replaced CTCP and list Programme A (competitiveness improvement), Programme B (expansionary working capital), Programme C (start-up funding, including early-stage businesses and fashion designers) and Programme D (cluster funding). The published guidelines are effective 9 July 2024, state that funding depends on annual availability and may be amended, and identify the IDC as administrator. Treat this as an enquiry route, not assumed eligibility or committed funding; confirm current intake, qualifying costs, applicant conditions and terms directly with the CTFLGP Desk/IDC. Official page: https://www.thedtic.gov.za/financial-and-non-financial-support/incentives/clothing-textiles-footwear-and-leather-growth-programme-ctflgp/; revised guidelines: https://www.thedtic.gov.za/wp-content/uploads/Guidelines.pdf.
 
 References:
 - https://transition-pathways.europa.eu/textiles/best-practices/digitalisation-lever-sustainability-example-textile-microfactories
