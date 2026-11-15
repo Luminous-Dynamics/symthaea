@@ -44,7 +44,9 @@ fn main() -> ExitCode {
                 "PASS: {} frozen rows; eligible={accept}, blocked={blocked}, indeterminate={indeterminate}, schema-reject={reject}",
                 REQUIRED_CASES.len()
             );
-            println!("SCOPE: structural corpus audit only; compiler behavior and physical correctness are not evaluated");
+            println!(
+                "SCOPE: structural corpus audit only; compiler behavior and physical correctness are not evaluated"
+            );
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -86,13 +88,20 @@ fn audit() -> Result<(usize, usize, usize, usize), String> {
             "BLOCKED" => counts.1 += 1,
             "INDETERMINATE" => counts.2 += 1,
             "REJECT" => counts.3 += 1,
-            other => return Err(format!("unknown expected disposition {other} for {case_id}")),
+            other => {
+                return Err(format!(
+                    "unknown expected disposition {other} for {case_id}"
+                ));
+            }
         }
         rows += 1;
     }
 
     if rows != REQUIRED_CASES.len() {
-        return Err(format!("expected {} rows, found {rows}", REQUIRED_CASES.len()));
+        return Err(format!(
+            "expected {} rows, found {rows}",
+            REQUIRED_CASES.len()
+        ));
     }
     for required in REQUIRED_CASES {
         if !ids.contains(required) {
@@ -101,7 +110,9 @@ fn audit() -> Result<(usize, usize, usize, usize), String> {
     }
 
     if counts != (5, 7, 6, 8) {
-        return Err(format!("unexpected expected-disposition counts: {counts:?}"));
+        return Err(format!(
+            "unexpected expected-disposition counts: {counts:?}"
+        ));
     }
 
     Ok(counts)
