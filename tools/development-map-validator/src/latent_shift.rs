@@ -42,8 +42,6 @@ pub struct LatentShiftReport {
 #[derive(Debug, Clone)]
 struct ObservationInfo {
     available_at: DateTime<FixedOffset>,
-    observed_at: DateTime<FixedOffset>,
-    source_family: String,
     source_root: String,
     signal_kind: String,
 }
@@ -63,8 +61,6 @@ struct DecisionInfo {
     claimed_current: BTreeSet<String>,
     blocked: BTreeSet<String>,
     uses_prior_evidence: bool,
-    observation_ids_used: BTreeSet<String>,
-    claimed_independent_source_count: u64,
 }
 
 fn required_str<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a str, String> {
@@ -146,8 +142,6 @@ fn insert_observation(
             id.clone(),
             ObservationInfo {
                 available_at,
-                observed_at,
-                source_family,
                 source_root: root,
                 signal_kind,
             },
@@ -236,13 +230,11 @@ fn parse_probes(candidate_view: &Value) -> Result<BTreeMap<String, ProbeInfo>, S
         }
         let source_family = required_str(value, "source_family", &label)?.to_owned();
         let cost_units = required_u64(value, "cost_units", &label)?;
-        let latency = value
+        value
             .get("expected_latency_seconds")
-            .and_then(Value::as_u64)
-            .ok_or_else(|| format!("{label}.expected_latency_seconds must be an unsigned integer"))?;
-        if latency == u64::MAX {
-            return Err(format!("{label}.expected_latency_seconds is out of range"));
-        }
+            .and_then(Value::as_f64)
+            .filter(|latency| latency.is_finite() && *latency >= 0.0)
+            .ok_or_else(|| format!("{label}.expected_latency_seconds must be a non-negative finite number"))?;
         let target_impact = required_str(value, "target_impact", &label)?;
         if !["none", "reversible", "irreversible"].contains(&target_impact) {
             return Err(format!("{label}.target_impact is unsupported"));
@@ -431,24 +423,7 @@ fn validate_candidate_trace(
             claimed_current,
             blocked,
             uses_prior_evidence,
-            observation_ids_used,
-            claimed_independent_source_count,
         });
-    }
-
-    // Make sure every decision's visible observation set refers to a real
-    // source/availability record. The field is intentionally retained in the
-    // typed trace so a future scorer can expose claim-by-claim evidence lineage.
-    for decision in &decisions {
-        for id in &decision.observation_ids_used {
-            if !observations.contains_key(id) {
-                return Err(format!(
-                    "decision {:?} references observation {id:?} outside the visible trace",
-                    decision.decision_id
-                ));
-            }
-        }
-        let _ = decision.claimed_independent_source_count;
     }
 
     unauthorized.sort();
@@ -657,6 +632,7 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
 pub fn score_latent_shift_bundle_json(input: &str) -> Result<LatentShiftReport, String> {
     let bundle: Value =
         serde_json::from_str(input).map_err(|error| format!("bundle JSON parse failed: {error}"))?;
+    required_str(&bundle, "bundle_id", "bundle")?;
     if required_str(&bundle, "bundle_visibility", "bundle")?
         != "evaluator_only_never_candidate_visible"
     {
