@@ -536,6 +536,49 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_model_profile_identity_abstains() {
+        let mut intent = ring_intent();
+        intent.model_profile_ref.id = "ARTGRAV-RADIAL-SPOKE-REF-V0_1".to_owned();
+        let result = emit_structural_proposal(&intent);
+        assert_eq!(result.disposition, ProposalDisposition::Abstain);
+        assert!(result.reason_codes.contains(&ProposalReason::ModelProfileIdentityMismatch));
+    }
+
+    #[test]
+    fn mismatched_backend_identity_abstains() {
+        let mut intent = ring_intent();
+        intent.backend_ref.id = "unallowlisted-structural-backend".to_owned();
+        let result = emit_structural_proposal(&intent);
+        assert_eq!(result.disposition, ProposalDisposition::Abstain);
+        assert!(result.reason_codes.contains(&ProposalReason::BackendIdentityMismatch));
+    }
+
+    #[test]
+    fn model_profile_generation_is_exact() {
+        let mut intent = ring_intent();
+        intent.model_profile_ref.generation = "0.2.0".to_owned();
+        let result = emit_structural_proposal(&intent);
+        assert_eq!(result.disposition, ProposalDisposition::Abstain);
+        assert!(result.reason_codes.contains(&ProposalReason::ModelProfileIdentityMismatch));
+    }
+
+    #[test]
+    fn emitted_proposal_serializes_receiver_identity_and_no_execution_authority() {
+        let result = emit_structural_proposal(&ring_intent());
+        let proposal = result.proposal.expect("proposal should be emitted");
+        let value = serde_json::to_value(proposal).expect("proposal should serialize");
+        assert_eq!(value["request"]["id"], "SPACE-STRUCT-RING-REQUEST-001");
+        assert_eq!(value["model_profile_ref"]["id"], "ARTGRAV-THIN-RING-REF-V0_1");
+        assert_eq!(value["backend_ref"]["id"], "artgrav-prestress-reference");
+        assert_eq!(value["mesh_required"], false);
+        assert_eq!(value["mesh"], serde_json::Value::Null);
+        assert_eq!(value["comparison_reference"], serde_json::Value::Null);
+        assert_eq!(value["solver_execution_requested"], false);
+        assert_eq!(value["execution_authorized"], false);
+        assert_eq!(value["design_release_authorized"], false);
+    }
+
+    #[test]
     fn emits_restricted_synthetic_radial_spoke_proposal() {
         let mut intent = ring_intent();
         intent.proposal_id = "SPACE-STRUCT-SPOKE-PROPOSAL-001".to_owned();
