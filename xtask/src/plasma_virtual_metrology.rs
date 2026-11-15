@@ -72,12 +72,26 @@ struct Scenario {
     specimen_id: String,
     configuration_digest: String,
     run_timestamp_unix_ms: u64,
+    #[serde(default)]
+    surface_diagnostics: Option<SurfaceDiagnostics>,
     telemetry: Vec<TelemetrySample>,
     energy: EnergyRecord,
     downstream_outcome: Option<DownstreamOutcome>,
     model_prediction: ModelPrediction,
     material_in_model_domain: bool,
     expected_disposition: Disposition,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SurfaceDiagnostics {
+    method_id: String,
+    adhesive_system_id: String,
+    process_gas: String,
+    water_contact_angle_deg: f64,
+    treatment_head_speed_mm_per_min: f64,
+    damage_status: String,
+    evidence_class: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -329,8 +343,29 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
     if scenario.service_profile_id != fixture.service_profile.profile_id {
         blocked.push("scenario service profile differs from the frozen fixture profile".to_owned());
     }
-    if !scenario.material_in_model_domain {
-        blocked.push("scenario explicitly marked outside model domain".to_owned());
+    if let Some(diagnostics) = &scenario.surface_diagnostics {
+        if diagnostics.method_id.trim().is_empty()
+            || diagnostics.adhesive_system_id.trim().is_empty()
+            || diagnostics.process_gas.trim().is_empty()
+            || diagnostics.evidence_class != "SYNTHETIC_DIAGNOSTIC"
+        {
+            blocked.push("surface diagnostic identity/evidence context is incomplete".to_owned());
+        }
+        if !diagnostics.water_contact_angle_deg.is_finite()
+            || !(0.0..=180.0).contains(&diagnostics.water_contact_angle_deg)
+            || !diagnostics.treatment_head_speed_mm_per_min.is_finite()
+            || diagnostics.treatment_head_speed_mm_per_min <= 0.0
+        {
+            rejected.push("surface diagnostic angle or treatment-speed value is invalid".to_owned());
+        }
+        if diagnostics.adhesive_system_id != fixture.service_profile.adhesive_system {
+            blocked.push("surface diagnostic adhesive system differs from the frozen service profile; contact angle cannot transfer across adhesive systems".to_owned());
+        }
+        match diagnostics.damage_status.as_str() {
+            "NONE_OBSERVED" => {}
+            "OBSERVED" => rejected.push("surface damage is a product-integrity failure regardless of contact angle or predicted bond strength".to_owned()),
+            _ => blocked.push("surface damage status is unknown".to_owned()),
+        }
     }
     if scenario.run_timestamp_unix_ms == 0 {
         blocked.push("run timestamp is missing".to_owned());
@@ -802,6 +837,39 @@ mod tests {
             result_for(&report, "in-spec-probability-below-gate").disposition,
             Disposition::Rejected
         );
+    }
+
+    #[test]
+    fn lower_contact_angle_does_not_transfer_across_adhesive_systems() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(
+            result_for(&report, "nitrogen-low-angle-unqualified-adhesive").disposition,
+            Disposition::Blocked
+        );
+        assert_eq!(
+            result_for(&report, "argon-higher-angle-unqualified-adhesive").disposition,
+            Disposition::Blocked
+        );
+    }
+
+    #[test]
+    fn observed_surface_damage_rejects_a_high_bond_strength_prediction() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(
+            result_for(&report, "nitrogen-overexposure-surface-damage").disposition,
+            Disposition::Rejected
+        );
+    }
+
+    #[test]
+    fn contact_angle_must_not_override_frozen_bond_acceptance() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        let low_angle = result_for(&report, "nitrogen-low-angle-unqualified-adhesive");
+        let high_angle = result_for(&report, "argon-higher-angle-unqualified-adhesive");
+        assert_eq!(low_angle.disposition, Disposition::Blocked);
+        assert_eq!(high_angle.disposition, Disposition::Blocked);
+        assert!(!low_angle.virtual_metrology_false_accept);
+        assert!(!high_angle.virtual_metrology_false_accept);
     }
 
     #[test]
