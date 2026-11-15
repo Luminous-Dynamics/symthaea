@@ -191,6 +191,11 @@ pub struct AudioStepEvaluationV1 {
     pub changed_frame_count: u64,
     pub changed_sample_value_count: u64,
     pub off_support_changed_sample_value_count: u64,
+    pub cumulative_authorized_frame_count: u64,
+    pub source_changed_frame_count: u64,
+    pub source_changed_sample_value_count: u64,
+    pub source_max_absolute_delta_samples: u32,
+    pub source_off_support_changed_sample_value_count: u64,
     pub boundary_measurements: Vec<AudioBoundaryMeasurementV1>,
     pub boundary_gate: AudioGateVerdictV1,
     pub upstream_gates_verified: bool,
@@ -227,6 +232,10 @@ pub struct AudioSequenceEvaluationV1 {
     pub final_audio_sha256: String,
     pub cumulative_changed_frame_count: u64,
     pub cumulative_changed_sample_value_count: u64,
+    pub final_source_changed_frame_count: u64,
+    pub final_source_changed_sample_value_count: u64,
+    pub final_source_max_absolute_delta_samples: u32,
+    pub cumulative_authorized_frame_count: u64,
     pub cumulative_attempt_count: u32,
     pub cumulative_failed_attempt_count: u32,
     pub cumulative_render_call_count: u32,
@@ -560,6 +569,10 @@ struct AudioReportPayloadV1 {
     final_audio_sha256: String,
     cumulative_changed_frame_count: u64,
     cumulative_changed_sample_value_count: u64,
+    final_source_changed_frame_count: u64,
+    final_source_changed_sample_value_count: u64,
+    final_source_max_absolute_delta_samples: u32,
+    cumulative_authorized_frame_count: u64,
     cumulative_attempt_count: u32,
     cumulative_failed_attempt_count: u32,
     cumulative_render_call_count: u32,
@@ -613,6 +626,11 @@ pub fn evaluate_audio_sequence_v1(
     let mut reports = Vec::with_capacity(steps.len());
     let mut total_changed_frames = 0_u64;
     let mut total_changed_samples = 0_u64;
+    let mut cumulative_support = Vec::<FrameWindowV1>::new();
+    let mut final_source_changed_frames = 0_u64;
+    let mut final_source_changed_samples = 0_u64;
+    let mut final_source_max_delta = 0_u32;
+    let mut final_cumulative_authorized_frames = 0_u64;
     let mut total_attempts = 0_u32;
     let mut total_failed_attempts = 0_u32;
     let mut total_render_calls = 0_u32;
@@ -678,6 +696,11 @@ pub fn evaluate_audio_sequence_v1(
         }
 
         let support = merge_support(&step.edit_regions, &step.transition_support);
+        cumulative_support.extend_from_slice(&step.edit_regions);
+        cumulative_support.extend_from_slice(&step.transition_support);
+        cumulative_support.sort_by_key(|window| (window.start_frame, window.end_frame));
+        cumulative_support = merge_support(&cumulative_support, &[]);
+        let cumulative_authorized_frame_count = count_authorized_frames(&cumulative_support);
         let channels = usize::from(request.format.channels);
         let mut changed_frames = BTreeSet::new();
         let mut changed_sample_values = 0_u64;
@@ -703,6 +726,37 @@ pub fn evaluate_audio_sequence_v1(
         if off_support_changes != 0 {
             return Err(AudioContinuityErrorV1::OffSupportMutation);
         }
+
+        // Re-measure drift against the frozen session source after every step.
+        let mut source_changed_frames = BTreeSet::new();
+        let mut source_changed_samples = 0_u64;
+        let mut source_max_delta = 0_u32;
+        let mut source_off_support_changes = 0_u64;
+        for (sample_index, (source_sample, output_sample)) in source
+            .samples
+            .iter()
+            .zip(step.output.samples.iter())
+            .enumerate()
+        {
+            if source_sample != output_sample {
+                source_changed_samples = source_changed_samples.saturating_add(1);
+                let frame = (sample_index / channels) as u64;
+                source_changed_frames.insert(frame);
+                let delta =
+                    (i32::from(*source_sample) - i32::from(*output_sample)).unsigned_abs();
+                source_max_delta = source_max_delta.max(delta);
+                if !frame_is_authorized(frame, &cumulative_support) {
+                    source_off_support_changes = source_off_support_changes.saturating_add(1);
+                }
+            }
+        }
+        if source_off_support_changes != 0 {
+            return Err(AudioContinuityErrorV1::OffSupportMutation);
+        }
+        final_source_changed_frames = source_changed_frames.len() as u64;
+        final_source_changed_samples = source_changed_samples;
+        final_source_max_delta = source_max_delta;
+        final_cumulative_authorized_frames = cumulative_authorized_frame_count;
 
         let measurements = boundary_measurements(
             &current,
@@ -754,6 +808,11 @@ pub fn evaluate_audio_sequence_v1(
             changed_frame_count: changed_frames.len() as u64,
             changed_sample_value_count: changed_sample_values,
             off_support_changed_sample_value_count: off_support_changes,
+            cumulative_authorized_frame_count,
+            source_changed_frame_count: source_changed_frames.len() as u64,
+            source_changed_sample_value_count: source_changed_samples,
+            source_max_absolute_delta_samples: source_max_delta,
+            source_off_support_changed_sample_value_count: source_off_support_changes,
             boundary_measurements: measurements,
             boundary_gate,
             upstream_gates_verified: upstream_verified,
@@ -786,6 +845,10 @@ pub fn evaluate_audio_sequence_v1(
         final_audio_sha256: current_sha,
         cumulative_changed_frame_count: total_changed_frames,
         cumulative_changed_sample_value_count: total_changed_samples,
+        final_source_changed_frame_count: final_source_changed_frames,
+        final_source_changed_sample_value_count: final_source_changed_samples,
+        final_source_max_absolute_delta_samples: final_source_max_delta,
+        cumulative_authorized_frame_count: final_cumulative_authorized_frames,
         cumulative_attempt_count: total_attempts,
         cumulative_failed_attempt_count: total_failed_attempts,
         cumulative_render_call_count: total_render_calls,
@@ -814,6 +877,10 @@ pub fn evaluate_audio_sequence_v1(
         final_audio_sha256: payload.final_audio_sha256,
         cumulative_changed_frame_count: total_changed_frames,
         cumulative_changed_sample_value_count: total_changed_samples,
+        final_source_changed_frame_count: payload.final_source_changed_frame_count,
+        final_source_changed_sample_value_count: payload.final_source_changed_sample_value_count,
+        final_source_max_absolute_delta_samples: payload.final_source_max_absolute_delta_samples,
+        cumulative_authorized_frame_count: payload.cumulative_authorized_frame_count,
         cumulative_attempt_count: total_attempts,
         cumulative_failed_attempt_count: total_failed_attempts,
         cumulative_render_call_count: total_render_calls,
@@ -1148,6 +1215,27 @@ mod tests {
         assert_eq!(result.cumulative_failed_attempt_count, 2);
         assert_eq!(result.cumulative_render_call_count, 4);
         assert_eq!(result.cumulative_changed_frame_count, 40);
+    }
+
+    #[test]
+    fn cumulative_source_drift_is_measured_against_the_frozen_session_root() {
+        let original = source(256, 2);
+        let first_window = FrameWindowV1 { start_frame: 32, end_frame: 48 };
+        let first_output = edited(&original, first_window, 100);
+        let second_window = FrameWindowV1 { start_frame: 160, end_frame: 184 };
+        let second_output = edited(&first_output, second_window, -75);
+        let steps = [
+            step(1, &original, first_output.clone(), first_window),
+            step(2, &first_output, second_output, second_window),
+        ];
+        let result = run(&original, 2, &steps).unwrap();
+        assert_eq!(result.steps[0].source_changed_frame_count, 16);
+        assert_eq!(result.steps[1].source_changed_frame_count, 40);
+        assert_eq!(result.final_source_changed_frame_count, 40);
+        assert_eq!(result.final_source_changed_sample_value_count, 80);
+        assert_eq!(result.final_source_max_absolute_delta_samples, 100);
+        assert_eq!(result.cumulative_authorized_frame_count, 40);
+        assert_eq!(result.steps[1].source_off_support_changed_sample_value_count, 0);
     }
 
     #[test]
