@@ -68,7 +68,7 @@ The plan fixes:
 - opaque plan identifier and version;
 - policy owner/issuer reference and policy digest;
 - verifier identity, audience, purpose and intended claim;
-- verifier-issued challenge reference, nonce commitment, request issue time (`issued_at`) and expiry;
+- verifier-issued challenge reference, nonce commitment, request issue time (`issued_at`) and expiry (`expires_at`); v1 encodes both as fixed-width UTC seconds and requires `expires_at > issued_at`;
 - request digest and the allowed public inputs.
 
 The plan is created before source acquisition. A claimant cannot self-issue a new audience, freshness window, or challenge and have it treated as equivalent.
@@ -311,6 +311,7 @@ The standalone fixture directory now contains:
 - missing status anti-rollback requirement;
 - duplicate JSON member name in a raw pre-canonicalization fixture;
 - invalid RFC 6901 JSON Pointer escape (`~2`) rejected during semantic preflight;
+- request expiry equal to issue time rejected during semantic preflight;
 - a machine-readable manifest describing the expected rejection stage.
 
 The fixtures are structural/semantic test inputs only. They contain zero digests and synthetic profile IDs, so they do not represent a valid cryptographic trust profile, issued credential, source session, or proof. The duplicate-member fixture must be rejected by the raw JSON admission parser before a normal JSON object is formed.
@@ -328,7 +329,7 @@ An isolated, research-only Rust workspace now exists at `research-tools/claim-pl
 
 Direct crate versions are pinned in `Cargo.toml`: `jsonschema 0.61.2`, `serde_json_canonicalizer 0.4.1`, `serde_json 1.0.151`, `serde 1.0.229`, `sha2 0.10.9` and `hex 0.4.3`. JSON Schema format assertion is explicitly enabled. Canonicalization follows the duplicate-aware parser because canonicalization cannot repair ambiguous duplicate-key input after an ordinary map parser has discarded a duplicate.
 
-The Rust source contains 12 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes and RFC 8785 UTF-16 object-key ordering. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
+The Rust source contains 13 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes, RFC 8785 UTF-16 object-key ordering and nonpositive request lifetime. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
 
 ## 11. Implementation sequence
 
