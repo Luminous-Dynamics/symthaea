@@ -65,6 +65,7 @@ pub enum ScheduleAction {
         epoch: String,
         scale: String,
         unit: String,
+        clock_mapping_action_id: String,
         source_timestamp_ns: u64,
         causal_predecessors: Vec<String>,
     },
@@ -174,6 +175,7 @@ pub enum SchedulerDisposition {
     BlockedByCrashedRecipient,
     ClockRegression,
     EventTimeRegression,
+    StaleClockMappingReference,
     ConflictingAcknowledgement,
     ConflictingReconciliation,
     ConflictingEffectCommit,
@@ -260,6 +262,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
     let mut action_ids = BTreeSet::new();
     let mut ordinals = BTreeSet::new();
     let mut clock_ticks = BTreeMap::<ClockSeriesKey, u64>::new();
+    let mut clock_mapping_action_history = BTreeMap::<ClockSeriesKey, BTreeSet<String>>::new();
     let mut produced_events = BTreeSet::<String>::new();
     let mut delivery_ids = BTreeSet::<String>::new();
 
@@ -287,14 +290,16 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(calibration_id, "calibration_id")?;
                 require_id(mapping_receipt_ref, "mapping_receipt_ref")?;
                 require_sha256(mapping_receipt_sha256, "mapping_receipt_sha256")?;
-                clock_ticks.insert(
-                    clock_series_key(clock_domain, basis_id, epoch, scale, unit),
-                    *local_tick_ns,
-                );
+                let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                clock_ticks.insert(key.clone(), *local_tick_ns);
+                clock_mapping_action_history
+                    .entry(key)
+                    .or_default()
+                    .insert(scheduled.action_id.clone());
             }
             ScheduleAction::EventProduced {
                 event_id, clock_domain, basis_id, epoch, scale, unit,
-                source_timestamp_ns, causal_predecessors,
+                clock_mapping_action_id, source_timestamp_ns, causal_predecessors,
             } => {
                 require_id(event_id, "event_id")?;
                 require_id(clock_domain, "clock_domain")?;
@@ -302,9 +307,19 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(epoch, "epoch")?;
                 require_id(scale, "scale")?;
                 require_id(unit, "unit")?;
+                require_id(clock_mapping_action_id, "clock_mapping_action_id")?;
+                let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
                 let latest_tick = clock_ticks
-                    .get(&clock_series_key(clock_domain, basis_id, epoch, scale, unit))
+                    .get(&key)
                     .ok_or_else(|| ReplayError::MissingClock(clock_domain.clone()))?;
+                if !clock_mapping_action_history
+                    .get(&key)
+                    .is_some_and(|history| history.contains(clock_mapping_action_id))
+                {
+                    return Err(ReplayError::InvalidCausalPredecessor(
+                        clock_mapping_action_id.clone(),
+                    ));
+                }
                 if source_timestamp_ns > latest_tick {
                     return Err(ReplayError::EventBeyondClock(event_id.clone()));
                 }
@@ -476,6 +491,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut crashed = BTreeSet::<String>::new();
     let mut produced = BTreeSet::<String>::new();
     let mut clock_ticks = BTreeMap::<ClockSeriesKey, u64>::new();
+    let mut active_clock_mapping_ids = BTreeMap::<ClockSeriesKey, String>::new();
     let mut event_times = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
@@ -496,7 +512,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 clock_domain, basis_id, epoch, scale, unit, local_tick_ns, ..
             } => {
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
-                let previous = clock_ticks.insert(key, *local_tick_ns);
+                let previous = clock_ticks.insert(key.clone(), *local_tick_ns);
+                active_clock_mapping_ids.insert(key, scheduled.action_id.clone());
                 if previous.is_some_and(|tick| *local_tick_ns < tick) {
                     SchedulerDisposition::ClockRegression
                 } else {
@@ -504,12 +521,16 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 }
             }
             ScheduleAction::EventProduced {
-                event_id, clock_domain, basis_id, epoch, scale, unit, source_timestamp_ns, ..
+                event_id, clock_domain, basis_id, epoch, scale, unit,
+                clock_mapping_action_id, source_timestamp_ns, ..
             } => {
                 produced.insert(event_id.clone());
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                let current_mapping = active_clock_mapping_ids.get(&key);
                 let previous = event_times.insert(key, *source_timestamp_ns);
-                if previous.is_some_and(|timestamp| *source_timestamp_ns < timestamp) {
+                if current_mapping != Some(clock_mapping_action_id) {
+                    SchedulerDisposition::StaleClockMappingReference
+                } else if previous.is_some_and(|timestamp| *source_timestamp_ns < timestamp) {
                     SchedulerDisposition::EventTimeRegression
                 } else {
                     SchedulerDisposition::Applied
@@ -785,6 +806,7 @@ pub fn generate_delivery_schedule(
         clock_ticks[clock_index] += 100;
         let domain = if clock_index == 0 { "clock-a" } else { "clock-b" };
         let at_ns = index as u64 + 1;
+        let clock_mapping_action_id = format!("action-{ordinal:06}");
         push_action(
             &mut actions,
             &mut ordinal,
@@ -818,6 +840,7 @@ pub fn generate_delivery_schedule(
                 epoch: "epoch-0".to_owned(),
                 scale: "tai".to_owned(),
                 unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id,
                 source_timestamp_ns: clock_ticks[clock_index],
                 causal_predecessors,
             },
@@ -1310,9 +1333,10 @@ mod tests {
         let mut schedule = generate_delivery_schedule(61, 2).expect("valid schedule");
         let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
         let t = 20_000;
+        let regression_mapping_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::ClockAdvance {
             clock_domain: "clock-a".to_owned(),
-            basis_id: "basis-a".to_owned(),
+            basis_id: "basis-clock-a".to_owned(),
             epoch: "epoch-0".to_owned(),
             scale: "tai".to_owned(),
             unit: "nanoseconds".to_owned(),
@@ -1332,9 +1356,11 @@ mod tests {
             epoch: "epoch-0".to_owned(),
             scale: "tai".to_owned(),
             unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: regression_mapping_id,
             source_timestamp_ns: 50,
             causal_predecessors: Vec::new(),
         });
+        let new_epoch_mapping_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::ClockAdvance {
             clock_domain: "clock-a".to_owned(),
             basis_id: "basis-clock-a".to_owned(),
@@ -1357,6 +1383,7 @@ mod tests {
             epoch: "epoch-1".to_owned(),
             scale: "tai".to_owned(),
             unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: new_epoch_mapping_id,
             source_timestamp_ns: 5,
             causal_predecessors: Vec::new(),
         });
