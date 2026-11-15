@@ -211,21 +211,24 @@ pub fn calculate_oee(
     }
     let quality = bounded_ratio_ppm(first_pass_good_count, total_count)?;
 
-    let product = availability
-        .value_ppm
-        .checked_mul(performance.value_ppm)
-        .and_then(|value| value.checked_mul(quality.value_ppm))
+    // Compute the combined product from the exact inputs rather than
+    // multiplying already-truncated component ppm values. Algebraically:
+    // (run / planned) * (ideal_cycle * total / run) * (good / total)
+    // = (ideal_cycle * good) / planned.
+    let exact_oee_numerator = u128::from(ideal_cycle_time_seconds_per_unit)
+        .checked_mul(u128::from(first_pass_good_count))
         .ok_or(KpiError::ArithmeticOverflow)?;
-    let scale_squared = PPM_SCALE
-        .checked_mul(PPM_SCALE)
-        .ok_or(KpiError::ArithmeticOverflow)?;
+    let oee_ppm = ratio_ppm_u128(
+        exact_oee_numerator,
+        u128::from(planned_production_time_seconds),
+    )?.value_ppm;
 
     Ok(OeeReport {
         work_unit_ref: work_unit_ref.into(),
         availability,
         performance,
         quality,
-        oee_ppm: product / scale_squared,
+        oee_ppm,
     })
 }
 
