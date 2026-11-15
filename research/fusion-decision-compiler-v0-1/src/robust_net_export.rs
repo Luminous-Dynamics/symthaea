@@ -514,7 +514,9 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plant_service_gate::{PowerObservable, PowerTermEvidence};
+    use crate::plant_service_gate::{
+        PowerObservable, PowerTermEvidence, evaluate_plant_power_balance,
+    };
 
     fn sha(character: char) -> String {
         character.to_string().repeat(64)
