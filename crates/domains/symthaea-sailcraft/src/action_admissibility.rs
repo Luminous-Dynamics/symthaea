@@ -30,6 +30,7 @@ pub struct QualifiedEvidenceRef {
     pub source_sha256: [u8; 32],
     /// Subject identity and exact configuration to which this reference applies.
     pub subject_asset_id: String,
+    pub target_track_id: String,
     pub configuration_sha256: [u8; 32],
     /// Encounter/scenario scope; a valid receipt from another scenario is not reusable.
     pub scenario_id: String,
@@ -42,6 +43,7 @@ impl QualifiedEvidenceRef {
     pub fn qualified(
         source_sha256: [u8; 32],
         subject_asset_id: impl Into<String>,
+        target_track_id: impl Into<String>,
         configuration_sha256: [u8; 32],
         scenario_id: impl Into<String>,
         timebase_id: impl Into<String>,
@@ -52,6 +54,7 @@ impl QualifiedEvidenceRef {
             state: EvidenceState::Qualified,
             source_sha256,
             subject_asset_id: subject_asset_id.into(),
+            target_track_id: target_track_id.into(),
             configuration_sha256,
             scenario_id: scenario_id.into(),
             timebase_id: timebase_id.into(),
@@ -65,6 +68,7 @@ impl QualifiedEvidenceRef {
             state: EvidenceState::Missing,
             source_sha256: [0; 32],
             subject_asset_id: String::new(),
+            target_track_id: String::new(),
             configuration_sha256: [0; 32],
             scenario_id: String::new(),
             timebase_id: String::new(),
@@ -76,6 +80,7 @@ impl QualifiedEvidenceRef {
     pub fn stale(
         source_sha256: [u8; 32],
         subject_asset_id: impl Into<String>,
+        target_track_id: impl Into<String>,
         configuration_sha256: [u8; 32],
         scenario_id: impl Into<String>,
         timebase_id: impl Into<String>,
@@ -84,6 +89,7 @@ impl QualifiedEvidenceRef {
             state: EvidenceState::Stale,
             source_sha256,
             subject_asset_id: subject_asset_id.into(),
+            target_track_id: target_track_id.into(),
             configuration_sha256,
             scenario_id: scenario_id.into(),
             timebase_id: timebase_id.into(),
@@ -239,6 +245,7 @@ impl ActionAdmissibilityResult {
 fn evidence_status(
     evidence: &QualifiedEvidenceRef,
     own_asset_id: &str,
+    target_track_id: &str,
     configuration_sha256: &[u8; 32],
     scenario_id: &str,
     common_timebase_id: &str,
@@ -262,6 +269,8 @@ fn evidence_status(
     if evidence.source_sha256 == [0; 32]
         || evidence.subject_asset_id.trim().is_empty()
         || evidence.subject_asset_id != own_asset_id
+        || evidence.target_track_id.trim().is_empty()
+        || evidence.target_track_id != target_track_id
         || evidence.configuration_sha256 == [0; 32]
         || &evidence.configuration_sha256 != configuration_sha256
         || evidence.scenario_id.trim().is_empty()
@@ -335,6 +344,7 @@ pub fn evaluate_action_admissibility(
         if let Err(error) = evidence_status(
             reference,
             &input.own_asset_id,
+            &input.target_track_id,
             &input.configuration_sha256,
             &input.scenario_id,
             timebase,
@@ -408,6 +418,7 @@ pub fn evaluate_action_admissibility(
             match evidence_status(
                 &oversight.evidence,
                 &input.own_asset_id,
+                &input.target_track_id,
                 &input.configuration_sha256,
                 &input.scenario_id,
                 timebase,
@@ -461,6 +472,7 @@ mod tests {
         QualifiedEvidenceRef::qualified(
             [byte; 32],
             ASSET,
+            "synthetic-target-07",
             CONFIGURATION,
             SCENARIO,
             CLOCK,
@@ -531,7 +543,7 @@ mod tests {
     fn stale_encounter_evidence_fails_closed() {
         let mut value = input();
         value.encounter_evidence = QualifiedEvidenceRef::stale(
-            [7; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK,
+            [7; 32], ASSET, "synthetic-target-07", CONFIGURATION, SCENARIO, CLOCK,
         );
         assert_eq!(
             disposition(&value),
@@ -543,7 +555,7 @@ mod tests {
     fn conflicted_odd_evidence_fails_closed() {
         let mut value = input();
         value.odd_evidence = QualifiedEvidenceRef::conflicted(
-            [8; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK,
+            [8; 32], ASSET, "synthetic-target-07", CONFIGURATION, SCENARIO, CLOCK,
         );
         assert_eq!(
             disposition(&value),
@@ -705,11 +717,11 @@ mod tests {
         let mut stale = input();
         stale.rule_assessment = RuleAssessment::Ambiguous;
         stale.human_oversight.evidence = QualifiedEvidenceRef::stale(
-            [9; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK,
+            [9; 32], ASSET, "synthetic-target-07", CONFIGURATION, SCENARIO, CLOCK,
         );
         assert_eq!(
             disposition(&stale),
-            ActionAdmissibilityDisposition::FallbackRequired
+            ActionAdmissibilityDisposition::NotEvaluatedStaleEvidence
         );
 
         let mut missing = input();
@@ -735,6 +747,16 @@ mod tests {
     fn evidence_from_another_vessel_identity_is_not_reused() {
         let mut value = input();
         value.encounter_evidence.subject_asset_id = "another-sailcraft".to_string();
+        assert_eq!(
+            disposition(&value),
+            ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
+        );
+    }
+
+    #[test]
+    fn evidence_from_another_target_track_is_not_reused() {
+        let mut value = input();
+        value.encounter_evidence.target_track_id = "another-target".to_string();
         assert_eq!(
             disposition(&value),
             ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
@@ -782,8 +804,8 @@ mod tests {
     fn every_disposition_remains_decision_support_only() {
         let mut cases = Vec::new();
         let mut a = input(); a.route_evidence = QualifiedEvidenceRef::missing(); cases.push(a);
-        let mut b = input(); b.encounter_evidence = QualifiedEvidenceRef::stale([7; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK); cases.push(b);
-        let mut c = input(); c.odd_evidence = QualifiedEvidenceRef::conflicted([8; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK); cases.push(c);
+        let mut b = input(); b.encounter_evidence = QualifiedEvidenceRef::stale([7; 32], ASSET, "synthetic-target-07", CONFIGURATION, SCENARIO, CLOCK); cases.push(b);
+        let mut c = input(); c.odd_evidence = QualifiedEvidenceRef::conflicted([8; 32], ASSET, "synthetic-target-07", CONFIGURATION, SCENARIO, CLOCK); cases.push(c);
         let mut d = input(); d.authority.evidence.state = EvidenceState::Revoked; cases.push(d);
         let mut e = input(); e.odd_assessment = OddAssessment::OutsideDeclaredDomain; cases.push(e);
         let mut f = input(); f.model_assessment = ModelAssessment::Infeasible; cases.push(f);
