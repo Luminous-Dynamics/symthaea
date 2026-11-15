@@ -47,7 +47,7 @@ impl PcmAudioArtifactV1 {
     pub fn frame_count(&self) -> Result<u64, AudioContinuityErrorV1> {
         validate_format(self.format)?;
         let channels = usize::from(self.format.channels);
-        if self.samples.is_empty() || self.samples.len() % channels != 0 {
+        if self.samples.is_empty() || !self.samples.len().is_multiple_of(channels) {
             return Err(AudioContinuityErrorV1::InvalidSampleLayout);
         }
         u64::try_from(self.samples.len() / channels)
@@ -359,7 +359,7 @@ fn isqrt(value: u128) -> u128 {
         return value;
     }
     let mut x = value;
-    let mut y = (x + 1) / 2;
+    let mut y = x.div_ceil(2);
     while y < x {
         x = y;
         y = (x + value / x) / 2;
