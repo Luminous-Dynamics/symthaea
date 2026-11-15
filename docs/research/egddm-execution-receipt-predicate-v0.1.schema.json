@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/egddm-execution-receipt-predicate-v0.1.schema.json",
   "title": "EGDDM signed execution receipt predicate v0.1",
-  "description": "Custom in-toto predicate payload. This schema does not define or verify a signature envelope or transparency receipt.",
+  "description": "Validate the predicate object carried by an in-toto Statement/v1 with predicateType https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1. This schema does not validate the enclosing Statement, signature envelope or transparency receipt.",
   "type": "object",
   "additionalProperties": false,
   "required": [
