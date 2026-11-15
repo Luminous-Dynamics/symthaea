@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use serde::Serialize;
 use sympoetic_bench::{
     Scorecard, Trace,
+    trajectory::{TeamTrajectory, validate_trajectory},
     validate::{sha256_hex, validate_corpus, validate_scorecard, validate_trace},
 };
 
@@ -32,6 +33,11 @@ enum Command {
     },
     /// Validate score ranges, provenance digests, and non-compensatory hard gates.
     ValidateScorecard {
+        #[arg(long)]
+        input: PathBuf,
+    },
+    /// Validate continuity, roster changes, consent, and digests across team cycles.
+    ValidateTrajectory {
         #[arg(long)]
         input: PathBuf,
     },
@@ -90,6 +96,16 @@ fn main() -> Result<()> {
                 scenario_id: &scorecard.scenario_id,
                 hard_gates_pass: scorecard.hard_gates.pass,
             };
+            println!("{}", serde_json::to_string_pretty(&receipt)?);
+        }
+        Command::ValidateTrajectory { input } => {
+            let bytes = fs::read(&input)
+                .with_context(|| format!("could not read {}", input.display()))?;
+            let trajectory: TeamTrajectory = serde_json::from_slice(&bytes)
+                .with_context(|| {
+                    format!("{} is not a valid team trajectory JSON document", input.display())
+                })?;
+            let receipt = validate_trajectory(&trajectory, &bytes)?;
             println!("{}", serde_json::to_string_pretty(&receipt)?);
         }
         Command::Digest { input } => {
