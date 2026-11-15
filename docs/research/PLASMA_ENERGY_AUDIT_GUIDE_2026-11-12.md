@@ -238,3 +238,8 @@ The Rust source auditor now validates the CO2 counterflow configurations as sepa
 Four new source-audit tests accept the distinct source record and reject borrowing the 792 W conversion into the 302 W point, converting a relative improvement into an absolute fraction, and duplicate configuration IDs. The focused audit remains solver-free; it qualifies source metadata / operating-point identity, not plasma physics or the source experiment.
 
 The xtask suite now has 31 authored Rust tests. The merged source register remains **37 cases / 46 negative controls / 5 derived checks**.
+
+
+## 9.19 Corpus snapshot — 2026-11-15
+
+The audit branch retains six microplasma source cases in addition to the source-register content, for 37 unique cases / 46 unique negative controls / 5 derived checks. Its xtask source contains 31 Rust tests, including source-arithmetic and CO2 counterflow operating-point refusal tests. The focused exact-head workflow is queued; no latest test pass is claimed until it completes.
