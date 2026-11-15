@@ -790,7 +790,7 @@ fn scorecard_rejects_unrecognized_and_auxiliary_only_scorer_kinds() {
 fn canonical_score_table_and_metric_evidence_receipts_have_one_to_one_coverage() {
     let scorecard = base_scorecard();
     let entries = scorecard.scores.entries().unwrap();
-    assert_eq!(entries.len(), 37);
+    assert_eq!(entries.len(), 39);
     assert_eq!(entries.len(), scorecard.metric_evidence.len());
 
     for (index, (name, _)) in entries.iter().enumerate() {
