@@ -413,6 +413,24 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
                 }
             }
         }
+
+        let all_receipts = unique_arm_receipts(arm)?;
+        for receipt in &all_receipts {
+            let available_at = parse_time(&receipt.available_at)?;
+            let first_available_checkpoint = arm.checkpoints.iter().position(|checkpoint| {
+                parse_time(&checkpoint.checkpoint_at)
+                    .is_ok_and(|cutoff| cutoff >= available_at)
+            }).ok_or_else(|| format!("receipt {} is not available by any checkpoint", receipt.receipt_id))?;
+            let first_seen_checkpoint = arm.checkpoints.iter().position(|checkpoint| {
+                checkpoint.receipts.iter().any(|item| item.receipt_id == receipt.receipt_id)
+            }).expect("unique receipts were collected from checkpoints");
+            if first_seen_checkpoint != first_available_checkpoint {
+                return Err(format!(
+                    "receipt {} must first appear at the earliest checkpoint where it is available",
+                    receipt.receipt_id
+                ));
+            }
+        }
     }
 
     let clean_arm = scenario.arms.iter()
@@ -958,6 +976,20 @@ mod tests {
         assert!(shifted.final_checkpoint_success);
         assert_eq!(shifted.critical_unverified_obligation_seconds, 480);
         assert_eq!(shifted.max_unverified_gap_seconds, 240);
+    }
+
+    #[test]
+    fn receipt_cannot_be_withheld_until_after_its_first_available_checkpoint() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        let clean = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Clean).expect("clean arm");
+        let arm_id = clean.arm_id.clone();
+        let receipt = clean.checkpoints[1].receipts.iter_mut()
+            .find(|receipt| receipt.obligation_id == "api-contract").expect("API receipt");
+        receipt.receipt_id = "late-disclosed-baseline-api".to_owned();
+        receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, receipt).expect("reseal");
+        assert!(evaluate_shift_scenario(&scenario).is_err());
     }
 
     #[test]
