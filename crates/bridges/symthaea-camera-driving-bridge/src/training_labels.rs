@@ -50,6 +50,24 @@ impl AppliedActionSourceKind {
 
 /// Canonical payload supplied by the simulator/recorder for an action that
 /// was actually applied, not merely proposed by a policy.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AppliedVehicleAction {
+    pub steering: f32,
+    pub throttle: f32,
+    pub brake: f32,
+}
+
+impl AppliedVehicleAction {
+    fn into_vehicle_command(self) -> VehicleCommand {
+        VehicleCommand {
+            steering: self.steering,
+            throttle: self.throttle,
+            brake: self.brake,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AppliedActionTrainingReceipt {
@@ -66,7 +84,7 @@ pub struct AppliedActionTrainingReceipt {
     pub source_kind: AppliedActionSourceKind,
     pub source_identity: String,
     pub privilege_profile: CameraPolicyPrivilegeProfile,
-    pub action: VehicleCommand,
+    pub action: AppliedVehicleAction,
     pub receipt_sha256: String,
 }
 
@@ -284,7 +302,7 @@ pub fn validate_applied_action_training_label(
     }
 
     Ok(ValidatedAppliedActionLabel {
-        target: action,
+        target: action.into_vehicle_command(),
         receipt_id: label.receipt_id.clone(),
         receipt_sha256: label.receipt_sha256.clone(),
         command_id: label.command_id.clone(),
@@ -336,7 +354,7 @@ mod tests {
             source_kind: AppliedActionSourceKind::ClassicalController,
             source_identity: "teacher-controller-r3".into(),
             privilege_profile: CameraPolicyPrivilegeProfile::NoPrivilegedInputs,
-            action: VehicleCommand {
+            action: AppliedVehicleAction {
                 steering: 0.25,
                 throttle: 0.6,
                 brake: 0.0,
