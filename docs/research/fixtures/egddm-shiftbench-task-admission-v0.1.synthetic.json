@@ -7,7 +7,9 @@
     "family": "dependency_api_breaking_change",
     "position": "middle",
     "control_class": "target_intervention",
-    "position_percentile": 50
+    "position_percentile": 50,
+    "planned_work_units_completed": 50,
+    "planned_work_units_total": 100
   },
   "task_seed_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "task_bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
