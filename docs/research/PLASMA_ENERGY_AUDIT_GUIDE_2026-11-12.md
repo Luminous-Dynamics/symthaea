@@ -202,3 +202,16 @@ Hua et al., *MHD capabilities in SAM and NekRS for fusion liquid metal blanket a
 This paper provides a source-pinned comparison of reduced-order SAM MHD modelling, high-fidelity NekRS MHD CFD, analytical duct references, and ALEX measurements for conducting square and round ducts under applied magnetic fields. Insulating-duct validation is explicitly future work.
 
 This strengthens [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733). It does not establish whole blanket performance. A valid reproduction must keep model/solver/experiment outputs distinct and pin wall conductivity, geometry, field profile, Hartmann/Reynolds/interaction parameters, boundary conditions and measurement uncertainty.
+
+
+## 9.17 Warm-plasma CO2 quench source frontier — 2026-11-15
+
+The merged source register now includes four quench-related cases:
+- June 2026 atmospheric gliding-arc plasma-cold gas counterflow experiment (DOI 10.1016/j.jece.2026.122322), preserving the 792 W / 23.6% conversion / 25.1% efficiency point separately from the 302 W / 46.2% efficiency highlight.
+- October 2026 Al2O3 particle-assisted / SO2 catalytic O-O recombination kinetic model (DOI 10.1016/j.jcou.2026.103579), preserving 79% / 47% and 72% / 43% as numerical predictions only.
+- 2026 multidimensional CO2 arc quench CFD model compared to nozzle / heat-exchanger experiments (DOI 10.1016/j.cej.2026.176010); >50% conversion remains conditional on perfect wall cooling.
+- July 2026 temperature-management experiment/model (DOI 10.1016/j.rechem.2026.103513), which reports source-specific thermal measurements and radiation losses.
+
+Eight new negative controls refuse point mixing, relative-vs-absolute errors, predicted-to-measured promotion, ideal-wall extrapolation, chemistry/regime transfer and omitted cooling/auxiliary loads.
+
+The current merged register contains **37 source cases / 48 negative controls / 5 derived checks**. It preserves the six miniaturized-plasma sources unique to this audit branch.
