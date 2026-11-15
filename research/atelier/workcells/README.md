@@ -358,3 +358,54 @@ FactoryBench evaluates accepted output, workload, resource capacity, layout, sch
 - [Issue #12323 — cell eligibility evaluator](https://github.com/Luminous-Dynamics/symthaea/issues/12323): implementation and independent-verification follow-up.
 
 The evidence classes in these tracks must remain separate: paper-reported, vendor-announced, simulated, physically trialled, independently measured, and production-qualified. A result can advance between classes only through its required evidence and review process.
+
+
+## 7. Soft-first modularity and dynamic reconfiguration
+
+Atelier should be modular, but modularity must not mean "move every machine whenever demand changes." The preferred hierarchy is:
+
+1. **Logical reassignment:** move an operation to another already-installed, qualified module while keeping the physical cell intact.
+2. **Recipe/tooling/fixture change:** change only within the exact approved parameter and tooling envelope; changed digests or fixtures invalidate the dependent qualification.
+3. **Physical module change:** add, remove, reconnect or relocate a module only when the measured benefit exceeds downtime, interface inspection, layout review and requalification cost.
+4. **Network reroute:** move the operation to another facility or partner only as a distinct site-scoped route with its own capability, workforce, lot, utility, transport and inspection evidence.
+
+This separates *reconfigurability* from merely *owning modular equipment*. The control problem is to choose the least disruptive qualified transition, not maximize the number of physical moves.
+
+### Why this matters for apparel
+
+A September 2026 apparel study uses CAD-derived seam-level workload, machine-specific sewing speed and a genetic algorithm to allocate machines in a fixed modular garment-assembly structure. It then evaluates demand increases and additional-order insertion with deterministic event simulation. Its reported result is that allocation re-optimization can shorten production time without physically reconfiguring the line; it does not provide a transferable universal effect size.
+
+A May 2026 systematic review examined 247 reconfigurable-manufacturing papers from 1990–2025. It reports a theory/practice gap, heavy-industry concentration, and under-study of diagnosability despite its operational importance.
+
+A June 2026 study used data from 112 Portuguese manufacturers to derive a five-factor reconfigurability index: modularity, integrability, customization, adaptability and diagnosability. In that sample, adaptability and diagnosability were the strongest contributors/associations, supporting the need to measure the *ability to detect and understand change*, not just physical modularity. The study is sector- and geography-bounded and its index should not be copied as a universal standard.
+
+### ReconfigBench
+
+[ATELIER-RECONFIG-001 #12390](https://github.com/Luminous-Dynamics/symthaea/issues/12390) and [draft PR #12390](https://github.com/Luminous-Dynamics/symthaea/pull/12390) introduce a typed module and transition evaluator in the dependency-free operations-research crate.
+
+The evaluator checks:
+- exact facility-scoped module identities and qualification validity;
+- process capability, process revision, parameter digest and inspection plan;
+- interface type, protocol, medium, unit, direction and capacity;
+- connection limits and required-peer ports;
+- coordinate frame, orthogonal placement rotation, declared footprint collision, cell bounds and keepouts;
+- operation assignments and their exact capability bindings.
+
+It distinguishes NoChange, AllocationOnly and PhysicalReconfiguration. Physical change plans are only FeasibleForQualification at best and require independent requalification; the evaluator never authorizes production or machine actuation.
+
+The synthetic regression corpus is `research/atelier/factorybench/reconfigbench-cases.v0.1.0.json`. It distinguishes soft reallocation from physical moves and covers stale evidence, wrong-site modules, port incompatibility, geometry conflicts and missing owner records.
+
+### Research and benchmark admission
+
+Do not optimize reconfiguration frequency. More frequent changes may increase downtime, errors, quality loss, training burden and qualification workload. Compare static assignment, simple FIFO/EDD/earliest-finish heuristics, matched pattern-driven GA baselines, exact small-instance assignment oracles, and Atelier's soft-first transition evaluator.
+
+Primary metrics:
+- share of demand changes solved without physical movement;
+- time to first independently accepted unit after a change;
+- logical decision latency vs physical changeover/requalification time;
+- requalification obligations and evidence burden;
+- capability coverage, false-eligible rate and diagnostic coverage;
+- first-pass yield, rework, scrap and worker task load after reconfiguration;
+- module reuse, stranded capacity, energy/material overhead where measured.
+
+Proposed research targets (not achieved): at least 80% of eligible mix/order changes handled through soft reassignment in the defined scope; 30% lower median configuration decision latency than a frozen heuristic; and 20% lower measured median time to first conforming unit for a named physical change task, with no first-pass quality, worker or hard-constraint regression.
