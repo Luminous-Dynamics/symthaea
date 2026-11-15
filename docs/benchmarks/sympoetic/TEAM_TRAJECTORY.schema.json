@@ -25,6 +25,7 @@
         "additionalProperties": false,
         "required": [
           "schema_version",
+          "team_id",
           "cycle_index",
           "run_id",
           "scenario_id",
@@ -171,6 +172,10 @@
           "cycle_digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "team_id": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "allOf": [
