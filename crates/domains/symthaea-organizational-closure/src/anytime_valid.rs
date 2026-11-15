@@ -978,7 +978,7 @@ mod tests {
             max_observations,
             evidence_receipts: [("receipt-1".into(), AnytimeValidEvidenceReceipt {
                 receipt_id: "receipt-1".into(),
-                description: "Randomization, execution, isolation, measurement and mean-contract receipt".into(),
+                description: "Verified experiment contract receipt".into(),
             })].into(),
         }
     }
@@ -1083,7 +1083,12 @@ mod tests {
         let mut observations = Vec::new();
         for index in 0..500 {
             observations.push(observation(format!("c-{index}"), "q1", RandomizedArm::Control, 0.1));
-            observations.push(observation(format!("t-{index}"), "q1", RandomizedArm::Treatment, 0.9));
+            observations.push(observation(
+                format!("t-{index}"),
+                "q1",
+                RandomizedArm::Treatment,
+                0.9,
+            ));
         }
         let alpha_arm = 0.025;
         let radius = hoeffding_alpha_spending_radius(1.0, 500, alpha_arm).unwrap();
