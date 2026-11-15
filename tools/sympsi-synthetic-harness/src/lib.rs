@@ -231,6 +231,7 @@ pub fn run_profile(
         &manifest_sha256,
         profile_name,
         critical_hits,
+        &null_distribution,
         &manifest,
     );
     let all_controls_passed = controls.iter().all(|control| control.passed)
@@ -355,6 +356,7 @@ fn run_controls(
     manifest_sha256: &str,
     profile_name: &str,
     critical_hits: usize,
+    null_distribution: &BinomialDistribution,
     manifest: &Manifest,
 ) -> Vec<ControlResult> {
     let expected_count = 24;
