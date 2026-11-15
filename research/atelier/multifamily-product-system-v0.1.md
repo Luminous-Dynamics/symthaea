@@ -223,6 +223,23 @@ Start with one-off samples, then pilot batches, then small production. Select ma
 
 Record first-pass yield, defects, rework, setup/changeover, accepted output, machine availability, resource consumption and workforce constraints. Do not optimize throughput by silently relaxing hard quality or worker constraints.
 
+### 10.1 Product-passport readiness
+
+Keep product and lifecycle data ready for future sector requirements without claiming current compliance. The European Commission identifies textiles/apparel as a priority product group under the Ecodesign for Sustainable Products Regulation and currently indicates a planned textile delegated act in Q4 2027; textile-specific data requirements will be defined through that future act and may change.
+
+The Atelier record should therefore preserve:
+- unique style/configuration/product identity;
+- material and component composition evidence with source type and uncertainty;
+- exact material/production lot identity;
+- care instructions and the evidence basis for them;
+- repair instructions, replacement parts and verified repair events;
+- inspection and service-life evidence;
+- authorized disclosure, ownership and privacy boundaries.
+
+Separate supplier declarations, measurements, predictions and independent test results. Do not expose private body measurements or wearer preferences in a public product passport. Do not describe the current record as an EU Digital Product Passport or legal compliance implementation.
+
+Reference: https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/textile-apparel_en
+
 ### Stage 10 — care, repair and lifecycle
 
 For each style, publish care based on tested fabric/garment behaviour. Record repair instructions, replaceable components, common failure zones, reinspection and requalification. End-of-life claims require a verified receiver and material route, not merely a fibre label.
