@@ -1,0 +1,385 @@
+{
+  "schema_version": "atelier.style-family-catalog/0.1",
+  "status": "planning_only_not_production_qualified",
+  "shared_design_language": [
+    "architectural_minimalism",
+    "natural_tactility",
+    "subtle_technical_construction"
+  ],
+  "families": [
+    {
+      "id": "AT-E01",
+      "name": "Woven everyday tops",
+      "examples": [
+        "shirt",
+        "overshirt",
+        "tunic"
+      ],
+      "construction_routes": [
+        "woven_cut_and_sew"
+      ],
+      "functional_profiles": [
+        "everyday_indoor_outdoor",
+        "travel"
+      ],
+      "key_engineering": [
+        "collar_neckline",
+        "shoulder_sleeve_pitch",
+        "placket",
+        "pockets",
+        "seated_and_reach_comfort"
+      ],
+      "initial_reference": "AO-01"
+    },
+    {
+      "id": "AT-E02",
+      "name": "Everyday bottoms",
+      "examples": [
+        "trousers",
+        "shorts",
+        "skirts"
+      ],
+      "construction_routes": [
+        "woven_cut_and_sew",
+        "stretch_woven_cut_and_sew"
+      ],
+      "functional_profiles": [
+        "everyday",
+        "movement",
+        "task_non_ppe"
+      ],
+      "key_engineering": [
+        "rise_crotch_seat",
+        "waistband",
+        "pockets",
+        "knee_and_sitting_mobility",
+        "closure"
+      ]
+    },
+    {
+      "id": "AT-E03",
+      "name": "Dresses and one-piece garments",
+      "examples": [
+        "shirt_dress",
+        "relaxed_dress",
+        "jumpsuit"
+      ],
+      "construction_routes": [
+        "woven_cut_and_sew",
+        "knit_cut_and_sew",
+        "modular_lining"
+      ],
+      "functional_profiles": [
+        "everyday",
+        "occasion",
+        "travel"
+      ],
+      "key_engineering": [
+        "drape_balance",
+        "coverage",
+        "closure",
+        "don_doff",
+        "mobility"
+      ]
+    },
+    {
+      "id": "AT-K01",
+      "name": "Knitted foundations",
+      "examples": [
+        "tee",
+        "base_layer",
+        "tank"
+      ],
+      "construction_routes": [
+        "circular_knit",
+        "flat_knit_panels",
+        "knit_cut_and_sew"
+      ],
+      "functional_profiles": [
+        "everyday",
+        "movement",
+        "rest"
+      ],
+      "key_engineering": [
+        "gauge",
+        "stretch_recovery",
+        "seam_extension",
+        "skin_feel",
+        "wash_stability"
+      ]
+    },
+    {
+      "id": "AT-K02",
+      "name": "Advanced knitwear",
+      "examples": [
+        "cardigan",
+        "sweater",
+        "seamless_top"
+      ],
+      "construction_routes": [
+        "fully_fashioned_flat_knit",
+        "whole_garment_knit",
+        "knit_and_wear"
+      ],
+      "functional_profiles": [
+        "everyday",
+        "rest",
+        "occasion"
+      ],
+      "key_engineering": [
+        "stitch_architecture",
+        "shaping",
+        "yarn_feed",
+        "machine_capability",
+        "finishing"
+      ]
+    },
+    {
+      "id": "AT-C01",
+      "name": "Wraps and travel layers",
+      "examples": [
+        "travel_wrap",
+        "robe_coat",
+        "convertible_layer"
+      ],
+      "construction_routes": [
+        "woven_cut_and_sew",
+        "modular_layered_assembly"
+      ],
+      "functional_profiles": [
+        "travel",
+        "rest",
+        "climate_transition"
+      ],
+      "key_engineering": [
+        "coverage_envelope",
+        "closure_retention",
+        "seated_pocket_access",
+        "packed_volume",
+        "panel_attachment"
+      ],
+      "initial_reference": "CR-01"
+    },
+    {
+      "id": "AT-O01",
+      "name": "Outer layers",
+      "examples": [
+        "light_coat",
+        "overshirt_jacket",
+        "non_ppe_shell"
+      ],
+      "construction_routes": [
+        "woven_cut_and_sew",
+        "lined_quilted",
+        "laminated_where_qualified"
+      ],
+      "functional_profiles": [
+        "climate_adaptation",
+        "travel",
+        "everyday"
+      ],
+      "key_engineering": [
+        "layering",
+        "seam_construction",
+        "closure",
+        "care",
+        "weather_claim_gate"
+      ]
+    },
+    {
+      "id": "AT-M01",
+      "name": "Movement apparel",
+      "examples": [
+        "stretch_top",
+        "active_trouser",
+        "mobility_layer"
+      ],
+      "construction_routes": [
+        "stretch_knit",
+        "stretch_woven",
+        "flatlock_coverstitch_or_bonded_where_qualified"
+      ],
+      "functional_profiles": [
+        "movement",
+        "everyday"
+      ],
+      "key_engineering": [
+        "dynamic_stretch",
+        "recovery",
+        "seam_extension",
+        "moisture",
+        "mobility"
+      ]
+    },
+    {
+      "id": "AT-A01",
+      "name": "Adaptive apparel",
+      "examples": [
+        "one_hand_closure_top",
+        "seated_fit_trouser",
+        "sensory_calm_garment"
+      ],
+      "construction_routes": [
+        "woven_cut_and_sew",
+        "knit_cut_and_sew",
+        "hybrid_modular"
+      ],
+      "functional_profiles": [
+        "adaptive_dressing",
+        "accessibility",
+        "sensory_preference"
+      ],
+      "key_engineering": [
+        "independent_don_doff",
+        "reach",
+        "pressure",
+        "closure_access",
+        "user_authored_fit"
+      ]
+    },
+    {
+      "id": "AT-W01",
+      "name": "Task/work garments",
+      "examples": [
+        "studio_jacket",
+        "maker_apron",
+        "utility_trouser"
+      ],
+      "construction_routes": [
+        "reinforced_woven_cut_and_sew"
+      ],
+      "functional_profiles": [
+        "task_non_ppe",
+        "repair_first"
+      ],
+      "key_engineering": [
+        "pocket_load",
+        "abrasion",
+        "stress_zones",
+        "repair_access"
+      ],
+      "claim_exclusions": [
+        "ppe",
+        "protective_safety_claims"
+      ]
+    },
+    {
+      "id": "AT-R01",
+      "name": "Rest and sleepwear",
+      "examples": [
+        "lounge_set",
+        "robe",
+        "sleep_top"
+      ],
+      "construction_routes": [
+        "soft_woven_cut_and_sew",
+        "soft_knit",
+        "low_bulk_seam_assembly"
+      ],
+      "functional_profiles": [
+        "rest",
+        "lounge"
+      ],
+      "key_engineering": [
+        "tactile",
+        "thermal",
+        "moisture",
+        "low_pressure_seams",
+        "care"
+      ]
+    },
+    {
+      "id": "AT-X01",
+      "name": "Occasion, ceremonial and expressive",
+      "examples": [
+        "formal_garment",
+        "performance_costume",
+        "heritage_inspired_piece"
+      ],
+      "construction_routes": [
+        "bespoke_woven_knit",
+        "hand_industrial_hybrid",
+        "decorative_assembly"
+      ],
+      "functional_profiles": [
+        "occasion",
+        "ceremonial",
+        "performance",
+        "conservation"
+      ],
+      "key_engineering": [
+        "aesthetic_authorship",
+        "rights_provenance",
+        "embellishment_care",
+        "repair_conservation"
+      ],
+      "rules": [
+        "low_frequency_is_not_a_value_penalty",
+        "cultural_references_require_provenance_and_respectful_context"
+      ]
+    },
+    {
+      "id": "AT-U01",
+      "name": "Accessories and soft goods",
+      "examples": [
+        "scarf",
+        "belt",
+        "pouch",
+        "travel_textile"
+      ],
+      "construction_routes": [
+        "woven_knit_cut_and_sew",
+        "modular_assembly"
+      ],
+      "functional_profiles": [
+        "travel",
+        "everyday",
+        "occasion"
+      ],
+      "key_engineering": [
+        "contact_feel",
+        "attachment",
+        "load",
+        "repair",
+        "packability"
+      ]
+    }
+  ],
+  "process_stages": [
+    "intent_and_requirements",
+    "concept_and_style",
+    "garment_configuration",
+    "material_architecture",
+    "pattern_and_geometry",
+    "virtual_screening",
+    "physical_toile",
+    "construction_operation_graph",
+    "route_and_machine_qualification",
+    "sample_and_inspection",
+    "production_and_quality",
+    "care_repair_lifecycle"
+  ],
+  "route_selection_dimensions": [
+    "geometry",
+    "material_structure",
+    "fit_and_movement",
+    "seam_or_join_requirements",
+    "machine_capability",
+    "operator_skill",
+    "lot_size",
+    "setup_changeover",
+    "material_yield",
+    "repairability",
+    "care",
+    "verified_recovery_route"
+  ],
+  "claim_boundaries": [
+    "render_not_pattern",
+    "pattern_not_fit_approval",
+    "simulation_not_physical_fit",
+    "machine_preflight_not_machine_execution",
+    "supplier_declaration_not_independent_composition_test",
+    "sensor_data_not_output_quality",
+    "non_ppe_until_separately_qualified"
+  ]
+}
