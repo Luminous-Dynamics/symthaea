@@ -1,0 +1,170 @@
+{
+  "schema_version": "mel-musical-context-baselines-v1",
+  "baselines": [
+    {
+      "baseline_id": "LOCAL-CUE-ONLY-001",
+      "description": "Negative control: maps each local cue signature to one action, ignoring explicit collaborator intent and preceding harmonic context.",
+      "predictions_by_family": [
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
+          "CONTINUE",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ]
+      ],
+      "expected": {
+        "member_valid_action_support_rate": 0.6666666666666666,
+        "context_sensitivity_rate": 0,
+        "surface_invariance_rate": 1,
+        "ambiguous_valid_action_rate": 1
+      }
+    },
+    {
+      "baseline_id": "INSTRUMENT-SURFACE-ONLY-001",
+      "description": "Negative control: chooses actions from surface instrument identity alone, ignoring intent, harmonic history and phrase context.",
+      "predictions_by_family": [
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "WAIT",
+          "RESPOND"
+        ],
+        [
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "RESPOND"
+        ]
+      ],
+      "expected": {
+        "member_valid_action_support_rate": 0.5238095238095238,
+        "context_sensitivity_rate": 0,
+        "surface_invariance_rate": 0,
+        "ambiguous_valid_action_rate": 1
+      }
+    },
+    {
+      "baseline_id": "EXPLICIT-CONTEXT-RULE-SANITY-001",
+      "description": "Hand-written symbolic rule sanity check: uses explicit invitations and preceding harmonic context, preserves actions across instrument-only changes, and chooses one action within an explicitly valid ambiguous set. This is not a learned model or SOTA result.",
+      "predictions_by_family": [
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "RESPOND"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ],
+        [
+          "WAIT"
+        ],
+        [
+          "RESPOND",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "CONTINUE"
+        ],
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "CONTINUE",
+          "RESPOND"
+        ],
+        [
+          "RESPOND",
+          "WAIT"
+        ],
+        [
+          "WAIT",
+          "WAIT"
+        ]
+      ],
+      "expected": {
+        "member_valid_action_support_rate": 1,
+        "context_sensitivity_rate": 1,
+        "surface_invariance_rate": 1,
+        "ambiguous_valid_action_rate": 1
+      }
+    }
+  ]
+}

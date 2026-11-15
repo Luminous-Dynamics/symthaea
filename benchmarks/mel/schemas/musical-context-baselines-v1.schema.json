@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/musical-context-baselines-v1.schema.json",
+  "title": "Melothaea musical context baseline predictions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baselines"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-musical-context-baselines-v1"
+    },
+    "baselines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "baseline_id",
+          "description",
+          "predictions_by_family",
+          "expected"
+        ],
+        "properties": {
+          "baseline_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "predictions_by_family": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "enum": [
+                  "WAIT",
+                  "RESPOND",
+                  "CONTINUE",
+                  "YIELD"
+                ]
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "member_valid_action_support_rate",
+              "context_sensitivity_rate",
+              "surface_invariance_rate",
+              "ambiguous_valid_action_rate"
+            ],
+            "properties": {
+              "member_valid_action_support_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "context_sensitivity_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "surface_invariance_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "ambiguous_valid_action_rate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
