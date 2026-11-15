@@ -539,6 +539,35 @@ mod tests {
     }
 
     #[test]
+    fn hydrostatics_are_translation_invariant_in_the_waterplane() {
+        let mut artifact = prismatic_loft();
+        for point in &mut artifact.candidate.geometry.vertices {
+            point[0] += 1_000_000_000.0;
+            point[1] -= 200_000_000.0;
+        }
+        artifact.candidate.geometry_digest_blake3 =
+            crate::compute_geometry_digest(&artifact.candidate.geometry).unwrap();
+        artifact.mesh_digest_blake3 = artifact.candidate.geometry_digest_blake3.clone();
+        artifact.admission_report = admit(&artifact.candidate);
+        artifact.loft_manifest_digest_blake3 =
+            crate::loft::compute_loft_manifest_digest(&artifact).unwrap();
+
+        let result = calculate_hydrostatic_properties(&artifact, 1_025.0).unwrap();
+        assert!((result.displacement_volume_m3 - 6_000.0).abs() < 1.0e-8);
+        assert!((result.waterplane_area_m2 - 2_000.0).abs() < 1.0e-8);
+        assert!((result.centre_of_buoyancy_m[0] - 1_000_000_050.0).abs() < 1.0e-6);
+        assert!((result.centre_of_buoyancy_m[1] + 200_000_000.0).abs() < 1.0e-6);
+        assert!(
+            (result.transverse_waterplane_second_moment_m4 - 66_666.666_666_666_67).abs()
+                < 1.0e-5
+        );
+        assert!(
+            (result.longitudinal_waterplane_second_moment_m4 - 1_666_666.666_666_666_7).abs()
+                < 1.0e-4
+        );
+    }
+
+    #[test]
     fn non_positive_density_is_rejected() {
         let error = calculate_hydrostatic_properties(&prismatic_loft(), 0.0).unwrap_err();
         assert!(error.iter().any(|item| item.code == "water_density"));
