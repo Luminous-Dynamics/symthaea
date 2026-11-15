@@ -320,11 +320,16 @@ fn validate_request_v1(request: &AudioBoundaryRequestV1) -> Result<(), AudioBoun
     for boundary in &request.boundaries {
         let left = u64::from(boundary.left_window_frames);
         let right = u64::from(boundary.right_window_frames);
+        let is_edit_edge = request.edit_windows.iter().any(|window| {
+            boundary.boundary_frame == window.start_frame
+                || boundary.boundary_frame == window.end_frame
+        });
         if boundary.boundary_id.trim().is_empty()
             || left < 2
             || right < 2
             || boundary.boundary_frame < left
             || boundary.boundary_frame.checked_add(right).is_none_or(|end| end > request.frame_count)
+            || !is_edit_edge
         {
             return Err(AudioBoundaryErrorV1::InvalidRegion);
         }
@@ -364,7 +369,7 @@ fn integer_sqrt(value: u128) -> u128 {
         return value;
     }
     let mut x = value;
-    let mut y = (x + 1) / 2;
+    let mut y = x.div_ceil(2);
     while y < x {
         x = y;
         y = (x + value / x) / 2;
@@ -767,6 +772,18 @@ mod tests {
         assert_eq!(
             evaluate_audio_edit_boundary_v1(&invalid, &source, &source),
             Err(AudioBoundaryErrorV1::ProtectedRegionOverlapsEditSupport)
+        );
+    }
+
+    #[test]
+    fn boundary_policy_must_name_an_edit_window_edge() {
+        let source = base_mono();
+        let request = request_for(&source, &source);
+        let mut invalid = request.clone();
+        invalid.boundaries[0].boundary_frame = 5;
+        assert_eq!(
+            evaluate_audio_edit_boundary_v1(&invalid, &source, &source),
+            Err(AudioBoundaryErrorV1::InvalidRegion)
         );
     }
 
