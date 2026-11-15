@@ -720,8 +720,9 @@ mod tests {
 
     #[test]
     fn session_length_is_limited_to_preregistered_ladder() {
+        let initial = vec![event("event-a", 60_000)];
         assert_eq!(
-            evaluate_sequence_v1(&request(3, &initial), &[event("event-a", 60_000)], &[]),
+            evaluate_sequence_v1(&request(3, &initial), &initial, &[]),
             Err(SequenceErrorV1::InvalidRequest)
         );
     }
