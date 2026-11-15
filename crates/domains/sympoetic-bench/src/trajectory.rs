@@ -200,7 +200,10 @@ pub fn validate_trajectory(
                     change.change_id
                 );
             }
-            if !change_targets.insert((change.change_type.as_str(), change.subject_principal_id.as_str())) {
+            if !change_targets.insert((
+                change.change_type.as_str(),
+                change.subject_principal_id.as_str(),
+            )) {
                 bail!(
                     "cycle {} contains duplicate {:?} events for subject {:?}",
                     cycle.cycle_index,
@@ -255,7 +258,9 @@ pub fn validate_trajectory(
                     bail!("first team cycle must not reference a prior cycle digest");
                 }
                 if !cycle.changes.is_empty() {
-                    bail!("first team cycle establishes the initial roster; it must not claim prior-cycle changes");
+                    bail!(
+                        "first team cycle establishes the roster; it cannot claim prior-cycle changes"
+                    );
                 }
             }
             Some(previous) => {
@@ -264,7 +269,10 @@ pub fn validate_trajectory(
                     .as_deref()
                     .context("subsequent team cycle requires prior_cycle_digest")?;
                 if prior != previous.cycle_digest {
-                    bail!("cycle {} does not reference the preceding cycle receipt", cycle.cycle_index);
+                    bail!(
+                        "cycle {} does not reference the preceding receipt",
+                        cycle.cycle_index
+                    );
                 }
                 if cycle.team_state_before_digest != previous.team_state_after_digest {
                     bail!("cycle {} breaks the team-state continuity chain", cycle.cycle_index);
@@ -276,7 +284,10 @@ pub fn validate_trajectory(
         let expected_digest = compute_cycle_digest(cycle)?;
         require_sha256("cycle_digest", &cycle.cycle_digest)?;
         if expected_digest != cycle.cycle_digest {
-            bail!("cycle {} cycle_digest does not match canonical cycle content", cycle.cycle_index);
+            bail!(
+                "cycle {} digest does not match canonical content",
+                cycle.cycle_index
+            );
         }
 
         previous_members = cycle.members.clone();
@@ -323,7 +334,9 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
                         before.principal_id
                     );
                 }
-                if before.role != after.role && !required_change("role_changed", &before.principal_id) {
+                if before.role != after.role
+                    && !required_change("role_changed", &before.principal_id)
+                {
                     bail!(
                         "cycle {} changed role for {:?} without role_changed event",
                         current.cycle_index,
@@ -343,7 +356,7 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
                     && !required_change("memory_consent_changed", &before.principal_id)
                 {
                     bail!(
-                        "cycle {} changed memory consent for {:?} without memory_consent_changed event",
+                        "cycle {} changed memory consent for {:?} without its event",
                         current.cycle_index,
                         before.principal_id
                     );
@@ -352,7 +365,7 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
                     && !required_change("model_snapshot_changed", &before.principal_id)
                 {
                     bail!(
-                        "cycle {} changed model snapshot for {:?} without model_snapshot_changed event",
+                        "cycle {} changed model snapshot for {:?} without its event",
                         current.cycle_index,
                         before.principal_id
                     );
@@ -382,7 +395,10 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
             .iter()
             .any(|change| change.change_type == "memory_policy_changed")
     {
-        bail!("cycle {} changed memory policy without memory_policy_changed event", current.cycle_index);
+        bail!(
+            "cycle {} changed memory policy without its event",
+            current.cycle_index
+        );
     }
 
     for change in &current.changes {
@@ -412,7 +428,7 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
         };
         if !matches_transition {
             bail!(
-                "cycle {} change {:?} does not correspond to an observed team configuration transition",
+                "cycle {} change {:?} does not match an observed transition",
                 current.cycle_index,
                 change.change_id
             );
