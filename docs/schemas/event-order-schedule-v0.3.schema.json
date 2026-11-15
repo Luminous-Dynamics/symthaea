@@ -40,7 +40,7 @@
           "properties": {
             "kind": { "const": "clock_advance" }, "clock_domain": { "$ref": "#/$defs/id" },
             "basis_id": { "$ref": "#/$defs/id" }, "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
-            "unit": { "$ref": "#/$defs/id" }, "local_tick_ns": { "$ref": "#/$defs/u64" },
+            "unit": { "const": "nanoseconds" }, "local_tick_ns": { "$ref": "#/$defs/u64" },
             "offset_ns": { "type": "integer" }, "uncertainty_ns": { "$ref": "#/$defs/u64" },
             "calibration_id": { "$ref": "#/$defs/id" }, "mapping_valid_through_ns": { "$ref": "#/$defs/u64" },
             "mapping_receipt_ref": { "$ref": "#/$defs/id" }, "mapping_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -54,7 +54,7 @@
             "kind": { "const": "event_produced" }, "event_id": { "$ref": "#/$defs/id" },
             "clock_domain": { "$ref": "#/$defs/id" }, "basis_id": { "$ref": "#/$defs/id" },
             "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
-            "unit": { "$ref": "#/$defs/id" }, "source_timestamp_ns": { "$ref": "#/$defs/u64" },
+            "unit": { "const": "nanoseconds" }, "source_timestamp_ns": { "$ref": "#/$defs/u64" },
             "causal_predecessors": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
           }
         },
