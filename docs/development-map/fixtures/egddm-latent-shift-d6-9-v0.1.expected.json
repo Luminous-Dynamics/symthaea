@@ -6,6 +6,7 @@
       "detected": true,
       "false_alarm": false,
       "detection_before_stale_use": true,
+      "premature_detection_decision_ids": [],
       "event_detection_delay_seconds": 190,
       "candidate_detection_delay_seconds": 125,
       "affected_obligations": [
@@ -22,6 +23,7 @@
       "unnecessary_invalidations": [],
       "unauthorized_probe_ids": [],
       "probe_cost_units": 2,
+      "source_correlation_overclaim_decision_ids": [],
       "correlated_signal_groups_discounted": true
     },
     {
@@ -30,6 +32,7 @@
       "detected": false,
       "false_alarm": false,
       "detection_before_stale_use": true,
+      "premature_detection_decision_ids": [],
       "event_detection_delay_seconds": null,
       "candidate_detection_delay_seconds": null,
       "affected_obligations": [],
@@ -40,8 +43,9 @@
       "unnecessary_invalidations": [],
       "unauthorized_probe_ids": [],
       "probe_cost_units": 2,
+      "source_correlation_overclaim_decision_ids": [],
       "correlated_signal_groups_discounted": true
     }
   ],
-  "claim_ceiling": "Synthetic known-answer report only. It does not establish a general shift detector, independent gold truth, production monitoring reliability, or agent performance."
+  "claim_ceiling": "Deterministic scoring of supplied candidate-visible observations and evaluator-side latent-shift labels. Does not authenticate observation producers, independently adjudicate hidden truth, implement a detector or probe planner, or establish production monitoring reliability."
 }
