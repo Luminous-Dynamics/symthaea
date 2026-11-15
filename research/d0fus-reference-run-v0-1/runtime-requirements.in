@@ -1,0 +1,8 @@
+# D0FUS v3.2.0 runtime dependencies, matching its pyproject.toml floors.
+# The CI receipt records exact resolved versions for this reference execution.
+numpy>=2.0
+matplotlib>=3.8.4
+scipy>=1.13
+tqdm>=4.60.0
+deap>=1.3.3
+joblib>=1.3
