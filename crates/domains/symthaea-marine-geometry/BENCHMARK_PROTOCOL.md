@@ -75,6 +75,21 @@ If published implementations or weights/data are unavailable or not licensed for
 5. Record all failed runs, retries, mesh-generation failures, failed candidates, rejected geometries, manual intervention and reviewer time in total cost.
 6. Keep a frozen benchmark manifest and evaluation script. Any change creates a new benchmark version; do not silently change the test set after seeing outcomes.
 
+## 4A. CAD translation benchmark and evidence preservation (G3)
+
+Add an interoperability track separate from forward hull generation and hydrodynamics:
+
+- AP242:2025 Edition 4 released baseline; AP214 negative control; AP242 Edition 5 committee draft as a separately tagged forward-compatibility experiment.
+- Exact B-rep and tessellated representations reported separately.
+- At least one Open CASCADE XDE/STEPCAF path and one independently implemented geometry kernel for import-back.
+- Same-kernel round-trip is a diagnostic control only, not independent validation.
+- Validate geometry (lengths, bounding boxes, surface distances, gaps, area, volume, centroid, inertia, topology, solid/shell count) and semantics (units, frame, persistent IDs, PMI/GD&T, product identity, configuration/revision, materials, assemblies, validation properties).
+- Record exporter/importer family, version, build and configuration digests; STEP schema edition; source and STEP artifact digests; exact tolerance profile; measured metrics and check statuses.
+- Require explicit measured values for all required numeric checks. A declared PASS with a missing metric or an out-of-profile value is a false accept.
+- Keep B-rep continuity, tessellation error, topology repair and semantic metadata loss as distinct result dimensions.
+
+Benchmark the cost of achieving independently verified CAD exchange, including re-export/repair and expert correction time. Do not report CAD parse success as geometry equivalence, and do not report geometry equivalence as DFM or structural validation.
+
 ## 5. Metric groups
 
 ### G: geometry fidelity and useful design-space coverage
