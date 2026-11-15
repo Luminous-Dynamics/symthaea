@@ -71,6 +71,19 @@ const TRACE_EVENT_TYPES: &[&str] = &[
     "artifact_revised",
     "evaluator_annotation",
     "session_end",
+    "intervention_decision",
+];
+
+const INTERVENTION_ACTIONS: &[&str] = &[
+    "ask",
+    "suggest",
+    "challenge",
+    "delegate",
+    "synthesize",
+    "preserve_divergence",
+    "defer",
+    "proceed",
+    "step_back",
 ];
 const CONDITIONS: &[&str] = &[
     "human_only",
@@ -377,6 +390,22 @@ pub fn validate_trace(
         seen.insert(event.event_id.as_str());
 
         match event.event_type.as_str() {
+            "intervention_decision" => {
+                if event.actor != "agent" {
+                    bail!("intervention_decision events must identify the evaluated agent as actor");
+                }
+                let action = event
+                    .intervention_action
+                    .as_deref()
+                    .context("intervention_decision requires intervention_action")?;
+                require_member("intervention_action", action, INTERVENTION_ACTIONS)?;
+                if event.tool_execution.is_some()
+                    || event.reconciled_status.is_some()
+                    || event.reconciliation_state_digest.is_some()
+                {
+                    bail!("intervention_decision must not contain tool or reconciliation fields");
+                }
+            }
             "tool_invocation" => {
                 if let Some(unknown_event) = awaiting_reconciliation.as_deref() {
                     bail!(
@@ -421,8 +450,9 @@ pub fn validate_trace(
                 }
                 if event.reconciled_status.is_some()
                     || event.reconciliation_state_digest.is_some()
+                    || event.intervention_action.is_some()
                 {
-                    bail!("tool_result must not contain reconciliation-only fields");
+                    bail!("tool_result must not contain reconciliation or intervention-only fields");
                 }
                 if execution.status == "unknown" {
                     if awaiting_reconciliation.is_some() {
@@ -473,8 +503,13 @@ pub fn validate_trace(
                 if event.tool_execution.is_some() {
                     bail!("only tool_result may contain tool_execution");
                 }
-                if event.reconciled_status.is_some() || event.reconciliation_state_digest.is_some() {
+                if event.reconciled_status.is_some()
+                    || event.reconciliation_state_digest.is_some()
+                {
                     bail!("reconciliation fields are only valid on execution_reconciled");
+                }
+                if event.intervention_action.is_some() {
+                    bail!("intervention_action is only valid on intervention_decision");
                 }
             }
         }
