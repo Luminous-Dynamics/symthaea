@@ -301,6 +301,29 @@ fn validate_predicate(
     Ok(())
 }
 
+fn is_valid_json_pointer(pointer: &str) -> bool {
+    if pointer.is_empty() {
+        return true;
+    }
+    if !pointer.starts_with('/') {
+        return false;
+    }
+
+    let bytes = pointer.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'~' {
+            if index + 1 >= bytes.len() || !matches!(bytes[index + 1], b'0' | b'1') {
+                return false;
+            }
+            index += 2;
+        } else {
+            index += 1;
+        }
+    }
+    true
+}
+
 fn validate_semantics(value: &Value) -> Result<usize, String> {
     let fields = value
         .get("fields")
@@ -317,8 +340,8 @@ fn validate_semantics(value: &Value) -> Result<usize, String> {
             return Err(format!("duplicate field_id: {id}"));
         }
         let pointer = str_at(field, "json_pointer", "field")?;
-        if !pointer.is_empty() && !pointer.starts_with('/') {
-            return Err(format!("field {id} has a non-RFC6901 JSON Pointer"));
+        if !is_valid_json_pointer(pointer) {
+            return Err(format!("field {id} has an invalid RFC6901 JSON Pointer escape or prefix"));
         }
         if !pointers.insert(pointer.to_owned()) {
             return Err(format!("duplicate JSON Pointer across field bindings: {pointer}"));
@@ -486,6 +509,15 @@ mod tests {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
         assert_eq!(digest.len(), 64);
+    }
+
+    #[test]
+    fn invalid_json_pointer_escape_rejects() {
+        let mut value: Value = serde_json::from_str(POSITIVE).expect("fixture JSON");
+        value["fields"][0]["json_pointer"] = Value::String("/currency~2code".to_owned());
+        let raw = serde_json::to_string(&value).expect("serialize mutation");
+        let error = validate_plan(&raw).expect_err("invalid pointer escape must reject");
+        assert!(error.contains("invalid RFC6901 JSON Pointer"));
     }
 
     #[test]
