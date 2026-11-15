@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-tlsn-risc0-probe-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Bounded input and journal contracts for TLSNotary RISC Zero verifier feasibility probe"
+
+[dependencies]
+serde = { version = "=1.0.228", default-features = false, features = ["derive", "alloc"] }
+
+[lints.rust]
+unsafe_code = "forbid"
