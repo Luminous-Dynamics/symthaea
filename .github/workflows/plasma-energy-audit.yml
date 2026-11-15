@@ -86,9 +86,16 @@ jobs:
           }
           EOF
       - name: Resolve isolated harness lockfile offline
-        run: cargo generate-lockfile --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --offline
+        run: cargo generate-lockfile --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml"
+      - name: Export resolved isolated harness lockfile
+        shell: bash
+        run: |
+          echo "PLASMA_AUDIT_LOCK_BEGIN"
+          base64 -w0 "$RUNNER_TEMP/plasma-energy-audit/Cargo.lock"
+          echo
+          echo "PLASMA_AUDIT_LOCK_END"
       - name: Unit tests for the exact xtask audit module
-        run: cargo test --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked --offline
+        run: cargo test --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked
       - name: Strict Clippy for the exact xtask audit module
         run: cargo clippy --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --all-targets --locked --offline -- -D warnings
       - name: Audit frozen plasma and thermal source corpora
