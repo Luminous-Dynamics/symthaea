@@ -232,10 +232,10 @@
     },
     {
       "id": "MUT-EVT-021",
-      "base_case": "EO-NEG-002",
+      "base_case": "EO-POS-002",
       "mutation_family": "retry_safety",
       "mutation": "retry_before_reconciliation",
-      "transform": "Retry the same operation while its prior outcome remains unknown.",
+      "transform": "Remove the exact NOT_APPLIED terminal reconciliation from a safe trace and replace it with a retry while the original operation outcome remains unknown; keep the valid stop discharge so the retry defect is isolated.",
       "expected_behavior": {
         "disposition": "critical_failure",
         "reason_code": "RETRY_BEFORE_RECONCILIATION"

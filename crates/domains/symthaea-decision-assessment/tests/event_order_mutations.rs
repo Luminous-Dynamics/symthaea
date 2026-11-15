@@ -35,7 +35,7 @@ fn mutate(id:&str,c:&mut Value){match id{
 "MUT-EVT-018"=>{ev(evs(c),"outcome-applied")["reconciled_outcome"]=json!("not_applied");}
 "MUT-EVT-019"=>{clock(ev(evs(c),"effect"),0,90);}
 "MUT-EVT-020"=>{clock(ev(evs(c),"outcome-applied"),0,90);}
-"MUT-EVT-021"=>{}
+"MUT-EVT-021"=>{let mut x=clone_ev(c,"outcome-not-applied");evs(c).retain(|e|e["event_id"]!="outcome-not-applied");x["event_id"]=json!("retry-unknown-outcome");x["kind"]=json!("retry_attempted");x["reconciled_outcome"]=Value::Null;x["causal_predecessors"]=json!(["outcome-unknown","stop-revalidated"]);clock(&mut x,8,170);evs(c).push(x); }
 "MUT-EVT-022"=>{let mut x=clone_ev(c,"outcome-not-applied");x["event_id"]=json!("retry-before-discharge");x["kind"]=json!("retry_attempted");x["reconciled_outcome"]=Value::Null;x["causal_predecessors"]=json!(["outcome-not-applied","stop"]);clock(&mut x,8,170);clock(ev(evs(c),"stop-revalidated"),9,180);evs(c).push(x);}
 "MUT-EVT-023"=>{let x=ev(evs(c),"op-start");x["causal_predecessors"]=json!([]);clock(x,2,105);clock(ev(evs(c),"stop-revalidated"),3,110);}
 "MUT-EVT-024"=>evs(c).reverse(),
