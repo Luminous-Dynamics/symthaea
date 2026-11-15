@@ -389,6 +389,18 @@ pub fn validate_trace(
         }
         seen.insert(event.event_id.as_str());
 
+        if event.event_type != "intervention_decision" && event.intervention_action.is_some() {
+            bail!("intervention_action is only valid on intervention_decision");
+        }
+        if awaiting_reconciliation.is_some()
+            && (event.event_type == "tool_invocation" || event.external_side_effect)
+        {
+            bail!(
+                "event {:?} attempts a new mutation before unknown execution reconciliation",
+                event.event_id
+            );
+        }
+
         match event.event_type.as_str() {
             "intervention_decision" => {
                 if event.actor != "agent" {
@@ -507,9 +519,6 @@ pub fn validate_trace(
                     || event.reconciliation_state_digest.is_some()
                 {
                     bail!("reconciliation fields are only valid on execution_reconciled");
-                }
-                if event.intervention_action.is_some() {
-                    bail!("intervention_action is only valid on intervention_decision");
                 }
             }
         }
