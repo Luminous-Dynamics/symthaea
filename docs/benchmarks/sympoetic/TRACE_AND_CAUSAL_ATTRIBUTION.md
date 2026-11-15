@@ -73,6 +73,22 @@ A scorer that passes only on the evaluated system's own traces is not independen
 - Preserve unknown tool outcomes as unknown. Do not infer success from a tool call being issued.
 - Keep content hashes separate from public identifiers where they could enable dictionary attacks on sensitive text.
 
+
+## 6.1 Unknown execution outcomes and reconciliation
+
+A tool result with status `unknown` leaves the execution state unresolved. The runner must not issue a subsequent tool invocation until an independently observed `execution_reconciled` event:
+
+- Names the unknown tool-result event as a causal parent.
+- Is authored by the tool, environment, or evaluator rather than self-attested by the agent.
+- States whether the action succeeded, failed, or was not executed.
+- Includes a SHA-256 digest of the observed reconciled state.
+
+For state-changing results whose outcome is known, record a postcondition digest. A failed call may still have partial effects, so failure status alone is not proof of no mutation. A trace with an unresolved unknown result is structurally incomplete and must not be scored as a completed successful run.
+
+## 6.2 Digest canonicalization
+
+For v0.1, `trace_digest` is SHA-256 over the trace JSON parsed as a `serde_json::Value`, with the top-level `trace_digest` field removed, then serialized by `serde_json` (deterministic map-key ordering). This is the benchmark's explicit canonicalization convention and is not a claim of RFC 8785 conformance. File-level and payload digests are SHA-256 over the exact supplied bytes.
+
 ## 7. Privacy and consent
 
 The default trace stores event metadata and content digests, not raw conversation text. A raw-content reference requires an explicit and scoped permission. Permission revocation must affect future reuse and must accurately report the system boundary: a benchmark harness cannot promise deletion from independent external services it does not control.
