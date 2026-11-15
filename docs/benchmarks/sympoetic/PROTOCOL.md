@@ -111,7 +111,7 @@ The first suite covers:
 - Conceptual and philosophical exploration with legitimate plural outcomes.
 - Longitudinal collaboration with evolving preferences and consent boundaries.
 
-The development corpus in SEED_CORPUS.v0.1.jsonl contains ten task templates. It is not a representative sample of human creativity and is not a locked test set.
+The development corpus in SEED_CORPUS.v0.1.jsonl contains thirteen task templates. It is not a representative sample of human creativity and is not a locked test set.
 
 ## 6. Evaluation protocol
 
