@@ -65,6 +65,16 @@ fn krippendorff_alpha_is_one_for_perfect_agreement() {
 }
 
 #[test]
+fn krippendorff_alpha_preserves_worse_than_chance_agreement() {
+    let ratings = vec![
+        vec![Some("A"), Some("B")],
+        vec![Some("A"), Some("B")],
+    ];
+    let alpha = krippendorff_alpha_nominal(&ratings).unwrap().unwrap();
+    assert!((alpha + 0.5).abs() < 1e-12);
+}
+
+#[test]
 fn krippendorff_alpha_returns_unavailable_without_pairable_units() {
     let ratings = vec![
         vec![Some("A"), None],
