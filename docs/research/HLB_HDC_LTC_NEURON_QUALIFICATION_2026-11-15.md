@@ -114,6 +114,15 @@ Averaging a (t+1), (t+5), and (t+10) forecast generally creates a new vector tha
 
 A related perception issue remains visible in `detect_semantic_patterns()`: it uses substring tests for words such as `if`, `do`, and `act`. The 2026-07-18 zero-vector failure from unmatched phantom primitives was fixed by changing the attention-weight averaging rule, but substring-triggered false positives (for example, `if` inside `life`) still deserve a word-boundary regression battery. Do not interpret the old zero-vector fix as a complete semantic-pattern parser.
 
+**Effective time in the cognitive loop is also a separate controller.** In `phase_dynamics_cfc_planning()`, the base `cfc_config.delta_t` (default 20 ms) is multiplied by up to 13 adaptive factors: resonance, arousal, codebook familiarity/novelty, arousal-trap recovery, FEP surprise and trajectory surprise, coherence velocity, prediction-error/slope horizon, somatic slowdown, substrate, thermal adaptation, neuroevolution, CPG synchrony, and Phi feedback. This is an intentional multi-signal gain schedule, but it is not identical to measuring the physical timestamp difference between two sensor observations.
+
+For genuinely irregular-time inputs, the contract should keep two quantities distinct:
+
+- `elapsed_dt`: measured from the observation/event timestamps and used to preserve physical time;
+- `inference_rate_scale`: an explicitly bounded controller that may alter internal update rate without rewriting the event's timestamp.
+
+The qualification should log the base interval, every factor, their product, the actual interval passed to the temporal backend, and the source timestamp delta. Test factor interactions and extremes, including disabled/absent signals. Otherwise the network may conflate slower/faster internal inference with the amount of real time that passed.
+
 ### 2.6 Critical invariant: the current gate does not preserve zero-time identity
 
 A source-level calculation exposes a mathematical qualification that should be tested before any performance comparison.
