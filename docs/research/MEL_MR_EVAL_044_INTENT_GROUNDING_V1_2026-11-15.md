@@ -38,6 +38,7 @@ The standalone crate is \`tools/mel-music-edit-intent-grounding-harness\`.
 
 A source observation binds:
 - source artifact and lineage digests;
+- an upstream observation-attestation receipt digest included in the source commitment;
 - source duration in integer ticks;
 - canonical event inventory with stable event and part IDs;
 - canonical temporal anchors (section, bar, beat, phrase, event or explicit time);
@@ -64,11 +65,11 @@ Parameters use integer values and explicit units. Stage 1 supports addition coun
 
 A unique selector that matches multiple source occurrences must return NeedsClarification with the exact candidate list and a bounded question. A selector with no supported occurrence, or an out-of-range ordinal, must Abstain. Both dispositions are non-executable: they may not retain selected events, target windows, parameters or execution evidence. A confidence score cannot bypass this rule.
 
-The verifier checks that a Ready plan's selection exactly matches its selector against the frozen occurrence inventory. It recomputes event support, protected complement, target windows, parameter constraints and grounding-evidence bindings. A plan cannot gain execution authority merely by claiming high confidence.
+The verifier checks that a Ready plan's selection exactly matches its selector against the frozen occurrence inventory. The receipt digests are references that bind into the content commitment; this stage validates their identity and shape but does not cryptographically verify the upstream observer or annotator signature. It recomputes event support, protected complement, target windows, parameter constraints and grounding-evidence bindings. A plan cannot gain execution authority merely by claiming high confidence.
 
 ## 5. Deterministic controls
 
-Twenty unit tests are authored. They include:
+Twenty-four unit tests are authored. They include:
 - exact second-occurrence selection;
 - all-occurrence selection and protected-complement computation;
 - ambiguity-to-clarification and rejection of silent promotion to Ready;
@@ -80,7 +81,7 @@ Twenty unit tests are authored. They include:
 - event-support substitution rejection;
 - parameter unit traps and valid gain units;
 - replacement asset identity validation;
-- missing/substituted grounding evidence;
+- missing/substituted grounding evidence and malformed observation/occurrence receipt digests;
 - source-observation commitment tampering;
 - clarification-candidate substitution;
 - non-executable disposition smuggling;
