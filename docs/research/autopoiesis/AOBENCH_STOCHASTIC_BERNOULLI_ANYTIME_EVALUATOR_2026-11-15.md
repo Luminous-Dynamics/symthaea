@@ -20,7 +20,7 @@ The agent-facing scenario contains alpha, minimum effect, sample ceilings, per-s
 - isolation;
 - observation.
 
-The evaluator-only oracle holds the true control and treatment Bernoulli probabilities. It is not serializable and is not embedded in the input scenario or trace. Oracle effect, coverage and claim correctness appear only in the final evaluator report after the episode closes.
+The evaluator-only oracle holds the true control and treatment Bernoulli probabilities. It is not serializable and is not embedded in the input scenario or trace. Oracle effect, final/interim coverage and claim correctness appear only in the evaluator report after the episode closes. The report preserves a per-look coverage flag and an all-looks coverage indicator, rather than treating final-look coverage as evidence of time-uniform coverage.
 
 Evidence statuses are supplied by a harness; this module does not authenticate their producer. A production evaluator must bind them to independent assignment and measurement receipts.
 
