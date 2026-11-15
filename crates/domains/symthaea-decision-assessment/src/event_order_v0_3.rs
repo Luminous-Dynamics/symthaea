@@ -858,7 +858,7 @@ pub fn generate_clock_mapping_fault_schedule(
             qualification: first_qualification,
         },
     );
-    let mut event_mapping_action_id = first_mapping_action_id.clone();
+    let event_mapping_action_id = first_mapping_action_id.clone();
     if fault == ClockMappingFault::StaleReference {
         push_action(
             &mut actions,
