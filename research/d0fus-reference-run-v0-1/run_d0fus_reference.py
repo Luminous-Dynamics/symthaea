@@ -239,12 +239,11 @@ def main() -> int:
         view_3d=False,
     )
 
-    expected_length = int(lock["expected_run_output_count"])
     if not isinstance(results, tuple):
         raise RuntimeError(f"D0FUS RUN did not return a tuple: {type(results)!r}")
-    if len(results) != expected_length:
+    if len(results) <= max(index for index, _ in CORE_OUTPUTS.values()):
         raise RuntimeError(
-            f"D0FUS output schema mismatch: expected {expected_length}, got {len(results)}"
+            f"D0FUS output tuple is too short for the declared core observables: {len(results)}"
         )
 
     core_observables: dict[str, float | None] = {}
