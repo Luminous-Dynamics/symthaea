@@ -11,6 +11,9 @@
 /// Additive v0.2 temporal, attempt-lineage and scoped stop-obligation contract kernel.
 pub mod event_order_v0_2;
 
+/// Additive v0.3 deterministic virtual-time schedule and fault-replay harness.
+pub mod event_order_v0_3;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, FixedOffset};
