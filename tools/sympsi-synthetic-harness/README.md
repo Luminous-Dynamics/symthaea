@@ -15,6 +15,14 @@ The four-choice profile preserves the original SCI-PSI-002 contract. The five-ch
 
 Both profiles use a one-sided exact binomial test with alpha = 0.005. The frozen manifest sets 100,000 null campaigns and 20,000 SESOI power campaigns. A discrete exact-binomial test may have a realized type-I rate below the nominal alpha; the receipt reports both.
 
+## Researcher-degrees-of-freedom stress test
+
+Each profile also simulates 100,000 **null campaigns** with ten interim looks. Each look applies the same unadjusted one-sided alpha = 0.005 test to the cumulative data; the campaign stops at the first nominally significant look. The receipt reports the empirical campaign-level familywise false-positive rate, its 99% Wilson interval and the inflation multiple relative to the fixed-sample alpha.
+
+This is deliberately an invalid analysis policy. The harness is expected to demonstrate that repeated unadjusted looks inflate false positives by at least 1.5x in this deterministic null simulation, while the trial-bundle validator rejects optional-stopping protocols. This is a metascience diagnostic—not a candidate procedure for the real experiment and not a psi test.
+
+An independent 100,000-campaign Python cross-check produced approximate null FWERs of 2.239% (four-choice) and 2.278% (five-choice) for the ten-look design. The exact Rust deterministic estimates are captured in the run receipts.
+
 The analytic reference values from the frozen manifest are:
 
 | Profile | Critical hit count | Exact discrete type-I rate | Exact power at SESOI |
