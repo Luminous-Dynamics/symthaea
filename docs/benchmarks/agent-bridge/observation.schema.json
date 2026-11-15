@@ -10,6 +10,7 @@
         "protocol_version",
         "kind",
         "turn_id",
+        "run_id",
         "call_id",
         "tool_name",
         "status",
@@ -70,6 +71,10 @@
         },
         "reversible": {
           "type": "boolean"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "allOf": [
@@ -125,6 +130,7 @@
         "protocol_version",
         "kind",
         "turn_id",
+        "run_id",
         "call_id",
         "reconciled_status",
         "state_digest",
@@ -162,6 +168,10 @@
             "environment",
             "evaluator"
           ]
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
