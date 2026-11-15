@@ -1,8 +1,8 @@
 use proptest::prelude::*;
 use symthaea_decision_assessment::event_order_v0_3::{
     canonical_schedule_bytes, canonical_schedule_sha256, generate_cancellation_commit_race_schedule,
-    generate_delivery_schedule, replay_virtual_schedule, CancellationCommitOrder, SchedulerDisposition,
-    ScheduleAction,
+    generate_clock_mapping_fault_schedule, generate_delivery_schedule, replay_virtual_schedule,
+    CancellationCommitOrder, ClockMappingFault, SchedulerDisposition, ScheduleAction,
 };
 
 proptest! {
@@ -53,6 +53,21 @@ proptest! {
         prop_assert!(acknowledgement_first_report.records.iter().any(|record| {
             matches!(record.action, ScheduleAction::StopDischarged { .. })
                 && record.disposition == SchedulerDisposition::Applied
+        }));
+    }
+
+    #[test]
+    fn clock_mapping_faults_never_become_applied(seed in any::<u64>(), fault_tag in 0u8..3) {
+        let (fault, expected) = match fault_tag {
+            0 => (ClockMappingFault::Unqualified, SchedulerDisposition::ClockMappingUnqualified),
+            1 => (ClockMappingFault::Expired, SchedulerDisposition::ClockMappingExpired),
+            _ => (ClockMappingFault::StaleReference, SchedulerDisposition::StaleClockMappingReference),
+        };
+        let schedule = generate_clock_mapping_fault_schedule(seed, fault);
+        let report = replay_virtual_schedule(&schedule).expect("fault schedule replay");
+        prop_assert!(report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventProduced { .. })
+                && record.disposition == expected
         }));
     }
 
