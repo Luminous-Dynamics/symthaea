@@ -6,6 +6,7 @@
 //! checker, CFD solver, or vessel-approval system.
 
 pub mod hydrostatics;
+pub mod sensitivity;
 pub mod loft;
 pub mod section;
 
