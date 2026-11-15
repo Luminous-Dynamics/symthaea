@@ -32,6 +32,14 @@ The frozen literature baseline includes:
 
 Commercial engineering systems are capability baselines, not claims that Symthaea must reproduce every proprietary feature. Simcenter STAR-CCM+ documents transient VOF free-surface simulation and up-to-six-degree-of-freedom dynamic fluid-body interaction in its hull-performance workflow. SHIPFLOW documents potential-flow, RANS, hull/propeller interaction and seakeeping/manoeuvring capabilities. OpenFOAM supplies an independently configured open solver path. We should initially interoperate with qualified solvers rather than claim an unvalidated replacement.
 
+
+## 2A. Additional subsystem and fleet-reconstruction comparators (15 Nov 2026)
+
+- Liu et al. (2026), *An integrated data-driven and experimental methodology for toroidal propeller design improvement*, Engineering Applications of Artificial Intelligence 184, 116126, DOI: https://doi.org/10.1016/j.engappai.2026.116126. Published 15 Nov 2026. It describes an experiment-simulation-optimization loop, with high-fidelity CFD checked against open-water experiments, PCHIP parametric geometry and adaptive radial-basis/evolutionary sampling-assisted optimization across 14 variables. It reports a study-specific 7.26% power reduction at matched thrust and 1.74 dB noise reduction against its best sampled design. Add this as a propulsor subsystem benchmark, not a hull generator arm. It is particularly relevant to the wake/propulsor co-design path.
+- *Raster2Hull: Learning 3D Ship Hull Geometry From Raster 2D General Arrangement and Lines Drawings*, IEEE Access 14 (31 Jul 2026), DOI: https://doi.org/10.1109/ACCESS.2026.3717961. Add this as a separate legacy-vessel geometry-reconstruction comparator. It addresses 2D drawing-to-3D hull reconstruction, not forward generative hull design or hydrodynamic optimization. Evaluate reconstruction error, lines-plan consistency, section recovery, topology, hydrostatic properties and uncertainty on held-out drawing sources.
+
+These extend the benchmark matrix without conflating generation, reconstruction and propulsor optimization into one score.
+
 ## 3. Matched comparison arms
 
 Every arm must use the same rights-cleared input hull families, displacement/payload and loading constraints, speed and mission envelope, environmental distribution, solver release, mesh policy, high-fidelity CFD budget, and independent holdout.
@@ -88,6 +96,14 @@ All metric implementations must be versioned and validated on known-answer synth
 Report resistance and wave-elevation comparisons, sinkage/trim, motions/RAOs, added resistance, propeller open-water KT/KQ/efficiency, self-propulsion, propeller-plane axial/radial/tangential velocity fields, wake fraction/thrust deduction (with explicit definitions), thrust/torque, rudder interaction and cavitation-relevant observables.
 
 Wake targets are **propulsor- and mission-conditioned flow fields**, not a blanket preference for uniform wake. Include full-vector coverage, coordinate frame, phase origin, radial/hub treatment, grid identity and transformation receipts. Axial-only data must be labelled axial-only.
+
+### R: reconstruction of legacy geometry
+
+Keep this track separate from forward generation. For Raster2Hull-like methods, report drawing-to-geometry alignment, section/offset error, deck/keel/centreline consistency, missing-view uncertainty, CAD reconstruction validity, hydrostatic coefficient error, manual repair time and provenance of the source drawing. Split by original vessel/drawing lineage, not patches or derived views. An uncertain or incomplete drawing must produce an uncertainty envelope or abstention rather than an invented surface.
+
+### P2: propulsion architecture subsystem
+
+In addition to hull/propulsor interaction, compare conventional open propellers, ducted/toroidal propellers and waterjets only within matched thrust, speed, diameter/installation and mission constraints. Report KT/KQ, delivered and electrical power, efficiency, pressure distribution, vortex metrics, cavitation indicators, underwater radiated noise and maintenance/ingestion risks. For the toroidal-propeller comparator, reproduce the experiment-to-CFD validation loop before comparing optimizer performance. Study-reported 7.26% power and 1.74 dB noise changes are contextual reference points, not target pass thresholds.
 
 ### O: operational usefulness
 
