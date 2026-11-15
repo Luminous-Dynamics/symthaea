@@ -1235,6 +1235,15 @@ mod tests {
         loft_waterplane_capped_hull(sections, profile).unwrap()
     }
 
+    fn rebind_loft_after_test_mutation(loft: &mut LoftedHullArtifact) {
+        loft.candidate.geometry_digest_blake3 =
+            crate::compute_geometry_digest(&loft.candidate.geometry).unwrap();
+        loft.mesh_digest_blake3 = loft.candidate.geometry_digest_blake3.clone();
+        loft.admission_report = crate::admit(&loft.candidate);
+        loft.loft_manifest_digest_blake3 =
+            crate::loft::compute_loft_manifest_digest(loft).unwrap();
+    }
+
     fn triangular_prism() -> (SectionFamilyArtifact, LoftedHullArtifact) {
         let sections = family(
             &[(0.0, 10.0, 6.0), (100.0, 10.0, 6.0)],
@@ -1317,6 +1326,73 @@ mod tests {
         assert_eq!(reference.bay_count, 2);
         assert_eq!(reference.bay_lengths_m, vec![40.0, 80.0]);
         assert!((reference.displacement_volume_m3 - 7_546.666_666_666_667).abs() < 1.0e-8);
+    }
+
+
+    #[test]
+    fn mutated_side_surface_is_detected_by_independent_sectional_check() {
+        let (sections, mut loft) = triangular_prism();
+        let keel_vertex = loft
+            .candidate
+            .geometry
+            .vertices
+            .iter()
+            .position(|point| {
+                (point[0] - 100.0).abs() < 1.0e-12
+                    && point[1].abs() < 1.0e-12
+                    && (point[2] - 6.0).abs() < 1.0e-12
+            })
+            .expect("stern/keel station vertex exists");
+        loft.candidate.geometry.vertices[keel_vertex][2] += 0.5;
+        rebind_loft_after_test_mutation(&mut loft);
+
+        let sectional = calculate_sectional_reference(&sections, &loft, 1_025.0).unwrap();
+        let polyhedral = calculate_hydrostatic_properties(&loft, 1_025.0).unwrap();
+        let report =
+            compare_with_polyhedral_hydrostatics(&sectional, &polyhedral, &test_tolerance())
+                .unwrap();
+        assert_eq!(report.disposition, CrossCheckDisposition::Inconsistent);
+    }
+
+    #[test]
+    fn mutated_waterplane_boundary_is_detected_by_independent_sectional_check() {
+        let (sections, mut loft) = triangular_prism();
+        let starboard_sheer = loft
+            .candidate
+            .geometry
+            .vertices
+            .iter()
+            .position(|point| {
+                (point[0] - 100.0).abs() < 1.0e-12
+                    && (point[1] - 10.0).abs() < 1.0e-12
+                    && point[2].abs() < 1.0e-12
+            })
+            .expect("starboard waterline vertex exists");
+        let port_sheer = loft
+            .candidate
+            .geometry
+            .vertices
+            .iter()
+            .position(|point| {
+                (point[0] - 100.0).abs() < 1.0e-12
+                    && (point[1] + 10.0).abs() < 1.0e-12
+                    && point[2].abs() < 1.0e-12
+            })
+            .expect("port waterline vertex exists");
+        loft.candidate.geometry.vertices[starboard_sheer][1] += 0.5;
+        loft.candidate.geometry.vertices[port_sheer][1] -= 0.5;
+        rebind_loft_after_test_mutation(&mut loft);
+
+        let sectional = calculate_sectional_reference(&sections, &loft, 1_025.0).unwrap();
+        let polyhedral = calculate_hydrostatic_properties(&loft, 1_025.0).unwrap();
+        let report =
+            compare_with_polyhedral_hydrostatics(&sectional, &polyhedral, &test_tolerance())
+                .unwrap();
+        assert_eq!(report.disposition, CrossCheckDisposition::Inconsistent);
+        assert!(report.metrics.iter().any(|metric| {
+            metric.metric_id == "waterplane_area_m2"
+                && metric.disposition == MetricDisposition::Fail
+        }));
     }
 
     #[test]
