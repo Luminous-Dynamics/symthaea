@@ -44,7 +44,11 @@
         "probe_cost_units",
         "correlated_signal_groups_discounted",
         "premature_detection_decision_ids",
-        "source_correlation_overclaim_decision_ids"
+        "source_correlation_overclaim_decision_ids",
+        "dependency_implied_affected_obligations",
+        "dependency_only_impact_obligations",
+        "gold_only_impact_obligations",
+        "critical_unsupported_current_claims"
       ],
       "properties": {
         "episode_id": {
@@ -146,6 +150,34 @@
           }
         },
         "source_correlation_overclaim_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependency_implied_affected_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependency_only_impact_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "gold_only_impact_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "critical_unsupported_current_claims": {
           "type": "array",
           "uniqueItems": true,
           "items": {
