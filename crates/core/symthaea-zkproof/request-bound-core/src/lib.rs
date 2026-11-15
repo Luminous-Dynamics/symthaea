@@ -27,6 +27,11 @@ pub struct BalanceProofRequestV1 {
     /// Digest of the source statement to which the caller says this request
     /// relates. It is a reference only; this guest does not authenticate it.
     pub source_statement_reference_digest: [u8; 32],
+    /// Digest of the claim schema, including field and unit semantics.
+    pub claim_schema_digest: [u8; 32],
+    /// Digest of the exact predicate semantics (operator, bounds, units,
+    /// rounding/fixed-point rules and comparison boundary).
+    pub predicate_digest: [u8; 32],
     /// Digest identifying the issuer/key reference selected by the caller.
     /// It is not proof that the issuer or key is authorized.
     pub issuer_key_reference_digest: [u8; 32],
@@ -70,6 +75,8 @@ pub struct BalanceProofRequestBoundOutputV1 {
 pub enum BalanceProofRequestValidationError {
     EmptyRequestId,
     EmptySourceStatementReferenceDigest,
+    EmptyClaimSchemaDigest,
+    EmptyPredicateDigest,
     EmptyIssuerKeyReferenceDigest,
     EmptyAudienceDigest,
     EmptyVerifierDigest,
@@ -85,6 +92,8 @@ impl core::fmt::Display for BalanceProofRequestValidationError {
             Self::EmptySourceStatementReferenceDigest => {
                 "source_statement_reference_digest must not be all zero"
             }
+            Self::EmptyClaimSchemaDigest => "claim_schema_digest must not be all zero",
+            Self::EmptyPredicateDigest => "predicate_digest must not be all zero",
             Self::EmptyIssuerKeyReferenceDigest => {
                 "issuer_key_reference_digest must not be all zero"
             }
@@ -112,6 +121,12 @@ impl BalanceProofRequestV1 {
             return Err(
                 BalanceProofRequestValidationError::EmptySourceStatementReferenceDigest,
             );
+        }
+        if !contains_nonzero_byte(&self.claim_schema_digest) {
+            return Err(BalanceProofRequestValidationError::EmptyClaimSchemaDigest);
+        }
+        if !contains_nonzero_byte(&self.predicate_digest) {
+            return Err(BalanceProofRequestValidationError::EmptyPredicateDigest);
         }
         if !contains_nonzero_byte(&self.issuer_key_reference_digest) {
             return Err(BalanceProofRequestValidationError::EmptyIssuerKeyReferenceDigest);
@@ -148,6 +163,8 @@ impl BalanceProofRequestV1 {
         hasher.update(DOMAIN);
         hasher.update(self.request_id);
         hasher.update(self.source_statement_reference_digest);
+        hasher.update(self.claim_schema_digest);
+        hasher.update(self.predicate_digest);
         hasher.update(self.issuer_key_reference_digest);
         hasher.update(self.audience_digest);
         hasher.update(self.verifier_digest);
@@ -179,12 +196,14 @@ mod request_bound_tests {
         BalanceProofRequestV1 {
             request_id: [1; 16],
             source_statement_reference_digest: [2; 32],
+            claim_schema_digest: [4; 32],
+            predicate_digest: [5; 32],
             issuer_key_reference_digest: [3; 32],
-            audience_digest: [4; 32],
-            verifier_digest: [5; 32],
-            purpose_digest: [6; 32],
-            policy_digest: [7; 32],
-            verifier_challenge: [8; 32],
+            audience_digest: [6; 32],
+            verifier_digest: [7; 32],
+            purpose_digest: [8; 32],
+            policy_digest: [9; 32],
+            verifier_challenge: [10; 32],
             required_minimum: 500,
         }
     }
@@ -219,6 +238,14 @@ mod request_bound_tests {
         assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptySourceStatementReferenceDigest));
 
         let mut changed = original.clone();
+        changed.claim_schema_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyClaimSchemaDigest));
+
+        let mut changed = original.clone();
+        changed.predicate_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyPredicateDigest));
+
+        let mut changed = original.clone();
         changed.issuer_key_reference_digest = [0; 32];
         assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyIssuerKeyReferenceDigest));
 
@@ -250,6 +277,14 @@ mod request_bound_tests {
 
         let mut changed = original.clone();
         changed.source_statement_reference_digest[0] ^= 1;
+        assert_ne!(changed.canonical_digest(), original_digest);
+
+        let mut changed = original.clone();
+        changed.claim_schema_digest[0] ^= 1;
+        assert_ne!(changed.canonical_digest(), original_digest);
+
+        let mut changed = original.clone();
+        changed.predicate_digest[0] ^= 1;
         assert_ne!(changed.canonical_digest(), original_digest);
 
         let mut changed = original.clone();
