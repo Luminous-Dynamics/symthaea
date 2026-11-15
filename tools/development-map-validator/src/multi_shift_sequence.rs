@@ -1175,6 +1175,25 @@ mod tests {
     }
 
     #[test]
+    fn source_epoch_cannot_be_laundered_by_rewriting_receipt_context() {
+        let mut value = fixture_value();
+        let fresh = value["candidate_traces"][0]["checkpoints"][1]["fresh_receipts"]
+            .as_array_mut().expect("fresh receipts");
+        let position = fresh.iter().position(|r| r["obligation_id"].as_str() == Some("build-repro"))
+            .expect("fresh build receipt");
+        let mut forged = fresh.remove(position);
+        forged["source_epoch"] = json!(0);
+        value["candidate_traces"][0]["checkpoints"][1]["reused_receipts"]
+            .as_array_mut().expect("reused receipts")
+            .push(forged);
+        let report = report_for(&value);
+        let result = trace(&report, "conformant-sequence");
+        assert!(result.epochs[1].false_resurrection_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].receipt_source_context_mismatch_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].unsupported_current_claims.contains(&"build-repro".to_owned()));
+    }
+
+    #[test]
     fn detects_future_available_evidence_claimed_current() {
         let mut value = fixture_value();
         value["candidate_traces"][0]["checkpoints"][0]["fresh_receipts"][0]["available_at"] =
