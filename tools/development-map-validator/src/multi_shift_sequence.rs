@@ -114,6 +114,18 @@ struct ReceiptAssessment {
     unavailable_at_cutoff: bool,
 }
 
+fn ensure_allowed_keys(value: &Value, allowed: &[&str], label: &str) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{label} must be an object"))?;
+    for key in object.keys() {
+        if !allowed.contains(&key.as_str()) {
+            return Err(format!("{label} contains unknown field {key:?}"));
+        }
+    }
+    Ok(())
+}
+
 fn required_str<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a str, String> {
     value
         .get(key)
@@ -197,6 +209,11 @@ fn parse_obligations(candidate_view: &Value) -> Result<BTreeMap<String, Obligati
     let mut obligations = BTreeMap::new();
     for (index, value) in values.iter().enumerate() {
         let label = format!("candidate_view.obligations[{index}]");
+        ensure_allowed_keys(
+            value,
+            &["obligation_id", "critical", "introduced_epoch", "dependency_dimensions"],
+            &label,
+        )?;
         let id = required_str(value, "obligation_id", &label)?.to_owned();
         let critical = value
             .get("critical")
@@ -245,6 +262,11 @@ fn assess_receipt(
     minimum_observed_at: Option<&DateTime<FixedOffset>>,
 ) -> Result<ReceiptAssessment, String> {
     let label = format!("{kind} receipt");
+    ensure_allowed_keys(
+        receipt,
+        &["obligation_id", "source_epoch", "outcome", "context", "observed_at", "available_at", "valid_until"],
+        &label,
+    )?;
     required_str(receipt, "obligation_id", &label)?;
     let source_epoch = required_u64(receipt, "source_epoch", &label)?;
     let source_state = state_history
@@ -398,6 +420,12 @@ fn validate_event_sequence(
 
     for (index, event) in events.iter().enumerate() {
         let label = format!("candidate_view.interventions[{index}]");
+        ensure_allowed_keys(
+            event,
+            &["event_id", "sequence_index", "event_kind", "event_time", "available_at",
+              "before", "after", "newly_introduced_obligations"],
+            &label,
+        )?;
         let epoch = index as u64 + 1;
         let sequence_index = required_u64(event, "sequence_index", &label)?;
         if sequence_index != epoch {
@@ -483,6 +511,11 @@ fn validate_gold_overlay(
     let gold = bundle
         .get("gold_overlay")
         .ok_or_else(|| "gold_overlay is required".to_owned())?;
+    ensure_allowed_keys(
+        gold,
+        &["visibility", "required_revalidation_by_epoch", "adjudication_status"],
+        "gold_overlay",
+    )?;
     if required_str(gold, "visibility", "gold_overlay")? != "evaluator_only" {
         return Err("gold_overlay.visibility must be evaluator_only".to_owned());
     }
@@ -507,6 +540,11 @@ fn validate_gold_overlay(
     for (index, item) in epochs.iter().enumerate() {
         let epoch = index as u64 + 1;
         let label = format!("gold_overlay.required_revalidation_by_epoch[{index}]");
+        ensure_allowed_keys(
+            item,
+            &["epoch", "required_revalidation_obligations", "reason_by_obligation"],
+            &label,
+        )?;
         if required_u64(item, "epoch", &label)? != epoch {
             return Err(format!("{label}.epoch must be {epoch}"));
         }
@@ -529,6 +567,7 @@ fn validate_gold_overlay(
         let mut reason_ids = BTreeSet::new();
         for (reason_index, reason) in reasons.iter().enumerate() {
             let reason_label = format!("{label}.reason_by_obligation[{reason_index}]");
+            ensure_allowed_keys(reason, &["obligation_id", "reason"], &reason_label)?;
             let id = required_str(reason, "obligation_id", &reason_label)?;
             required_str(reason, "reason", &reason_label)?;
             if !reason_ids.insert(id.to_owned()) {
@@ -552,6 +591,7 @@ fn score_trace(
     obligations: &BTreeMap<String, Obligation>,
     enforce_synthetic_dependency_parity: bool,
 ) -> Result<MultiShiftTraceReport, String> {
+    ensure_allowed_keys(trace, &["trace_id", "checkpoints"], "candidate_trace")?;
     let trace_id = required_str(trace, "trace_id", "candidate_trace")?.to_owned();
     let checkpoints = trace
         .get("checkpoints")
@@ -589,6 +629,11 @@ fn score_trace(
     for (index, checkpoint) in checkpoints.iter().enumerate() {
         let epoch = index as u64 + 1;
         let label = format!("trace {trace_id} checkpoint[{index}]");
+        ensure_allowed_keys(
+            checkpoint,
+            &["epoch", "decision_cutoff", "fresh_receipts", "reused_receipts", "declared_current_obligations"],
+            &label,
+        )?;
         if required_u64(checkpoint, "epoch", &label)? != epoch {
             return Err(format!("{label}.epoch must be {epoch}"));
         }
@@ -849,6 +894,13 @@ fn score_restoration_control(
     let control = bundle
         .get("restoration_control")
         .ok_or_else(|| "restoration_control is required".to_owned())?;
+    ensure_allowed_keys(
+        control,
+        &["control_id", "final_state", "decision_cutoff", "receipt_validity_window_open",
+          "reused_receipts", "reuse_policy", "expected_required_revalidation",
+          "expected_false_resurrection_count", "active_obligation_ids"],
+        "restoration_control",
+    )?;
     let control_id = required_str(control, "control_id", "restoration_control")?.to_owned();
     if required_str(control, "reuse_policy", "restoration_control")?
         != "permitted_only_when_all_declared_identity_and_validity_dimensions_match"
@@ -971,6 +1023,12 @@ fn score_restoration_control(
 pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequenceReport, String> {
     let bundle: Value =
         serde_json::from_str(input).map_err(|error| format!("bundle JSON parse failed: {error}"))?;
+    ensure_allowed_keys(
+        &bundle,
+        &["bundle_id", "bundle_visibility", "candidate_view", "gold_overlay", "candidate_traces",
+          "restoration_control", "expected_summary", "claim_ceiling"],
+        "bundle",
+    )?;
     if required_str(&bundle, "bundle_id", "bundle")?.is_empty() {
         return Err("bundle_id must not be empty".to_owned());
     }
@@ -982,6 +1040,11 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
     let candidate_view = bundle
         .get("candidate_view")
         .ok_or_else(|| "candidate_view is required".to_owned())?;
+    ensure_allowed_keys(
+        candidate_view,
+        &["scenario_id", "baseline", "obligations", "initial_receipts", "interventions"],
+        "candidate_view",
+    )?;
     if candidate_view.get("gold_overlay").is_some() {
         return Err("candidate_view must not contain gold_overlay".to_owned());
     }
