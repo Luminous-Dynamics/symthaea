@@ -1067,11 +1067,14 @@ mod tests {
                 "luminous_measurement": false,
                 "inputs": {
                     "near_complete_conversion_energy_yield_g_H2_per_kWh": 45.0,
+                    "intermediate_92_4_percent_energy_yield_g_H2_per_kWh": 50.0,
                     "best_energy_yield_g_H2_per_kWh": 51.0
                 },
                 "derivation": {
                     "near_complete_conversion_specific_energy_kWh_per_kg_H2": 1000.0 / 45.0,
+                    "intermediate_92_4_percent_specific_energy_kWh_per_kg_H2": 1000.0 / 50.0,
                     "best_energy_yield_specific_energy_kWh_per_kg_H2": 1000.0 / 51.0,
+                    "relative_specific_energy_reduction_at_92_4_percent_conversion": 1.0 - 45.0 / 50.0,
                     "relative_specific_energy_reduction_at_76_percent_conversion": 1.0 - 45.0 / 51.0
                 },
                 "interpretation": "Two distinct source operating points; not a matched process result."
@@ -1098,6 +1101,16 @@ mod tests {
             ["best_energy_yield_specific_energy_kWh_per_kg_H2"] = serde_json::json!(18.0);
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
         assert!(error.to_string().contains("best-yield specific-energy derivation"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_cross_point_throughput_energy_yield_mismatch() {
+        let mut source = nh3_energy_yield_source_manifest();
+        source["derived_reference_checks"][0]["derivation"]
+            ["intermediate_92_4_percent_specific_energy_kWh_per_kg_H2"] =
+            serde_json::json!(22.2222222222);
+        let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
+        assert!(error.to_string().contains("92.4-percent specific-energy derivation"));
     }
 
     #[test]
@@ -1430,23 +1443,53 @@ fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<
         "best_energy_yield_specific_energy_kWh_per_kg_H2",
         &context,
     )?;
+    let actual_intermediate = required_f64(
+        derivation,
+        "intermediate_92_4_percent_specific_energy_kWh_per_kg_H2",
+        &context,
+    )?;
+    let actual_reduction_92_4 = required_f64(
+        derivation,
+        "relative_specific_energy_reduction_at_92_4_percent_conversion",
+        &context,
+    )?;
     let actual_reduction = required_f64(
         derivation,
         "relative_specific_energy_reduction_at_76_percent_conversion",
         &context,
     )?;
 
+    let intermediate_yield = required_f64(
+        inputs,
+        "intermediate_92_4_percent_energy_yield_g_H2_per_kWh",
+        &context,
+    )?;
+    ensure!(
+        intermediate_yield > 0.0,
+        "{context}: intermediate energy yield must be positive"
+    );
+    let expected_intermediate = 1000.0 / intermediate_yield;
+    let expected_reduction_92_4 = 1.0 - near_complete_yield / intermediate_yield;
+
     ensure!(
         close_f64(actual_near_complete, expected_near_complete),
         "{context}: near-complete specific-energy derivation does not equal 1000 / reported yield"
+    );
+    ensure!(
+        close_f64(actual_intermediate, expected_intermediate),
+        "{context}: 92.4-percent specific-energy derivation does not equal 1000 / reported yield"
     );
     ensure!(
         close_f64(actual_best, expected_best),
         "{context}: best-yield specific-energy derivation does not equal 1000 / reported yield"
     );
     ensure!(
+        close_f64(actual_reduction_92_4, expected_reduction_92_4),
+        "{context}: 92.4-percent relative specific-energy reduction is inconsistent with the source points"
+    );
+    ensure!(
         close_f64(actual_reduction, expected_reduction),
-        "{context}: relative specific-energy reduction is inconsistent with the two source points"
+        "{context}: 76-percent relative specific-energy reduction is inconsistent with the source points"
     );
     Ok(())
 }
