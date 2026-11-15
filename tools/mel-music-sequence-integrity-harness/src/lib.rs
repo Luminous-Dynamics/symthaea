@@ -372,9 +372,13 @@ pub fn evaluate_sequence_v1(
                 return Err(SequenceErrorV1::InvalidDigest);
             }
         }
-        if step.selection_receipt_sha256 == step.realization_receipt_sha256
-            || step.realization_receipt_sha256 == step.verification_report_sha256
-        {
+        let receipt_ids = [
+            step.selection_receipt_sha256.as_str(),
+            step.realization_receipt_sha256.as_str(),
+            step.verification_report_sha256.as_str(),
+        ];
+        let unique_receipt_ids: BTreeSet<&str> = receipt_ids.into_iter().collect();
+        if unique_receipt_ids.len() != receipt_ids.len() {
             return Err(SequenceErrorV1::MissingReceiptIdentity);
         }
         if step.input_artifact_sha256 != previous_artifact_sha256 {
@@ -687,6 +691,18 @@ mod tests {
         assert_eq!(
             symbolic_state_sha256_v1(&duplicate),
             Err(SequenceErrorV1::DuplicateEventId)
+        );
+    }
+
+    #[test]
+    fn selection_realization_and_verification_receipts_must_be_distinct() {
+        let initial = initial_fixture_events();
+        let output = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let mut first = step(1, h(11), h(21), &initial, output, "event-a", StepGateVerdictV1::Verified);
+        first.verification_report_sha256 = first.selection_receipt_sha256.clone();
+        assert_eq!(
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
+            Err(SequenceErrorV1::MissingReceiptIdentity)
         );
     }
 
