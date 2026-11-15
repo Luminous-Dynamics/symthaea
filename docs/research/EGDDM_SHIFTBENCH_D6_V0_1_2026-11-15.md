@@ -42,7 +42,7 @@ Every scenario begins from one frozen initial snapshot and branches into two mat
 - **Clean arm:** continuation proceeds without a material workspace intervention.
 - **Shifted arm:** an intervention is introduced at a preregistered point while preserving the same saved prefix.
 
-Change families should include requirements, dependency/API contracts, toolchains, configuration, runtime state, session/tool identity, authority/policy, and contradictory or stale evidence. Intervention positions should be balanced across early, middle and late work.
+Change families should include requirements, dependency/API contracts, toolchains, configuration, runtime state, session/tool identity, authority/policy, and contradictory or stale evidence. Following SWE-Shift's nine-position temporal resolution, D6 schedules interventions at 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80% and 90% of preregistered planned work. Early (10–30%), middle (40–60%) and late (70–90%) remain reporting aggregates only.
 
 At each checkpoint, the agent reports:
 - obligations it believes are active;
@@ -237,9 +237,9 @@ No cross-paper headline score should be described as a direct apples-to-apples c
 
 ## 10. Next experiments
 
-The corpus plan is tracked in [issue #12281](https://github.com/Luminous-Dynamics/symthaea/issues/12281), with its [machine-readable 12-family/3-position blueprint](EGDDM_SHIFTBENCH_D6_CORPUS_BLUEPRINT_V0_1_2026-11-15.json) and [execution protocol](EGDDM_SHIFTBENCH_D6_CORPUS_PLAN_V0_1_2026-11-15.md).
+The corpus plan is tracked in [issue #12281](https://github.com/Luminous-Dynamics/symthaea/issues/12281), with its [machine-readable 12-family/9-position blueprint](EGDDM_SHIFTBENCH_D6_CORPUS_BLUEPRINT_V0_1_2026-11-15.json) and [execution protocol](EGDDM_SHIFTBENCH_D6_CORPUS_PLAN_V0_1_2026-11-15.md).
 
-1. Expand from the synthetic case to 12 intervention families, 3 intervention positions and 10 independently authored seeds per family/position cell: 360 matched scenario pairs (720 trajectories per model per trial). This is a target, not a collected dataset.
+1. Expand from the synthetic case to 12 intervention families, 9 planned-work positions and 5 independently authored seeds per family/position cell: 540 matched scenario pairs (1,080 trajectories per model per trial). The first validity pilot is 108 candidate seeds, one per family/position cell. This is a target, not a collected dataset.
 2. Add multiple change events so the invalidation frontier can grow, shrink or be partially superseded.
 3. Extend uncertainty intervals for impact and evidence freshness, with an explicit unknown state.
 4. Integrate D3 EVSI so the system chooses which authorized checks to acquire under multidimensional cost budgets.
