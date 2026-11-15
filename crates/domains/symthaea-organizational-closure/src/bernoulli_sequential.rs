@@ -300,6 +300,29 @@ fn boundary(interval: BernoulliInterval, minimum_effect: f64) -> BernoulliBounda
     }
 }
 
+/// Compute the public decision boundary from agent-observable arm counts.
+/// This helper has no access to evaluator-only probabilities or outcomes.
+pub(crate) fn boundary_for_counts(
+    control_successes: usize,
+    control_samples: usize,
+    treatment_successes: usize,
+    treatment_samples: usize,
+    alpha: f64,
+    minimum_effect: f64,
+) -> BernoulliBoundary {
+    let control = ArmCounts {
+        attempted: control_samples,
+        qualified: control_samples,
+        successes: control_successes,
+    };
+    let treatment = ArmCounts {
+        attempted: treatment_samples,
+        qualified: treatment_samples,
+        successes: treatment_successes,
+    };
+    boundary(effect_interval(&control, &treatment, alpha), minimum_effect)
+}
+
 fn mean(successes: usize, samples: usize) -> Option<f64> {
     (samples > 0).then(|| successes as f64 / samples as f64)
 }
