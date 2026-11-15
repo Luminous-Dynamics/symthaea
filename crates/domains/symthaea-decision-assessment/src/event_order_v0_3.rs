@@ -2232,10 +2232,14 @@ pub fn project_action_history(
                     reasons.insert(format!("TERMINAL_WITHOUT_ATTEMPT_START:{attempt_id}"));
                     continue;
                 }
-                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
-                    critical = true;
-                    reasons.insert(format!("TERMINAL_NOT_REPLAY_APPLIED:{attempt_id}"));
-                    continue;
+                match record_disposition(&action.action_id) {
+                    Some(SchedulerDisposition::Applied) => {}
+                    Some(SchedulerDisposition::Duplicate) => continue,
+                    _ => {
+                        critical = true;
+                        reasons.insert(format!("TERMINAL_NOT_REPLAY_APPLIED:{attempt_id}"));
+                        continue;
+                    }
                 }
                 let (exact_start_action_id, qualification) = match &action.evidence {
                     Some(ActionEvidence::TerminalReconciliation { exact_start_action_id, qualification }) => {
@@ -2304,10 +2308,14 @@ pub fn project_action_history(
                     reasons.insert(format!("EFFECT_COMMIT_WITHOUT_ATTEMPT_START:{attempt_id}"));
                     continue;
                 }
-                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
-                    critical = true;
-                    reasons.insert(format!("EFFECT_COMMIT_NOT_REPLAY_APPLIED:{attempt_id}"));
-                    continue;
+                match record_disposition(&action.action_id) {
+                    Some(SchedulerDisposition::Applied) => {}
+                    Some(SchedulerDisposition::Duplicate) => continue,
+                    _ => {
+                        critical = true;
+                        reasons.insert(format!("EFFECT_COMMIT_NOT_REPLAY_APPLIED:{attempt_id}"));
+                        continue;
+                    }
                 }
                 let (receipt_ref, receipt_sha256) = match &action.evidence {
                     Some(ActionEvidence::EffectCommit { receipt_ref, receipt_sha256 }) => {
