@@ -128,15 +128,15 @@ sigma      = 1 - decay * (1 - sigma_base)
 
 At `dt = 0`, `decay = 1`, so:
 
-[
+\[
 \sigma(0)=\sigma_{\mathrm{base}}
-]
+\]
 
 The sigmoid gate is generally nonzero. Therefore, whenever the current state differs from the current equilibrium, the update
 
-[
+\[
 x'=(1-\sigma)x+\sigma x_\infty
-]
+\]
 
 moves the state even though no time elapsed. This does not satisfy the continuous-time identity invariant (F(0,x)=x). The source-level derivation is direct; a runtime regression test has not yet been executed.
 
@@ -151,9 +151,9 @@ moves the state even though no time elapsed. This does not satisfy the continuou
 
 A candidate alternative is:
 
-[
+\[
 \sigma=\sigma_{\mathrm{base}}\left(1-e^{-\Delta t/\tau}\right)
-]
+\]
 
 which makes the interpolation coefficient zero at zero elapsed time. This is a **hypothesis for a repair**, not a validated drop-in correction: it changes the gate's influence and must be compared against the current formula for stability, trajectory error and task performance. Other formulations may be justified, but none should be adopted without the invariant tests and a matched counterfactual.
 
