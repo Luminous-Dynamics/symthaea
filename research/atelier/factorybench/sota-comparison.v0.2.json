@@ -1,0 +1,304 @@
+{
+  "schema_version": "atelier.factorybench-sota-matrix/0.2",
+  "status": "literature_reference_not_Atelier_results",
+  "benchmark_owner_issue": 12289,
+  "studies": [
+    {
+      "id": "SOTA-SLP-TEXTILE-2026",
+      "domain": "textile factory layout",
+      "published": "2026-03-05",
+      "method": [
+        "Systematic Layout Planning",
+        "AHP/TOPSIS"
+      ],
+      "reported_metrics": {
+        "average_travel_time_reduction_pct": 45,
+        "travel_distance_reduction_pct": 34
+      },
+      "scope": "single textile-company layout case",
+      "limitations": [
+        "case-specific",
+        "not a general benchmark dataset",
+        "multi-criteria weights are judgment-dependent",
+        "no claim of transfer to Atelier"
+      ],
+      "reproduction": [
+        "freeze same source From-To flows and activity relationship chart if available",
+        "reconstruct baseline and selected alternative",
+        "report absolute time/distance and definitions",
+        "preserve safety and egress as hard constraints"
+      ],
+      "source": "https://doi.org/10.3390/engproc2026128003"
+    },
+    {
+      "id": "SOTA-FDSM-GA-APPAREL-2026",
+      "domain": "shirt assembly line layout",
+      "published": "2026-02-09",
+      "method": [
+        "fuzzy design structure matrix",
+        "genetic algorithm",
+        "FlexSim simulation"
+      ],
+      "reported_metrics": {
+        "objective_reduction_pct": 42,
+        "workstation_workload_balance_improvement_pct": 15.37,
+        "sewing_machine_count_reduction": 4,
+        "additional_finished_products_per_day": 11
+      },
+      "scope": "shirt-production example",
+      "limitations": [
+        "study-specific objective and assumptions",
+        "simulation result not an Atelier physical production result",
+        "daily output depends on its demand, staffing and model assumptions"
+      ],
+      "reproduction": [
+        "reconstruct design-structure matrix and operation precedence",
+        "compare manual sequencing and FDSM-GA",
+        "report objective definition and machine count separately",
+        "verify every operation/skill/inspection assignment"
+      ],
+      "source": "https://doi.org/10.1108/IJCST-11-2024-0220"
+    },
+    {
+      "id": "SOTA-PATTERN-GA-ALLOCATION-2026",
+      "domain": "modular apparel machine allocation",
+      "published": "2026-09-01",
+      "method": [
+        "CAD-derived seam-level workload",
+        "machine-specific sewing speeds",
+        "genetic algorithm",
+        "deterministic event-based simulation"
+      ],
+      "reported_metrics": {
+        "numeric_improvement_not_extracted": true
+      },
+      "scope": "fixed modular assembly structure, different production scales and additional-order insertion",
+      "limitations": [
+        "machine allocation within a fixed cell structure, not full facility layout",
+        "abstract describes directional simulation results without a transferable numeric effect size"
+      ],
+      "reproduction": [
+        "bind seam/operation workload to exact pattern revision",
+        "compare unoptimized allocation and GA",
+        "test urgent order insertion without physical cell rebuild",
+        "report runtime, makespan, workload balance and all feasibility violations"
+      ],
+      "source": "https://doi.org/10.1108/IJCST-01-2026-0029"
+    },
+    {
+      "id": "SOTA-CUT-ORDER-PSO-GA-2026",
+      "domain": "apparel cut-order planning",
+      "published": "2026-03",
+      "method": [
+        "mathematical cost model",
+        "particle swarm optimization",
+        "genetic algorithm"
+      ],
+      "reported_metrics": {
+        "scenario_count": 32,
+        "numeric_improvement_not_extracted": true
+      },
+      "scope": "fabric, marker, cutting, shortage and overproduction costs",
+      "limitations": [
+        "cut-plan optimization does not establish sewing-line or facility superiority",
+        "cost results depend on fabric, marker and order assumptions"
+      ],
+      "reproduction": [
+        "freeze order/size/color mix, roll widths, fabric lots and marker rules",
+        "compare incumbent/manual, GA and PSO",
+        "report yield, offcut, shortage, overproduction, cutting time and cost"
+      ],
+      "source": "https://doi.org/10.1016/j.asoc.2026.114590"
+    },
+    {
+      "id": "SOTA-MULTILINE-MILP-EGA-2026",
+      "domain": "multi-line garment scheduling",
+      "published": "2026-02",
+      "method": [
+        "mixed-integer linear programming",
+        "enhanced genetic algorithm",
+        "lot streaming",
+        "heterogeneous workforce assignment"
+      ],
+      "reported_metrics": {
+        "exact_oracle": "MILP on benchmark-sized instances",
+        "numeric_improvement_not_extracted": true
+      },
+      "scope": "multi-line flow-shop garment case study",
+      "limitations": [
+        "large-instance EGA optimality gap must be measured against exact small instances",
+        "case-specific process times, skills and line configuration"
+      ],
+      "reproduction": [
+        "use MILP as oracle on small instances",
+        "compare EGA and simple heuristics on larger cases",
+        "report optimality gap, runtime, makespan, skill utilization and lot-streaming behavior"
+      ],
+      "source": "https://doi.org/10.1016/j.procs.2026.02.164"
+    },
+    {
+      "id": "SOTA-GREEN-SUPPLIER-ALLOCATION-2026",
+      "domain": "textile supplier and outsourced order allocation",
+      "published": "2026-10-05",
+      "method": [
+        "genetic algorithm",
+        "dynamic order allocation",
+        "lexicographic green-supplier tie-breaking"
+      ],
+      "reported_metrics": {
+        "numeric_improvement_not_extracted": true
+      },
+      "scope": "multiple outsourcing entities and interconnected production departments",
+      "limitations": [
+        "supplier environmental criteria require evidence and declared scope",
+        "cannot allow green preference to override technical capability or delivery feasibility"
+      ],
+      "reproduction": [
+        "compare fixed supplier allocation and dynamic allocation",
+        "include partner capability, lead-time, quality and lot identity",
+        "green criteria are a final tie-break only after hard feasibility and primary service/cost objectives"
+      ],
+      "source": "https://sp.ftn.uns.ac.rs/index.php/ijiem/article/view/1976"
+    },
+    {
+      "id": "SOTA-SLP-DES-GA-CROSSINDUSTRY-2026",
+      "domain": "industrial facility layout, non-textile",
+      "published": "2026-07-21",
+      "method": [
+        "Systematic Layout Planning",
+        "discrete-event simulation",
+        "genetic algorithm"
+      ],
+      "reported_metrics": {
+        "material_handling_cost_reduction_pct": 35,
+        "monthly_throughput_increase_pct": 2.46
+      },
+      "scope": "transformer manufacturing facility",
+      "limitations": [
+        "not apparel/textile",
+        "results are case-specific",
+        "do not transfer percentages as Atelier targets"
+      ],
+      "reproduction": [
+        "compare SLP baseline, DES and GA hybrid",
+        "verify handling cost boundary and throughput denominator",
+        "use as method comparator only"
+      ],
+      "source": "https://doi.org/10.3390/asi9070156"
+    },
+    {
+      "id": "SOTA-RMS-SYSTEMATIC-REVIEW-2026",
+      "domain": "reconfigurable manufacturing systems and supply-chain resilience",
+      "published": "2026-05-20",
+      "method": [
+        "PRISMA 2020 systematic review",
+        "Scopus review covering 1990–2025",
+        "247 peer-reviewed papers",
+        "three-level model connecting RMS characteristics, capabilities and resilience"
+      ],
+      "reported_metrics": {
+        "papers_analyzed": 247,
+        "experimental_practical_gap": "qualitative review finding",
+        "diagnosability_research_coverage": "least studied RMS characteristic in the review"
+      },
+      "scope": "cross-industry RMS literature, with observed concentration in heavy industries and limited attention to process industries and supply-chain implications",
+      "limitations": [
+        "review does not prove a specific reconfiguration method works in apparel",
+        "supply-chain resilience relationship is mainly theoretical and insufficiently tested in practice",
+        "classification findings are bounded by review corpus, search strategy and publication years"
+      ],
+      "reproduction": [
+        "use as a taxonomy and research-gap map, not as a numerical performance baseline",
+        "evaluate the least-studied diagnosability dimension through injected faults and evidence invalidation",
+        "measure physical reconfiguration and network resilience in textile partner pilots"
+      ],
+      "source": "https://doi.org/10.3390/logistics10050117"
+    },
+    {
+      "id": "SOTA-RECONFIGURABILITY-INDEX-PCA-2026",
+      "domain": "reconfigurability maturity and industrial performance associations",
+      "published": "2026-06-19",
+      "method": [
+        "principal component analysis",
+        "survey/empirical data from 112 Portuguese manufacturing companies",
+        "five dimensions: modularity, integrability, customization, adaptability and diagnosability"
+      ],
+      "reported_metrics": {
+        "companies": 112,
+        "kmo": 0.73,
+        "variance_explained_pct": 66.05,
+        "adaptability_contribution_pct": 25,
+        "diagnosability_contribution_pct": 25
+      },
+      "scope": "Portuguese manufacturing company sample; transferable-index proposal but empirical context remains geographically and sector bounded",
+      "limitations": [
+        "not an apparel-specific causal study",
+        "the derived index is not a universal standard or engineering acceptance threshold",
+        "associations with cost and delivery performance do not prove causal effects"
+      ],
+      "reproduction": [
+        "retain the five dimensions as a research taxonomy",
+        "measure adaptability and diagnosability independently instead of rewarding physical modularity alone",
+        "estimate Atelier-specific factor weights only after collecting sufficient, representative data"
+      ],
+      "source": "https://doi.org/10.1007/s00170-026-18507-6"
+    }
+  ],
+  "synthesis": {
+    "recommended_architecture": "feasibility-first hierarchical co-optimization with iterative cross-stage feedback",
+    "stages": [
+      "pattern_and_seam_workload",
+      "cut_order_and_marker_yield",
+      "machine_and_worker_allocation",
+      "facility_layout_and_flow",
+      "supplier_partner_order_allocation",
+      "multi_line_schedule_and_lot_streaming",
+      "discrete_event_variability_and_reconfiguration"
+    ],
+    "mandatory_baselines": [
+      "manual_or_SLP",
+      "transparent_greedy_heuristics",
+      "exact_MILP_or_brute_force_on_small_instances",
+      "published_GA_or_PSO_when_the_paper_task_matches"
+    ],
+    "hard_constraints": [
+      "safety_and_egress",
+      "machine_process_capability",
+      "worker_skill_and_calendar",
+      "inspection_authority",
+      "material_lot_and_recipe_compatibility",
+      "operation_precedence",
+      "qualified_supplier_and_partner_route",
+      "privacy_and_worker_rights"
+    ],
+    "objectives_report_separately": [
+      "lead_time",
+      "makespan",
+      "travel",
+      "WIP",
+      "machine_count",
+      "workload_balance",
+      "first_pass_yield",
+      "rework_and_scrap",
+      "fabric_yield",
+      "accepted_output",
+      "fully_loaded_cost",
+      "resource_intensity",
+      "resilience_recovery"
+    ],
+    "claim_boundary": "A result on a synthetic case, paper reproduction or simulation is not a measured physical factory improvement.",
+    "soft_first_reconfiguration": {
+      "principle": "Prefer logical allocation and qualified route changes before physical module movement; physical changes are selected only after accounting for changeover, interface inspection and requalification burden.",
+      "atelier_gap": "Diagnosability and requalification-aware transition planning: explain why a module/route became unavailable, identify which evidence dependencies changed, and quantify whether soft reallocation dominates a physical change.",
+      "benchmark": "ReconfigBench v0.1.0",
+      "apparel_baseline": {
+        "paper": "Toward smart and adaptive apparel manufacturing: pattern-driven genetic algorithm optimization for modular garment assembly",
+        "published": "2026-09-01",
+        "doi": "10.1108/IJCST-01-2026-0029",
+        "result": "The study reports simulated production-time and workload-balance improvements from pattern-driven machine allocation, including additional-order rescheduling in a fixed modular structure without physical line reconfiguration.",
+        "numeric_effect_size": "not extracted; do not invent a transferable percentage",
+        "scope": "fixed modular apparel assembly structure evaluated by deterministic event-based simulation"
+      }
+    }
+  }
+}

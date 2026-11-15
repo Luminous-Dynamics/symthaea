@@ -1,0 +1,594 @@
+{
+  "dictionary_version": "0.1.0",
+  "benchmark": "Atelier FactoryBench",
+  "created_at": "2026-11-15",
+  "status": "proposed_measurement_contract",
+  "claim_ceiling": "Metric definitions support reproducible comparison. They do not establish measured performance, standards conformity, production capacity, product quality, worker wellbeing, or commercial viability.",
+  "governing_rules": [
+    "Every metric result is bound to exact product, process, facility, cell, equipment and dataset revisions where applicable.",
+    "Every result records its evidence class, interval, sample size, source references, input digest, exclusions and uncertainty.",
+    "Missing, unknown, stale or unmeasured values remain missing or indeterminate; never replace them with zero.",
+    "Synthetic, simulated, paper-reported, vendor-claimed, imported, measured and independently measured results are separate evidence classes.",
+    "No weighted aggregate may compensate for failed safety, egress, inspection, worker qualification, material admission or capability constraints.",
+    "OEE is reported per named work unit or asset; do not average unrelated machine OEE values into a factory score.",
+    "Garment SAM/SMV, line efficiency and OEE require distinct stated time boundaries and must not be treated as interchangeable."
+  ],
+  "evidence_classes": [
+    "synthetic",
+    "simulated",
+    "paper_reported",
+    "vendor_claimed",
+    "imported",
+    "measured",
+    "independently_measured"
+  ],
+  "common_result_envelope": {
+    "required_fields": [
+      "metric_id",
+      "definition_version",
+      "value",
+      "unit",
+      "evidence_class",
+      "observed_from",
+      "observed_until",
+      "sample_count",
+      "product_scope_ref",
+      "process_revision_ref",
+      "facility_or_partner_ref",
+      "input_digest_sha256",
+      "evidence_refs",
+      "exclusions",
+      "uncertainty"
+    ],
+    "missing_value_representation": "value=null with an explicit missing_reason; do not use 0.",
+    "percentile_method": "nearest-rank: sort n observations ascending and select rank ceil(p*n), with rank indexed from 1.",
+    "confidence_interval": "Publish interval and method for sampled or stochastic metrics; do not infer one from a single run."
+  },
+  "comparability_key": [
+    "garment_family_and_style_revision",
+    "size_and_colour_mix",
+    "fabric_and_trim_lot_or_equivalent_material_class",
+    "order_quantity_and_lot_streaming_policy",
+    "operation_graph_and_approved_standard_work_revision",
+    "machine_count_and_capability_profile",
+    "staffing_and_skill_mix",
+    "shift_calendar_and_paid_time_definition",
+    "inspection_and_first_pass_acceptance_definition",
+    "planned_and_unplanned_downtime_boundary",
+    "facility_and_partner_boundary",
+    "freight_and_queue_boundary",
+    "measurement_method_and_uncertainty"
+  ],
+  "standards_alignment": {
+    "iso_22400_2": {
+      "reference": "ISO 22400-2:2014",
+      "status_at_2026_11_15": "Published 2014 edition remains the published reference; ISO/PRF 22400-2 Edition 2 entered final approval on 2026-11-13 and is not yet published.",
+      "use": "Review metric structure, formulas, units and work-unit boundaries against the published standard and update the adapter after Edition 2 publication.",
+      "conformance_claim": false
+    },
+    "iso_23247_5_2026": {
+      "use": "Digital-thread reference for linking product, planning, production and testing evidence.",
+      "conformance_claim": false
+    },
+    "nist_ir_8536_september_2026": {
+      "use": "Interoperability and provenance principles across independently operated partner systems; preserve source payload ownership.",
+      "conformance_claim": false
+    }
+  },
+  "metrics": [
+    {
+      "metric_id": "AT-FB-PROD-001",
+      "name": "Approved standard minutes per accepted product",
+      "dimension": "work_content",
+      "unit": "standard_minutes_per_accepted_unit",
+      "formula": "sum(approved_standard_minutes_for_each_product_revision * first_pass_accepted_quantity) / first_pass_accepted_quantity",
+      "numerator": "Approved standard minutes earned by first-pass accepted units, with style/size-specific standard-work revision.",
+      "denominator": "First-pass accepted units.",
+      "boundary": "Product and construction revision; exclude synthetic ticks unless separately labeled synthetic.",
+      "required_metadata": [
+        "standard_method_ref",
+        "standard_allowances_policy",
+        "product_revision_ref",
+        "size_mix"
+      ],
+      "cautions": [
+        "SAM/SMV values must be established by an identified method and review; generated estimates are not measured standard times."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-LAB-001",
+      "name": "Quality-adjusted sewing line efficiency",
+      "dimension": "labour_productivity",
+      "unit": "percent",
+      "formula": "100 * first_pass_accepted_earned_standard_minutes / direct_paid_labour_minutes",
+      "numerator": "Approved standard minutes earned by units accepted on first inspection.",
+      "denominator": "Paid direct labour minutes assigned to the line during the measurement interval, including paid setup, training, waiting, rework and downtime; exclude unpaid breaks and separately report any exclusions.",
+      "boundary": "Named line, shift calendar, workforce and approved standard-work revision.",
+      "required_metadata": [
+        "standard_method_ref",
+        "paid_time_policy_ref",
+        "worker_count_by_skill",
+        "overtime_minutes",
+        "downtime_minutes"
+      ],
+      "cautions": [
+        "This is a quality-adjusted definition; do not compare to a published line-efficiency figure unless numerator and denominator are matched."
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "line_efficiency_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-OEE-001",
+      "name": "Overall equipment effectiveness",
+      "dimension": "equipment_effectiveness",
+      "unit": "percent",
+      "formula": "100 * availability_ratio * performance_ratio * first_pass_quality_ratio",
+      "numerator": "Availability = run time / planned production time; performance = ideal cycle time * total count / run time; quality = first-pass good count / total count.",
+      "denominator": "Named work unit or asset's planned production time and total output count.",
+      "boundary": "Single named asset or work unit, with a pre-registered treatment for changeovers, planned stops, microstoppages and rework.",
+      "required_metadata": [
+        "asset_ref",
+        "planned_production_time_seconds",
+        "run_time_seconds",
+        "ideal_cycle_time_seconds",
+        "total_count",
+        "first_pass_good_count",
+        "loss_classification_policy"
+      ],
+      "cautions": [
+        "Do not average OEE across heterogeneous assets or use OEE as a proxy for garment quality, whole-factory productivity or worker wellbeing."
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "calculate_oee",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-QUAL-001",
+      "name": "First-pass yield",
+      "dimension": "quality",
+      "unit": "percent",
+      "formula": "100 * units_accepted_on_first_inspection / units_presented_for_first_inspection",
+      "numerator": "Distinct units accepted without rework at the first defined inspection gate.",
+      "denominator": "Distinct units presented for that gate for the first time.",
+      "boundary": "Named process/inspection gate and product revision.",
+      "required_metadata": [
+        "inspection_plan_ref",
+        "acceptance_criteria_revision",
+        "gate_ref",
+        "defect_taxonomy_ref"
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "first_pass_yield_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-QUAL-002",
+      "name": "Defects per hundred inspected units",
+      "dimension": "quality",
+      "unit": "defects_per_100_units",
+      "formula": "100 * total_nonconformity_occurrences / distinct_units_inspected",
+      "numerator": "Count of nonconformity occurrences using a frozen defect taxonomy; a unit may contribute multiple defects.",
+      "denominator": "Distinct units inspected.",
+      "boundary": "Inspection gate, defect taxonomy and sampling plan.",
+      "cautions": [
+        "Keep distinct from the percentage of defective units."
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "defects_per_100_units",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-QUAL-003",
+      "name": "Defective units per hundred inspected units",
+      "dimension": "quality",
+      "unit": "defective_units_per_100_units",
+      "formula": "100 * distinct_units_with_one_or_more_defects / distinct_units_inspected",
+      "numerator": "Distinct inspected units with at least one nonconformity.",
+      "denominator": "Distinct units inspected.",
+      "boundary": "Inspection gate and frozen acceptance criteria.",
+      "cautions": [
+        "Keep distinct from defects per hundred units; one garment with three defects counts once here."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-LAB-002",
+      "name": "First-pass accepted output per direct paid labour hour",
+      "dimension": "labour_productivity",
+      "unit": "accepted_units_per_direct_paid_labour_hour",
+      "formula": "first_pass_accepted_units / direct_paid_labour_hours",
+      "numerator": "Distinct units accepted without rework at the defined final acceptance gate.",
+      "denominator": "Paid direct labour hours under the same time boundary as line-efficiency measurement.",
+      "boundary": "Named line/facility/partner and shift interval.",
+      "required_metadata": [
+        "worker_count_by_skill",
+        "paid_time_policy_ref",
+        "inspection_plan_ref"
+      ]
+    },
+    {
+      "metric_id": "AT-FB-CAP-001",
+      "name": "Accepted output per constrained machine hour",
+      "dimension": "machine_productivity",
+      "unit": "accepted_units_per_constrained_machine_hour",
+      "formula": "first_pass_accepted_units / constrained_machine_operating_hours",
+      "numerator": "Distinct first-pass accepted units attributable to the named constrained machine/work unit.",
+      "denominator": "Available operating hours for that constrained resource; report calendar and downtime exclusions.",
+      "boundary": "Named asset and product mix.",
+      "cautions": [
+        "Do not use nameplate speed as actual productive hours."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-TIME-001",
+      "name": "Order-to-acceptance lead time P50/P95",
+      "dimension": "service",
+      "unit": "hours",
+      "formula": "nearest_rank_percentile(final_quality_release_timestamp - released_order_timestamp, p)",
+      "numerator": "Elapsed wall-clock time from released order to final independent quality release.",
+      "denominator": "One completed order; aggregate across orders using the declared percentile method.",
+      "boundary": "State separately whether partner queues, inbound material waits, transport and dispatch are included.",
+      "required_metadata": [
+        "order_release_event_ref",
+        "final_release_event_ref",
+        "timezone",
+        "percentile_method"
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "nearest_rank_percentile",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Nearest-rank aggregation only; event-time extraction, timezone normalization, order boundary and censoring remain external."
+      }
+    },
+    {
+      "metric_id": "AT-FB-SVC-001",
+      "name": "On-time in-full accepted orders",
+      "dimension": "service",
+      "unit": "percent",
+      "formula": "100 * due_orders_delivered_complete_and_accepted_by_promise / all_due_orders",
+      "numerator": "Orders delivered in full, accepted to the agreed criteria, and no later than the promised time.",
+      "denominator": "All orders due in the measurement interval.",
+      "boundary": "Customer promise and acceptance definition frozen before the period.",
+      "cautions": [
+        "A partial shipment or late order is not OTIF."
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "otif_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-FLOW-001",
+      "name": "Material travel distance per accepted unit",
+      "dimension": "flow",
+      "unit": "metres_per_accepted_unit",
+      "formula": "sum(flow_quantity * measured_or_declared_path_distance_metres) / first_pass_accepted_units",
+      "numerator": "Flow-weighted movement distance for identified material classes; report each class separately as well as total.",
+      "denominator": "First-pass accepted units.",
+      "boundary": "Named surveyed facility layout revision and movement period.",
+      "required_metadata": [
+        "layout_revision_ref",
+        "coordinate_frame_ref",
+        "distance_basis",
+        "flow_matrix_digest"
+      ],
+      "cautions": [
+        "Synthetic graph distances stay synthetic; do not infer physical travel distance from zone adjacency alone."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-FLOW-002",
+      "name": "Person travel distance per paid labour hour",
+      "dimension": "flow",
+      "unit": "metres_per_paid_labour_hour",
+      "formula": "sum(person_route_distance_metres) / direct_paid_labour_hours",
+      "numerator": "Measured person movement distance within the declared facility boundary.",
+      "denominator": "Direct paid labour hours over the same interval.",
+      "boundary": "Named facility layout revision; person movement must be measured or explicitly synthetic.",
+      "cautions": [
+        "Do not merge person movement with material handling distance."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-SETUP-001",
+      "name": "Changeover duration",
+      "dimension": "flexibility",
+      "unit": "minutes",
+      "formula": "production_ready_timestamp_after_changeover - planned_stop_timestamp",
+      "numerator": "Elapsed time from stop for the declared changeover until the cell is ready for the new configuration.",
+      "denominator": "One changeover event; publish distribution across repeated events.",
+      "boundary": "Named old/new configurations, setup procedure and resource set.",
+      "cautions": [
+        "Readiness is not the same as first conforming output."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-FLEX-001",
+      "name": "Time to first conforming unit",
+      "dimension": "flexibility",
+      "unit": "minutes",
+      "formula": "independent_first_good_unit_acceptance_timestamp - changeover_start_timestamp",
+      "numerator": "Elapsed time until the first independently accepted unit of the new product/configuration.",
+      "denominator": "One reconfiguration event.",
+      "boundary": "Include setup, ramp loss, required inspection and rework; identify any outsourced queue or transport.",
+      "cautions": [
+        "This is the primary reconfiguration KPI; nominal setup completion is insufficient."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-MAT-001",
+      "name": "Fabric material yield",
+      "dimension": "material_efficiency",
+      "unit": "percent",
+      "formula": "100 * net_fabric_mass_in_first_pass_accepted_units / gross_fabric_mass_issued_to_cut",
+      "numerator": "Measured fabric mass embodied in first-pass accepted units.",
+      "denominator": "Gross fabric mass issued to the cutting operation, including measured unusable loss.",
+      "boundary": "Same fabric lot, conditioning basis and mass measurement method.",
+      "required_metadata": [
+        "fabric_lot_ref",
+        "conditioning_method_ref",
+        "mass_measurement_method_ref",
+        "cut_plan_revision_ref"
+      ],
+      "cautions": [
+        "Report reusable offcuts, scrap, defects and rework separately; do not count unverified recoverability as yield."
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "material_yield_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-ENV-001",
+      "name": "Electricity per first-pass accepted unit",
+      "dimension": "resource_efficiency",
+      "unit": "kWh_per_first_pass_accepted_unit",
+      "formula": "metered_electricity_kWh_within_declared_boundary / first_pass_accepted_units",
+      "numerator": "Metered electricity for the declared production boundary; report idle/base load and rework separately where meters permit.",
+      "denominator": "First-pass accepted units.",
+      "boundary": "Named facility/cell/process and measurement interval; document shared loads and allocation.",
+      "required_metadata": [
+        "meter_ref",
+        "meter_calibration_ref",
+        "boundary_diagram_ref",
+        "allocation_method_ref"
+      ],
+      "cautions": [
+        "Do not infer energy from machine nameplate power or simulator defaults."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RES-001",
+      "name": "Disruption recovery time",
+      "dimension": "resilience",
+      "unit": "hours",
+      "formula": "stable_qualified_route_restoration_timestamp - disruption_detection_timestamp",
+      "numerator": "Elapsed time until the qualified route is restored and remains within the predeclared accepted-output and first-pass-quality envelope for the stability window.",
+      "denominator": "One named disruption event; aggregate distributions across repeated scenarios.",
+      "boundary": "Define detection event, stability window, acceptable rate, quality criteria and any supplier/utility recovery dependency.",
+      "cautions": [
+        "A process restart is not full recovery if quality, skill or material qualification is still missing."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-TRACE-001",
+      "name": "Material lot disposition traceability coverage",
+      "dimension": "traceability",
+      "unit": "percent",
+      "formula": "100 * critical_input_lots_with_complete_lineage_and_disposition / critical_input_lots_consumed",
+      "numerator": "Critical lots with resolvable links to all relevant descendants and final accepted output, rework, scrap or quarantine disposition.",
+      "denominator": "All critical input lots consumed in the period.",
+      "boundary": "Frozen lot classification and traceability-query scope.",
+      "cautions": [
+        "A record count or QR-code presence is not proof of complete lineage."
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "traceability_coverage_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
+    },
+    {
+      "metric_id": "AT-FB-ELIG-001",
+      "name": "False-eligible assignment rate",
+      "dimension": "capability_integrity",
+      "unit": "percent",
+      "formula": "100 * assignments_reported_Eligible_but_independently_rejected / all_assignments_reported_Eligible",
+      "numerator": "Assignments initially declared eligible but later rejected by an independent verifier using the same frozen facts and validity time.",
+      "denominator": "All assignments declared Eligible in the evaluated corpus.",
+      "boundary": "Exact evaluator and verifier versions, source snapshot, evidence validity time and adjudication policy.",
+      "cautions": [
+        "Report the absolute false-eligible count as well. Zero false positives on a small corpus is not proof of universal correctness."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-COST-001",
+      "name": "Fully loaded cost per first-pass accepted unit",
+      "dimension": "economics",
+      "unit": "currency_per_first_pass_accepted_unit",
+      "formula": "declared_total_cost_within_boundary / first_pass_accepted_units",
+      "numerator": "Materials, paid labour, setup, inspection, rework/scrap, utilities, maintenance, depreciation/lease, partner fees, freight, packaging, returns and allocated overhead within the stated accounting policy.",
+      "denominator": "First-pass accepted units.",
+      "boundary": "Currency, FX date, tax treatment, overhead policy and owned/partner boundary must be explicit.",
+      "cautions": [
+        "Do not compare without identical cost boundary and accounting policy."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-WORK-001",
+      "name": "Operator workload distribution",
+      "dimension": "workforce",
+      "unit": "declared_task_load_units",
+      "formula": "publish per-operator task load, range, median, P95, task repetition and task-specific ergonomic assessment; no single scalar pass score",
+      "numerator": "Not a single numerator; use task-specific measured work content and exposure observations.",
+      "denominator": "Per-operator scheduled/paid interval and declared task context.",
+      "boundary": "Privacy-preserving worker-approved data collection, role-level or pseudonymous aggregation.",
+      "cautions": [
+        "Utilization is not wellbeing; do not infer fatigue, comfort or safety from utilization alone."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-001",
+      "name": "Soft reallocation share of eligible demand changes",
+      "dimension": "reconfigurability",
+      "unit": "percent",
+      "formula": "100 * eligible_demand_changes_resolved_without_physical_module_or_connection_change / all_eligible_demand_changes",
+      "numerator": "Demand or order-mix changes resolved by reassignment within the unchanged, currently qualified physical configuration.",
+      "denominator": "All demand changes adjudicated as feasible under the frozen capability pool and safety/quality constraints.",
+      "boundary": "Named cell configuration, operation graph, demand-change corpus and time interval.",
+      "required_metadata": [
+        "current_configuration_digest",
+        "target_configuration_digest",
+        "transition_evaluator_version",
+        "demand_change_case_ref",
+        "qualification_status"
+      ],
+      "cautions": [
+        "Do not count an infeasible or quality-degrading assignment as successful soft reallocation.",
+        "This measures the share of changes handled without physical movement, not overall productivity."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-002",
+      "name": "Time to first independently accepted unit after a configuration change",
+      "dimension": "reconfigurability",
+      "unit": "minutes",
+      "formula": "independent_first_good_unit_acceptance_timestamp - change_trigger_timestamp",
+      "numerator": "Elapsed time from the triggering demand/configuration event to the first independently accepted product under the target configuration.",
+      "denominator": "One reconfiguration event; report median, P95 and all event outcomes.",
+      "boundary": "Include planning, physical moves, connection inspection, commissioning, requalification, operator handoff, ramp-up and first inspection; identify partner/transport boundary.",
+      "required_metadata": [
+        "change_trigger_event_ref",
+        "target_configuration_ref",
+        "commissioning_evidence_ref",
+        "first_acceptance_event_ref",
+        "inspection_plan_ref"
+      ],
+      "cautions": [
+        "A physically installed module or successful machine restart is not the endpoint.",
+        "Failed or censored reconfiguration events remain in the result set."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-003",
+      "name": "Physical reconfiguration downtime",
+      "dimension": "reconfigurability",
+      "unit": "minutes",
+      "formula": "qualified_production_stop_to_qualified_production_resume_elapsed_minutes",
+      "numerator": "Elapsed time from the first planned stop for physical change until the new configuration has completed its required independent requalification and is permitted by the responsible owners for production consideration.",
+      "denominator": "One physical configuration-change event.",
+      "boundary": "Named cell, exact before/after configuration digests and all independent qualification steps.",
+      "required_metadata": [
+        "stop_event_ref",
+        "resume_event_ref",
+        "before_configuration_digest",
+        "after_configuration_digest",
+        "requalification_obligation_refs"
+      ],
+      "cautions": [
+        "The benchmark evaluator's planned actions are not observed downtime.",
+        "Report labour-hours and external downtime separately where available."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-004",
+      "name": "Injected-fault diagnostic coverage",
+      "dimension": "diagnosability",
+      "unit": "percent",
+      "formula": "100 * injected_faults_correctly_localized_within_declared_time / all_injected_faults",
+      "numerator": "Injected fault cases localized to the correct module, interface, process revision, evidence dependency or utility within the preregistered time bound.",
+      "denominator": "All injected fault cases, including unresolved and false diagnoses.",
+      "boundary": "Frozen fault taxonomy, exact ground-truth labels, module graph and diagnostic algorithm revision.",
+      "required_metadata": [
+        "fault_corpus_digest",
+        "ground_truth_revision",
+        "diagnostic_algorithm_ref",
+        "time_bound_seconds",
+        "false_positive_count"
+      ],
+      "cautions": [
+        "Report false positives and localization time separately; detecting an alarm is not diagnosis.",
+        "Synthetic diagnosability does not establish field MTTR."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-005",
+      "name": "Requalification obligation count per physical transition",
+      "dimension": "qualification_burden",
+      "unit": "obligations_per_transition",
+      "formula": "count_of_distinct_independent_requalification_obligations_for_transition",
+      "numerator": "Distinct required requalification obligations emitted by the frozen dependency/invalidation rules.",
+      "denominator": "One physical reconfiguration event; publish distribution across events.",
+      "boundary": "Named profile, process, layout, tooling, utility, workforce and inspection evidence dependencies.",
+      "required_metadata": [
+        "before_configuration_digest",
+        "after_configuration_digest",
+        "invalidation_rule_revision",
+        "obligation_set_digest",
+        "independent_reviewer_ref"
+      ],
+      "cautions": [
+        "Lower counts are not inherently better; omitted required obligations are a safety/capability failure.",
+        "Compare only under matched change types and dependency graphs."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-006",
+      "name": "Qualified module reuse rate",
+      "dimension": "circularity_and_capacity",
+      "unit": "percent",
+      "formula": "100 * previously_qualified_modules_reused_in_target_configurations / all_modules_installed_in_target_configurations",
+      "numerator": "Distinct module instances reused without creating a new module identity, while their qualification remains valid for the target site/configuration.",
+      "denominator": "All module instances installed across target configurations in the measurement interval.",
+      "boundary": "Named module pool, facility/site identity and qualification dependencies.",
+      "required_metadata": [
+        "module_profile_revision_refs",
+        "before_after_configuration_refs",
+        "site_ref",
+        "module_identity_policy",
+        "qualification_validity_intervals"
+      ],
+      "cautions": [
+        "A reused module at a different site is not qualified by identity alone.",
+        "Reuse is not beneficial when it creates excessive changeover or requalification burden."
+      ]
+    }
+  ],
+  "synthesis": {
+    "reconfigurability_measurement": "ReconfigBench reports soft reallocation, time to first accepted unit, physical downtime, diagnostic coverage, requalification burden and qualified module reuse separately. Do not collapse them into a single modularity score."
+  }
+}
