@@ -267,7 +267,10 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "two-site gate charge-conservation residual {residual} exceeds tolerance {tolerance}"
             ),
-            Self::TwoSiteHamiltonianHermiticityResidual { residual, tolerance } => write!(
+            Self::TwoSiteHamiltonianHermiticityResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "two-site Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
             ),
@@ -499,32 +502,60 @@ impl U1CanonicalGaugeReceipt {
             .fold(1.0, |bound, (_, residual)| bound * (1.0 + residual).sqrt())
     }
 
-    pub fn bond(&self) -> usize { self.bond }
-    pub fn site_count(&self) -> usize { self.site_count }
-    pub fn total_charge(&self) -> i32 { self.total_charge }
-    pub fn left_isometry_residuals(&self) -> &[(usize, f64)] { &self.left_isometry_residuals }
-    pub fn right_isometry_residuals(&self) -> &[(usize, f64)] { &self.right_isometry_residuals }
-    pub fn maximum_left_isometry_residual(&self) -> f64 { self.maximum_left_isometry_residual }
-    pub fn maximum_right_isometry_residual(&self) -> f64 { self.maximum_right_isometry_residual }
+    pub fn bond(&self) -> usize {
+        self.bond
+    }
+    pub fn site_count(&self) -> usize {
+        self.site_count
+    }
+    pub fn total_charge(&self) -> i32 {
+        self.total_charge
+    }
+    pub fn left_isometry_residuals(&self) -> &[(usize, f64)] {
+        &self.left_isometry_residuals
+    }
+    pub fn right_isometry_residuals(&self) -> &[(usize, f64)] {
+        &self.right_isometry_residuals
+    }
+    pub fn maximum_left_isometry_residual(&self) -> f64 {
+        self.maximum_left_isometry_residual
+    }
+    pub fn maximum_right_isometry_residual(&self) -> f64 {
+        self.maximum_right_isometry_residual
+    }
     pub fn left_exterior_operator_norm_upper_bound(&self) -> f64 {
         self.left_exterior_operator_norm_upper_bound
     }
     pub fn right_exterior_operator_norm_upper_bound(&self) -> f64 {
         self.right_exterior_operator_norm_upper_bound
     }
-    pub fn factorization_max_residual(&self) -> f64 { self.factorization_max_residual }
-    pub fn factorization_l2_residual(&self) -> f64 { self.factorization_l2_residual }
+    pub fn factorization_max_residual(&self) -> f64 {
+        self.factorization_max_residual
+    }
+    pub fn factorization_l2_residual(&self) -> f64 {
+        self.factorization_l2_residual
+    }
     pub fn state_reconstruction_l2_residual(&self) -> f64 {
         self.state_reconstruction_l2_residual
     }
     pub fn exact_zero_singular_values_omitted(&self) -> usize {
         self.exact_zero_singular_values_omitted
     }
-    pub fn selection_rule_residual(&self) -> f64 { self.selection_rule_residual }
-    pub fn input_norm_squared(&self) -> f64 { self.input_norm_squared }
-    pub fn output_norm_squared(&self) -> f64 { self.output_norm_squared }
-    pub fn relative_norm_drift(&self) -> f64 { self.relative_norm_drift }
-    pub fn is_qualified(&self) -> bool { self.qualified }
+    pub fn selection_rule_residual(&self) -> f64 {
+        self.selection_rule_residual
+    }
+    pub fn input_norm_squared(&self) -> f64 {
+        self.input_norm_squared
+    }
+    pub fn output_norm_squared(&self) -> f64 {
+        self.output_norm_squared
+    }
+    pub fn relative_norm_drift(&self) -> f64 {
+        self.relative_norm_drift
+    }
+    pub fn is_qualified(&self) -> bool {
+        self.qualified
+    }
 
     pub fn qualifies(&self, tolerance: f64) -> bool {
         tolerance.is_finite()
@@ -561,7 +592,9 @@ impl U1CanonicalGaugeReceipt {
             && self.right_exterior_operator_norm_upper_bound
                 + 8.0 * f64::EPSILON * self.required_right_exterior_bound().max(1.0)
                 >= self.required_right_exterior_bound()
-            && self.exterior_operator_norm_product_upper_bound().is_finite()
+            && self
+                .exterior_operator_norm_product_upper_bound()
+                .is_finite()
             && self.left_isometry_residuals.len() == self.bond
             && self
                 .left_isometry_residuals
@@ -573,8 +606,7 @@ impl U1CanonicalGaugeReceipt {
                         && *residual >= 0.0
                         && *residual <= tolerance
                 })
-            && self.right_isometry_residuals.len()
-                == self.site_count.saturating_sub(self.bond + 2)
+            && self.right_isometry_residuals.len() == self.site_count.saturating_sub(self.bond + 2)
             && self
                 .right_isometry_residuals
                 .iter()
@@ -1070,8 +1102,12 @@ impl ComplexU1Mps {
         for tensor in &self.tensors {
             mix(tensor.left_dimension() as u64);
             mix(tensor.right_dimension() as u64);
-            for charge in &tensor.left_charges { mix(*charge as u64); }
-            for charge in &tensor.right_charges { mix(*charge as u64); }
+            for charge in &tensor.left_charges {
+                mix(*charge as u64);
+            }
+            for charge in &tensor.right_charges {
+                mix(*charge as u64);
+            }
             for value in &tensor.data {
                 mix(value.re.to_bits());
                 mix(value.im.to_bits());
@@ -1938,8 +1974,6 @@ pub struct U1TwoSiteGate {
     hamiltonian_projection_error_operator_upper_bound: f64,
 }
 
-
-
 /// Hermitian nearest-neighbour two-qubit Hamiltonian restricted to U(1) sectors.
 ///
 /// Basis order is |00>, |01>, |10>, |11>. The only coupled block is the
@@ -1956,10 +1990,7 @@ pub struct U1TwoSiteHamiltonian {
 
 impl U1TwoSiteHamiltonian {
     /// Construct a finite Hermitian two-site Hamiltonian with zero U(1) flux.
-    pub fn new(
-        matrix: [[Complex64; 4]; 4],
-        tolerance: f64,
-    ) -> Result<Self, U1MpsError> {
+    pub fn new(matrix: [[Complex64; 4]; 4], tolerance: f64) -> Result<Self, U1MpsError> {
         if !tolerance.is_finite() || tolerance <= 0.0 {
             return Err(U1MpsError::InvalidTolerance(tolerance));
         }
@@ -2017,9 +2048,7 @@ impl U1TwoSiteHamiltonian {
         let projection_residual_frobenius = matrix
             .iter()
             .zip(projected.iter())
-            .flat_map(|(row, projected_row)| {
-                row.iter().zip(projected_row.iter())
-            })
+            .flat_map(|(row, projected_row)| row.iter().zip(projected_row.iter()))
             .map(|(value, projected_value)| (*value - *projected_value).norm_sqr())
             .sum::<f64>()
             .sqrt();
@@ -2093,12 +2122,10 @@ impl U1TwoSiteHamiltonian {
         let mut gate = [[Complex64::new(0.0, 0.0); 4]; 4];
         gate[0][0] = Complex64::from_polar(1.0, -dt * h00);
         gate[3][3] = Complex64::from_polar(1.0, -dt * h33);
-        gate[1][1] =
-            phase_single * (Complex64::new(cosine, 0.0) + imaginary_factor * difference);
+        gate[1][1] = phase_single * (Complex64::new(cosine, 0.0) + imaginary_factor * difference);
         gate[1][2] = phase_single * imaginary_factor * coupling;
         gate[2][1] = phase_single * imaginary_factor * coupling.conj();
-        gate[2][2] =
-            phase_single * (Complex64::new(cosine, 0.0) - imaginary_factor * difference);
+        gate[2][2] = phase_single * (Complex64::new(cosine, 0.0) - imaginary_factor * difference);
 
         let gate = U1TwoSiteGate::new(gate, gate_tolerance)?;
         // Duhamel's bound for H = H_projected + Delta, with H_projected
@@ -2114,7 +2141,6 @@ impl U1TwoSiteHamiltonian {
         gate.with_hamiltonian_projection_error(projection_operator_error_upper_bound)
     }
 }
-
 
 /// The exact two-site tensor obtained after contracting an MPS bond and
 /// applying one U(1)-conserving two-qubit gate.
@@ -2218,10 +2244,7 @@ impl U1TwoSiteGate {
         self.hamiltonian_projection_error_operator_upper_bound
     }
 
-    fn with_hamiltonian_projection_error(
-        mut self,
-        bound: f64,
-    ) -> Result<Self, U1MpsError> {
+    fn with_hamiltonian_projection_error(mut self, bound: f64) -> Result<Self, U1MpsError> {
         if !bound.is_finite() || bound < 0.0 {
             return Err(U1MpsError::NonFiniteContraction(
                 "Hamiltonian projection error bound",
@@ -2986,8 +3009,7 @@ fn gate_quality_error_bounds_from_residuals(
     }
     let polar_distance = ((1.0 + block_unitarity_residual).sqrt() - 1.0)
         .max(1.0 - (1.0 - block_unitarity_residual).sqrt());
-    let quality_error =
-        (off_sector_operator_error + polar_distance) * pre_gate_norm_squared.sqrt();
+    let quality_error = (off_sector_operator_error + polar_distance) * pre_gate_norm_squared.sqrt();
     if !gate_operator_norm_upper.is_finite() || !quality_error.is_finite() {
         return Err(U1MpsError::NonFiniteContraction(
             "gate quality operator bound",
@@ -3007,11 +3029,16 @@ fn gate_quality_error_bounds(
     )
 }
 
-
 impl U1MpsTruncationLedger {
-    pub fn gate_count(&self) -> usize { self.gate_count }
-    pub fn accumulated_discarded_weight(&self) -> f64 { self.accumulated_discarded_weight }
-    pub fn cumulative_local_l2_error_bound(&self) -> f64 { self.cumulative_local_l2_error_bound }
+    pub fn gate_count(&self) -> usize {
+        self.gate_count
+    }
+    pub fn accumulated_discarded_weight(&self) -> f64 {
+        self.accumulated_discarded_weight
+    }
+    pub fn cumulative_local_l2_error_bound(&self) -> f64 {
+        self.cumulative_local_l2_error_bound
+    }
     pub fn cumulative_canonicalization_l2_error_bound(&self) -> f64 {
         self.cumulative_canonicalization_l2_error_bound
     }
@@ -3082,10 +3109,7 @@ impl U1MpsTruncationLedger {
 
     /// Record local tensor truncation diagnostics without claiming a global
     /// state-vector bound.
-    fn record(
-        &mut self,
-        diagnostics: &U1TwoSiteTruncationDiagnostics,
-    ) -> Result<(), U1MpsError> {
+    fn record(&mut self, diagnostics: &U1TwoSiteTruncationDiagnostics) -> Result<(), U1MpsError> {
         self.record_local(diagnostics)?;
         self.global_state_error_bound_qualified = false;
         self.global_state_error_bound_upper = None;
@@ -3194,10 +3218,8 @@ impl U1MpsTruncationLedger {
         // approximation defects act on that reference state, not merely on
         // the current approximate state.
         let current_state_norm = pre_gate_norm_squared.sqrt();
-        let reference_state_norm_upper =
-            current_state_norm + prior_bound.unwrap_or(0.0);
-        let reference_state_norm_squared =
-            reference_state_norm_upper * reference_state_norm_upper;
+        let reference_state_norm_upper = current_state_norm + prior_bound.unwrap_or(0.0);
+        let reference_state_norm_squared = reference_state_norm_upper * reference_state_norm_upper;
         let (gate_operator_norm_upper, gate_quality_error) =
             gate_quality_error_bounds_from_residuals(
                 gate_unitarity_residual,
@@ -3255,9 +3277,9 @@ impl U1MpsTruncationLedger {
         if let Some(bound) = next_bound {
             self.global_state_error_bound_qualified = true;
             self.global_state_error_bound_upper = Some(bound);
-            self.cumulative_canonicalization_l2_error_bound =
-                prior_canonicalization_error * gate_operator_norm_upper
-                    + canonicalization_error * gate_operator_norm_upper;
+            self.cumulative_canonicalization_l2_error_bound = prior_canonicalization_error
+                * gate_operator_norm_upper
+                + canonicalization_error * gate_operator_norm_upper;
             self.cumulative_gate_quality_l2_error_bound =
                 prior_gate_quality_error * gate_operator_norm_upper + gate_quality_error;
             self.cumulative_hamiltonian_projection_l2_error_bound =
@@ -3450,8 +3472,7 @@ impl U1TeBDLayer {
             let truncation = evolved_pair.split_truncated(policy)?;
             let prior_global_bound = truncation_ledger.global_state_error_bound_upper;
             let current_state_norm = gauge_receipt.output_norm_squared.sqrt();
-            let reference_state_norm_upper =
-                current_state_norm + prior_global_bound.unwrap_or(0.0);
+            let reference_state_norm_upper = current_state_norm + prior_global_bound.unwrap_or(0.0);
             let reference_state_norm_squared =
                 reference_state_norm_upper * reference_state_norm_upper;
             let (gate_operator_norm_upper, gate_quality_error_upper_bound) =
@@ -3469,11 +3490,11 @@ impl U1TeBDLayer {
             let global_l2_error_contribution = truncation_ledger
                 .global_state_error_bound_upper
                 .map(|after| after - propagated_prior_bound);
-            let global_l2_error_bound_after_gate =
-                truncation_ledger.global_state_error_bound_upper;
+            let global_l2_error_bound_after_gate = truncation_ledger.global_state_error_bound_upper;
             let local_projection_error_upper_bound = truncation.reconstruction_l2_residual;
-            let hamiltonian_projection_operator_error_upper_bound =
-                entry.gate.hamiltonian_projection_error_operator_upper_bound();
+            let hamiltonian_projection_operator_error_upper_bound = entry
+                .gate
+                .hamiltonian_projection_error_operator_upper_bound();
             let hamiltonian_projection_error_upper_bound =
                 hamiltonian_projection_operator_error_upper_bound * reference_state_norm_upper;
             state.tensors[bond] = truncation.left_tensor.clone();
@@ -3518,8 +3539,6 @@ impl U1TeBDLayer {
     }
 }
 
-
-
 /// One nearest-neighbour two-site Hamiltonian term in a U(1) chain.
 #[derive(Debug, Clone, PartialEq)]
 pub struct U1TeBDHamiltonianTerm {
@@ -3529,7 +3548,10 @@ pub struct U1TeBDHamiltonianTerm {
 
 impl U1TeBDHamiltonianTerm {
     pub fn new(bond_index: usize, hamiltonian: U1TwoSiteHamiltonian) -> Self {
-        Self { bond_index, hamiltonian }
+        Self {
+            bond_index,
+            hamiltonian,
+        }
     }
 
     pub const fn bond_index(&self) -> usize {
@@ -3625,12 +3647,7 @@ impl U1TeBDStrangStepper {
         dt: f64,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TeBDStepResult, U1MpsError> {
-        self.apply_with_ledger(
-            input,
-            dt,
-            policy,
-            U1MpsTruncationLedger::default(),
-        )
+        self.apply_with_ledger(input, dt, policy, U1MpsTruncationLedger::default())
     }
 
     /// Apply one Strang step while continuing an existing error ledger.
@@ -3659,7 +3676,8 @@ impl U1TeBDStrangStepper {
         let mut odd_full_gates = Vec::new();
         for term in &self.terms {
             let gate = if term.bond_index % 2 == 0 {
-                term.hamiltonian.evolution_gate(0.5 * dt, policy.tolerance)?
+                term.hamiltonian
+                    .evolution_gate(0.5 * dt, policy.tolerance)?
             } else {
                 term.hamiltonian.evolution_gate(dt, policy.tolerance)?
             };
@@ -3676,16 +3694,10 @@ impl U1TeBDStrangStepper {
         let even_last = U1TeBDLayer::new(self.site_count, 0, even_half_gates)?;
 
         let first = even_first.apply_with_ledger(input, policy, initial_ledger)?;
-        let second = odd.apply_with_ledger(
-            &first.state,
-            policy,
-            first.truncation_ledger.clone(),
-        )?;
-        let third = even_last.apply_with_ledger(
-            &second.state,
-            policy,
-            second.truncation_ledger.clone(),
-        )?;
+        let second =
+            odd.apply_with_ledger(&first.state, policy, first.truncation_ledger.clone())?;
+        let third =
+            even_last.apply_with_ledger(&second.state, policy, second.truncation_ledger.clone())?;
 
         let mut gate_receipts = first.gate_receipts;
         gate_receipts.extend(second.gate_receipts);
@@ -3699,8 +3711,7 @@ impl U1TeBDStrangStepper {
         let output_norm_squared = third.state.norm_squared(policy.tolerance)?;
         let output_selection_rule_residual = third.state.selection_rule_residual();
         let output_total_charge = third.state.total_charge();
-        let global_l2_bound_qualified =
-            third.truncation_ledger.global_state_error_bound_qualified;
+        let global_l2_bound_qualified = third.truncation_ledger.global_state_error_bound_qualified;
 
         Ok(U1TeBDStepResult {
             state: third.state,
@@ -3721,16 +3732,13 @@ impl U1TeBDStrangStepper {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
-        U1TeBDStepResult, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
-        U1TwoSiteState,
-        U1TwoSiteTruncationPolicy,
-        left_isometry_residual, right_isometry_residual,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
+        U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
+        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
 
@@ -4580,9 +4588,7 @@ mod tests {
 
         let mut ledger = U1MpsTruncationLedger::default();
         ledger.record(&diagnostics).unwrap();
-        assert!(
-            ledger.cumulative_local_l2_error_bound >= diagnostics.reconstruction_l2_residual
-        );
+        assert!(ledger.cumulative_local_l2_error_bound >= diagnostics.reconstruction_l2_residual);
         assert!(!ledger.global_state_error_bound_qualified);
     }
 
@@ -5136,10 +5142,7 @@ mod tests {
         let layer = U1TeBDLayer::new(
             4,
             0,
-            vec![
-                U1TeBDGate::new(0, gate.clone()),
-                U1TeBDGate::new(2, gate),
-            ],
+            vec![U1TeBDGate::new(0, gate.clone()), U1TeBDGate::new(2, gate)],
         )
         .unwrap();
         let result = layer
@@ -5163,8 +5166,7 @@ mod tests {
 
         let first_bound = first.global_l2_error_bound_after_gate.unwrap();
         let second_bound = second.global_l2_error_bound_after_gate.unwrap();
-        let second_gate_operator_norm =
-            (1.0 + second.gate_unitarity_residual).sqrt();
+        let second_gate_operator_norm = (1.0 + second.gate_unitarity_residual).sqrt();
         let propagated_first = first_bound * second_gate_operator_norm;
         let second_increment = second.global_l2_error_contribution.unwrap();
         assert!(second_increment >= 0.0);
@@ -5186,13 +5188,17 @@ mod tests {
             .global_state_error_bound_upper
             .unwrap();
         assert!(bound + 1.0e-12 >= actual_error);
-        let component_sum = result.truncation_ledger.cumulative_canonicalization_l2_error_bound
-            + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
-            + result.truncation_ledger.cumulative_projection_l2_error_bound;
+        let component_sum = result
+            .truncation_ledger
+            .cumulative_canonicalization_l2_error_bound
+            + result
+                .truncation_ledger
+                .cumulative_gate_quality_l2_error_bound
+            + result
+                .truncation_ledger
+                .cumulative_projection_l2_error_bound;
         assert!((component_sum - bound).abs() <= 1.0e-12);
     }
-
-
 
     #[test]
     fn gate_quality_operator_bound_accounts_for_entrywise_to_spectral_norm_conversion() {
@@ -5231,8 +5237,7 @@ mod tests {
         let gate = hamiltonian.evolution_gate(dt, 1.0e-12).unwrap();
         let expected = dt.abs() * delta * (dt.abs() * delta).exp();
         assert!(
-            (gate.hamiltonian_projection_error_operator_upper_bound() - expected).abs()
-                <= 1.0e-12
+            (gate.hamiltonian_projection_error_operator_upper_bound() - expected).abs() <= 1.0e-12
         );
         // The true scalar-channel amplitude error is exp(delta*dt)-1.
         let true_error = (delta * dt).exp() - 1.0;
@@ -5260,25 +5265,22 @@ mod tests {
         assert!((matrix[0][0] - Complex64::from_polar(1.0, -dt * 0.2)).norm() <= 1.0e-12);
         assert!((matrix[3][3] - Complex64::from_polar(1.0, dt * 0.3)).norm() <= 1.0e-12);
         assert!(
-            (matrix[1][2] - Complex64::new(0.0, -sine_over_radius * coupling)).norm()
-                <= 1.0e-12
+            (matrix[1][2] - Complex64::new(0.0, -sine_over_radius * coupling)).norm() <= 1.0e-12
         );
         assert!(
-            (matrix[2][1] - Complex64::new(0.0, -sine_over_radius * coupling)).norm()
-                <= 1.0e-12
+            (matrix[2][1] - Complex64::new(0.0, -sine_over_radius * coupling)).norm() <= 1.0e-12
         );
         assert!(
             (matrix[1][1]
                 - Complex64::new(cosine, 0.0)
                 - Complex64::new(0.0, -sine_over_radius * difference))
-                .norm()
+            .norm()
                 <= 1.0e-12
         );
         assert!(
-            (matrix[2][2]
-                - Complex64::new(cosine, 0.0)
+            (matrix[2][2] - Complex64::new(cosine, 0.0)
                 + Complex64::new(0.0, -sine_over_radius * difference))
-                .norm()
+            .norm()
                 <= 1.0e-12
         );
         assert!(gate.unitarity_residual() <= 1.0e-12);
@@ -5317,8 +5319,6 @@ mod tests {
         assert!(model.evolution_gate(f64::INFINITY, 1.0e-12).is_err());
         assert!(model.evolution_gate(0.1, f64::NAN).is_err());
     }
-
-
 
     fn nearest_neighbour_hopping_term(coupling: f64) -> U1TwoSiteHamiltonian {
         let mut matrix = [[complex_zero(); 4]; 4];
@@ -5456,7 +5456,10 @@ mod tests {
 
         let gate = hamiltonian.evolution_gate(0.3, 1.0e-12).unwrap();
         assert!(gate.hamiltonian_projection_error_operator_upper_bound() > 0.0);
-        assert!(gate.hamiltonian_projection_error_operator_upper_bound().is_finite());
+        assert!(
+            gate.hamiltonian_projection_error_operator_upper_bound()
+                .is_finite()
+        );
         assert!(gate.unitarity_residual() <= 1.0e-12);
         assert_eq!(gate.charge_conservation_residual(), 0.0);
     }
@@ -5473,11 +5476,8 @@ mod tests {
         matrix[1][0] = Complex64::new(1.0e-8, 0.0);
         let hamiltonian = U1TwoSiteHamiltonian::new(matrix, 1.0e-6).unwrap();
 
-        let stepper = U1TeBDStrangStepper::new(
-            2,
-            vec![U1TeBDHamiltonianTerm::new(0, hamiltonian)],
-        )
-        .unwrap();
+        let stepper =
+            U1TeBDStrangStepper::new(2, vec![U1TeBDHamiltonianTerm::new(0, hamiltonian)]).unwrap();
         let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
         let result = stepper
             .apply(
@@ -5501,15 +5501,24 @@ mod tests {
         let component_sum = result
             .truncation_ledger
             .cumulative_canonicalization_l2_error_bound
-            + result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+            + result
+                .truncation_ledger
+                .cumulative_gate_quality_l2_error_bound
             + result
                 .truncation_ledger
                 .cumulative_hamiltonian_projection_l2_error_bound
-            + result.truncation_ledger.cumulative_projection_l2_error_bound;
-        let bound = result.truncation_ledger.global_state_error_bound_upper.unwrap();
+            + result
+                .truncation_ledger
+                .cumulative_projection_l2_error_bound;
+        let bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .unwrap();
         assert!((component_sum - bound).abs() <= 1.0e-12);
         assert!(result.gate_receipts.iter().all(|receipt| {
-            receipt.hamiltonian_projection_operator_error_upper_bound.is_finite()
+            receipt
+                .hamiltonian_projection_operator_error_upper_bound
+                .is_finite()
                 && receipt.hamiltonian_projection_error_upper_bound.is_finite()
         }));
     }
@@ -5532,23 +5541,24 @@ mod tests {
             tolerance: 1.0e-10,
         };
         let first = stepper.apply(&input, 0.25, policy).unwrap();
-        let first_bound = first.truncation_ledger.global_state_error_bound_upper.unwrap();
+        let first_bound = first
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .unwrap();
         assert_eq!(first.truncation_ledger.gate_count, 3);
         let second = stepper
-            .apply_with_ledger(
-                &first.state,
-                0.25,
-                policy,
-                first.truncation_ledger.clone(),
-            )
+            .apply_with_ledger(&first.state, 0.25, policy, first.truncation_ledger.clone())
             .unwrap();
         assert_eq!(second.truncation_ledger.gate_count, 6);
         assert!(second.global_l2_bound_qualified);
-        assert!(second.truncation_ledger.global_state_error_bound_upper.unwrap() >= first_bound);
-        assert_eq!(
-            second.truncation_ledger.canonical_gauge_receipt_count,
-            6
+        assert!(
+            second
+                .truncation_ledger
+                .global_state_error_bound_upper
+                .unwrap()
+                >= first_bound
         );
+        assert_eq!(second.truncation_ledger.canonical_gauge_receipt_count, 6);
     }
 
     #[test]
@@ -5587,24 +5597,14 @@ mod tests {
         let first = stepper.apply(&input, 0.1, policy).unwrap();
         let unrelated = ComplexU1Mps::product_state(&[false, true, false]).unwrap();
         assert!(matches!(
-            stepper.apply_with_ledger(
-                &unrelated,
-                0.1,
-                policy,
-                first.truncation_ledger.clone()
-            ),
+            stepper.apply_with_ledger(&unrelated, 0.1, policy, first.truncation_ledger.clone()),
             Err(U1MpsError::TruncationLedgerStateMismatch)
         ));
         // The continuation is accepted when paired with the exact output state
         // to which the ledger was bound.
         assert!(
             stepper
-                .apply_with_ledger(
-                    &first.state,
-                    0.1,
-                    policy,
-                    first.truncation_ledger.clone()
-                )
+                .apply_with_ledger(&first.state, 0.1, policy, first.truncation_ledger.clone())
                 .is_ok()
         );
     }
@@ -5623,10 +5623,7 @@ mod tests {
             Err(U1MpsError::DuplicateTeBDGate { bond_index: 0 })
         ));
         assert!(matches!(
-            U1TeBDStrangStepper::new(
-                3,
-                vec![U1TeBDHamiltonianTerm::new(3, hamiltonian)]
-            ),
+            U1TeBDStrangStepper::new(3, vec![U1TeBDHamiltonianTerm::new(3, hamiltonian)]),
             Err(U1MpsError::TeBDGateOutOfRange { .. })
         ));
     }
@@ -5753,10 +5750,7 @@ mod tests {
         let mut norm_squared = 0.0;
         for (basis, amplitude) in dense.iter_mut().enumerate() {
             if basis.count_ones() as i32 == total_charge {
-                *amplitude = Complex64::new(
-                    deterministic_unit(seed),
-                    deterministic_unit(seed),
-                );
+                *amplitude = Complex64::new(deterministic_unit(seed), deterministic_unit(seed));
                 norm_squared += amplitude.norm_sqr();
             }
         }
@@ -5771,8 +5765,7 @@ mod tests {
     fn deterministic_u1_gate(seed: &mut u64, time_step: f64) -> U1TwoSiteGate {
         let mut hamiltonian = [[complex_zero(); 4]; 4];
         for index in 0..4 {
-            hamiltonian[index][index] =
-                Complex64::new(0.5 * deterministic_unit(seed), 0.0);
+            hamiltonian[index][index] = Complex64::new(0.5 * deterministic_unit(seed), 0.0);
         }
         let hopping = Complex64::new(
             0.7 * deterministic_unit(seed),
@@ -5860,7 +5853,8 @@ mod tests {
     }
 
     #[test]
-    fn global_error_certificate_falsification_grid_dominates_dense_oracle_for_noncanonical_gauges() {
+    fn global_error_certificate_falsification_grid_dominates_dense_oracle_for_noncanonical_gauges()
+    {
         const CASES: usize = 48;
         let mut qualified_cases = 0;
         let mut compression_cases = 0;
@@ -5891,14 +5885,9 @@ mod tests {
                 "case={case_index}, non-unitary virtual gauge changed the physical state: {gauge_state_error}"
             );
             if (input.tensors()[gauge_bond].data()
-                != ComplexU1Mps::from_dense_fixed_charge(
-                    &dense,
-                    site_count,
-                    total_charge,
-                    1.0e-12,
-                )
-                .unwrap()
-                .tensors()[gauge_bond]
+                != ComplexU1Mps::from_dense_fixed_charge(&dense, site_count, total_charge, 1.0e-12)
+                    .unwrap()
+                    .tensors()[gauge_bond]
                     .data())
             {
                 nontrivial_gauge_cases += 1;
@@ -5955,7 +5944,6 @@ mod tests {
         assert!(compression_cases > CASES / 3);
         assert_eq!(nontrivial_gauge_cases, CASES);
     }
-
 
     #[test]
     fn gate_quality_and_hamiltonian_projection_bounds_use_prior_reference_norm() {
@@ -6031,5 +6019,4 @@ mod tests {
                     + 2.0e-3 * reference_norm_upper
         );
     }
-
 }
