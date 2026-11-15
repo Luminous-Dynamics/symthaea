@@ -85,3 +85,19 @@ The reported anytime p-value uses the running maximum e-value: min(1, exp(-max_l
 This is valid under a simple conditional Gaussian null with known, positive sigma_t committed predictably with the discrepancy before each observation. It therefore supports known action-dependent measurement variance. It is not automatically valid for unknown or estimated variance, composite nulls, serial dependence not captured by the conditional model, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
 
 See docs/research/SEQUENTIAL_FALSIFICATION_EPROCESS_V0_2026-11-15.md for assumptions, equations, benchmark controls and the distinction from SLICE and terminal-test induction.
+
+
+## Sequential calibration report
+
+The standalone binary sequential_null_calibration runs a deterministic synthetic operating-characteristic study:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin sequential_null_calibration
+
+It reports, separately for a fixed-known-variance null, a predictable adaptive-variance null, and a material alternative:
+- path count, horizon, fixed root seed and PRNG version;
+- e-process boundary-crossing rate and 95% Wilson interval;
+- naive repeated fixed-time 5% test crossing rate and 95% Wilson interval;
+- mean look of e-process detection among paths that cross;
+- undetected path count.
+
+The focused GitHub workflow runs this binary and uploads the JSON, source commit identity and SHA-256 receipt. The fixed synthetic campaign uses 20,000 paths and 100 looks per scenario. Its checks are smoke gates for this exact generator: null e-process rates <=6%, and the adaptive-null naive repeated-look rate >10%. These are not universal statistical guarantees, a 5% calibration proof, confidence intervals across generator families, or physical validation. The naive repeated fixed-time test is deliberately invalid under optional stopping and is included only as a negative control.
