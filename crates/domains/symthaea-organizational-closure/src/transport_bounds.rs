@@ -266,6 +266,7 @@ pub enum TransportFindingCode {
     ReportedIntervalNarrowerThanSharpBound,
     UnsafeDecision,
     NonFiniteSharpBound,
+    TargetDistributionOutsideSensitivityEnvelope,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -852,7 +853,26 @@ pub fn evaluate_transport_bounds(
     let mut stratum_reports = Vec::new();
     let mut target_effect_lower = 0.0_f64;
     let mut target_effect_upper = 0.0_f64;
-    let mut target_ate = 0.0_f64;
+    let target_ate = oracle
+        .target_rows
+        .iter()
+        .map(|row| row.population_weight * (row.outcome_treatment - row.outcome_control))
+        .sum::<f64>();
+    if !target_ate.is_finite() {
+        push_finding(
+            &mut findings,
+            TransportFindingCode::NonFiniteTargetPotentialOutcome,
+            None,
+            None,
+            "evaluator target ATE is non-finite",
+        );
+        return empty_report(
+            scenario,
+            trace,
+            TransportQualification::NotQualified,
+            findings,
+        );
+    }
     let mut all_strata_supported = true;
     let mut all_density_ratios_compatible = true;
 
@@ -971,10 +991,6 @@ pub fn evaluate_transport_bounds(
         target_effect_lower += stratum.target_mass * stratum_lower;
         target_effect_upper += stratum.target_mass * stratum_upper;
 
-        let target_control_mean = weighted_mean(&target_control);
-        let target_treatment_mean = weighted_mean(&target_treatment);
-        target_ate += stratum.target_mass * (target_treatment_mean - target_control_mean);
-
         stratum_reports.push(TransportStratumReport {
             stratum_id: stratum.stratum_id.clone(),
             target_mass: stratum.target_mass,
@@ -1035,6 +1051,16 @@ pub fn evaluate_transport_bounds(
             trace,
             TransportQualification::NotQualified,
             findings,
+        );
+    }
+
+    if !all_density_ratios_compatible {
+        push_finding(
+            &mut findings,
+            TransportFindingCode::TargetDistributionOutsideSensitivityEnvelope,
+            None,
+            None,
+            "the evaluator-only target outcome distribution violates the registered conditional likelihood-ratio sensitivity envelope",
         );
     }
 
@@ -1139,6 +1165,69 @@ mod tests {
     }
 
     #[test]
+    fn threshold_reweighting_matches_exhaustive_finite_vertex_enumeration() {
+        let distribution = vec![
+            WeightedOutcome {
+                value: 0.0,
+                probability: 0.25,
+            },
+            WeightedOutcome {
+                value: 5.0,
+                probability: 0.50,
+            },
+            WeightedOutcome {
+                value: 10.0,
+                probability: 0.25,
+            },
+        ];
+        let lambda = 2.0;
+        let actual_lower = sharp_shifted_mean(&distribution, lambda, false).unwrap();
+        let actual_upper = sharp_shifted_mean(&distribution, lambda, true).unwrap();
+
+        let lower_ratio = 1.0 / lambda;
+        let upper_ratio = lambda;
+        let mut oracle_lower = f64::INFINITY;
+        let mut oracle_upper = f64::NEG_INFINITY;
+        // At a vertex of this box-constrained simplex, at most one
+        // likelihood ratio is interior. Enumerate endpoint pairs and solve
+        // the third ratio from sum_i p_i r_i = 1.
+        for first in [lower_ratio, upper_ratio] {
+            for second in [lower_ratio, upper_ratio] {
+                let third =
+                    (1.0 - 0.25 * first - 0.50 * second) / 0.25;
+                if third < lower_ratio - MASS_TOLERANCE
+                    || third > upper_ratio + MASS_TOLERANCE
+                {
+                    continue;
+                }
+                let mean = 0.25 * first * 0.0
+                    + 0.50 * second * 5.0
+                    + 0.25 * third * 10.0;
+                oracle_lower = oracle_lower.min(mean);
+                oracle_upper = oracle_upper.max(mean);
+            }
+        }
+        for first in [lower_ratio, upper_ratio] {
+            for third in [lower_ratio, upper_ratio] {
+                let second =
+                    (1.0 - 0.25 * first - 0.25 * third) / 0.50;
+                if second < lower_ratio - MASS_TOLERANCE
+                    || second > upper_ratio + MASS_TOLERANCE
+                {
+                    continue;
+                }
+                let mean = 0.25 * first * 0.0
+                    + 0.50 * second * 5.0
+                    + 0.25 * third * 10.0;
+                oracle_lower = oracle_lower.min(mean);
+                oracle_upper = oracle_upper.max(mean);
+            }
+        }
+        assert!((actual_lower - oracle_lower).abs() < 1.0e-10);
+        assert!((actual_upper - oracle_upper).abs() < 1.0e-10);
+    }
+
+    #[test]
     fn lambda_two_produces_sharp_threshold_bounds_and_covers_target() {
         let (scenario, oracle, trace) = fixture();
         let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
@@ -1211,12 +1300,15 @@ mod tests {
         let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
         assert_eq!(
             report.qualification,
-            TransportQualification::Qualified,
+            TransportQualification::NotQualified,
             "{:?}",
             report.findings
         );
         assert_eq!(report.oracle_within_sensitivity_model, Some(false));
         assert_eq!(report.target_truth_covered, Some(false));
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == TransportFindingCode::TargetDistributionOutsideSensitivityEnvelope
+        }));
     }
 
     #[test]
