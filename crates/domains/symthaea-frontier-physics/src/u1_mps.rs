@@ -3029,6 +3029,14 @@ fn gate_quality_error_bounds(
     )
 }
 
+#[derive(Debug, Clone, Copy)]
+struct U1MpsGateErrorContext {
+    unitarity_residual: f64,
+    charge_residual: f64,
+    hamiltonian_projection_operator_error_upper_bound: f64,
+    pre_gate_norm_squared: f64,
+}
+
 impl U1MpsTruncationLedger {
     pub fn gate_count(&self) -> usize {
         self.gate_count
@@ -3109,7 +3117,7 @@ impl U1MpsTruncationLedger {
 
     /// Record local tensor truncation diagnostics without claiming a global
     /// state-vector bound.
-    fn record(&mut self, diagnostics: &U1TwoSiteTruncationDiagnostics) -> Result<(), U1MpsError> {
+    pub fn record(&mut self, diagnostics: &U1TwoSiteTruncationDiagnostics) -> Result<(), U1MpsError> {
         self.record_local(diagnostics)?;
         self.global_state_error_bound_qualified = false;
         self.global_state_error_bound_upper = None;
@@ -3119,7 +3127,7 @@ impl U1MpsTruncationLedger {
     /// Compatibility helper for callers that have already established an
     /// exactly unitary, charge-conserving two-site gate. Production TEBD should
     /// use record_with_canonical_gauge_and_gate so gate defects are included.
-    fn record_with_canonical_gauge(
+    pub fn record_with_canonical_gauge(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
         receipt: &U1CanonicalGaugeReceipt,
@@ -3128,10 +3136,12 @@ impl U1MpsTruncationLedger {
         self.record_with_gate_error_bounds(
             diagnostics,
             receipt,
-            0.0,
-            0.0,
-            0.0,
-            receipt.output_norm_squared,
+            U1MpsGateErrorContext {
+                unitarity_residual: 0.0,
+                charge_residual: 0.0,
+                hamiltonian_projection_operator_error_upper_bound: 0.0,
+                pre_gate_norm_squared: receipt.output_norm_squared,
+            },
             tolerance,
         )
     }
@@ -3166,10 +3176,13 @@ impl U1MpsTruncationLedger {
         self.record_with_gate_error_bounds(
             diagnostics,
             receipt,
-            unitarity_residual,
-            charge_residual,
-            gate.hamiltonian_projection_error_operator_upper_bound(),
-            receipt.output_norm_squared,
+            U1MpsGateErrorContext {
+                unitarity_residual,
+                charge_residual,
+                hamiltonian_projection_operator_error_upper_bound: gate
+                    .hamiltonian_projection_error_operator_upper_bound(),
+                pre_gate_norm_squared: receipt.output_norm_squared,
+            },
             tolerance,
         )
     }
@@ -3181,12 +3194,15 @@ impl U1MpsTruncationLedger {
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
         receipt: &U1CanonicalGaugeReceipt,
-        gate_unitarity_residual: f64,
-        gate_charge_residual: f64,
-        hamiltonian_projection_operator_error_upper_bound: f64,
-        pre_gate_norm_squared: f64,
+        context: U1MpsGateErrorContext,
         tolerance: f64,
     ) -> Result<(), U1MpsError> {
+        let U1MpsGateErrorContext {
+            unitarity_residual: gate_unitarity_residual,
+            charge_residual: gate_charge_residual,
+            hamiltonian_projection_operator_error_upper_bound,
+            pre_gate_norm_squared,
+        } = context;
         let prior_count = self.gate_count;
         let prior_qualified = self.global_state_error_bound_qualified;
         let prior_bound = self.global_state_error_bound_upper;
@@ -3739,7 +3755,7 @@ impl U1TeBDStrangStepper {
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
         U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
         U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
     };
@@ -5993,10 +6009,12 @@ mod tests {
             .record_with_gate_error_bounds(
                 &diagnostics,
                 &receipt,
-                1.0e-3,
-                0.0,
-                2.0e-3,
-                pre_gate_norm_squared,
+                U1MpsGateErrorContext {
+                    unitarity_residual: 1.0e-3,
+                    charge_residual: 0.0,
+                    hamiltonian_projection_operator_error_upper_bound: 2.0e-3,
+                    pre_gate_norm_squared,
+                },
                 1.0e-10,
             )
             .unwrap();
