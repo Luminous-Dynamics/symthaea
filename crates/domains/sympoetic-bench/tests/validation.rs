@@ -293,6 +293,33 @@ fn unknown_tool_outcome_blocks_next_tool_invocation_until_reconciled() {
 }
 
 #[test]
+fn unknown_execution_blocks_non_tool_external_side_effects_too() {
+    let mut unknown = base_event("unknown-tool-result", 0, "tool_result");
+    unknown.actor = "tool".to_owned();
+    unknown.external_side_effect = true;
+    unknown.tool_execution = Some(ToolExecution {
+        tool_name: "external_mutation".to_owned(),
+        status: "unknown".to_owned(),
+        idempotency_key: Some("idempotency-unknown".to_owned()),
+        precondition_digest: Some(digest('e')),
+        postcondition_digest: None,
+    });
+    let mut artifact_change = base_event("external-artifact-write", 1, "artifact_revised");
+    artifact_change.external_side_effect = true;
+    artifact_change.parent_event_ids.push("unknown-tool-result".to_owned());
+
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "trace-unknown-side-effect".to_owned(),
+        scenario_id: "SP-ENG-001".to_owned(),
+        trace_digest: None,
+        events: vec![unknown, artifact_change],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
 fn consented_content_cannot_be_stored_after_revocation() {
     let mut event = base_event("stored-content", 0, "assistant_proposal");
     event.payload_storage = "encrypted_consented_reference".to_owned();
