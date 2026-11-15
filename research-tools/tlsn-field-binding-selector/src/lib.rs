@@ -510,8 +510,8 @@ mod tests {
         let composed = select(document, "/é");
         let decomposed = select(document, "/é");
 
-        assert_eq!(selected_bytes(document, &composed), br#"\"composed\""#);
-        assert_eq!(selected_bytes(document, &decomposed), br#"\"decomposed\""#);
+        assert_eq!(selected_bytes(document, &composed), br#""composed""#);
+        assert_eq!(selected_bytes(document, &decomposed), br#""decomposed""#);
         assert_ne!(composed.body_range, decomposed.body_range);
     }
 
