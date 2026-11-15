@@ -57,7 +57,7 @@ pub fn cohens_kappa_nominal(
     let expected = a_counts
         .iter()
         .map(|(label, count_a)| {
-            *count_a as f64 * *b_counts.get(label).unwrap_or(&0) as f64
+            *count_a as f64 * *b_counts.get(*label).unwrap_or(&0) as f64
         })
         .sum::<f64>()
         / (n * n);
