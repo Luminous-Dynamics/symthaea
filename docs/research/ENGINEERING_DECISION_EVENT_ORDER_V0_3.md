@@ -23,6 +23,16 @@ The remaining gap is test realism. A collection of static traces is useful but c
 
 The scheduler is not the v0.2 safety oracle. It emits reproducible schedule observations and precondition outcomes. Clock regressions and event-time regressions are diagnosed within an exact source clock series; a new epoch starts a new series. Failed/unresolved clock qualifications and semantic unsafe orderings are retained as replay inputs; malformed identity, causal references, or receipt-digest shapes are rejected. The next adapter must translate those into v0.2 owner-qualified inputs and run the matched evaluator ladder. A schedule may intentionally contain unsafe orderings; the scheduler must preserve them rather than silently "repair" them. A local clock regression is an observation about that source clock, not a cross-domain ordering claim.
 
+## v0.3.1 qualified capture-clock projection
+
+The stacked v0.3.1 branch is `research/event-order-v0-3-1-bitemporal-clocks-2026-11-15` and is tracked by [issue #12292](https://github.com/Luminous-Dynamics/symthaea/issues/12292). It introduces a versioned v0.3.1 schema without changing the original v0.3 schema path.
+
+`EventObserved` and `EventPersisted` now have distinct source clock series, local timestamps, exact clock-mapping action IDs, receipt references/digests and qualification states. The replay classifier diagnoses unqualified, expired, not-yet-valid, invalid-validity and stale-reference mappings for source, observer and durable-store clocks. The simulator `at_ns` remains scheduling time only.
+
+`project_bitemporal_event` requires the exact event production, unique event-level first observation and unique durable write to be replay-applied. It resolves all three owner times from a caller-supplied `QualifiedEventTime` map keyed by (mapping action ID, source-local timestamp); verifies clock receipt and validity binding; enforces occurrence-not-after-observation and observation-before-durable-record; then emits the v0.2 `BitemporalEventEnvelope`. Its evidence sidecar preserves the schedule digest, action IDs, mapping-action IDs, source-local timestamps and receipt digests. Missing owner resolution is Indeterminate; substituted identity or contradictory chronology is CriticalFailure. The adapter does not normalize clocks, authenticate signatures/trust roots, or reconstruct attempt/stop inventory yet.
+
+A standalone independent reference model is available at [event-order-v0.3.1-independent-reference.mjs](../../benchmarks/engineering-change-impact/event-order-v0.3.1-independent-reference.mjs), with its run record at [event-order-v0.3.1-independent-reference.json](../../benchmarks/engineering-change-impact/event-order-v0.3.1-independent-reference.json). It covers 8,000 capture-clock fault checks, 100,000 interval-order pairs and 100,000 projection-order cases. It is JavaScript reference evidence only, not execution of the Rust module.
+
 ## Paradigm shifts
 
 1. **From trace fixtures to executable histories.** Scenarios describe how facts are produced, delivered, observed and persisted, not only the final JSON snapshot.
