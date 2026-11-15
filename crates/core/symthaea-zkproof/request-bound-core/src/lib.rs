@@ -197,6 +197,49 @@ mod request_bound_tests {
     }
 
     #[test]
+    fn request_digest_matches_fixed_known_answer() {
+        let request = sample_request();
+        assert_eq!(
+            request.canonical_digest(),
+            [
+                0x67, 0x9d, 0x12, 0x0f, 0xd3, 0xa0, 0x36, 0xab,
+                0xb5, 0x17, 0xe0, 0xd3, 0x7e, 0x8a, 0xeb, 0xfc,
+                0xdc, 0xab, 0xde, 0xed, 0xa3, 0x42, 0x47, 0xf8,
+                0x92, 0x97, 0xc6, 0xf9, 0x5b, 0xed, 0x96, 0xcb,
+            ]
+        );
+    }
+
+    #[test]
+    fn request_validation_rejects_each_missing_context_reference() {
+        let original = sample_request();
+
+        let mut changed = original.clone();
+        changed.source_statement_reference_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptySourceStatementReferenceDigest));
+
+        let mut changed = original.clone();
+        changed.issuer_key_reference_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyIssuerKeyReferenceDigest));
+
+        let mut changed = original.clone();
+        changed.audience_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyAudienceDigest));
+
+        let mut changed = original.clone();
+        changed.verifier_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyVerifierDigest));
+
+        let mut changed = original.clone();
+        changed.purpose_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyPurposeDigest));
+
+        let mut changed = original;
+        changed.policy_digest = [0; 32];
+        assert_eq!(changed.validate(), Err(BalanceProofRequestValidationError::EmptyPolicyDigest));
+    }
+
+    #[test]
     fn request_digest_binds_every_context_field() {
         let original = sample_request();
         let original_digest = original.canonical_digest();
