@@ -1385,14 +1385,19 @@ mod tests {
 
     #[test]
     fn negative_outcome_support_is_handled_by_threshold_ordering() {
-        let (mut scenario, oracle, mut trace) = fixture();
+        let (mut scenario, mut oracle, mut trace) = fixture();
         scenario.source_trial[0].observed_outcome = -10.0;
         scenario.source_trial[1].observed_outcome = 10.0;
         scenario.source_trial[2].observed_outcome = -10.0;
         scenario.source_trial[3].observed_outcome = 10.0;
+        oracle.target_rows = vec![
+            TargetPotentialOutcomeRow::new(101, "x0", 0.5, -10.0, -10.0),
+            TargetPotentialOutcomeRow::new(102, "x0", 0.5, 10.0, 10.0),
+        ];
         trace.claim.reported_interval = TransportEffectInterval::new(-10.0, 10.0);
         let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, TransportQualification::Qualified, "{:?}", report.findings);
+        assert_eq!(report.oracle_within_sensitivity_model, Some(true));
         let bounds = report.recomputed_target_effect_bounds.unwrap();
         assert!(bounds.lower <= bounds.upper);
         assert!(bounds.lower.is_finite() && bounds.upper.is_finite());
