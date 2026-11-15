@@ -237,8 +237,7 @@ pub struct AnytimeValidCausalReport {
 
 impl AnytimeValidCausalReport {
     pub fn is_qualified(&self) -> bool {
-        self.qualification == AnytimeValidQualification::Qualified
-            && self.findings.is_empty()
+        self.qualification == AnytimeValidQualification::Qualified && self.findings.is_empty()
     }
 
     pub fn all_queries_covered(&self) -> Option<bool> {
@@ -307,8 +306,7 @@ pub fn hoeffding_alpha_spending_radius(
     }
 
     let n_f = n as f64;
-    let log_two_over_alpha_n =
-        LN_2 - armwise_alpha.ln() + n_f.ln() + (n_f + 1.0).ln();
+    let log_two_over_alpha_n = LN_2 - armwise_alpha.ln() + n_f.ln() + (n_f + 1.0).ln();
     let multiplier = (log_two_over_alpha_n / (2.0 * n_f)).sqrt();
     let radius = if multiplier >= 1.0 {
         outcome_range
@@ -330,12 +328,14 @@ fn arm_confidence_interval(
 
     let n = outcomes.len();
     // Stable online mean avoids overflowing a direct sum of large bounded values.
-    let mean = outcomes.iter().enumerate().fold(0.0, |current, (index, value)| {
-        current + (value - current) / (index + 1) as f64
-    });
+    let mean = outcomes
+        .iter()
+        .enumerate()
+        .fold(0.0, |current, (index, value)| {
+            current + (value - current) / (index + 1) as f64
+        });
     let range = upper - lower;
-    let radius = hoeffding_alpha_spending_radius(range, n, armwise_alpha)
-        .unwrap_or(range);
+    let radius = hoeffding_alpha_spending_radius(range, n, armwise_alpha).unwrap_or(range);
     let distance_to_lower = mean - lower;
     let distance_to_upper = upper - mean;
     let interval_lower = if radius >= distance_to_lower {
@@ -614,8 +614,10 @@ pub fn evaluate_anytime_valid_causal_effects(
     }
 
     let mut observation_ids = BTreeSet::new();
-    let mut observations_by_query: BTreeMap<String, (Vec<f64>, Vec<f64>)> =
-        queries.keys().map(|id| (id.clone(), (Vec::new(), Vec::new()))).collect();
+    let mut observations_by_query: BTreeMap<String, (Vec<f64>, Vec<f64>)> = queries
+        .keys()
+        .map(|id| (id.clone(), (Vec::new(), Vec::new())))
+        .collect();
 
     let mut unavailable_evidence = false;
     let mut rejected_evidence = false;
@@ -655,7 +657,10 @@ pub fn evaluate_anytime_valid_causal_effects(
             continue;
         };
 
-        if !scenario.evidence_receipts.contains_key(&observation.evidence_receipt_id) {
+        if !scenario
+            .evidence_receipts
+            .contains_key(&observation.evidence_receipt_id)
+        {
             push_finding(
                 &mut findings,
                 AnytimeValidFindingCode::UnknownEvidenceReceipt,
@@ -746,9 +751,7 @@ pub fn evaluate_anytime_valid_causal_effects(
             );
             continue;
         }
-        if observation.outcome < query.outcome_lower
-            || observation.outcome > query.outcome_upper
-        {
+        if observation.outcome < query.outcome_lower || observation.outcome > query.outcome_upper {
             push_finding(
                 &mut findings,
                 AnytimeValidFindingCode::OutcomeOutsideSupport,
@@ -768,7 +771,9 @@ pub fn evaluate_anytime_valid_causal_effects(
         }
     }
 
-    let claims: BTreeMap<String, &SequentialCausalClaim> = trace.claims.iter()
+    let claims: BTreeMap<String, &SequentialCausalClaim> = trace
+        .claims
+        .iter()
         .map(|claim| (claim.query_id.clone(), claim))
         .collect();
     if claims.len() != trace.claims.len() {
@@ -820,8 +825,7 @@ pub fn evaluate_anytime_valid_causal_effects(
         return empty_report(scenario, trace, qualification, findings);
     }
 
-    let per_arm_alpha =
-        scenario.familywise_alpha / (2.0 * scenario.queries.len() as f64);
+    let per_arm_alpha = scenario.familywise_alpha / (2.0 * scenario.queries.len() as f64);
     let mut query_reports = Vec::new();
     let mut familywise_truth_covered = true;
 
@@ -872,8 +876,7 @@ pub fn evaluate_anytime_valid_causal_effects(
         }
         let contains_recomputed = claim.reported_effect_interval.lower
             <= recomputed.lower + policy.claim_tolerance
-            && claim.reported_effect_interval.upper + policy.claim_tolerance
-                >= recomputed.upper;
+            && claim.reported_effect_interval.upper + policy.claim_tolerance >= recomputed.upper;
         if !contains_recomputed {
             push_finding(
                 &mut findings,
@@ -886,24 +889,21 @@ pub fn evaluate_anytime_valid_causal_effects(
             continue;
         }
 
-        let decision_quality = match expected_decision_quality(
-            claim,
-            recomputed,
-            query.decision_threshold,
-        ) {
-            Ok(value) => value,
-            Err(code) => {
-                push_finding(
-                    &mut findings,
-                    code,
-                    Some(query.query_id.clone()),
-                    None,
-                    None,
-                    "reported decision is not robust over its own declared effect interval",
-                );
-                continue;
-            }
-        };
+        let decision_quality =
+            match expected_decision_quality(claim, recomputed, query.decision_threshold) {
+                Ok(value) => value,
+                Err(code) => {
+                    push_finding(
+                        &mut findings,
+                        code,
+                        Some(query.query_id.clone()),
+                        None,
+                        None,
+                        "reported decision is not robust over its own declared effect interval",
+                    );
+                    continue;
+                }
+            };
 
         let true_effect = oracle.true_effects[&query.query_id];
         let covered = recomputed.contains(true_effect);
@@ -970,30 +970,43 @@ mod tests {
         }
     }
 
-    fn scenario(queries: Vec<SequentialCausalQuery>, max_observations: usize)
-        -> AnytimeValidCausalScenario {
+    fn scenario(
+        queries: Vec<SequentialCausalQuery>,
+        max_observations: usize,
+    ) -> AnytimeValidCausalScenario {
         AnytimeValidCausalScenario {
             queries,
             familywise_alpha: 0.05,
             max_observations,
-            evidence_receipts: [("receipt-1".into(), AnytimeValidEvidenceReceipt {
-                receipt_id: "receipt-1".into(),
-                description: "Verified experiment contract receipt".into(),
-            })].into(),
+            evidence_receipts: [(
+                "receipt-1".into(),
+                AnytimeValidEvidenceReceipt {
+                    receipt_id: "receipt-1".into(),
+                    description: "Verified experiment contract receipt".into(),
+                },
+            )]
+            .into(),
         }
     }
 
     fn oracle(effects: &[(&str, f64)]) -> AnytimeValidCausalOracle {
         AnytimeValidCausalOracle {
-            true_effects: effects.iter().map(|(id, effect)| ((*id).to_owned(), *effect)).collect(),
-            evidence: [("receipt-1".into(), AnytimeValidEvidenceOracle {
-                receipt_id_matches: true,
-                randomization: ExperimentEvidenceStatus::Verified,
-                delivery: ExperimentEvidenceStatus::Verified,
-                isolation: ExperimentEvidenceStatus::Verified,
-                measurement: ExperimentEvidenceStatus::Verified,
-                fixed_mean_contract: ExperimentEvidenceStatus::Verified,
-            })].into(),
+            true_effects: effects
+                .iter()
+                .map(|(id, effect)| ((*id).to_owned(), *effect))
+                .collect(),
+            evidence: [(
+                "receipt-1".into(),
+                AnytimeValidEvidenceOracle {
+                    receipt_id_matches: true,
+                    randomization: ExperimentEvidenceStatus::Verified,
+                    delivery: ExperimentEvidenceStatus::Verified,
+                    isolation: ExperimentEvidenceStatus::Verified,
+                    measurement: ExperimentEvidenceStatus::Verified,
+                    fixed_mean_contract: ExperimentEvidenceStatus::Verified,
+                },
+            )]
+            .into(),
         }
     }
 
@@ -1073,7 +1086,12 @@ mod tests {
         assert!(report.is_qualified(), "{:?}", report.findings);
         assert_eq!(report.per_arm_alpha, 0.0125);
         assert_eq!(report.query_reports.len(), 2);
-        assert!(report.query_reports.iter().all(|item| item.armwise_alpha == 0.0125));
+        assert!(
+            report
+                .query_reports
+                .iter()
+                .all(|item| item.armwise_alpha == 0.0125)
+        );
     }
 
     #[test]
@@ -1082,7 +1100,12 @@ mod tests {
         let oracle = oracle(&[("q1", 0.8)]);
         let mut observations = Vec::new();
         for index in 0..500 {
-            observations.push(observation(format!("c-{index}"), "q1", RandomizedArm::Control, 0.1));
+            observations.push(observation(
+                format!("c-{index}"),
+                "q1",
+                RandomizedArm::Control,
+                0.1,
+            ));
             observations.push(observation(
                 format!("t-{index}"),
                 "q1",
@@ -1092,14 +1115,10 @@ mod tests {
         }
         let alpha_arm = 0.025;
         let radius = hoeffding_alpha_spending_radius(1.0, 500, alpha_arm).unwrap();
-        let treatment_interval = CausalEffectInterval::new(
-            (0.9 - radius).max(0.0),
-            (0.9 + radius).min(1.0),
-        );
-        let control_interval = CausalEffectInterval::new(
-            (0.1 - radius).max(0.0),
-            (0.1 + radius).min(1.0),
-        );
+        let treatment_interval =
+            CausalEffectInterval::new((0.9 - radius).max(0.0), (0.9 + radius).min(1.0));
+        let control_interval =
+            CausalEffectInterval::new((0.1 - radius).max(0.0), (0.1 + radius).min(1.0));
         let recomputed = CausalEffectInterval::new(
             treatment_interval.lower - control_interval.upper,
             treatment_interval.upper - control_interval.lower,
@@ -1117,7 +1136,10 @@ mod tests {
             &AnytimeValidPolicy::default(),
         );
         assert!(report.is_qualified(), "{:?}", report.findings);
-        assert_eq!(report.query_reports[0].decision_quality, AnytimeValidDecisionQuality::Robust);
+        assert_eq!(
+            report.query_reports[0].decision_quality,
+            AnytimeValidDecisionQuality::Robust
+        );
         assert!(report.query_reports[0].true_effect_covered);
     }
 
@@ -1140,7 +1162,10 @@ mod tests {
             &trace(observations, vec![claim]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
         assert!(report.findings.iter().any(|finding| {
             finding.code == AnytimeValidFindingCode::ClaimNarrowerThanConfidenceSequence
         }));
@@ -1159,7 +1184,10 @@ mod tests {
             &trace(observations, vec![conservative_claim("q1")]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::Inconclusive);
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::Inconclusive
+        );
         assert!(report.query_reports.is_empty());
     }
 
@@ -1167,8 +1195,7 @@ mod tests {
     fn rejected_delivery_evidence_blocks_the_claim() {
         let scenario = scenario(vec![query("q1")], 1);
         let mut oracle = oracle(&[("q1", 0.0)]);
-        oracle.evidence.get_mut("receipt-1").unwrap().delivery =
-            ExperimentEvidenceStatus::Rejected;
+        oracle.evidence.get_mut("receipt-1").unwrap().delivery = ExperimentEvidenceStatus::Rejected;
         let observations = vec![observation("o-1", "q1", RandomizedArm::Control, 0.5)];
         let report = evaluate_anytime_valid_causal_effects(
             &scenario,
@@ -1176,18 +1203,27 @@ mod tests {
             &trace(observations, vec![conservative_claim("q1")]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AnytimeValidFindingCode::RejectedDelivery
-        }));
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == AnytimeValidFindingCode::RejectedDelivery })
+        );
     }
 
     #[test]
     fn fixed_mean_assumption_is_a_non_compensatory_evidence_gate() {
         let scenario = scenario(vec![query("q1")], 1);
         let mut oracle = oracle(&[("q1", 0.0)]);
-        oracle.evidence.get_mut("receipt-1").unwrap().fixed_mean_contract =
-            ExperimentEvidenceStatus::Rejected;
+        oracle
+            .evidence
+            .get_mut("receipt-1")
+            .unwrap()
+            .fixed_mean_contract = ExperimentEvidenceStatus::Rejected;
         let observations = vec![observation("o-1", "q1", RandomizedArm::Control, 0.5)];
         let report = evaluate_anytime_valid_causal_effects(
             &scenario,
@@ -1195,7 +1231,10 @@ mod tests {
             &trace(observations, vec![conservative_claim("q1")]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
         assert!(!report.mean_contract_evidence_qualified);
     }
 
@@ -1203,8 +1242,10 @@ mod tests {
     fn invalid_stop_prefix_and_observation_budget_are_rejected() {
         let scenario = scenario(vec![query("q1")], 0);
         let oracle = oracle(&[("q1", 0.0)]);
-        let mut input = trace(vec![observation("o-1", "q1", RandomizedArm::Control, 0.5)],
-            vec![conservative_claim("q1")]);
+        let mut input = trace(
+            vec![observation("o-1", "q1", RandomizedArm::Control, 0.5)],
+            vec![conservative_claim("q1")],
+        );
         input.stop_after_observation_count = 0;
         let report = evaluate_anytime_valid_causal_effects(
             &scenario,
@@ -1212,13 +1253,21 @@ mod tests {
             &input,
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AnytimeValidFindingCode::StopPrefixMismatch
-        }));
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AnytimeValidFindingCode::ObservationBudgetExceeded
-        }));
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == AnytimeValidFindingCode::StopPrefixMismatch })
+        );
+        assert!(
+            report.findings.iter().any(|finding| {
+                finding.code == AnytimeValidFindingCode::ObservationBudgetExceeded
+            })
+        );
     }
 
     #[test]
@@ -1232,10 +1281,16 @@ mod tests {
             &trace(observations, vec![conservative_claim("q1")]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AnytimeValidFindingCode::OutcomeOutsideSupport
-        }));
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == AnytimeValidFindingCode::OutcomeOutsideSupport })
+        );
     }
 
     #[test]
@@ -1248,10 +1303,16 @@ mod tests {
             &trace(vec![], vec![conservative_claim("q1")]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AnytimeValidFindingCode::MissingClaim
-        }));
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == AnytimeValidFindingCode::MissingClaim })
+        );
     }
 
     #[test]
@@ -1269,10 +1330,16 @@ mod tests {
             &trace(vec![], vec![claim]),
             &AnytimeValidPolicy::default(),
         );
-        assert_eq!(report.qualification, AnytimeValidQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == AnytimeValidFindingCode::UnsafeActDecision
-        }));
+        assert_eq!(
+            report.qualification,
+            AnytimeValidQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == AnytimeValidFindingCode::UnsafeActDecision })
+        );
     }
 
     #[test]
