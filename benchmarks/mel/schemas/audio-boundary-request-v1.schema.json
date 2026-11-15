@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-audio-boundary-request-v1.schema.json",
+  "title": "Melothaea Audio Boundary Integrity Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request", "source", "output"],
+  "properties": {
+    "request": { "$ref": "#/$defs/request" },
+    "source": { "$ref": "#/$defs/pcm" },
+    "output": { "$ref": "#/$defs/pcm" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "pcm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_rate_hz", "channel_count", "samples_interleaved_s32"],
+      "properties": {
+        "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 384000 },
+        "channel_count": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "samples_interleaved_s32": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 }
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "operation_id", "source_lineage_sha256",
+        "operation_plan_sha256", "source_pcm_sha256",
+        "expected_output_pcm_sha256", "sample_rate_hz",
+        "channel_count", "frame_count", "edit_windows",
+        "protected_regions", "boundaries"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-audio-boundary-request-v1" },
+        "operation_id": { "type": "string", "minLength": 1 },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "operation_plan_sha256": { "$ref": "#/$defs/sha256" },
+        "source_pcm_sha256": { "$ref": "#/$defs/sha256" },
+        "expected_output_pcm_sha256": { "$ref": "#/$defs/sha256" },
+        "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 384000 },
+        "channel_count": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "frame_count": { "type": "integer", "minimum": 4 },
+        "edit_windows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/window" }
+        },
+        "protected_regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protected_region" }
+        },
+        "boundaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/boundary" }
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_frame", "end_frame"],
+      "properties": {
+        "start_frame": { "type": "integer", "minimum": 0 },
+        "end_frame": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "protected_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_id", "start_frame", "end_frame", "expected_region_sha256"],
+      "properties": {
+        "region_id": { "type": "string", "minLength": 1 },
+        "start_frame": { "type": "integer", "minimum": 0 },
+        "end_frame": { "type": "integer", "minimum": 1 },
+        "expected_region_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boundary_id", "boundary_frame", "left_window_frames",
+        "right_window_frames", "maximum_seam_jump_abs",
+        "maximum_slope_delta_abs", "maximum_local_step_abs",
+        "maximum_rms_ratio_deviation_ppm"
+      ],
+      "properties": {
+        "boundary_id": { "type": "string", "minLength": 1 },
+        "boundary_frame": { "type": "integer", "minimum": 2 },
+        "left_window_frames": { "type": "integer", "minimum": 2, "maximum": 65535 },
+        "right_window_frames": { "type": "integer", "minimum": 2, "maximum": 65535 },
+        "maximum_seam_jump_abs": { "type": "integer", "minimum": 0 },
+        "maximum_slope_delta_abs": { "type": "integer", "minimum": 0 },
+        "maximum_local_step_abs": { "type": "integer", "minimum": 0 },
+        "maximum_rms_ratio_deviation_ppm": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
+      }
+    }
+  }
+}
