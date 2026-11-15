@@ -6,6 +6,7 @@ use development_map_validator::{
     tree_projection::{collect_github_tree_inventory_json, compose_repository_tree_json, RepositoryTreeAnchor},
     dynamapbench::validate_dynamapbench_manifest_json,
     temporal_replay::{validate_temporal_ledger_json, replay_temporal_ledger_json},
+    workspace_shift::evaluate_shift_scenario_json,
     validate_document_json,
 };
 
@@ -19,6 +20,7 @@ fn usage() {
     eprintln!("  development-map-validator dynamapbench-manifest <manifest.json>");
     eprintln!("  development-map-validator temporal-ledger <ledger.json>");
     eprintln!("  development-map-validator temporal-replay <ledger.json> <query.json>");
+    eprintln!("  development-map-validator workspace-shift <scenario.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -297,6 +299,34 @@ fn replay_temporal_ledger_file(args: &[String]) -> i32 {
     }
 }
 
+fn evaluate_workspace_shift_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D6-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match evaluate_shift_scenario_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D6-SHIFT-001 {path}: {error}");
+            1
+        }
+        Ok(report) => match serde_json::to_string_pretty(&report) {
+            Ok(output) => {
+                println!("{output}");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR D6-SHIFT-JSON-001 {path}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -315,6 +345,7 @@ fn main() {
         "dynamapbench-manifest" => validate_dynamapbench_manifest_file(&args),
         "temporal-ledger" => validate_temporal_ledger_file(&args),
         "temporal-replay" => replay_temporal_ledger_file(&args),
+        "workspace-shift" => evaluate_workspace_shift_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();
