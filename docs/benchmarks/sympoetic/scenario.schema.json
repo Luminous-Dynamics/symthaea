@@ -43,7 +43,8 @@
         "longitudinal_adaptation",
         "partner_coordination",
         "adaptive_intervention",
-        "collaborative_learning"
+        "collaborative_learning",
+        "epistemic_resilience"
       ]
     },
     "difficulty": {
@@ -111,7 +112,17 @@
               "scaffold_adjustment",
               "independent_assessment",
               "retention_check",
-              "independent_transfer"
+              "independent_transfer",
+              "confidence_assessment",
+              "claim_verification",
+              "source_attribution",
+              "belief_revision",
+              "contradiction_resolution",
+              "human_planning",
+              "human_monitoring",
+              "human_reflection",
+              "independent_reasoning_attempt",
+              "ai_core_step_supplied"
             ]
           },
           "instruction": {
