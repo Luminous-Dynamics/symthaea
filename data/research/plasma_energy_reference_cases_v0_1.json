@@ -2481,5 +2481,57 @@
       "interpretation": "The three source-specific reciprocals are approximately 22.22 kWh/kg H2 at >99% conversion (45 g/kWh), 20.00 kWh/kg H2 at 92.4% conversion and 150 g/h (50 g/kWh), and 19.61 kWh/kg H2 at 76% conversion (51 g/kWh). The high-throughput point is not the >99% point, and the best energy-yield point is not the high-conversion point. These numbers retain the source's reported energy basis and are not assumed to be complete wall-plug-to-purified-H2 performance.",
       "luminous_measurement": false
     }
+  ],
+  "benchmark_targets": [
+    {
+      "target_id": "NH3-DELIVERED-H2-PARETO-001",
+      "lane": "AMMONIA_CRACKING",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-CRACK-MW-ATM-MECHANISM-2026",
+        "NH3-CRACK-TEA-LBNL-2023"
+      ],
+      "metric_thresholds": {
+        "ammonia_conversion_min_fraction": 0.99,
+        "hydrogen_energy_yield_min_g_H2_per_kWh": 51,
+        "hydrogen_production_rate_min_g_H2_per_hour": 150,
+        "all_thresholds_must_hold_at_same_operating_point": true
+      },
+      "claim_guards": {
+        "full_wall_plug_to_accepted_h2_boundary_required": true,
+        "source_energy_yield_not_equivalent_to_complete_plant_energy": true,
+        "matched_catalytic_thermal_cracking_baseline_required": true
+      },
+      "rationale": "The 2026 source reports >99% conversion at 45 g/kWh, 92.4% conversion at 150 g/h and 50 g/kWh, and 76% conversion at 51 g/kWh. The stretch target requires these competing attributes to be reached together, rather than combining different operating points."
+    },
+    {
+      "target_id": "CH4-PYROLYSIS-PLASMA-PARETO-CHALLENGE-001",
+      "lane": "METHANE_PYROLYSIS",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "METHANE-PYROLYSIS-HEATING-REVIEW-2026",
+        "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026",
+        "METHANE-PYROLYSIS-LCA-CARBON-CREDIT-2026"
+      ],
+      "metric_thresholds": {
+        "methane_conversion_min_fraction": 0.92,
+        "hydrogen_selectivity_min_fraction": 0.99,
+        "levelized_cost_hydrogen_max_usd_per_kg": 0.7,
+        "all_thresholds_must_hold_at_same_operating_point": true
+      },
+      "credit_policies": [
+        "NO_CREDIT",
+        "ALLOCATION",
+        "AVOIDED_PRODUCT_CREDIT"
+      ],
+      "claim_guards": {
+        "no_credit_baseline_required": true,
+        "avoided_product_credit_requires_independent_carbon_grade_qualification": true,
+        "avoided_product_credit_requires_market_capacity_and_offtake_evidence": true,
+        "matched_complete_plant_boundary_required": true,
+        "currency_year_and_functional_unit_must_match": true
+      },
+      "rationale": "The combined stretch envelope challenges the 2026 review's separate shock-wave cost/conversion point and microwave conversion/selectivity point. It is a deliberate target for a new Pareto frontier, not a reported existing result."
+    }
   ]
 }
