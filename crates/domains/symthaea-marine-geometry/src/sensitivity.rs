@@ -172,7 +172,7 @@ fn perturb_spec(
         SectionParameter::LengthM => &mut result.length_m,
         SectionParameter::BeamM => &mut result.beam_m,
         SectionParameter::DraftM => &mut result.draft_m,
-        SectionParameter::StationHalfBreadthFraction { station_index } => result
+        SectionParameter::StationHalfBreadthFraction { station_index } => &mut result
             .stations
             .get_mut(station_index)
             .ok_or_else(|| SensitivityViolation {
@@ -180,7 +180,7 @@ fn perturb_spec(
                 detail: format!("station index {station_index} is outside the source specification"),
             })?
             .half_breadth_fraction,
-        SectionParameter::StationDraftFraction { station_index } => result
+        SectionParameter::StationDraftFraction { station_index } => &mut result
             .stations
             .get_mut(station_index)
             .ok_or_else(|| SensitivityViolation {
