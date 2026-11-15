@@ -590,7 +590,8 @@ mod tests {
     #[test]
     fn non_identifiable_counterfactual_is_reported_as_unavailable() {
         assert_eq!(marginal_contribution_impact(0.8, 0.6, false).unwrap(), None);
-        assert_eq!(marginal_contribution_impact(0.8, 0.6, true).unwrap(), Some(0.2));
+        let impact = marginal_contribution_impact(0.8, 0.6, true).unwrap().unwrap();
+        assert!((impact - 0.2).abs() < 1e-12);
         assert!(marginal_contribution_impact(1.1, 0.6, true).is_err());
     }
 
