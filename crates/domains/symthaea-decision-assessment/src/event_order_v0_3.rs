@@ -4727,6 +4727,30 @@ mod tests {
     }
 
     #[test]
+    fn cancellation_request_without_attempt_start_is_not_applied() {
+        let mut schedule = generate_delivery_schedule(0x2026_1130, 1)
+            .expect("base deterministic schedule");
+        let mut ordinal = schedule.actions.iter().map(|action| action.ordinal).max().unwrap_or(0) + 1;
+        push_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            20_000,
+            ScheduleAction::CancellationRequested {
+                operation_id: "missing-operation".to_owned(),
+                attempt_id: "missing-attempt".to_owned(),
+            },
+        );
+        validate_schedule(&schedule).expect("request without start is a semantic fault input");
+        let report = replay_virtual_schedule(&schedule).expect("fault schedule replays");
+        let request = report.records.iter().find(|record| {
+            matches!(record.action, ScheduleAction::CancellationRequested {
+                attempt_id, ..
+            } if attempt_id == "missing-attempt")
+        }).expect("cancellation request record");
+        assert_eq!(request.disposition, SchedulerDisposition::PreconditionViolation);
+    }
+
+    #[test]
     fn cancellation_acknowledgement_does_not_create_not_applied_terminal() {
         let mut actions = Vec::new();
         let mut ordinal = 0_u64;
