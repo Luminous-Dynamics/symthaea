@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let source = PcmAudioArtifactV1 {
         format,
-        samples: (0..512_usize)
+        samples: (0..2048_usize)
             .map(|index| ((index as i32 * 97 % 20_000) - 10_000) as i16)
             .collect(),
     };
