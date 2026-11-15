@@ -85,3 +85,7 @@ path = "src/bin/pwc_waterjet_pump_loop_reference.rs"
 [[bin]]
 name = "pwc-waterjet-station-energy-flux"
 path = "src/bin/pwc_waterjet_station_energy_flux.rs"
+
+[[bin]]
+name = "pwc-waterjet-performance-composition"
+path = "src/bin/pwc_waterjet_performance_composition.rs"
