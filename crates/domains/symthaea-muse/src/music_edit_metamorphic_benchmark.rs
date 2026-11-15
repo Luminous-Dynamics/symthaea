@@ -654,7 +654,7 @@ pub fn evaluate_music_edit_metamorphic_pair_v1(
             continue;
         }
 
-        let mut matched = false;
+        let matched;
         let mut numeric_residual = None;
         let mut tolerance = None;
         match (&entry.rule, &left.value, &right.value) {
