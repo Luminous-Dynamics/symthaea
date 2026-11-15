@@ -38,3 +38,6 @@ cargo test -p symthaea-operations-research cell_eligibility
 ```
 
 The unit tests are authored but have not been run in an environment with the Rust toolchain.
+
+
+The B1 eligibility evaluator also checks the process configuration's own validity interval and exact parameter SHA-256 digest, rather than relying only on process-qualification evidence. Worker requirements carry a minimum qualified headcount; unresolved headcount is Indeterminate and a known shortfall is Blocked. Zero-person requirements and malformed digests are rejected.
