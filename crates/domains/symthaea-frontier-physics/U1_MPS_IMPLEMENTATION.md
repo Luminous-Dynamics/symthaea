@@ -189,6 +189,21 @@ Primary external references:
 - TDVP errors and conservation trade-offs: https://tensornetwork.org/mps/algorithms/timeevo/tdvp.html
 - TEBD time-step error and higher-order splitting: https://tensornetwork.org/mps/algorithms/timeevo/tebd.html
 
+
+## Goal-driven compression budget execution at the TEBD layer
+
+The layer executor now consumes the compression component of a compiled error budget through \`U1TeBDLayer::apply_with_error_budget\`.
+
+For each gate \(i\), it measures the mixed-canonical exterior operator-norm upper bound \(E_i\), computes the product \(D_i\) of operator-norm upper bounds for all later gates in the same layer, and assigns the local residual target
+\[
+\epsilon_i=\frac{B_{\mathrm{compress}}}{n E_i D_i},
+\]
+where \(n\) is the number of gates in the layer. The goal-driven two-site splitter then selects the smallest rank meeting the *measured* local re-contraction residual, subject to the global bond cap. Each receipt reports \(\epsilon_i\), achieved residual, \(E_i\), \(D_i\), propagated compression contribution, selected/minimum rank and SVD pass count.
+
+The layer checks that each propagated contribution is at most \(B_{\mathrm{compress}}/n\) and that their sum does not exceed the compression allocation. Failure to meet an individual share under the bond cap is a typed infeasibility; no looser fallback is attempted.
+
+This is explicitly a **layer-level compression allowance**. Canonicalization, gate quality, Hamiltonian projection and time discretization remain separate channels in the overall plan. The TEBD layer still validates the global state-error certificate independently, and Trotter error remains unqualified.
+
 ## Claim ceiling
 
 A passing exact-head harness would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense factorization, local gates, exact and approximate charge-block splits, deterministic parity layers, mixed-canonical gauge receipts, a global bound covering canonicalization/gate/model-projection/compression defects, and a nearest-neighbour second-order Strang stepper. It would **not** establish a Trotter-error certificate, long-range MPO/TDVP support, advantage over Quimb/ITensor, large-N speedup, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.

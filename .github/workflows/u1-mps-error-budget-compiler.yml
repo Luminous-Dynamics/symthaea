@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - research/u1-mps-error-budget-compiler-20261114
+      - research/u1-tebd-error-budget-execution-20261115
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
       - .github/workflows/u1-mps-error-budget-compiler.yml
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - research/u1-mps-canonical-gauge-20261113
       - research/u1-mps-error-budget-compiler-20261114
+      - research/u1-tebd-error-budget-execution-20261115
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
       - .github/workflows/u1-mps-error-budget-compiler.yml
@@ -24,6 +27,7 @@ concurrency:
 
 jobs:
   source-harness:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Rust 1.96 adaptive error budget exact-source validation
     runs-on: ubuntu-latest
     steps:
