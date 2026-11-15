@@ -184,13 +184,16 @@ for (let i = 0; i < 50_000; i++) {
   cancellationChecks++;
 }
 
+function terminalConsistent(outcome, effectCommitCount) {
+  return outcome !== "not_applied" || effectCommitCount === 0;
+}
 let effectTerminalChecks = 0, appliedCommitOrderViolations = 0, notAppliedCommitContradictionsMissed = 0;
 for (let i = 0; i < 50_000; i++) {
   const commit = { basis: "tai-v1", qualification: "pass", lo: i * 4, hi: i * 4 };
   const terminal = { basis: "tai-v1", qualification: "pass", lo: i * 4 + 2, hi: i * 4 + 2 };
   if (compare(commit, terminal) !== "before") appliedCommitOrderViolations++;
   const hasCommit = true;
-  if ("not_applied" === "not_applied" && hasCommit && false) notAppliedCommitContradictionsMissed++;
+  if (terminalConsistent("not_applied", hasCommit ? 1 : 0)) notAppliedCommitContradictionsMissed++;
   effectTerminalChecks++;
 }
 
