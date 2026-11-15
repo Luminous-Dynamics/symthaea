@@ -791,9 +791,9 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
             })?
             .1
             .context("metric evidence is present for a scorecard metric with no value")?;
-        if (score_value - receipt.value).abs() > 1e-9 {
+        if !score_value.is_finite() || (score_value - receipt.value).abs() > 1e-9 {
             bail!(
-                "metric {:?} evidence value does not match the scorecard value",
+                "metric {:?} evidence value does not match a finite scorecard value",
                 receipt.metric_name
             );
         }
