@@ -88,7 +88,7 @@ fn main() {
             fusion_reject_audit::AuditSample {
                 candidate_id: candidate_id.clone(),
                 outcome: *outcome,
-                evidence_ref: format!("synthetic-solver-receipt-{candidate_id}"),
+                evidence_ref: format!("synthetic-reference-run-{candidate_id}"),
             }
         })
         .collect();
@@ -120,7 +120,7 @@ fn main() {
         .map(|(candidate_id, outcome, _, _)| AcceptedCandidate {
             candidate_id: (*candidate_id).to_string(),
             outcome: *outcome,
-            evidence_ref: format!("synthetic-accepted-receipt-{candidate_id}"),
+            evidence_ref: format!("synthetic-reference-run-{candidate_id}"),
         })
         .collect::<Vec<_>>();
 
