@@ -280,6 +280,9 @@ fn audit(record: &Record) -> AuditReport {
     if record.record_status != "synthetic" {
         findings.incomplete("/record_status", "only synthetic reference records are supported in v0.1.0");
     }
+    if record.limitations.is_empty() || record.limitations.iter().any(|item| item.trim().is_empty()) {
+        findings.invalid("/limitations", "at least one non-empty limitation must be declared");
+    }
 
     if record.method.document != "ITTC 7.5-02-05-03.2"
         || record.method.revision != "02"
