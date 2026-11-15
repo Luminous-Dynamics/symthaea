@@ -65,6 +65,17 @@ The upstream AOBench benchmark card identifies a gap between deterministic mock 
 
 These are candidate research directions, not completed capabilities. Keep any extended score separate from the official AOBench score.
 
+## Current Symthaea integration status
+
+The existing Symthaea service is a JSON-line/HTTP gateway. Its HTTP surface currently exposes `POST /v1/service`, not `POST /v1/chat/completions`. The `query` request contains text and an optional context value, but the current handler ignores that context and calls `Symthaea::process` directly. Therefore:
+
+- Existing `OpenAiBackend` code is an outbound client to an OpenAI-compatible model endpoint, not an inbound OpenAI-compatible server.
+- The service's current query endpoint is a text-in/text-out reasoning interface, not a structured function-calling interface.
+- The separate `symthaea-soma` tool-use loop has a three-round loop and a built-in tool set (calculate, time, search, memory recall), but is not yet a generic AOBench task/role/tool-registry adapter.
+- The interactive REPL has a different sandboxed action-execution path. It should not be silently treated as the AOBench service contract.
+
+The implementation gap is consequently explicit: **Symthaea does not yet have a verified AOBench agent adapter or a generic role-scoped tool-proposal endpoint.** The next step is the Rust-first Agent Decision Protocol in [AGENT_DECISION_PROTOCOL.md](AGENT_DECISION_PROTOCOL.md), followed by a small AOBench-side adapter that delegates decisions to the Rust service and executes all tools through AOBench's supplied role-filtered registry.
+
 ## Adapter semantics and the MCP trap
 
 The upstream AOBench MCP adapter is an **MCP client with an OpenAI agentic loop**, not a transparent executor for the MCP server's own reasoning. It connects to the supplied MCP server, discovers that server's tools, then presents those tools to an OpenAI-compatible model which makes the calls. A bare Symthaea MCP tool server evaluated through this adapter would therefore measure the OpenAI model driving those calls unless the integration explicitly routes decision-making through Symthaea.
