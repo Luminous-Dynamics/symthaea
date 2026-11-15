@@ -184,6 +184,8 @@ proptest! {
         prop_assert!(projection.envelope.is_none());
     }
 
+}
+
 #[test]
 fn frozen_v0_3_1_observer_store_clock_fixture_replays_and_projects() {
     let fixture = include_str!("../../../../benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json");
@@ -214,5 +216,4 @@ fn frozen_v0_3_1_observer_store_clock_fixture_replays_and_projects() {
     assert_eq!(envelope.occurred_at.expect("qualified occurrence").interval.earliest_ns, 500);
     assert_eq!(envelope.first_observed_at.interval.earliest_ns, 1_000);
     assert_eq!(envelope.durably_recorded_at.interval.earliest_ns, 1_200);
-}
 }
