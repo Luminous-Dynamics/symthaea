@@ -39,6 +39,7 @@ The standalone crate is \`tools/mel-music-edit-intent-grounding-harness\`.
 A source observation binds:
 - source artifact and lineage digests;
 - an upstream observation-attestation receipt digest included in the source commitment;
+- an upstream observation-attestation receipt digest included in the source commitment;
 - source duration in integer ticks;
 - canonical event inventory with stable event and part IDs;
 - canonical temporal anchors (section, bar, beat, phrase, event or explicit time);
@@ -65,7 +66,7 @@ Parameters use integer values and explicit units. Stage 1 supports addition coun
 
 A unique selector that matches multiple source occurrences must return NeedsClarification with the exact candidate list and a bounded question. A selector with no supported occurrence, or an out-of-range ordinal, must Abstain. Both dispositions are non-executable: they may not retain selected events, target windows, parameters or execution evidence. A confidence score cannot bypass this rule.
 
-The verifier checks that a Ready plan's selection exactly matches its selector against the frozen occurrence inventory. The receipt digests are references that bind into the content commitment; this stage validates their identity and shape but does not cryptographically verify the upstream observer or annotator signature. It recomputes event support, protected complement, target windows, parameter constraints and grounding-evidence bindings. A plan cannot gain execution authority merely by claiming high confidence.
+The verifier checks that a Ready plan's selection exactly matches its selector against the frozen occurrence inventory. A second entry point also compares the observation to expected source artifact, lineage, observation-receipt and observation digests supplied by the caller from its independently verified upstream context. Receipt digests are references, not cryptographic proof by themselves; this harness validates identity and binding but does not verify upstream signatures. The receipt digests are references that bind into the content commitment; this stage validates their identity and shape but does not cryptographically verify the upstream observer or annotator signature. It recomputes event support, protected complement, target windows, parameter constraints and grounding-evidence bindings. A plan cannot gain execution authority merely by claiming high confidence.
 
 ## 5. Deterministic controls
 
@@ -118,4 +119,4 @@ For the Harmony 420-example cohort, the broader Melothaea target remains ≥30% 
 
 ## Claim boundary
 
-This implementation verifies structured planner output against an explicit frozen source observation. It does not parse natural-language prompts, establish that an upstream audio model detected the occurrences correctly, render audio, measure musical quality, or authorize a transaction. Exact-head Rust qualification is pending; no test, format or Clippy pass is claimed yet.
+This implementation verifies structured planner output against an explicit frozen source observation. It does not parse natural-language prompts, establish that an upstream audio model detected the occurrences correctly, render audio, measure musical quality, or authorize a transaction. Exact-head Rust qualification remains pending on the current source head; no test, format or Clippy pass is claimed yet.
