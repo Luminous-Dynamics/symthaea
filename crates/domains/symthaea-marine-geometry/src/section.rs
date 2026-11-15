@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::CoordinateFrame;
 
+use blake3;
+
 const SECTION_SCHEMA_VERSION: u32 = 1;
 const ENDPOINT_TOLERANCE: f64 = 1.0e-12;
 const MAX_STATIONS: usize = 512;
@@ -63,6 +65,19 @@ pub struct SampledSection {
     /// Starboard-side samples from keel/centreline to sheer.
     /// Coordinates use x-forward, y-starboard, z-down and metres.
     pub keel_to_sheer_m: Vec<[f64; 3]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SectionFamilyArtifact {
+    pub artifact_schema_version: u32,
+    pub candidate_id: String,
+    pub source_spec_digest_blake3: String,
+    pub sampled_sections_digest_blake3: String,
+    pub length_m: f64,
+    pub beam_m: f64,
+    pub draft_m: f64,
+    pub coordinate_frame: CoordinateFrame,
+    pub sections: Vec<SampledSection>,
 }
 
 fn violation(violations: &mut Vec<SectionViolation>, code: &str, detail: impl Into<String>) {
@@ -303,6 +318,22 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
     }
 }
 
+/// Compute a deterministic digest of the normalized, typed section specification.
+pub fn compute_section_spec_digest(
+    spec: &SectionHullSpec,
+) -> Result<String, serde_json::Error> {
+    let bytes = serde_json::to_vec(spec)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+/// Compute a deterministic digest of generated section samples.
+pub fn compute_sampled_sections_digest(
+    sections: &[SampledSection],
+) -> Result<String, serde_json::Error> {
+    let bytes = serde_json::to_vec(sections)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
 /// Generate deterministic physical starboard-side section samples.
 ///
 /// Each adjacent control-point pair is linearly sampled with
@@ -364,6 +395,40 @@ pub fn generate_sections(
     }
 
     Ok(output)
+}
+
+/// Generate a section-family artifact bound to both the exact specification
+/// and the exact sampled coordinates. These hashes provide identity and
+/// integrity, not signatures or proof of engineering correctness.
+pub fn generate_section_artifact(
+    spec: &SectionHullSpec,
+) -> Result<SectionFamilyArtifact, Vec<SectionViolation>> {
+    let sections = generate_sections(spec)?;
+    let source_spec_digest_blake3 = compute_section_spec_digest(spec).map_err(|error| {
+        vec![SectionViolation {
+            code: "spec_serialization".into(),
+            detail: format!("could not serialize section specification: {error}"),
+        }]
+    })?;
+    let sampled_sections_digest_blake3 =
+        compute_sampled_sections_digest(&sections).map_err(|error| {
+            vec![SectionViolation {
+                code: "sample_serialization".into(),
+                detail: format!("could not serialize generated samples: {error}"),
+            }]
+        })?;
+
+    Ok(SectionFamilyArtifact {
+        artifact_schema_version: 1,
+        candidate_id: spec.candidate_id.clone(),
+        source_spec_digest_blake3,
+        sampled_sections_digest_blake3,
+        length_m: spec.length_m,
+        beam_m: spec.beam_m,
+        draft_m: spec.draft_m,
+        coordinate_frame: spec.coordinate_frame.clone(),
+        sections,
+    })
 }
 
 #[cfg(test)]
@@ -479,6 +544,28 @@ mod tests {
         spec.samples_per_segment = 0;
         let error = validate_section_spec(&spec).unwrap_err();
         assert!(error.iter().any(|item| item.code == "samples_per_segment"));
+    }
+
+    #[test]
+    fn section_artifact_binds_spec_and_generated_samples() {
+        let spec = valid_spec();
+        let first = generate_section_artifact(&spec).unwrap();
+        let second = generate_section_artifact(&spec).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            first.source_spec_digest_blake3,
+            compute_section_spec_digest(&spec).unwrap()
+        );
+        assert_eq!(
+            first.sampled_sections_digest_blake3,
+            compute_sampled_sections_digest(&first.sections).unwrap()
+        );
+        let mut changed = spec;
+        changed.beam_m += 0.1;
+        assert_ne!(
+            first.source_spec_digest_blake3,
+            compute_section_spec_digest(&changed).unwrap()
+        );
     }
 
     #[test]
