@@ -1343,9 +1343,22 @@ pub fn generate_clocked_observation_persistence_schedule(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedTimeEvidenceBinding {
+    pub action_id: String,
+    pub clock_mapping_action_id: String,
+    pub source_timestamp_ns: u64,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BitemporalProjectionReport {
+    pub schedule_sha256: Option<String>,
     pub disposition: EventTraceDisposition,
     pub envelope: Option<BitemporalEventEnvelope>,
+    pub occurrence_binding: Option<ProjectedTimeEvidenceBinding>,
+    pub observation_binding: Option<ProjectedTimeEvidenceBinding>,
+    pub persistence_binding: Option<ProjectedTimeEvidenceBinding>,
     pub reason_codes: Vec<String>,
 }
 
@@ -1408,9 +1421,15 @@ fn resolve_owner_qualified_time(
     let qualified = resolutions.get(&(mapping_action_id.to_owned(), local_timestamp_ns))
         .cloned()
         .ok_or(ProjectionFault::Indeterminate("OWNER_QUALIFIED_TIME_RESOLUTION_MISSING"))?;
+    let expected_valid_from = i64::try_from(valid_from)
+        .map_err(|_| ProjectionFault::Indeterminate("CLOCK_MAPPING_VALIDITY_OUTSIDE_SUPPORTED_RANGE"))?;
+    let expected_valid_through = i64::try_from(valid_through)
+        .map_err(|_| ProjectionFault::Indeterminate("CLOCK_MAPPING_VALIDITY_OUTSIDE_SUPPORTED_RANGE"))?;
     if qualified.source_clock_domain_id != source_clock_domain_id
         || qualified.mapping_receipt_ref != receipt_ref
         || qualified.mapping_receipt_sha256 != receipt_sha256
+        || qualified.mapping_valid_from_ns != expected_valid_from
+        || qualified.mapping_valid_through_ns != expected_valid_through
     {
         return Err(ProjectionFault::Critical("OWNER_TIME_RESOLUTION_BINDING_MISMATCH"));
     }
@@ -1426,13 +1445,21 @@ fn resolve_owner_qualified_time(
 fn projection_failure(fault: ProjectionFault) -> BitemporalProjectionReport {
     match fault {
         ProjectionFault::Indeterminate(code) => BitemporalProjectionReport {
+            schedule_sha256: None,
             disposition: EventTraceDisposition::Indeterminate,
             envelope: None,
+            occurrence_binding: None,
+            observation_binding: None,
+            persistence_binding: None,
             reason_codes: vec![code.to_owned()],
         },
         ProjectionFault::Critical(code) => BitemporalProjectionReport {
+            schedule_sha256: None,
             disposition: EventTraceDisposition::CriticalFailure,
             envelope: None,
+            occurrence_binding: None,
+            observation_binding: None,
+            persistence_binding: None,
             reason_codes: vec![code.to_owned()],
         },
     }
@@ -1611,22 +1638,79 @@ pub fn project_bitemporal_event(
     if superseded.len() > 1 {
         reasons.insert("EVENT_SUPERSESSION_CARDINALITY_INVALID".to_owned());
         return Ok(BitemporalProjectionReport {
+            schedule_sha256: Some(replay.schedule_sha256.clone()),
             disposition: EventTraceDisposition::CriticalFailure,
             envelope: None,
+            occurrence_binding: None,
+            observation_binding: None,
+            persistence_binding: None,
             reason_codes: reasons.into_iter().collect(),
         });
     }
 
+    let occurrence_binding = match &produced[0].action {
+        ScheduleAction::EventProduced {
+            clock_mapping_action_id, source_timestamp_ns, ..
+        } => {
+            let mapping = schedule.actions.iter().find(|action| action.action_id == *clock_mapping_action_id)
+                .expect("mapping action was already resolved");
+            let (receipt_ref, receipt_sha256) = match &mapping.action {
+                ScheduleAction::ClockAdvance { mapping_receipt_ref, mapping_receipt_sha256, .. } => {
+                    (mapping_receipt_ref.clone(), mapping_receipt_sha256.clone())
+                }
+                _ => unreachable!("mapping action was already checked"),
+            };
+            Some(ProjectedTimeEvidenceBinding {
+                action_id: produced[0].action_id.clone(),
+                clock_mapping_action_id: clock_mapping_action_id.clone(),
+                source_timestamp_ns: *source_timestamp_ns,
+                receipt_ref,
+                receipt_sha256,
+            })
+        }
+        _ => None,
+    };
+    let observation_binding = match &observations[0].action {
+        ScheduleAction::EventObserved {
+            clock_mapping_action_id, observed_at_ns, observation_receipt_ref,
+            observation_receipt_sha256, ..
+        } => Some(ProjectedTimeEvidenceBinding {
+            action_id: observations[0].action_id.clone(),
+            clock_mapping_action_id: clock_mapping_action_id.clone(),
+            source_timestamp_ns: *observed_at_ns,
+            receipt_ref: observation_receipt_ref.clone(),
+            receipt_sha256: observation_receipt_sha256.clone(),
+        }),
+        _ => None,
+    };
+    let persistence_binding = match &persistence_records[0].action {
+        ScheduleAction::EventPersisted {
+            clock_mapping_action_id, persisted_at_ns, persistence_receipt_ref,
+            persistence_receipt_sha256, ..
+        } => Some(ProjectedTimeEvidenceBinding {
+            action_id: persistence_records[0].action_id.clone(),
+            clock_mapping_action_id: clock_mapping_action_id.clone(),
+            source_timestamp_ns: *persisted_at_ns,
+            receipt_ref: persistence_receipt_ref.clone(),
+            receipt_sha256: persistence_receipt_sha256.clone(),
+        }),
+        _ => None,
+    };
+
     Ok(BitemporalProjectionReport {
+        schedule_sha256: Some(replay.schedule_sha256.clone()),
         disposition,
         envelope: Some(BitemporalEventEnvelope {
             event_id: event_id.to_owned(),
-            occurred_at,
+            occurred_at: Some(occurred_at),
             first_observed_at: observed_time,
             durably_recorded_at: persisted_time,
             capture_qualification,
             supersedes_event_id: superseded.into_iter().next(),
         }),
+        occurrence_binding,
+        observation_binding,
+        persistence_binding,
         reason_codes: reasons.into_iter().collect(),
     })
 }
