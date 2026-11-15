@@ -137,6 +137,7 @@ pub enum ComparisonDiagnostic {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComparisonValidationError {
     EmptyField(&'static str),
+    NonFiniteNumber(&'static str),
     InvalidSha256(&'static str),
     DuplicateRunIdentity(String),
     DependencyManifestRunMismatch {
@@ -399,7 +400,7 @@ fn validate_output(
         }));
     }
     if !output.normalized_value.is_finite() {
-        errors.push(ComparisonValidationError::EmptyField(match prefix {
+        errors.push(ComparisonValidationError::NonFiniteNumber(match prefix {
             "first" => "first.normalized_value",
             _ => "second.normalized_value",
         }));
@@ -1012,7 +1013,7 @@ mod tests {
         )));
         assert!(errors.iter().any(|error| matches!(
             error,
-            ComparisonValidationError::EmptyField("first.normalized_value")
+            ComparisonValidationError::NonFiniteNumber("first.normalized_value")
         )));
     }
 
