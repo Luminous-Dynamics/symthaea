@@ -167,6 +167,8 @@ pub enum SchedulerDisposition {
     BlockedByCrashedRecipient,
     ClockRegression,
     EventTimeRegression,
+    ConflictingAcknowledgement,
+    ConflictingReconciliation,
     PreconditionViolation,
 }
 
@@ -464,12 +466,13 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut observed = BTreeSet::<(String, String)>::new();
     let mut persisted = BTreeSet::<(String, String)>::new();
     let mut cancel_requests = BTreeSet::<(String, String)>::new();
-    let mut cancel_acknowledgements = BTreeSet::<(String, String)>::new();
+    let mut cancel_acknowledgements = BTreeMap::<(String, String), bool>::new();
     let mut stop_triggers = BTreeMap::<String, StopReplayState>::new();
     let mut stop_discharges = BTreeSet::<String>::new();
     let mut attempts = BTreeSet::<(String, String)>::new();
     let mut committed_attempts = BTreeSet::<(String, String)>::new();
-    let mut reconciled_attempts = BTreeSet::<(String, String)>::new();
+    let mut reconciled_attempts =
+        BTreeMap::<(String, String), (ReconciliationOutcome, String, String)>::new();
     let mut records = Vec::new();
 
     for scheduled in ordered_actions(schedule) {
@@ -565,14 +568,19 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     SchedulerDisposition::Duplicate
                 }
             }
-            ScheduleAction::CancellationAcknowledged { operation_id, attempt_id, .. } => {
+            ScheduleAction::CancellationAcknowledged { operation_id, attempt_id, accepted } => {
                 let key = (operation_id.clone(), attempt_id.clone());
                 if !cancel_requests.contains(&key) {
                     SchedulerDisposition::PreconditionViolation
-                } else if cancel_acknowledgements.insert(key) {
-                    SchedulerDisposition::Applied
+                } else if let Some(previous) = cancel_acknowledgements.get(&key) {
+                    if previous == accepted {
+                        SchedulerDisposition::Duplicate
+                    } else {
+                        SchedulerDisposition::ConflictingAcknowledgement
+                    }
                 } else {
-                    SchedulerDisposition::Duplicate
+                    cancel_acknowledgements.insert(key, *accepted);
+                    SchedulerDisposition::Applied
                 }
             }
             ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
@@ -627,12 +635,22 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     SchedulerDisposition::PreconditionViolation
                 }
             }
-            ScheduleAction::AttemptReconciled { operation_id, attempt_id, .. } => {
+            ScheduleAction::AttemptReconciled {
+                operation_id, attempt_id, outcome, receipt_ref, receipt_sha256,
+            } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                if attempts.contains(&key) && reconciled_attempts.insert(key) {
-                    SchedulerDisposition::Applied
-                } else {
+                let terminal = (*outcome, receipt_ref.clone(), receipt_sha256.clone());
+                if !attempts.contains(&key) {
                     SchedulerDisposition::PreconditionViolation
+                } else if let Some(previous) = reconciled_attempts.get(&key) {
+                    if previous == &terminal {
+                        SchedulerDisposition::Duplicate
+                    } else {
+                        SchedulerDisposition::ConflictingReconciliation
+                    }
+                } else {
+                    reconciled_attempts.insert(key, terminal);
+                    SchedulerDisposition::Applied
                 }
             }
             ScheduleAction::ProcessCrashed { process_id } => {
@@ -1194,6 +1212,41 @@ mod tests {
     }
 
     #[test]
+    fn attempt_reconciliation_is_idempotent_but_conflicts_are_visible() {
+        let mut schedule = generate_delivery_schedule(67, 1).expect("valid schedule");
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let operation_id = "reconcile-op".to_owned();
+        let attempt_id = "reconcile-attempt".to_owned();
+        let t = 20_000;
+        push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::EffectAttempted {
+            operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
+        });
+        for (offset, outcome, receipt_ref, digest) in [
+            (1, ReconciliationOutcome::NotApplied, "terminal-a", "a"),
+            (2, ReconciliationOutcome::NotApplied, "terminal-a", "a"),
+            (3, ReconciliationOutcome::Applied, "terminal-b", "b"),
+        ] {
+            push_action(&mut schedule.actions, &mut ordinal, t + offset, ScheduleAction::AttemptReconciled {
+                operation_id: operation_id.clone(), attempt_id: attempt_id.clone(), outcome,
+                receipt_ref: receipt_ref.to_owned(), receipt_sha256: digest.repeat(64),
+            });
+        }
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        let dispositions: Vec<_> = report.records.iter().filter_map(|record| {
+            if matches!(record.action, ScheduleAction::AttemptReconciled { .. }) {
+                Some(record.disposition)
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(dispositions, vec![
+            SchedulerDisposition::Applied,
+            SchedulerDisposition::Duplicate,
+            SchedulerDisposition::ConflictingReconciliation,
+        ]);
+    }
+
+    #[test]
     fn receipt_digests_require_canonical_sha256_shape() {
         let mut schedule = generate_delivery_schedule(53, 2).expect("valid schedule");
         if let Some(item) = schedule.actions.iter_mut().find(|item| {
@@ -1229,9 +1282,9 @@ mod tests {
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::CancellationRequested {
             operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
         });
-        for offset in 1..=2 {
+        for (offset, accepted) in [(1, true), (2, true), (3, false)] {
             push_action(&mut schedule.actions, &mut ordinal, t + offset, ScheduleAction::CancellationAcknowledged {
-                operation_id: operation_id.clone(), attempt_id: attempt_id.clone(), accepted: true,
+                operation_id: operation_id.clone(), attempt_id: attempt_id.clone(), accepted,
             });
         }
         let report = replay_virtual_schedule(&schedule).expect("replay");
@@ -1245,6 +1298,7 @@ mod tests {
         assert_eq!(ack_dispositions, vec![
             SchedulerDisposition::Applied,
             SchedulerDisposition::Duplicate,
+            SchedulerDisposition::ConflictingAcknowledgement,
         ]);
     }
 }
