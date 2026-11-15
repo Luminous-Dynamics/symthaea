@@ -14,14 +14,24 @@ The remaining gap is test realism. A collection of static traces is useful but c
 - Independent virtual time per source clock series, including clock domain, basis descriptor, epoch, scale, nanosecond unit, offset, uncertainty, calibration validity, receipt reference and qualification state. Each produced event binds back to that exact source clock series; `_ns` fields reject non-nanosecond units.
 - Event production with explicit causal predecessor edges and an exact `clock_mapping_action_id` binding; the event's source timestamp is checked against that specific mapping's tick, not merely the latest clock tick.
 - Deterministic network delivery, duplicate/drop controls, partition and reconnect.
-- Observation and durability steps; cancellation request/acknowledgement; stop trigger, policy revision and discharge; effect attempt, commit and terminal reconciliation; process crash/restart; event supersession.
+- Observer and durable-store timestamps on independent, exact clock series with receipt/qualification fields and an owner-qualified v0.2 bitemporal projection; cancellation request/acknowledgement; stop trigger, policy revision and discharge; effect attempt, commit and terminal reconciliation; process crash/restart; event supersession.
 - Canonical action ordering by virtual time and unique ordinal. Input vector order is not semantic; causal predecessor lists are normalized as sets.
 - Replay report with schedule digest, ordered action records and scheduler dispositions.
 - Fixed-seed SplitMix64 delivery/partition generator, a clock-mapping fault generator (unqualified, expired, stale mapping reference), and a second generator for both stop/cancel/commit race orders (commit-before-accepted-ack and commit-after-accepted-ack).
 - Delta-debugging shrinker that only accepts a candidate when structural validation still passes and the supplied counterexample predicate still reproduces.
-- Sixteen module unit tests and four Proptest properties (256 cases each configured), covering determinism, permutation invariance, exact mapping identity, unqualified/expired/stale clock mappings, receipt shape, clock epoch regression, exact stop action binding, crash/persistence, conflicting reconciliation, and both cancellation/commit race orders.
+- Thirty module unit tests and seven Proptest properties (256 cases each configured; 1,792 potential property cases), covering deterministic replay, action permutation, exact source/observer/store mapping identity, unqualified/expired/stale/not-yet-valid/invalid clock mappings, separate owner-time projection, missing/substituted owner resolutions, event-level first-observation cardinality, occurrence/observation/persistence ordering, exact stop action binding, crash/persistence, conflicting reconciliation, and cancellation/commit races.
 
 The scheduler is not the v0.2 safety oracle. It emits reproducible schedule observations and precondition outcomes. Clock regressions and event-time regressions are diagnosed within an exact source clock series; a new epoch starts a new series. Failed/unresolved clock qualifications and semantic unsafe orderings are retained as replay inputs; malformed identity, causal references, or receipt-digest shapes are rejected. The next adapter must translate those into v0.2 owner-qualified inputs and run the matched evaluator ladder. A schedule may intentionally contain unsafe orderings; the scheduler must preserve them rather than silently "repair" them. A local clock regression is an observation about that source clock, not a cross-domain ordering claim.
+
+## v0.3.1 qualified capture-clock projection
+
+The stacked v0.3.1 branch is `research/event-order-v0-3-1-bitemporal-clocks-2026-11-15` and is tracked by [issue #12292](https://github.com/Luminous-Dynamics/symthaea/issues/12292). It introduces a versioned v0.3.1 schema without changing the original v0.3 schema path.
+
+`EventObserved` and `EventPersisted` now have distinct source clock series, local timestamps, exact clock-mapping action IDs, receipt references/digests and qualification states. The replay classifier diagnoses unqualified, expired, not-yet-valid, invalid-validity and stale-reference mappings for source, observer and durable-store clocks. The simulator `at_ns` remains scheduling time only.
+
+`project_bitemporal_event` requires the exact event production, unique event-level first observation and unique durable write to be replay-applied. It resolves all three owner times from a caller-supplied `QualifiedEventTime` map keyed by (mapping action ID, source-local timestamp); verifies clock receipt and validity binding; enforces occurrence-not-after-observation and observation-before-durable-record; then emits the v0.2 `BitemporalEventEnvelope`. Its evidence sidecar preserves the schedule digest, action IDs, mapping-action IDs, source-local timestamps and receipt digests. Missing owner resolution is Indeterminate; substituted identity or contradictory chronology is CriticalFailure. The adapter does not normalize clocks, authenticate signatures/trust roots, or reconstruct attempt/stop inventory yet.
+
+A standalone independent reference model is available at [event-order-v0.3.1-independent-reference.mjs](../../benchmarks/engineering-change-impact/event-order-v0.3.1-independent-reference.mjs), with its run record at [event-order-v0.3.1-independent-reference.json](../../benchmarks/engineering-change-impact/event-order-v0.3.1-independent-reference.json). It covers 8,000 capture-clock fault checks, 100,000 interval-order pairs and 100,000 projection-order cases. It is JavaScript reference evidence only, not execution of the Rust module.
 
 ## Paradigm shifts
 
@@ -48,6 +58,9 @@ Targets are preregistered objectives, not measured results.
 | Completeness | 100% missing, stale, or unresolved inventory blocks | Decision frontier |
 | Determinism | 100% byte-identical replay for fixed seed, generator, build and input | Replay |
 | Permutation | 100% canonical report invariance under action delivery permutation | Schedule equivalence class |
+| Clocked bitemporality | 100% separate source/observer/store clock identity; no simulator-time substitution | Event/observer/store triple |
+| Owner mapping | 100% missing, stale, failed, out-of-validity or substituted mapping blocks projection | Exact mapping-action/timestamp key |
+| Capture order | 100% unknown/overlapping observation→durability order remains Indeterminate; reverse order is critical | Bitemporal envelope |
 | Five-way ordering | ≥95% on blinded, independently adjudicated traces | Independent schedule lineage |
 | False hold | Proposed ≤5% only after adequate eligible-ACT denominator | Paired ACT/HOLD case |
 | Performance | Report p50/p95 assessment latency, event/s, peak memory, generation cost, shrink iterations and replay time | Fixed hardware/build/corpus |
@@ -84,16 +97,27 @@ This is a capability comparison, not a claim of current superiority. The systems
 
 The differentiator to test is not "better clock sync" or a universal distributed database. It is a cross-owner admissibility layer for irreversible engineering operations when time bases, evidence authorities, policy scopes and systems of record differ. Demonstrate this only with identical frozen inputs, independently adjudicated ground truth, ablations and performance measurements.
 
+## v0.3.1 qualified observer and durable-store clocks
+
+The stacked follow-on adds a separate observer clock series and durable-store clock series to the schedule action model. Both carry exact clock domain/basis/epoch/scale/nanosecond unit, exact mapping-action identity, source-local time, receipt ref/digest and qualification. Simulator action time remains only a replay scheduler field and is never promoted into the v0.2 time contract.
+
+A deterministic generator creates event → delivery → observer clock/observation → independent store clock/durable record. The first v0.2 adapter, `project_bitemporal_event`, requires exactly one production record, one selected observer record and one selected store record; it requires the observation and persistence actions to have Applied scheduler dispositions; and it consumes externally supplied `QualifiedEventTime` resolutions keyed by (mapping action ID, source-local timestamp). It checks mapping-action identity, source domain, receipt reference/digest, owner qualification, mapping validity and local sample bounds before building `BitemporalEventEnvelope`.
+
+Missing owner time is Indeterminate; explicit owner FAIL, substituted clock identity or receipt mismatch is CriticalFailure. It does not normalize source clocks, authenticate signatures or trust roots, or infer durable time from simulator time. Occurrence time remains optional if no independently qualified occurrence-time resolution is supplied. The projected envelope is suitable for the v0.2 bitemporal visibility evaluator; attempt lineage, scoped stops and complete attempt inventory are not yet reconstructed by this adapter.
+
+The v0.3.1 branch has 24 authored module unit tests, six Proptest properties (256 cases each configured; 1,536 potential property cases), and one frozen integration known-answer fixture at `benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json`. The fixture contains seven schedule actions and is linked through the v0.3.1 JSON Schema. These are source counts and a frozen input, not executed results.
+
 ## Known limitations / next increment
 
-- The implemented generator families currently cover event production/delivery/partition, three clock-mapping failures (unqualified, expired, stale reference), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for calibration drift/step changes, crash between effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
-- Observation and durable-persistence actions are currently ordered by simulator virtual time; they do not yet carry separate observer-clock and store-clock basis/epoch/timestamp evidence. The next increment must add these domains so the v0.2 bitemporal envelope can be populated without promoting simulator time into physical/owner time.
+- The implemented generator families cover event production/delivery/partition, source-clock unqualified/expired/stale mapping faults, eight observer/store mapping faults (unqualified, expired, not-yet-valid and invalid validity interval), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for gradual calibration drift/step changes, crash precisely between physical effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
-- The v0.3 scheduler is not yet wired to the v0.2 evaluator. That adapter and an independent oracle are the next critical step.
+- The v0.3.1 bitemporal projection is wired to v0.2's bitemporal envelope and returns exact action/mapping/receipt sidecars, but does not yet reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory. A full action/effect adapter and separately implemented independent oracle remain critical next steps.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- Sixteen Rust module unit tests and four Proptest properties (256 cases each configured) are authored at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
+- Thirty Rust module unit tests and seven Proptest properties (256 cases each configured; 1,792 potential cases) are authored in the v0.3.1 branch at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
 
 ## Reproduction
+
+The v0.3.1 follow-on branch is `research/event-order-v0-3-1-bitemporal-clocks-2026-11-15`, stacked on v0.3 PR #12287. Its observer/store clock fields and bitemporal projection are in the same crate module, with dedicated unit and property tests.
 
 ```sh
 cargo test -p symthaea-decision-assessment
