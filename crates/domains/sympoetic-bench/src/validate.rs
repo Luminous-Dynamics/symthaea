@@ -21,6 +21,7 @@ const SCENARIO_DOMAINS: &[&str] = &[
     "adaptive_intervention",
     "collaborative_learning",
     "epistemic_resilience",
+    "persistent_team_coordination",
 ];
 const DIFFICULTIES: &[&str] = &["introductory", "moderate", "advanced"];
 const SPLITS: &[&str] = &["development", "pilot", "confirmatory_locked"];
@@ -63,6 +64,13 @@ const EVENT_KINDS: &[&str] = &[
     "human_reflection",
     "independent_reasoning_attempt",
     "ai_core_step_supplied",
+    "team_cycle_started",
+    "shared_plan_revised",
+    "membership_change",
+    "role_transition",
+    "team_reflection",
+    "authority_revalidated",
+    "team_state_snapshot",
 ];
 const SCORING_MODES: &[&str] = &["binary", "ordinal", "human_rating", "trace_audit"];
 const CONSENT_VALUES: &[&str] = &["not_applicable", "task_only", "explicit_opt_in"];
@@ -105,6 +113,14 @@ const TRACE_EVENT_TYPES: &[&str] = &[
     "human_reflection",
     "independent_reasoning_attempt",
     "ai_core_step_supplied",
+    "team_cycle_started",
+    "shared_plan_revised",
+    "membership_change",
+    "role_transition",
+    "team_reflection",
+    "authority_revalidated",
+    "team_state_snapshot",
+    "memory_policy_changed",
 ];
 
 const INTERVENTION_ACTIONS: &[&str] = &[
