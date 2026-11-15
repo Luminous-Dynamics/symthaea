@@ -135,11 +135,16 @@ fn valid_digest(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn digest_event(ledger: &Ledger, event: &Event) -> Result<String, String> {
+fn digest_event(
+    schema_version: &str,
+    ledger_id: &str,
+    repository_full_name: &str,
+    event: &Event,
+) -> Result<String, String> {
     let envelope = HashEnvelope {
-        schema_version: &ledger.schema_version,
-        ledger_id: &ledger.ledger_id,
-        repository_full_name: &ledger.repository_full_name,
+        schema_version,
+        ledger_id,
+        repository_full_name,
         event_id: &event.event_id,
         sequence: event.sequence,
         previous_hash: &event.previous_hash,
@@ -177,7 +182,7 @@ fn validate_ledger(ledger: &Ledger) -> Result<String, String> {
         if event.previous_hash != prior_hash || !valid_digest(&event.event_hash) {
             return Err(format!("{location}: broken event hash linkage"));
         }
-        let recomputed = digest_event(ledger, event)?;
+        let recomputed = digest_event(&ledger.schema_version, &ledger.ledger_id, &ledger.repository_full_name, event)?;
         if recomputed != event.event_hash {
             return Err(format!("{location}: event digest mismatch"));
         }
@@ -455,11 +460,14 @@ mod tests {
     const RESTATED_QUERY: &str = include_str!("../../../docs/development-map/fixtures/temporal-replay-restated-v0.1.json");
 
     fn reseal(ledger: &mut Ledger) {
+        let schema_version = ledger.schema_version.clone();
+        let ledger_id = ledger.ledger_id.clone();
+        let repository_full_name = ledger.repository_full_name.clone();
         let mut previous = GENESIS.to_owned();
         for (index, event) in ledger.events.iter_mut().enumerate() {
             event.sequence = index as u64 + 1;
             event.previous_hash = previous.clone();
-            event.event_hash = digest_event(ledger, event).expect("oracle event hash");
+            event.event_hash = digest_event(&schema_version, &ledger_id, &repository_full_name, event).expect("oracle event hash");
             previous = event.event_hash.clone();
         }
     }
