@@ -592,7 +592,7 @@ mod tests {
         let two_samples = sample_outcomes("b", &population_b, 20, 0x5eed_f00d_cafe_babe, &outcomes);
 
         let one =
-            audit_rejected_candidates(&plan(vec![stratum("a", population_a, one_samples)], 1_000))
+            audit_rejected_candidates(&plan(vec![stratum("a", population_a.clone(), one_samples)], 1_000))
                 .unwrap();
         let two = audit_rejected_candidates(&plan(
             vec![
