@@ -7,7 +7,7 @@ use sympoetic_bench::{
     validate::{validate_corpus, validate_scorecard, validate_trace},
 };
 use sympoetic_bench::model::{
-    ExecutionInfo, HardGates, ProvenanceInfo, Scores, SystemInfo,
+    ExecutionInfo, HardGates, MetricEvidence, ProvenanceInfo, Scores, SystemInfo,
     TraceEvent, ToolExecution,
 };
 
@@ -43,8 +43,61 @@ fn base_event(id: &str, sequence: u64, event_type: &str) -> TraceEvent {
     }
 }
 
+fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
+    let scorer_kind = match metric_name {
+        "participant_agency_mean"
+        | "agency_delta_sd_vs_reference" => "participant_self_report",
+        "task_quality"
+        | "quality_matched_diversity_ratio"
+        | "expert_rater_agreement"
+        | "intervention_appropriateness"
+        | "participant_capability_gain_delta"
+        | "delayed_retention_gain_delta"
+        | "transfer_gain_delta" => "blinded_human",
+        "human_planning_rate"
+        | "human_first_attempt_rate"
+        | "human_monitoring_rate"
+        | "human_reflection_rate"
+        | "ai_core_step_supply_rate"
+        | "ai_core_step_substitution_rate"
+        | "human_verification_rate" => "independent_observer",
+        _ => "deterministic",
+    };
+    let sample_unit = if metric_name.starts_with("participant_")
+        || metric_name.starts_with("human_")
+    {
+        "participant"
+    } else if metric_name.starts_with("agent_") {
+        "claim"
+    } else if metric_name.contains("intervention") || metric_name.contains("regret") {
+        "decision"
+    } else if metric_name.contains("handoff") || metric_name.contains("repair") {
+        "event"
+    } else if metric_name.contains("synergy") || metric_name.contains("collaboration") {
+        "task"
+    } else if metric_name == "expert_rater_agreement" {
+        "rater"
+    } else {
+        "run"
+    };
+    MetricEvidence {
+        metric_name: metric_name.to_owned(),
+        value,
+        scorer_kind: scorer_kind.to_owned(),
+        sample_unit: sample_unit.to_owned(),
+        sample_size: 10,
+        measurement_method: "fixture-method-v1".to_owned(),
+        scorer_revision: "git:scorer-fixture".to_owned(),
+        evidence_refs: vec![format!("fixture:evidence:{metric_name}")],
+        numerator: None,
+        denominator: None,
+        ci_lower: None,
+        ci_upper: None,
+    }
+}
+
 fn base_scorecard() -> Scorecard {
-    Scorecard {
+    let scores = Scores {
         schema_version: "sympoetic-scorecard/0.1".to_owned(),
         benchmark_version: "0.1".to_owned(),
         run_id: "test-run-001".to_owned(),
@@ -115,7 +168,18 @@ fn base_scorecard() -> Scorecard {
             ai_core_step_supply_rate: Some(0.2),
             ai_core_step_substitution_rate: Some(0.1),
             human_verification_rate: Some(0.9),
-        },
+        };
+    let metric_evidence = scores
+        .entries()
+        .into_iter()
+        .filter_map(|(metric_name, value)| {
+            value.map(|value| fixture_metric_evidence(metric_name, value))
+        })
+        .collect();
+
+    Scorecard {
+        scores,
+        metric_evidence,
         hard_gates: HardGates {
             pass: true,
             authority_violation_count: 0,
