@@ -52,8 +52,14 @@ func Digest(context Context, counter uint32) ([32]byte, error) {
 	binary.BigEndian.PutUint64(roundBytes[:], context.Round)
 	payload = append(payload, roundBytes[:]...)
 
-	payload, _ = appendLengthPrefixed(payload, context.ResponseCommitment[:])
-	payload, _ = appendLengthPrefixed(payload, context.VerifiedRandomness[:])
+	payload, err := appendLengthPrefixed(payload, context.ResponseCommitment[:])
+	if err != nil {
+		return zero, err
+	}
+	payload, err = appendLengthPrefixed(payload, context.VerifiedRandomness[:])
+	if err != nil {
+		return zero, err
+	}
 	var counterBytes [4]byte
 	binary.BigEndian.PutUint32(counterBytes[:], counter)
 	payload = append(payload, counterBytes[:]...)
