@@ -51,7 +51,7 @@ Each permitted diagnostic probe declares:
 - reversibility/target impact;
 - which proof obligations its outcomes can inform, without declaring that an outcome is sufficient by itself.
 
-The benchmark records the candidate's selected probes and exact response availability. Existing REA/EVSI planners may choose probes; D6.9 scores whether the chosen observations were useful and admissible. Do not fork or modify their planner APIs.
+The benchmark records the candidate's selected probes, exact returned observation payloads, provenance/source family, observation time, and availability time. A decision is not scored as supported merely because it names a response ID; the response bytes and their availability must be present in the candidate trace. Existing REA/EVSI planners may choose probes; D6.9 scores whether the chosen observations were useful and admissible. Do not fork or modify their planner APIs.
 
 ## 6. Required known-answer controls
 
