@@ -150,6 +150,7 @@ pub struct ArmScore {
     pub critical_time_weighted_conformance: Option<f64>,
     pub recovery_event_count: usize,
     pub max_unverified_gap_seconds: u64,
+    pub max_critical_unverified_gap_seconds: u64,
     pub obligation_exposures: Vec<ObligationExposure>,
     pub final_checkpoint_success: bool,
     pub claim_ceiling: String,
@@ -713,6 +714,9 @@ fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, Strin
         .map(|item| item.recovery_events).sum();
     let max_unverified_gap_seconds = obligation_exposures.iter()
         .map(|item| item.max_unverified_gap_seconds).max().unwrap_or(0);
+    let max_critical_unverified_gap_seconds = obligation_exposures.iter()
+        .filter(|item| item.critical)
+        .map(|item| item.max_unverified_gap_seconds).max().unwrap_or(0);
 
     let retained_ok = retained_functionality.is_none_or(|value| value >= 1.0);
     let conformance_ok = active_requirement_conformance.is_some_and(|value| value >= 1.0);
@@ -743,6 +747,7 @@ fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, Strin
         critical_time_weighted_conformance,
         recovery_event_count,
         max_unverified_gap_seconds,
+        max_critical_unverified_gap_seconds,
         obligation_exposures,
         final_checkpoint_success,
         claim_ceiling: "Deterministic scoring of a supplied synthetic/benchmark trace only. Receipt digests are not signatures; the evaluator does not authenticate test execution, source observations, gold custody, authority, CI, or deployed outcomes.".to_owned(),
