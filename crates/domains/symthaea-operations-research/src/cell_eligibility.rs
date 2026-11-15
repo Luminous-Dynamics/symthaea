@@ -846,6 +846,77 @@ mod tests {
 
 
 
+
+    #[test]
+    fn independent_verifier_accepts_a_sound_eligible_claim() {
+        let req = requirement();
+        let cell = qualified_cell();
+        let claim = evaluate_cell_eligibility(&req, &cell);
+        assert_eq!(claim.status, EligibilityStatus::Eligible);
+        let verification = crate::cell_eligibility_verifier::verify_eligible_claim(&req, &cell, &claim);
+        assert_eq!(verification.status, crate::cell_eligibility_verifier::VerificationStatus::Verified);
+        assert!(verification.findings.is_empty());
+        assert_eq!(verification.independently_resolved_evidence_refs, claim.evidence_refs);
+    }
+
+    #[test]
+    fn independent_verifier_rejects_forged_eligible_claim_for_unknown_asset() {
+        let req = requirement();
+        let mut cell = qualified_cell();
+        let mut claim = evaluate_cell_eligibility(&req, &cell);
+        cell.assets[0].status = AssetStatus::Unknown;
+        claim.status = EligibilityStatus::Eligible;
+        claim.reasons.clear();
+        let verification = crate::cell_eligibility_verifier::verify_eligible_claim(&req, &cell, &claim);
+        assert_eq!(verification.status, crate::cell_eligibility_verifier::VerificationStatus::Rejected);
+        assert!(verification.findings.iter().any(|finding|
+            finding.code == crate::cell_eligibility_verifier::VerificationFindingCode::AssetNotAvailable
+        ));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_forged_eligible_claim_with_insufficient_headcount() {
+        let req = requirement();
+        let mut cell = qualified_cell();
+        let mut claim = evaluate_cell_eligibility(&req, &cell);
+        cell.skill_qualifications[0].available_qualified_people = Some(0);
+        claim.status = EligibilityStatus::Eligible;
+        claim.reasons.clear();
+        let verification = crate::cell_eligibility_verifier::verify_eligible_claim(&req, &cell, &claim);
+        assert_eq!(verification.status, crate::cell_eligibility_verifier::VerificationStatus::Rejected);
+        assert!(verification.findings.iter().any(|finding|
+            finding.code == crate::cell_eligibility_verifier::VerificationFindingCode::SkillHeadcountInsufficient
+        ));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_forged_eligible_claim_with_expired_configuration() {
+        let req = requirement();
+        let mut cell = qualified_cell();
+        let mut claim = evaluate_cell_eligibility(&req, &cell);
+        cell.process_configurations[0].valid_until_unix_seconds = Some(NOW);
+        claim.status = EligibilityStatus::Eligible;
+        claim.reasons.clear();
+        let verification = crate::cell_eligibility_verifier::verify_eligible_claim(&req, &cell, &claim);
+        assert_eq!(verification.status, crate::cell_eligibility_verifier::VerificationStatus::Rejected);
+        assert!(verification.findings.iter().any(|finding|
+            finding.code == crate::cell_eligibility_verifier::VerificationFindingCode::ConfigurationOutsideValidity
+        ));
+    }
+
+    #[test]
+    fn independent_verifier_rejects_tampered_evidence_set() {
+        let req = requirement();
+        let cell = qualified_cell();
+        let mut claim = evaluate_cell_eligibility(&req, &cell);
+        claim.evidence_refs.pop();
+        let verification = crate::cell_eligibility_verifier::verify_eligible_claim(&req, &cell, &claim);
+        assert_eq!(verification.status, crate::cell_eligibility_verifier::VerificationStatus::Rejected);
+        assert!(verification.findings.iter().any(|finding|
+            finding.code == crate::cell_eligibility_verifier::VerificationFindingCode::EvidenceSetMismatch
+        ));
+    }
+
     #[test]
     fn malformed_parameter_digest_is_blocked() {
         let mut cell = qualified_cell();
