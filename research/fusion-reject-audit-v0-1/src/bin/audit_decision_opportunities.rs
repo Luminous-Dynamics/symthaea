@@ -4,8 +4,9 @@ use fusion_reject_audit::{
     AcceptedCandidate, AcceptedCandidateManifest, AuditOutcome, FrozenCandidateUniverse,
     RejectAuditPlan, RejectStratum,
     decision_opportunity::{
-        audit_decision_opportunities, DecisionEvaluation, DecisionOpportunityPlan, IncumbentFrontierPoint, ObjectiveDefinition,
+        DecisionEvaluation, DecisionOpportunityPlan, IncumbentFrontierPoint, ObjectiveDefinition,
         ObjectiveDirection, ObjectiveValue, StratumDecisionEvaluations,
+        audit_decision_opportunities,
     },
     deterministic_audit_sample_ids,
 };
