@@ -15,9 +15,9 @@
     {
       "artifact_id": "SYNTH-BODY-PLAN",
       "source_type": "BODY_PLAN",
-      "locator": "synthetic://marine-legacy-reconstruction/body-plan-v0.1",
+      "locator": "docs/research/marine/fixtures/assets/synthetic-body-plan-source.txt",
       "revision_or_date": "synthetic fixture v0.1",
-      "mime_type": "application/vnd.luminous.synthetic-view+json",
+      "mime_type": "text/plain",
       "byte_length": 54,
       "digest": {
         "algorithm": "SHA-256",
@@ -45,10 +45,10 @@
     {
       "artifact_id": "SYNTH-HALF-BREADTH",
       "source_type": "HALF_BREADTH_PLAN",
-      "locator": "synthetic://marine-legacy-reconstruction/half-breadth-v0.1",
+      "locator": "docs/research/marine/fixtures/assets/synthetic-half-breadth-source.txt",
       "revision_or_date": "synthetic fixture v0.1",
-      "mime_type": "application/vnd.luminous.synthetic-view+json",
-      "byte_length": 58,
+      "mime_type": "text/plain",
+      "byte_length": 57,
       "digest": {
         "algorithm": "SHA-256",
         "hex": "c015687d572f0b31cb030f6b5911cbae5416d1502f091356681f776bab63c04d"
@@ -268,10 +268,10 @@
     {
       "candidate_id": "CANDIDATE-POINT-CLOUD-001",
       "representation": "POINT_CLOUD",
-      "artifact_locator": "synthetic://marine-legacy-reconstruction/candidate-point-cloud-001",
+      "artifact_locator": "docs/research/marine/fixtures/assets/synthetic-candidate-point-cloud.json",
       "digest": {
         "algorithm": "SHA-256",
-        "hex": "bd84b8a627d75cf52c8d9097f9b41e96282d2b366c4a240f148874d4cebc7cf9"
+        "hex": "6010783b2c76f21ba160fd04e1a12968b0926ea8a548d619142db72d8d86811f"
       },
       "units": "m",
       "coordinate_frame_id": "VESSEL-LOCAL-X-FWD-Y-STARBOARD-Z-UP",
@@ -284,7 +284,7 @@
         "version": "0.1.0",
         "configuration_digest": {
           "algorithm": "SHA-256",
-          "hex": "a694060d69eb6cdf916e5af1484aa722c99a150e49eb26dfb2b4ec8c94640be2"
+          "hex": "fda7c066b674b9883adaa2cbc29cc51916c35f87d4ce498453a2620e4016364a"
         }
       },
       "uncertainty_status": "PARTIAL",
