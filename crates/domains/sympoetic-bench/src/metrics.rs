@@ -101,10 +101,14 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
 
     for (index, record) in records.iter().enumerate() {
         if record.unnecessary && record.appropriate {
-            bail!("intervention record {index}: an unnecessary intervention cannot be adjudicated appropriate");
+            bail!(
+            "intervention record {index}: an unnecessary intervention cannot be adjudicated appropriate"
+        );
         }
         if record.critical_missed && !record.critical_opportunity {
-            bail!("intervention record {index}: a missed critical intervention requires a critical opportunity");
+            bail!(
+            "intervention record {index}: a missed critical intervention requires a critical opportunity"
+        );
         }
         if record.appropriate {
             appropriate_count += 1;
@@ -120,7 +124,9 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
         }
         if let Some(regret) = record.counterfactual_regret {
             if !regret.is_finite() || !(0.0..=1.0).contains(&regret) {
-                bail!("intervention record {index}: counterfactual regret must be finite and in [0, 1]");
+                bail!(
+                    "intervention record {index}: counterfactual regret must be finite and in [0, 1]"
+                );
             }
             regret_sum += regret;
             regret_count += 1;
@@ -176,12 +182,14 @@ pub fn exact_shapley_values(coalition_values: &[Option<f64>]) -> Result<Vec<f64>
     }
     let player_count = coalition_values.len().trailing_zeros() as usize;
     if player_count > 12 {
-        bail!("exact Shapley attribution is limited to 12 players; use a sampled estimator above that");
+        bail!(
+            "exact Shapley attribution is limited to 12 players; use a sampled estimator above that"
+        );
     }
 
     let mut values = Vec::with_capacity(coalition_values.len());
     for (coalition, value) in coalition_values.iter().enumerate() {
-        let value = value.with_context(|| {
+        let value = value.as_ref().with_context(|| {
             format!("coalition {coalition} is non-identifiable; do not impute its value")
         })?;
         if !value.is_finite() || !(0.0..=1.0).contains(value) {
@@ -239,7 +247,9 @@ pub fn participant_capability_amplification(
         || collaborative_pre.len() < 2
         || control_pre.len() < 2
     {
-        bail!("capability amplification requires matched pre/post scores and at least two participants per arm");
+        bail!(
+            "capability amplification requires matched pre/post scores and at least two participants per arm"
+        );
     }
     if draws < 1_000 {
         bail!("capability amplification bootstrap requires at least 1,000 draws");
@@ -504,7 +514,9 @@ mod tests {
         assert!((result[0] - 0.1).abs() < 1e-12);
         assert!((result[1] - 0.2).abs() < 1e-12);
         assert!((result[2] - 0.3).abs() < 1e-12);
-        assert!((result.iter().sum::<f64>() - (values[7].unwrap() - values[0].unwrap())).abs() < 1e-12);
+        let allocated = result.iter().sum::<f64>();
+        let coalition_gain = values[7].unwrap() - values[0].unwrap();
+        assert!((allocated - coalition_gain).abs() < 1e-12);
     }
 
     #[test]
