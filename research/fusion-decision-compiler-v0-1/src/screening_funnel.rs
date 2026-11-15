@@ -707,6 +707,66 @@ mod tests {
     }
 
     #[test]
+    fn non_pass_disposition_requires_a_reason_code() {
+        let ids = two_candidates();
+        let mut records = complete_records(&ids);
+        let analytical = records
+            .iter_mut()
+            .find(|record| {
+                record.candidate_id == "candidate-b"
+                    && record.stage == ScreeningStage::Analytical
+            })
+            .unwrap();
+        analytical.disposition = ScreeningDisposition::Rejected;
+        analytical.reason_code = None;
+
+        let errors =
+            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        assert!(errors.contains(&FunnelValidationError::MissingReasonCode {
+            candidate_id: "candidate-b".to_string(),
+            stage: ScreeningStage::Analytical,
+        }));
+    }
+
+    #[test]
+    fn analytical_stage_cannot_be_marked_not_evaluated() {
+        let ids = two_candidates();
+        let mut records = complete_records(&ids);
+        let analytical = records
+            .iter_mut()
+            .find(|record| {
+                record.candidate_id == "candidate-b"
+                    && record.stage == ScreeningStage::Analytical
+            })
+            .unwrap();
+        analytical.disposition = ScreeningDisposition::NotEvaluated;
+        analytical.reason_code = Some("analytical-stage-skipped".to_string());
+
+        let errors =
+            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        assert!(errors.contains(&FunnelValidationError::InvalidSelectionBasis {
+            candidate_id: "candidate-b".to_string(),
+            stage: ScreeningStage::Analytical,
+        }));
+    }
+
+    #[test]
+    fn reference_label_for_unknown_candidate_is_rejected() {
+        let ids = two_candidates();
+        let labels = ReferenceAuditInput {
+            labels: vec![ReferenceLabel {
+                candidate_id: "not-in-universe".to_string(),
+                disposition: ReferenceDisposition::Feasible,
+            }],
+        };
+        let errors =
+            audit_screening_funnel(&ids, &complete_records(&ids), &labels).unwrap_err();
+        assert!(errors.contains(&FunnelValidationError::UnknownReferenceLabel(
+            "not-in-universe".to_string()
+        )));
+    }
+
+    #[test]
     fn duplicate_reference_label_is_rejected() {
         let ids = two_candidates();
         let labels = ReferenceAuditInput {
