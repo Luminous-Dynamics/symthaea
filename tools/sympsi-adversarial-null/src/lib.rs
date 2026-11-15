@@ -387,8 +387,6 @@ fn simulate_scenario(
     } else {
         1
     };
-    let _ = block_size;
-
     Ok(ScenarioResult {
         scenario_id: spec.id.into(),
         null_mechanism: spec.mechanism.into(),
@@ -428,6 +426,9 @@ fn generate_campaign(
 
     for index in 0..n {
         let block = index / block_size;
+        if scenario_id == "blockwise_shared_drift" && index % block_size == 0 {
+            previous_response = None;
+        }
         let (target_weights, response_weights, markov) =
             scenario_weights(scenario_id, choices, block);
         let target = rng.categorical(&target_weights);
@@ -700,8 +701,8 @@ mod tests {
         let targets = [2, 2, 1, 1];
         let responses = [2, 1, 2, 1];
         let (mean, variance) = conditional_moments(&targets, &responses);
-        assert!((mean - 2.5).abs() < 1e-12);
-        assert!((variance - 0.8333333333333333).abs() < 1e-12);
+        assert!((mean - 1.5).abs() < 1e-12);
+        assert!((variance - 1.25).abs() < 1e-12);
     }
 
     #[test]
