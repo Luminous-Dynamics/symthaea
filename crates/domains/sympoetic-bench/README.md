@@ -2,7 +2,7 @@
 
 Rust validation and measurement core for SympoeticBench v0.1.
 
-This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit.
+This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The development corpus includes partner coordination and adaptive intervention scenarios.
 
 ## Commands
 
