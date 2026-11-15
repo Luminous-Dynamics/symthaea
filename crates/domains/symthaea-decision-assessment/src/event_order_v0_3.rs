@@ -2639,7 +2639,7 @@ pub fn project_action_history(
             if let Some(mapped_outcome) = mapped_outcome {
                 let record = AttemptTerminalReconciliation {
                     event_id: terminal_action.action_id.clone(),
-                    start_event_id: exact_start_action_id,
+                    start_event_id: exact_start_action_id.clone(),
                     outcome: mapped_outcome,
                     qualification,
                     start_to_terminal_order: start_to_terminal,
@@ -4902,6 +4902,11 @@ mod tests {
             report.start_gate.as_ref().map(|gate| gate.start_permitted_by_stop_contract),
             Some(fixture.expected.start_permitted_by_stop_contract),
         );
+        assert!(report.schedule_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert!(report.replay_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert_eq!(report.terminal_reconciliations.len(), 1);
+        assert_eq!(report.stop_evidence.len(), 2);
+        assert_eq!(report.inventory_attestations.len(), 1);
     }
 
     #[test]
@@ -4927,6 +4932,16 @@ mod tests {
         assert_eq!(report.effect_commits.len(), 1);
         assert!(report.cancellation_acknowledgements.is_empty());
         assert_eq!(report.attempts[0].terminal_reconciliation.as_ref().map(|t| t.outcome), Some(ReconciledOperationOutcome::Applied));
+        assert!(report.schedule_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert!(report.replay_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert_eq!(report.terminal_reconciliations.len(), 1);
+        assert_eq!(report.terminal_reconciliations[0].exact_start_action_id, report.attempts[0].start_event_ids[0]);
+        assert_eq!(report.terminal_reconciliations[0].receipt_ref, "synthetic://terminal/1");
+        assert_eq!(report.stop_evidence.len(), 2);
+        assert!(report.stop_evidence.iter().any(|item| item.kind == ProjectedStopEvidenceKind::Trigger));
+        assert!(report.stop_evidence.iter().any(|item| item.kind == ProjectedStopEvidenceKind::Discharge));
+        assert_eq!(report.inventory_attestations.len(), 1);
+        assert_eq!(report.inventory_attestations[0].inventory_frontier_event_id, "inventory-frontier-1");
     }
 
     #[test]
