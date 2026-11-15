@@ -783,3 +783,12 @@ The source register now includes `benchmark_targets`, each bound to exact source
 - `CH4-PYROLYSIS-PLASMA-PARETO-CHALLENGE-001`: combined challenge envelope >=92% methane conversion, >=99% H2 selectivity and <=USD 0.70/kg H2 LCOH, all at the same operating point and matched boundary. Show no-credit, allocation and avoided-product-credit cases independently. Carbon credit requires qualified product grade, market capacity and offtake.
 
 The goals intentionally combine advantages that current published points report separately. They are falsifiable targets, not results, standards or assumed feasible operating points.
+
+
+## 9.18 Plasma-assisted ammonia synthesis — separate product and energy lane
+
+The 7 July 2026 JACS study, *Plasma-Electrocatalytic Nitrogen Reduction for Ammonia Synthesis* (DOI https://doi.org/10.1021/jacs.6c04148), reports an integrated nonthermal-plasma/electrolysis membrane-electrode assembly. Among 14 screened metals, Ag gave 7.7 ± 0.8 nmol NH3 s−1 cm−2 and 86 ± 14% electrochemical Faradaic efficiency at −0.54 V vs RHE, room temperature and atmospheric pressure. Plasma/electrolysis on-off controls and 15N2 labeling support nitrogen-source attribution; modeling and Raman results support a vibrationally excited N2 pathway.
+
+These are valuable reactor-level mechanism and selectivity results, not a complete plant energy metric. The 2026 industrial roadmap separately reports plasma-ammonia synthesis energy yields around 0.3–3 g NH3/kWh and about 127 g NH3/kWh for Haber–Bosch, but explicitly notes that the stated comparison excludes hydrogen-production energy. Neither the JACS area-normalized rate nor its electrochemical Faradaic efficiency can be promoted into full-chain grid-to-ammonia efficiency.
+
+A third machine-readable target, `NH3-PLASMA-SYNTHESIS-FULL-CHAIN-001`, requires at least 3 g accepted NH3/kWh after including hydrogen generation, plasma and electrolysis power, gas/feed handling and product separation, with a matched Haber–Bosch baseline under the same H2-energy boundary. This is a research target, not an achieved result.
