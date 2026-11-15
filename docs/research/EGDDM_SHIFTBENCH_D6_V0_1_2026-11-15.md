@@ -37,7 +37,7 @@ The resulting project state is not merely a repository snapshot. It is a time-in
 
 ## 3. Matched task protocol
 
-Every scenario begins from one frozen initial snapshot and branches into two matched continuations:
+Every scenario begins from one frozen initial snapshot and branches into two matched continuations. The evaluator requires identical initial active obligations and equivalent initial evidence outcomes, source scope and availability in both arms; otherwise the pair is invalid:
 
 - **Clean arm:** continuation proceeds without a material workspace intervention.
 - **Shifted arm:** an intervention is introduced at a preregistered point while preserving the same saved prefix.
