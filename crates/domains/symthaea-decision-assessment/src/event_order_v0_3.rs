@@ -5011,6 +5011,272 @@ mod tests {
     }
 
     #[test]
+    fn historical_discharge_is_valid_for_its_policy_but_does_not_clear_a_later_revision() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let obligation_id = "revised-obligation".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 1_000);
+        let trigger_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::StopTriggered {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::StopTrigger {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://revision-test/trigger".to_owned(),
+                receipt_sha256: "a".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        receipts.insert(
+            trigger_id.clone(),
+            passing_owner_receipt("synthetic://revision-test/trigger", &"a".repeat(64)),
+        );
+
+        let frontier_id = "revision-frontier".to_owned();
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::EventProduced {
+                event_id: frontier_id.clone(),
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id: mapping_id.clone(),
+                source_timestamp_ns: 110,
+                causal_predecessors: Vec::new(),
+            },
+        );
+        actions.last_mut().expect("frontier action").owner_time_ref =
+            Some(ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 110,
+            });
+        resolutions.insert(
+            (mapping_id.clone(), 110),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 110, 1_020),
+        );
+
+        let empty_manifest = crate::event_order_v0_2::canonical_attempt_manifest_sha256(&[])
+            .expect("empty complete attempt manifest");
+        let inventory_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::AttemptInventoryAttested {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: frontier_id.clone(),
+                attempt_manifest_sha256: empty_manifest.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 120,
+            },
+            ActionEvidence::InventoryAttestation {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: frontier_id.clone(),
+                attempt_manifest_sha256: empty_manifest.clone(),
+                receipt_ref: "synthetic://revision-test/inventory".to_owned(),
+                receipt_sha256: "b".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 120),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 120, 1_030),
+        );
+        receipts.insert(
+            inventory_id,
+            passing_owner_receipt("synthetic://revision-test/inventory", &"b".repeat(64)),
+        );
+
+        let historical_discharge_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            5,
+            ScheduleAction::StopDischarged {
+                obligation_id: obligation_id.clone(),
+                trigger_action_id: trigger_id.clone(),
+                policy_revision_action_id: trigger_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+                receipt_ref: "synthetic://revision-test/discharge-v1".to_owned(),
+                receipt_sha256: "c".repeat(64),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 130,
+            },
+            ActionEvidence::StopDischarge {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: frontier_id.clone(),
+                attempt_manifest_sha256: empty_manifest.clone(),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 130),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 130, 1_040),
+        );
+        receipts.insert(
+            historical_discharge_id,
+            passing_owner_receipt("synthetic://revision-test/discharge-v1", &"c".repeat(64)),
+        );
+
+        let revision_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            6,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 140,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://revision-test/policy-v2".to_owned(),
+                receipt_sha256: "d".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 140),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 140, 1_050),
+        );
+        receipts.insert(
+            revision_id,
+            passing_owner_receipt("synthetic://revision-test/policy-v2", &"d".repeat(64)),
+        );
+
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1131,
+            scenario_family: "historical_stop_discharge_then_policy_revision".to_owned(),
+            actions,
+        };
+        let report = project_action_history(
+            &schedule,
+            "robot-not-started",
+            &resolutions,
+            &receipts,
+        ).expect("historical discharge projection");
+        assert_ne!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.obligations.len(), 1);
+        assert_eq!(report.obligations[0].policy_revision, "policy-v2");
+        assert!(report.obligations[0].discharge.is_none());
+        assert!(report.stop_evidence.iter().any(|evidence| {
+            evidence.kind == ProjectedStopEvidenceKind::Discharge
+                && evidence.policy_revision == "policy-v1"
+        }));
+        assert!(report.reason_codes.iter().any(|code| code == "STOP_OBLIGATION_UNDISCHARGED:revised-obligation"));
+        assert!(!report.reason_codes.iter().any(|code| {
+            code == "STOP_DISCHARGE_ACTION_LINEAGE_MISMATCH:revised-obligation"
+        }));
+    }
+
+    #[test]
+    fn undischarged_scope_widening_preserves_the_expanded_scope() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let obligation_id = "widened-obligation".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 1_000);
+        let original_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned()].into_iter().collect(),
+        );
+        let expanded_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned(), "robot-2".to_owned()].into_iter().collect(),
+        );
+        let trigger_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::StopTriggered {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::StopTrigger {
+                scope: original_scope,
+                receipt_ref: "synthetic://widening/trigger".to_owned(),
+                receipt_sha256: "1".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        receipts.insert(
+            trigger_id,
+            passing_owner_receipt("synthetic://widening/trigger", &"1".repeat(64)),
+        );
+        let revision_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 110,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: expanded_scope.clone(),
+                receipt_ref: "synthetic://widening/policy-v2".to_owned(),
+                receipt_sha256: "2".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 110),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 110, 1_010),
+        );
+        receipts.insert(
+            revision_id,
+            passing_owner_receipt("synthetic://widening/policy-v2", &"2".repeat(64)),
+        );
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1132,
+            scenario_family: "undischarged_stop_scope_widening".to_owned(),
+            actions,
+        };
+        let report = project_action_history(
+            &schedule,
+            "robot-2",
+            &resolutions,
+            &receipts,
+        ).expect("scope widening projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert_eq!(report.obligations.len(), 1);
+        assert_eq!(report.obligations[0].policy_revision, "policy-v2");
+        assert_eq!(report.obligations[0].scope, expanded_scope);
+        assert!(report.obligations[0].discharge.is_none());
+        assert!(report.reason_codes.iter().any(|code| code == "STOP_OBLIGATION_UNDISCHARGED:widened-obligation"));
+    }
+
+    #[test]
     fn action_projection_rejects_inventory_frontier_not_in_event_history() {
         let (mut schedule, _, _, _) = action_history_fixture();
         for action in &mut schedule.actions {
