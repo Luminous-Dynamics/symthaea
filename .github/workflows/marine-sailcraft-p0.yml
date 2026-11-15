@@ -42,9 +42,23 @@ jobs:
           set -euo pipefail
           source_commit="$(git rev-parse HEAD)"
           test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
-      - name: Format
-        run: cargo fmt --check -p symthaea-sailcraft
-      - name: Unit tests
-        run: cargo test --locked -p symthaea-sailcraft
-      - name: Strict Clippy
-        run: cargo clippy --locked -p symthaea-sailcraft --all-targets -- -D warnings
+      - name: Create isolated validation manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sailcraft-p0"
+          cat > "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" <<EOF
+          [package]
+          name = "symthaea-sailcraft-p0-validation"
+          version = "0.1.0"
+          edition = "2024"
+
+          [lib]
+          path = "$GITHUB_WORKSPACE/crates/domains/symthaea-sailcraft/src/lib.rs"
+          EOF
+      - name: Format sailcraft kernel without loading unrelated workspace members
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-sailcraft/src/lib.rs
+      - name: Unit tests in isolated manifest
+        run: cargo test --manifest-path "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" --all-targets
+      - name: Strict Clippy in isolated manifest
+        run: cargo clippy --manifest-path "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" --all-targets -- -D warnings
