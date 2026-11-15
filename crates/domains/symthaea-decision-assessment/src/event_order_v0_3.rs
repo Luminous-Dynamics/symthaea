@@ -3432,6 +3432,56 @@ pub fn project_action_history(
                                 }
                             }
                         }
+                        // The snapshot may only contain stop-discharge relations
+                        // whose exact discharge event was already before the cut.
+                        // Later discharge relations are part of the current delta,
+                        // not evidence that existed at this inventory frontier.
+                        let mut snapshot_relations = Vec::new();
+                        for relation in &attempt.stop_discharge_relations {
+                            let discharge_action = canonical_actions.iter().find(|candidate| {
+                                candidate.action_id == relation.discharge_event_id
+                            });
+                            let Some(discharge_action) = discharge_action else {
+                                critical = true;
+                                reasons.insert(format!(
+                                    "SNAPSHOT_STOP_RELATION_DISCHARGE_MISSING:{}:{}",
+                                    attempt_id, relation.obligation_id
+                                ));
+                                continue;
+                            };
+                            let discharge_time = match action_owner_time(schedule, discharge_action, time_resolutions) {
+                                Ok(value) => value,
+                                Err(ProjectionFault::Indeterminate(code)) => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("{code}:{attempt_id}:SNAPSHOT_STOP_RELATION"));
+                                    continue;
+                                }
+                                Err(ProjectionFault::Critical(code)) => {
+                                    critical = true;
+                                    reasons.insert(format!("{code}:{attempt_id}:SNAPSHOT_STOP_RELATION"));
+                                    continue;
+                                }
+                            };
+                            match event_order_between(&discharge_time, frontier_time) {
+                                EventOrder::Before => snapshot_relations.push(relation.clone()),
+                                EventOrder::After => {}
+                                EventOrder::Overlapping | EventOrder::Unknown => {
+                                    indeterminate = true;
+                                    reasons.insert(format!(
+                                        "SNAPSHOT_STOP_RELATION_FRONTIER_ORDER_UNRESOLVED:{}:{}",
+                                        attempt_id, relation.obligation_id
+                                    ));
+                                }
+                                EventOrder::Inconsistent => {
+                                    critical = true;
+                                    reasons.insert(format!(
+                                        "SNAPSHOT_STOP_RELATION_FRONTIER_ORDER_INCONSISTENT:{}:{}",
+                                        attempt_id, relation.obligation_id
+                                    ));
+                                }
+                            }
+                        }
+                        snapshot_attempt.stop_discharge_relations = snapshot_relations;
                         inventory_snapshot_attempts.push(snapshot_attempt);
                     }
                     EventOrder::After => {
@@ -4042,14 +4092,9 @@ mod tests {
                 qualification: GateState::Pass,
                 start_to_terminal_order: EventOrder::Before,
             }),
-            stop_discharge_relations: vec![AttemptStopDischargeRelation {
-                obligation_id: obligation_id.clone(),
-                discharge_event_id: discharge_action_id.clone(),
-                attempt_start_event_id: start_action_id.clone(),
-                discharge_to_start_order: EventOrder::After,
-                terminal_event_id_at_discharge: Some(terminal_action_id.clone()),
-                terminal_to_discharge_order: Some(EventOrder::Before),
-            }],
+            // This inventory frontier is before discharge; the manifest must
+            // not contain the future attempt-to-discharge relation.
+            stop_discharge_relations: Vec::new(),
             retry_predecessor_terminal_event_id: None,
             retry_predecessor_start_event_id: None,
             retry_predecessor_terminal_to_start_order: None,
