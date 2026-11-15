@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-shiftbench-analysis-plan-v0.1.schema.json",
+  "title": "EGDDM ShiftBench analysis plan template v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "benchmark",
+    "date",
+    "design",
+    "arms",
+    "primary_estimand",
+    "outcomes",
+    "analysis",
+    "preregistration_lock",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "enum": [
+        "design_template_not_ready_for_unblinding",
+        "preregistered_before_unblinding"
+      ]
+    },
+    "benchmark": {
+      "const": "EGDDM ShiftBench D6"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_unit",
+        "blocking",
+        "conditions",
+        "intervention_families",
+        "intervention_positions",
+        "seeds_per_family_position_cell_target",
+        "matched_scenario_pairs_target",
+        "validation_pilot_candidate_seeds",
+        "independent_trials_per_model_harness_target",
+        "model_harness_families_target",
+        "holdouts",
+        "phase_aggregates",
+        "trajectories_per_model_per_trial_target",
+        "total_trajectories_across_three_models_and_trials_target"
+      ],
+      "properties": {
+        "paired_unit": {
+          "const": "scenario_pair_id"
+        },
+        "blocking": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "conditions": {
+          "const": [
+            "clean",
+            "shifted"
+          ]
+        },
+        "intervention_families": {
+          "const": 12
+        },
+        "intervention_positions": {
+          "const": [
+            "p10",
+            "p20",
+            "p30",
+            "p40",
+            "p50",
+            "p60",
+            "p70",
+            "p80",
+            "p90"
+          ]
+        },
+        "seeds_per_family_position_cell_target": {
+          "const": 5
+        },
+        "matched_scenario_pairs_target": {
+          "const": 540
+        },
+        "validation_pilot_candidate_seeds": {
+          "const": 108
+        },
+        "independent_trials_per_model_harness_target": {
+          "const": 3
+        },
+        "model_harness_families_target": {
+          "const": 3
+        },
+        "holdouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_family_holdout",
+            "forward_time_holdout",
+            "lock_task_and_gold_labels_before_agent_runs"
+          ],
+          "properties": {
+            "repository_family_holdout": {
+              "const": true
+            },
+            "forward_time_holdout": {
+              "const": true
+            },
+            "lock_task_and_gold_labels_before_agent_runs": {
+              "const": true
+            }
+          }
+        },
+        "phase_aggregates": {
+          "const": [
+            "early:p10-p30",
+            "middle:p40-p60",
+            "late:p70-p90"
+          ]
+        },
+        "trajectories_per_model_per_trial_target": {
+          "const": 1080
+        },
+        "total_trajectories_across_three_models_and_trials_target": {
+          "const": 9720
+        }
+      }
+    },
+    "arms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_candidates",
+        "candidate",
+        "primary_comparator_selection",
+        "ablation_comparisons",
+        "lower_bound_references"
+      ],
+      "properties": {
+        "baseline_candidates": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "candidate": {
+          "const": "full_egddm"
+        },
+        "primary_comparator_selection": {
+          "type": "string",
+          "minLength": 20
+        },
+        "ablation_comparisons": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "lower_bound_references": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "primary_estimand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "population",
+        "unit",
+        "components",
+        "decision_rule",
+        "noninferiority_margins",
+        "cost_superiority_confidence_level",
+        "margins_must_be_frozen_before_unblinding"
+      ],
+      "properties": {
+        "name": {
+          "const": "cost_reduction_under_recovery_and_critical_risk_noninferiority"
+        },
+        "population": {
+          "type": "string",
+          "minLength": 10
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 10
+        },
+        "components": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "decision_rule": {
+          "type": "string",
+          "minLength": 30
+        },
+        "noninferiority_margins": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "shifted_recovery_success_absolute_difference",
+            "critical_unverified_obligation_seconds_difference"
+          ],
+          "properties": {
+            "shifted_recovery_success_absolute_difference": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "critical_unverified_obligation_seconds_difference": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          }
+        },
+        "cost_superiority_confidence_level": {
+          "const": 0.95
+        },
+        "margins_must_be_frozen_before_unblinding": {
+          "const": true
+        }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary",
+        "secondary",
+        "cost_components",
+        "hard_failures"
+      ],
+      "properties": {
+        "primary": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "secondary": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "cost_components": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "hard_failures": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence_level",
+        "familywise_alpha",
+        "target_power",
+        "primary_binary_test",
+        "primary_continuous_interval",
+        "bootstrap_replicates_target",
+        "bootstrap_resampling_unit",
+        "repeated_trials",
+        "secondary_multiple_comparisons",
+        "missing_or_timeout",
+        "heterogeneity",
+        "aggregate_score"
+      ],
+      "properties": {
+        "confidence_level": {
+          "const": 0.95
+        },
+        "familywise_alpha": {
+          "const": 0.05
+        },
+        "target_power": {
+          "const": 0.9
+        },
+        "primary_binary_test": {
+          "const": "paired_exact_mcnemar"
+        },
+        "primary_continuous_interval": {
+          "const": "paired_hierarchical_cluster_bootstrap"
+        },
+        "bootstrap_replicates_target": {
+          "const": 10000
+        },
+        "bootstrap_resampling_unit": {
+          "type": "string",
+          "minLength": 10
+        },
+        "repeated_trials": {
+          "type": "string",
+          "minLength": 10
+        },
+        "secondary_multiple_comparisons": {
+          "const": "holm_bonferroni"
+        },
+        "missing_or_timeout": {
+          "type": "string",
+          "minLength": 10
+        },
+        "heterogeneity": {
+          "type": "string",
+          "minLength": 10
+        },
+        "aggregate_score": {
+          "const": "prohibited"
+        }
+      }
+    },
+    "preregistration_lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "must_freeze_before_unblinding",
+        "signed_by",
+        "timestamp",
+        "analysis_code_digest",
+        "randomization_seed",
+        "final_sample_size",
+        "stopping_rule"
+      ],
+      "properties": {
+        "must_freeze_before_unblinding": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "signed_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timestamp": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "analysis_code_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "randomization_seed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "final_sample_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "stopping_rule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  }
+}
