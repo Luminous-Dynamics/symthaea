@@ -252,6 +252,26 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "intervention_appropriateness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unnecessary_intervention_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "missed_critical_intervention_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "intervention_regret": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     },
