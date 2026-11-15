@@ -1475,11 +1475,10 @@ mod tests {
             .objectives
             .swap(0, 1);
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(
-            errors
-                .iter()
-                .any(|error| matches!(error, ScenarioOpportunityError::InvalidObjectiveVector { .. }))
-        );
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            ScenarioOpportunityError::InvalidObjectiveVector { .. }
+        )));
     }
 
     #[test]
@@ -1487,11 +1486,10 @@ mod tests {
         let mut test_plan = plan();
         test_plan.rejected_strata[0].bundles.swap(0, 1);
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(
-            errors
-                .iter()
-                .any(|error| matches!(error, ScenarioOpportunityError::RejectedBundleIdentityMismatch { .. }))
-        );
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            ScenarioOpportunityError::RejectedBundleIdentityMismatch { .. }
+        )));
     }
 
     #[test]
