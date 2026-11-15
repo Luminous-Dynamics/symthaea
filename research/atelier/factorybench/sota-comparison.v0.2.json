@@ -185,6 +185,63 @@
         "use as method comparator only"
       ],
       "source": "https://doi.org/10.3390/asi9070156"
+    },
+    {
+      "id": "SOTA-RMS-SYSTEMATIC-REVIEW-2026",
+      "domain": "reconfigurable manufacturing systems and supply-chain resilience",
+      "published": "2026-05-20",
+      "method": [
+        "PRISMA 2020 systematic review",
+        "Scopus review covering 1990–2025",
+        "247 peer-reviewed papers",
+        "three-level model connecting RMS characteristics, capabilities and resilience"
+      ],
+      "reported_metrics": {
+        "papers_analyzed": 247,
+        "experimental_practical_gap": "qualitative review finding",
+        "diagnosability_research_coverage": "least studied RMS characteristic in the review"
+      },
+      "scope": "cross-industry RMS literature, with observed concentration in heavy industries and limited attention to process industries and supply-chain implications",
+      "limitations": [
+        "review does not prove a specific reconfiguration method works in apparel",
+        "supply-chain resilience relationship is mainly theoretical and insufficiently tested in practice",
+        "classification findings are bounded by review corpus, search strategy and publication years"
+      ],
+      "reproduction": [
+        "use as a taxonomy and research-gap map, not as a numerical performance baseline",
+        "evaluate the least-studied diagnosability dimension through injected faults and evidence invalidation",
+        "measure physical reconfiguration and network resilience in textile partner pilots"
+      ],
+      "source": "https://doi.org/10.3390/logistics10050117"
+    },
+    {
+      "id": "SOTA-RECONFIGURABILITY-INDEX-PCA-2026",
+      "domain": "reconfigurability maturity and industrial performance associations",
+      "published": "2026-06-19",
+      "method": [
+        "principal component analysis",
+        "survey/empirical data from 112 Portuguese manufacturing companies",
+        "five dimensions: modularity, integrability, customization, adaptability and diagnosability"
+      ],
+      "reported_metrics": {
+        "companies": 112,
+        "kmo": 0.73,
+        "variance_explained_pct": 66.05,
+        "adaptability_contribution_pct": 25,
+        "diagnosability_contribution_pct": 25
+      },
+      "scope": "Portuguese manufacturing company sample; transferable-index proposal but empirical context remains geographically and sector bounded",
+      "limitations": [
+        "not an apparel-specific causal study",
+        "the derived index is not a universal standard or engineering acceptance threshold",
+        "associations with cost and delivery performance do not prove causal effects"
+      ],
+      "reproduction": [
+        "retain the five dimensions as a research taxonomy",
+        "measure adaptability and diagnosability independently instead of rewarding physical modularity alone",
+        "estimate Atelier-specific factor weights only after collecting sufficient, representative data"
+      ],
+      "source": "https://doi.org/10.1007/s00170-026-18507-6"
     }
   ],
   "synthesis": {
@@ -229,6 +286,19 @@
       "resource_intensity",
       "resilience_recovery"
     ],
-    "claim_boundary": "A result on a synthetic case, paper reproduction or simulation is not a measured physical factory improvement."
+    "claim_boundary": "A result on a synthetic case, paper reproduction or simulation is not a measured physical factory improvement.",
+    "soft_first_reconfiguration": {
+      "principle": "Prefer logical allocation and qualified route changes before physical module movement; physical changes are selected only after accounting for changeover, interface inspection and requalification burden.",
+      "appparel_baseline": {
+        "paper": "Toward smart and adaptive apparel manufacturing: pattern-driven genetic algorithm optimization for modular garment assembly",
+        "published": "2026-09-01",
+        "doi": "10.1108/IJCST-01-2026-0029",
+        "result": "The study reports simulated production-time and workload-balance improvements from pattern-driven machine allocation, including additional-order rescheduling in a fixed modular structure without physical line reconfiguration.",
+        "numeric_effect_size": "not extracted; do not invent a transferable percentage",
+        "scope": "fixed modular apparel assembly structure evaluated by deterministic event-based simulation"
+      },
+      "atelier_gap": "Diagnosability and requalification-aware transition planning: explain why a module/route became unavailable, identify which evidence dependencies changed, and quantify whether soft reallocation dominates a physical change.",
+      "benchmark": "ReconfigBench v0.1.0"
+    }
   }
 }
