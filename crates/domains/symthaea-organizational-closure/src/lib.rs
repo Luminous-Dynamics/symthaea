@@ -20,6 +20,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+pub mod algorithmic_residual;
 pub mod assay;
 pub mod experiment_design;
 pub mod identity;
@@ -28,40 +29,46 @@ pub mod reconfiguration;
 pub mod semantic_continuity;
 pub mod viability;
 
+pub use algorithmic_residual::{
+    AgentEvidenceReceipt, AlgorithmGraphOutput, BaselineSelectionOracle, CausalGraph,
+    EdgeEditOperation, EvidenceBackedEdgeEdit, EvidenceKind, EvidenceReceiptOracle,
+    EvidenceReceiptStatus, GraphQualityMetrics, ResidualDirectedEdge, ResidualDiscoveryOracle,
+    ResidualDiscoveryReport, ResidualDiscoveryScenario, ResidualDiscoveryTrace, ResidualFinding,
+    ResidualFindingCode, ResidualQualification, evaluate_algorithmic_residual,
+};
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
     ModelId, ModelPairAssessment, evaluate_assay_adequacy,
+};
+pub use experiment_design::{
+    ExperimentBudget, ExperimentEvidenceStatus, ExperimentFinding, ExperimentFindingCode,
+    ExperimentOracle, ExperimentProbe, ExperimentQualification, ExperimentTerminalDecision,
+    ExperimentTrial, HypothesisId, MechanismHypothesis, ProbeId, SequentialExperimentReport,
+    SequentialExperimentScenario, SequentialExperimentTrace, TrialInformationAssessment,
+    evaluate_sequential_experiment,
 };
 pub use identity::{
     ContinuityFinding, ContinuityFindingCode, ContinuityPolicy, ContinuityQualification,
     ContinuityReport, RelationMode, StateId, StateProfile, Transition, TransitionSystem,
     evaluate_operational_continuity,
 };
-pub use experiment_design::{
-    ExperimentBudget, ExperimentEvidenceStatus, ExperimentFinding, ExperimentFindingCode,
-    ExperimentOracle, ExperimentProbe, ExperimentQualification, ExperimentTerminalDecision,
-    ExperimentTrial, HypothesisId, MechanismHypothesis, ProbeId,
-    SequentialExperimentReport, SequentialExperimentScenario, SequentialExperimentTrace,
-    TrialInformationAssessment, evaluate_sequential_experiment,
-};
 pub use model_refinement::{
-    CandidateMechanismModel, ModelAdequacyDecision, ModelAdequacyScenario,
-    ModelAdequacyStatus, ModelAdequacyTrace, ModelRefinementFinding,
-    ModelRefinementFindingCode, ModelRefinementOracle, ModelRefinementProposal,
-    ModelRefinementQualification, ModelRefinementReport, RefinementProbe,
+    CandidateMechanismModel, ModelAdequacyDecision, ModelAdequacyScenario, ModelAdequacyStatus,
+    ModelAdequacyTrace, ModelRefinementFinding, ModelRefinementFindingCode, ModelRefinementOracle,
+    ModelRefinementProposal, ModelRefinementQualification, ModelRefinementReport, RefinementProbe,
     evaluate_model_refinement,
-};
-pub use semantic_continuity::{
-    AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
-    EffectReversibility, EvidenceRef, EvidenceStatus, GrantStatus, LineageStep,
-    SemanticContinuityPolicy, SemanticContinuityReport, SemanticFinding,
-    SemanticFindingCode, SemanticPlane, SemanticTransition, SemanticTransitionKey,
-    SubstrateDependency, evaluate_semantic_continuity,
 };
 pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
     ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode, ReconfigurationPolicy,
     ReconfigurationQualification, ReconfigurationReport, evaluate_reconfiguration,
+};
+pub use semantic_continuity::{
+    AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
+    EffectReversibility, EvidenceRef, EvidenceStatus, GrantStatus, LineageStep,
+    SemanticContinuityPolicy, SemanticContinuityReport, SemanticFinding, SemanticFindingCode,
+    SemanticPlane, SemanticTransition, SemanticTransitionKey, SubstrateDependency,
+    evaluate_semantic_continuity,
 };
 
 macro_rules! string_id {

@@ -12,14 +12,18 @@ use std::collections::{BTreeMap, BTreeSet};
 #[serde(transparent)]
 pub struct HypothesisId(pub String);
 impl From<&str> for HypothesisId {
-    fn from(value: &str) -> Self { Self(value.to_owned()) }
+    fn from(value: &str) -> Self {
+        Self(value.to_owned())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ProbeId(pub String);
 impl From<&str> for ProbeId {
-    fn from(value: &str) -> Self { Self(value.to_owned()) }
+    fn from(value: &str) -> Self {
+        Self(value.to_owned())
+    }
 }
 
 /// Candidate mechanism and its prior weight in the frozen finite model class.
@@ -31,8 +35,16 @@ pub struct MechanismHypothesis {
     pub prior_weight: u64,
 }
 impl MechanismHypothesis {
-    pub fn new(id: impl Into<HypothesisId>, target_class: impl Into<String>, prior_weight: u64) -> Self {
-        Self { id: id.into(), target_class: target_class.into(), prior_weight }
+    pub fn new(
+        id: impl Into<HypothesisId>,
+        target_class: impl Into<String>,
+        prior_weight: u64,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            target_class: target_class.into(),
+            prior_weight,
+        }
     }
 }
 
@@ -46,9 +58,18 @@ pub struct ExperimentProbe {
     pub outcomes: BTreeMap<HypothesisId, String>,
 }
 impl ExperimentProbe {
-    pub fn new(id: impl Into<ProbeId>, cost_units: u64, risk_units: u64,
-        outcomes: BTreeMap<HypothesisId, String>) -> Self {
-        Self { id: id.into(), cost_units, risk_units, outcomes }
+    pub fn new(
+        id: impl Into<ProbeId>,
+        cost_units: u64,
+        risk_units: u64,
+        outcomes: BTreeMap<HypothesisId, String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            cost_units,
+            risk_units,
+            outcomes,
+        }
     }
 }
 
@@ -75,13 +96,19 @@ pub struct ExperimentOracle {
 }
 impl ExperimentOracle {
     pub fn new(actual_hypothesis: impl Into<HypothesisId>) -> Self {
-        Self { actual_hypothesis: actual_hypothesis.into() }
+        Self {
+            actual_hypothesis: actual_hypothesis.into(),
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ExperimentEvidenceStatus { Verified, Rejected, Unavailable }
+pub enum ExperimentEvidenceStatus {
+    Verified,
+    Rejected,
+    Unavailable,
+}
 
 /// Delivery, isolation and observation are independent evidence gates.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,7 +148,11 @@ pub struct SequentialExperimentTrace {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ExperimentQualification { Qualified, NotQualified, Inconclusive }
+pub enum ExperimentQualification {
+    Qualified,
+    NotQualified,
+    Inconclusive,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -209,21 +240,36 @@ impl SequentialExperimentReport {
     }
 }
 
-fn push_finding(findings: &mut Vec<ExperimentFinding>, code: ExperimentFindingCode,
-    trial_index: Option<usize>, probe_id: Option<ProbeId>, detail: impl Into<String>) {
-    findings.push(ExperimentFinding { code, trial_index, probe_id, detail: detail.into() });
+fn push_finding(
+    findings: &mut Vec<ExperimentFinding>,
+    code: ExperimentFindingCode,
+    trial_index: Option<usize>,
+    probe_id: Option<ProbeId>,
+    detail: impl Into<String>,
+) {
+    findings.push(ExperimentFinding {
+        code,
+        trial_index,
+        probe_id,
+        detail: detail.into(),
+    });
 }
 
-fn qualification(findings: &[ExperimentFinding], invalid_scenario: bool) -> ExperimentQualification {
+fn qualification(
+    findings: &[ExperimentFinding],
+    invalid_scenario: bool,
+) -> ExperimentQualification {
     if invalid_scenario {
         return ExperimentQualification::Inconclusive;
     }
-    let only_inconclusive_findings = findings.iter().all(|finding| matches!(
-        finding.code,
-        ExperimentFindingCode::EvidenceUnavailable
-            | ExperimentFindingCode::ObservationContradictsFrozenModel
-            | ExperimentFindingCode::NoConsistentHypothesis
-    ));
+    let only_inconclusive_findings = findings.iter().all(|finding| {
+        matches!(
+            finding.code,
+            ExperimentFindingCode::EvidenceUnavailable
+                | ExperimentFindingCode::ObservationContradictsFrozenModel
+                | ExperimentFindingCode::NoConsistentHypothesis
+        )
+    });
     if !findings.is_empty() && only_inconclusive_findings {
         ExperimentQualification::Inconclusive
     } else if !findings.is_empty() {
@@ -233,58 +279,88 @@ fn qualification(findings: &[ExperimentFinding], invalid_scenario: bool) -> Expe
     }
 }
 
-fn target_classes(active: &BTreeSet<HypothesisId>,
-    hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>) -> BTreeSet<String> {
-    active.iter().filter_map(|id| hypotheses.get(id))
-        .map(|hypothesis| hypothesis.target_class.clone()).collect()
+fn target_classes(
+    active: &BTreeSet<HypothesisId>,
+    hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>,
+) -> BTreeSet<String> {
+    active
+        .iter()
+        .filter_map(|id| hypotheses.get(id))
+        .map(|hypothesis| hypothesis.target_class.clone())
+        .collect()
 }
 
 fn entropy(weights: &BTreeMap<String, f64>) -> f64 {
     let total: f64 = weights.values().sum();
-    if total <= 0.0 { return 0.0; }
-    weights.values().filter(|weight| **weight > 0.0).map(|weight| {
-        let p = *weight / total;
-        -p * p.log2()
-    }).sum()
+    if total <= 0.0 {
+        return 0.0;
+    }
+    weights
+        .values()
+        .filter(|weight| **weight > 0.0)
+        .map(|weight| {
+            let p = *weight / total;
+            -p * p.log2()
+        })
+        .sum()
 }
 
 /// Expected reduction in target-class entropy under one frozen probe.
-fn information_gain_bits(active: &BTreeSet<HypothesisId>,
+fn information_gain_bits(
+    active: &BTreeSet<HypothesisId>,
     hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>,
-    probe: &ExperimentProbe) -> f64 {
+    probe: &ExperimentProbe,
+) -> f64 {
     let mut prior_by_class: BTreeMap<String, f64> = BTreeMap::new();
     let mut by_outcome_and_class: BTreeMap<(String, String), f64> = BTreeMap::new();
     let mut outcome_totals: BTreeMap<String, f64> = BTreeMap::new();
 
     for id in active {
-        let Some(hypothesis) = hypotheses.get(id) else { continue };
+        let Some(hypothesis) = hypotheses.get(id) else {
+            continue;
+        };
         let weight = hypothesis.prior_weight as f64;
-        *prior_by_class.entry(hypothesis.target_class.clone()).or_default() += weight;
+        *prior_by_class
+            .entry(hypothesis.target_class.clone())
+            .or_default() += weight;
         if let Some(outcome) = probe.outcomes.get(id) {
-            *by_outcome_and_class.entry((outcome.clone(), hypothesis.target_class.clone())).or_default() += weight;
+            *by_outcome_and_class
+                .entry((outcome.clone(), hypothesis.target_class.clone()))
+                .or_default() += weight;
             *outcome_totals.entry(outcome.clone()).or_default() += weight;
         }
     }
     let total: f64 = prior_by_class.values().sum();
-    if total <= 0.0 { return 0.0; }
+    if total <= 0.0 {
+        return 0.0;
+    }
     let prior_entropy = entropy(&prior_by_class);
     let mut expected_posterior_entropy = 0.0;
     for (outcome, outcome_weight) in &outcome_totals {
         let mut conditional_classes: BTreeMap<String, f64> = BTreeMap::new();
         for ((observed, class), weight) in &by_outcome_and_class {
-            if observed == outcome { conditional_classes.insert(class.clone(), *weight); }
+            if observed == outcome {
+                conditional_classes.insert(class.clone(), *weight);
+            }
         }
         expected_posterior_entropy += (*outcome_weight / total) * entropy(&conditional_classes);
     }
     (prior_entropy - expected_posterior_entropy).max(0.0)
 }
 
-fn eligible_probe_utilities(active: &BTreeSet<HypothesisId>,
+fn eligible_probe_utilities(
+    active: &BTreeSet<HypothesisId>,
     hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>,
-    probes: &BTreeMap<ProbeId, &ExperimentProbe>, remaining_cost: u64,
-    remaining_risk: u64, remaining_trials: usize) -> Vec<(ProbeId, f64, f64)> {
-    if remaining_trials == 0 { return Vec::new(); }
-    probes.values()
+    probes: &BTreeMap<ProbeId, &ExperimentProbe>,
+    remaining_cost: u64,
+    remaining_risk: u64,
+    remaining_trials: usize,
+) -> Vec<(ProbeId, f64, f64)> {
+    if remaining_trials == 0 {
+        return Vec::new();
+    }
+    probes
+        .values()
         .filter(|probe| probe.cost_units <= remaining_cost && probe.risk_units <= remaining_risk)
         .map(|probe| {
             let gain = information_gain_bits(active, hypotheses, probe);
@@ -294,10 +370,12 @@ fn eligible_probe_utilities(active: &BTreeSet<HypothesisId>,
         .collect()
 }
 
-fn invalid_scenario_report(findings: Vec<ExperimentFinding>,
+fn invalid_scenario_report(
+    findings: Vec<ExperimentFinding>,
     active: BTreeSet<HypothesisId>,
     hypotheses: &BTreeMap<HypothesisId, &MechanismHypothesis>,
-    trace: &SequentialExperimentTrace) -> SequentialExperimentReport {
+    trace: &SequentialExperimentTrace,
+) -> SequentialExperimentReport {
     SequentialExperimentReport {
         qualification: ExperimentQualification::Inconclusive,
         remaining_target_classes: target_classes(&active, hypotheses).into_iter().collect(),
@@ -323,62 +401,122 @@ fn invalid_scenario_report(findings: Vec<ExperimentFinding>,
 /// and observation evidence are all verified. Stop is accepted only when one
 /// target-equivalence class remains; abstain is accepted when no informative
 /// probe remains within the frozen cost, risk and trial budgets.
-pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
-    oracle: &ExperimentOracle, trace: &SequentialExperimentTrace) -> SequentialExperimentReport {
+pub fn evaluate_sequential_experiment(
+    scenario: &SequentialExperimentScenario,
+    oracle: &ExperimentOracle,
+    trace: &SequentialExperimentTrace,
+) -> SequentialExperimentReport {
     let mut findings = Vec::new();
     if scenario.hypotheses.is_empty() {
-        push_finding(&mut findings, ExperimentFindingCode::EmptyHypothesisSet, None, None,
-            "the frozen mechanism hypothesis set is empty");
+        push_finding(
+            &mut findings,
+            ExperimentFindingCode::EmptyHypothesisSet,
+            None,
+            None,
+            "the frozen mechanism hypothesis set is empty",
+        );
     }
 
     let mut hypotheses: BTreeMap<HypothesisId, &MechanismHypothesis> = BTreeMap::new();
     for hypothesis in &scenario.hypotheses {
         if hypothesis.id.0.trim().is_empty() {
-            push_finding(&mut findings, ExperimentFindingCode::EmptyHypothesisId, None, None,
-                "hypothesis ID is empty");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::EmptyHypothesisId,
+                None,
+                None,
+                "hypothesis ID is empty",
+            );
         }
         if hypothesis.target_class.trim().is_empty() {
-            push_finding(&mut findings, ExperimentFindingCode::EmptyTargetClass, None, None,
-                "hypothesis target-equivalence class is empty");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::EmptyTargetClass,
+                None,
+                None,
+                "hypothesis target-equivalence class is empty",
+            );
         }
         if hypothesis.prior_weight == 0 {
-            push_finding(&mut findings, ExperimentFindingCode::ZeroPriorWeight, None, None,
-                "hypothesis prior weight must be positive");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::ZeroPriorWeight,
+                None,
+                None,
+                "hypothesis prior weight must be positive",
+            );
         }
-        if hypotheses.insert(hypothesis.id.clone(), hypothesis).is_some() {
-            push_finding(&mut findings, ExperimentFindingCode::DuplicateHypothesisId, None, None,
-                "hypothesis ID is duplicated");
+        if hypotheses
+            .insert(hypothesis.id.clone(), hypothesis)
+            .is_some()
+        {
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::DuplicateHypothesisId,
+                None,
+                None,
+                "hypothesis ID is duplicated",
+            );
         }
     }
     if !hypotheses.contains_key(&oracle.actual_hypothesis) {
-        push_finding(&mut findings, ExperimentFindingCode::UnknownOracleHypothesis, None, None,
-            "evaluator-only actual hypothesis is absent from the frozen model class");
+        push_finding(
+            &mut findings,
+            ExperimentFindingCode::UnknownOracleHypothesis,
+            None,
+            None,
+            "evaluator-only actual hypothesis is absent from the frozen model class",
+        );
     }
 
     let mut probes: BTreeMap<ProbeId, &ExperimentProbe> = BTreeMap::new();
     for probe in &scenario.probes {
         if probe.id.0.trim().is_empty() {
-            push_finding(&mut findings, ExperimentFindingCode::EmptyProbeId, None, Some(probe.id.clone()),
-                "probe ID is empty");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::EmptyProbeId,
+                None,
+                Some(probe.id.clone()),
+                "probe ID is empty",
+            );
         }
         if probes.insert(probe.id.clone(), probe).is_some() {
-            push_finding(&mut findings, ExperimentFindingCode::DuplicateProbeId, None, Some(probe.id.clone()),
-                "probe ID is duplicated");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::DuplicateProbeId,
+                None,
+                Some(probe.id.clone()),
+                "probe ID is duplicated",
+            );
         }
         for id in hypotheses.keys() {
             match probe.outcomes.get(id) {
-                None => push_finding(&mut findings, ExperimentFindingCode::MissingProbeResponse, None,
-                    Some(probe.id.clone()), format!("probe has no response for hypothesis {}", id.0)),
-                Some(outcome) if outcome.trim().is_empty() => push_finding(&mut findings,
-                    ExperimentFindingCode::EmptyProbeOutcome, None, Some(probe.id.clone()),
-                    format!("probe has an empty response for hypothesis {}", id.0)),
+                None => push_finding(
+                    &mut findings,
+                    ExperimentFindingCode::MissingProbeResponse,
+                    None,
+                    Some(probe.id.clone()),
+                    format!("probe has no response for hypothesis {}", id.0),
+                ),
+                Some(outcome) if outcome.trim().is_empty() => push_finding(
+                    &mut findings,
+                    ExperimentFindingCode::EmptyProbeOutcome,
+                    None,
+                    Some(probe.id.clone()),
+                    format!("probe has an empty response for hypothesis {}", id.0),
+                ),
                 Some(_) => {}
             }
         }
         for id in probe.outcomes.keys() {
             if !hypotheses.contains_key(id) {
-                push_finding(&mut findings, ExperimentFindingCode::UnknownProbeResponseHypothesis, None,
-                    Some(probe.id.clone()), format!("probe response references unknown hypothesis {}", id.0));
+                push_finding(
+                    &mut findings,
+                    ExperimentFindingCode::UnknownProbeResponseHypothesis,
+                    None,
+                    Some(probe.id.clone()),
+                    format!("probe response references unknown hypothesis {}", id.0),
+                );
             }
         }
     }
@@ -394,8 +532,11 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
     let mut qualified_trials = 0_usize;
     let mut unqualified_trials = 0_usize;
     let mut informative_trials = 0_usize;
-    let mut first_identified_after_trials =
-        if target_classes(&active, &hypotheses).len() == 1 { Some(0) } else { None };
+    let mut first_identified_after_trials = if target_classes(&active, &hypotheses).len() == 1 {
+        Some(0)
+    } else {
+        None
+    };
     let mut cumulative_information_gain = 0.0_f64;
     let mut cumulative_oracle_regret = 0.0_f64;
     let mut assessments = Vec::new();
@@ -403,19 +544,33 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
     for (index, trial) in trace.trials.iter().enumerate() {
         let trial_index = index + 1;
         if trial_index > scenario.budget.max_trials {
-            push_finding(&mut findings, ExperimentFindingCode::TrialBudgetExceeded,
-                Some(trial_index), Some(trial.probe_id.clone()), "trace exceeds the frozen trial budget");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::TrialBudgetExceeded,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "trace exceeds the frozen trial budget",
+            );
             break;
         }
         let Some(probe) = probes.get(&trial.probe_id) else {
-            push_finding(&mut findings, ExperimentFindingCode::UnknownProbe,
-                Some(trial_index), Some(trial.probe_id.clone()), "trial references an undeclared probe");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::UnknownProbe,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "trial references an undeclared probe",
+            );
             continue;
         };
         if first_identified_after_trials.is_some() {
-            push_finding(&mut findings, ExperimentFindingCode::ProbeSelectedAfterIdentification,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "a target-equivalence class was already identified before this probe");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::ProbeSelectedAfterIdentification,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "a target-equivalence class was already identified before this probe",
+            );
         }
 
         let cost_before = total_cost;
@@ -423,26 +578,42 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
         let next_cost = total_cost.checked_add(probe.cost_units);
         let next_risk = total_risk.checked_add(probe.risk_units);
         if next_cost.is_none_or(|value| value > scenario.budget.max_cost_units) {
-            push_finding(&mut findings, ExperimentFindingCode::CostBudgetExceeded,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "probe would exceed the frozen cumulative cost budget");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::CostBudgetExceeded,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "probe would exceed the frozen cumulative cost budget",
+            );
         }
         if next_risk.is_none_or(|value| value > scenario.budget.max_risk_units) {
-            push_finding(&mut findings, ExperimentFindingCode::RiskBudgetExceeded,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "probe would exceed the frozen cumulative risk budget");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::RiskBudgetExceeded,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "probe would exceed the frozen cumulative risk budget",
+            );
         }
         total_cost = next_cost.unwrap_or(u64::MAX);
         total_risk = next_risk.unwrap_or(u64::MAX);
 
         let utilities = eligible_probe_utilities(
-            &active, &hypotheses, &probes,
+            &active,
+            &hypotheses,
+            &probes,
             scenario.budget.max_cost_units.saturating_sub(cost_before),
             scenario.budget.max_risk_units.saturating_sub(risk_before),
             scenario.budget.max_trials.saturating_sub(index),
         );
-        let best_gain = utilities.iter().map(|(_, gain, _)| *gain).fold(0.0_f64, f64::max);
-        let best_efficiency = utilities.iter().map(|(_, _, value)| *value).fold(0.0_f64, f64::max);
+        let best_gain = utilities
+            .iter()
+            .map(|(_, gain, _)| *gain)
+            .fold(0.0_f64, f64::max);
+        let best_efficiency = utilities
+            .iter()
+            .map(|(_, _, value)| *value)
+            .fold(0.0_f64, f64::max);
         let chosen_gain = information_gain_bits(&active, &hypotheses, probe);
         let chosen_efficiency = chosen_gain / probe.cost_units.max(1) as f64;
         cumulative_information_gain += chosen_gain;
@@ -466,21 +637,37 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
                         "isolation" => ExperimentFindingCode::IsolationRejected,
                         _ => ExperimentFindingCode::ObservationRejected,
                     };
-                    push_finding(&mut findings, code, Some(trial_index), Some(trial.probe_id.clone()),
-                        format!("{label} evidence was rejected"));
+                    push_finding(
+                        &mut findings,
+                        code,
+                        Some(trial_index),
+                        Some(trial.probe_id.clone()),
+                        format!("{label} evidence was rejected"),
+                    );
                 }
                 ExperimentEvidenceStatus::Unavailable => {
                     evidence_qualified = false;
-                    push_finding(&mut findings, ExperimentFindingCode::EvidenceUnavailable,
-                        Some(trial_index), Some(trial.probe_id.clone()),
-                        format!("{label} evidence is unavailable; outcome cannot update hypotheses"));
+                    push_finding(
+                        &mut findings,
+                        ExperimentFindingCode::EvidenceUnavailable,
+                        Some(trial_index),
+                        Some(trial.probe_id.clone()),
+                        format!(
+                            "{label} evidence is unavailable; outcome cannot update hypotheses"
+                        ),
+                    );
                 }
             }
         }
         if trial.observed_outcome.trim().is_empty() {
             evidence_qualified = false;
-            push_finding(&mut findings, ExperimentFindingCode::EmptyObservedOutcome,
-                Some(trial_index), Some(trial.probe_id.clone()), "observed outcome is empty");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::EmptyObservedOutcome,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "observed outcome is empty",
+            );
         }
 
         assessments.push(TrialInformationAssessment {
@@ -499,69 +686,126 @@ pub fn evaluate_sequential_experiment(scenario: &SequentialExperimentScenario,
         }
         qualified_trials += 1;
 
-        if probe.outcomes.get(&oracle.actual_hypothesis)
-            .is_none_or(|expected| expected != &trial.observed_outcome) {
-            push_finding(&mut findings, ExperimentFindingCode::ObservationContradictsFrozenModel,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "qualified observation differs from the evaluator-only deterministic response");
+        if probe
+            .outcomes
+            .get(&oracle.actual_hypothesis)
+            .is_none_or(|expected| expected != &trial.observed_outcome)
+        {
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::ObservationContradictsFrozenModel,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "qualified observation differs from the evaluator-only deterministic response",
+            );
             continue;
         }
 
         if chosen_gain <= f64::EPSILON && target_classes(&active, &hypotheses).len() > 1 {
-            push_finding(&mut findings, ExperimentFindingCode::UninformativeProbe,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "selected probe does not distinguish the remaining target classes under the frozen model");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::UninformativeProbe,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "selected probe does not distinguish the remaining target classes under the frozen model",
+            );
         }
 
-        active.retain(|id| probe.outcomes.get(id)
-            .is_some_and(|outcome| outcome == &trial.observed_outcome));
+        active.retain(|id| {
+            probe
+                .outcomes
+                .get(id)
+                .is_some_and(|outcome| outcome == &trial.observed_outcome)
+        });
         if active.is_empty() || !active.contains(&oracle.actual_hypothesis) {
-            push_finding(&mut findings, ExperimentFindingCode::NoConsistentHypothesis,
-                Some(trial_index), Some(trial.probe_id.clone()),
-                "qualified observation leaves no consistent hypothesis including evaluator-only truth");
+            push_finding(
+                &mut findings,
+                ExperimentFindingCode::NoConsistentHypothesis,
+                Some(trial_index),
+                Some(trial.probe_id.clone()),
+                "qualified observation leaves no consistent hypothesis including evaluator-only truth",
+            );
             continue;
         }
         if first_identified_after_trials.is_none()
-            && target_classes(&active, &hypotheses).len() == 1 {
+            && target_classes(&active, &hypotheses).len() == 1
+        {
             first_identified_after_trials = Some(trial_index);
         }
     }
 
     let remaining_classes = target_classes(&active, &hypotheses);
-    let actual_class = hypotheses.get(&oracle.actual_hypothesis)
+    let actual_class = hypotheses
+        .get(&oracle.actual_hypothesis)
         .map(|hypothesis| hypothesis.target_class.as_str());
 
     match &trace.terminal {
         ExperimentTerminalDecision::Stop { target_class } => {
             if remaining_classes.len() != 1 {
-                push_finding(&mut findings, ExperimentFindingCode::PrematureStop, None, None,
-                    "more than one target-equivalence class remains");
-            } else if remaining_classes.iter().next().is_some_and(|class| class != target_class)
-                || actual_class.is_none_or(|class| class != target_class) {
-                push_finding(&mut findings, ExperimentFindingCode::WrongTargetClass, None, None,
-                    "declared target class differs from the uniquely identified or evaluator-only class");
+                push_finding(
+                    &mut findings,
+                    ExperimentFindingCode::PrematureStop,
+                    None,
+                    None,
+                    "more than one target-equivalence class remains",
+                );
+            } else if remaining_classes
+                .iter()
+                .next()
+                .is_some_and(|class| class != target_class)
+                || actual_class.is_none_or(|class| class != target_class)
+            {
+                push_finding(
+                    &mut findings,
+                    ExperimentFindingCode::WrongTargetClass,
+                    None,
+                    None,
+                    "declared target class differs from the uniquely identified or evaluator-only class",
+                );
             }
         }
         ExperimentTerminalDecision::Abstain { reason: _ } => {
             if remaining_classes.len() == 1 {
-                push_finding(&mut findings, ExperimentFindingCode::AbstainedAfterIdentification, None, None,
-                    "agent abstained after a single target-equivalence class was identified");
+                push_finding(
+                    &mut findings,
+                    ExperimentFindingCode::AbstainedAfterIdentification,
+                    None,
+                    None,
+                    "agent abstained after a single target-equivalence class was identified",
+                );
             } else if remaining_classes.len() > 1 {
                 let remaining_cost = scenario.budget.max_cost_units.saturating_sub(total_cost);
                 let remaining_risk = scenario.budget.max_risk_units.saturating_sub(total_risk);
-                let remaining_trials = scenario.budget.max_trials.saturating_sub(trace.trials.len());
-                let model_class_discrepancy = findings.iter().any(|finding| matches!(
-                    finding.code,
-                    ExperimentFindingCode::ObservationContradictsFrozenModel
-                        | ExperimentFindingCode::NoConsistentHypothesis
-                ));
+                let remaining_trials = scenario
+                    .budget
+                    .max_trials
+                    .saturating_sub(trace.trials.len());
+                let model_class_discrepancy = findings.iter().any(|finding| {
+                    matches!(
+                        finding.code,
+                        ExperimentFindingCode::ObservationContradictsFrozenModel
+                            | ExperimentFindingCode::NoConsistentHypothesis
+                    )
+                });
                 let informative_available = !model_class_discrepancy
                     && eligible_probe_utilities(
-                        &active, &hypotheses, &probes, remaining_cost, remaining_risk, remaining_trials,
-                    ).iter().any(|(_, gain, _)| *gain > f64::EPSILON);
+                        &active,
+                        &hypotheses,
+                        &probes,
+                        remaining_cost,
+                        remaining_risk,
+                        remaining_trials,
+                    )
+                    .iter()
+                    .any(|(_, gain, _)| *gain > f64::EPSILON);
                 if informative_available {
-                    push_finding(&mut findings, ExperimentFindingCode::AbstainedWhileInformativeProbeAvailable,
-                        None, None, "agent abstained while an informative probe remained within all frozen budgets");
+                    push_finding(
+                        &mut findings,
+                        ExperimentFindingCode::AbstainedWhileInformativeProbeAvailable,
+                        None,
+                        None,
+                        "agent abstained while an informative probe remained within all frozen budgets",
+                    );
                 }
             }
         }
@@ -597,23 +841,45 @@ mod tests {
                 MechanismHypothesis::new("dependency-fault", "external-dependency", 1),
             ],
             probes: vec![
-                ExperimentProbe::new("inspect-model", 2, 1, [
-                    (HypothesisId::from("model-fault"), "corrupt".into()),
-                    (HypothesisId::from("memory-fault"), "healthy".into()),
-                    (HypothesisId::from("dependency-fault"), "healthy".into()),
-                ].into()),
-                ExperimentProbe::new("inspect-memory", 1, 1, [
-                    (HypothesisId::from("model-fault"), "healthy".into()),
-                    (HypothesisId::from("memory-fault"), "stale".into()),
-                    (HypothesisId::from("dependency-fault"), "healthy".into()),
-                ].into()),
-                ExperimentProbe::new("inspect-boundary", 3, 2, [
-                    (HypothesisId::from("model-fault"), "open".into()),
-                    (HypothesisId::from("memory-fault"), "open".into()),
-                    (HypothesisId::from("dependency-fault"), "blocked".into()),
-                ].into()),
+                ExperimentProbe::new(
+                    "inspect-model",
+                    2,
+                    1,
+                    [
+                        (HypothesisId::from("model-fault"), "corrupt".into()),
+                        (HypothesisId::from("memory-fault"), "healthy".into()),
+                        (HypothesisId::from("dependency-fault"), "healthy".into()),
+                    ]
+                    .into(),
+                ),
+                ExperimentProbe::new(
+                    "inspect-memory",
+                    1,
+                    1,
+                    [
+                        (HypothesisId::from("model-fault"), "healthy".into()),
+                        (HypothesisId::from("memory-fault"), "stale".into()),
+                        (HypothesisId::from("dependency-fault"), "healthy".into()),
+                    ]
+                    .into(),
+                ),
+                ExperimentProbe::new(
+                    "inspect-boundary",
+                    3,
+                    2,
+                    [
+                        (HypothesisId::from("model-fault"), "open".into()),
+                        (HypothesisId::from("memory-fault"), "open".into()),
+                        (HypothesisId::from("dependency-fault"), "blocked".into()),
+                    ]
+                    .into(),
+                ),
             ],
-            budget: ExperimentBudget { max_cost_units: 5, max_risk_units: 3, max_trials: 3 },
+            budget: ExperimentBudget {
+                max_cost_units: 5,
+                max_risk_units: 3,
+                max_trials: 3,
+            },
         }
     }
 
@@ -626,12 +892,17 @@ mod tests {
                 ExperimentTrial::qualified("inspect-memory", "healthy"),
                 ExperimentTrial::qualified("inspect-model", "corrupt"),
             ],
-            terminal: ExperimentTerminalDecision::Stop { target_class: "model-corruption".into() },
+            terminal: ExperimentTerminalDecision::Stop {
+                target_class: "model-corruption".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Qualified);
         assert!(report.correctly_identified_target_class());
-        assert_eq!(report.remaining_hypotheses, vec![HypothesisId::from("model-fault")]);
+        assert_eq!(
+            report.remaining_hypotheses,
+            vec![HypothesisId::from("model-fault")]
+        );
         assert_eq!(report.first_identified_after_trials, Some(2));
         assert_eq!(report.qualified_trial_count, 2);
         assert!(report.cumulative_information_gain_bits > 0.0);
@@ -643,11 +914,18 @@ mod tests {
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("inspect-model", "healthy")],
-            terminal: ExperimentTerminalDecision::Stop { target_class: "memory-staleness".into() },
+            terminal: ExperimentTerminalDecision::Stop {
+                target_class: "memory-staleness".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::PrematureStop));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::PrematureStop)
+        );
     }
 
     #[test]
@@ -659,7 +937,9 @@ mod tests {
         trial.delivery = ExperimentEvidenceStatus::Unavailable;
         let trace = SequentialExperimentTrace {
             trials: vec![trial],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "delivery receipt unavailable".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "delivery receipt unavailable".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
@@ -673,11 +953,18 @@ mod tests {
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("inspect-model", "unexpected")],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "model mismatch".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "model mismatch".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::ObservationContradictsFrozenModel));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::ObservationContradictsFrozenModel)
+        );
     }
 
     #[test]
@@ -687,11 +974,18 @@ mod tests {
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("inspect-model", "healthy")],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "budget exhausted".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "budget exhausted".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::CostBudgetExceeded));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::CostBudgetExceeded)
+        );
     }
 
     #[test]
@@ -702,11 +996,18 @@ mod tests {
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("inspect-memory", "stale")],
-            terminal: ExperimentTerminalDecision::Stop { target_class: "memory-staleness".into() },
+            terminal: ExperimentTerminalDecision::Stop {
+                target_class: "memory-staleness".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::RiskBudgetExceeded));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::RiskBudgetExceeded)
+        );
     }
 
     #[test]
@@ -717,7 +1018,11 @@ mod tests {
                 MechanismHypothesis::new("implementation-b", "same-capability-class", 1),
             ],
             probes: vec![],
-            budget: ExperimentBudget { max_cost_units: 0, max_risk_units: 0, max_trials: 0 },
+            budget: ExperimentBudget {
+                max_cost_units: 0,
+                max_risk_units: 0,
+                max_trials: 0,
+            },
         };
         let oracle = ExperimentOracle::new("implementation-a");
         let trace = SequentialExperimentTrace {
@@ -741,7 +1046,9 @@ mod tests {
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "no safe affordable probe".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "no safe affordable probe".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Qualified);
@@ -751,19 +1058,32 @@ mod tests {
     #[test]
     fn uninformative_probe_is_reported() {
         let mut scenario = scenario();
-        scenario.probes.push(ExperimentProbe::new("no-op", 0, 0, [
-            (HypothesisId::from("model-fault"), "same".into()),
-            (HypothesisId::from("memory-fault"), "same".into()),
-            (HypothesisId::from("dependency-fault"), "same".into()),
-        ].into()));
+        scenario.probes.push(ExperimentProbe::new(
+            "no-op",
+            0,
+            0,
+            [
+                (HypothesisId::from("model-fault"), "same".into()),
+                (HypothesisId::from("memory-fault"), "same".into()),
+                (HypothesisId::from("dependency-fault"), "same".into()),
+            ]
+            .into(),
+        ));
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("no-op", "same")],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "no further signal".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "no further signal".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::UninformativeProbe));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::UninformativeProbe)
+        );
     }
 
     #[test]
@@ -775,45 +1095,79 @@ mod tests {
         trial.delivery = ExperimentEvidenceStatus::Rejected;
         let trace = SequentialExperimentTrace {
             trials: vec![trial],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "delivery was rejected".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "delivery was rejected".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
         assert_eq!(report.remaining_hypotheses.len(), 3);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::DeliveryRejected));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::DeliveryRejected)
+        );
     }
 
     #[test]
     fn qualified_model_mismatch_is_not_misreported_as_an_uninformative_probe() {
         let mut scenario = scenario();
-        scenario.probes.push(ExperimentProbe::new("no-op", 0, 0, [
-            (HypothesisId::from("model-fault"), "same".into()),
-            (HypothesisId::from("memory-fault"), "same".into()),
-            (HypothesisId::from("dependency-fault"), "same".into()),
-        ].into()));
+        scenario.probes.push(ExperimentProbe::new(
+            "no-op",
+            0,
+            0,
+            [
+                (HypothesisId::from("model-fault"), "same".into()),
+                (HypothesisId::from("memory-fault"), "same".into()),
+                (HypothesisId::from("dependency-fault"), "same".into()),
+            ]
+            .into(),
+        ));
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("no-op", "outside-model")],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "candidate model incomplete".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "candidate model incomplete".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::ObservationContradictsFrozenModel));
-        assert!(!report.findings.iter().any(|f| f.code == ExperimentFindingCode::UninformativeProbe));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::ObservationContradictsFrozenModel)
+        );
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::UninformativeProbe)
+        );
     }
 
     #[test]
     fn malformed_probe_response_table_is_inconclusive_not_a_score() {
         let mut scenario = scenario();
-        scenario.probes[0].outcomes.remove(&HypothesisId::from("dependency-fault"));
+        scenario.probes[0]
+            .outcomes
+            .remove(&HypothesisId::from("dependency-fault"));
         let oracle = ExperimentOracle::new("memory-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![],
-            terminal: ExperimentTerminalDecision::Abstain { reason: "invalid scenario".into() },
+            terminal: ExperimentTerminalDecision::Abstain {
+                reason: "invalid scenario".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Inconclusive);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::MissingProbeResponse));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::MissingProbeResponse)
+        );
     }
 
     #[test]
@@ -823,20 +1177,37 @@ mod tests {
                 MechanismHypothesis::new("implementation-a", "same-class", 1),
                 MechanismHypothesis::new("implementation-b", "same-class", 1),
             ],
-            probes: vec![ExperimentProbe::new("gratuitous-inspection", 1, 1, [
-                (HypothesisId::from("implementation-a"), "a".into()),
-                (HypothesisId::from("implementation-b"), "b".into()),
-            ].into())],
-            budget: ExperimentBudget { max_cost_units: 2, max_risk_units: 2, max_trials: 1 },
+            probes: vec![ExperimentProbe::new(
+                "gratuitous-inspection",
+                1,
+                1,
+                [
+                    (HypothesisId::from("implementation-a"), "a".into()),
+                    (HypothesisId::from("implementation-b"), "b".into()),
+                ]
+                .into(),
+            )],
+            budget: ExperimentBudget {
+                max_cost_units: 2,
+                max_risk_units: 2,
+                max_trials: 1,
+            },
         };
         let oracle = ExperimentOracle::new("implementation-a");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("gratuitous-inspection", "a")],
-            terminal: ExperimentTerminalDecision::Stop { target_class: "same-class".into() },
+            terminal: ExperimentTerminalDecision::Stop {
+                target_class: "same-class".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ExperimentFindingCode::ProbeSelectedAfterIdentification));
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.code == ExperimentFindingCode::ProbeSelectedAfterIdentification)
+        );
     }
 
     #[test]
@@ -845,7 +1216,9 @@ mod tests {
         let oracle = ExperimentOracle::new("model-fault");
         let trace = SequentialExperimentTrace {
             trials: vec![ExperimentTrial::qualified("inspect-model", "corrupt")],
-            terminal: ExperimentTerminalDecision::Stop { target_class: "model-corruption".into() },
+            terminal: ExperimentTerminalDecision::Stop {
+                target_class: "model-corruption".into(),
+            },
         };
         let report = evaluate_sequential_experiment(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ExperimentQualification::Qualified);
