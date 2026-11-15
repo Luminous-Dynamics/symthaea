@@ -1,0 +1,237 @@
+{
+  "schema_version": "0.1.0",
+  "scenario_id": "egddm-shiftbench-selective-revalidation-001",
+  "repository_full_name": "synthetic/decision-api",
+  "initial_snapshot": {
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "obligations": [
+    {
+      "obligation_id": "api-contract",
+      "check_id": "api-compatibility",
+      "critical": true
+    },
+    {
+      "obligation_id": "build-repro",
+      "check_id": "reproducible-build",
+      "critical": false
+    },
+    {
+      "obligation_id": "audit-requirement",
+      "check_id": "audit-log-contract",
+      "critical": true
+    }
+  ],
+  "arms": [
+    {
+      "arm_id": "clean",
+      "condition": "clean",
+      "epochs": [
+        {
+          "epoch": 0,
+          "observed_at": "2026-11-15T07:00:00Z",
+          "snapshot": {
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "initial",
+          "affected_obligation_ids": [],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro"
+          ]
+        },
+        {
+          "epoch": 1,
+          "observed_at": "2026-11-15T07:10:00Z",
+          "snapshot": {
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "none",
+          "affected_obligation_ids": [],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "epoch": 0,
+          "predicted_affected_obligation_ids": [],
+          "receipts": [
+            {
+              "receipt_id": "clean-epoch0-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "e68957bb601ba4fa55eca96c0e1adb7cb0ef6b8c949c7bc52b7602ca7b9eeb44"
+            },
+            {
+              "receipt_id": "clean-epoch0-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "b8cb3185d6f221eb3ead5492baf272f3acb816fec75519814c25556dc60abb6a"
+            }
+          ],
+          "revalidation_cost_units": 0
+        },
+        {
+          "epoch": 1,
+          "predicted_affected_obligation_ids": [],
+          "receipts": [
+            {
+              "receipt_id": "clean-epoch1-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "053a2a9d01478f38cfe70459b227ca605793bf1725cca61f4fa7c17d93fc845a"
+            },
+            {
+              "receipt_id": "clean-epoch1-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "75a15ede0e0a1cf3fa7901b08e8bd95dec5b0fea0ff7d638f1f0c95d0597017c"
+            }
+          ],
+          "revalidation_cost_units": 0
+        }
+      ]
+    },
+    {
+      "arm_id": "shifted",
+      "condition": "shifted",
+      "epochs": [
+        {
+          "epoch": 0,
+          "observed_at": "2026-11-15T07:00:00Z",
+          "snapshot": {
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "initial",
+          "affected_obligation_ids": [],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro"
+          ]
+        },
+        {
+          "epoch": 1,
+          "observed_at": "2026-11-15T07:10:00Z",
+          "snapshot": {
+            "revision": "dddddddddddddddddddddddddddddddddddddddd",
+            "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "dependency_api",
+          "affected_obligation_ids": [
+            "api-contract"
+          ],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro",
+            "audit-requirement"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "epoch": 0,
+          "predicted_affected_obligation_ids": [],
+          "receipts": [
+            {
+              "receipt_id": "shifted-epoch0-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "13599663a96deb4210c6dac21608f0c61873143862b5eb536b11b82e9c96aff6"
+            },
+            {
+              "receipt_id": "shifted-epoch0-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "60fc8e54ba6262c0341f60aaa9dcf5989d526ab78795cb03d2cafda77b6a8404"
+            }
+          ],
+          "revalidation_cost_units": 0
+        },
+        {
+          "epoch": 1,
+          "predicted_affected_obligation_ids": [
+            "api-contract"
+          ],
+          "receipts": [
+            {
+              "receipt_id": "shifted-epoch1-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 1,
+              "revision": "dddddddddddddddddddddddddddddddddddddddd",
+              "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "f5ebc57b9983fc84137a6b5913894c73a15232041737d0275a2925f3a53adaf4"
+            },
+            {
+              "receipt_id": "shifted-epoch1-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "212c14714a7006cd31f0dd9eec01a5493af06c75d285d24de6ec337e18b746e4"
+            },
+            {
+              "receipt_id": "shifted-epoch1-audit",
+              "obligation_id": "audit-requirement",
+              "check_id": "audit-log-contract",
+              "outcome": "pass",
+              "source_epoch": 1,
+              "revision": "dddddddddddddddddddddddddddddddddddddddd",
+              "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "b81b6e0090606511ed9d0d5ba6905581103c3610b4d2478746d3d5db4a9eb481"
+            }
+          ],
+          "revalidation_cost_units": 2
+        }
+      ]
+    }
+  ]
+}
