@@ -54,7 +54,9 @@
         "pockets",
         "knee_and_sitting_mobility",
         "closure"
-      ]
+      ],
+      "initial_reference": "T-01",
+      "brief_issue": 12262
     },
     {
       "id": "AT-E03",
@@ -106,7 +108,9 @@
         "seam_extension",
         "skin_feel",
         "wash_stability"
-      ]
+      ],
+      "initial_reference": "K-01",
+      "brief_issue": 12261
     },
     {
       "id": "AT-K02",
