@@ -2177,7 +2177,7 @@ mod tests {
             mapping_valid_through_ns: 100,
             mapping_receipt_ref: "synthetic://mapping/new-epoch".to_owned(),
             mapping_receipt_sha256: "e".repeat(64),
-            qualification: GateState::Indeterminate,
+            qualification: GateState::Pass,
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::EventProduced {
             event_id: "event-new-epoch".to_owned(),
@@ -2268,6 +2268,68 @@ mod tests {
             SchedulerDisposition::Duplicate,
             SchedulerDisposition::ConflictingReconciliation,
         ]);
+    }
+
+    #[test]
+    fn observer_and_persistence_receipt_conflicts_are_explicit() {
+        let mut observation_schedule = generate_clocked_observation_persistence_schedule(79)
+            .expect("clocked schedule");
+        let original_observation = observation_schedule.actions.iter().find_map(|action| {
+            match &action.action {
+                ScheduleAction::EventObserved { .. } => Some(action.action.clone()),
+                _ => None,
+            }
+        }).expect("original observation");
+        let mut altered_observation = original_observation;
+        if let ScheduleAction::EventObserved { observation_receipt_ref, .. } = &mut altered_observation {
+            *observation_receipt_ref = "synthetic://observation/substituted".to_owned();
+        }
+        let mut ordinal = observation_schedule.actions.iter().map(|action| action.ordinal).max().unwrap_or(0) + 1;
+        let later = observation_schedule.actions.iter().map(|action| action.at_ns).max().unwrap_or(0) + 1;
+        push_action(&mut observation_schedule.actions, &mut ordinal, later, altered_observation);
+        let observation_report = replay_virtual_schedule(&observation_schedule).expect("replay");
+        assert!(observation_report.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::ConflictingObservation
+        }));
+
+        let mut persistence_schedule = generate_clocked_observation_persistence_schedule(83)
+            .expect("clocked schedule");
+        let original_persistence = persistence_schedule.actions.iter().find_map(|action| {
+            match &action.action {
+                ScheduleAction::EventPersisted { .. } => Some(action.action.clone()),
+                _ => None,
+            }
+        }).expect("original persistence");
+        let mut altered_persistence = original_persistence;
+        if let ScheduleAction::EventPersisted { persistence_receipt_ref, .. } = &mut altered_persistence {
+            *persistence_receipt_ref = "synthetic://persistence/substituted".to_owned();
+        }
+        let mut ordinal = persistence_schedule.actions.iter().map(|action| action.ordinal).max().unwrap_or(0) + 1;
+        let later = persistence_schedule.actions.iter().map(|action| action.at_ns).max().unwrap_or(0) + 1;
+        push_action(&mut persistence_schedule.actions, &mut ordinal, later, altered_persistence);
+        let persistence_report = replay_virtual_schedule(&persistence_schedule).expect("replay");
+        assert!(persistence_report.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::ConflictingPersistence
+        }));
+    }
+
+    #[test]
+    fn observation_time_beyond_its_clock_sample_fails_closed() {
+        let mut schedule = generate_clocked_observation_persistence_schedule(89)
+            .expect("clocked schedule");
+        if let Some(action) = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventObserved { .. })
+        }) {
+            if let ScheduleAction::EventObserved { observed_at_ns, .. } = &mut action.action {
+                *observed_at_ns = 100_001;
+            }
+        }
+        validate_schedule(&schedule).expect("future timestamp is a replayable fault");
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        assert!(report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ClockTimestampBeyondQualifiedTick
+        }));
     }
 
     #[test]
