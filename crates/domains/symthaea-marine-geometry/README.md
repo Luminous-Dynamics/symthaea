@@ -69,6 +69,24 @@ From the workspace root:
     cargo test --locked -p symthaea-marine-geometry
     cargo clippy --locked -p symthaea-marine-geometry --all-targets -- -D warnings
 
+## Independent sectional hydrostatics cross-check (research increment)
+
+The sectional oracle is under development in `sectional_hydrostatics.rs` for [#12400](https://github.com/Luminous-Dynamics/symthaea/issues/12400), stacked on the G2c hydrostatics work.
+
+It is intentionally independent of the G2c volume and waterplane triangle integrators. For each longitudinal station bay it intersects the exact G2b side and waterplane triangles at the bay midpoint, reconstructs the section polygon, computes submerged area and vertical first moment, then applies Simpson 1/3 separately over the actual bay length. It also integrates waterplane half-breadth functions to recover waterplane area, LCF and second moments.
+
+This is a cross-check of the same piecewise-planar displacement mesh—not a second general hydrostatics solver. It is scoped to the current convex, symmetric G2b section family. A matching result means only that these two numerical methods agree within the named fixture/tolerance profile.
+
+Once the focused workflow is enabled for this branch, the CLI interface is:
+
+```sh
+cargo run --locked -p symthaea-marine-geometry --bin marine-hydrostatics-crosscheck -- request.json --output cross-check.json
+```
+
+The request binds the exact `section_family`, `lofted_artifact`, explicit `water_density_kg_m3`, and numeric `tolerance` profile. Exit codes are 0 = consistent, 3 = inconsistent, 4 = incomparable inputs, 2 = input/I/O/verification error. The output contains both numerical references, per-observable absolute/relative comparison results, exact method identities, and a digest-bound report.
+
+The oracle does not establish KG/GM, intact/damage stability, trim equilibrium, structural or class approval, CFD, seakeeping, an as-built vessel condition or operational authority. It is not a substitute for an independently qualified naval-architecture package.
+
 ## Candidate input
 
 A candidate contains schema_version (currently 1), a non-empty candidate_id, geometry_digest_blake3 (initially empty while computing the digest), geometry (units, coordinate_frame, vertices, faces), and profile (profile ID, closure requirement, minimum triangle area, minimum enclosed volume, and unsupported required checks).
