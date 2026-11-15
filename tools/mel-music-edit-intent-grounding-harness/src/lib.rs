@@ -65,6 +65,8 @@ pub struct SourceOccurrenceV1 {
     pub event_ids: Vec<String>,
     /// Stable source anchors that contain or identify this occurrence.
     pub anchor_ids: Vec<String>,
+    /// Upstream evidence receipt supporting this exact occurrence.
+    pub evidence_receipt_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -443,6 +445,9 @@ pub fn validate_source_observation_v1(
         {
             return Err(IntentPlanIssueV1::InvalidOccurrence);
         }
+        if !valid_sha256(&occurrence.evidence_receipt_sha256) {
+            return Err(IntentPlanIssueV1::InvalidDigest);
+        }
         if !validate_sorted_unique(occurrence.event_ids.iter().map(String::as_str))
             || !validate_sorted_unique(occurrence.anchor_ids.iter().map(String::as_str))
         {
@@ -794,9 +799,11 @@ pub fn verify_music_edit_intent_plan_v1(
                 return Err(IntentPlanIssueV1::GroundingEvidenceMismatch);
             }
             for (evidence, occurrence_id) in plan.grounding_evidence.iter().zip(expected_occurrences.iter()) {
+                let occurrence = occurrence_by_id(observation, occurrence_id)
+                    .ok_or(IntentPlanIssueV1::SelectionSetMismatch)?;
                 if evidence.occurrence_id != *occurrence_id
                     || evidence.source_observation_sha256 != observation.observation_sha256
-                    || !valid_sha256(&evidence.evidence_receipt_sha256)
+                    || evidence.evidence_receipt_sha256 != occurrence.evidence_receipt_sha256
                     || evidence.confidence_bp > MAX_CONFIDENCE_BP_V1
                 {
                     return Err(IntentPlanIssueV1::GroundingEvidenceMismatch);
@@ -903,6 +910,7 @@ mod tests {
                     end_tick: 1_600,
                     event_ids: vec!["guitar-note-1".to_owned()],
                     anchor_ids: vec!["chorus-1".to_owned()],
+                    evidence_receipt_sha256: h(101),
                 },
                 SourceOccurrenceV1 {
                     occurrence_id: "guitar-entry-2".to_owned(),
@@ -911,6 +919,8 @@ mod tests {
                     end_tick: 4_500,
                     event_ids: vec!["guitar-note-2".to_owned()],
                     anchor_ids: vec!["chorus-2".to_owned()],
+                    evidence_receipt_sha256: h(103),
+                    evidence_receipt_sha256: h(102),
                 },
                 SourceOccurrenceV1 {
                     occurrence_id: "snare-hit-1".to_owned(),
@@ -951,7 +961,8 @@ mod tests {
             grounding_evidence: occurrence_ids.iter().map(|id| OccurrenceGroundingEvidenceV1 {
                 occurrence_id: id.clone(),
                 source_observation_sha256: observation.observation_sha256.clone(),
-                evidence_receipt_sha256: h(500),
+                evidence_receipt_sha256: occurrence_by_id(observation, id)
+                    .expect("selected occurrence is present").evidence_receipt_sha256.clone(),
                 evidence_kind: GroundingEvidenceKindV1::EventMap,
                 confidence_bp: 9_500,
             }).collect(),
@@ -1072,7 +1083,8 @@ mod tests {
         plan.grounding_evidence = ids.iter().map(|id| OccurrenceGroundingEvidenceV1 {
             occurrence_id: id.clone(),
             source_observation_sha256: observation.observation_sha256.clone(),
-            evidence_receipt_sha256: h(501),
+            evidence_receipt_sha256: occurrence_by_id(&observation, id)
+                .expect("selected occurrence is present").evidence_receipt_sha256.clone(),
             evidence_kind: GroundingEvidenceKindV1::HumanAnnotation,
             confidence_bp: 10_000,
         }).collect();
@@ -1225,6 +1237,24 @@ mod tests {
         assert_eq!(
             verify_music_edit_intent_plan_v1(&observation, &plan),
             Err(IntentPlanIssueV1::GroundingEvidenceMismatch)
+        );
+    }
+
+    #[test]
+    fn occurrence_receipt_is_committed_and_must_match_plan_evidence() {
+        let observation = source();
+        let mut plan = base_plan(&observation);
+        plan.grounding_evidence[0].evidence_receipt_sha256 = h(999);
+        assert_eq!(
+            verify_music_edit_intent_plan_v1(&observation, &plan),
+            Err(IntentPlanIssueV1::GroundingEvidenceMismatch)
+        );
+
+        let mut altered = observation.clone();
+        altered.occurrences[1].evidence_receipt_sha256 = h(999);
+        assert_eq!(
+            validate_source_observation_v1(&altered),
+            Err(IntentPlanIssueV1::ObservationDigestMismatch)
         );
     }
 
