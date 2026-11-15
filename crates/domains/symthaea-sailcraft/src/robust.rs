@@ -110,6 +110,10 @@ pub struct RobustRouteRequest {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RobustCourseCandidate {
+    /// Exact craft configuration that scopes this route candidate.
+    pub configuration_digest: [u8; 32],
+    /// Exact polar artifact used to construct the route candidate.
+    pub polar_artifact_digest: [u8; 32],
     /// Advisory heading only; this is never a rudder or helm command.
     pub heading_deg: f64,
     pub tack_side: TackSide,
@@ -544,6 +548,8 @@ pub fn evaluate_robust_route_candidates(
         }
 
         let candidate = RobustCourseCandidate {
+            configuration_digest: request.configuration_digest,
+            polar_artifact_digest: polar.source_artifact_digest,
             heading_deg,
             tack_side,
             true_wind_angle_deg: twa,
@@ -716,6 +722,8 @@ mod tests {
     #[test]
     fn discarded_heading_upper_envelope_prevents_false_unique_tack_claim() {
         let port = RobustCourseCandidate {
+            configuration_digest: CONFIG,
+            polar_artifact_digest: [0xb6; 32],
             heading_deg: 45.0,
             tack_side: TackSide::Port,
             true_wind_angle_deg: ScalarInterval {
@@ -740,6 +748,8 @@ mod tests {
             },
         };
         let starboard = RobustCourseCandidate {
+            configuration_digest: CONFIG,
+            polar_artifact_digest: [0xb6; 32],
             heading_deg: 315.0,
             tack_side: TackSide::Starboard,
             true_wind_angle_deg: ScalarInterval {
