@@ -180,7 +180,7 @@ pub fn verify_backend_capability_manifest(
                 Some(value) if is_blake3_digest(value) => {}
                 _ => add_violation(
                     &mut violations,
-                    "pass_without_fixture",
+                    "result_without_fixture",
                     format!(
                         "capability {:?} has a PASS/FAIL status but no valid fixture-manifest digest",
                         evidence.capability
@@ -191,7 +191,7 @@ pub fn verify_backend_capability_manifest(
                 Some(value) if is_blake3_digest(value) => {}
                 _ => add_violation(
                     &mut violations,
-                    "pass_without_test_report",
+                    "result_without_test_report",
                     format!(
                         "capability {:?} has a PASS/FAIL status but no valid test-report digest",
                         evidence.capability
@@ -452,10 +452,10 @@ mod tests {
         item.manifest_digest_blake3 =
             compute_backend_capability_digest(&item.payload).unwrap();
         let error = verify_backend_capability_manifest(&item).unwrap_err();
-        assert!(error.iter().any(|issue| issue.code == "pass_without_fixture"));
+        assert!(error.iter().any(|issue| issue.code == "result_without_fixture"));
         assert!(error
             .iter()
-            .any(|issue| issue.code == "pass_without_test_report"));
+            .any(|issue| issue.code == "result_without_test_report"));
     }
 
     #[test]
