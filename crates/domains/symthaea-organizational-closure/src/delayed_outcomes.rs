@@ -1480,7 +1480,10 @@ mod tests {
         let (scenario, oracle, mut trace) = fixture();
         trace.claims[0].reported_effect_interval = DelayedEffectInterval::new(-1.0, 1.0);
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::NotQualified);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::NotQualified
+        );
         assert!(report.findings.iter().any(|finding| {
             finding.code == DelayedOutcomeFindingCode::ReportedIntervalNarrowerThanSequence
         }));
