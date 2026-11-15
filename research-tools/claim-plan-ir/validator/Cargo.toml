@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "claim-plan-ir-preflight"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+description = "Standalone research preflight for Symthaea Claim Plan IR v1"
+
+[dependencies]
+hex = "=0.4.3"
+jsonschema = { version = "=0.61.2", default-features = false }
+serde = "=1.0.229"
+serde_json = "=1.0.151"
+serde_json_canonicalizer = "=0.4.1"
+sha2 = "=0.10.9"
