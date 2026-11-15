@@ -6,7 +6,8 @@
   "intervention": {
     "family": "dependency_api_breaking_change",
     "position": "middle",
-    "control_class": "target_intervention"
+    "control_class": "target_intervention",
+    "position_percentile": 50
   },
   "task_seed_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "task_bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
