@@ -82,6 +82,9 @@ jobs:
       - name: Validate persistent team trajectory fixture
         run: cargo run -p sympoetic-bench -- validate-trajectory --input docs/benchmarks/sympoetic/fixtures/team-trajectory.example.json
 
+      - name: Validate evidence-bearing scorecard fixture
+        run: cargo run -p sympoetic-bench -- validate-scorecard --input docs/benchmarks/sympoetic/fixtures/scorecard-with-evidence.example.json
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
