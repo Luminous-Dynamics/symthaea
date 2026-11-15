@@ -6,6 +6,8 @@
 //! checker, CFD solver, or vessel-approval system.
 
 pub mod cad_exchange;
+pub mod step_header;
+pub mod cad_backend;
 pub mod loft;
 pub mod section;
 

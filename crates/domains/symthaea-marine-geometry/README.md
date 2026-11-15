@@ -34,6 +34,36 @@ The contract is not a STEP parser/writer or CAD kernel. It validates receipt com
 
 See [CAD_INTEROP_PROTOCOL.md](./CAD_INTEROP_PROTOCOL.md) for the standard/version policy, representation semantics, validation metrics, negative controls and cross-kernel benchmark sequence.
 
+## G3b CAD backend capability evaluation
+
+G3b is under development for [issue #12381](https://github.com/Luminous-Dynamics/symthaea/issues/12381) on branch `research/marine-cad-kernel-bakeoff-g3b-20261115`. It adds a typed backend capability manifest and evaluator. A capability can qualify only with both a frozen fixture-manifest digest and a test-report digest; missing/unknown results remain incomplete and failed results reject the selected profile.
+
+The current comparison candidates are OCCT 8.0.1, the experimental Rust `cad-kernel`, `brep-to-step` and `vcad_kernel_step`. Their documented STEP schema coverage differs; do not treat AP214, AP242 Edition 2 and AP242:2025 Edition 4 as equivalent.
+
+Run a backend capability manifest against a frozen requirement profile:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-cad-backend-evaluate -- backend-evaluation-request.json
+
+Exit codes: 0 = qualified within profile; 1 = incomplete; 2 = rejected; 3 = CLI, I/O, parse or manifest-integrity error.
+
+See [CAD_BACKEND_EVALUATION.md](./CAD_BACKEND_EVALUATION.md) for candidate capabilities, CAx-IF fixture families and the cross-kernel bake-off. No backend is qualified by this manifest alone; real backend tests remain required.
+
+## G3b Part 21 STEP header inspection
+
+The G3b backend branch also includes a minimal ISO 10303-21 Part 21 envelope inspector. It checks the start/end markers, HEADER/DATA/ENDSEC ordering, a single FILE_SCHEMA statement and an exact match against a caller-supplied frozen list of schema identifiers. It ignores text inside comments and quoted strings.
+
+Run it with:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-step-header-inspect -- model.step ap242e4-header-profile.json
+
+Important: this inspects the Part 21 envelope and exact FILE_SCHEMA string only. The required edition is profile metadata; the header string alone does not prove ISO edition/conformance, valid DATA entities, B-rep correctness, PMI preservation or geometric equivalence.
+
+The composed `marine-cad-translation-verify` CLI reads a real STEP file, a CAD translation receipt and a frozen header profile. It verifies that the actual STEP bytes match the receipt's file digest and that the Part 21 envelope/FILE_SCHEMA identifiers match the profile:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-cad-translation-verify -- model.step translation-receipt.json ap242e4-header-profile.json
+
+This is still an envelope-and-identity check. It does not parse B-rep DATA entities or perform independent geometric/PMI validation.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
