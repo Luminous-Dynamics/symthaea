@@ -1283,11 +1283,16 @@ mod tests {
                 "hydrogen_production_rate_min_g_H2_per_hour": 150.0,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
-        } else {
+        } else if lane == "METHANE_PYROLYSIS" {
             serde_json::json!({
                 "methane_conversion_min_fraction": 0.92,
                 "hydrogen_selectivity_min_fraction": 0.99,
                 "levelized_cost_hydrogen_max_usd_per_kg": 0.70,
+                "all_thresholds_must_hold_at_same_operating_point": true
+            })
+        } else {
+            serde_json::json!({
+                "ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh": 3.0,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
         };
@@ -1295,10 +1300,18 @@ mod tests {
             serde_json::json!({
                 "full_wall_plug_to_accepted_h2_boundary_required": true
             })
-        } else {
+        } else if lane == "METHANE_PYROLYSIS" {
             serde_json::json!({
                 "no_credit_baseline_required": true,
                 "avoided_product_credit_requires_independent_carbon_grade_qualification": true
+            })
+        } else {
+            serde_json::json!({
+                "hydrogen_generation_energy_included": true,
+                "plasma_and_electrolysis_electricity_included": true,
+                "gas_feed_and_product_separation_energy_included": true,
+                "accepted_nh3_product_purity_and_pressure_contract_required": true,
+                "matched_haber_bosch_baseline_includes_hydrogen_energy": true
             })
         };
         serde_json::json!({
@@ -1341,6 +1354,22 @@ mod tests {
         let source = minimal_benchmark_target_manifest("METHANE_PYROLYSIS");
         let summary = audit_source_value(&source, "methane-target.json").unwrap();
         assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_accepts_ammonia_synthesis_full_chain_target() {
+        let source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS");
+        let summary = audit_source_value(&source, "ammonia-synthesis-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_ammonia_synthesis_target_without_h2_energy() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS");
+        source["benchmark_targets"][0]["claim_guards"]["hydrogen_generation_energy_included"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "ammonia-synthesis-target.json").unwrap_err();
+        assert!(error.to_string().contains("hydrogen_generation_energy_included"));
     }
 
     #[test]
@@ -1999,12 +2028,12 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
                     "{display_name}: methane benchmark target {target_id} must bind metrics to one operating point"
                 );
-                let credit_policies = target
-                    .get("credit_policies")
-                    .and_then(Value::as_array)
-                    .filter(|value| value.iter().any(|item| item.as_str() == Some("NO_CREDIT")))
-                    .with_context(|| format!("{display_name}: methane benchmark target {target_id} must include a NO_CREDIT scenario"))?;
-                let _ = credit_policies;
+                ensure!(
+                    target.get("credit_policies")
+                        .and_then(Value::as_array)
+                        .is_some_and(|value| value.iter().any(|item| item.as_str() == Some("NO_CREDIT"))),
+                    "{display_name}: methane benchmark target {target_id} must include a NO_CREDIT scenario"
+                );
                 ensure!(
                     guards.get("no_credit_baseline_required").and_then(Value::as_bool) == Some(true),
                     "{display_name}: methane benchmark target {target_id} must require a no-credit baseline"
@@ -2023,6 +2052,30 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                         "{display_name}: methane benchmark target {target_id} has invalid or missing threshold {key}"
                     );
                 }
+            }
+            "AMMONIA_SYNTHESIS" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: ammonia synthesis target {target_id} must bind metrics to one operating point"
+                );
+                for key in [
+                    "hydrogen_generation_energy_included",
+                    "plasma_and_electrolysis_electricity_included",
+                    "gas_feed_and_product_separation_energy_included",
+                    "accepted_nh3_product_purity_and_pressure_contract_required",
+                    "matched_haber_bosch_baseline_includes_hydrogen_energy",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: ammonia synthesis target {target_id} is missing required full-chain guard {key}"
+                    );
+                }
+                ensure!(
+                    metrics.get("ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh")
+                        .and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                    "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
+                );
             }
             _ => {}
         }
