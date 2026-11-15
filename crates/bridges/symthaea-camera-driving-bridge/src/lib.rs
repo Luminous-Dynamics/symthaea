@@ -1247,7 +1247,10 @@ mod tests {
     }
 
     #[test]
-    fn changed_frame_bytes_change_frame_and_fused_digests() {
+    fn changed_frame_bytes_change_raw_frame_and_receipt_commitments() {
+        // Raw-frame lineage is byte-exact. The HDC visual representation is
+        // intentionally lossy/quantized, so distinct frames may map to the
+        // same semantic state; that does not weaken the raw receipt commitment.
         let state = VehicleState::cruising(10.0);
         let first_pixels = vec![10; 16 * 16 * 3];
         let second_pixels = vec![11; 16 * 16 * 3];
@@ -1260,11 +1263,9 @@ mod tests {
             .observe(observation(&second_pixels, 1, 10_000, &state))
             .unwrap();
         assert_ne!(a.receipt.raw_frame_sha256, b.receipt.raw_frame_sha256);
-        assert_ne!(a.receipt.visual_state_sha256, b.receipt.visual_state_sha256);
-        assert_ne!(
-            a.receipt.fused_policy_input_sha256,
-            b.receipt.fused_policy_input_sha256
-        );
+        assert_ne!(a.receipt.receipt_sha256, b.receipt.receipt_sha256);
+        assert_eq!(a.receipt.raw_frame_sha256, digest_bytes(&first_pixels));
+        assert_eq!(b.receipt.raw_frame_sha256, digest_bytes(&second_pixels));
     }
 
     #[test]
@@ -1359,9 +1360,12 @@ mod tests {
             .unwrap();
         assert_eq!(first.receipt.previous_vehicle_state_sha256, None);
         assert_eq!(first.receipt.previous_visual_state_sha256, None);
-        let second = bridge
-            .observe(observation(&second_pixels, 2, 20_000, &state_b))
-            .unwrap();
+        let second_observation = observation(&second_pixels, 2, 20_000, &state_b);
+        let expected_upstream_observation_id =
+            second_observation.upstream.calculated_observation_id();
+        let expected_upstream_receipt_sha256 =
+            second_observation.upstream.calculated_receipt_sha256();
+        let second = bridge.observe(second_observation).unwrap();
         assert_eq!(
             second.receipt.previous_vehicle_state_sha256.as_deref(),
             Some(first.receipt.vehicle_state_sha256.as_str())
@@ -1376,9 +1380,12 @@ mod tests {
         );
         assert_eq!(
             second.receipt.upstream_observation_id,
-            digest_bytes(b"observation-2")
+            expected_upstream_observation_id
         );
-        assert_eq!(second.receipt.upstream_receipt_sha256, "c".repeat(64));
+        assert_eq!(
+            second.receipt.upstream_receipt_sha256,
+            expected_upstream_receipt_sha256
+        );
         assert_eq!(
             second.receipt.receipt_sha256,
             digest_receipt(&second.receipt)
@@ -1461,7 +1468,14 @@ mod tests {
 
         let mut geometry_bridge = bridge();
         let mut wrong_geometry = observation(&pixels, 1, 10_000, &state);
+        // Keep the upstream receipt internally self-consistent so validation
+        // reaches the comparison against the separately captured pixel geometry.
         wrong_geometry.upstream.width = 8;
+        wrong_geometry.upstream.frame_byte_len = 8 * 16 * 3;
+        wrong_geometry.upstream.observation_id =
+            wrong_geometry.upstream.calculated_observation_id();
+        wrong_geometry.upstream.receipt_sha256 =
+            wrong_geometry.upstream.calculated_receipt_sha256();
         assert_eq!(
             geometry_bridge.observe(wrong_geometry).err(),
             Some(BridgeError::UpstreamGeometryMismatch)
