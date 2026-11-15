@@ -40,6 +40,8 @@ jobs:
 
       - name: Install repository-pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
 
       - name: Generate lockfile for pinned standalone dependencies
         run: cargo generate-lockfile --manifest-path tools/marine-propulsion-validator/Cargo.toml
@@ -79,5 +81,5 @@ jobs:
           name: marine-drift-evaluator-${{ github.sha }}
           if-no-files-found: warn
           path: |
-            "$RUNNER_TEMP/marine-drift-positive.json"
-            "$RUNNER_TEMP/marine-drift-negative.json"
+            ${{ runner.temp }}/marine-drift-positive.json
+            ${{ runner.temp }}/marine-drift-negative.json
