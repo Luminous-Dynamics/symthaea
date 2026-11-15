@@ -8,7 +8,8 @@ use symthaea_decision_assessment::event_order_v0_3::{
     canonical_schedule_bytes, canonical_schedule_sha256, generate_cancellation_commit_race_schedule,
     generate_capture_clock_fault_schedule, generate_clock_mapping_fault_schedule, generate_clocked_observation_persistence_schedule,
     generate_delivery_schedule, project_bitemporal_event, replay_virtual_schedule, validate_schedule,
-    CancellationCommitOrder, CaptureClockFault, ClockMappingFault, SchedulerDisposition, ScheduleAction, VirtualSchedule,
+    ActionClockTimeReference, ActionEvidence, CancellationCommitOrder, CaptureClockFault, ClockMappingFault,
+    SchedulerDisposition, ScheduleAction, VirtualSchedule,
 };
 
 fn owner_qualified_resolutions(
@@ -165,6 +166,60 @@ proptest! {
     }
 
     #[test]
+    fn action_owner_time_references_bind_the_exact_active_clock_mapping(seed in any::<u64>()) {
+        let mut schedule = generate_delivery_schedule(seed, 4).expect("generated schedule");
+        let event_index = schedule.actions.iter().position(|item| {
+            matches!(&item.action, ScheduleAction::EventProduced { event_id, .. } if event_id == "event-000002")
+        }).expect("third event");
+        let (mapping_id, timestamp_ns) = match &schedule.actions[event_index].action {
+            ScheduleAction::EventProduced { clock_mapping_action_id, source_timestamp_ns, .. } => {
+                (clock_mapping_action_id.clone(), *source_timestamp_ns)
+            }
+            _ => unreachable!("selected event"),
+        };
+        schedule.actions[event_index].owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id.clone(),
+            local_timestamp_ns: timestamp_ns,
+        });
+        validate_schedule(&schedule).expect("exact map reference validates");
+        let exact_report = replay_virtual_schedule(&schedule).expect("exact map replay");
+        let target_action_id = schedule.actions[event_index].action_id.clone();
+        prop_assert!(exact_report.records.iter().any(|record| {
+            record.action_id == target_action_id && record.disposition == SchedulerDisposition::Applied
+        }));
+
+        let previous_mapping = schedule.actions.iter().find_map(|item| {
+            if let ScheduleAction::EventProduced { event_id, clock_mapping_action_id, .. } = &item.action {
+                (event_id == "event-000000").then_some(clock_mapping_action_id.clone())
+            } else {
+                None
+            }
+        }).expect("prior source mapping");
+        let mut stale = schedule.clone();
+        let stale_target = stale.actions.iter_mut().find(|item| item.action_id == target_action_id)
+            .expect("target action remains");
+        stale_target.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: previous_mapping,
+            local_timestamp_ns: timestamp_ns,
+        });
+        validate_schedule(&stale).expect("previous map is a structurally valid reference");
+        let stale_report = replay_virtual_schedule(&stale).expect("stale map replay");
+        prop_assert!(stale_report.records.iter().any(|record| {
+            record.action_id == target_action_id
+                && record.disposition == SchedulerDisposition::StaleClockMappingReference
+        }));
+
+        let mut missing = schedule;
+        let missing_target = missing.actions.iter_mut().find(|item| item.action_id == target_action_id)
+            .expect("target action remains");
+        missing_target.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: "missing-clock-map".to_owned(),
+            local_timestamp_ns: timestamp_ns,
+        });
+        prop_assert!(validate_schedule(&missing).is_err());
+    }
+
+    #[test]
     fn replay_is_repeatable_for_identical_seed_and_input(
         seed in any::<u64>(),
         event_count in 1usize..96,
@@ -219,6 +274,22 @@ proptest! {
         prop_assert!(projection.envelope.is_none());
     }
 
+}
+
+#[test]
+fn action_evidence_cannot_be_substituted_across_action_kinds() {
+    let mut schedule = generate_delivery_schedule(0x2026_1124, 4).expect("schedule");
+    let target = schedule.actions.iter_mut().find(|item| {
+        matches!(item.action, ScheduleAction::EventProduced { .. })
+    }).expect("event production action");
+    target.evidence = Some(ActionEvidence::EffectCommit {
+        receipt_ref: "synthetic://wrong-kind".to_owned(),
+        receipt_sha256: "a".repeat(64),
+    });
+    assert!(matches!(
+        validate_schedule(&schedule),
+        Err(symthaea_decision_assessment::event_order_v0_3::ReplayError::ActionEvidenceMismatch("action_variant"))
+    ));
 }
 
 #[test]
