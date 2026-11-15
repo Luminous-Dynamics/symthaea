@@ -22,6 +22,8 @@
 | Metacognitive sensitivity (J. Mathematical Psychology, 2026) | Whether confidence discriminates correct from incorrect judgments, beyond calibration alone | Analytical signal-detection account with naturalistic classification application | Add separate Brier/ECE calibration and AUC-style sensitivity for both human and AI judgments |
 | OHAI persistent human-AI teams (Frontiers, Oct 2026) | Collective functioning and collective intelligence across repeated interdependent cycles | Theoretical framework; calls for configuration and measurement qualification before longitudinal CI claims | Separate one-shot feasibility from multi-cycle team-level evidence and CI trajectories |
 
+| OHAI persistent human-AI teams (Frontiers, Oct 2026) | Distinguishes system configuration, enacted collective functioning, and multi-task collective intelligence over repeated cycles | Theoretical framework with a staged empirical programme; direct longitudinal team evidence remains limited | Add versioned team-cycle receipts, state continuity, membership/authority changes, consent-scoped memory, and a separate evidential threshold for CI claims |
+
 ## 2. Findings that shape our design
 
 The 2026 common-ground benchmark formalizes shared assumptions, goals, situation awareness, joint action and repair as core conditions for collaboration. This is a strong reference for SympoeticBench's common-ground and repair tasks.
@@ -59,6 +61,7 @@ No benchmark should claim that the adjacent work is absent. The opportunity is t
 13. Human capability amplification: independent learning, delayed retention, and transfer after collaboration.
 14. Epistemic resilience: knowledge/belief distinction, confidence calibration, evidence provenance, contradiction handling, and human verification.
 15. Persistent-team collective functioning across multiple cycles; collective-intelligence claims require comparable multi-task longitudinal evidence.
+16. Team continuity and configuration audit: membership, roles, authority, memory policy, and consent changes must be explicit across cycles.
 14. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
 
 The benchmark's contribution is the integrated measurement protocol and reproducible corpus, not a claim that any one of these constructs is newly invented.
@@ -86,6 +89,7 @@ The first goal is construct validity and reproducibility, not leaderboard rank. 
 - An adaptive-intervention comparison measuring overreach, missed critical warnings, and unnecessary interruption.
 - An epistemic-resilience slice with first-person false beliefs, stale evidence, non-independent sources, contradictory telemetry, and prompt injection in untrusted evidence.
 - A longitudinal persistent-team study before any claim about collective-intelligence trajectories.
+- A multi-cycle test of role turnover, authority revalidation, memory consent, and shared-plan continuity.
 - An external human study with preregistered outcomes and blinded raters.
 - A learning/transfer study showing independent human capability gain versus matched practice controls, including delayed retention.
 - An independent replication on a held-out scenario set.
