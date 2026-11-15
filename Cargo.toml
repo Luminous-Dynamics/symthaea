@@ -21,6 +21,10 @@ exclude = [
     # Incomplete verifier directory without a package manifest; recovery tracked in #8673.
     "crates/domains/symthaea-rea-evidence-verifier",
     # Empty placeholder directory; the root package named "symthaea" is the actual crate.
+    "crates/core/symthaea-iit",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-compat",
     "crates/core/symthaea",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
