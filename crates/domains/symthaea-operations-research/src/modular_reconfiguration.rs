@@ -1213,6 +1213,70 @@ mod tests {
         assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::GeometryFrameMismatch));
     }
 
+
+    #[test]
+    fn incompatible_port_units_are_blocked() {
+        let (mut profile_a, placement_a) = module("urn:example:module:cut", 0, vec![]);
+        let (mut profile_b, placement_b) = module("urn:example:module:sew", 1_200, vec![]);
+        profile_a.ports = vec![port("out", PortDirection::Output, true)];
+        profile_b.ports = vec![port("in", PortDirection::Input, true)];
+        profile_b.ports[0].unit_ref = "urn:example:unit:pieces-per-minute".to_owned();
+        let mut target = base_config(vec![placement_a, placement_b], vec![]);
+        target.connections.push(PortConnection {
+            connection_ref: "urn:example:connection:cut-to-sew".to_owned(),
+            from_module_ref: "urn:example:module:cut".to_owned(),
+            from_port_ref: "out".to_owned(),
+            to_module_ref: "urn:example:module:sew".to_owned(),
+            to_port_ref: "in".to_owned(),
+            capacity_units: 10,
+            connection_evidence: evidence("urn:example:evidence:connection"),
+        });
+        let report = evaluate_reconfiguration(input(None, &target, &[profile_a, profile_b], &[]));
+        assert_eq!(report.status, PlanStatus::Blocked);
+        assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::PortUnitMismatch));
+    }
+
+    #[test]
+    fn connection_capacity_cannot_exceed_either_port() {
+        let (mut profile_a, placement_a) = module("urn:example:module:cut", 0, vec![]);
+        let (mut profile_b, placement_b) = module("urn:example:module:sew", 1_200, vec![]);
+        profile_a.ports = vec![port("out", PortDirection::Output, true)];
+        profile_b.ports = vec![port("in", PortDirection::Input, true)];
+        profile_a.ports[0].max_capacity_units = 5;
+        let mut target = base_config(vec![placement_a, placement_b], vec![]);
+        target.connections.push(PortConnection {
+            connection_ref: "urn:example:connection:cut-to-sew".to_owned(),
+            from_module_ref: "urn:example:module:cut".to_owned(),
+            from_port_ref: "out".to_owned(),
+            to_module_ref: "urn:example:module:sew".to_owned(),
+            to_port_ref: "in".to_owned(),
+            capacity_units: 10,
+            connection_evidence: evidence("urn:example:evidence:connection"),
+        });
+        let report = evaluate_reconfiguration(input(None, &target, &[profile_a, profile_b], &[]));
+        assert_eq!(report.status, PlanStatus::Blocked);
+        assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::PortCapacityExceeded));
+    }
+
+    #[test]
+    fn duplicate_module_profiles_are_rejected() {
+        let (profile, placement) = module("urn:example:module:cut", 0, vec![]);
+        let target = base_config(vec![placement], vec![]);
+        let report = evaluate_reconfiguration(input(None, &target, &[profile.clone(), profile], &[]));
+        assert_eq!(report.status, PlanStatus::Blocked);
+        assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::DuplicateModuleProfile));
+    }
+
+    #[test]
+    fn revoked_module_evidence_blocks_a_still_qualified_profile() {
+        let (mut profile, placement) = module("urn:example:module:cut", 0, vec![]);
+        profile.qualification_evidence.status = EvidenceStatus::Revoked;
+        let target = base_config(vec![placement], vec![]);
+        let report = evaluate_reconfiguration(input(None, &target, &[profile], &[]));
+        assert_eq!(report.status, PlanStatus::Blocked);
+        assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::ModuleQualificationEvidenceInvalid));
+    }
+
     #[test]
     fn incompatible_port_protocol_is_blocked() {
         let (mut profile_a, placement_a) = module("urn:example:module:cut", 0, vec![]);
