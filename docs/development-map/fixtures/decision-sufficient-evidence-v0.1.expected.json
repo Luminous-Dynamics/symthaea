@@ -1,0 +1,29 @@
+{
+  "fixture_id": "synthetic:decision-sufficient-evidence-v0.1",
+  "status": "hand_derived_known_answer",
+  "baseline": {
+    "action_id": "hold",
+    "expected_loss": 5
+  },
+  "recommendation": "acquire_evidence",
+  "selected_evidence_id": "pinned-contract-test",
+  "assessments": {
+    "pinned-contract-test": {
+      "feasible": true,
+      "expected_loss_after_observation": 2.5,
+      "gross_evsi": 2.5,
+      "acquisition_cost_utility": 1,
+      "net_evsi": 1.5,
+      "pareto_efficient": true
+    },
+    "uninformative-search": {
+      "feasible": true,
+      "expected_loss_after_observation": 5,
+      "gross_evsi": 0,
+      "acquisition_cost_utility": 0.2,
+      "net_evsi": -0.2,
+      "pareto_efficient": true
+    }
+  },
+  "claim_ceiling": "Synthetic decision-theory example only. Likelihoods, loss values, costs and hard-gate booleans are supplied assumptions, not measured or authenticated facts."
+}
