@@ -20,7 +20,8 @@ fn request() -> AgentTurnRequest {
             environment_id: "env-001".to_owned(),
             role: "operator".to_owned(),
             goal: "Inspect the service state".to_owned(),
-            brief: "Inspect the named service and report its state without making changes.".to_owned(),
+            brief: "Inspect the named service and report its state without making changes."
+                .to_owned(),
             domain: Some("hpc_operations".to_owned()),
             qcat: Some("read_only".to_owned()),
         },
@@ -231,7 +232,11 @@ fn action_outside_granted_authority_is_rejected() {
     let mut req = request();
     req.authority.allowed_actions = vec!["ask".to_owned()];
     let mut guard = AgentProtocolGuard::default();
-    assert!(guard.validate_decision(&req, &tool_decision("call-3", "read_service_status")).is_err());
+    assert!(
+        guard
+            .validate_decision(&req, &tool_decision("call-3", "read_service_status"))
+            .is_err()
+    );
 }
 
 #[test]
