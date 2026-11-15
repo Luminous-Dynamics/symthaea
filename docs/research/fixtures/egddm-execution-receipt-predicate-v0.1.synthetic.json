@@ -62,12 +62,12 @@
     },
     "workflow_run_id": "synthetic-run-0001",
     "workflow_attempt": 1,
-    "slsa_provenance": {
+    "test_result": {
       "statement_digest": {
         "algorithm": "sha256",
         "value": "9999999999999999999999999999999999999999999999999999999999999999"
       },
-      "predicate_type": "https://slsa.dev/provenance/v1",
+      "predicate_type": "https://in-toto.io/attestation/test-result/v0.1",
       "subject_digest": {
         "algorithm": "sha256",
         "value": "6666666666666666666666666666666666666666666666666666666666666666"
