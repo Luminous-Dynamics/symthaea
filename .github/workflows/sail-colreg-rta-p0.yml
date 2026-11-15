@@ -1,0 +1,56 @@
+name: Sailcraft COLREG action-admissibility P0
+
+on:
+  push:
+    branches: ["research/sail-colreg-rta-p0-v0-1"]
+    paths:
+      - "crates/domains/symthaea-sailcraft/**"
+      - "docs/SAIL_COLREG_RTA_ACTION_ADMISSIBILITY_V0_1.md"
+      - ".github/workflows/sail-colreg-rta-p0.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-sailcraft/**"
+      - "docs/SAIL_COLREG_RTA_ACTION_ADMISSIBILITY_V0_1.md"
+      - ".github/workflows/sail-colreg-rta-p0.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sail-colreg-rta-p0-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+      - name: Assert exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "source_commit=$actual"
+      - name: Format check
+        run: cargo fmt --check -p symthaea-sailcraft
+      - name: Unit tests
+        run: cargo test --locked -p symthaea-sailcraft
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sailcraft --all-targets -- -D warnings

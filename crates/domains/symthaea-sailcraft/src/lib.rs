@@ -13,6 +13,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod action_admissibility;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceState {
     Qualified,
