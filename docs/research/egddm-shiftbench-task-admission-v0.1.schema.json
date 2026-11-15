@@ -45,7 +45,9 @@
         "family",
         "position",
         "position_percentile",
-        "control_class"
+        "control_class",
+        "planned_work_units_completed",
+        "planned_work_units_total"
       ],
       "properties": {
         "family": {
@@ -93,6 +95,14 @@
             80,
             90
           ]
+        },
+        "planned_work_units_completed": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "planned_work_units_total": {
+          "type": "integer",
+          "minimum": 2
         }
       }
     },
