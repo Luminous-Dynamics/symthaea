@@ -363,6 +363,14 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "cohen_kappa_nominal": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "krippendorff_alpha_nominal": {
+          "type": "number"
         }
       }
     },
