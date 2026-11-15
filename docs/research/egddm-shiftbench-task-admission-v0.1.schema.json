@@ -44,6 +44,7 @@
       "required": [
         "family",
         "position",
+        "position_percentile",
         "control_class"
       ],
       "properties": {
@@ -77,6 +78,20 @@
             "positive_control",
             "negative_control",
             "common_cause_control"
+          ]
+        },
+        "position_percentile": {
+          "type": "integer",
+          "enum": [
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            90
           ]
         }
       }
