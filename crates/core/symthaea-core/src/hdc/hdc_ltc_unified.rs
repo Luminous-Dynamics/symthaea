@@ -2251,6 +2251,19 @@ mod tests {
     use super::*;
 
     #[test]
+    fn snapshot_state_comparison_excludes_call_clocks_but_full_comparison_does_not() {
+        let before = NetworkStateSnapshot::snapshot_with(0.25, 1.0, 7);
+        let after_zero_dt = NetworkStateSnapshot::snapshot_with(0.25, 1.0, 8);
+        let after_elapsed_dt = NetworkStateSnapshot::snapshot_with(0.25, 1.1, 8);
+        let after_state_change = NetworkStateSnapshot::snapshot_with(0.3, 1.0, 8);
+
+        assert!(before.state_values_approx_eq(&after_zero_dt, 1e-7));
+        assert!(!before.approx_eq(&after_zero_dt, 1e-7));
+        assert!(!before.approx_eq(&after_elapsed_dt, 1e-7));
+        assert!(!before.state_values_approx_eq(&after_state_change, 1e-7));
+    }
+
+    #[test]
     fn test_unified_neuron_creation() {
         let config = UnifiedConfig::default();
         let neuron = HdcLtcUnifiedNeuron::new(config, 42);
@@ -3128,13 +3141,21 @@ mod tests {
 
         let mut exact = HdcLtcUnifiedNeuron::new(config.clone(), 42);
         exact.set_state(initial.clone());
+        let exact_before = exact.stats();
         exact.evolve_closed_form_exact(0.0, &input);
+        let exact_after = exact.stats();
         assert_eq!(exact.state().values, initial.values);
+        assert_eq!(exact_after.total_time, exact_before.total_time);
+        assert_eq!(exact_after.update_count, exact_before.update_count + 1);
 
         let mut iterative = HdcLtcUnifiedNeuron::new(config, 42);
         iterative.set_state(initial.clone());
+        let iterative_before = iterative.stats();
         iterative.evolve_closed_form_iterative(0.0, &input);
+        let iterative_after = iterative.stats();
         assert_eq!(iterative.state().values, initial.values);
+        assert_eq!(iterative_after.total_time, iterative_before.total_time);
+        assert_eq!(iterative_after.update_count, iterative_before.update_count + 1);
     }
 
     /// Right-continuity acceptance regression for the adaptive-gate path.
