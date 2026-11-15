@@ -26,6 +26,11 @@ cargo run -p sympoetic-bench -- validate-scorecard --input path/to/scorecard.jso
 cargo run -p sympoetic-bench -- validate-scorecard \\
   --input docs/benchmarks/sympoetic/fixtures/scorecard-with-evidence.example.json
 
+# Summarize capability gains and negative-gain rates by baseline stratum
+cargo run -p sympoetic-bench -- summarize-capability-strata \\
+  --input docs/benchmarks/sympoetic/fixtures/distributional-capability.example.json \\
+  --draws 2000 --seed 42
+
 # Digest a file without modifying it
 cargo run -p sympoetic-bench -- digest --input path/to/artifact
 ```
@@ -72,6 +77,7 @@ The `trajectory` module validates multi-cycle team receipts, prior-cycle digests
 - `marginal_contribution_impact`: full artifact quality minus quality from an identifiable counterfactual replay without the contribution. Non-identifiable replays return unavailable rather than an invented score.
 - `exact_shapley_values`: allocates a bounded outcome across up to 12 contributors using a complete, identifiable (2^n) coalition table; missing coalitions are rejected.
 - `participant_capability_amplification`: independent-arm, participant-cluster bootstrap of pre/post learning gains versus a matched control. Delayed retention and transfer use the same estimator with their respective held-out assessment scores.
+- `summarize_capability_amplification_by_stratum`: the `summarize-capability-strata` CLI reports treatment-control gain intervals and negative-gain rates/intervals separately for preregistered baseline task-capability strata.
 - `summarize_capability_amplification_by_stratum`: reports treatment-control gain intervals and negative individual-gain rates separately for preregistered baseline task-capability strata. It does not infer demographic groups or hide harmed strata in a pooled mean.
 - `paired_cluster_bootstrap_difference`: seeded percentile bootstrap over one pre-aggregated value per participant cluster. It must not be used to treat conversation turns as independent samples.
 
