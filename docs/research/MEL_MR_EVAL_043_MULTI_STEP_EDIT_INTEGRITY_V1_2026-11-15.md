@@ -1,7 +1,7 @@
 # MEL-MR-EVAL-043 — Multi-step edit integrity contract v1
 
 **Date:** 2026-11-15  
-**Status:** Source and tests authored; exact-head qualification pending  
+**Status:** Stage 1 and Stage 2 focused qualification passed at exact head `f4ff5f3971f3acc3a8ea4b5e7b61f56c00cbe18d`  
 **Issue:** [#12243](https://github.com/Luminous-Dynamics/symthaea/issues/12243)  
 **Stack base:** EVAL-042 [PR #12201](https://github.com/Luminous-Dynamics/symthaea/pull/12201)
 
@@ -29,7 +29,7 @@ The standalone crate is \`tools/mel-music-sequence-integrity-harness\`.
 
 ### Executable controls
 
-Fifteen unit tests are authored. They cover:
+Twenty-one unit tests are authored. They cover:
 - exact two-step ancestry and cumulative cost;
 - unauthorized collateral event changes;
 - stale artifact and symbolic-state parents;
@@ -42,15 +42,39 @@ Fifteen unit tests are authored. They cover:
 - canonical ordering and duplicate event IDs;
 - distinct selection/realization/verification receipt identities;
 - candidate-attempt accounting;
-- preregistered session-length ladder bounds.
+- preregistered session-length ladder bounds;
+- read/write-set commutativity and execution-order convergence;
+- same-event operation conflicts and stale patch preconditions;
+- exact undo/redo with history-receipt tamper detection;
+- disjoint branch merge with both parents retained;
+- conflicting branch merge with exactly one explicit resolution per conflict.
 
 The eight-step example produces a deterministic symbolic session in which each operation changes one event and leaves the other seven unchanged. It is a known-answer contract fixture, not an audio-quality result.
 
-## Qualification
+## Stage 2 — operation algebra and collaborative history
 
-The exact-head workflow uses Rust 1.96.0, verifies the checked-out PR head, stages the isolated crate outside the large workspace, normalizes and checks staged formatting, runs tests and the eight-step example, runs Clippy with warnings denied, and uploads source/schema/lockfile identities.
+The harness now adds deterministic symbolic operation patches with exact before-state preconditions and explicit read/write sets.
 
-**No compilation, test, formatting or Clippy result is claimed until that workflow passes for the current exact head.** As with the EVAL-042 harness, rustfmt currently normalizes a staged copy; it does not yet prove that committed source text was originally formatted.
+- **Commutativity:** an operation pair is declared independent only when write/write and read/write intersections are empty and both execution orders yield the same canonical state digest.
+- **Non-commutativity:** same-event writes are not silently serialized; a stale precondition fails and the pair is marked non-commuting.
+- **Undo/redo:** the operation, before/after state digests and inverse patch are bound into a domain-separated history receipt. Undo is accepted only from the exact after-state; redo only from the exact before-state. Tampering or stale state fails closed.
+- **Branch/merge:** every branch commits to the same base state. The merge plan computes event-level patches, retains both branch IDs, and surfaces conflicting event IDs. The resolver requires exactly one explicit choice for each conflict; it never auto-picks a winner.
+
+This is a symbolic operation algebra, not yet a complete multi-track DAW or collaborative CRDT. It does, however, create the core contract needed to test reorderability, reversibility and conflict semantics before introducing rendered audio.
+
+## Exact-head qualification
+
+The focused Melothaea multi-step sequence integrity workflow passed on exact head `f4ff5f3971f3acc3a8ea4b5e7b61f56c00cbe18d` (run 7):
+
+- Rust 1.96 exact checkout and SHA assertion: passed.
+- Sequence JSON Schema validation: passed.
+- Staged isolated-crate formatting: passed.
+- Standalone compile/tests: **21 passed, 0 failed**.
+- Deterministic eight-step preservation example: passed.
+- Clippy with warnings denied: passed.
+- Exact source/schema/dependency identity artifact uploaded: `mel-sequence-f4ff5f3971f3acc3a8ea4b5e7b61f56c00cbe18d`.
+
+Formatting is normalized on the staged copy; this is not a claim that committed source text was already rustfmt-clean. Repository-wide CI, Workflow Syntax and PR Governance were skipped by path filters, not passed.
 
 ## Deliberate limits
 
