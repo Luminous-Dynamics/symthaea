@@ -612,18 +612,14 @@ mod tests {
                 }
             })
             .collect();
-        for (index, station) in spec.stations.iter_mut().enumerate() {
-            station.x_over_length = index as f64 / 2.0;
-            station.control_points = controls.clone();
-        }
-        for index in 3..200 {
-            spec.stations.push(SectionStation {
+        spec.stations = (0..200)
+            .map(|index| SectionStation {
                 x_over_length: index as f64 / 199.0,
                 half_breadth_fraction: 1.0,
                 draft_fraction: 1.0,
                 control_points: controls.clone(),
-            });
-        }
+            })
+            .collect();
         let error = validate_section_spec(&spec).unwrap_err();
         assert!(error.iter().any(|item| item.code == "section_point_budget"));
     }
