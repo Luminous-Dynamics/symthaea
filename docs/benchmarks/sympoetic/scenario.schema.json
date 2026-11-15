@@ -106,7 +106,12 @@
               "handoff",
               "reflection",
               "role_assignment",
-              "role_change"
+              "role_change",
+              "pretest",
+              "scaffold_adjustment",
+              "independent_assessment",
+              "retention_check",
+              "independent_transfer"
             ]
           },
           "instruction": {
