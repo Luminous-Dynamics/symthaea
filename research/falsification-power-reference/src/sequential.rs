@@ -102,6 +102,9 @@ impl Error for SequentialError {}
 pub struct SequentialUpdate {
     pub observation_id: String,
     pub decision_digest: String,
+    pub alpha: f64,
+    pub expected_residual: f64,
+    pub sigma: f64,
     pub observations: u64,
     pub log_e_value: f64,
     pub maximum_log_e_value: f64,
@@ -121,6 +124,7 @@ pub struct WeightedAlternative {
 pub struct MixtureComponentUpdate {
     pub id: String,
     pub weight: f64,
+    pub expected_residual: f64,
     pub log_e_value: f64,
 }
 
@@ -129,6 +133,8 @@ pub struct MixtureComponentUpdate {
 pub struct MixtureSequentialUpdate {
     pub observation_id: String,
     pub decision_digest: String,
+    pub alpha: f64,
+    pub sigma: f64,
     pub observations: u64,
     pub components: Vec<MixtureComponentUpdate>,
     pub log_e_value: f64,
@@ -333,6 +339,9 @@ impl PredictableGaussianEProcess {
         Ok(SequentialUpdate {
             observation_id: pending.observation_id,
             decision_digest: pending.decision_digest,
+            alpha: self.alpha,
+            expected_residual: pending.residuals[0],
+            sigma: pending.sigma,
             observations: self.observations,
             log_e_value: self.log_e_value,
             maximum_log_e_value: self.maximum_log_e_value,
@@ -547,10 +556,12 @@ impl PredictableGaussianMixture {
             .iter()
             .zip(self.weights.iter().copied())
             .zip(self.component_log_e_values.iter().copied())
+            .zip(pending.residuals.iter().copied())
             .map(
-                |((alternative, weight), log_e_value)| MixtureComponentUpdate {
+                |(((alternative, weight), log_e_value), expected_residual)| MixtureComponentUpdate {
                     id: alternative.id.clone(),
                     weight,
+                    expected_residual,
                     log_e_value,
                 },
             )
@@ -559,6 +570,8 @@ impl PredictableGaussianMixture {
         Ok(MixtureSequentialUpdate {
             observation_id: pending.observation_id,
             decision_digest: pending.decision_digest,
+            alpha: self.alpha,
+            sigma: pending.sigma,
             observations: self.observations,
             components,
             log_e_value: self.log_e_value,
@@ -627,6 +640,12 @@ mod tests {
 
         assert!((first.log_e_value - 0.853_333_333_333_333_3).abs() < 1.0e-12);
         assert!((second.log_e_value - 1.066_666_666_666_666_7).abs() < 1.0e-12);
+        assert_eq!(first.alpha, 0.05);
+        assert_eq!(second.alpha, 0.05);
+        assert_eq!(first.expected_residual, 0.24);
+        assert_eq!(second.expected_residual, 0.24);
+        assert_eq!(first.sigma, 0.15);
+        assert_eq!(second.sigma, 0.30);
     }
 
     #[test]
@@ -799,6 +818,10 @@ mod tests {
         let result = mixture.observe("obs-1", "sha256:decision-1", 0.30).unwrap();
         let expected = (0.5_f64 * 0.16_f64.exp() + 0.5_f64 * (-0.32_f64).exp()).ln();
         assert!((result.log_e_value - expected).abs() < 1.0e-12);
+        assert_eq!(result.alpha, 0.05);
+        assert_eq!(result.sigma, 0.50);
+        assert_eq!(result.components[0].expected_residual, 0.20);
+        assert_eq!(result.components[1].expected_residual, -0.20);
         assert_eq!(result.components.len(), 2);
         assert_eq!(result.observations, 1);
     }
