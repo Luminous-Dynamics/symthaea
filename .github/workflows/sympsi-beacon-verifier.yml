@@ -29,22 +29,61 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Resolve and freeze dependency graph
+        run: cargo generate-lockfile --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
+
+      - name: Inspect cryptographic dependency metadata
+        run: |
+          cargo metadata --format-version 1 --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --locked \
+            | jq -c '.packages[] | select(.name == "drandite-core") | {
+                name, version, license, license_file, repository, source,
+                dependencies: [.dependencies[] | {name, req, source}]
+              }' | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Format
         run: cargo fmt --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all -- --check
 
       - name: Unit tests
-        run: cargo test --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
+        run: cargo test --locked --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
 
       - name: Clippy
-        run: cargo clippy --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all-targets -- -D warnings
 
       - name: Verify published Quicknet round 1000 known answer
         env:
           EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          cargo run --manifest-path tools/sympsi-beacon-verifier/Cargo.toml -- \
+          cargo run --locked --manifest-path tools/sympsi-beacon-verifier/Cargo.toml -- \
             --requested-round 1000 \
             --git-head "$EXACT_HEAD" \
             --input tools/sympsi-beacon-verifier/fixtures/quicknet-round-1000.json \
             --out "$RUNNER_TEMP/sympsi-quicknet-round-1000-receipt.json"
           cat "$RUNNER_TEMP/sympsi-quicknet-round-1000-receipt.json"
+
+      - name: Summarize exact-head receipt and lockfile
+        run: |
+          jq -c '.receipt | {
+            git_head: .git_head,
+            profile_id: .verification.profile_id,
+            chain_hash: .verification.chain_hash,
+            trust_root_manifest_sha256: .verification.trust_root_manifest_sha256,
+            scheme_id: .verification.scheme_id,
+            requested_round: .verification.requested_round,
+            returned_round: .verification.returned_round,
+            signature_valid_for_pinned_profile_and_round: .verification.signature_valid_for_pinned_profile_and_round,
+            published_randomness_matches_signature: .verification.published_randomness_matches_signature,
+            freshness_verified: .verification.freshness_verified,
+            response_chronology_verified: .verification.response_chronology_verified,
+            claim_ceiling: .verification.claim_ceiling
+          }' "$RUNNER_TEMP/sympsi-quicknet-round-1000-receipt.json" >> "$GITHUB_STEP_SUMMARY"
+          sha256sum tools/sympsi-beacon-verifier/Cargo.lock "$RUNNER_TEMP/sympsi-quicknet-round-1000-receipt.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact-head lockfile and verification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: sympsi-quicknet-verifier-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/sympsi-beacon-verifier/Cargo.lock
+            ${{ runner.temp }}/sympsi-quicknet-round-1000-receipt.json
+          if-no-files-found: error
+          retention-days: 90
