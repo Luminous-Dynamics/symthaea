@@ -2293,6 +2293,50 @@ mod tests {
     }
 
     #[test]
+    fn explicit_owner_failure_is_not_collapsed_into_indeterminate() {
+        let mut mapping_failed = generate_clocked_observation_persistence_schedule(113)
+            .expect("clocked schedule");
+        for action in &mut mapping_failed.actions {
+            if let ScheduleAction::ClockAdvance { clock_domain, qualification, .. } = &mut action.action {
+                if clock_domain.starts_with("observer-clock-") {
+                    *qualification = GateState::Fail;
+                }
+            }
+        }
+        let mapping_report = replay_virtual_schedule(&mapping_failed).expect("replay");
+        assert!(mapping_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ClockMappingRejected
+        }));
+
+        let mut observation_failed = generate_clocked_observation_persistence_schedule(127)
+            .expect("clocked schedule");
+        for action in &mut observation_failed.actions {
+            if let ScheduleAction::EventObserved { qualification, .. } = &mut action.action {
+                *qualification = GateState::Fail;
+            }
+        }
+        let observation_report = replay_virtual_schedule(&observation_failed).expect("replay");
+        assert!(observation_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ObservationRejected
+        }));
+
+        let mut persistence_failed = generate_clocked_observation_persistence_schedule(131)
+            .expect("clocked schedule");
+        for action in &mut persistence_failed.actions {
+            if let ScheduleAction::EventPersisted { qualification, .. } = &mut action.action {
+                *qualification = GateState::Fail;
+            }
+        }
+        let persistence_report = replay_virtual_schedule(&persistence_failed).expect("replay");
+        assert!(persistence_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventPersisted { .. })
+                && record.disposition == SchedulerDisposition::PersistenceRejected
+        }));
+    }
+
+    #[test]
     fn observer_and_store_mapping_qualification_states_fail_closed() {
         let mut observation_unqualified = generate_clocked_observation_persistence_schedule(97)
             .expect("clocked schedule");
