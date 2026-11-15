@@ -182,3 +182,14 @@ The ammonia microwave check `NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026` receiv
 Negative tests mutate the reported derivation, source-case link and Luminous-measurement flag to ensure the source audit refuses them.
 
 The combined source register on this branch now contains 31 plasma source cases, 33 negative controls and 5 derived checks. The register retains the six microplasma source cases unique to this branch in addition to the two 2026 ammonia cases added from the source-register lineage.
+
+
+## 9.15 Industrial plasma Power-to-X TEA comparator — 2026-11-15
+
+Kaufmann et al., *Electrification of the chemical industry via plasma power to X – A techno economic view*, Energy 358 (2026), DOI https://doi.org/10.1016/j.energy.2026.141338.
+
+The source models plasma-based biogas-to-syngas pathways and downstream Fischer–Tropsch fuels or methanol. Its leading biogas-reforming model reports approximately EUR 840/t syngas at about 44% plant efficiency for a 300 MW scale. Electricity accounts for roughly 50–60% of total syngas cost. Under favourable renewable-electricity assumptions and reduced full-load hours, the study models syngas costs below EUR 600/t.
+
+This is a techno-economic model, not a physical plant demonstration or observed product price. The 44% figure is a study-specific plant-pathway efficiency, not plasma coupling efficiency. Cost competitiveness must be evaluated under the same accepted syngas composition, feedstock and electricity boundary, capacity factor, power price, location, CAPEX/OPEX, maintenance and downstream product pathway.
+
+The merged source corpus has 32 cases / 36 negative controls / 5 derived checks. It preserves this branch's six microplasma cases in addition to the three 2026 cases added from the main plasma-energy source-register lineage.
