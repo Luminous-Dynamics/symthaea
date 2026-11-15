@@ -68,6 +68,17 @@ Event and query contracts:
 
 Synthetic fixtures are under `docs/development-map/fixtures/temporal-*`. They distinguish actor knowledge, ledger-as-recorded history and retrospective restatement. Availability proof references are supplied inputs, not authenticated receipts. Event and checkpoint hashes detect content mutation only when their digests are retained; they do not establish source authenticity, event-stream completeness, actor access, trusted time, Git-object existence or authority. The prototype does not promote CI/test/independent-qualification claims.
 
+
+## Independent D2 replay oracle
+
+A second, standalone Rust crate independently evaluates D2 fixture behavior without importing the candidate validator:
+
+- [tools/temporal-replay-oracle](../temporal-replay-oracle/README.md)
+- Its evaluator recomputes the event chain, independently reduces actor-knowledge and ledger-as-recorded views, and compares normalized projections against hand-derived expected-state fixtures.
+- Run its tests from that crate's directory with cargo test; the candidate replay CLI and independent oracle are deliberately separate executables.
+
+This reduces common-mode implementation risk but is not an external audit: the same project authors both implementations and the expected fixtures. Compilation and execution remain pending.
+
 ## What it checks
 
 - v0.1 top-level, node, edge, provenance, lifecycle and event field shape;
@@ -99,7 +110,7 @@ The validator never executes commands from a repository or follows links from a 
 
 ## Status
 
-V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). One hundred and forty-five Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases, 10 Rust-syntax cases, 24 tree-inventory/tree-composition cases, 22 DynaMapBench manifest cases and 20 temporal-replay cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
+V0.1 prototype source and negative-control tests are authored for map snapshots, decision-time authority evidence, development-trajectory planning, fixed-budget retrieval/exploration cases and four-project federation manifests (including versioned federation v0.1.1). One hundred and forty-five Rust unit-test cases are authored at the current branch head (59 validator/DTEA/federation/retrieval cases, 10 Cargo-projection cases, 10 Rust-syntax cases, 24 tree-inventory/tree-composition cases, 22 DynaMapBench manifest cases, 20 candidate temporal-replay cases and 6 independent-oracle cases); compilation and execution remain pending. Do not treat unexecuted tests as passing.
 
 
 ## DynaMapBench manifest validation
