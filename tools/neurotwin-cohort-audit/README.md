@@ -33,6 +33,10 @@ Exit codes: `0` for preliminary pass or review, `2` for a blocked receipt or exe
 - `REVIEW`: no blocking issue found, but at least one warning exists.
 - `BLOCKED`: a blocking metadata/structure issue was found.
 
+The receipt contract is published at `schema/cohort-receipt-v0.1.schema.json`.
+
+This tool targets BIDS 1.11.2 as a supported stable baseline, while accepting and reporting the version declared by each dataset. See the [BIDS 1.11.2 specification](https://bids-specification.readthedocs.io/en/v1.11.2/), [dataset description requirements](https://bids-specification.readthedocs.io/en/stable/modality-agnostic-files.html), and [participants file requirements](https://bids-specification.readthedocs.io/en/stable/modality-agnostic-files/data-summary-files.html).
+
 ## Explicit limitations
 
 This tool is not the official BIDS Validator and does not validate all BIDS entity rules, JSON sidecars, TSV schemas, modality-specific metadata, image integrity, scanner quality, task labels, acquisition provenance, consent, ethics approval, licences, data-use agreements, cohort appropriateness, clinical endpoints, leakage, or statistical validity. Use the official BIDS Validator as a separate gate.
