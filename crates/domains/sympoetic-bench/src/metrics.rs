@@ -386,7 +386,7 @@ pub fn summarize_capability_amplification_by_stratum(
         };
         arm.pre.push(observation.pre_score);
         arm.post.push(observation.post_score);
-        arm.negative_gains += usize::from(observation.post_score < observation.pre_score);
+        arm.negative_gains += (observation.post_score < observation.pre_score) as usize;
     }
 
     let mut estimates = Vec::with_capacity(groups.len());
