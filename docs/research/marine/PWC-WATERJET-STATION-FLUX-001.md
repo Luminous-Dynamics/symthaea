@@ -75,7 +75,7 @@ The sign convention is explicit: (n_\xi) is the signed projection of each cell's
 
 ### Shared reference and time
 
-Both stations must declare the same pressure-reference ID and elevation-datum ID. Pressure may be absolute or gauge, but its reference must be explicit and common. Elevation values must use a common vertical datum. Every observation must fall in the declared measurement window and be available by the evaluation time.
+Both stations must declare the same pressure-reference ID and elevation-datum ID. Pressure may be absolute or gauge, but its reference must be explicit and common. Elevation values must use a common vertical datum. Every observation must fall in the declared measurement window and be available by the evaluation time. The record also declares a maximum observation-time skew across density, both station planes and every cell channel. If the observed skew exceeds that limit, the comparison is INCOMPARABLE rather than treating different transient states as one station-to-station power balance.
 
 ### Continuity gate
 
