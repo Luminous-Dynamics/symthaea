@@ -59,7 +59,7 @@ pub struct BalanceProofOutput {
 
 
 // ---------------------------------------------------------------------------
-// Request-bound balance proof types (tag = 2)
+// Request-bound balance proof types (separate guest image V1)
 // ---------------------------------------------------------------------------
 
 /// Versioned public request context for a request-bound balance proof.
@@ -97,7 +97,7 @@ pub struct BalanceProofRequestV1 {
     pub required_minimum: u64,
 }
 
-/// Private witness plus the public request context for tag 2.
+/// Private witness plus the public request context for the request-bound guest.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BalanceProofRequestBoundInputV1 {
     /// Private balance witness. It is not included in the committed output.
@@ -106,7 +106,7 @@ pub struct BalanceProofRequestBoundInputV1 {
     pub request: BalanceProofRequestV1,
 }
 
-/// Public journal committed by a tag-2 guest execution.
+/// Public journal committed by the request-bound guest image.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct BalanceProofRequestBoundOutputV1 {
     /// Whether the private balance meets the request threshold.
