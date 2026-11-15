@@ -3349,6 +3349,39 @@ mod tests {
             ),
         );
 
+        let cancellation_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 2.5_f64 as u64, 105);
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            2_501,
+            ScheduleAction::CancellationRequested {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+        );
+        let cancellation_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2_502,
+            ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                accepted: true,
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: cancellation_mapping.clone(),
+                local_timestamp_ns: 105,
+            },
+            ActionEvidence::CancellationAcknowledgement {
+                receipt_ref: "synthetic://cancel-ack/1".to_owned(),
+                receipt_sha256: "1".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (cancellation_mapping.clone(), 105),
+            qualified_resolution_from_fixture(&actions, &cancellation_mapping, 105, 1_025),
+        );
+        receipts.insert(cancellation_action_id, passing_owner_receipt());
         let commit_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 3, 110);
         let commit_action_id = push_clocked_action(
             &mut actions,
@@ -4270,6 +4303,9 @@ mod tests {
         assert_eq!(report.obligations[0].discharge.as_ref().map(|receipt| receipt.qualification), Some(GateState::Pass));
         assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
         assert_eq!(report.effect_commits.len(), 1);
+        assert_eq!(report.cancellation_acknowledgements.len(), 1);
+        assert!(!report.cancellation_acknowledgements[0].establishes_not_applied);
+        assert_eq!(report.attempts[0].terminal_reconciliation.as_ref().map(|t| t.outcome), Some(ReconciledOperationOutcome::Applied));
     }
 
     #[test]
