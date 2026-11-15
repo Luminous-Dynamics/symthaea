@@ -79,6 +79,9 @@ jobs:
       - name: Validate development scenario corpus
         run: cargo run -p sympoetic-bench -- validate-corpus --input docs/benchmarks/sympoetic/SEED_CORPUS.v0.1.jsonl
 
+      - name: Validate persistent team trajectory fixture
+        run: cargo run -p sympoetic-bench -- validate-trajectory --input docs/benchmarks/sympoetic/fixtures/team-trajectory.example.json
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
