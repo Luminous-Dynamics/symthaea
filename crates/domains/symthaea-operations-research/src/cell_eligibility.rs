@@ -691,6 +691,52 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn missing_inspection_plan_evidence_is_indeterminate() {
+        let mut cell = qualified_cell();
+        cell.process_configurations[0].inspection_plan_evidence.status = EvidenceStatus::Missing;
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Indeterminate);
+        assert!(has_code(&report, EligibilityReasonCode::EvidenceMissing));
+    }
+
+    #[test]
+    fn utility_unit_mismatch_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.utility_capacities[0].unit_ref = "urn:example:unit:kilowatt".to_owned();
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::UtilityUnitMismatch));
+    }
+
+    #[test]
+    fn revoked_process_qualification_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.process_configurations[0].qualification_evidence.status = EvidenceStatus::Revoked;
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::EvidenceRevoked));
+    }
+
+    #[test]
+    fn known_insufficient_utility_capacity_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.utility_capacities[0].capacity_units = 100;
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::UtilityCapacityInsufficient));
+    }
+
+    #[test]
+    fn unsupported_process_capability_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.assets[0].capability_refs.clear();
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::AssetCapabilityMismatch));
+    }
+
     #[test]
     fn duplicate_configuration_reference_is_blocked_and_order_independent() {
         let req = requirement();
