@@ -47,6 +47,10 @@ For per-stratum error probability alpha_s, the upper count U is the largest K no
 
 With S non-empty strata, alpha_s = (1 - familywise_confidence_level) / S. The total rejected upper bound is the sum of the stratum upper counts. This is a finite-population bound, not a binomial approximation and not a model-based extrapolation.
 
+## Numerical implementation note
+
+The hypergeometric tail is evaluated in the log domain using IEEE-754 `f64`, log-factorials and log-sum-exp, then inverted by monotone binary search over the finite population success count. It is the exact finite-population hypergeometric test construction, not a binomial/Hoeffding approximation; the numerical probabilities themselves are floating-point evaluations, not exact rational arithmetic. The test suite exhaustively enumerates coverage for every population size through 18, every sample size and every possible true success count at nominal 95% confidence, plus census-collapse and monotonicity checks. Very large populations or decisions near a regulatory confidence threshold should receive an independent high-precision numerical cross-check before the result is used as engineering evidence.
+
 ## Sample-selection integrity
 
 The crate uses a versioned deterministic SplitMix64 / partial Fisher–Yates selection algorithm. It derives the expected sample identities from the frozen, lexicographically ordered rejected-candidate identities, seed, and stratum identity. The supplied sample identities must match the deterministic draw in exact order.
