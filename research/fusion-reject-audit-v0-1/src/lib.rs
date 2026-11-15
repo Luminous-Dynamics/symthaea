@@ -516,11 +516,11 @@ fn validate_sorted_unique(
         if candidate_id.trim().is_empty() {
             errors.push(AuditError::EmptyIdentity("candidate_id"));
         }
-        if let Some(last) = previous {
-            if candidate_id.as_str() <= last {
-                errors.push(AuditError::UnsortedCandidatePopulation(label.to_string()));
-                break;
-            }
+        if let Some(last) = previous
+            && candidate_id.as_str() <= last
+        {
+            errors.push(AuditError::UnsortedCandidatePopulation(label.to_string()));
+            break;
         }
         previous = Some(candidate_id);
         if !result.insert(candidate_id.clone()) {
@@ -543,13 +543,13 @@ fn validate_accepted_manifest(
         if candidate.evidence_ref.trim().is_empty() {
             errors.push(AuditError::EmptyIdentity("accepted.candidate.evidence_ref"));
         }
-        if let Some(last) = previous {
-            if candidate.candidate_id.as_str() <= last {
-                errors.push(AuditError::UnsortedCandidatePopulation(
-                    "accepted".to_string(),
-                ));
-                break;
-            }
+        if let Some(last) = previous
+            && candidate.candidate_id.as_str() <= last
+        {
+            errors.push(AuditError::UnsortedCandidatePopulation(
+                "accepted".to_string(),
+            ));
+            break;
         }
         previous = Some(&candidate.candidate_id);
         if !result.insert(candidate.candidate_id.clone()) {
