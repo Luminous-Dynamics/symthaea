@@ -3,8 +3,9 @@ use fusion_decision_compiler_contract::plant_service_gate::{
     evaluate_plant_power_balance,
 };
 use fusion_decision_compiler_contract::robust_net_export::{
-    NetExportBoundMethod, NetExportEvidenceClass, NetExportLowerBoundReceipt,
-    RobustNetExportDisposition, RobustNetExportProfile, evaluate_robust_net_export,
+    ModelFormValidity, NetExportBoundMethod, NetExportEvidenceClass,
+    NetExportLowerBoundReceipt, RobustNetExportDisposition, RobustNetExportProfile,
+    evaluate_robust_net_export,
 };
 
 fn sha(character: char) -> String {
@@ -104,6 +105,9 @@ fn main() {
             distribution_assumption_ref: "synthetic-known-answer-normal-fixture-v1".to_string(),
             assumption_manifest_sha256: sha('d'),
             validity_domain_ref: "synthetic-declared-domain-v1".to_string(),
+            model_form_validity: ModelFormValidity::WithinDeclaredDomain,
+            model_form_evidence_ref: "synthetic-model-form-validity-evidence".to_string(),
+            model_form_evidence_sha256: sha('f'),
             covariance_receipt_ref: Some("synthetic-covariance-receipt-v1".to_string()),
             covariance_receipt_sha256: Some(sha('e')),
             covariance_run_id: Some(run.run_id.clone()),
