@@ -25189,3 +25189,7 @@ dependencies = [
  "syn 2.0.117",
  "winnow 1.0.3",
 ]
+
+[[package]]
+name = "symthaea-sailcraft"
+version = "0.1.0"
