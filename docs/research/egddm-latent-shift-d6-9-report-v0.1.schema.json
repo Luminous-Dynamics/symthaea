@@ -48,7 +48,8 @@
         "dependency_implied_affected_obligations",
         "dependency_only_impact_obligations",
         "gold_only_impact_obligations",
-        "critical_unsupported_current_claims"
+        "critical_unsupported_current_claims",
+        "gold_adjudication_status"
       ],
       "properties": {
         "episode_id": {
@@ -183,6 +184,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "gold_adjudication_status": {
+          "enum": [
+            "synthetic_known_answer_not_independently_adjudicated",
+            "independently_adjudicated"
+          ]
         }
       }
     }
