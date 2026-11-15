@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/temporal-event-ledger-v0.1.schema.json",
+  "title": "EGDDM temporal event ledger v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "ledger_id",
+    "repository_full_name",
+    "events"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "ledger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_full_name": {
+      "type": "string",
+      "pattern": "^[^/\\\\s]+/[^/\\\\s]+$"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    }
+  },
+  "$defs": {
+    "oid": {
+      "type": "string",
+      "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableTime": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "sequence",
+        "previous_hash",
+        "event_hash",
+        "body"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "previous_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "event_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "body": {
+          "$ref": "#/$defs/body"
+        }
+      }
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "fact_id",
+        "recorded_at",
+        "observed_at",
+        "actor_availability",
+        "scope",
+        "effective_at",
+        "valid_from",
+        "valid_through",
+        "validity_completeness",
+        "target_event_id",
+        "payload"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "assert",
+            "invalidate",
+            "supersede",
+            "propose"
+          ]
+        },
+        "fact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/time"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/time"
+        },
+        "actor_availability": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/actorAvailability"
+          }
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "effective_at": {
+          "$ref": "#/$defs/nullableTime"
+        },
+        "valid_from": {
+          "$ref": "#/$defs/nullableTime"
+        },
+        "valid_through": {
+          "$ref": "#/$defs/nullableTime"
+        },
+        "validity_completeness": {
+          "enum": [
+            "complete",
+            "incomplete",
+            null
+          ]
+        },
+        "target_event_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "payload": {
+          "type": "object"
+        }
+      }
+    },
+    "actorAvailability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_id",
+        "available_at",
+        "proof_ref"
+      ],
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available_at": {
+          "$ref": "#/$defs/time"
+        },
+        "proof_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "tree_oid",
+        "configuration_world_digest"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "#/$defs/oid"
+        },
+        "tree_oid": {
+          "$ref": "#/$defs/oid"
+        },
+        "configuration_world_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

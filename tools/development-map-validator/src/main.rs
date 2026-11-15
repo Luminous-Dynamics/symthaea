@@ -5,6 +5,7 @@ use development_map_validator::{
     rust_syntax::{project_rust_file, RustFileAnchor},
     tree_projection::{collect_github_tree_inventory_json, compose_repository_tree_json, RepositoryTreeAnchor},
     dynamapbench::validate_dynamapbench_manifest_json,
+    temporal_replay::{validate_temporal_ledger_json, replay_temporal_ledger_json},
     validate_document_json,
 };
 
@@ -16,9 +17,11 @@ fn usage() {
     eprintln!("  development-map-validator tree-inventory <github-tree.json> <repository> <revision> <tree-oid>");
     eprintln!("  development-map-validator tree-compose <request.json>");
     eprintln!("  development-map-validator dynamapbench-manifest <manifest.json>");
+    eprintln!("  development-map-validator temporal-ledger <ledger.json>");
+    eprintln!("  development-map-validator temporal-replay <ledger.json> <query.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
-    eprintln!("projects a Cargo manifest or Rust source file, or composes exact source projections into a Git tree snapshot.");
+    eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
     eprintln!("No mode invokes Cargo, rustc, build scripts, tests or repository code.");
     eprintln!("Git identities are recorded and syntax-checked, not authenticated.");
 }
@@ -230,6 +233,70 @@ fn validate_dynamapbench_manifest_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn validate_temporal_ledger_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D2-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match validate_temporal_ledger_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D2-JSON-001 {path}: {error}");
+            2
+        }
+        Ok(report) if report.valid => {
+            println!("VALID TEMPORAL_LEDGER events={} head={}", report.event_count, report.verified_head_hash);
+            println!("CLAIM_CEILING {}", report.claim_ceiling);
+            0
+        }
+        Ok(report) => {
+            for item in &report.diagnostics {
+                eprintln!("ERROR {} {} {}", item.code, item.path, item.message);
+            }
+            eprintln!("INVALID TEMPORAL_LEDGER diagnostics={}", report.diagnostics.len());
+            1
+        }
+    }
+}
+
+fn replay_temporal_ledger_file(args: &[String]) -> i32 {
+    if args.len() != 3 {
+        usage();
+        return 2;
+    }
+    let ledger_path = &args[1];
+    let query_path = &args[2];
+    let ledger = match read_input(ledger_path, "D2-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    let query = match read_input(query_path, "D2-IO-002") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match replay_temporal_ledger_json(&ledger, &query) {
+        Err(error) => {
+            eprintln!("ERROR D2-REPLAY-001 {ledger_path}: {error}");
+            1
+        }
+        Ok(projection) => match serde_json::to_string_pretty(&projection) {
+            Ok(output) => {
+                println!("{output}");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR D2-REPLAY-JSON-001 {ledger_path}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -246,6 +313,8 @@ fn main() {
         "tree-inventory" => collect_github_tree_inventory_file(&args),
         "tree-compose" => compose_repository_tree_file(&args),
         "dynamapbench-manifest" => validate_dynamapbench_manifest_file(&args),
+        "temporal-ledger" => validate_temporal_ledger_file(&args),
+        "temporal-replay" => replay_temporal_ledger_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();

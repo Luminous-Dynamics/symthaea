@@ -1,0 +1,8 @@
+{
+  "repository_full_name": "synthetic/decision-api",
+  "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "actor_id": "release-steward",
+  "knowledge_cutoff_at": "2026-11-14T10:00:00Z",
+  "valid_at": "2026-11-14T10:00:00Z",
+  "ledger_recorded_cutoff_at": "2026-11-14T10:00:00Z"
+}
