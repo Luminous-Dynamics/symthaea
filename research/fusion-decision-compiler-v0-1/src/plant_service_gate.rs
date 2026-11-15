@@ -11,6 +11,8 @@ pub const D0FUS_3_2_0_ITER_SCHEMA_REF: &str =
     "d0fus-3.2.0-iter-run-output-165-v1";
 pub const D0FUS_3_2_0_SOURCE_COMMIT: &str =
     "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924";
+pub const D0FUS_3_2_0_ITER_SCHEMA_SHA256: &str =
+    "a390b317a336f1ec683e3c2e2950cb7480c7d79bdac38d498258270266b2f774";
 pub const D0FUS_3_2_0_EXPECTED_OUTPUT_LENGTH: usize = 165;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -385,7 +387,7 @@ mod tests {
     fn profile() -> PowerBalanceProfile {
         PowerBalanceProfile {
             schema_ref: D0FUS_3_2_0_ITER_SCHEMA_REF.to_string(),
-            schema_sha256: sha('a'),
+            schema_sha256: D0FUS_3_2_0_ITER_SCHEMA_SHA256.to_string(),
             service_boundary_ref: "plant-terminal-net-electric-v1".to_string(),
             unit_ref: "MWe".to_string(),
             averaging_window_ref: "iter-run-steady-state-window-v1".to_string(),
@@ -410,7 +412,7 @@ mod tests {
             candidate_revision: "iter-reference-deck-v1".to_string(),
             output_sha256: sha('b'),
             schema_ref: D0FUS_3_2_0_ITER_SCHEMA_REF.to_string(),
-            schema_sha256: sha('a'),
+            schema_sha256: D0FUS_3_2_0_ITER_SCHEMA_SHA256.to_string(),
             service_boundary_ref: "plant-terminal-net-electric-v1".to_string(),
             unit_ref: "MWe".to_string(),
             averaging_window_ref: "iter-run-steady-state-window-v1".to_string(),
