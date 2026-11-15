@@ -104,12 +104,16 @@ Only after physical/solver evidence exists, compare annual delivered cargo work,
 ## 5. Proposed programme targets
 
 These are research targets, not current achievements:
-- at least 5% independently validated mission-energy or delivered-power reduction for one frozen vessel/service class; 10% stretch target;
+- **Propulsor-specific milestone:** at least 5% independently validated reduction in delivered propulsor/shaft power under matched vessel service; 10% stretch target.
+- **Whole-mission parent target:** at least 10% validated whole-mission energy improvement; 15% stretch target.
+- at least 10% validated Pareto-hypervolume improvement under the frozen common objective normalization;
 - at least 20% reduction in compute/evaluation cost to the independently confirmed Pareto frontier versus preregistered random/grid baselines;
 - no increase in false-feasible rate relative to the matched incumbent search process;
 - condition-specific calibration reported for every primary observable; unresolved conditions remain unresolved;
 - zero mandatory safety/environmental gate violations in any admitted candidate;
 - 100% provenance closure for geometry, solver configuration, raw/derived evidence and test reports used in accepted claims.
+
+A propulsor-level power result is not a whole-mission energy result. The parent targets are assessed only after route, payload, auxiliary loads, schedule and lifecycle effects are included.
 
 These are only meaningful when candidate service and constraints match. Failure to achieve them is a publishable result.
 
