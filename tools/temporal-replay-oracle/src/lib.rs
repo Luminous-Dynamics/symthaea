@@ -454,6 +454,16 @@ mod tests {
     const LEDGER_QUERY: &str = include_str!("../../../docs/development-map/fixtures/temporal-replay-ledger-as-of-v0.1.json");
     const RESTATED_QUERY: &str = include_str!("../../../docs/development-map/fixtures/temporal-replay-restated-v0.1.json");
 
+    fn reseal(ledger: &mut Ledger) {
+        let mut previous = GENESIS.to_owned();
+        for (index, event) in ledger.events.iter_mut().enumerate() {
+            event.sequence = index as u64 + 1;
+            event.previous_hash = previous.clone();
+            event.event_hash = digest_event(ledger, event).expect("oracle event hash");
+            previous = event.event_hash.clone();
+        }
+    }
+
     fn check(query_text: &str, key: &str) {
         let ledger: Ledger = serde_json::from_str(LEDGER).unwrap();
         let query: Query = serde_json::from_str(query_text).unwrap();
@@ -492,8 +502,9 @@ mod tests {
         second.body.recorded_at = "2026-11-14T12:00:00Z".to_owned();
         second.body.observed_at = "2026-11-14T11:59:00Z".to_owned();
         second.body.actor_availability[0].available_at = "2026-11-14T12:01:00Z".to_owned();
-        // An independent oracle must reject a malformed chain before judging semantics.
         ledger.events.push(second);
-        assert!(validate_ledger(&ledger).is_err());
+        reseal(&mut ledger);
+        let error = validate_ledger(&ledger).unwrap_err();
+        assert!(error.contains("multiple terminal transitions"), "{error}");
     }
 }
