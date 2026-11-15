@@ -69,7 +69,7 @@
           "oracle_lower_bound_savings_fraction": 0.33333333333333337,
           "agent_observed_refresh_fraction": 0.6666666666666666,
           "revalidation_precision": 1.0,
-          "revalidation_recall": 1
+          "revalidation_recall": 1.0
         }
       ],
       "total_oracle_minimum_revalidation_units": 2,
