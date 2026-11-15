@@ -27,6 +27,7 @@ pub mod reconfiguration;
 pub mod semantic_continuity;
 pub mod experiment_design;
 pub mod bernoulli_sequential;
+pub mod bernoulli_benchmark;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
@@ -50,6 +51,10 @@ pub use bernoulli_sequential::{
     BernoulliQualification, BernoulliSequentialReport, BernoulliSequentialScenario,
     BernoulliSequentialTrace, BernoulliTerminalDecision, BernoulliTrial,
     BernoulliTrialAssessment, evaluate_bernoulli_sequential,
+};
+pub use bernoulli_benchmark::{
+    BernoulliBenchmarkError, BernoulliBenchmarkSummary, RateEstimate,
+    summarize_bernoulli_episodes,
 };
 pub use semantic_continuity::{
     AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
