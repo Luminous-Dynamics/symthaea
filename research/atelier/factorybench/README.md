@@ -52,7 +52,7 @@ ISO 23247-5:2026 is published and provides a digital-thread architecture referen
 
 ## Modular reconfiguration and diagnosability
 
-- `reconfigbench-cases.v0.1.0.json` (implemented on the companion feature branch) defines 21 synthetic transition cases. The case matrix separates NoChange, AllocationOnly and PhysicalReconfiguration and includes site mismatch, expired evidence, process digest drift, interface incompatibility, footprint/keepout conflicts, coordinate frames, missing commissioning and partial owner data.
+- [PR #12398](https://github.com/Luminous-Dynamics/symthaea/pull/12398) adds `reconfigbench-cases.v0.1.0.json` and the soft-first module transition evaluator defines 21 synthetic transition cases. The case matrix separates NoChange, AllocationOnly and PhysicalReconfiguration and includes site mismatch, expired evidence, process digest drift, interface incompatibility, footprint/keepout conflicts, coordinate frames, missing commissioning and partial owner data.
 - `metric-dictionary.v0.1.0.json` now contains six additional reconfiguration KPIs: soft reallocation share, time to first independently accepted unit after a change, physical reconfiguration downtime, injected-fault diagnostic coverage, requalification-obligation count and qualified module reuse rate.
 - The SOTA matrix adds a 247-paper RMS systematic review (2026) and a 112-company PCA-derived reconfigurability-index study (2026). These are research-gap and construct comparators, not direct textile production baselines.
 
