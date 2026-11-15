@@ -76,6 +76,20 @@ struct Estimate {
     nominal: f64,
     bounds: Interval,
 }
+impl Estimate {
+    fn add(self, other: Self) -> Self {
+        Self {
+            nominal: self.nominal + other.nominal,
+            bounds: self.bounds.add(other.bounds),
+        }
+    }
+    fn sub(self, other: Self) -> Self {
+        Self {
+            nominal: self.nominal - other.nominal,
+            bounds: self.bounds.sub(other.bounds),
+        }
+    }
+}
 
 #[derive(Debug, Serialize)]
 struct Scalar {
@@ -440,6 +454,11 @@ fn audit(root: &Value) -> AuditReport {
             findings.incomparable(&format!("/{name}/condition"), error);
         }
     }
+    if findings.incomparable {
+        let mut report = make_empty_report(case_id, test_path, findings, "TEST_STAGES_INCOMPARABLE");
+        report.source_record_ids = ids;
+        return report;
+    }
     if path_name == "composite_independent_tests" {
         for name in ["inlet_duct_test", "pump_loop_test"] {
             if let Some(stage) = root.get(name) {
@@ -447,6 +466,11 @@ fn audit(root: &Value) -> AuditReport {
                     findings.incomparable(&format!("/{name}/condition"), error);
                 }
             }
+        }
+        if findings.incomparable {
+            let mut report = make_empty_report(case_id, test_path, findings, "TEST_STAGES_INCOMPARABLE");
+            report.source_record_ids = ids;
+            return report;
         }
     }
 
@@ -487,6 +511,14 @@ fn audit(root: &Value) -> AuditReport {
         findings.incomparable("/station_flux_test/effective_jet_system_power_p_jse_w", "recorded P_JSE does not agree with E7-E1 within the declared power tolerance");
     }
     let p_jse = Estimate { nominal: p_jse_nominal, bounds: p_jse_from_flux };
+    if findings.incomparable || p_jse.nominal <= 0.0 || p_jse.bounds.lo <= 0.0 {
+        if p_jse.nominal <= 0.0 || p_jse.bounds.lo <= 0.0 {
+            findings.blocked("/station_flux_test/p_jse", "P_JSE must be bounded strictly above zero");
+        }
+        let mut report = make_empty_report(case_id, test_path, findings, "STATION_FLUX_NOT_COMPOSABLE");
+        report.source_record_ids = ids;
+        return report;
+    }
 
     let nvr = match measurement_at(propulsion, "/condition/nvr", "1") {
         Ok(value) => value,
@@ -637,7 +669,15 @@ fn audit(root: &Value) -> AuditReport {
             findings.incomparable("/waterjet_system_test/effective_pump_power_w", "P_PE from P_JSE + inlet/nozzle loss terms, rho*g*Q*H_JS and system-test measurement do not agree within declared power tolerance");
         }
         let eta_p_from_terms = multiply(eta_p0, eta_inst);
-        let eta_p_from_power = ratio(ppe_comparison, p_d, "eta_P")?;
+        let eta_p_from_power = match ratio(ppe_comparison, p_d, "eta_P") {
+            Ok(value) => value,
+            Err(error) => {
+                findings.invalid("/waterjet_system_test", error);
+                let mut report = make_empty_report(case_id, test_path, findings, "INVALID_ETA_P");
+                report.source_record_ids = ids;
+                return report;
+            }
+        };
         let eff_tol = number_at(tolerances, "/efficiency_abs").unwrap_or(0.0);
         if (eta_p_from_terms.nominal - eta_p_from_power.nominal).abs() > eff_tol
             || eta_p_from_terms.bounds.gap(eta_p_from_power.bounds) > eff_tol
@@ -649,12 +689,42 @@ fn audit(root: &Value) -> AuditReport {
         eta_p0_out = Some(eta_p0);
         eta_inst_out = Some(eta_inst);
         eta_p = eta_p_from_power;
-        eta_duct = ratio(p_jse, ppe_comparison, "eta_duct")?;
+        eta_duct = match ratio(p_jse, ppe_comparison, "eta_duct") {
+            Ok(value) => value,
+            Err(error) => {
+                findings.invalid("/waterjet_system_test", error);
+                let mut report = make_empty_report(case_id, test_path, findings, "INVALID_ETA_DUCT");
+                report.source_record_ids = ids;
+                return report;
+            }
+        };
         p_pe = ppe_comparison;
     } else {
-        eta_p = ratio(p_pe_system, p_d, "eta_P")?;
-        eta_duct = ratio(p_jse, p_pe_system, "eta_duct")?;
+        eta_p = match ratio(p_pe_system, p_d, "eta_P") {
+            Ok(value) => value,
+            Err(error) => {
+                findings.invalid("/waterjet_system_test", error);
+                let mut report = make_empty_report(case_id, test_path, findings, "INVALID_ETA_P");
+                report.source_record_ids = ids;
+                return report;
+            }
+        };
+        eta_duct = match ratio(p_jse, p_pe_system, "eta_duct") {
+            Ok(value) => value,
+            Err(error) => {
+                findings.invalid("/waterjet_system_test", error);
+                let mut report = make_empty_report(case_id, test_path, findings, "INVALID_ETA_DUCT");
+                report.source_record_ids = ids;
+                return report;
+            }
+        };
         p_pe = p_pe_system;
+    }
+
+    if findings.incomparable {
+        let mut report = make_empty_report(case_id, test_path, findings, "TEST_POWER_BALANCE_INCOMPARABLE");
+        report.source_record_ids = ids;
+        return report;
     }
 
     let eta_0 = multiply_three(eta_i, eta_p, eta_duct);
