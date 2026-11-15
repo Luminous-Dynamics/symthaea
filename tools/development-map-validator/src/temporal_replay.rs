@@ -849,7 +849,7 @@ mod tests {
         let expected_facts = expected["facts"].as_object().unwrap();
         assert_eq!(actual.facts.len(), expected_facts.len());
         for (event_id, expected_fact) in expected_facts {
-            let actual_fact = actual.facts.iter().find(|fact| fact.assertion_event_id == *event_id).expect("expected fact");
+            let actual_fact = actual.facts.iter().find(|fact| fact.assertion_event_id.as_str() == event_id.as_str()).expect("expected fact");
             if let Some(value) = expected_fact.get("lifecycle") {
                 assert_eq!(serde_json::to_value(&actual_fact.lifecycle).unwrap(), *value);
             }
@@ -860,7 +860,7 @@ mod tests {
                 assert_eq!(actual_fact.temporally_admissible, value.as_bool().unwrap());
             }
             if let Some(value) = expected_fact.get("payload") {
-                assert_eq!(actual_fact.payload, *value);
+                assert_eq!(&actual_fact.payload, value);
             }
         }
         assert_eq!(actual.proposals.len(), expected["proposals"].as_array().unwrap().len());
