@@ -278,6 +278,17 @@ fn direction_projection(
     ScalarInterval { lower, upper }
 }
 
+/// Require a strict margin beyond floating-point evaluation noise before
+/// declaring one tack dominant. Values separated by less than 1e-9 m/s
+/// remain unresolved rather than allowing rounding to choose a side.
+fn robustly_exceeds(lower_bound: f64, upper_bound: f64) -> bool {
+    if !lower_bound.is_finite() || !upper_bound.is_finite() {
+        return false;
+    }
+    let scale = lower_bound.abs().max(upper_bound.abs()).max(1.0);
+    lower_bound - upper_bound > 1e-9 * scale
+}
+
 fn uniquely_dominant_tack(
     port_best: Option<RobustCourseCandidate>,
     starboard_best: Option<RobustCourseCandidate>,
@@ -288,13 +299,13 @@ fn uniquely_dominant_tack(
         (Some(_), None) => Some(TackSide::Port),
         (None, Some(_)) => Some(TackSide::Starboard),
         (Some(port), Some(starboard)) => {
-            if starboard_max_possible_vmg
-                .is_some_and(|upper| port.ground_velocity_made_good_mps.lower > upper)
-            {
+            if starboard_max_possible_vmg.is_some_and(|upper| {
+                robustly_exceeds(port.ground_velocity_made_good_mps.lower, upper)
+            }) {
                 Some(TackSide::Port)
-            } else if port_max_possible_vmg
-                .is_some_and(|upper| starboard.ground_velocity_made_good_mps.lower > upper)
-            {
+            } else if port_max_possible_vmg.is_some_and(|upper| {
+                robustly_exceeds(starboard.ground_velocity_made_good_mps.lower, upper)
+            }) {
                 Some(TackSide::Starboard)
             } else {
                 None
