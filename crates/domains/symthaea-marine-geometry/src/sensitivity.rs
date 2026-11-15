@@ -560,6 +560,50 @@ mod tests {
         }
     }
 
+    fn rectangular_spec() -> SectionHullSpec {
+        let controls = vec![
+            SectionControlPoint {
+                breadth_fraction: 0.0,
+                depth_fraction: 1.0,
+            },
+            SectionControlPoint {
+                breadth_fraction: 1.0,
+                depth_fraction: 1.0,
+            },
+            SectionControlPoint {
+                breadth_fraction: 1.0,
+                depth_fraction: 0.0,
+            },
+        ];
+        SectionHullSpec {
+            schema_version: 1,
+            candidate_id: "sensitivity-rectangular-prism-001".into(),
+            length_m: 100.0,
+            beam_m: 20.0,
+            draft_m: 6.0,
+            coordinate_frame: CoordinateFrame {
+                id: "ship-local".into(),
+                axis_convention: "x-forward,y-starboard,z-down".into(),
+                handedness: "right-handed".into(),
+            },
+            samples_per_segment: 1,
+            stations: vec![
+                SectionStation {
+                    x_over_length: 0.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: controls.clone(),
+                },
+                SectionStation {
+                    x_over_length: 1.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: controls,
+                },
+            ],
+        }
+    }
+
     #[test]
     fn d_volume_d_length_matches_triangular_prism_analytic_value() {
         let result = calculate_hydrostatic_sensitivity(
@@ -655,6 +699,49 @@ mod tests {
             verify_sensitivity_result(&result).unwrap_err().code,
             "sensitivity_digest_mismatch"
         );
+    }
+
+    #[test]
+    fn rectangular_prism_derivatives_match_independent_known_answers() {
+        let cases = [
+            (SectionParameter::LengthM, 120.0),
+            (SectionParameter::BeamM, 600.0),
+            (SectionParameter::DraftM, 2_000.0),
+        ];
+        for (parameter, expected) in cases {
+            let result = calculate_hydrostatic_sensitivity(
+                &rectangular_spec(),
+                &profile(),
+                parameter,
+                0.1,
+                HydrostaticObservable::DisplacementVolumeM3,
+                1_025.0,
+                "synthetic-rectangular-prism-known-answer",
+            )
+            .unwrap();
+            assert!((result.base_value - 12_000.0).abs() < 1.0e-9);
+            assert!(
+                (result.derivative_per_parameter_unit - expected).abs() < 1.0e-7,
+                "{parameter:?}: expected {expected}, got {}",
+                result.derivative_per_parameter_unit
+            );
+        }
+    }
+
+    #[test]
+    fn rectangular_prism_vertical_buoyancy_derivative_is_one_half() {
+        let result = calculate_hydrostatic_sensitivity(
+            &rectangular_spec(),
+            &profile(),
+            SectionParameter::DraftM,
+            0.1,
+            HydrostaticObservable::VerticalCentreOfBuoyancyM,
+            1_025.0,
+            "synthetic-rectangular-prism-known-answer",
+        )
+        .unwrap();
+        assert!((result.base_value - 3.0).abs() < 1.0e-9);
+        assert!((result.derivative_per_parameter_unit - 0.5).abs() < 1.0e-8);
     }
 
     #[test]
