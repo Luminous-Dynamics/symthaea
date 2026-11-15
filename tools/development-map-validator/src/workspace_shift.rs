@@ -5,7 +5,7 @@
 //! provide deterministic integrity checks only; they do not authenticate a
 //! producer, source observation, test execution, authority or CI result.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
