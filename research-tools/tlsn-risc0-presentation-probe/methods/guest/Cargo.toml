@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-tlsn-risc0-presentation-verify-guest"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+risc0-zkvm = { version = "=3.0.6", default-features = false, features = ["std"] }
+symthaea-tlsn-risc0-probe-core = { path = "../../shared" }
+tlsn-attestation = { git = "https://github.com/tlsnotary/tlsn", rev = "40a069565a2eaecbb5e691dbc634be20e8498daf" }
+tlsn-core = { git = "https://github.com/tlsnotary/tlsn", rev = "40a069565a2eaecbb5e691dbc634be20e8498daf" }
+bincode = "=1.3.3"
+sha2 = "=0.10.9"
+
+[lints.rust]
+unsafe_code = "forbid"
