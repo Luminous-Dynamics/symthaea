@@ -166,7 +166,7 @@ proptest! {
     }
 
     #[test]
-    fn action_owner_time_references_bind_the_exact_active_clock_mapping(seed in any::<u64>()) {
+    fn action_owner_time_references_bind_exact_payloads_and_active_clock_maps(seed in any::<u64>()) {
         let mut schedule = generate_delivery_schedule(seed, 4).expect("generated schedule");
         let event_index = schedule.actions.iter().position(|item| {
             matches!(&item.action, ScheduleAction::EventProduced { event_id, .. } if event_id == "event-000002")
@@ -181,28 +181,55 @@ proptest! {
             clock_mapping_action_id: mapping_id.clone(),
             local_timestamp_ns: timestamp_ns,
         });
-        validate_schedule(&schedule).expect("exact map reference validates");
+        validate_schedule(&schedule).expect("exact map and timestamp validate");
         let exact_report = replay_virtual_schedule(&schedule).expect("exact map replay");
-        let target_action_id = schedule.actions[event_index].action_id.clone();
+        let event_action_id = schedule.actions[event_index].action_id.clone();
         prop_assert!(exact_report.records.iter().any(|record| {
-            record.action_id == target_action_id && record.disposition == SchedulerDisposition::Applied
+            record.action_id == event_action_id && record.disposition == SchedulerDisposition::Applied
         }));
 
-        let previous_mapping = schedule.actions.iter().find_map(|item| {
-            if let ScheduleAction::EventProduced { event_id, clock_mapping_action_id, .. } = &item.action {
-                (event_id == "event-000000").then_some(clock_mapping_action_id.clone())
+        let (previous_mapping, previous_timestamp) = schedule.actions.iter().find_map(|item| {
+            if let ScheduleAction::EventProduced { event_id, clock_mapping_action_id, source_timestamp_ns, .. } = &item.action {
+                (event_id == "event-000000").then_some((clock_mapping_action_id.clone(), *source_timestamp_ns))
             } else {
                 None
             }
-        }).expect("prior source mapping");
+        }).expect("prior source mapping and tick");
+
+        // Native event clock payloads cannot be substituted independently of
+        // owner_time_ref; reject at the schedule contract boundary.
+        let mut mismatched_payload = schedule.clone();
+        let mismatched = mismatched_payload.actions.iter_mut()
+            .find(|item| item.action_id == event_action_id)
+            .expect("target event remains");
+        mismatched.owner_time_ref.as_mut().expect("owner time ref").local_timestamp_ns += 1;
+        prop_assert!(matches!(
+            validate_schedule(&mismatched_payload),
+            Err(symthaea_decision_assessment::event_order_v0_3::ReplayError::ActionEvidenceMismatch("owner_time_payload_binding"))
+        ));
+
+        // For actions without a duplicated native clock field, an earlier
+        // mapping in the same series is structurally known but stale at replay.
         let mut stale = schedule.clone();
-        let stale_target = stale.actions.iter_mut().find(|item| item.action_id == target_action_id)
-            .expect("target action remains");
-        stale_target.owner_time_ref = Some(ActionClockTimeReference {
+        let mut ordinal = stale.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let at_ns = stale.actions.iter().map(|item| item.at_ns).max().unwrap_or(0) + 1;
+        push_action(
+            &mut stale.actions,
+            &mut ordinal,
+            at_ns,
+            ScheduleAction::EffectAttempted {
+                operation_id: "owner-time-probe".to_owned(),
+                attempt_id: "stale-map-probe".to_owned(),
+            },
+        );
+        let stale_action = stale.actions.last_mut().expect("probe action");
+        let target_action_id = stale_action.action_id.clone();
+        stale_action.owner_time_ref = Some(ActionClockTimeReference {
             clock_mapping_action_id: previous_mapping,
-            local_timestamp_ns: timestamp_ns,
+            local_timestamp_ns: previous_timestamp,
         });
-        validate_schedule(&stale).expect("previous map is a structurally valid reference");
+        stale_action.evidence = Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None });
+        validate_schedule(&stale).expect("known prior map is structurally valid");
         let stale_report = replay_virtual_schedule(&stale).expect("stale map replay");
         prop_assert!(stale_report.records.iter().any(|record| {
             record.action_id == target_action_id
@@ -210,12 +237,23 @@ proptest! {
         }));
 
         let mut missing = schedule;
-        let missing_target = missing.actions.iter_mut().find(|item| item.action_id == target_action_id)
-            .expect("target action remains");
-        missing_target.owner_time_ref = Some(ActionClockTimeReference {
+        let mut missing_ordinal = missing.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let missing_at = missing.actions.iter().map(|item| item.at_ns).max().unwrap_or(0) + 1;
+        push_action(
+            &mut missing.actions,
+            &mut missing_ordinal,
+            missing_at,
+            ScheduleAction::EffectAttempted {
+                operation_id: "owner-time-probe".to_owned(),
+                attempt_id: "missing-map-probe".to_owned(),
+            },
+        );
+        let missing_action = missing.actions.last_mut().expect("probe action");
+        missing_action.owner_time_ref = Some(ActionClockTimeReference {
             clock_mapping_action_id: "missing-clock-map".to_owned(),
             local_timestamp_ns: timestamp_ns,
         });
+        missing_action.evidence = Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None });
         prop_assert!(validate_schedule(&missing).is_err());
     }
 
