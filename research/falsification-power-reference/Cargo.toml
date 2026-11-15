@@ -7,3 +7,5 @@ description = "Dependency-free Gaussian power envelope reference for scientific 
 
 [lib]
 path = "src/lib.rs"
+
+[workspace]
