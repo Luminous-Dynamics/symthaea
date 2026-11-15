@@ -169,10 +169,14 @@ pub fn verify_quicknet_response(
         .ok_or_else(|| VerificationError::TrustRoot("invalid public key in trust root".into()))?;
     let genesis_seed = decode_hex::<32>(&trust_root.genesis_seed)
         .ok_or_else(|| VerificationError::TrustRoot("invalid genesis seed in trust root".into()))?;
-    let period = Period::from_secs(trust_root.period_seconds)
+    let period_seconds = u32::try_from(trust_root.period_seconds)
+        .map_err(|_| VerificationError::TrustRoot("round period exceeds u32".into()))?;
+    let genesis_unix_seconds = i64::try_from(trust_root.genesis_unix_seconds)
+        .map_err(|_| VerificationError::TrustRoot("genesis timestamp exceeds i64".into()))?;
+    let period = Period::from_secs(period_seconds)
         .ok_or_else(|| VerificationError::TrustRoot("invalid round period in trust root".into()))?;
     let timeline = Timeline::new(
-        UnixTimestamp::from_secs(trust_root.genesis_unix_seconds),
+        UnixTimestamp::from_secs(genesis_unix_seconds),
         period,
     );
     let verifier = AnyVerifier::new(
@@ -195,7 +199,7 @@ pub fn verify_quicknet_response(
         )
         .map_err(|error| VerificationError::InvalidSignature(error.to_string()))?;
 
-    let verified_randomness = *verified.randomness.get();
+    let verified_randomness = verified.randomness.get();
     let digest: [u8; 32] = Sha256::digest(signature).into();
     if digest != verified_randomness {
         return Err(VerificationError::RandomnessMismatch);
