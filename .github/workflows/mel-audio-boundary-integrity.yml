@@ -8,6 +8,7 @@ on:
       - "benchmarks/mel/registry/audio-boundary-known-answer-v1.json"
       - "docs/research/MEL_MR_EVAL_044_PCM_BOUNDARY_INTEGRITY_V1_2026-11-15.md"
       - ".github/workflows/mel-audio-boundary-integrity.yml"
+      - ".github/workflows/mel-benchmark-registry.yml"
   workflow_dispatch:
 
 permissions:
