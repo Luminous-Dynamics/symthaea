@@ -19,8 +19,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 const MODALITIES: &[&str] = &[
-    "anat", "beh", "dwi", "eeg", "fmap", "func", "ieeg", "meg", "micr", "motion",
-    "nirs", "perf", "pet", "physio", "stim",
+    "anat", "beh", "dwi", "eeg", "fmap", "func", "ieeg", "meg", "micr", "motion", "nirs", "perf",
+    "pet", "physio", "stim",
 ];
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -316,9 +316,7 @@ mod tests {
     }
 
     fn write_description(root: &Path, extra: &str) {
-        let json = format!(
-            r#"{{"Name":"Synthetic Test Cohort","BIDSVersion":"1.11.2"{extra}}}"#
-        );
+        let json = format!(r#"{{"Name":"Synthetic Test Cohort","BIDSVersion":"1.11.2"{extra}}}"#);
         fs::write(root.join("dataset_description.json"), json).expect("write description");
     }
 
@@ -357,7 +355,12 @@ mod tests {
         let receipt = audit_dataset(dir.path()).unwrap();
         assert_eq!(receipt.status, "REVIEW");
         assert!(!receipt.participants_tsv_present);
-        assert!(receipt.findings.iter().any(|f| f.code == "PARTICIPANTS_TSV_ABSENT"));
+        assert!(
+            receipt
+                .findings
+                .iter()
+                .any(|f| f.code == "PARTICIPANTS_TSV_ABSENT")
+        );
     }
 
     #[test]
@@ -372,10 +375,12 @@ mod tests {
         .unwrap();
         let receipt = audit_dataset(dir.path()).unwrap();
         assert_eq!(receipt.status, "BLOCKED");
-        assert!(receipt
-            .findings
-            .iter()
-            .any(|f| f.code == "PARTICIPANTS_TABLE_MISSING_SUBJECT_DIRECTORY"));
+        assert!(
+            receipt
+                .findings
+                .iter()
+                .any(|f| f.code == "PARTICIPANTS_TABLE_MISSING_SUBJECT_DIRECTORY")
+        );
     }
 
     #[test]
@@ -385,10 +390,12 @@ mod tests {
         fs::create_dir_all(dir.path().join("sub-01")).unwrap();
         let receipt = audit_dataset(dir.path()).unwrap();
         assert_eq!(receipt.status, "BLOCKED");
-        assert!(receipt
-            .findings
-            .iter()
-            .any(|f| f.code == "DERIVATIVE_MISSING_GENERATED_BY"));
+        assert!(
+            receipt
+                .findings
+                .iter()
+                .any(|f| f.code == "DERIVATIVE_MISSING_GENERATED_BY")
+        );
     }
 
     #[test]
