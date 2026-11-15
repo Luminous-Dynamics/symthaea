@@ -328,7 +328,7 @@ fn match_conditions(
 fn source_ids(root: &Value, test_path: &str) -> Result<Vec<String>, String> {
     let mut ids = Vec::new();
     for name in ["propulsion_test", "station_flux_test", "inlet_duct_test", "pump_loop_test", "waterjet_system_test"] {
-        if root.get(name).is_some() {
+        if root.get(*name).is_some() {
             ids.push(string_at(root, &format!("/{name}/source_record_id"))?);
         }
     }
@@ -601,6 +601,15 @@ fn audit(root: &Value) -> AuditReport {
                 return make_empty_report(case_id, test_path, findings, "INVALID_INLET_ENERGY_FLUX");
             }
         };
+        let power_tolerance = number_at(tolerances, "/power_abs_w").unwrap_or(0.0);
+        if (e1_inlet.nominal - e1.nominal).abs() > power_tolerance
+            || e1_inlet.bounds.gap(e1.bounds) > power_tolerance
+        {
+            findings.incomparable("/inlet_duct_test/energy_flux_e1_w", "inlet-duct station-1 energy flux does not match the propulsion/station-flux station-1 record");
+            let mut report = make_empty_report(case_id, test_path, findings, "INLET_STATION_1_MISMATCH");
+            report.source_record_ids = ids;
+            return report;
+        }
         let zeta13 = match ratio(e1_inlet.bounds.sub(e3.bounds).into_estimate(e1_inlet.nominal - e3.nominal), e0, "zeta13") {
             Ok(value) => value,
             Err(error) => {
@@ -793,7 +802,7 @@ fn values_error<T>(_values: T) -> &'static str {
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    if args.len() != 3 {
+    if args.len() != 2 {
         eprintln!("usage: pwc-waterjet-performance-composition <schema.json> <case.json>");
         std::process::exit(64);
     }
