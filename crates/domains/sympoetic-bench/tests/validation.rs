@@ -71,11 +71,17 @@ fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
         "claim"
     } else if metric_name.contains("intervention") || metric_name.contains("regret") {
         "decision"
-    } else if metric_name.contains("handoff") || metric_name.contains("repair") {
+    } else if metric_name.contains("handoff")
+        || metric_name.contains("repair")
+        || metric_name.starts_with("attribution_")
+    {
         "event"
-    } else if metric_name.contains("synergy") || metric_name.contains("collaboration") {
+    } else if metric_name.contains("synergy")
+        || metric_name.contains("collaboration")
+        || metric_name == "quality_matched_diversity_ratio"
+    {
         "task"
-    } else if metric_name == "expert_rater_agreement" {
+    } else if metric_name == "task_quality" || metric_name == "expert_rater_agreement" {
         "rater"
     } else {
         "run"
