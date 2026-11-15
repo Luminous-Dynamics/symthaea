@@ -262,7 +262,16 @@
         "Pareto rankings depend on objective weighting and study-defined process boundaries.",
         "No universal plasma inferiority claim follows from this review."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "coproduct_accounting": {
+        "policy": "REVIEW_LEVEL_NO_SPECIFIC_CREDIT_ASSUMPTION",
+        "credit_claim_status": "SOURCE_MODEL_ONLY",
+        "carbon_product_qualification_status": "NOT_VALIDATED",
+        "carbon_market_capacity_status": "NOT_VALIDATED",
+        "offtake_status": "NOT_VALIDATED",
+        "realized_revenue_evidence": false,
+        "no_credit_baseline_required": true
+      }
     },
     {
       "case_id": "HTTES-PACKED-BED-EXPERIMENT-2026",
