@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-shiftbench-task-admission-v0.1.schema.json",
+  "title": "EGDDM ShiftBench task-admission manifest v0.1",
+  "description": "Admission contract for a candidate-blinded longitudinal software-engineering task. Digest strings are declarations until their preimages are independently fetched and verified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_kind",
+    "task_id",
+    "scenario_pair_id",
+    "intervention",
+    "task_seed_digest",
+    "task_bundle_digest",
+    "acceptance_contract_digest",
+    "repository_snapshot",
+    "two_sided_validity",
+    "blind_reconstruction",
+    "isolation",
+    "gold_custody"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_kind": {
+      "enum": [
+        "synthetic",
+        "curated"
+      ]
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "position",
+        "control_class"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "requirement_addition_or_reinterpretation",
+            "requirement_removal_or_narrowing",
+            "dependency_api_breaking_change",
+            "toolchain_or_build_system_upgrade",
+            "configuration_world_drift",
+            "runtime_or_external_service_change",
+            "session_tool_or_execution_context_change",
+            "authority_or_policy_revocation",
+            "evidence_invalidation_or_contradiction",
+            "test_or_acceptance_contract_revision",
+            "common_cause_environment_change",
+            "cross_repository_contract_or_schema_change"
+          ]
+        },
+        "position": {
+          "enum": [
+            "early",
+            "middle",
+            "late"
+          ]
+        },
+        "control_class": {
+          "enum": [
+            "target_intervention",
+            "sham",
+            "positive_control",
+            "negative_control",
+            "common_cause_control"
+          ]
+        }
+      }
+    },
+    "task_seed_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "task_bundle_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "acceptance_contract_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "repository_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_full_name",
+        "revision_oid",
+        "tree_oid",
+        "configuration_world_digest"
+      ],
+      "properties": {
+        "repository_full_name": {
+          "type": "string",
+          "pattern": "^[^/\\s]+/[^/\\s]+$"
+        },
+        "revision_oid": {
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        },
+        "tree_oid": {
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        },
+        "configuration_world_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "two_sided_validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_patch",
+        "empty_patch_control"
+      ],
+      "properties": {
+        "reference_patch": {
+          "$ref": "#/$defs/controlResultPass"
+        },
+        "empty_patch_control": {
+          "$ref": "#/$defs/controlResultFail"
+        }
+      }
+    },
+    "blind_reconstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completed",
+        "primary_author_id",
+        "adjudicator_ids",
+        "disagreement_resolved"
+      ],
+      "properties": {
+        "completed": {
+          "const": true
+        },
+        "primary_author_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjudicator_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "disagreement_resolved": {
+          "const": true
+        }
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner_image_digest",
+        "network_policy_digest",
+        "model_endpoint_only",
+        "candidate_evaluator_separated",
+        "pristine_regrade",
+        "candidate_can_read_gold"
+      ],
+      "properties": {
+        "runner_image_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "network_policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "model_endpoint_only": {
+          "const": true
+        },
+        "candidate_evaluator_separated": {
+          "const": true
+        },
+        "pristine_regrade": {
+          "const": true
+        },
+        "candidate_can_read_gold": {
+          "const": false
+        }
+      }
+    },
+    "gold_custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gold_label_manifest_digest",
+        "custodian_id",
+        "candidate_readable",
+        "evaluator_readable",
+        "labels_separate_from_candidate_bundle"
+      ],
+      "properties": {
+        "gold_label_manifest_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "custodian_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_readable": {
+          "const": false
+        },
+        "evaluator_readable": {
+          "const": true
+        },
+        "labels_separate_from_candidate_bundle": {
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "controlResultPass": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patch_digest",
+        "result",
+        "clean_regrade",
+        "grader_environment_digest",
+        "evidence_digest"
+      ],
+      "properties": {
+        "patch_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "result": {
+          "const": "pass"
+        },
+        "clean_regrade": {
+          "const": true
+        },
+        "grader_environment_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "controlResultFail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patch_digest",
+        "result",
+        "clean_regrade",
+        "grader_environment_digest",
+        "evidence_digest"
+      ],
+      "properties": {
+        "patch_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "result": {
+          "const": "fail"
+        },
+        "clean_regrade": {
+          "const": true
+        },
+        "grader_environment_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
