@@ -199,9 +199,7 @@ pub struct LifecycleServiceReport {
 /// Concurrent time is counted exactly once in total unavailability. Net
 /// energy is integrated across all states, including negative imports during
 /// hot standby, planned maintenance and forced outages.
-pub fn evaluate_lifecycle_service_budget(
-    plan: &LifecycleServicePlan,
-) -> LifecycleServiceReport {
+pub fn evaluate_lifecycle_service_budget(plan: &LifecycleServicePlan) -> LifecycleServiceReport {
     let mut diagnostics = Vec::new();
     let mut event_by_id: BTreeMap<&str, &AvailabilityEvent> = BTreeMap::new();
     let mut segment_ids = BTreeSet::new();
@@ -322,8 +320,7 @@ pub fn evaluate_lifecycle_service_budget(
             .events
             .iter()
             .filter(|event| {
-                event.start_second <= segment.start_second
-                    && event.end_second >= segment.end_second
+                event.start_second <= segment.start_second && event.end_second >= segment.end_second
             })
             .map(|event| event.event_id.clone())
             .collect();
@@ -367,12 +364,7 @@ pub fn evaluate_lifecycle_service_budget(
     let event_receipts = canonical_event_receipts(plan);
     let segment_receipts = canonical_segment_receipts(plan);
     if !diagnostics.is_empty() {
-        return invalid_report(
-            plan,
-            diagnostics,
-            event_receipts,
-            segment_receipts,
-        );
+        return invalid_report(plan, diagnostics, event_receipts, segment_receipts);
     }
 
     let horizon = plan.horizon_end_second - plan.horizon_start_second;
@@ -419,15 +411,13 @@ pub fn evaluate_lifecycle_service_budget(
             import_energy += -energy;
         }
 
-        let entry = energy_by_state
-            .entry(segment.state)
-            .or_insert(StateEnergy {
-                state: segment.state,
-                signed_net_energy_mwh: 0.0,
-                export_energy_mwh: 0.0,
-                import_energy_mwh: 0.0,
-                duration_seconds: 0,
-            });
+        let entry = energy_by_state.entry(segment.state).or_insert(StateEnergy {
+            state: segment.state,
+            signed_net_energy_mwh: 0.0,
+            export_energy_mwh: 0.0,
+            import_energy_mwh: 0.0,
+            duration_seconds: 0,
+        });
         entry.signed_net_energy_mwh += energy;
         entry.duration_seconds += duration;
         if energy >= 0.0 {
@@ -612,15 +602,62 @@ mod tests {
     fn overlapping_planned_plan() -> LifecycleServicePlan {
         base_plan(
             vec![
-                event("planned-a", OutageCategory::Planned, ServiceImpact::FullOutage, 100, 400),
-                event("planned-b", OutageCategory::Planned, ServiceImpact::FullOutage, 300, 600),
+                event(
+                    "planned-a",
+                    OutageCategory::Planned,
+                    ServiceImpact::FullOutage,
+                    100,
+                    400,
+                ),
+                event(
+                    "planned-b",
+                    OutageCategory::Planned,
+                    ServiceImpact::FullOutage,
+                    300,
+                    600,
+                ),
             ],
             vec![
-                segment("s0", 0, 100, 100.0, PowerOperatingState::PowerGeneration, &[]),
-                segment("s1", 100, 300, -5.0, PowerOperatingState::PlannedMaintenance, &["planned-a"]),
-                segment("s2", 300, 400, -8.0, PowerOperatingState::PlannedMaintenance, &["planned-a", "planned-b"]),
-                segment("s3", 400, 600, -5.0, PowerOperatingState::PlannedMaintenance, &["planned-b"]),
-                segment("s4", 600, 1000, 100.0, PowerOperatingState::PowerGeneration, &[]),
+                segment(
+                    "s0",
+                    0,
+                    100,
+                    100.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
+                segment(
+                    "s1",
+                    100,
+                    300,
+                    -5.0,
+                    PowerOperatingState::PlannedMaintenance,
+                    &["planned-a"],
+                ),
+                segment(
+                    "s2",
+                    300,
+                    400,
+                    -8.0,
+                    PowerOperatingState::PlannedMaintenance,
+                    &["planned-a", "planned-b"],
+                ),
+                segment(
+                    "s3",
+                    400,
+                    600,
+                    -5.0,
+                    PowerOperatingState::PlannedMaintenance,
+                    &["planned-b"],
+                ),
+                segment(
+                    "s4",
+                    600,
+                    1000,
+                    100.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
             ],
         )
     }
@@ -628,15 +665,62 @@ mod tests {
     fn concurrent_planned_forced_plan() -> LifecycleServicePlan {
         base_plan(
             vec![
-                event("planned-a", OutageCategory::Planned, ServiceImpact::FullOutage, 100, 500),
-                event("forced-b", OutageCategory::Unplanned, ServiceImpact::FullOutage, 300, 700),
+                event(
+                    "planned-a",
+                    OutageCategory::Planned,
+                    ServiceImpact::FullOutage,
+                    100,
+                    500,
+                ),
+                event(
+                    "forced-b",
+                    OutageCategory::Unplanned,
+                    ServiceImpact::FullOutage,
+                    300,
+                    700,
+                ),
             ],
             vec![
-                segment("s0", 0, 100, 100.0, PowerOperatingState::PowerGeneration, &[]),
-                segment("s1", 100, 300, -5.0, PowerOperatingState::PlannedMaintenance, &["planned-a"]),
-                segment("s2", 300, 500, -8.0, PowerOperatingState::ConcurrentOutage, &["forced-b", "planned-a"]),
-                segment("s3", 500, 700, -7.0, PowerOperatingState::ForcedOutage, &["forced-b"]),
-                segment("s4", 700, 1000, 100.0, PowerOperatingState::PowerGeneration, &[]),
+                segment(
+                    "s0",
+                    0,
+                    100,
+                    100.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
+                segment(
+                    "s1",
+                    100,
+                    300,
+                    -5.0,
+                    PowerOperatingState::PlannedMaintenance,
+                    &["planned-a"],
+                ),
+                segment(
+                    "s2",
+                    300,
+                    500,
+                    -8.0,
+                    PowerOperatingState::ConcurrentOutage,
+                    &["forced-b", "planned-a"],
+                ),
+                segment(
+                    "s3",
+                    500,
+                    700,
+                    -7.0,
+                    PowerOperatingState::ForcedOutage,
+                    &["forced-b"],
+                ),
+                segment(
+                    "s4",
+                    700,
+                    1000,
+                    100.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
             ],
         )
     }
@@ -671,8 +755,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.power_segments[1].start_second = 101;
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::ScheduleGap));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::ScheduleGap)
+        );
     }
 
     #[test]
@@ -680,8 +771,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.power_segments[1].start_second = 99;
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::ScheduleOverlap));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::ScheduleOverlap)
+        );
     }
 
     #[test]
@@ -689,8 +787,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.power_segments.remove(2);
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::MissingEventBoundary));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::MissingEventBoundary)
+        );
     }
 
     #[test]
@@ -698,8 +803,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.power_segments[2].active_event_ids = vec!["planned-a".to_string()];
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::ActiveEventSetMismatch));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::ActiveEventSetMismatch)
+        );
     }
 
     #[test]
@@ -708,8 +820,15 @@ mod tests {
         plan.events[0].start_second = 999;
         plan.events[0].end_second = 1001;
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::EventOutsideHorizon));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::EventOutsideHorizon)
+        );
     }
 
     #[test]
@@ -717,8 +836,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.events.push(plan.events[0].clone());
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::DuplicateEventId));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::DuplicateEventId)
+        );
     }
 
     #[test]
@@ -726,8 +852,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.events[0].evidence_ref.clear();
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::EmptyEventEvidence));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::EmptyEventEvidence)
+        );
     }
 
     #[test]
@@ -744,7 +877,10 @@ mod tests {
             )],
         );
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::ValidDeterministicLedger);
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::ValidDeterministicLedger
+        );
         assert_eq!(report.signed_net_energy_mwh, Some(-10.0 / 3.6));
         assert_eq!(report.export_energy_mwh, Some(0.0));
         assert_eq!(report.import_energy_mwh, Some(10.0 / 3.6));
@@ -755,8 +891,22 @@ mod tests {
         let plan = base_plan(
             Vec::new(),
             vec![
-                segment("generation", 0, 600, 120.0, PowerOperatingState::PowerGeneration, &[]),
-                segment("standby", 600, 1000, -9.0, PowerOperatingState::HotStandby, &[]),
+                segment(
+                    "generation",
+                    0,
+                    600,
+                    120.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
+                segment(
+                    "standby",
+                    600,
+                    1000,
+                    -9.0,
+                    PowerOperatingState::HotStandby,
+                    &[],
+                ),
             ],
         );
         let report = evaluate_lifecycle_service_budget(&plan);
@@ -769,14 +919,54 @@ mod tests {
     fn half_open_event_intervals_do_not_overlap_at_touching_boundaries() {
         let plan = base_plan(
             vec![
-                event("planned-a", OutageCategory::Planned, ServiceImpact::FullOutage, 100, 300),
-                event("forced-b", OutageCategory::Unplanned, ServiceImpact::FullOutage, 300, 500),
+                event(
+                    "planned-a",
+                    OutageCategory::Planned,
+                    ServiceImpact::FullOutage,
+                    100,
+                    300,
+                ),
+                event(
+                    "forced-b",
+                    OutageCategory::Unplanned,
+                    ServiceImpact::FullOutage,
+                    300,
+                    500,
+                ),
             ],
             vec![
-                segment("s0", 0, 100, 80.0, PowerOperatingState::PowerGeneration, &[]),
-                segment("s1", 100, 300, -5.0, PowerOperatingState::PlannedMaintenance, &["planned-a"]),
-                segment("s2", 300, 500, -6.0, PowerOperatingState::ForcedOutage, &["forced-b"]),
-                segment("s3", 500, 1000, 80.0, PowerOperatingState::PowerGeneration, &[]),
+                segment(
+                    "s0",
+                    0,
+                    100,
+                    80.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
+                segment(
+                    "s1",
+                    100,
+                    300,
+                    -5.0,
+                    PowerOperatingState::PlannedMaintenance,
+                    &["planned-a"],
+                ),
+                segment(
+                    "s2",
+                    300,
+                    500,
+                    -6.0,
+                    PowerOperatingState::ForcedOutage,
+                    &["forced-b"],
+                ),
+                segment(
+                    "s3",
+                    500,
+                    1000,
+                    80.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
             ],
         );
         let report = evaluate_lifecycle_service_budget(&plan);
@@ -806,17 +996,36 @@ mod tests {
                 800,
             )],
             vec![
-                segment("full", 0, 200, 100.0, PowerOperatingState::PowerGeneration, &[]),
-                segment("derated", 200, 800, 60.0, PowerOperatingState::ReducedPower, &["pump-derate"]),
-                segment("full-again", 800, 1000, 100.0, PowerOperatingState::PowerGeneration, &[]),
+                segment(
+                    "full",
+                    0,
+                    200,
+                    100.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
+                segment(
+                    "derated",
+                    200,
+                    800,
+                    60.0,
+                    PowerOperatingState::ReducedPower,
+                    &["pump-derate"],
+                ),
+                segment(
+                    "full-again",
+                    800,
+                    1000,
+                    100.0,
+                    PowerOperatingState::PowerGeneration,
+                    &[],
+                ),
             ],
         );
         let report = evaluate_lifecycle_service_budget(&plan);
         assert_eq!(report.availability_fraction, Some(1.0));
         let expected = 100.0 * 400.0 / 3600.0 + 60.0 * 600.0 / 3600.0;
-        assert!(
-            (report.signed_net_energy_mwh.unwrap() - expected).abs() < 1e-12
-        );
+        assert!((report.signed_net_energy_mwh.unwrap() - expected).abs() < 1e-12);
     }
 
     #[test]
@@ -833,8 +1042,15 @@ mod tests {
             )],
         );
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::OutageStateWithoutFullOutageEvent));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::OutageStateWithoutFullOutageEvent)
+        );
     }
 
     #[test]
@@ -842,8 +1058,15 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.power_segments[1].state = PowerOperatingState::ForcedOutage;
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::OutageStateMismatch));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::OutageStateMismatch)
+        );
     }
 
     #[test]
@@ -852,9 +1075,20 @@ mod tests {
         plan.power_segments[0].power_balance_report_ref.clear();
         plan.power_segments[1].output_sha256 = "bad".to_string();
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::MissingPowerBalanceReceipt));
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::InvalidSegmentOutputDigest));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::MissingPowerBalanceReceipt)
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::InvalidSegmentOutputDigest)
+        );
     }
 
     #[test]
@@ -881,7 +1115,10 @@ mod tests {
         let mut plan = overlapping_planned_plan();
         plan.events[0].evidence_class = LifecycleEvidenceClass::Assumed;
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::ValidDeterministicLedger);
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::ValidDeterministicLedger
+        );
         assert_eq!(
             report.event_receipts[0].evidence_class,
             LifecycleEvidenceClass::Assumed
@@ -902,7 +1139,14 @@ mod tests {
             )],
         );
         let report = evaluate_lifecycle_service_budget(&plan);
-        assert_eq!(report.disposition, LifecycleServiceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&LifecycleDiagnostic::NonFiniteNetPower));
+        assert_eq!(
+            report.disposition,
+            LifecycleServiceDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&LifecycleDiagnostic::NonFiniteNetPower)
+        );
     }
 }
