@@ -306,3 +306,55 @@ Sources:
 5. Treat grant/loan support as a conditional financing scenario; retain a no-incentive downside case.
 
 A South African microfactory proposal becomes materially stronger when it can show additional output and import replacement, measurable job/skills development, partner capability uplift, traceability, and credible order-backed demand—not merely that the technology is novel.
+
+
+## 2026 research update: separate planning, manipulation and factory benchmarks
+
+The newer literature makes it important not to publish one undifferentiated "textile automation" score. Three separate benchmark tracks are required.
+
+### Track A — SewingPlanBench (construction planning)
+
+Park and Kim's September 2026 study, *Development of an LLM-Based Multi-Agent System for Sewing Sequence Planning*, formalizes garment panel/edge metadata and combines generation, verification, question and revision agents. It evaluates 100 patterns, reports improvement over a single-agent configuration, and retains expert intervention for patterns whose construction choices cannot be resolved from the formalized knowledge.
+
+This is a serious direct comparator for the typed sewing-plan work already defined in SEWING-PLAN-COMPILER #12134. Atelier should reproduce the same planning task where data and permissions allow, then compare:
+- expert patternmaker/technologist;
+- deterministic precedence and construction-rule baseline;
+- single-agent and multi-agent generation;
+- typed graph planning with exact topology checks, explicit uncertainty and human clarification.
+
+Measure edge/piece correspondence, operation and precedence correctness, impossible or inaccessible joins, expert corrections, clarification calibration, stale-revision rejection, and physical first-pass assembly acceptance. Do not score fluent prose as correct construction.
+
+### Track B — Cloth manipulation and robotic sewing (physical execution)
+
+Two separate evidence sources are useful:
+- RGBench (AAAI 2026) evaluates garment manipulation and simulator fidelity against measured garment dynamics. Its project page reports over 6,000 garment meshes, but the available evaluation dataset is a smaller physical-evaluation subset; the larger simulator and mesh library are described as follow-up releases. Do not imply all 6,000 meshes are already in the released evaluation corpus.
+- A September 2026 robotic-sewing study integrates vision-based fabric detection, learned grasp-point estimation, trajectory generation, seam tracking and force-regulated control on a SCARA platform with an industrial sewing machine. Its experiment reports mean seam deviation about 1.2 mm, standard deviation 0.9 mm, maximum 2.5 mm and 79% of seam points inside its desired offset tolerance. It also reports limited human intervention and identifies generalization and broader fabric/task evaluation as future work.
+
+These are task-specific research results, not production-line throughput or universal seam-quality targets. Atelier should separately evaluate:
+- cloth state/pose estimation and grasp reliability;
+- deformation and slip through handling;
+- seam path tracking and offset error distributions;
+- stitch/assembly quality after physical execution;
+- setup and human intervention per accepted seam;
+- transfer across held-out fabrics, garment topology, seam curvature, thickness and lot variation.
+
+A simulator's agreement with physical data does not prove a process is qualified for a product or partner factory. Keep simulation, robot trial, operator trial and production qualification as separate evidence classes.
+
+### Track C — FactoryBench (factory/network performance)
+
+FactoryBench evaluates accepted output, workload, resource capacity, layout, scheduling, quality, cost and resilience under matched demand. It must consume the operation and capability results from Tracks A and B, but it must not merge their task metrics into a fabricated aggregate score.
+
+### Standards and traceability update
+
+- **NIST IR 8536 (September 2026)** explicitly recommends interoperability over uniformity. For Atelier this means standard traceability links and verified source references across independent partner repositories, while leaving each partner's underlying records in its own appropriate schema. This supports the decision not to force a new universal Atelier supplier ledger.
+- **ISO 23247-5:2026** is published (June 2026) and specifies digital-thread principles for connecting manufacturing digital twins across design, planning, production and testing. Treat it as an architecture reference, not a certificate.
+- **IEC 63278-4:2026** is published (17 September 2026) and supplies Asset Administration Shell application guidance. Use an AAS adapter only where it improves asset interoperability; do not create another asset master.
+- **ISO 22400-2 Edition 2** entered final approval on 13 November 2026 and is not yet published as an International Standard. Keep KPI formulas versioned and identify which edition was used in each result. Do not claim Edition 2 conformance before publication and applicable assessment.
+
+### New executable B1 references
+
+- [PR #12356 — fail-closed cell eligibility evaluator](https://github.com/Luminous-Dynamics/symthaea/pull/12356): dependency-free Rust eligibility evaluator with stable reason codes, validity checks, exact revision matching, duplicate-reference rejection and synthetic unit tests (authored, not run).
+- [FactoryBench B1 case corpus](../factorybench/cell-eligibility-cases.v0.1.0.json): 16 machine-readable synthetic positive and negative cases.
+- [Issue #12323 — cell eligibility evaluator](https://github.com/Luminous-Dynamics/symthaea/issues/12323): implementation and independent-verification follow-up.
+
+The evidence classes in these tracks must remain separate: paper-reported, vendor-announced, simulated, physically trialled, independently measured, and production-qualified. A result can advance between classes only through its required evidence and review process.
