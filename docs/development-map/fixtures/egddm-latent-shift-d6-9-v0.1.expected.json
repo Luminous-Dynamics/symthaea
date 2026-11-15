@@ -1,0 +1,47 @@
+{
+  "episode_reports": [
+    {
+      "episode_id": "silent-runner-drift",
+      "truth_kind": "latent_shift",
+      "detected": true,
+      "false_alarm": false,
+      "detection_before_stale_use": true,
+      "event_detection_delay_seconds": 190,
+      "candidate_detection_delay_seconds": 125,
+      "affected_obligations": [
+        "api-compat",
+        "build-repro"
+      ],
+      "blocked_obligations": [
+        "api-compat",
+        "build-repro"
+      ],
+      "obligation_precision": 1,
+      "obligation_recall": 1,
+      "unsupported_current_claims": [],
+      "unnecessary_invalidations": [],
+      "unauthorized_probe_ids": [],
+      "probe_cost_units": 2,
+      "correlated_signal_groups_discounted": true
+    },
+    {
+      "episode_id": "sham-load-noise",
+      "truth_kind": "sham_no_shift",
+      "detected": false,
+      "false_alarm": false,
+      "detection_before_stale_use": true,
+      "event_detection_delay_seconds": null,
+      "candidate_detection_delay_seconds": null,
+      "affected_obligations": [],
+      "blocked_obligations": [],
+      "obligation_precision": null,
+      "obligation_recall": null,
+      "unsupported_current_claims": [],
+      "unnecessary_invalidations": [],
+      "unauthorized_probe_ids": [],
+      "probe_cost_units": 2,
+      "correlated_signal_groups_discounted": true
+    }
+  ],
+  "claim_ceiling": "Synthetic known-answer report only. It does not establish a general shift detector, independent gold truth, production monitoring reliability, or agent performance."
+}
