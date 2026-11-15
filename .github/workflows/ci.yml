@@ -85,6 +85,9 @@ jobs:
       - name: Validate evidence-bearing scorecard fixture
         run: cargo run -p sympoetic-bench -- validate-scorecard --input docs/benchmarks/sympoetic/fixtures/scorecard-with-evidence.example.json
 
+      - name: Summarize distributional capability fixture
+        run: cargo run -p sympoetic-bench -- summarize-capability-strata --input docs/benchmarks/sympoetic/fixtures/distributional-capability.example.json --draws 2000 --seed 42
+
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
