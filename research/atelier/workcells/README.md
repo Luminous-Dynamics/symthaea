@@ -79,7 +79,7 @@ Use these monotonic states:
 
 - **draft:** incomplete authoring; never allocatable.
 - **candidate:** structurally described, but one or more qualifications or evidence checks remain; never allocatable.
-- **qualified:** all declared eligibility conditions and independent verification references are present and current for the specified scope.
+- **qualified:** all declared eligibility conditions and independent verification references are present and current for the specified scope. The schema additionally requires available equipment with calibration evidence, per-configuration qualification evidence, and qualification evidence for declared operator requirements; semantic checks must still resolve references, validate dates, and verify the underlying facts.
 - **suspended:** temporarily ineligible; reason and reinstatement evidence required.
 - **expired:** validity interval elapsed; requalification required.
 - **revoked:** qualification withdrawn; dependent plans must be reviewed.
