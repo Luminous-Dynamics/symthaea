@@ -18,6 +18,20 @@ A separate CLI accepts a request containing `section_family` and `profile`:
 
     cargo run --locked -p symthaea-marine-geometry --bin marine-waterplane-loft -- loft-request.json --output /tmp/lofted-displacement.json
 
+## G2c hydrostatic properties
+
+G2c is under development for [issue #12366](https://github.com/Luminous-Dynamics/symthaea/issues/12366) on branch `research/marine-hydrostatics-g2c-20261115`.
+
+The hydrostatics layer verifies the candidate geometry digest, loft-manifest digest, semantic face ranges and a fresh G0/G1 admission result. It then calculates polyhedral displacement volume and centre of buoyancy, and integrates the explicitly identified waterplane triangles for waterplane area, LCF/TCF, centroidal second moments, BM_T/BM_L and TPC using an explicitly supplied water density.
+
+The results apply to the supplied waterplane-capped mesh. They do not establish that the geometry represents an actual vessel or calculate KG, GM, stability pass/fail, loading-condition effects or regulatory compliance.
+
+A request contains `lofted_artifact` and `water_density_kg_m3`:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-hydrostatics -- hydrostatics-request.json --output /tmp/hydrostatic-properties.json
+
+The triangular-prism known-answer fixture is 100 m long, 20 m waterplane beam and 6 m depth. Its displacement volume is 6,000 m³, waterplane area is 2,000 m², and the analytical centre of buoyancy is 50 m longitudinally and 2 m below the waterplane.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.

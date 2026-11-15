@@ -65,7 +65,7 @@ struct LoftArtifactIdentity<'a> {
     admission_profile: &'a AdmissionProfile,
 }
 
-fn compute_loft_manifest_digest(
+pub fn compute_loft_manifest_digest(
     artifact: &LoftedHullArtifact,
 ) -> Result<String, serde_json::Error> {
     let identity = LoftArtifactIdentity {
