@@ -32,6 +32,12 @@ pub struct NetExportLowerBoundReceipt {
     pub one_sided_coverage_level: f64,
     pub method: NetExportBoundMethod,
     pub method_ref: String,
+    /// Authenticated method-specific evidence payload identity.
+    pub method_evidence_sha256: String,
+    pub method_run_id: String,
+    pub method_output_sha256: String,
+    /// Ordered source variables used by the method.
+    pub method_variable_order: Vec<String>,
     pub distribution_assumption_ref: String,
     pub assumption_manifest_sha256: String,
     pub validity_domain_ref: String,
@@ -96,6 +102,8 @@ pub enum RobustNetExportDiagnostic {
     EmptyValidityDomain,
     MissingCovarianceReceipt,
     MissingSimultaneousAllocationReceipt,
+    MethodEvidenceReceiptMismatch,
+    MethodVariableOrderMismatch,
     MissingDirectNetAnalysisReceipt,
     UnexpectedMethodReceipt,
     EmptyEvidenceReference,
@@ -114,6 +122,10 @@ pub struct RobustNetExportReport {
     pub robust_reserve_margin_mwe: Option<f64>,
     pub one_sided_coverage_level: Option<f64>,
     pub method: Option<NetExportBoundMethod>,
+    pub method_ref: Option<String>,
+    pub method_evidence_sha256: Option<String>,
+    pub assumption_manifest_sha256: Option<String>,
+    pub validity_domain_ref: Option<String>,
     pub receipt_id: Option<String>,
     pub diagnostics: Vec<RobustNetExportDiagnostic>,
     pub evidence_refs: Vec<String>,
@@ -177,6 +189,10 @@ pub fn evaluate_robust_net_export(
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            None,
             RobustNetExportDisposition::NotEvaluable,
             diagnostics,
             Vec::new(),
@@ -188,6 +204,10 @@ pub fn evaluate_robust_net_export(
             power_run,
             point_report,
             point,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -268,6 +288,25 @@ pub fn evaluate_robust_net_export(
         diagnostics.push(RobustNetExportDiagnostic::EmptyEvidenceReference);
     }
 
+    if !is_sha256(&receipt.method_evidence_sha256)
+        || receipt.method_run_id != receipt.run_id
+        || receipt.method_output_sha256 != receipt.output_sha256
+    {
+        diagnostics.push(RobustNetExportDiagnostic::MethodEvidenceReceiptMismatch);
+    }
+    let expected_method_order: &[&str] = match receipt.method {
+        NetExportBoundMethod::JointCovarianceContrast
+        | NetExportBoundMethod::SimultaneousComponentIntervals => {
+            &["P_e_gross", "P_recirc_var", "P_recirc_fix"]
+        }
+        NetExportBoundMethod::DirectNetOutputInterval => &["P_elec"],
+    };
+    if receipt.method_variable_order
+        != expected_method_order.iter().map(|value| (*value).to_string()).collect::<Vec<_>>()
+    {
+        diagnostics.push(RobustNetExportDiagnostic::MethodVariableOrderMismatch);
+    }
+
     match receipt.method {
         NetExportBoundMethod::JointCovarianceContrast => {
             if receipt
@@ -305,6 +344,10 @@ pub fn evaluate_robust_net_export(
             }
             if receipt.covariance_receipt_ref.is_some()
                 || receipt.direct_net_analysis_ref.is_some()
+                || receipt.covariance_receipt_sha256.is_some()
+                || receipt.covariance_run_id.is_some()
+                || receipt.covariance_output_sha256.is_some()
+                || !receipt.covariance_variable_order.is_empty()
             {
                 diagnostics.push(RobustNetExportDiagnostic::UnexpectedMethodReceipt);
             }
@@ -358,6 +401,10 @@ pub fn evaluate_robust_net_export(
             Some(receipt.lower_bound_mwe),
             Some(receipt.one_sided_coverage_level),
             Some(receipt.method),
+            Some(receipt.method_ref.clone()),
+            Some(receipt.method_evidence_sha256.clone()),
+            Some(receipt.assumption_manifest_sha256.clone()),
+            Some(receipt.validity_domain_ref.clone()),
             Some(receipt.receipt_id.clone()),
             RobustNetExportDisposition::NotEvaluable,
             diagnostics,
@@ -386,6 +433,10 @@ pub fn evaluate_robust_net_export(
         Some(lower),
         Some(receipt.one_sided_coverage_level),
         Some(receipt.method),
+        Some(receipt.method_ref.clone()),
+        Some(receipt.method_evidence_sha256.clone()),
+        Some(receipt.assumption_manifest_sha256.clone()),
+        Some(receipt.validity_domain_ref.clone()),
         Some(receipt.receipt_id.clone()),
         disposition,
         diagnostics,
@@ -400,6 +451,10 @@ fn report(
     lower: Option<f64>,
     coverage: Option<f64>,
     method: Option<NetExportBoundMethod>,
+    method_ref: Option<String>,
+    method_evidence_sha256: Option<String>,
+    assumption_manifest_sha256: Option<String>,
+    validity_domain_ref: Option<String>,
     receipt_id: Option<String>,
     disposition: RobustNetExportDisposition,
     diagnostics: Vec<RobustNetExportDiagnostic>,
@@ -421,6 +476,10 @@ fn report(
         robust_reserve_margin_mwe: margin,
         one_sided_coverage_level: coverage,
         method,
+        method_ref,
+        method_evidence_sha256,
+        assumption_manifest_sha256,
+        validity_domain_ref,
         receipt_id,
         diagnostics,
         evidence_refs,
@@ -524,6 +583,14 @@ mod tests {
             one_sided_coverage_level: 0.95,
             method: NetExportBoundMethod::JointCovarianceContrast,
             method_ref: "joint-linear-contrast-v1".to_string(),
+            method_evidence_sha256: sha('e'),
+            method_run_id: run.run_id.clone(),
+            method_output_sha256: run.output_sha256.clone(),
+            method_variable_order: vec![
+                "P_e_gross".to_string(),
+                "P_recirc_var".to_string(),
+                "P_recirc_fix".to_string(),
+            ],
             distribution_assumption_ref: "calibrated-coverage-method-v1".to_string(),
             assumption_manifest_sha256: sha('c'),
             validity_domain_ref: "declared-process-regime-v1".to_string(),
