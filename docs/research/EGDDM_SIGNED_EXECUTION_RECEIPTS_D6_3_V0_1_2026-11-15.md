@@ -51,7 +51,12 @@ The verifier should emit separate outcomes, not a generic "trusted" boolean:
 
 ## 3. Reuse the in-toto statement and envelope model
 
-The machine-readable schema added in this branch defines the predicate object for an in-toto Statement/v1 with predicate type `https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1`; it does not define a new envelope. The [synthetic example](fixtures/egddm-execution-receipt-predicate-v0.1.synthetic.json) is a complete in-toto Statement with an immutable subject digest. Its identities and digests are placeholders, and it contains no DSSE signature or transparency receipt. This follows the [in-toto predicate authoring guidance](https://github.com/in-toto/attestation/blob/main/docs/new_predicate_guidelines.md), which calls for complete Statement examples rather than predicate fragments.
+The machine-readable schema added in this branch defines the predicate object for an in-toto Statement/v1 with predicate type `https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1`; it does not define a new envelope. The examples are complete in-toto Statements with immutable subject digests:
+- [Runner/test compatibility claim](fixtures/egddm-execution-receipt-predicate-v0.1.synthetic.json), referencing the standard Test Result predicate.
+- [Agent observation claim](fixtures/egddm-agent-observation-statement-v0.1.synthetic.json), intentionally without runner execution fields.
+- [Authority decision claim](fixtures/egddm-authority-decision-statement-v0.1.synthetic.json), also without runner execution fields.
+
+All identities and digests are synthetic placeholders; none of the examples contains a DSSE signature or transparency receipt. This follows the [in-toto predicate authoring guidance](https://github.com/in-toto/attestation/blob/main/docs/new_predicate_guidelines.md), which calls for complete Statement examples rather than predicate fragments.
 
 The intended layering is:
 
