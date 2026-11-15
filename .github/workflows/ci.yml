@@ -43,7 +43,7 @@ env:
 
 jobs:
   sympoetic-bench:
-    name: SympoeticBench (schema, trace, and metric tests)
+    name: SympoeticBench (workspace, format, clippy, and tests)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -63,6 +63,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-sympoetic-bench-
             ${{ runner.os }}-cargo-test-
+
+      - name: Check Cargo workspace target integrity
+        run: bash scripts/check-workspace-targets.sh
+
+      - name: Check formatting
+        run: cargo fmt -p sympoetic-bench -- --check
+
+      - name: Run Clippy
+        run: cargo clippy -p sympoetic-bench --all-targets -- -D warnings
 
       - name: Run focused benchmark tests
         run: cargo test -p sympoetic-bench
