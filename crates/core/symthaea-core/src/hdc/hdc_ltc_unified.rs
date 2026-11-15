@@ -2986,8 +2986,8 @@ mod tests {
         }
     }
 
-    /// Compare all four scalar laws with frozen equilibrium, gate and tau.
-    /// Only rate and ungated exponential relaxation should form a semigroup.
+    /// Compare all five scalar laws with frozen equilibrium, gate and tau.
+    /// Rate-modulated and ungated exponential relaxation should form a semigroup.
     #[test]
     fn gate_law_candidates_separate_identity_gate_semantics_and_composition() {
         let gate_logit = 0.0_f32;
@@ -3012,7 +3012,14 @@ mod tests {
         let rate_at_tau = candidate_gate_sigma(GateLawCandidate::ExponentialRate, gate_logit, tau, tau);
         assert!(
             (rate_at_tau - sigma_base).abs() < 2e-7,
-            "rate mapping must preserve the original gate at dt=tau"
+            "softplus-rate mapping must preserve the original gate at dt=tau"
+        );
+        let sigmoid_rate_at_tau =
+            candidate_gate_sigma(GateLawCandidate::SigmoidRate, gate_logit, tau, tau);
+        let expected_sigmoid_rate_at_tau = -(-sigma_base).exp_m1();
+        assert!(
+            (sigmoid_rate_at_tau - expected_sigmoid_rate_at_tau).abs() < 2e-7,
+            "sigmoid-rate mapping must equal 1-exp(-sigma_base) at dt=tau"
         );
 
         let retention = |law: GateLawCandidate, step: f32| {
@@ -3048,18 +3055,18 @@ mod tests {
             }
         }
 
-        // The rate formulation is invariant to a consistent change of time units.
+        // Both rate parameterizations are invariant to a consistent change of time units.
         for scale in [0.1_f32, 10.0_f32, 1000.0_f32] {
-            let scaled = candidate_gate_sigma(
-                GateLawCandidate::ExponentialRate,
-                gate_logit,
-                tau * scale,
-                dt * scale,
-            );
-            assert!(
-                (scaled - rate_at_tau).abs() < 2e-7,
-                "time-unit scaling changed rate interpolation at scale={scale}"
-            );
+            for (law, expected) in [
+                (GateLawCandidate::ExponentialRate, rate_at_tau),
+                (GateLawCandidate::SigmoidRate, sigmoid_rate_at_tau),
+            ] {
+                let scaled = candidate_gate_sigma(law, gate_logit, tau * scale, dt * scale);
+                assert!(
+                    (scaled - expected).abs() < 2e-7,
+                    "{law:?} time-unit scaling changed interpolation at scale={scale}"
+                );
+            }
         }
 
         let large_logit_rate = candidate_softplus(80.0) / tau;
