@@ -176,6 +176,7 @@ pub enum SchedulerDisposition {
     EventTimeRegression,
     ConflictingAcknowledgement,
     ConflictingReconciliation,
+    ConflictingEffectCommit,
     AcceptedCancellationAfterCommit,
     CommitAfterAcceptedCancellation,
     PreconditionViolation,
@@ -484,7 +485,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut stop_triggers = BTreeMap::<String, StopReplayState>::new();
     let mut stop_discharges = BTreeSet::<String>::new();
     let mut attempts = BTreeSet::<(String, String)>::new();
-    let mut committed_attempts = BTreeSet::<(String, String)>::new();
+    let mut committed_attempts = BTreeMap::<(String, String), String>::new();
     let mut reconciled_attempts =
         BTreeMap::<(String, String), (ReconciliationOutcome, String, String)>::new();
     let mut records = Vec::new();
@@ -645,14 +646,23 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     SchedulerDisposition::PreconditionViolation
                 }
             }
-            ScheduleAction::EffectCommitted { operation_id, attempt_id, .. } => {
+            ScheduleAction::EffectCommitted { operation_id, attempt_id, effect_id } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                if !attempts.contains(&key) || !committed_attempts.insert(key.clone()) {
+                if !attempts.contains(&key) {
                     SchedulerDisposition::PreconditionViolation
-                } else if cancel_acknowledgements.get(&key) == Some(&true) {
-                    SchedulerDisposition::CommitAfterAcceptedCancellation
+                } else if let Some(previous_effect_id) = committed_attempts.get(&key) {
+                    if previous_effect_id == effect_id {
+                        SchedulerDisposition::Duplicate
+                    } else {
+                        SchedulerDisposition::ConflictingEffectCommit
+                    }
                 } else {
-                    SchedulerDisposition::Applied
+                    committed_attempts.insert(key.clone(), effect_id.clone());
+                    if cancel_acknowledgements.get(&key) == Some(&true) {
+                        SchedulerDisposition::CommitAfterAcceptedCancellation
+                    } else {
+                        SchedulerDisposition::Applied
+                    }
                 }
             }
             ScheduleAction::AttemptReconciled {
@@ -1362,6 +1372,37 @@ mod tests {
             matches!(&record.action, ScheduleAction::EventProduced { event_id, .. } if event_id == "event-new-epoch")
                 && record.disposition == SchedulerDisposition::Applied
         }));
+    }
+
+    #[test]
+    fn exact_effect_commit_repeat_is_idempotent_but_substitution_conflicts() {
+        let mut schedule = generate_delivery_schedule(73, 1).expect("valid schedule");
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let operation_id = "effect-op".to_owned();
+        let attempt_id = "effect-attempt".to_owned();
+        let t = 20_000;
+        push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::EffectAttempted {
+            operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
+        });
+        for (offset, effect_id) in [(1, "effect-a"), (2, "effect-a"), (3, "effect-b")] {
+            push_action(&mut schedule.actions, &mut ordinal, t + offset, ScheduleAction::EffectCommitted {
+                operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
+                effect_id: effect_id.to_owned(),
+            });
+        }
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        let dispositions: Vec<_> = report.records.iter().filter_map(|record| {
+            if matches!(record.action, ScheduleAction::EffectCommitted { .. }) {
+                Some(record.disposition)
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(dispositions, vec![
+            SchedulerDisposition::Applied,
+            SchedulerDisposition::Duplicate,
+            SchedulerDisposition::ConflictingEffectCommit,
+        ]);
     }
 
     #[test]
