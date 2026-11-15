@@ -331,7 +331,8 @@ pub fn evaluate_plant_power_balance(
     let has_invalid_power_sign = diagnostics
         .contains(&PowerBalanceDiagnostic::NegativeGrossGeneration)
         || diagnostics.contains(&PowerBalanceDiagnostic::NegativeRecirculationLoad);
-    let disposition = if !required_values_present || has_non_balance_diagnostic || has_invalid_power_sign {
+    let disposition =
+        if !required_values_present || has_non_balance_diagnostic || has_invalid_power_sign {
 
         PowerBalanceDisposition::NotEvaluable
     } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
