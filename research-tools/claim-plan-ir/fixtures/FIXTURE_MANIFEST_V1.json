@@ -1,11 +1,16 @@
 {
   "version": "claim-plan-fixture-manifest/v1",
-  "purpose": "Synthetic-only claim-plan schema and semantic preflight fixtures. No cryptographic or issuer qualification is implied.",
+  "purpose": "Synthetic-only multi-field claim plan, canonical-input, status privacy and semantic preflight fixtures. No cryptographic or issuer qualification is implied.",
   "positive": [
     {
       "path": "positive_zar_balance_plan_v1.json",
       "expected": "accept-structure-and-semantic-preflight",
-      "required": true
+      "required": true,
+      "covers": [
+        "currency == ZAR",
+        "available_minor_units >= 100000",
+        "as_of fresh within 300 seconds of verifier request issued_at, with 30-second future skew"
+      ]
     }
   ],
   "negative": [
@@ -39,6 +44,7 @@
     "The fixture uses synthetic identifiers and zero digests.",
     "No TLS session or proof is present.",
     "All profile IDs are test labels, not qualified profiles.",
-    "Schema shape is not policy correctness or authorization."
+    "Schema shape is not policy correctness or authorization.",
+    "The plan binds three fields from one synthetic response; it does not yet prove their transcript openings or predicate."
   ]
 }
