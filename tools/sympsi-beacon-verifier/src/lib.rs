@@ -197,7 +197,6 @@ pub fn verify_quicknet_response(
         chain_hash: trust_root.chain_hash,
         trust_root_manifest_sha256,
         scheme_id: trust_root.scheme_id,
-        
         beacon_id: BEACON_ID.into(),
         requested_round,
         returned_round: response.round,
@@ -324,6 +323,12 @@ mod tests {
             verify_quicknet_response(0, &response),
             Err(VerificationError::EmptyOrInvalidRound)
         );
+    }
+
+    #[test]
+    fn strict_relay_response_rejects_unknown_fields() {
+        let bytes = br#"{"round":1000,"randomness":"00","signature":"00","previous_signature":"00"}"#;
+        assert!(serde_json::from_slice::<QuicknetBeaconResponse>(bytes).is_err());
     }
 
     #[test]
