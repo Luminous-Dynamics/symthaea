@@ -24,6 +24,8 @@ const CHANGE_TYPES: &[&str] = &[
     "role_changed",
     "authority_changed",
     "memory_policy_changed",
+    "memory_consent_changed",
+    "model_snapshot_changed",
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -210,6 +212,9 @@ pub fn validate_trajectory(
                 if cycle.prior_cycle_digest.is_some() {
                     bail!("first team cycle must not reference a prior cycle digest");
                 }
+                if !cycle.changes.is_empty() {
+                    bail!("first team cycle establishes the initial roster; it must not claim prior-cycle changes");
+                }
             }
             Some(previous) => {
                 let prior = cycle
@@ -269,6 +274,13 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
                 }
             }
             Some(after) => {
+                if before.participant_type != after.participant_type {
+                    bail!(
+                        "cycle {} changes principal {:?} participant_type; use a new principal_id",
+                        current.cycle_index,
+                        before.principal_id
+                    );
+                }
                 if before.role != after.role && !required_change("role_changed", &before.principal_id) {
                     bail!(
                         "cycle {} changed role for {:?} without role_changed event",
@@ -281,6 +293,24 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
                 {
                     bail!(
                         "cycle {} changed authority for {:?} without authority_changed event",
+                        current.cycle_index,
+                        before.principal_id
+                    );
+                }
+                if before.memory_consent != after.memory_consent
+                    && !required_change("memory_consent_changed", &before.principal_id)
+                {
+                    bail!(
+                        "cycle {} changed memory consent for {:?} without memory_consent_changed event",
+                        current.cycle_index,
+                        before.principal_id
+                    );
+                }
+                if before.model_snapshot != after.model_snapshot
+                    && !required_change("model_snapshot_changed", &before.principal_id)
+                {
+                    bail!(
+                        "cycle {} changed model snapshot for {:?} without model_snapshot_changed event",
                         current.cycle_index,
                         before.principal_id
                     );
@@ -305,12 +335,43 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
     }
 
     if previous.memory_policy != current.memory_policy
-        && !current
-            .changes
-            .iter()
-            .any(|change| change.change_type == "memory_policy_changed")
+        && !required_change("memory_policy_changed", &current.members[0].principal_id)
     {
         bail!("cycle {} changed memory policy without memory_policy_changed event", current.cycle_index);
+    }
+
+    for change in &current.changes {
+        let before = previous
+            .members
+            .iter()
+            .find(|member| member.principal_id == change.subject_principal_id);
+        let after = current
+            .members
+            .iter()
+            .find(|member| member.principal_id == change.subject_principal_id);
+        let matches_transition = match change.change_type.as_str() {
+            "member_added" => before.is_none() && after.is_some(),
+            "member_removed" => before.is_some() && after.is_none(),
+            "role_changed" => before.zip(after).is_some_and(|(a, b)| a.role != b.role),
+            "authority_changed" => before
+                .zip(after)
+                .is_some_and(|(a, b)| a.authority_digest != b.authority_digest),
+            "memory_policy_changed" => previous.memory_policy != current.memory_policy,
+            "memory_consent_changed" => before
+                .zip(after)
+                .is_some_and(|(a, b)| a.memory_consent != b.memory_consent),
+            "model_snapshot_changed" => before
+                .zip(after)
+                .is_some_and(|(a, b)| a.model_snapshot != b.model_snapshot),
+            _ => false,
+        };
+        if !matches_transition {
+            bail!(
+                "cycle {} change {:?} does not correspond to an observed team configuration transition",
+                current.cycle_index,
+                change.change_id
+            );
+        }
     }
 
     Ok(())
