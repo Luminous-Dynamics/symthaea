@@ -1,0 +1,615 @@
+{
+  "schema_version": "atelier.microfactory-layout/0.1",
+  "status": "synthetic_reference_only",
+  "owner_issue": 12288,
+  "parent_issue": 8051,
+  "initial_garments": [
+    "AO-01",
+    "K-01",
+    "T-01",
+    "CR-01"
+  ],
+  "phase_plan": [
+    {
+      "id": "P0",
+      "name": "Networked development studio",
+      "owned_production": false,
+      "capabilities": [
+        "product_engineering",
+        "pattern_technical_data",
+        "material_sampling",
+        "partner_sample_acceptance",
+        "quality_standards"
+      ]
+    },
+    {
+      "id": "P1",
+      "name": "Prototype and repair microfactory",
+      "owned_production": true,
+      "capabilities": [
+        "receiving_quarantine",
+        "material_inspection",
+        "pattern_sample_room",
+        "manual_assisted_cutting",
+        "woven_cut_and_sew",
+        "pressing_dry_finish",
+        "inspection_metrology",
+        "repair_alteration",
+        "packing_dispatch"
+      ],
+      "explicit_exclusions": [
+        "dyeing",
+        "scouring",
+        "bleaching",
+        "wet_finishing",
+        "industrial_laundry",
+        "chemical_coating",
+        "fibre_opening",
+        "wet_recycling"
+      ]
+    },
+    {
+      "id": "P2",
+      "name": "Multi-family modular cells",
+      "owned_production": true,
+      "capabilities": [
+        "knit_cut_and_sew",
+        "trouser_cell",
+        "modular_layer_assembly",
+        "passive_machine_observability",
+        "assisted_cutting_if_qualified"
+      ]
+    },
+    {
+      "id": "P3",
+      "name": "Advanced knitting and distributed network",
+      "owned_production": "selective",
+      "capabilities": [
+        "flat_knitting_if_named_machine_available",
+        "whole_garment_knitting_if_qualified",
+        "robotic_cloth_handling_if_qualified",
+        "qualified_partner_network"
+      ]
+    },
+    {
+      "id": "P4",
+      "name": "Upstream process investment",
+      "owned_production": "decision_gated",
+      "capabilities": [
+        "only_processes_justified_by_demand_site_utilities_capability_and_qualification"
+      ]
+    }
+  ],
+  "reference_area_scenarios_m2": [
+    120,
+    200,
+    300
+  ],
+  "area_note": "Synthetic test envelopes only. Not minimum requirements, safe occupancy recommendations, lease targets or approved building sizes.",
+  "zones": [
+    {
+      "id": "Z01",
+      "name": "Receiving and inbound identification",
+      "class": "inbound",
+      "adjacent": [
+        "Z02",
+        "Z03"
+      ],
+      "separation_rules": [
+        "unknown_lots_remain_quarantined"
+      ]
+    },
+    {
+      "id": "Z02",
+      "name": "Supplier lot quarantine and receiving inspection",
+      "class": "quality_hold",
+      "adjacent": [
+        "Z01",
+        "Z03",
+        "Z16"
+      ],
+      "separation_rules": [
+        "do_not_release_without_acceptance"
+      ]
+    },
+    {
+      "id": "Z03",
+      "name": "Accepted material and trim storage",
+      "class": "accepted_storage",
+      "adjacent": [
+        "Z02",
+        "Z04",
+        "Z05"
+      ],
+      "separation_rules": [
+        "maintain_lot_identity",
+        "storage_conditions_are_material_specific"
+      ]
+    },
+    {
+      "id": "Z04",
+      "name": "Material inspection and conditioning",
+      "class": "metrology",
+      "adjacent": [
+        "Z03",
+        "Z05",
+        "Z06"
+      ]
+    },
+    {
+      "id": "Z05",
+      "name": "Design, CAD, pattern and technical development",
+      "class": "engineering",
+      "adjacent": [
+        "Z04",
+        "Z06",
+        "Z07"
+      ],
+      "separation_rules": [
+        "protect_private_body_measurements_and_personal_fit_data"
+      ]
+    },
+    {
+      "id": "Z06",
+      "name": "Spreading cutting and preparation",
+      "class": "preparation",
+      "adjacent": [
+        "Z03",
+        "Z04",
+        "Z05",
+        "Z07",
+        "Z08"
+      ],
+      "separation_rules": [
+        "guard_cutting_hazards",
+        "manage_lint_waste"
+      ]
+    },
+    {
+      "id": "Z07",
+      "name": "Tooling calibration and machine maintenance",
+      "class": "support",
+      "adjacent": [
+        "Z06",
+        "Z08",
+        "Z09",
+        "Z10"
+      ],
+      "separation_rules": [
+        "maintenance_isolation_and_safe_access"
+      ]
+    },
+    {
+      "id": "Z08",
+      "name": "Reconfigurable sewing and assembly cells",
+      "class": "production",
+      "adjacent": [
+        "Z06",
+        "Z07",
+        "Z09",
+        "Z10"
+      ],
+      "separation_rules": [
+        "machine_capability_and_operator_skill_required"
+      ]
+    },
+    {
+      "id": "Z09",
+      "name": "Optional knitting and advanced machine area",
+      "class": "future_production",
+      "phase": "P3",
+      "adjacent": [
+        "Z07",
+        "Z08",
+        "Z10"
+      ],
+      "separation_rules": [
+        "machine_family_specific_safety_and_utilities"
+      ]
+    },
+    {
+      "id": "Z10",
+      "name": "Pressing and dry finishing",
+      "class": "finishing",
+      "adjacent": [
+        "Z08",
+        "Z09",
+        "Z11"
+      ],
+      "separation_rules": [
+        "thermal_ventilation_fire_review"
+      ]
+    },
+    {
+      "id": "Z11",
+      "name": "In-process inspection and controlled rework",
+      "class": "quality_hold",
+      "adjacent": [
+        "Z08",
+        "Z10",
+        "Z12",
+        "Z13"
+      ],
+      "separation_rules": [
+        "failed_output_not_released"
+      ]
+    },
+    {
+      "id": "Z12",
+      "name": "Final inspection and measurement",
+      "class": "quality_release",
+      "adjacent": [
+        "Z11",
+        "Z14"
+      ],
+      "separation_rules": [
+        "independent_acceptance_authority"
+      ]
+    },
+    {
+      "id": "Z13",
+      "name": "Repair returns and refurbishment",
+      "class": "reverse_flow",
+      "adjacent": [
+        "Z11",
+        "Z12",
+        "Z15"
+      ],
+      "separation_rules": [
+        "separate_return_status_from_new_stock"
+      ]
+    },
+    {
+      "id": "Z14",
+      "name": "Packing finished goods and dispatch",
+      "class": "outbound",
+      "adjacent": [
+        "Z12",
+        "Z15"
+      ]
+    },
+    {
+      "id": "Z15",
+      "name": "Component and material recovery segregation",
+      "class": "recovery",
+      "adjacent": [
+        "Z13",
+        "Z14"
+      ],
+      "separation_rules": [
+        "receiver_and_grade_evidence_required"
+      ]
+    },
+    {
+      "id": "Z16",
+      "name": "Utility rooms and safe circulation / staff welfare",
+      "class": "building_support",
+      "adjacent": [
+        "Z01",
+        "Z02",
+        "Z07",
+        "Z08",
+        "Z10",
+        "Z12",
+        "Z14"
+      ],
+      "separation_rules": [
+        "qualified_egress_access_fire_and_building_review"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "F01",
+      "from": "Z01",
+      "to": "Z02",
+      "kind": "new_material",
+      "condition": "received_identity_and_documentation"
+    },
+    {
+      "id": "F02",
+      "from": "Z02",
+      "to": "Z03",
+      "kind": "new_material",
+      "condition": "inspection_accepted"
+    },
+    {
+      "id": "F03",
+      "from": "Z03",
+      "to": "Z04",
+      "kind": "new_material",
+      "condition": "lot_reserved_for_job"
+    },
+    {
+      "id": "F04",
+      "from": "Z04",
+      "to": "Z06",
+      "kind": "prepared_material",
+      "condition": "material_profile_and_lot_known"
+    },
+    {
+      "id": "F05",
+      "from": "Z06",
+      "to": "Z08",
+      "kind": "cut_panels",
+      "condition": "pattern_marker_cut_plan_revision_bound"
+    },
+    {
+      "id": "F06",
+      "from": "Z08",
+      "to": "Z11",
+      "kind": "work_in_progress",
+      "condition": "operation_graph_step_complete"
+    },
+    {
+      "id": "F07",
+      "from": "Z11",
+      "to": "Z08",
+      "kind": "rework",
+      "condition": "authorized_bounded_rework_plan"
+    },
+    {
+      "id": "F08",
+      "from": "Z11",
+      "to": "Z12",
+      "kind": "inspection_candidate",
+      "condition": "in_process_acceptance"
+    },
+    {
+      "id": "F09",
+      "from": "Z12",
+      "to": "Z14",
+      "kind": "accepted_product",
+      "condition": "final_inspection_pass"
+    },
+    {
+      "id": "F10",
+      "from": "Z14",
+      "to": "Z13",
+      "kind": "return",
+      "condition": "return_received_and_identity_bound"
+    },
+    {
+      "id": "F11",
+      "from": "Z13",
+      "to": "Z12",
+      "kind": "repair_reinspection",
+      "condition": "repair_complete"
+    },
+    {
+      "id": "F12",
+      "from": "Z13",
+      "to": "Z15",
+      "kind": "recovery",
+      "condition": "qualified_route_and_receiver"
+    },
+    {
+      "id": "F13",
+      "from": "Z02",
+      "to": "Z01",
+      "kind": "supplier_return",
+      "condition": "lot_rejected_and_return_authorized"
+    }
+  ],
+  "layouts": [
+    {
+      "id": "L-A",
+      "name": "Functional job shop",
+      "rationale": "low volume high variety and shared specialist machines",
+      "risks": [
+        "long_travel",
+        "queueing",
+        "WIP_growth",
+        "routing_complexity"
+      ],
+      "baseline_required": true
+    },
+    {
+      "id": "L-B",
+      "name": "Product-family U-cells",
+      "rationale": "repeatable small-batch flow and team ownership",
+      "risks": [
+        "machine_duplication",
+        "skill_bottlenecks",
+        "mix_sensitive_balance"
+      ],
+      "baseline_required": true
+    },
+    {
+      "id": "L-C",
+      "name": "Hybrid microfactory",
+      "rationale": "shared support services with reconfigurable assembly cells and distinct repair lane",
+      "preferred_hypothesis": true,
+      "risks": [
+        "shared_resource_queues",
+        "dispatch_discipline",
+        "cell_reconfiguration_cost"
+      ],
+      "baseline_required": true
+    },
+    {
+      "id": "L-D",
+      "name": "Distributed qualified network",
+      "rationale": "Atelier engineering and quality hub with qualified partner operations",
+      "risks": [
+        "partner_dependency",
+        "transport",
+        "process_visibility",
+        "IP_handoff"
+      ],
+      "baseline_required": true
+    }
+  ],
+  "utility_profiles": [
+    {
+      "id": "U-ELECTRIC",
+      "phase": "P1",
+      "boundary": "machine_and_facility_separate_metering",
+      "status": "to_be_measured",
+      "required_studies": [
+        "connected_load",
+        "inrush",
+        "peak_demand",
+        "power_quality",
+        "backup_criticality",
+        "outage_recovery"
+      ],
+      "do_not_assume": [
+        "nameplate_sum_equals_actual_demand",
+        "PV_battery_is_always_economic"
+      ]
+    },
+    {
+      "id": "U-WATER",
+      "phase": "P1",
+      "boundary": "domestic_and_actual_process_use_separate",
+      "status": "low_water_dry_process_hypothesis",
+      "required_studies": [
+        "domestic_use",
+        "any_actual_process_use",
+        "discharge_if_process_water_exists"
+      ],
+      "explicit_exclusion": "no_onsite_dyeing_washing_scouring_bleaching_or_chemical_finishing_in_P1"
+    },
+    {
+      "id": "U-THERMAL-AIR",
+      "phase": "P1",
+      "status": "professional_design_required",
+      "required_studies": [
+        "people_and_machine_heat_load",
+        "fresh_air",
+        "pressing_thermal_services",
+        "local_extraction_if_process_requires",
+        "lint_dust_noise_fire_review"
+      ]
+    },
+    {
+      "id": "U-COMPRESSED-AIR",
+      "phase": "P1",
+      "status": "only_if_named_machine_requires",
+      "required_studies": [
+        "point_of_use_pressure_quality",
+        "demand_profile",
+        "leakage_idle_loss",
+        "maintenance"
+      ]
+    },
+    {
+      "id": "U-DATA",
+      "phase": "P1",
+      "status": "local_first_read_only",
+      "required_studies": [
+        "offline_continuity",
+        "network_separation",
+        "timebase",
+        "access_control",
+        "machine_control_authority_separation"
+      ]
+    }
+  ],
+  "benchmark_scenarios": [
+    {
+      "id": "S00",
+      "name": "Matched base demand",
+      "disruption": "none"
+    },
+    {
+      "id": "S01",
+      "name": "One sewing machine outage",
+      "disruption": "machine_unavailable"
+    },
+    {
+      "id": "S02",
+      "name": "Supplier lot rejection",
+      "disruption": "material_lot_quarantine"
+    },
+    {
+      "id": "S03",
+      "name": "Skilled operator absence",
+      "disruption": "skill_capacity_reduction"
+    },
+    {
+      "id": "S04",
+      "name": "Power interruption and restore",
+      "disruption": "utility_outage"
+    },
+    {
+      "id": "S05",
+      "name": "Inspection/metrology resource failure",
+      "disruption": "quality_release_blocked"
+    },
+    {
+      "id": "S06",
+      "name": "Product mix shift",
+      "disruption": "order_mix_change"
+    },
+    {
+      "id": "S07",
+      "name": "Repair and returns surge",
+      "disruption": "reverse_flow_load"
+    },
+    {
+      "id": "S08",
+      "name": "Calibration expiry",
+      "disruption": "evidence_stale"
+    },
+    {
+      "id": "S09",
+      "name": "Planned cell reconfiguration",
+      "disruption": "layout_change"
+    }
+  ],
+  "hard_constraints": [
+    "egress_and_fire_access",
+    "machine_and_process_safety",
+    "accessibility_and_worker_requirements",
+    "qualified_machine_capability",
+    "required_worker_skill",
+    "material_lot_acceptance",
+    "independent_quality_release",
+    "utility_capacity_and_quality",
+    "reverse_flow_segregation_where_required"
+  ],
+  "metrics": [
+    "material_travel_distance",
+    "person_travel_distance",
+    "median_and_p95_lead_time",
+    "WIP_and_queue_time",
+    "first_pass_yield",
+    "rework_and_scrap",
+    "accepted_output_per_resource_hour",
+    "changeover_and_reconfiguration_time",
+    "kWh_per_accepted_garment",
+    "water_per_accepted_garment_only_if_process_relevant",
+    "worker_skill_coverage_and_ergonomic_assessment",
+    "cost_per_accepted_garment",
+    "recovery_time_by_disruption",
+    "traceability_and_containment"
+  ],
+  "owners": {
+    "apparel_thread": "symthaea#11731",
+    "factory_vertical": "symthaea#8051",
+    "built_environment": "symthaea#6032",
+    "built_site": "symthaea#6034",
+    "built_bim": "symthaea#6036",
+    "built_commissioning": "symthaea#6037",
+    "built_microfactory_pilot": "symthaea#6040",
+    "process_semantics": "symthaea#5686",
+    "operations_research": "symthaea#7677",
+    "textile_schedule": "symtropy#4875",
+    "textile_robotics": "symtropy#4865",
+    "machine_observability": "symtropy#5311",
+    "textile_knit_preflight": "symtropy#4878",
+    "textile_physics": "symtropy#456",
+    "lifecycle": "symthaea#5705"
+  },
+  "claim_boundaries": [
+    "no_site_selected",
+    "no_floor_area_approved",
+    "no_capacity_claim",
+    "layout_simulation_not_facility_commissioning",
+    "vendor_claim_not_independent_result",
+    "no_environmental_benefit_without_metered_or_validated_LCA_evidence",
+    "no_actuation_or_machine_safety_authority"
+  ]
+}
