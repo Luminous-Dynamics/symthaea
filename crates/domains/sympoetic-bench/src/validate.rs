@@ -702,6 +702,157 @@ fn validate_optional_unit_interval(name: &str, value: Option<f64>) -> Result<()>
     Ok(())
 }
 
+fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
+    const SCORER_KINDS: &[&str] = &[
+        "deterministic",
+        "blinded_human",
+        "participant_self_report",
+        "independent_observer",
+    ];
+    const SAMPLE_UNITS: &[&str] = &[
+        "participant",
+        "task",
+        "claim",
+        "decision",
+        "event",
+        "rater",
+        "run",
+        "member",
+        "cycle",
+        "coalition",
+    ];
+
+    let metric_values = scorecard.scores.entries();
+    let mut evidenced_metrics = HashSet::new();
+
+    for receipt in &scorecard.metric_evidence {
+        require_nonempty("metric_evidence.metric_name", &receipt.metric_name)?;
+        require_member(
+            "metric_evidence.scorer_kind",
+            &receipt.scorer_kind,
+            SCORER_KINDS,
+        )?;
+        require_member(
+            "metric_evidence.sample_unit",
+            &receipt.sample_unit,
+            SAMPLE_UNITS,
+        )?;
+        require_nonempty(
+            "metric_evidence.measurement_method",
+            &receipt.measurement_method,
+        )?;
+        require_nonempty(
+            "metric_evidence.scorer_revision",
+            &receipt.scorer_revision,
+        )?;
+        if receipt.sample_size == 0 {
+            bail!(
+                "metric {:?} must have a non-zero sample_size",
+                receipt.metric_name
+            );
+        }
+        if receipt.evidence_refs.is_empty()
+            || receipt.evidence_refs.iter().any(|reference| reference.trim().is_empty())
+        {
+            bail!(
+                "metric {:?} must reference at least one non-empty evidence source",
+                receipt.metric_name
+            );
+        }
+        let mut refs = HashSet::new();
+        if receipt
+            .evidence_refs
+            .iter()
+            .any(|reference| !refs.insert(reference.as_str()))
+        {
+            bail!(
+                "metric {:?} contains duplicate evidence references",
+                receipt.metric_name
+            );
+        }
+        if !receipt.value.is_finite() {
+            bail!("metric {:?} evidence value must be finite", receipt.metric_name);
+        }
+        if !evidenced_metrics.insert(receipt.metric_name.as_str()) {
+            bail!(
+                "scorecard contains duplicate metric evidence for {:?}",
+                receipt.metric_name
+            );
+        }
+
+        let score_value = metric_values
+            .iter()
+            .find(|(name, _)| *name == receipt.metric_name)
+            .with_context(|| {
+                format!(
+                    "metric evidence references unknown metric {:?}",
+                    receipt.metric_name
+                )
+            })?
+            .1
+            .context("metric evidence is present for a scorecard metric with no value")?;
+        if (score_value - receipt.value).abs() > 1e-9 {
+            bail!(
+                "metric {:?} evidence value does not match the scorecard value",
+                receipt.metric_name
+            );
+        }
+
+        match (receipt.numerator, receipt.denominator) {
+            (Some(numerator), Some(denominator)) => {
+                if !numerator.is_finite()
+                    || !denominator.is_finite()
+                    || denominator <= 0.0
+                    || numerator < 0.0
+                    || numerator > denominator
+                {
+                    bail!(
+                        "metric {:?} has an invalid numerator/denominator pair",
+                        receipt.metric_name
+                    );
+                }
+                if (numerator / denominator - receipt.value).abs() > 1e-6 {
+                    bail!(
+                        "metric {:?} value is inconsistent with its numerator/denominator",
+                        receipt.metric_name
+                    );
+                }
+            }
+            (None, None) => {}
+            _ => bail!(
+                "metric {:?} must provide both numerator and denominator or neither",
+                receipt.metric_name
+            ),
+        }
+
+        match (receipt.ci_lower, receipt.ci_upper) {
+            (Some(lower), Some(upper)) => {
+                if !lower.is_finite() || !upper.is_finite() || lower > receipt.value || upper < receipt.value || lower > upper {
+                    bail!(
+                        "metric {:?} has an invalid uncertainty interval",
+                        receipt.metric_name
+                    );
+                }
+            }
+            (None, None) => {}
+            _ => bail!(
+                "metric {:?} must provide both ci_lower and ci_upper or neither",
+                receipt.metric_name
+            ),
+        }
+    }
+
+    for (metric_name, value) in metric_values {
+        if value.is_some() && !evidenced_metrics.contains(metric_name) {
+            bail!(
+                "scorecard metric {:?} has a value but no evidence receipt",
+                metric_name
+            );
+        }
+    }
+    Ok(())
+}
+
 pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     if scorecard.schema_version != "sympoetic-scorecard/0.1"
         || scorecard.benchmark_version != "0.1"
@@ -709,6 +860,7 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         bail!("unsupported scorecard schema or benchmark version");
     }
     require_nonempty("run_id", &scorecard.run_id)?;
+    validate_metric_evidence(scorecard)?;
     if !valid_scenario_id(&scorecard.scenario_id) {
         bail!("scorecard has invalid scenario_id {:?}", scorecard.scenario_id);
     }
