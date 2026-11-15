@@ -100,6 +100,9 @@
       "required": [
         "control_id",
         "final_state",
+        "decision_cutoff",
+        "receipt_validity_window_open",
+        "reused_receipts",
         "reuse_policy",
         "expected_required_revalidation",
         "expected_false_resurrection_count"
@@ -124,6 +127,19 @@
         "expected_false_resurrection_count": {
           "type": "integer",
           "minimum": 0
+        },
+        "decision_cutoff": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt_validity_window_open": {
+          "const": true
+        },
+        "reused_receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receipt"
+          }
         }
       }
     },
@@ -239,7 +255,10 @@
         "obligation_id",
         "source_epoch",
         "outcome",
-        "context"
+        "context",
+        "observed_at",
+        "available_at",
+        "valid_until"
       ],
       "properties": {
         "obligation_id": {
@@ -259,6 +278,18 @@
         },
         "context": {
           "$ref": "#/$defs/state"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -378,7 +409,8 @@
             "additionalProperties": false,
             "required": [
               "epoch",
-              "fresh_pass_obligations",
+              "decision_cutoff",
+              "fresh_pass_receipts",
               "reused_receipts",
               "declared_current_obligations"
             ],
@@ -387,31 +419,20 @@
                 "type": "integer",
                 "minimum": 1
               },
-              "fresh_pass_obligations": {
+              "decision_cutoff": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "fresh_pass_receipts": {
                 "type": "array",
-                "uniqueItems": true,
                 "items": {
-                  "type": "string"
+                  "$ref": "#/$defs/receipt"
                 }
               },
               "reused_receipts": {
                 "type": "array",
                 "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "obligation_id",
-                    "source_epoch"
-                  ],
-                  "properties": {
-                    "obligation_id": {
-                      "type": "string"
-                    },
-                    "source_epoch": {
-                      "type": "integer",
-                      "minimum": 0
-                    }
-                  }
+                  "$ref": "#/$defs/receipt"
                 }
               },
               "declared_current_obligations": {
