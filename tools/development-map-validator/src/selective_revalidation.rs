@@ -399,6 +399,20 @@ mod tests {
     }
 
     #[test]
+    fn digest_helper_reproduces_committed_d6_receipt_digest() {
+        let mut scenario = fixture_value();
+        let original = scenario["arms"][1]["checkpoints"][1]["receipts"][0]["receipt_digest"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        refresh_receipt_digest(&mut scenario, 1, 1, 0);
+        assert_eq!(
+            scenario["arms"][1]["checkpoints"][1]["receipts"][0]["receipt_digest"],
+            original
+        );
+    }
+
+    #[test]
     fn computes_oracle_minimum_for_shifted_synthetic_trace() {
         let report = score_selective_revalidation_oracle_json(FIXTURE).unwrap();
         let shifted = report.arm_reports.iter()
