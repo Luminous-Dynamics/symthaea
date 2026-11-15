@@ -5882,6 +5882,56 @@ mod tests {
     }
 
     #[test]
+    fn inventory_cut_rejects_an_unattested_attempt_started_before_discharge() {
+        let (mut schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let mapping_id = push_test_clock_mapping(
+            &mut schedule.actions,
+            &mut ordinal,
+            13,
+            150,
+        );
+        push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            14,
+            ScheduleAction::EffectAttempted {
+                operation_id: "robot-2".to_owned(),
+                attempt_id: "attempt-omitted-before-discharge".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 150,
+            },
+            ActionEvidence::AttemptStart {
+                retry_of_attempt_id: None,
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(
+                &schedule.actions,
+                &mapping_id,
+                150,
+                1_190,
+            ),
+        );
+        let report = project_action_history(
+            &schedule,
+            "robot-1",
+            &resolutions,
+            &receipts,
+        ).expect("unattested pre-discharge attempt assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(!report.start_gate.as_ref().is_some_and(|gate| {
+            gate.start_permitted_by_stop_contract
+        }));
+        assert!(report.reason_codes.iter().any(|code| {
+            code.contains("POST_FRONTIER_ATTEMPT_PRECEDES_STOP_DISCHARGE:attempt-omitted-before-discharge")
+        }));
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
