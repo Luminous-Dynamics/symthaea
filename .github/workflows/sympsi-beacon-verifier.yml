@@ -40,6 +40,15 @@ jobs:
                 dependencies: [.dependencies[] | {name, req, source}]
               }' | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Capture resolved dependency trees
+        run: |
+          cargo tree --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --locked -e normal,build \
+            > "$RUNNER_TEMP/sympsi-dependency-tree-normal.txt"
+          cargo tree --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --locked -e dev \
+            > "$RUNNER_TEMP/sympsi-dependency-tree-dev.txt"
+          cat "$RUNNER_TEMP/sympsi-dependency-tree-normal.txt" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/sympsi-dependency-tree-dev.txt" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Format
         run: cargo fmt --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all -- --check
 
@@ -85,5 +94,7 @@ jobs:
           path: |
             tools/sympsi-beacon-verifier/Cargo.lock
             ${{ runner.temp }}/sympsi-quicknet-round-1000-receipt.json
+            ${{ runner.temp }}/sympsi-dependency-tree-normal.txt
+            ${{ runner.temp }}/sympsi-dependency-tree-dev.txt
           if-no-files-found: error
           retention-days: 90
