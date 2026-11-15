@@ -19,8 +19,12 @@ cargo run -p sympoetic-bench -- validate-trajectory --input path/to/team-traject
 # Validate a recorded interaction trace
 cargo run -p sympoetic-bench -- validate-trace --input path/to/trace.json
 
-# Validate scorecard ranges, F1 consistency, evidence digests, and hard gates
+# Validate scorecard values, per-metric evidence receipts, provenance, and hard gates
 cargo run -p sympoetic-bench -- validate-scorecard --input path/to/scorecard.json
+
+# Validate the checked-in evidence-bearing example
+cargo run -p sympoetic-bench -- validate-scorecard \\
+  --input docs/benchmarks/sympoetic/fixtures/scorecard-with-evidence.example.json
 
 # Digest a file without modifying it
 cargo run -p sympoetic-bench -- digest --input path/to/artifact
@@ -38,7 +42,7 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 - Every proposed tool call must receive its matching observation before another decision is accepted.
 - An unknown tool outcome blocks the agent decision loop until a matching, independently observed reconciliation event arrives.
 - Scorecard dimensions are range-checked; attribution F1 must agree with precision and recall.
-- Every reported score must have exactly one metric-level evidence receipt containing the matching value, scorer kind/revision, sample unit/count, and non-empty evidence references. Optional numerator/denominator pairs and confidence intervals must be internally consistent.
+- Every reported score must have exactly one metric-level evidence receipt containing the matching value, scorer kind/revision, sample unit/count, measurement method, and non-empty evidence references. Optional numerator/denominator pairs and confidence intervals must be internally consistent.
 - `model_auxiliary` is not accepted as a primary scorer kind in v0.1; human-rated, participant-reported, independent-observer, and deterministic measures remain separately identified.
 - Hard-gate failures are non-compensatory. A scorecard cannot mark hard gates as passing while any failure counter is non-zero.
 
