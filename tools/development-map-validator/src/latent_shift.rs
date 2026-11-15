@@ -15,6 +15,7 @@ use serde_json::Value;
 pub struct LatentShiftEpisodeReport {
     pub episode_id: String,
     pub truth_kind: String,
+    pub gold_adjudication_status: String,
     pub detected: bool,
     pub false_alarm: bool,
     pub detection_before_stale_use: bool,
@@ -511,6 +512,14 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
     if truth_kind == "latent_shift" && (changed_dimensions.is_empty() || affected.is_empty()) {
         return Err("latent_shift must declare changed dimensions and affected obligations".to_owned());
     }
+    const IMPACT_DIMENSIONS: &[&str] = &[
+        "source_tree", "runner_image", "toolchain", "policy", "issuer", "api_contract", "docs_contract"
+    ];
+    for dimension in &changed_dimensions {
+        if !IMPACT_DIMENSIONS.contains(&dimension.as_str()) {
+            return Err(format!("unsupported changed dependency dimension {dimension:?}"));
+        }
+    }
     if first_sufficient < hidden_event_time {
         return Err("first_sufficient_observation_available_at precedes the hidden event".to_owned());
     }
@@ -595,7 +604,10 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
     }
 
     let detected = !detection_times.is_empty();
-    let false_alarm = truth_kind == "sham_no_shift" && detected;
+    let false_alarm = truth_kind == "sham_no_shift"
+        && decisions.iter().any(|decision| {
+            matches!(decision.shift_disposition.as_str(), "possible_shift" | "shift_detected")
+        });
     let first_detection = detection_times.into_iter().min();
     let final_decision = decisions
         .last()
@@ -630,13 +642,13 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
 
     let event_detection_delay_seconds = match (&first_detection, truth_kind.as_str()) {
         (Some(detected_at), "latent_shift") => {
-            Some(detected_at.signed_duration_since(hidden_event_time).num_seconds())
+            Some(detected_at.timestamp() - hidden_event_time.timestamp())
         }
         _ => None,
     };
     let candidate_detection_delay_seconds = match (&first_detection, &first_candidate_signal) {
         (Some(detected_at), Some(first_signal)) => {
-            Some(detected_at.signed_duration_since(first_signal).num_seconds())
+            Some(detected_at.timestamp() - first_signal.timestamp())
         }
         _ => None,
     };
@@ -659,6 +671,7 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
     Ok(LatentShiftEpisodeReport {
         episode_id,
         truth_kind,
+        gold_adjudication_status: adjudication_status,
         detected,
         false_alarm,
         detection_before_stale_use,
