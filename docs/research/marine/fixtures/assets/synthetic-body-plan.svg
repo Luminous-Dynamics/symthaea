@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1800" viewBox="0 0 2400 1800">
+  <rect width="2400" height="1800" fill="white"/>
+  <g stroke="#999" stroke-width="2" fill="none">
+    <path d="M100 900 H2300 M1200 120 V1680" stroke-dasharray="18 12"/>
+    <path d="M1200 260 C980 330 760 520 720 900 C760 1280 980 1470 1200 1540"/>
+    <path d="M1200 260 C1420 330 1640 520 1680 900 C1640 1280 1420 1470 1200 1540"/>
+    <path d="M1200 450 C1040 510 900 680 880 900 C900 1120 1040 1290 1200 1350"/>
+    <path d="M1200 450 C1360 510 1500 680 1520 900 C1500 1120 1360 1290 1200 1350"/>
+  </g>
+  <g fill="#222" font-family="sans-serif" font-size="42">
+    <text x="80" y="100">SYNTHETIC BODY PLAN — NOT A REAL VESSEL</text>
+    <text x="1220" y="1700">Centreline</text>
+  </g>
+</svg>
