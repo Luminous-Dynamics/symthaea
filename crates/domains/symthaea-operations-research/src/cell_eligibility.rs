@@ -137,6 +137,7 @@ pub struct OperationRequirement {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EligibilityReasonCode {
     EmptyRequiredReference,
+    DuplicateResolvedReference,
     SnapshotIncomplete,
     FacilityMismatch,
     ProfileNotQualified,
@@ -256,12 +257,18 @@ pub fn evaluate_cell_eligibility(
         for evidence in &cell.qualification_evidence { out.check_evidence(evidence, at); }
     }
 
-    let config = cell.process_configurations.iter()
-        .find(|candidate| candidate.configuration_ref == requirement.process_configuration_ref);
-
-    let Some(config) = config else {
-        out.add(EligibilityReasonCode::ConfigurationMissing, missing_severity(cell.resolution), &requirement.process_configuration_ref);
-        return out.finish(requirement, cell, at);
+    let config = match unique_match(&cell.process_configurations, |candidate| {
+        candidate.configuration_ref == requirement.process_configuration_ref
+    }) {
+        Ok(Some(config)) => config,
+        Ok(None) => {
+            out.add(EligibilityReasonCode::ConfigurationMissing, missing_severity(cell.resolution), &requirement.process_configuration_ref);
+            return out.finish(requirement, cell, at);
+        }
+        Err(()) => {
+            out.add(EligibilityReasonCode::DuplicateResolvedReference, EligibilitySeverity::Blocked, &requirement.process_configuration_ref);
+            return out.finish(requirement, cell, at);
+        }
     };
 
     if !config.operation_refs.contains(&requirement.operation_ref) {
@@ -285,9 +292,16 @@ pub fn evaluate_cell_eligibility(
         out.add(EligibilityReasonCode::AssetMissing, EligibilitySeverity::Indeterminate, &config.configuration_ref);
     }
     for asset_ref in &config.asset_refs {
-        let Some(asset) = cell.assets.iter().find(|candidate| candidate.asset_ref == *asset_ref) else {
-            out.add(EligibilityReasonCode::AssetMissing, missing_severity(cell.resolution), asset_ref);
-            continue;
+        let asset = match unique_match(&cell.assets, |candidate| candidate.asset_ref == *asset_ref) {
+            Ok(Some(asset)) => asset,
+            Ok(None) => {
+                out.add(EligibilityReasonCode::AssetMissing, missing_severity(cell.resolution), asset_ref);
+                continue;
+            }
+            Err(()) => {
+                out.add(EligibilityReasonCode::DuplicateResolvedReference, EligibilitySeverity::Blocked, asset_ref);
+                continue;
+            }
         };
         match asset.status {
             AssetStatus::Available => {}
@@ -307,9 +321,16 @@ pub fn evaluate_cell_eligibility(
     }
 
     for skill_ref in &requirement.required_skill_refs {
-        let Some(skill) = cell.skill_qualifications.iter().find(|candidate| candidate.skill_ref == *skill_ref) else {
-            out.add(EligibilityReasonCode::SkillMissing, missing_severity(cell.resolution), skill_ref);
-            continue;
+        let skill = match unique_match(&cell.skill_qualifications, |candidate| candidate.skill_ref == *skill_ref) {
+            Ok(Some(skill)) => skill,
+            Ok(None) => {
+                out.add(EligibilityReasonCode::SkillMissing, missing_severity(cell.resolution), skill_ref);
+                continue;
+            }
+            Err(()) => {
+                out.add(EligibilityReasonCode::DuplicateResolvedReference, EligibilitySeverity::Blocked, skill_ref);
+                continue;
+            }
         };
         match skill.availability {
             Availability::Available => {}
@@ -320,9 +341,16 @@ pub fn evaluate_cell_eligibility(
     }
 
     for lot_ref in &requirement.required_material_lot_refs {
-        let Some(lot) = cell.material_lots.iter().find(|candidate| candidate.lot_ref == *lot_ref) else {
-            out.add(EligibilityReasonCode::MaterialLotMissing, missing_severity(cell.resolution), lot_ref);
-            continue;
+        let lot = match unique_match(&cell.material_lots, |candidate| candidate.lot_ref == *lot_ref) {
+            Ok(Some(lot)) => lot,
+            Ok(None) => {
+                out.add(EligibilityReasonCode::MaterialLotMissing, missing_severity(cell.resolution), lot_ref);
+                continue;
+            }
+            Err(()) => {
+                out.add(EligibilityReasonCode::DuplicateResolvedReference, EligibilitySeverity::Blocked, lot_ref);
+                continue;
+            }
         };
         match lot.status {
             MaterialLotStatus::Accepted => {}
@@ -339,9 +367,16 @@ pub fn evaluate_cell_eligibility(
     }
 
     for demand in &requirement.utility_requirements {
-        let Some(capacity) = cell.utility_capacities.iter().find(|candidate| candidate.service_ref == demand.service_ref) else {
-            out.add(EligibilityReasonCode::UtilityMissing, missing_severity(cell.resolution), &demand.service_ref);
-            continue;
+        let capacity = match unique_match(&cell.utility_capacities, |candidate| candidate.service_ref == demand.service_ref) {
+            Ok(Some(capacity)) => capacity,
+            Ok(None) => {
+                out.add(EligibilityReasonCode::UtilityMissing, missing_severity(cell.resolution), &demand.service_ref);
+                continue;
+            }
+            Err(()) => {
+                out.add(EligibilityReasonCode::DuplicateResolvedReference, EligibilitySeverity::Blocked, &demand.service_ref);
+                continue;
+            }
         };
         if capacity.unit_ref != demand.unit_ref {
             out.add(EligibilityReasonCode::UtilityUnitMismatch, EligibilitySeverity::Blocked, &capacity.service_ref);
@@ -361,14 +396,34 @@ pub fn evaluate_cell_eligibility(
     }
 
     for clearance_ref in &requirement.required_clearance_refs {
-        let Some(clearance) = cell.clearances.iter().find(|candidate| candidate.clearance_ref == *clearance_ref) else {
-            out.add(EligibilityReasonCode::ClearanceEvidenceMissing, missing_severity(cell.resolution), clearance_ref);
-            continue;
+        let clearance = match unique_match(&cell.clearances, |candidate| candidate.clearance_ref == *clearance_ref) {
+            Ok(Some(clearance)) => clearance,
+            Ok(None) => {
+                out.add(EligibilityReasonCode::ClearanceEvidenceMissing, missing_severity(cell.resolution), clearance_ref);
+                continue;
+            }
+            Err(()) => {
+                out.add(EligibilityReasonCode::DuplicateResolvedReference, EligibilitySeverity::Blocked, clearance_ref);
+                continue;
+            }
         };
         out.check_evidence(&clearance.evidence, at);
     }
 
     out.finish(requirement, cell, at)
+}
+
+fn unique_match<'a, T, F>(items: &'a [T], predicate: F) -> Result<Option<&'a T>, ()>
+where
+    F: Fn(&T) -> bool,
+{
+    let mut matches = items.iter().filter(|item| predicate(item));
+    let first = matches.next();
+    if matches.next().is_some() {
+        Err(())
+    } else {
+        Ok(first)
+    }
 }
 
 fn contains_all(available: &[String], required: &[String]) -> bool {
