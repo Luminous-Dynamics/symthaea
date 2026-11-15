@@ -1,0 +1,139 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark": "Atelier FactoryBench B1 — Cell Eligibility",
+  "evidence_class": "synthetic",
+  "claim_ceiling": "These cases test evaluator logic only. They do not qualify a physical machine, worker, partner, facility, or production process.",
+  "evaluation_contract": {
+    "outcomes": [
+      "Eligible",
+      "Blocked",
+      "Indeterminate"
+    ],
+    "fail_closed_rule": "A candidate is Eligible only when every hard requirement is explicitly resolved and satisfied at the scheduled operation time.",
+    "known_absence": "Missing required record in a Complete snapshot is Blocked.",
+    "unresolved_absence": "Missing required record in a Partial or Unknown snapshot is Indeterminate.",
+    "conflict_rule": "Known hard violations produce Blocked even when other facts are unresolved.",
+    "duplicate_reference_rule": "Multiple records matching one required stable reference are Blocked; input order must never select one."
+  },
+  "cases": [
+    {
+      "case_id": "B1-ELIG-001",
+      "name": "Qualified matched operation",
+      "expected_outcome": "Eligible",
+      "mutation": "none",
+      "reason": "All required revisions, assets, skills, lots, utilities, clearances, and inspection evidence are current and matching."
+    },
+    {
+      "case_id": "B1-NEG-002",
+      "name": "Candidate profile",
+      "expected_outcome": "Blocked",
+      "mutation": "profile_status=Candidate",
+      "reason": "A candidate profile is not a production-eligible qualification."
+    },
+    {
+      "case_id": "B1-NEG-003",
+      "name": "Unknown machine state",
+      "expected_outcome": "Indeterminate",
+      "mutation": "asset_status=Unknown",
+      "reason": "Unknown asset state cannot be interpreted as available."
+    },
+    {
+      "case_id": "B1-NEG-004",
+      "name": "Expired calibration",
+      "expected_outcome": "Blocked",
+      "mutation": "calibration_evidence=Expired",
+      "reason": "The scheduled operation occurs outside the calibration evidence validity."
+    },
+    {
+      "case_id": "B1-NEG-005",
+      "name": "Wrong pattern revision",
+      "expected_outcome": "Blocked",
+      "mutation": "configuration_pattern_revision!=operation_pattern_revision",
+      "reason": "A configuration qualified against another pattern revision cannot be reused."
+    },
+    {
+      "case_id": "B1-NEG-006",
+      "name": "Quarantined input lot",
+      "expected_outcome": "Blocked",
+      "mutation": "material_lot_status=Quarantined",
+      "reason": "A quarantined lot cannot enter an accepted production route."
+    },
+    {
+      "case_id": "B1-NEG-007",
+      "name": "Unknown utility availability",
+      "expected_outcome": "Indeterminate",
+      "mutation": "utility_availability=Unknown",
+      "reason": "Unknown utility service state is not available capacity."
+    },
+    {
+      "case_id": "B1-NEG-008",
+      "name": "Required skill absent from complete snapshot",
+      "expected_outcome": "Blocked",
+      "mutation": "remove_required_skill_from_complete_snapshot",
+      "reason": "The complete workforce snapshot proves that the required skill is not covered."
+    },
+    {
+      "case_id": "B1-NEG-009",
+      "name": "Required skill unresolved in partial snapshot",
+      "expected_outcome": "Indeterminate",
+      "mutation": "remove_required_skill_and_set_snapshot=Partial",
+      "reason": "Incomplete workforce evidence cannot prove either presence or absence."
+    },
+    {
+      "case_id": "B1-NEG-010",
+      "name": "Wrong facility context",
+      "expected_outcome": "Blocked",
+      "mutation": "operation_facility_ref!=cell_facility_ref",
+      "reason": "A cell qualification is site-specific and cannot be silently reused at another facility."
+    },
+    {
+      "case_id": "B1-NEG-011",
+      "name": "Unknown evidence validity window",
+      "expected_outcome": "Indeterminate",
+      "mutation": "evidence_valid_until=null",
+      "reason": "Evidence without a resolvable validity interval cannot establish current qualification."
+    },
+    {
+      "case_id": "B1-NEG-012",
+      "name": "Duplicate process-configuration identity",
+      "expected_outcome": "Blocked",
+      "mutation": "duplicate_matching_configuration_ref_with_conflicting_pattern_revision",
+      "reason": "Ambiguous canonical identity must not be resolved by input order."
+    },
+    {
+      "case_id": "B1-NEG-013",
+      "name": "Missing inspection-plan evidence",
+      "expected_outcome": "Indeterminate",
+      "mutation": "inspection_plan_evidence=Missing",
+      "reason": "A plan identifier without current supporting evidence is not enough for eligibility."
+    },
+    {
+      "case_id": "B1-NEG-014",
+      "name": "Utility unit mismatch",
+      "expected_outcome": "Blocked",
+      "mutation": "utility_capacity_unit_ref!=utility_requirement_unit_ref",
+      "reason": "A numerical comparison across incompatible units is invalid."
+    },
+    {
+      "case_id": "B1-NEG-015",
+      "name": "Insufficient known utility capacity",
+      "expected_outcome": "Blocked",
+      "mutation": "available_utility_capacity<required_utility_capacity",
+      "reason": "Known insufficient service capacity blocks the operation."
+    },
+    {
+      "case_id": "B1-NEG-016",
+      "name": "Revoked qualification evidence",
+      "expected_outcome": "Blocked",
+      "mutation": "process_qualification_evidence=Revoked",
+      "reason": "Revoked evidence cannot continue authorizing a planned operation."
+    }
+  ],
+  "publication_requirements": [
+    "Publish all raw cases and per-case reason codes.",
+    "Record exact source commit, evaluator version, input digest, and operation evaluation time.",
+    "Run at least 30 repeated randomized input-order permutations for determinism checks.",
+    "Use an independent verifier implementation before claiming optimizer-to-verifier agreement.",
+    "Do not publish synthetic fixture results as measured factory capability."
+  ]
+}
