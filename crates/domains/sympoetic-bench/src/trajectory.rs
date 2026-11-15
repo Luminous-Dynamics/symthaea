@@ -259,7 +259,7 @@ pub fn validate_trajectory(
                 }
                 if !cycle.changes.is_empty() {
                     bail!(
-                        "first team cycle establishes the roster; it cannot claim prior-cycle changes"
+                        "first cycle establishes the roster; it cannot claim prior changes"
                     );
                 }
             }
