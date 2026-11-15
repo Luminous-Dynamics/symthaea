@@ -812,10 +812,13 @@ mod tests {
         let selected = sample_ids("reject-all", &rejected, 4, seed);
         let samples = selected
             .into_iter()
-            .map(|candidate_id| AuditSample {
-                candidate_id,
-                outcome: AuditOutcome::ConfirmedInfeasible,
-                evidence_ref: format!("reference-run-{candidate_id}"),
+            .map(|candidate_id| {
+                let evidence_ref = format!("reference-run-{candidate_id}");
+                AuditSample {
+                    candidate_id,
+                    outcome: AuditOutcome::ConfirmedInfeasible,
+                    evidence_ref,
+                }
             })
             .collect();
         let mut candidate_ids = vec!["accepted-0".to_string(), "accepted-1".to_string()];
