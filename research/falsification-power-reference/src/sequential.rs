@@ -558,11 +558,13 @@ impl PredictableGaussianMixture {
             .zip(self.component_log_e_values.iter().copied())
             .zip(pending.residuals.iter().copied())
             .map(
-                |(((alternative, weight), log_e_value), expected_residual)| MixtureComponentUpdate {
-                    id: alternative.id.clone(),
-                    weight,
-                    expected_residual,
-                    log_e_value,
+                |(((alternative, weight), log_e_value), expected_residual)| {
+                    MixtureComponentUpdate {
+                        id: alternative.id.clone(),
+                        weight,
+                        expected_residual,
+                        log_e_value,
+                    }
                 },
             )
             .collect();
