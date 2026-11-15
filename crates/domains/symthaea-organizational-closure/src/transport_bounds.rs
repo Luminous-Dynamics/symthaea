@@ -1223,6 +1223,21 @@ mod tests {
                 oracle_upper = oracle_upper.max(mean);
             }
         }
+        for second in [lower_ratio, upper_ratio] {
+            for third in [lower_ratio, upper_ratio] {
+                let first = (1.0 - 0.50 * second - 0.25 * third) / 0.25;
+                if first < lower_ratio - MASS_TOLERANCE
+                    || first > upper_ratio + MASS_TOLERANCE
+                {
+                    continue;
+                }
+                let mean = 0.25 * first * 0.0
+                    + 0.50 * second * 5.0
+                    + 0.25 * third * 10.0;
+                oracle_lower = oracle_lower.min(mean);
+                oracle_upper = oracle_upper.max(mean);
+            }
+        }
         assert!((actual_lower - oracle_lower).abs() < 1.0e-10);
         assert!((actual_upper - oracle_upper).abs() < 1.0e-10);
     }
