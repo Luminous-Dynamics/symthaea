@@ -11,8 +11,8 @@ This directory separates three questions that are often collapsed into one AI sc
 | Programme | Primary question | Status |
 |---|---|---|
 | Symthaea Psych-Bench | Does the architecture exhibit the cognitive and psychometric behaviours represented by its test suite? | Existing suite; see its own README and calibration transparency report |
-| Agent-operations interoperability | How does a Symthaea-driven agent compare on external, role-aware operations evaluations? | Research plan only; external AOBench is not copied or modified here |
-| SympoeticBench | Does human-AI collaboration produce useful joint capability without eroding agency, diversity, consent, or provenance? | Protocol and development seed corpus proposed in v0.1 |
+| Agent-operations interoperability | How does a Symthaea-driven agent compare on external, role-aware operations evaluations? | Adapter semantics, protocol contract, Rust decision guard, and schemas drafted; no AOBench run yet |
+| SympoeticBench | Does human-AI collaboration produce useful joint capability without eroding agency, diversity, consent, or provenance? | v0.1 protocol, 14-scenario seed set, JSON schemas, Rust validators, metrics, and agent-protocol guard; human validation pending |
 
 These programmes are complementary, not interchangeable. Psych-Bench is not a human-AI collaboration benchmark. An operations score is not evidence of general intelligence. A creative artifact's quality is not evidence that collaboration was reciprocal.
 
@@ -42,6 +42,16 @@ Every result intended for comparison must identify:
 - Cost, latency, human time, and interaction burden.
 
 Hard safety failures are reported separately and cannot be averaged away by high artifact quality. No single weighted aggregate is defined in v0.1.
+
+## Research and implementation entry points
+
+- [SympoeticBench protocol](sympoetic/PROTOCOL.md) — constructs, baselines, statistical rules, and hard gates.
+- [Benchmark landscape](BENCHMARK_LANDSCAPE.md) — adjacent SOTA and comparison strategy.
+- [Collaboration gap and relay protocol](sympoetic/COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) — solo/team degradation, order effects, specialist handoffs.
+- [Adaptive intervention policy](sympoetic/ADAPTIVE_INTERVENTION_POLICY.md) — when the system should ask, challenge, delegate, defer, or step back.
+- [Causal contribution and trace protocol](sympoetic/TRACE_AND_CAUSAL_ATTRIBUTION.md) — event provenance and counterfactual replay.
+- [Symthaea agent decision protocol](AGENT_DECISION_PROTOCOL.md) — proposal-only tool decisions and harness-owned execution authority.
+- [AOBench interoperability](AGENT_OPERATIONS_INTEROP.md) — fair external comparison and current adapter gap.
 
 ## Scientific boundaries
 
