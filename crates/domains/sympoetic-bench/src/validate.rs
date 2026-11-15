@@ -1031,6 +1031,17 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             bail!("agency_delta_sd_vs_reference must be finite");
         }
     }
+    if let Some(value) = scorecard.scores.cohen_kappa_nominal {
+        if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
+            bail!("cohen_kappa_nominal must be finite and in [-1, 1]");
+        }
+    }
+    if let Some(value) = scorecard.scores.krippendorff_alpha_nominal {
+        if !value.is_finite() {
+            bail!("krippendorff_alpha_nominal must be finite");
+        }
+    }
+
     for (name, value) in [
         ("synergy_delta", scorecard.scores.synergy_delta),
         ("collaboration_gap", scorecard.scores.collaboration_gap),
