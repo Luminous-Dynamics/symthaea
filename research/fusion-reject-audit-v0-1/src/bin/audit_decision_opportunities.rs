@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use fusion_reject_audit::{
     AcceptedCandidate, AcceptedCandidateManifest, AuditOutcome, FrozenCandidateUniverse,
-    RejectAuditPlan, RejectStratum, audit_decision_opportunities, deterministic_audit_sample_ids,
+    RejectAuditPlan, RejectStratum, audit_decision_opportunities,
     decision_opportunity::{
         DecisionEvaluation, DecisionOpportunityPlan, IncumbentFrontierPoint, ObjectiveDefinition,
         ObjectiveDirection, ObjectiveValue, StratumDecisionEvaluations,
     },
+    deterministic_audit_sample_ids,
 };
 
 fn digest(character: char) -> String {
@@ -63,10 +64,7 @@ fn main() {
                 objective_values(95.0, 0.94),
             ),
         ),
-        (
-            "rejected-1",
-            (AuditOutcome::NonConverged, true, Vec::new()),
-        ),
+        ("rejected-1", (AuditOutcome::NonConverged, true, Vec::new())),
         (
             "rejected-2",
             (AuditOutcome::Inconclusive, false, Vec::new()),
@@ -102,12 +100,7 @@ fn main() {
             true,
             objective_values(90.0, 0.93),
         ),
-        (
-            "accepted-1",
-            AuditOutcome::Failed,
-            true,
-            Vec::new(),
-        ),
+        ("accepted-1", AuditOutcome::Failed, true, Vec::new()),
         (
             "accepted-2",
             AuditOutcome::ConfirmedInfeasible,
