@@ -86,7 +86,35 @@ The extraction analysis and crate registry record that this crate was copied out
 
 **Decision:** do not migrate or merge the implementations by name. Treat them as separate experimental arms. Any eventual consolidation must identify which measured behaviour is being retained, port tests and consumers, remove the duplicate definition, and only then update the crate disposition.
 
-### 2.4 What "O(1) temporal jump" means—and does not mean
+### 2.4 The cognitive-loop trainer is not full temporal BPTT
+
+The adapter's training names also need a precise boundary:
+
+- `TemporalNetwork::train_step_bptt()` dispatches HdcLtc to `HdcLtcBridge::train_step()`.
+- `HdcLtcBridge::train_step_impl()` runs one scratch forward transition, then calls `neuron.backward(...)` once for each neuron in each layer.
+- The `HdcLtcGradients` type contains `d_input` for inter-layer propagation, but this bridge loop does not consume that field or pass an accumulated error to the preceding layer. Each neuron is instead updated against the same projected target hypervector.
+- The call uses a historical evolution snapshot for the (encoding at t−1 → encoding at t) pair once the rolling snapshot queue is warm. This corrects the training start state; it is not an unrolled activation tape or backpropagation through multiple time steps.
+- The default cognitive-loop config enables asynchronous training. In that path the sample is queued and the cycle returns no synchronous training-loss value, so qualification harnesses should pin `async_training = false` when they need a directly observed per-update result.
+
+This does not mean the local gradient is useless: the neuron computes a derivative through its single interpolation, activation, binding and scalar-τ update. It means the name "BPTT" must not be read as proof of temporal credit assignment or full cross-layer chain-rule propagation in the active HdcLtc bridge.
+
+**Immediate research consequence:** qualify three independent mechanisms rather than one ambiguous "BPTT" switch:
+
+1. single-transition local gradient correctness;
+2. cross-layer error propagation (including use of `d_input`);
+3. temporal credit assignment across earlier activations (eligibility traces/e-prop or a bounded activation tape).
+
+Use the existing temporal benchmark v2 to decide whether either of the latter two adds value. Keep any change to the bridge's local target rule separately ablated.
+
+### 2.5 Multi-horizon prediction is a policy choice, not a single calibrated forecast
+
+`get_multi_scale_prediction()` requests predictions from several horizons from the same restored starting state and averages them. It also retains the raw predictions and the shortest-horizon forecast. The compression programme correctly identifies the raw `delta_t` forecast as the appropriate object for one-step predictive-bits comparisons.
+
+Averaging a (t+1), (t+5), and (t+10) forecast generally creates a new vector that is not itself a forecast at any one of those horizons. It may be a useful feature or ensemble statistic, but it should not be treated as a calibrated one-step prediction without a separate validation. Report horizon-specific error/calibration, and score the aggregate only against a separately declared aggregate target or downstream decision.
+
+A related perception issue remains visible in `detect_semantic_patterns()`: it uses substring tests for words such as `if`, `do`, and `act`. The 2026-07-18 zero-vector failure from unmatched phantom primitives was fixed by changing the attention-weight averaging rule, but substring-triggered false positives (for example, `if` inside `life`) still deserve a word-boundary regression battery. Do not interpret the old zero-vector fix as a complete semantic-pattern parser.
+
+### 2.6 What "O(1) temporal jump" means—and does not mean
 
 The per-neuron interpolation update is \(O(D)\) in hypervector dimension \(D\), while a single update does not require a number of ODE solver substeps proportional to the elapsed interval. It is therefore reasonable to describe the interpolation step as **horizon-independent in step count**, not as constant total work independent of dimension.
 
