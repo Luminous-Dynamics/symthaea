@@ -402,7 +402,7 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
                 organization_state.viability_class.clone(),
             )
             .is_some_and(|previous| {
-                previous.as_str() != organization_state.viability_class.as_str()
+                previous != organization_state.viability_class
             })
         {
             ap1_ok = false;
@@ -520,7 +520,7 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
                 production_state.viability_class.clone(),
                 boundary_state.viability_class.clone(),
             )
-            .is_some_and(|previous| previous.as_str() != boundary_state.viability_class.as_str())
+            .is_some_and(|previous| previous != boundary_state.viability_class)
         {
             ap2_ok = false;
             finding(
