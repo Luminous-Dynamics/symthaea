@@ -1198,6 +1198,86 @@ mod tests {
         assert!(error.to_string().contains("duplicate configuration ID"));
     }
 
+    fn co2_counterflow_source_manifest() -> Value {
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [{
+                "case_id": "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026",
+                "lane": "CO2_WARM_PLASMA_QUENCHING",
+                "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                "luminous_reproduction": false,
+                "source": {"url": "https://doi.org/10.1016/j.jece.2026.122322"},
+                "configurations": [
+                    {
+                        "id": "counterflow-magd-792w",
+                        "gas_flow_slm": 4.0,
+                        "electrical_power_w": 792.0,
+                        "observations": [
+                            {"metric":"co2_conversion","value":0.236,"unit":"fraction"},
+                            {"metric":"energy_efficiency","value":0.251,"unit":"fraction"}
+                        ]
+                    },
+                    {
+                        "id": "counterflow-low-power-302w",
+                        "electrical_power_w": 302.0,
+                        "observations": [
+                            {"metric":"energy_efficiency","value":0.462,"unit":"fraction"},
+                            {"metric":"co2_conversion","value":null,"unit":"fraction"}
+                        ]
+                    },
+                    {
+                        "id": "counterflow-ratio-distance-optimization",
+                        "observations": [
+                            {"metric":"counterflow_gas_ratio","value":2.5,"unit":"ratio"},
+                            {"metric":"counterflow_distance","value":30.0,"unit":"mm"},
+                            {"metric":"relative_conversion_increase","value":2.073,"unit":"fractional_increase"},
+                            {"metric":"relative_energy_efficiency_increase","value":2.036,"unit":"fractional_increase"}
+                        ]
+                    }
+                ]
+            }],
+            "negative_controls": [{
+                "control_id":"NC-CO2-QUENCH-001",
+                "expected_disposition":"REJECT_OPERATING_POINT_IDENTITY_MISMATCH"
+            }]
+        })
+    }
+
+    #[test]
+    fn source_manifest_accepts_separate_co2_counterflow_operating_points() {
+        let summary = audit_source_value(&co2_counterflow_source_manifest(), "co2-counterflow.json").unwrap();
+        assert_eq!(summary.case_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_borrowing_792w_conversion_for_302w_case() {
+        let mut source = co2_counterflow_source_manifest();
+        source["cases"][0]["configurations"][1]["observations"][1]["value"] =
+            serde_json::json!(0.236);
+        let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
+        assert!(error.to_string().contains("302 W conversion must remain unknown"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_relative_improvement_as_absolute_efficiency() {
+        let mut source = co2_counterflow_source_manifest();
+        source["cases"][0]["configurations"][2]["observations"][3]["unit"] =
+            serde_json::json!("fraction");
+        let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
+        assert!(error.to_string().contains("must remain a relative increase"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_duplicate_co2_operating_point_ids() {
+        let mut source = co2_counterflow_source_manifest();
+        source["cases"][0]["configurations"][1]["id"] =
+            serde_json::json!("counterflow-magd-792w");
+        let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
+        assert!(error.to_string().contains("duplicate configuration ID"));
+    }
+
     #[test]
     fn source_manifest_rejects_duplicate_case_and_control_ids() {
         let duplicate_case = serde_json::json!({
@@ -1502,6 +1582,119 @@ fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -
     Ok(())
 }
 
+fn co2_configuration<'a>(case: &'a Value, configuration_id: &str) -> Option<&'a Value> {
+    case.get("configurations")?
+        .as_array()?
+        .iter()
+        .find(|configuration| {
+            configuration.get("id").and_then(Value::as_str) == Some(configuration_id)
+        })
+}
+
+fn co2_metric<'a>(configuration: &'a Value, metric_name: &str) -> Option<&'a Value> {
+    configuration.get("observations")?
+        .as_array()?
+        .iter()
+        .find(|observation| {
+            observation.get("metric").and_then(Value::as_str) == Some(metric_name)
+        })
+}
+
+fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: CO2 counterflow operating-point audit");
+    let configurations = case
+        .get("configurations")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: configurations array is missing"))?;
+    ensure!(
+        configurations.len() == 3,
+        "{context}: expected exactly three separately identified source configurations"
+    );
+
+    let mut configuration_ids = BTreeSet::new();
+    for configuration in configurations {
+        let id = configuration
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.trim().is_empty())
+            .with_context(|| format!("{context}: configuration has no non-empty id"))?;
+        ensure!(
+            configuration_ids.insert(id.to_owned()),
+            "{context}: duplicate configuration ID {id}"
+        );
+    }
+
+    let magd = co2_configuration(case, "counterflow-magd-792w")
+        .with_context(|| format!("{context}: missing 792 W MAGD configuration"))?;
+    ensure!(
+        magd.get("electrical_power_w").and_then(Value::as_f64) == Some(792.0),
+        "{context}: MAGD configuration must retain its 792 W operating point"
+    );
+    ensure!(
+        magd.get("gas_flow_slm").and_then(Value::as_f64) == Some(4.0),
+        "{context}: MAGD configuration must retain its 4 slm feed-flow point"
+    );
+    for (metric_name, expected) in [
+        ("co2_conversion", 0.236),
+        ("energy_efficiency", 0.251),
+    ] {
+        let observation = co2_metric(magd, metric_name)
+            .with_context(|| format!("{context}: 792 W configuration lacks {metric_name}"))?;
+        ensure!(
+            observation.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, expected)),
+            "{context}: 792 W {metric_name} does not match its source-pinned operating point"
+        );
+    }
+
+    let low_power = co2_configuration(case, "counterflow-low-power-302w")
+        .with_context(|| format!("{context}: missing separate 302 W configuration"))?;
+    ensure!(
+        low_power.get("electrical_power_w").and_then(Value::as_f64) == Some(302.0),
+        "{context}: low-power configuration must retain its 302 W operating point"
+    );
+    let low_power_efficiency = co2_metric(low_power, "energy_efficiency")
+        .with_context(|| format!("{context}: 302 W configuration lacks energy_efficiency"))?;
+    ensure!(
+        low_power_efficiency.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, 0.462)),
+        "{context}: 302 W energy efficiency must remain the source-reported 46.2% point"
+    );
+    let low_power_conversion = co2_metric(low_power, "co2_conversion")
+        .with_context(|| format!("{context}: 302 W configuration must explicitly preserve unknown CO2 conversion"))?;
+    ensure!(
+        low_power_conversion.get("value").is_some_and(Value::is_null),
+        "{context}: 302 W conversion must remain unknown; do not borrow the 792 W conversion"
+    );
+
+    let sweep = co2_configuration(case, "counterflow-ratio-distance-optimization")
+        .with_context(|| format!("{context}: missing separate ratio/distance optimization record"))?;
+    for (metric_name, expected, expected_unit) in [
+        ("relative_conversion_increase", 2.073, "fractional_increase"),
+        ("relative_energy_efficiency_increase", 2.036, "fractional_increase"),
+    ] {
+        let observation = co2_metric(sweep, metric_name)
+            .with_context(|| format!("{context}: optimization record lacks {metric_name}"))?;
+        ensure!(
+            observation.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, expected)),
+            "{context}: {metric_name} does not match the source-reported relative increase"
+        );
+        ensure!(
+            observation.get("unit").and_then(Value::as_str) == Some(expected_unit),
+            "{context}: {metric_name} must remain a relative increase, not an absolute fraction"
+        );
+    }
+    ensure!(
+        sweep.get("observations").and_then(Value::as_array).is_some_and(|items| {
+            items.iter().any(|item| item.get("metric").and_then(Value::as_str) == Some("counterflow_gas_ratio")
+                && item.get("value").and_then(Value::as_f64) == Some(2.5))
+                && items.iter().any(|item| item.get("metric").and_then(Value::as_str) == Some("counterflow_distance")
+                    && item.get("value").and_then(Value::as_f64) == Some(30.0))
+        }),
+        "{context}: relative-improvement record must retain its 2.5 ratio / 30 mm geometry context"
+    );
+
+    Ok(())
+}
+
 fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
     let programme = root
         .get("programme")
@@ -1575,6 +1768,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .filter(|url| has_http_authority(url))
             .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL with a non-empty authority"))?;
         ensure!(!source_url.trim().is_empty(), "{display_name}: case {case_id} has empty source URL");
+
+        if case_id == "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026" {
+            validate_co2_counterflow_operating_points(case, display_name)?;
+        }
 
         if case_id == "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026" {
             validate_co2_counterflow_operating_points(case, display_name)?;
