@@ -34,6 +34,9 @@ pub struct MultiShiftEpochReport {
     pub event_id: String,
     pub decision_cutoff: String,
     pub required_revalidation_obligations: Vec<String>,
+    pub dependency_implied_revalidation_obligations: Vec<String>,
+    pub dependency_only_impact_obligations: Vec<String>,
+    pub gold_only_impact_obligations: Vec<String>,
     pub fresh_revalidated_obligations: Vec<String>,
     pub fresh_passing_obligations: Vec<String>,
     pub reused_current_obligations: Vec<String>,
@@ -66,6 +69,8 @@ pub struct MultiShiftTraceReport {
     pub total_stale_carryovers: usize,
     pub total_future_evidence_leakages: usize,
     pub total_unsupported_current_claims: usize,
+    pub total_dependency_only_impact_labels: usize,
+    pub total_gold_only_impact_labels: usize,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -82,6 +87,7 @@ pub struct MultiShiftRestorationReport {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct MultiShiftSequenceReport {
     pub scenario_id: String,
+    pub gold_adjudication_status: String,
     pub trace_reports: Vec<MultiShiftTraceReport>,
     pub restoration_control: MultiShiftRestorationReport,
     pub claim_ceiling: String,
@@ -352,7 +358,7 @@ fn assess_initial_receipts(
 fn validate_event_sequence(
     candidate_view: &Value,
     obligations: &BTreeMap<String, Obligation>,
-) -> Result<Vec<(String, Value, DateTime<FixedOffset>, DateTime<FixedOffset>)>, String> {
+) -> Result<Vec<(String, Value, Value, DateTime<FixedOffset>, DateTime<FixedOffset>)>, String> {
     let baseline = candidate_view
         .get("baseline")
         .ok_or_else(|| "candidate_view.baseline is required".to_owned())?;
@@ -422,7 +428,7 @@ fn validate_event_sequence(
                 "{label}.newly_introduced_obligations does not match obligation introduced_epoch values"
             ));
         }
-        sequence.push((event_id, after.clone(), event_time.clone(), available_at.clone()));
+        sequence.push((event_id, before.clone(), after.clone(), event_time.clone(), available_at.clone()));
         previous_state = after.clone();
         previous_event_time = Some(event_time);
         previous_available_at = Some(available_at);
@@ -510,9 +516,10 @@ fn validate_gold_overlay(
 
 fn score_trace(
     trace: &Value,
-    sequence: &[(String, Value, DateTime<FixedOffset>, DateTime<FixedOffset>)],
+    sequence: &[(String, Value, Value, DateTime<FixedOffset>, DateTime<FixedOffset>)],
     gold_required: &[BTreeSet<String>],
     obligations: &BTreeMap<String, Obligation>,
+    enforce_synthetic_dependency_parity: bool,
 ) -> Result<MultiShiftTraceReport, String> {
     let trace_id = required_str(trace, "trace_id", "candidate_trace")?.to_owned();
     let checkpoints = trace
@@ -535,6 +542,8 @@ fn score_trace(
     let mut total_stale_carryovers = 0usize;
     let mut total_future_leakages = 0usize;
     let mut total_unsupported = 0usize;
+    let mut total_dependency_only = 0usize;
+    let mut total_gold_only = 0usize;
     let mut previous_cutoff: Option<DateTime<FixedOffset>> = None;
 
     for (index, checkpoint) in checkpoints.iter().enumerate() {
@@ -543,7 +552,7 @@ fn score_trace(
         if required_u64(checkpoint, "epoch", &label)? != epoch {
             return Err(format!("{label}.epoch must be {epoch}"));
         }
-        let (event_id, current_state, _event_time, event_available_at) = &sequence[index];
+        let (event_id, before_state, current_state, _event_time, event_available_at) = &sequence[index];
         let decision_cutoff = parse_time(checkpoint, "decision_cutoff", &label)?;
         if decision_cutoff < *event_available_at {
             return Err(format!("{label}: decision cutoff precedes intervention availability"));
@@ -663,6 +672,33 @@ fn score_trace(
         }
 
         let required = gold_required[index].clone();
+        let changed_dimensions: BTreeSet<String> = STATE_DIMENSIONS
+            .iter()
+            .filter(|dimension| before_state.get(**dimension) != current_state.get(**dimension))
+            .map(|dimension| (*dimension).to_owned())
+            .collect();
+        let dependency_implied: BTreeSet<String> = obligations
+            .iter()
+            .filter(|(_, obligation)| {
+                obligation.introduced_epoch <= epoch
+                    && (obligation.introduced_epoch == epoch
+                        || obligation
+                            .dependency_dimensions
+                            .iter()
+                            .any(|dimension| changed_dimensions.contains(dimension)))
+            })
+            .map(|(id, _)| id.clone())
+            .collect();
+        let dependency_only: BTreeSet<String> =
+            dependency_implied.difference(&required).cloned().collect();
+        let gold_only: BTreeSet<String> =
+            required.difference(&dependency_implied).cloned().collect();
+        if enforce_synthetic_dependency_parity && (!dependency_only.is_empty() || !gold_only.is_empty()) {
+            return Err(format!(
+                "synthetic gold impact disagrees with dependency-implied impact at epoch {epoch}: dependency_only={:?}, gold_only={:?}",
+                dependency_only, gold_only
+            ));
+        }
         let missing: BTreeSet<String> =
             required.difference(&valid_fresh).cloned().collect();
         let required_without_pass: BTreeSet<String> =
@@ -689,6 +725,9 @@ fn score_trace(
             event_id: event_id.clone(),
             decision_cutoff: decision_cutoff.to_rfc3339(),
             required_revalidation_obligations: required.iter().cloned().collect(),
+            dependency_implied_revalidation_obligations: dependency_implied.iter().cloned().collect(),
+            dependency_only_impact_obligations: dependency_only.iter().cloned().collect(),
+            gold_only_impact_obligations: gold_only.iter().cloned().collect(),
             fresh_revalidated_obligations: valid_fresh.iter().cloned().collect(),
             fresh_passing_obligations: fresh_pass.iter().cloned().collect(),
             reused_current_obligations: valid_reused_pass.iter().cloned().collect(),
@@ -717,6 +756,8 @@ fn score_trace(
         total_stale_carryovers += report.stale_carryover_obligations.len();
         total_future_leakages += report.future_evidence_leakage_obligations.len();
         total_unsupported += report.unsupported_current_claims.len();
+        total_dependency_only += report.dependency_only_impact_obligations.len();
+        total_gold_only += report.gold_only_impact_obligations.len();
         epoch_reports.push(report);
     }
 
@@ -732,6 +773,8 @@ fn score_trace(
         total_stale_carryovers,
         total_future_evidence_leakages: total_future_leakages,
         total_unsupported_current_claims: total_unsupported,
+        total_dependency_only_impact_labels: total_dependency_only,
+        total_gold_only_impact_labels: total_gold_only,
     })
 }
 
@@ -886,11 +929,15 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
         .ok_or_else(|| "candidate_view.baseline is required".to_owned())?;
     let first_event_time = sequence
         .first()
-        .map(|item| item.2.clone())
+        .map(|item| item.3.clone())
         .ok_or_else(|| "at least one intervention is required".to_owned())?;
     assess_initial_receipts(candidate_view, &obligations, &first_event_time, baseline)?;
 
     let gold_required = validate_gold_overlay(&bundle, &obligations, sequence.len())?;
+    let gold_adjudication_status =
+        required_str(&bundle["gold_overlay"], "adjudication_status", "gold_overlay")?.to_owned();
+    let enforce_synthetic_dependency_parity =
+        gold_adjudication_status == "synthetic_known_answer_not_independently_adjudicated";
     let traces = bundle
         .get("candidate_traces")
         .and_then(Value::as_array)
@@ -910,6 +957,7 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
             &sequence,
             &gold_required,
             &obligations,
+            enforce_synthetic_dependency_parity,
         )?);
     }
     trace_reports.sort_by(|left, right| left.trace_id.cmp(&right.trace_id));
@@ -919,6 +967,7 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
 
     Ok(MultiShiftSequenceReport {
         scenario_id,
+        gold_adjudication_status,
         trace_reports,
         restoration_control,
         claim_ceiling: "Deterministic evaluation of supplied multi-shift traces against evaluator-side impact labels and declared receipt dependency/time semantics. Does not authenticate execution or authority, independently adjudicate gold labels, prove causal completeness, or establish agent performance.".to_owned(),
