@@ -84,16 +84,27 @@ This is a capability comparison, not a claim of current superiority. The systems
 
 The differentiator to test is not "better clock sync" or a universal distributed database. It is a cross-owner admissibility layer for irreversible engineering operations when time bases, evidence authorities, policy scopes and systems of record differ. Demonstrate this only with identical frozen inputs, independently adjudicated ground truth, ablations and performance measurements.
 
+## v0.3.1 qualified observer and durable-store clocks
+
+The stacked follow-on adds a separate observer clock series and durable-store clock series to the schedule action model. Both carry exact clock domain/basis/epoch/scale/nanosecond unit, exact mapping-action identity, source-local time, receipt ref/digest and qualification. Simulator action time remains only a replay scheduler field and is never promoted into the v0.2 time contract.
+
+A deterministic generator creates event → delivery → observer clock/observation → independent store clock/durable record. The first v0.2 adapter, `project_bitemporal_event`, requires exactly one production record, one selected observer record and one selected store record; it requires the observation and persistence actions to have Applied scheduler dispositions; and it consumes externally supplied `QualifiedEventTime` resolutions keyed by (mapping action ID, source-local timestamp). It checks mapping-action identity, source domain, receipt reference/digest, owner qualification, mapping validity and local sample bounds before building `BitemporalEventEnvelope`.
+
+Missing owner time is Indeterminate; explicit owner FAIL, substituted clock identity or receipt mismatch is CriticalFailure. It does not normalize source clocks, authenticate signatures or trust roots, or infer durable time from simulator time. Occurrence time remains optional if no independently qualified occurrence-time resolution is supplied. The projected envelope is suitable for the v0.2 bitemporal visibility evaluator; attempt lineage, scoped stops and complete attempt inventory are not yet reconstructed by this adapter.
+
+The v0.3.1 branch has 24 authored module unit tests and six Proptest properties (256 cases each configured; 1,536 potential property cases). These are source counts, not executed results.
+
 ## Known limitations / next increment
 
 - The implemented generator families currently cover event production/delivery/partition, three clock-mapping failures (unqualified, expired, stale reference), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for calibration drift/step changes, crash between effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
-- Observation and durable-persistence actions are currently ordered by simulator virtual time; they do not yet carry separate observer-clock and store-clock basis/epoch/timestamp evidence. The next increment must add these domains so the v0.2 bitemporal envelope can be populated without promoting simulator time into physical/owner time.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
-- The v0.3 scheduler is not yet wired to the v0.2 evaluator. That adapter and an independent oracle are the next critical step.
+- The v0.3.1 bitemporal projection is wired to v0.2's bitemporal envelope, but does not yet reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory. A full action/effect adapter and separately implemented independent oracle remain critical next steps.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- Sixteen Rust module unit tests and four Proptest properties (256 cases each configured) are authored at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
+- Twenty-four Rust module unit tests and six Proptest properties (256 cases each configured; 1,536 potential cases) are authored in the v0.3.1 branch at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
 
 ## Reproduction
+
+The v0.3.1 follow-on branch is `research/event-order-v0-3-1-bitemporal-clocks-2026-11-15`, stacked on v0.3 PR #12287. Its observer/store clock fields and bitemporal projection are in the same crate module, with dedicated unit and property tests.
 
 ```sh
 cargo test -p symthaea-decision-assessment
