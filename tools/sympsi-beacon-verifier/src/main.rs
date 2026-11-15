@@ -47,7 +47,8 @@ fn run() -> Result<(), String> {
             "--requested-round" => {
                 let value = next_value(&mut args, "--requested-round")?;
                 requested_round = Some(
-                    value.parse::<u64>()
+                    value
+                        .parse::<u64>()
                         .map_err(|error| format!("invalid --requested-round: {error}"))?,
                 );
             }
@@ -64,8 +65,8 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let requested_round = requested_round
-        .ok_or_else(|| "missing required --requested-round argument".to_string())?;
+    let requested_round =
+        requested_round.ok_or_else(|| "missing required --requested-round argument".to_string())?;
     let git_head = git_head
         .ok_or_else(|| "missing required --git-head exact-commit-sha argument".to_string())?;
     validate_git_head(&git_head)?;
@@ -74,8 +75,8 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot read beacon response {}: {error}", input.display()))?;
     let response: QuicknetBeaconResponse = serde_json::from_slice(&bytes)
         .map_err(|error| format!("strict Quicknet response JSON failed: {error}"))?;
-    let verification = verify_quicknet_response(requested_round, &response)
-        .map_err(|error| error.to_string())?;
+    let verification =
+        verify_quicknet_response(requested_round, &response).map_err(|error| error.to_string())?;
 
     let receipt = RunReceipt {
         receipt_schema_version: "sympsi.quicknet-run-receipt.v0.1".into(),
