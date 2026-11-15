@@ -519,16 +519,14 @@ fn validate_metamorphic_observation_v1(
         if let MusicEditMetamorphicValueV1::Numeric { value, unit } = &property.value
             && (!value.is_finite() || unit.trim().is_empty())
         {
-                issues.push(MusicEditMetamorphicAssessmentIssueV1::NonFiniteNumericValue(
-                    property.property_id.clone(),
-                ));
-            }
+            issues.push(MusicEditMetamorphicAssessmentIssueV1::NonFiniteNumericValue(
+                property.property_id.clone(),
+            ));
         }
         if let MusicEditMetamorphicValueV1::Category { value } = &property.value
             && value.trim().is_empty()
         {
-                issues.push(MusicEditMetamorphicAssessmentIssueV1::EmptyPropertyId);
-            }
+            issues.push(MusicEditMetamorphicAssessmentIssueV1::EmptyPropertyId);
         }
     }
     issues
