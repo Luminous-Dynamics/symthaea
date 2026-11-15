@@ -411,3 +411,32 @@ The current product crosswalk and matched ride-service benchmark proposal are in
 `../../docs/research/marine/PWC-INDUSTRY-BENCHMARK-CROSSWALK-2026-11-15.md`.
 The next independent stage—station energy flux, NVR, inlet/duct and interaction-efficiency
 joining—is tracked in Symthaea issue #12232.
+
+## PWC propulsion-test station energy-flux reference
+
+Run direct station 1 / station 7 energy-flux quadrature:
+
+~~~sh
+cargo run --bin pwc-waterjet-station-energy-flux -- \
+  ../../docs/research/marine/pwc-waterjet-station-energy-flux-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-pwc-waterjet-station-flux-v0.1.0.json
+~~~
+
+The calculation follows ITTC 7.5-02-05-03.1 Eq. (11), integrating local axial
+velocity, signed station-normal projection, static pressure, elevation and cell area.
+It reports `P_JSE = E_7ξ - E_1ξ` only after station-1 and station-7 volume-flow
+continuity fits the declared tolerance and uncertainty interval. It does not use a
+station-6 shortcut, mean-velocity substitution, NVR or any system-level efficiency.
+
+The synthetic known-answer case gives `E_1ξ = 209650 W`, `E_7ξ = 306650 W` and
+`P_JSE = 97000 W`. The mismatch and reversed-normal fixtures must return
+INCOMPARABLE with no effective power output. The result remains INCOMPLETE because
+the source data are synthetic.
+
+Research specification: `../../docs/research/marine/PWC-WATERJET-STATION-FLUX-001.md`.
+
+
+The station-flux record also declares `maximum_observation_skew_ms`. The auditor checks the
+maximum observed timestamp spread across fluid density and both complete station planes.
+A transient record that exceeds this tolerance is INCOMPARABLE, even when its integrated
+flows happen to match. The observation-skew negative control is part of the focused workflow.

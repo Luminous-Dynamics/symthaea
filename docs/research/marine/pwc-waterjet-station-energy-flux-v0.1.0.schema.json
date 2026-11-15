@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:pwc-waterjet-station-energy-flux:0.1.0",
+  "title": "PWC waterjet propulsion-test station energy flux input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "method",
+    "measurement_window",
+    "evaluation_time_utc",
+    "maximum_observation_skew_ms",
+    "fluid",
+    "pressure_reference",
+    "elevation_datum",
+    "flow_balance_tolerance",
+    "station_1",
+    "station_7",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "const": "synthetic"
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document",
+        "revision",
+        "effective_year",
+        "calculation",
+        "axis_definition",
+        "scope_note"
+      ],
+      "properties": {
+        "document": {
+          "const": "ITTC 7.5-02-05-03.1"
+        },
+        "revision": {
+          "const": "02"
+        },
+        "effective_year": {
+          "const": 2011
+        },
+        "calculation": {
+          "const": "direct_station_energy_flux"
+        },
+        "axis_definition": {
+          "const": "local_axial_xi"
+        },
+        "scope_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "measurement_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_utc",
+        "end_utc"
+      ],
+      "properties": {
+        "start_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_utc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "evaluation_time_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fluid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "density"
+      ],
+      "properties": {
+        "density": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "kg/m3"
+            }
+          }
+        }
+      }
+    },
+    "pressure_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "reference_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "absolute",
+            "gauge"
+          ]
+        },
+        "reference_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "elevation_datum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "datum_id"
+      ],
+      "properties": {
+        "datum_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "flow_balance_tolerance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "absolute_m3_s",
+        "relative_fraction"
+      ],
+      "properties": {
+        "absolute_m3_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "relative_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.1
+        }
+      }
+    },
+    "station_1": {
+      "$ref": "#/$defs/station1"
+    },
+    "station_7": {
+      "$ref": "#/$defs/station7"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "maximum_observation_skew_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5000
+    }
+  },
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "lower",
+        "upper",
+        "unit",
+        "observed_at_utc",
+        "available_at_utc",
+        "calibration_status"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "observed_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "calibration_status": {
+          "const": "synthetic"
+        }
+      }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cell_id",
+        "axial_velocity",
+        "normal_x",
+        "static_pressure",
+        "elevation",
+        "area"
+      ],
+      "properties": {
+        "cell_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axial_velocity": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "m/s"
+            }
+          }
+        },
+        "normal_x": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "1"
+            }
+          }
+        },
+        "static_pressure": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "Pa"
+            }
+          }
+        },
+        "elevation": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "m"
+            }
+          }
+        },
+        "area": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "m2"
+            }
+          }
+        }
+      }
+    },
+    "station": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "station_number",
+        "station_id",
+        "pressure_reference_id",
+        "elevation_datum_id",
+        "cells"
+      ],
+      "properties": {
+        "station_number": {
+          "enum": [
+            1,
+            7
+          ]
+        },
+        "station_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pressure_reference_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "elevation_datum_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/cell"
+          }
+        }
+      }
+    },
+    "station1": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/station"
+        },
+        {
+          "properties": {
+            "station_number": {
+              "const": 1
+            }
+          }
+        }
+      ]
+    },
+    "station7": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/station"
+        },
+        {
+          "properties": {
+            "station_number": {
+              "const": 7
+            }
+          }
+        }
+      ]
+    }
+  }
+}
