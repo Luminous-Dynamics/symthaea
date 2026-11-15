@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/schemas/event-order-schedule-v0.3.schema.json",
+  "title": "Symthaea Event-Order Virtual Schedule v0.3",
+  "description": "Deterministic synthetic schedule input. Action-array order is non-semantic; actions are replayed by at_ns then unique ordinal. This schema does not establish owner authenticity or effect authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generator_version", "seed", "scenario_family", "actions"],
+  "properties": {
+    "schema_version": { "const": "symthaea.event-order-schedule.v0.3" },
+    "generator_version": { "type": "string", "minLength": 1 },
+    "seed": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+    "scenario_family": { "type": "string", "minLength": 1 },
+    "actions": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": { "$ref": "#/$defs/scheduled_action" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1 },
+    "u64": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+    "gate_state": { "enum": ["pass", "fail", "indeterminate", "not_applicable"] },
+    "scheduled_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "at_ns", "ordinal", "action"],
+      "properties": {
+        "action_id": { "$ref": "#/$defs/id" },
+        "at_ns": { "$ref": "#/$defs/u64" },
+        "ordinal": { "$ref": "#/$defs/u64" },
+        "action": { "$ref": "#/$defs/action" }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "clock_domain", "basis_id", "epoch", "scale", "unit", "local_tick_ns", "offset_ns", "uncertainty_ns", "calibration_id", "mapping_valid_through_ns", "mapping_receipt_ref", "mapping_receipt_sha256", "qualification"],
+          "properties": {
+            "kind": { "const": "clock_advance" }, "clock_domain": { "$ref": "#/$defs/id" },
+            "basis_id": { "$ref": "#/$defs/id" }, "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
+            "unit": { "const": "nanoseconds" }, "local_tick_ns": { "$ref": "#/$defs/u64" },
+            "offset_ns": { "type": "integer" }, "uncertainty_ns": { "$ref": "#/$defs/u64" },
+            "calibration_id": { "$ref": "#/$defs/id" }, "mapping_valid_through_ns": { "$ref": "#/$defs/u64" },
+            "mapping_receipt_ref": { "$ref": "#/$defs/id" }, "mapping_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "qualification": { "$ref": "#/$defs/gate_state" }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "event_id", "clock_domain", "basis_id", "epoch", "scale", "unit", "clock_mapping_action_id", "source_timestamp_ns", "causal_predecessors"],
+          "properties": {
+            "kind": { "const": "event_produced" }, "event_id": { "$ref": "#/$defs/id" },
+            "clock_domain": { "$ref": "#/$defs/id" }, "basis_id": { "$ref": "#/$defs/id" },
+            "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
+            "unit": { "const": "nanoseconds" }, "clock_mapping_action_id": { "$ref": "#/$defs/id" }, "source_timestamp_ns": { "$ref": "#/$defs/u64" },
+            "causal_predecessors": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "channel_id", "partitioned"],
+          "properties": { "kind": { "const": "network_partition" }, "channel_id": { "$ref": "#/$defs/id" }, "partitioned": { "type": "boolean" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "event_id", "channel_id", "recipient_id", "delivery_id", "mode"],
+          "properties": {
+            "kind": { "const": "delivery" }, "event_id": { "$ref": "#/$defs/id" }, "channel_id": { "$ref": "#/$defs/id" },
+            "recipient_id": { "$ref": "#/$defs/id" }, "delivery_id": { "$ref": "#/$defs/id" },
+            "mode": { "enum": ["deliver", "duplicate", "drop"] }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "event_id", "observer_id"],
+          "properties": { "kind": { "const": "event_observed" }, "event_id": { "$ref": "#/$defs/id" }, "observer_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "event_id", "observer_id", "store_id"],
+          "properties": { "kind": { "const": "event_persisted" }, "event_id": { "$ref": "#/$defs/id" }, "observer_id": { "$ref": "#/$defs/id" }, "store_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "operation_id", "attempt_id"],
+          "properties": { "kind": { "const": "cancellation_requested" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "operation_id", "attempt_id", "accepted"],
+          "properties": { "kind": { "const": "cancellation_acknowledged" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" }, "accepted": { "type": "boolean" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "obligation_id", "policy_revision"],
+          "properties": { "kind": { "const": "stop_triggered" }, "obligation_id": { "$ref": "#/$defs/id" }, "policy_revision": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "obligation_id", "policy_revision"],
+          "properties": { "kind": { "const": "stop_policy_revised" }, "obligation_id": { "$ref": "#/$defs/id" }, "policy_revision": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "obligation_id", "trigger_action_id", "policy_revision_action_id", "policy_revision", "receipt_ref", "receipt_sha256"],
+          "properties": { "kind": { "const": "stop_discharged" }, "obligation_id": { "$ref": "#/$defs/id" }, "trigger_action_id": { "$ref": "#/$defs/id" }, "policy_revision_action_id": { "$ref": "#/$defs/id" }, "policy_revision": { "$ref": "#/$defs/id" }, "receipt_ref": { "$ref": "#/$defs/id" }, "receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "operation_id", "attempt_id"],
+          "properties": { "kind": { "const": "effect_attempted" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "operation_id", "attempt_id", "effect_id"],
+          "properties": { "kind": { "const": "effect_committed" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" }, "effect_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "operation_id", "attempt_id", "outcome", "receipt_ref", "receipt_sha256"],
+          "properties": { "kind": { "const": "attempt_reconciled" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" }, "outcome": { "enum": ["applied", "not_applied", "unknown"] }, "receipt_ref": { "$ref": "#/$defs/id" }, "receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "process_id"],
+          "properties": { "kind": { "const": "process_crashed" }, "process_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "process_id"],
+          "properties": { "kind": { "const": "process_restarted" }, "process_id": { "$ref": "#/$defs/id" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "event_id", "superseded_event_id"],
+          "properties": { "kind": { "const": "event_superseded" }, "event_id": { "$ref": "#/$defs/id" }, "superseded_event_id": { "$ref": "#/$defs/id" } }
+        }
+      ]
+    }
+  }
+}
