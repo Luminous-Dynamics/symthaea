@@ -259,32 +259,33 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
         reasons.push(ProposalReason::BackendIdentityMismatch);
     }
 
-    let (supported_physics, supported_observables) = match intent.model_profile {
-        StructuralModelProfile::ThinRotatingRingV0_1 => (
-            vec![PhysicsTerm::SteadyUniformRotation, PhysicsTerm::ThinRingMembrane],
-            vec![
-                Observable::HoopStress,
-                Observable::HoopStrain,
-                Observable::RadialExtension,
-            ],
-        ),
-        StructuralModelProfile::UniformRadialSpokeV0_1 => (
-            vec![
-                PhysicsTerm::SteadyUniformRotation,
-                PhysicsTerm::SelfCentrifugalLoad,
-                PhysicsTerm::RadialAxialElasticity,
-            ],
-            vec![
-                Observable::AxialForceDistribution,
-                Observable::AxialStressDistribution,
-                Observable::TipExtension,
-            ],
-        ),
-        _ => {
-            reasons.push(ProposalReason::UnsupportedModelProfile);
-            (Vec::new(), Vec::new())
-        }
-    };
+    let (supported_physics, supported_observables): (&[PhysicsTerm], &[Observable]) =
+        match intent.model_profile {
+            StructuralModelProfile::ThinRotatingRingV0_1 => (
+                &[PhysicsTerm::SteadyUniformRotation, PhysicsTerm::ThinRingMembrane],
+                &[
+                    Observable::HoopStress,
+                    Observable::HoopStrain,
+                    Observable::RadialExtension,
+                ],
+            ),
+            StructuralModelProfile::UniformRadialSpokeV0_1 => (
+                &[
+                    PhysicsTerm::SteadyUniformRotation,
+                    PhysicsTerm::SelfCentrifugalLoad,
+                    PhysicsTerm::RadialAxialElasticity,
+                ],
+                &[
+                    Observable::AxialForceDistribution,
+                    Observable::AxialStressDistribution,
+                    Observable::TipExtension,
+                ],
+            ),
+            _ => {
+                reasons.push(ProposalReason::UnsupportedModelProfile);
+                (&[], &[])
+            }
+        };
 
     if intent.requested_physics.is_empty() || intent.requested_observables.is_empty() {
         reasons.push(ProposalReason::EmptyPhysicsOrObservableSet);
