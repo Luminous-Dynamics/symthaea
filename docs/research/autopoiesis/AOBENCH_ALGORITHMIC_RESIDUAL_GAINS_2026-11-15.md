@@ -52,6 +52,8 @@ Agent trace:
 - evidence receipt IDs for every operation.
 
 The evaluator checks:
+- a hidden calibration-selection receipt binds the chosen algorithm ID, calibration split digest, sealed evaluation split digest and algorithm-registry/version digest;
+- calibration and evaluation split digests differ and match the evaluator-only receipt;
 - frozen baseline selection;
 - node set, endpoint, self-edge and DAG constraints;
 - receipt lookup, independent status and operation support;
@@ -64,18 +66,20 @@ A verified receipt is not a proof of edge truth. Graph metrics remain independen
 
 ## 4. Deterministic fixtures
 
-Eleven deterministic tests cover:
+Thirteen deterministic tests cover:
 1. a verified, novel true edge improves the frozen baseline;
 2. missing or unknown evidence;
 3. rejected evidence;
 4. unavailable evidence produces Inconclusive;
 5. a receipt that does not support the exact edit;
 6. an agent attempting to switch away from the calibration-selected baseline;
-7. final graph mismatch against edit replay;
-8. a DAG cycle despite a valid receipt;
-9. an evidence-backed but false edge being scored as a graph error rather than hidden;
-10. the ex-post algorithm-suite ceiling remaining distinct from the frozen baseline;
-11. a reorientation being counted as one edge operation and one SHD change.
+7. calibration/evaluation split reuse rejected against the hidden selection receipt;
+8. final graph mismatch against edit replay;
+9. a DAG cycle despite a valid receipt;
+10. an evidence-backed but false edge being scored as a graph error rather than hidden;
+11. the ex-post algorithm-suite ceiling remaining distinct from the frozen baseline;
+12. a reorientation being counted as one edge operation and one SHD change;
+13. edge-edit budget violations being non-compensatory.
 
 These are source-authored deterministic controls, not a mutation campaign, statistical benchmark result or compiler pass.
 
