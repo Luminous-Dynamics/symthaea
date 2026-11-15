@@ -113,7 +113,15 @@
       ],
       "cautions": [
         "This is a quality-adjusted definition; do not compare to a published line-efficiency figure unless numerator and denominator are matched."
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "line_efficiency_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-OEE-001",
@@ -135,7 +143,15 @@
       ],
       "cautions": [
         "Do not average OEE across heterogeneous assets or use OEE as a proxy for garment quality, whole-factory productivity or worker wellbeing."
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "calculate_oee",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-QUAL-001",
@@ -151,7 +167,15 @@
         "acceptance_criteria_revision",
         "gate_ref",
         "defect_taxonomy_ref"
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "first_pass_yield_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-QUAL-002",
@@ -164,7 +188,15 @@
       "boundary": "Inspection gate, defect taxonomy and sampling plan.",
       "cautions": [
         "Keep distinct from the percentage of defective units."
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "defects_per_100_units",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-QUAL-003",
@@ -221,7 +253,15 @@
         "final_release_event_ref",
         "timezone",
         "percentile_method"
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "nearest_rank_percentile",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Nearest-rank aggregation only; event-time extraction, timezone normalization, order boundary and censoring remain external."
+      }
     },
     {
       "metric_id": "AT-FB-SVC-001",
@@ -234,7 +274,15 @@
       "boundary": "Customer promise and acceptance definition frozen before the period.",
       "cautions": [
         "A partial shipment or late order is not OTIF."
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "otif_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-FLOW-001",
@@ -311,7 +359,15 @@
       ],
       "cautions": [
         "Report reusable offcuts, scrap, defects and rework separately; do not count unverified recoverability as yield."
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "material_yield_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-ENV-001",
@@ -356,7 +412,15 @@
       "boundary": "Frozen lot classification and traceability-query scope.",
       "cautions": [
         "A record count or QR-code presence is not proof of complete lineage."
-      ]
+      ],
+      "calculation_implementation": {
+        "status": "arithmetic_function_authored_tests_unrun",
+        "crate": "symthaea-operations-research",
+        "module": "manufacturing_metrics",
+        "function": "traceability_coverage_ppm",
+        "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/12364",
+        "boundary_note": "Calculator does not validate input evidence, measurement method, or physical truth."
+      }
     },
     {
       "metric_id": "AT-FB-ELIG-001",
