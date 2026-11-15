@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-selective-revalidation-oracle-report-v0.1.schema.json",
+  "title": "EGDDM selective revalidation oracle report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "arm_reports",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "arm_reports": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/arm"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "idList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "nullableFraction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "epoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epoch",
+        "active_obligation_count",
+        "gold_required_revalidation_obligations",
+        "agent_freshly_revalidated_obligations",
+        "agent_fresh_pass_obligations",
+        "unnecessary_revalidation_obligations",
+        "missing_required_revalidation_obligations",
+        "required_without_fresh_pass_obligations",
+        "oracle_minimum_revalidation_units",
+        "agent_fresh_revalidation_units",
+        "full_rerun_reference_units",
+        "over_revalidation_units",
+        "under_revalidation_units",
+        "selection_set_distance_units",
+        "oracle_lower_bound_savings_fraction",
+        "agent_observed_refresh_fraction",
+        "revalidation_precision",
+        "revalidation_recall"
+      ],
+      "properties": {
+        "epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "active_obligation_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "gold_required_revalidation_obligations": {
+          "$ref": "#/$defs/idList"
+        },
+        "agent_freshly_revalidated_obligations": {
+          "$ref": "#/$defs/idList"
+        },
+        "agent_fresh_pass_obligations": {
+          "$ref": "#/$defs/idList"
+        },
+        "unnecessary_revalidation_obligations": {
+          "$ref": "#/$defs/idList"
+        },
+        "missing_required_revalidation_obligations": {
+          "$ref": "#/$defs/idList"
+        },
+        "required_without_fresh_pass_obligations": {
+          "$ref": "#/$defs/idList"
+        },
+        "oracle_minimum_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "agent_fresh_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "full_rerun_reference_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "under_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selection_set_distance_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oracle_lower_bound_savings_fraction": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "agent_observed_refresh_fraction": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "revalidation_precision": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "revalidation_recall": {
+          "$ref": "#/$defs/nullableFraction"
+        }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "condition",
+        "epochs",
+        "total_oracle_minimum_revalidation_units",
+        "total_agent_fresh_revalidation_units",
+        "total_full_rerun_reference_units",
+        "total_over_revalidation_units",
+        "total_under_revalidation_units",
+        "total_selection_set_distance_units",
+        "oracle_lower_bound_savings_fraction",
+        "agent_observed_refresh_fraction",
+        "aggregate_revalidation_precision",
+        "aggregate_revalidation_recall",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "enum": [
+            "clean",
+            "shifted"
+          ]
+        },
+        "epochs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/epoch"
+          }
+        },
+        "total_oracle_minimum_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_agent_fresh_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_full_rerun_reference_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_over_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_under_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_selection_set_distance_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oracle_lower_bound_savings_fraction": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "agent_observed_refresh_fraction": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "aggregate_revalidation_precision": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "aggregate_revalidation_recall": {
+          "$ref": "#/$defs/nullableFraction"
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    }
+  }
+}
