@@ -2,7 +2,7 @@
 
 Rust validation and measurement core for SympoeticBench v0.1, including a proposal-only agent decision protocol guard.
 
-This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The 16-scenario development corpus includes partner coordination, adaptive intervention, capability amplification, and epistemic resilience scenarios.
+This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The 17-scenario development corpus includes partner coordination, adaptive intervention, capability amplification, epistemic resilience, and persistent-team scenarios.
 
 ## Commands
 
@@ -12,6 +12,9 @@ From the Symthaea repository root:
 # Validate every JSONL scenario (typed validation + corpus digest)
 cargo run -p sympoetic-bench -- validate-corpus \
   --input docs/benchmarks/sympoetic/SEED_CORPUS.v0.1.jsonl
+
+# Validate a multi-cycle team trajectory
+cargo run -p sympoetic-bench -- validate-trajectory --input path/to/team-trajectory.json
 
 # Validate a recorded interaction trace
 cargo run -p sympoetic-bench -- validate-trace --input path/to/trace.json
@@ -48,6 +51,10 @@ The epistemic resilience track also reports confidence calibration (Brier/ECE), 
 ## Agent decision bridge
 
 The typed protocol contract lives in `agent_protocol.rs`; the normative schemas and design are in `docs/benchmarks/agent-bridge/` and `docs/benchmarks/AGENT_DECISION_PROTOCOL.md`. `AgentProtocolGuard` validates proposals and observations but deliberately does not execute tools. The benchmark adapter remains the authority boundary.
+
+## Persistent team trajectories
+
+The `trajectory` module validates multi-cycle team receipts, prior-cycle digests, team-state continuity, explicit membership/role/authority changes, memory-policy changes, and per-member consent. The CLI command is `validate-trajectory`. This verifies recorded continuity claims; it is not a collective-intelligence estimator.
 
 ## Metrics
 
