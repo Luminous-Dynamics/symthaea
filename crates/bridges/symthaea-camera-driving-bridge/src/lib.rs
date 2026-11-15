@@ -15,9 +15,9 @@ use symthaea_vision_manifold::{VisionConfig, VisionManifold, VisionTelemetry};
 pub mod policy_compatibility;
 pub mod training_labels;
 pub use training_labels::{
-    APPLIED_ACTION_TRAINING_RECEIPT_SCHEMA_VERSION, AppliedActionSourceKind,
-    AppliedActionTrainingReceipt, TrainingLabelError, ValidatedAppliedActionLabel,
-    validate_applied_action_training_label,
+    APPLIED_ACTION_TRAINING_RECEIPT_SCHEMA_VERSION, AppliedActionDisposition,
+    AppliedActionSourceKind, AppliedActionTrainingReceipt, AppliedVehicleAction,
+    TrainingLabelError, ValidatedAppliedActionLabel, validate_applied_action_training_label,
 };
 
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
