@@ -514,6 +514,59 @@ mod tests {
         loft_waterplane_capped_hull(&sections, profile).unwrap()
     }
 
+    fn rectangular_prism_loft() -> LoftedHullArtifact {
+        let control_points = vec![
+            SectionControlPoint {
+                breadth_fraction: 0.0,
+                depth_fraction: 1.0,
+            },
+            SectionControlPoint {
+                breadth_fraction: 1.0,
+                depth_fraction: 1.0,
+            },
+            SectionControlPoint {
+                breadth_fraction: 1.0,
+                depth_fraction: 0.0,
+            },
+        ];
+        let spec = SectionHullSpec {
+            schema_version: 1,
+            candidate_id: "hydro-rectangular-prism-known-answer-001".into(),
+            length_m: 100.0,
+            beam_m: 20.0,
+            draft_m: 6.0,
+            coordinate_frame: CoordinateFrame {
+                id: "ship-local".into(),
+                axis_convention: "x-forward,y-starboard,z-down".into(),
+                handedness: "right-handed".into(),
+            },
+            samples_per_segment: 1,
+            stations: vec![
+                SectionStation {
+                    x_over_length: 0.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: control_points.clone(),
+                },
+                SectionStation {
+                    x_over_length: 1.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points,
+                },
+            ],
+        };
+        let section_artifact = generate_section_artifact(&spec).unwrap();
+        let profile = AdmissionProfile {
+            id: "hydrostatic-rectangular-prism-v1".into(),
+            require_closed_surface: true,
+            minimum_face_area_m2: 1.0e-12,
+            minimum_enclosed_volume_m3: 1.0e-12,
+            additional_required_checks: vec![],
+        };
+        loft_waterplane_capped_hull(&section_artifact, profile).unwrap()
+    }
+
     #[test]
     fn triangular_prism_hydrostatics_match_known_answers() {
         let result = calculate_hydrostatic_properties(&prismatic_loft(), 1_025.0).unwrap();
@@ -535,6 +588,23 @@ mod tests {
         );
         assert!((result.transverse_metacentric_radius_bm_t_m - 11.111_111_111_111_11).abs() < 1.0e-9);
         assert!((result.longitudinal_metacentric_radius_bm_l_m - 277.777_777_777_777_77).abs() < 1.0e-9);
+        assert!((result.tonnes_per_centimetre_immersion - 20.5).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn rectangular_prism_hydrostatics_match_known_answers() {
+        let result = calculate_hydrostatic_properties(&rectangular_prism_loft(), 1_025.0).unwrap();
+        assert!((result.displacement_volume_m3 - 12_000.0).abs() < 1.0e-9);
+        assert!((result.displacement_tonnes - 12_300.0).abs() < 1.0e-9);
+        assert!((result.centre_of_buoyancy_m[0] - 50.0).abs() < 1.0e-9);
+        assert!(result.centre_of_buoyancy_m[1].abs() < 1.0e-9);
+        assert!((result.centre_of_buoyancy_m[2] - 3.0).abs() < 1.0e-9);
+        assert!((result.waterplane_area_m2 - 2_000.0).abs() < 1.0e-9);
+        assert!((result.transverse_waterplane_second_moment_m4 - 66_666.666_666_666_67).abs() < 1.0e-6);
+        assert!((result.longitudinal_waterplane_second_moment_m4 - 1_666_666.666_666_666_7).abs() < 1.0e-5);
+        assert!(result.waterplane_product_of_inertia_m4.abs() < 1.0e-8);
+        assert!((result.transverse_metacentric_radius_bm_t_m - 5.555_555_555_555_556).abs() < 1.0e-9);
+        assert!((result.longitudinal_metacentric_radius_bm_l_m - 138.888_888_888_888_89).abs() < 1.0e-8);
         assert!((result.tonnes_per_centimetre_immersion - 20.5).abs() < 1.0e-9);
     }
 
