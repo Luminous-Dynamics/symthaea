@@ -4357,6 +4357,88 @@ mod tests {
     }
 
     #[test]
+    fn action_projection_rejects_inventory_frontier_not_in_event_history() {
+        let (mut schedule, _, _, _) = action_history_fixture();
+        for action in &mut schedule.actions {
+            match &mut action.action {
+                ScheduleAction::AttemptInventoryAttested { inventory_frontier_event_id, .. } => {
+                    *inventory_frontier_event_id = "missing-frontier-event".to_owned();
+                    if let Some(ActionEvidence::InventoryAttestation { inventory_frontier_event_id, .. }) = &mut action.evidence {
+                        *inventory_frontier_event_id = "missing-frontier-event".to_owned();
+                    }
+                }
+                ScheduleAction::StopDischarged { .. } => {
+                    if let Some(ActionEvidence::StopDischarge { inventory_frontier_event_id, .. }) = &mut action.evidence {
+                        *inventory_frontier_event_id = "missing-frontier-event".to_owned();
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert!(matches!(
+            validate_schedule(&schedule),
+            Err(ReplayError::InvalidCausalPredecessor(id)) if id == "missing-frontier-event"
+        ));
+    }
+
+    #[test]
+    fn action_projection_rejects_not_applied_terminal_when_effect_commit_exists() {
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        for action in &mut schedule.actions {
+            if let ScheduleAction::AttemptReconciled { outcome, .. } = &mut action.action {
+                *outcome = ReconciliationOutcome::NotApplied;
+            }
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "NOT_APPLIED_TERMINAL_CONTRADICTS_EFFECT_COMMIT:attempt-1"
+        }));
+    }
+
+    #[test]
+    fn action_projection_rejects_terminal_ordered_before_effect_commit() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let terminal_key = schedule.actions.iter().find_map(|action| {
+            if let ScheduleAction::AttemptReconciled { .. } = &action.action {
+                action.owner_time_ref.as_ref().map(|reference| {
+                    (reference.clock_mapping_action_id.clone(), reference.local_timestamp_ns)
+                })
+            } else {
+                None
+            }
+        }).expect("terminal owner-time key");
+        let terminal_time = resolutions.get_mut(&terminal_key).expect("terminal resolution");
+        terminal_time.interval.earliest_ns = 900;
+        terminal_time.interval.latest_ns = 900;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "TERMINAL_PRECEDES_EFFECT_COMMIT:attempt-1"
+        }));
+    }
+
+    #[test]
+    fn action_projection_blocks_incomplete_attempt_inventory_attestation() {
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let inventory_action_id = schedule.actions.iter().find_map(|action| {
+            matches!(action.action, ScheduleAction::AttemptInventoryAttested { .. })
+                .then_some(action.action_id.clone())
+        }).expect("inventory attestation action");
+        let mut assessment = receipts.get(&inventory_action_id).copied().expect("inventory receipt result");
+        assessment.completeness = GateState::Fail;
+        receipts.insert(inventory_action_id, assessment);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "ATTEMPT_INVENTORY_COMPLETENESS_FAILED"
+        }));
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
