@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::Value;
 
 const EPSILON: f64 = 1e-9;
 
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(report.baseline_action_id, expected["baseline"]["action_id"].as_str().unwrap());
         assert!((report.baseline_expected_loss - expected["baseline"]["expected_loss"].as_f64().unwrap()).abs() < EPSILON);
         for (evidence_id, fields) in expected["assessments"].as_object().unwrap() {
-            let actual = report.assessments.iter().find(|item| item.evidence_id == *evidence_id).expect("assessment");
+            let actual = report.assessments.iter().find(|item| item.evidence_id.as_str() == evidence_id.as_str()).expect("assessment");
             assert_eq!(actual.feasible, fields["feasible"].as_bool().unwrap());
             assert!((actual.expected_loss_after_observation.unwrap() - fields["expected_loss_after_observation"].as_f64().unwrap()).abs() < EPSILON);
             assert!((actual.gross_evsi.unwrap() - fields["gross_evsi"].as_f64().unwrap()).abs() < EPSILON);
