@@ -457,6 +457,8 @@ fn report_with_stations(
     p_jse: Option<Scalar>,
     reason: &'static str,
 ) -> AuditReport {
+    let nominal_flow_difference =
+        station_7.integrated_volume_flow.value - station_1.integrated_volume_flow.value;
     AuditReport {
         auditor: "pwc-waterjet-station-energy-flux",
         auditor_version: "0.1.0",
@@ -467,7 +469,7 @@ fn report_with_stations(
         reason_code: reason,
         station_1: Some(station_1),
         station_7: Some(station_7),
-        station_flow_difference: Some(scalar(flow_difference.lo + (flow_difference.hi - flow_difference.lo) / 2.0, flow_difference, "m3/s")),
+        station_flow_difference: Some(scalar(nominal_flow_difference, flow_difference, "m3/s")),
         flow_balance_tolerance_m3_s: Some(tolerance),
         flow_balance_valid: flow_valid,
         effective_jet_system_power_p_jse: p_jse,
