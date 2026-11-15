@@ -4935,6 +4935,208 @@ mod tests {
     }
 
     #[test]
+    fn action_projection_binds_retry_predecessor_terminal_to_child_start() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let operation_id = "robot-retry".to_owned();
+        let predecessor_id = "attempt-predecessor".to_owned();
+        let child_id = "attempt-child".to_owned();
+
+        let clock_mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 1_000);
+        let frontier_action_id = format!("action-{ordinal:06}");
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::EventProduced {
+                event_id: "inventory-frontier-retry".to_owned(),
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                source_timestamp_ns: 50,
+                causal_predecessors: Vec::new(),
+            },
+        );
+        let frontier = actions.iter_mut().find(|item| item.action_id == frontier_action_id)
+            .expect("frontier production");
+        frontier.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: clock_mapping_id.clone(),
+            local_timestamp_ns: 50,
+        });
+        resolutions.insert(
+            (clock_mapping_id.clone(), 50),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 50, 500),
+        );
+
+        let predecessor_start_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: predecessor_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::AttemptStart { retry_of_attempt_id: None },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 100, 1_000),
+        );
+
+        let terminal_ref = "synthetic://retry/predecessor-terminal".to_owned();
+        let terminal_sha = "a".repeat(64);
+        let terminal_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::AttemptReconciled {
+                operation_id: operation_id.clone(),
+                attempt_id: predecessor_id.clone(),
+                outcome: ReconciliationOutcome::NotApplied,
+                receipt_ref: terminal_ref.clone(),
+                receipt_sha256: terminal_sha.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 200,
+            },
+            ActionEvidence::TerminalReconciliation {
+                exact_start_action_id: predecessor_start_id,
+                qualification: GateState::Pass,
+            },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 200),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 200, 2_000),
+        );
+        receipts.insert(terminal_action_id.clone(), passing_owner_receipt(&terminal_ref, &terminal_sha));
+
+        let child_start_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            5,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: child_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 300,
+            },
+            ActionEvidence::AttemptStart {
+                retry_of_attempt_id: Some(predecessor_id.clone()),
+            },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 300),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 300, 3_000),
+        );
+
+        let expected_attempts = vec![
+            OperationAttemptRecord {
+                identity: AttemptIdentity {
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: predecessor_id.clone(),
+                    retry_of_attempt_id: None,
+                },
+                start_event_ids: vec![actions.iter().find(|item| {
+                    matches!(&item.action, ScheduleAction::EffectAttempted { attempt_id, .. } if attempt_id == &predecessor_id)
+                }).expect("predecessor start").action_id.clone()],
+                terminal_reconciliation_event_ids: vec![terminal_action_id.clone()],
+                terminal_reconciliation: Some(AttemptTerminalReconciliation {
+                    event_id: terminal_action_id.clone(),
+                    start_event_id: actions.iter().find(|item| {
+                        matches!(&item.action, ScheduleAction::EffectAttempted { attempt_id, .. } if attempt_id == &predecessor_id)
+                    }).expect("predecessor start").action_id.clone(),
+                    outcome: ReconciledOperationOutcome::NotApplied,
+                    qualification: GateState::Pass,
+                    start_to_terminal_order: EventOrder::Before,
+                }),
+                stop_discharge_relations: Vec::new(),
+                retry_predecessor_terminal_event_id: None,
+                retry_predecessor_start_event_id: None,
+                retry_predecessor_terminal_to_start_order: None,
+            },
+            OperationAttemptRecord {
+                identity: AttemptIdentity {
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: child_id.clone(),
+                    retry_of_attempt_id: Some(predecessor_id.clone()),
+                },
+                start_event_ids: vec![child_start_id.clone()],
+                terminal_reconciliation_event_ids: Vec::new(),
+                terminal_reconciliation: None,
+                stop_discharge_relations: Vec::new(),
+                retry_predecessor_terminal_event_id: Some(terminal_action_id.clone()),
+                retry_predecessor_start_event_id: Some(child_start_id.clone()),
+                retry_predecessor_terminal_to_start_order: Some(EventOrder::Before),
+            },
+        ];
+        let manifest = crate::event_order_v0_2::canonical_attempt_manifest_sha256(&expected_attempts)
+            .expect("manifest digest");
+        let inventory_ref = "synthetic://retry/inventory".to_owned();
+        let inventory_sha = "b".repeat(64);
+        let inventory_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            6,
+            ScheduleAction::AttemptInventoryAttested {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: "inventory-frontier-retry".to_owned(),
+                attempt_manifest_sha256: manifest.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 400,
+            },
+            ActionEvidence::InventoryAttestation {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: "inventory-frontier-retry".to_owned(),
+                attempt_manifest_sha256: manifest,
+                receipt_ref: inventory_ref.clone(),
+                receipt_sha256: inventory_sha.clone(),
+            },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 400),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 400, 4_000),
+        );
+        receipts.insert(inventory_action_id, passing_owner_receipt(&inventory_ref, &inventory_sha));
+
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1127,
+            scenario_family: "retry_child_start_exact_binding".to_owned(),
+            actions,
+        };
+        validate_schedule(&schedule).expect("retry lineage schedule validates");
+        let replay = replay_virtual_schedule(&schedule).expect("retry replay");
+        assert!(replay.records.iter().any(|record| {
+            record.action_id == child_start_id && record.disposition == SchedulerDisposition::Applied
+        }));
+
+        let report = project_action_history(&schedule, &operation_id, &resolutions, &receipts)
+            .expect("attempt history projection");
+        assert_ne!(report.disposition, EventTraceDisposition::CriticalFailure);
+        let child = report.attempts.iter().find(|attempt| attempt.identity.attempt_id == child_id)
+            .expect("child attempt");
+        assert_eq!(child.retry_predecessor_terminal_event_id.as_deref(), Some(terminal_action_id.as_str()));
+        assert_eq!(child.retry_predecessor_start_event_id.as_deref(), Some(child_start_id.as_str()));
+        assert_eq!(child.retry_predecessor_terminal_to_start_order, Some(EventOrder::Before));
+        assert!(!report.reason_codes.iter().any(|code| code == "RETRY_EVENT_BINDING_INVALID:attempt-child"));
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
