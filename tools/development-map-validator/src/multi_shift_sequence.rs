@@ -996,6 +996,17 @@ mod tests {
     }
 
     #[test]
+    fn matches_complete_machine_readable_known_answer_report() {
+        const EXPECTED: &str = include_str!(
+            "../../../docs/development-map/fixtures/egddm-multi-shift-sequence-v0.1.expected.json"
+        );
+        let actual = score_multi_shift_sequence_json(FIXTURE).expect("D6.8 fixture must score");
+        let actual_value = serde_json::to_value(actual).expect("serialize report");
+        let expected_value: Value = serde_json::from_str(EXPECTED).expect("expected report JSON");
+        assert_eq!(actual_value, expected_value);
+    }
+
+    #[test]
     fn matches_multishift_known_answer_and_restoration_control() {
         let report = score_multi_shift_sequence_json(FIXTURE).expect("D6.8 fixture must score");
         let conformant = trace(&report, "conformant-sequence");
