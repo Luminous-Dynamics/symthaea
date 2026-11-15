@@ -14,6 +14,7 @@ const SECTION_SCHEMA_VERSION: u32 = 1;
 const ENDPOINT_TOLERANCE: f64 = 1.0e-12;
 const MAX_STATIONS: usize = 512;
 const MAX_CONTROL_POINTS_PER_STATION: usize = 128;
+const MAX_TOTAL_OUTPUT_POINTS: usize = 1_000_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -185,6 +186,7 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
     }
 
     let mut previous_x: Option<f64> = None;
+    let mut total_output_points = 0_usize;
     for (station_index, station) in spec.stations.iter().enumerate() {
         if !station.x_over_length.is_finite()
             || !(0.0..=1.0).contains(&station.x_over_length)
@@ -307,6 +309,36 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
                     ),
                 );
             }
+        }
+
+        let station_output_points = station
+            .control_points
+            .len()
+            .checked_sub(1)
+            .and_then(|segments| {
+                segments.checked_mul(spec.samples_per_segment as usize)
+            })
+            .and_then(|points| points.checked_add(1));
+        match station_output_points
+            .and_then(|points| total_output_points.checked_add(points))
+        {
+            Some(total) => {
+                total_output_points = total;
+                if total_output_points > MAX_TOTAL_OUTPUT_POINTS {
+                    violation(
+                        &mut violations,
+                        "section_point_budget",
+                        format!(
+                            "generated section samples would exceed the {MAX_TOTAL_OUTPUT_POINTS}-point output budget"
+                        ),
+                    );
+                }
+            }
+            None => violation(
+                &mut violations,
+                "section_point_budget",
+                "generated section sample count overflows the supported size",
+            ),
         }
     }
 
@@ -565,6 +597,35 @@ mod tests {
             first.source_spec_digest_blake3,
             compute_section_spec_digest(&changed).unwrap()
         );
+    }
+
+    #[test]
+    fn oversized_sample_output_is_rejected_before_allocation() {
+        let mut spec = valid_spec();
+        spec.samples_per_segment = 64;
+        let controls: Vec<SectionControlPoint> = (0..128)
+            .map(|index| {
+                let fraction = index as f64 / 127.0;
+                SectionControlPoint {
+                    breadth_fraction: fraction,
+                    depth_fraction: 1.0 - fraction,
+                }
+            })
+            .collect();
+        for (index, station) in spec.stations.iter_mut().enumerate() {
+            station.x_over_length = index as f64 / 2.0;
+            station.control_points = controls.clone();
+        }
+        for index in 3..200 {
+            spec.stations.push(SectionStation {
+                x_over_length: index as f64 / 199.0,
+                half_breadth_fraction: 1.0,
+                draft_fraction: 1.0,
+                control_points: controls.clone(),
+            });
+        }
+        let error = validate_section_spec(&spec).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "section_point_budget"));
     }
 
     #[test]
