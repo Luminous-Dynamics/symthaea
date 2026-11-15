@@ -127,7 +127,7 @@ fn run_scenario(scenario: Scenario) -> Result<OperatingCounts, Box<dyn Error>> {
         let mut previous_observation = 0.0;
         let mut standardized_sum = 0.0;
         let mut e_process_first_crossing = None;
-        let mut naive_first_crossing = None;
+        let mut naive_first_crossing = false;
 
         for look in 1..=HORIZON {
             let (discrepancy, sigma) = scenario.design(previous_observation);
@@ -160,19 +160,19 @@ fn run_scenario(scenario: Scenario) -> Result<OperatingCounts, Box<dyn Error>> {
             // one-sided fixed-time 5% z test at every prefix.
             standardized_sum += observed / sigma;
             let naive_z = standardized_sum / (look as f64).sqrt();
-            if naive_z >= Z_CRITICAL_ONE_SIDED_05 && naive_first_crossing.is_none() {
-                naive_first_crossing = Some(look);
+            if naive_z >= Z_CRITICAL_ONE_SIDED_05 {
+                naive_first_crossing = true;
             }
 
             previous_observation = observed;
         }
 
-        if e_process_first_crossing.is_some() {
+        if let Some(detection_step) = e_process_first_crossing {
             counts.e_process_crossings += 1;
             counts.detections_with_step += 1;
-            counts.detection_steps += e_process_first_crossing.unwrap_or(HORIZON);
+            counts.detection_steps += detection_step;
         }
-        if naive_first_crossing.is_some() {
+        if naive_first_crossing {
             counts.naive_repeated_test_crossings += 1;
         }
     }
@@ -276,10 +276,11 @@ mod tests {
     fn deterministic_prng_replays_and_derived_paths_diverge() {
         let mut first = SplitMix64::new(ROOT_SEED);
         let mut replay = SplitMix64::new(ROOT_SEED);
-        let mut changed = SplitMix64::new(ROOT_SEED ^ 1);
         for _ in 0..8 {
             assert_eq!(first.next_u64(), replay.next_u64());
         }
-        assert_ne!(replay.next_u64(), changed.next_u64());
+        let first_seeded_value = SplitMix64::new(ROOT_SEED).next_u64();
+        let changed_seeded_value = SplitMix64::new(ROOT_SEED ^ 1).next_u64();
+        assert_ne!(first_seeded_value, changed_seeded_value);
     }
 }
