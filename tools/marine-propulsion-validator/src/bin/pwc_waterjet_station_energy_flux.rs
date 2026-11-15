@@ -289,12 +289,12 @@ fn integrate_station(station: &Station, density: &Measurement) -> (Interval, Int
     (volume_flow, energy_flux, area_sum)
 }
 
-fn station_result(station: &Station, q: Interval, energy: Interval, area: f64) -> StationResult {
+fn station_result(station: &Station, q_nominal: f64, q: Interval, energy_nominal: f64, energy: Interval, area: f64) -> StationResult {
     StationResult {
         station_number: station.station_number,
         station_id: station.station_id.clone(),
-        integrated_volume_flow: scalar(q.lo + (q.hi - q.lo) / 2.0, q, "m3/s"),
-        total_axial_energy_flux: scalar(energy.lo + (energy.hi - energy.lo) / 2.0, energy, "W"),
+        integrated_volume_flow: scalar(q_nominal, q, "m3/s"),
+        total_axial_energy_flux: scalar(energy_nominal, energy, "W"),
         integrated_area_m2: area,
         cell_count: station.cells.len(),
     }
@@ -387,8 +387,8 @@ fn audit(record: &Record) -> AuditReport {
     let flow_uncertainty_within_tolerance = flow_difference.max_abs() <= tolerance;
     let nominal_flow_within_tolerance = nominal_flow_difference.abs() <= tolerance;
 
-    let station_1 = station_result(&record.station_1, q1, e1, area1);
-    let station_7 = station_result(&record.station_7, q7, e7, area7);
+    let station_1 = station_result(&record.station_1, q1_nominal, q1, e1_nominal, e1, area1);
+    let station_7 = station_result(&record.station_7, q7_nominal, q7, e7_nominal, e7, area7);
 
     if q1_nominal <= 0.0 || q7_nominal <= 0.0 {
         findings.incomparable("/station_flow", "integrated flow is non-positive; check local axial velocity sign and station normal orientation");
