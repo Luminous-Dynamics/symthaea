@@ -20,6 +20,8 @@ This is a first integration step, not the completed issuer-bound private-claim t
 |---|---:|---|
 | `request_id` | 16 bytes | Unique request identity in the verifier's namespace |
 | `source_statement_reference_digest` | 32 bytes | Reference to a source statement; not authenticated by this guest |
+| `claim_schema_digest` | 32 bytes | Claim schema, field and unit semantics |
+| `predicate_digest` | 32 bytes | Exact predicate semantics, including comparison boundary and rounding |
 | `issuer_key_reference_digest` | 32 bytes | Reference to an issuer/key; not authenticated or authorized by this guest |
 | `audience_digest` | 32 bytes | Pairwise/purpose-scoped verifier audience |
 | `verifier_digest` | 32 bytes | Verifier/request authority context |
@@ -34,7 +36,7 @@ Structural validation rejects all-zero identifiers/digests/challenges. A nonzero
 
 The digest is:
 
-`SHA-256(domain || request_id || source_statement_reference_digest || issuer_key_reference_digest || audience_digest || verifier_digest || purpose_digest || policy_digest || verifier_challenge || required_minimum_be)`
+`SHA-256(domain || request_id || source_statement_reference_digest || claim_schema_digest || predicate_digest || issuer_key_reference_digest || audience_digest || verifier_digest || purpose_digest || policy_digest || verifier_challenge || required_minimum_be)`
 
 Domain:
 
@@ -46,17 +48,19 @@ A fixed known-answer vector is included in the isolated request-bound core tests
 
 - request ID: 16 bytes of `0x01`
 - source statement reference: 32 bytes of `0x02`
+- claim schema: 32 bytes of `0x04`
+- predicate: 32 bytes of `0x05`
 - issuer-key reference: 32 bytes of `0x03`
-- audience: 32 bytes of `0x04`
-- verifier: 32 bytes of `0x05`
-- purpose: 32 bytes of `0x06`
-- policy: 32 bytes of `0x07`
-- challenge: 32 bytes of `0x08`
+- audience: 32 bytes of `0x06`
+- verifier: 32 bytes of `0x07`
+- purpose: 32 bytes of `0x08`
+- policy: 32 bytes of `0x09`
+- challenge: 32 bytes of `0x0a`
 - threshold: 500
 
 Expected digest:
 
-`679d120fd3a036abb517e0d37e8aebfcdcabdeeda34247f89297c6f95bed96cb`
+`f173037a1126d495e2b228fa79d6132cee083d97613498322b5a7d2f3fda538d`
 
 ## 4. Guest and host behavior
 
