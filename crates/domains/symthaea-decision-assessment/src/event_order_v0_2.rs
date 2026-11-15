@@ -1374,7 +1374,7 @@ mod tests {
 
     #[test]
     fn unrelated_pending_attempt_does_not_block_an_unrelated_scoped_start() {
-        let unrelated = attempt("robot-9", "attempt-pending", None, "start-pending", None, None);
+        let unrelated = attempt("robot-9", "attempt-pending", None, "start-pending", None, None, None);
         let obligation = scoped_obligation("obligation-a", "robot-7");
         let attempts = vec![unrelated];
         let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
