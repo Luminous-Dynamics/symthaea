@@ -59,11 +59,11 @@ jobs:
               .naive_repeated_fixed_time_wilson95[0] <= .naive_repeated_fixed_time_rate and
               .naive_repeated_fixed_time_rate <= .naive_repeated_fixed_time_wilson95[1]
             ) and
-            ( .scenarios[] | select(.scenario == "fixed_known_variance_null") | .e_process_rate ) <= 0.06 and
-            ( .scenarios[] | select(.scenario == "predictable_adaptive_variance_null") | .e_process_rate ) <= 0.06 and
-            ( .scenarios[] | select(.scenario == "predictable_adaptive_variance_null") | .naive_repeated_fixed_time_rate ) > 0.10
+            (.scenarios | map(select(.scenario == "fixed_known_variance_null"))[0].e_process_rate) <= 0.06 and
+            (.scenarios | map(select(.scenario == "predictable_adaptive_variance_null"))[0].e_process_rate) <= 0.06 and
+            (.scenarios | map(select(.scenario == "predictable_adaptive_variance_null"))[0].naive_repeated_fixed_time_rate) > 0.10
           ' "$report"
-          printf '%s\\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
           sha256sum "$report" | tee "$report.sha256"
           cat "$report"
 
