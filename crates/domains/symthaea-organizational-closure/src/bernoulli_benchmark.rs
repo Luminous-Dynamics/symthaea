@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 //! Suite-level operating-characteristic and process-integrity metrics for
 //! the AOBENCH stochastic Bernoulli sequential assay.
 
@@ -215,34 +216,13 @@ mod tests {
     }
 
     fn positive_trace() -> BernoulliSequentialTrace {
-        let scenario = scenario();
-        let mut control_successes = 0_usize;
-        let mut treatment_successes = 0_usize;
-        let mut control_n = 0_usize;
-        let mut treatment_n = 0_usize;
         let mut trials = Vec::new();
-        for _ in 0..scenario.max_samples_per_arm {
+        // At alpha=0.05 and delta=0.10, deterministic 0/1 streams first
+        // cross the conservative two-arm boundary after 29 samples per arm.
+        for _ in 0..29 {
             trials.push(BernoulliTrial::qualified(BernoulliArm::Control, false));
-            control_n += 1;
             trials.push(BernoulliTrial::qualified(BernoulliArm::Treatment, true));
-            treatment_n += 1;
-            treatment_successes += 1;
-            let control = crate::bernoulli_sequential::BernoulliInterval {
-                lower: (control_successes as f64 / control_n as f64),
-                upper: (control_successes as f64 / control_n as f64),
-            };
-            let treatment = crate::bernoulli_sequential::BernoulliInterval {
-                lower: (treatment_successes as f64 / treatment_n as f64),
-                upper: (treatment_successes as f64 / treatment_n as f64),
-            };
-            let _ = (control, treatment);
-            // This fixture has deterministic 0/1 streams; the evaluator's
-            // actual confidence sequence determines the stop point below.
-            if trials.len() >= 100 {
-                break;
-            }
         }
-        // The chosen conservative boundary is crossed well before 100 trials.
         BernoulliSequentialTrace {
             trials,
             terminal: BernoulliTerminalDecision::Stop { claim: BernoulliClaim::Benefit },
