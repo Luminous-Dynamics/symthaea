@@ -357,6 +357,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "ai_core_step_supply_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     },
