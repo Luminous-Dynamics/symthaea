@@ -59,7 +59,10 @@ struct LoftArtifactIdentity<'a> {
     side_face_range: FaceRange,
     waterplane_face_range: FaceRange,
     end_cap_face_range: FaceRange,
+    candidate_schema_version: u32,
     candidate_id: &'a str,
+    geometry_digest_blake3: &'a str,
+    admission_profile: &'a AdmissionProfile,
 }
 
 pub fn compute_loft_manifest_digest(
@@ -75,7 +78,10 @@ pub fn compute_loft_manifest_digest(
         side_face_range: artifact.side_face_range,
         waterplane_face_range: artifact.waterplane_face_range,
         end_cap_face_range: artifact.end_cap_face_range,
+        candidate_schema_version: artifact.candidate.schema_version,
         candidate_id: &artifact.candidate.candidate_id,
+        geometry_digest_blake3: &artifact.candidate.geometry_digest_blake3,
+        admission_profile: &artifact.candidate.profile,
     };
     let bytes = serde_json::to_vec(&identity)?;
     Ok(blake3::hash(&bytes).to_hex().to_string())
@@ -502,6 +508,41 @@ pub fn verify_loft_artifact_integrity(
             &mut violations,
             "face_region_coverage",
             "semantic face ranges do not cover every mesh face",
+        );
+    }
+
+    if artifact.artifact_schema_version != LOFT_SCHEMA_VERSION
+        || artifact.generator != "symthaea-marine-waterplane-loft-v1"
+        || artifact.cap_semantics != "closed-displacement-volume-at-design-waterplane-z0"
+        || artifact.candidate.schema_version != 1
+    {
+        violation(
+            &mut violations,
+            "loft_artifact_version",
+            "loft artifact, generator, cap semantics or candidate schema is unsupported",
+        );
+    }
+    if !artifact.candidate.profile.require_closed_surface {
+        violation(
+            &mut violations,
+            "profile_requires_closure",
+            "loft artifact profile must require a closed surface",
+        );
+    }
+
+    if artifact.side_face_range.first_face != 0
+        || artifact.waterplane_face_range.first_face
+            != artifact.side_face_range.first_face + artifact.side_face_range.face_count
+        || artifact.end_cap_face_range.first_face
+            != artifact.waterplane_face_range.first_face
+                + artifact.waterplane_face_range.face_count
+        || artifact.end_cap_face_range.first_face + artifact.end_cap_face_range.face_count
+            != face_count
+    {
+        violation(
+            &mut violations,
+            "face_region_order",
+            "side, waterplane and end-cap face ranges must be contiguous in generator order",
         );
     }
 
