@@ -61,7 +61,7 @@ Rights states are explicit: license confirmed, permission granted, synthetic-own
 
 Each extracted view identifies its source artifact, page, view type, pixel dimensions, rotation/skew, coordinate-frame ID and calibration state.
 
-Calibration binds pixel anchors to physical coordinates, units and uncertainty. It distinguishes uncalibrated, scale-only, affine, projective, engineering-datum-bound and synthetic-known-answer cases. A visually plausible scale bar is not treated as a confirmed dimension unless its origin and method are recorded.
+Calibration binds each pixel anchor to an explicitly named engineering axis (longitudinal, transverse or vertical), units and uncertainty. It distinguishes uncalibrated, scale-only, affine, projective, engineering-datum-bound and synthetic-known-answer cases. A visually plausible scale bar is not treated as a confirmed dimension unless its origin and method are recorded.
 
 ### 4.3 Constraints, conflicts and unresolved regions
 
