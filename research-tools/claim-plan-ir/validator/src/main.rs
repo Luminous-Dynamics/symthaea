@@ -1,4 +1,4 @@
-use serde::de::{self, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, Error as _, MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -45,15 +45,24 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
         formatter.write_str("strict JSON with unique object member names and exact safe integers")
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictJson::Null)
     }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E> {
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictJson::Null)
     }
 
-    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictJson::Bool(value))
     }
 
@@ -86,11 +95,17 @@ impl<'de> Visitor<'de> for StrictJsonVisitor {
         ))
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictJson::String(value.to_owned()))
     }
 
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(StrictJson::String(value))
     }
 
@@ -160,12 +175,6 @@ fn parse_strict(raw: &str) -> Result<StrictJson, String> {
         ));
     }
     serde_json::from_str::<StrictJson>(raw).map_err(|error| format!("strict JSON admission: {error}"))
-}
-
-fn as_object<'a>(value: &'a Value, what: &str) -> Result<&'a serde_json::Map<String, Value>, String> {
-    value
-        .as_object()
-        .ok_or_else(|| format!("{what} must be an object"))
 }
 
 fn str_at<'a>(value: &'a Value, key: &str, what: &str) -> Result<&'a str, String> {
