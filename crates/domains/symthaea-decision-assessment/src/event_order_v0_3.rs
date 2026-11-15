@@ -3046,6 +3046,7 @@ pub fn project_action_history(
     }
 
     let mut discharged_obligation_ids = BTreeSet::new();
+    let mut discharged_policy_generations = BTreeSet::<(String, String)>::new();
     for action in &canonical_actions {
         let ScheduleAction::StopDischarged {
             obligation_id, trigger_action_id, policy_revision_action_id, policy_revision,
@@ -3061,11 +3062,37 @@ pub fn project_action_history(
             reasons.insert(format!("STOP_DISCHARGE_WITHOUT_TRIGGER:{obligation_id}"));
             continue;
         };
-        let Some((current_policy_action, current_scope, current_policy, revision_time)) = latest_policy_actions.get(obligation_id) else {
+        let Some(discharge_position) = canonical_actions.iter()
+            .position(|candidate| candidate.action_id == action.action_id) else {
             critical = true;
-            reasons.insert(format!("STOP_DISCHARGE_WITHOUT_CURRENT_POLICY:{obligation_id}"));
+            reasons.insert(format!("STOP_DISCHARGE_ACTION_NOT_IN_CANONICAL_HISTORY:{obligation_id}"));
             continue;
         };
+        let current_policy_action = canonical_actions[..discharge_position].iter().rev().find(|candidate| {
+            match &candidate.action {
+                ScheduleAction::StopTriggered { obligation_id: candidate_id, .. }
+                | ScheduleAction::StopPolicyRevised { obligation_id: candidate_id, .. } => candidate_id == obligation_id,
+                _ => false,
+            }
+        });
+        let Some(current_policy_action) = current_policy_action else {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_WITHOUT_PRIOR_POLICY_ACTION:{obligation_id}"));
+            continue;
+        };
+        let policy_evidence = stop_evidence.iter().find(|evidence| {
+            evidence.action_id == current_policy_action.action_id
+                && evidence.obligation_id == *obligation_id
+                && evidence.kind != ProjectedStopEvidenceKind::Discharge
+        });
+        let Some(policy_evidence) = policy_evidence else {
+            indeterminate = true;
+            reasons.insert(format!("STOP_DISCHARGE_PRIOR_POLICY_NOT_OWNER_QUALIFIED:{obligation_id}"));
+            continue;
+        };
+        let current_scope = &policy_evidence.scope;
+        let current_policy = &policy_evidence.policy_revision;
+        let revision_time = &policy_evidence.owner_time;
         if trigger_action.action_id != *trigger_action_id
             || current_policy_action.action_id != *policy_revision_action_id
             || current_policy != policy_revision
@@ -3156,6 +3183,19 @@ pub fn project_action_history(
                 continue;
             }
         }
+        match event_order_between(revision_time, &discharge_time) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!("STOP_DISCHARGE_PRECEDES_CURRENT_POLICY:{obligation_id}"));
+                continue;
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_DISCHARGE_POLICY_ORDER_UNRESOLVED:{obligation_id}"));
+                continue;
+            }
+        }
         let trigger_order = event_order_between(trigger_time, &discharge_time);
         if trigger_order != EventOrder::Before {
             match trigger_order {
@@ -3195,11 +3235,17 @@ pub fn project_action_history(
             in_flight_attempt_manifest_sha256: manifest,
             trigger_to_discharge_order: trigger_order,
         };
-        if !discharged_obligation_ids.insert(obligation_id.clone()) {
+        let policy_generation_key = (
+            obligation_id.clone(),
+            current_policy_action.action_id.clone(),
+        );
+        if !discharged_policy_generations.insert(policy_generation_key) {
             critical = true;
-            reasons.insert(format!("DUPLICATE_STOP_DISCHARGE:{obligation_id}"));
+            reasons.insert(format!("DUPLICATE_STOP_DISCHARGE_FOR_POLICY_GENERATION:{obligation_id}"));
             continue;
         }
+        let is_final_policy_generation = latest_policy_actions.get(obligation_id)
+            .is_some_and(|(latest_action, _, _, _)| latest_action.action_id == current_policy_action.action_id);
         let inventory_action_id = &inventory_match[0].1;
         if let Some(inventory_action) = schedule.actions.iter().find(|item| item.action_id == *inventory_action_id) {
             match action_owner_time(schedule, inventory_action, time_resolutions) {
@@ -3224,27 +3270,34 @@ pub fn project_action_history(
                 }
             }
         }
-        obligations.push(ScopedStopObligation {
-            obligation_id: obligation_id.clone(),
-            trigger_event_id: trigger_action.action_id.clone(),
-            policy_revision: current_policy.clone(),
-            scope,
-            discharge: Some(discharge),
-        });
+        if is_final_policy_generation {
+            if !discharged_obligation_ids.insert(obligation_id.clone()) {
+                critical = true;
+                reasons.insert(format!("MULTIPLE_FINAL_STOP_DISCHARGES:{obligation_id}"));
+                continue;
+            }
+            obligations.push(ScopedStopObligation {
+                obligation_id: obligation_id.clone(),
+                trigger_event_id: trigger_action.action_id.clone(),
+                policy_revision: current_policy.clone(),
+                scope,
+                discharge: Some(discharge),
+            });
+        }
     }
 
     for (obligation_id, (trigger_action, trigger_scope, _trigger_policy, _trigger_time)) in &stop_trigger_actions {
         if discharged_obligation_ids.contains(obligation_id) {
             continue;
         }
-        let current_policy = latest_policy_actions.get(obligation_id)
-            .map(|entry| entry.2.clone())
-            .unwrap_or_else(|| _trigger_policy.clone());
+        let (current_scope, current_policy) = latest_policy_actions.get(obligation_id)
+            .map(|entry| (entry.1.clone(), entry.2.clone()))
+            .unwrap_or_else(|| (trigger_scope.clone(), _trigger_policy.clone()));
         obligations.push(ScopedStopObligation {
             obligation_id: obligation_id.clone(),
             trigger_event_id: trigger_action.action_id.clone(),
             policy_revision: current_policy,
-            scope: trigger_scope.clone(),
+            scope: current_scope,
             discharge: None,
         });
         indeterminate = true;
