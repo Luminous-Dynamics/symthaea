@@ -116,12 +116,7 @@ pub fn compute_geometry_digest(geometry: &MeshGeometry) -> Result<String, serde_
     Ok(blake3::hash(&canonical).to_hex().to_string())
 }
 
-fn push(
-    checks: &mut Vec<Check>,
-    code: &str,
-    status: CheckStatus,
-    detail: impl Into<String>,
-) {
+fn push(checks: &mut Vec<Check>, code: &str, status: CheckStatus, detail: impl Into<String>) {
     checks.push(Check {
         code: code.to_owned(),
         status,
@@ -163,8 +158,14 @@ fn count_non_manifold_vertex_links(geometry: &MeshGeometry) -> Option<usize> {
             return None;
         }
         for (center, left, right) in [(a, b, c), (b, c, a), (c, a, b)] {
-            links[center as usize].entry(left).or_default().insert(right);
-            links[center as usize].entry(right).or_default().insert(left);
+            links[center as usize]
+                .entry(left)
+                .or_default()
+                .insert(right);
+            links[center as usize]
+                .entry(right)
+                .or_default()
+                .insert(left);
         }
     }
 
@@ -310,7 +311,10 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
             &mut checks,
             "schema_version",
             CheckStatus::Fail,
-            format!("schema version {} is not supported", candidate.schema_version),
+            format!(
+                "schema version {} is not supported",
+                candidate.schema_version
+            ),
         );
     }
 
@@ -648,7 +652,11 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
     });
 
     if volume_evaluable {
-        match (component_volumes.as_ref(), total_volume, all_components_outward) {
+        match (
+            component_volumes.as_ref(),
+            total_volume,
+            all_components_outward,
+        ) {
             (Some(volumes), Some(total), true) => {
                 push(
                     &mut checks,
@@ -828,8 +836,7 @@ mod tests {
     fn open_surface_is_rejected_when_closure_is_required() {
         let mut candidate = tetrahedron();
         candidate.geometry.faces.pop();
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
         assert!(report.metrics.boundary_edge_count > 0);
@@ -856,9 +863,12 @@ mod tests {
         candidate.geometry.vertices[1][0] = 1.25;
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
-        assert!(report.checks.iter().any(|c| {
-            c.code == "geometry_digest" && c.status == CheckStatus::Fail
-        }));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| { c.code == "geometry_digest" && c.status == CheckStatus::Fail })
+        );
     }
 
     #[test]
@@ -870,7 +880,12 @@ mod tests {
             .push("self_intersection_free".into());
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Incomplete);
-        assert!(report.checks.iter().any(|c| c.status == CheckStatus::Unknown));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| c.status == CheckStatus::Unknown)
+        );
     }
 
     #[test]
@@ -928,9 +943,12 @@ mod tests {
         candidate.geometry.vertices[0][0] = f64::NAN;
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
-        assert!(report.checks.iter().any(|c| {
-            c.code == "finite_coordinates" && c.status == CheckStatus::Fail
-        }));
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|c| { c.code == "finite_coordinates" && c.status == CheckStatus::Fail })
+        );
     }
 
     #[test]
@@ -951,18 +969,23 @@ mod tests {
         let report = admit(&candidate);
         assert!(report.metrics.signed_volume_m3.unwrap() > 0.0);
         assert_eq!(report.metrics.component_signed_volumes_m3.len(), 2);
-        assert!(report.metrics.component_signed_volumes_m3.iter().any(|v| *v < 0.0));
+        assert!(
+            report
+                .metrics
+                .component_signed_volumes_m3
+                .iter()
+                .any(|v| *v < 0.0)
+        );
         assert_eq!(report.disposition, Disposition::Invalid);
     }
 
     #[test]
     fn closed_shells_touching_only_at_one_vertex_are_rejected() {
         let mut candidate = tetrahedron();
-        candidate.geometry.vertices.extend([
-            [ -1.0, 0.0, 0.0 ],
-            [ 0.0, -1.0, 0.0 ],
-            [ 0.0, 0.0, -1.0 ],
-        ]);
+        candidate
+            .geometry
+            .vertices
+            .extend([[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]);
         // The second tetrahedron shares the first tetrahedron's vertex 0,
         // but shares no edges. Its local winding is outward.
         candidate.geometry.faces.extend([
