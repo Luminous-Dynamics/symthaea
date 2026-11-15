@@ -1005,6 +1005,9 @@ mod tests {
         assert_eq!(conformant.total_under_revalidation_units, 0);
         assert_eq!(conformant.total_false_resurrections, 0);
         assert_eq!(conformant.total_critical_false_resurrections, 0);
+        assert_eq!(conformant.total_dependency_only_impact_labels, 0);
+        assert_eq!(conformant.total_gold_only_impact_labels, 0);
+        assert_eq!(report.gold_adjudication_status, "synthetic_known_answer_not_independently_adjudicated");
         let adversarial = trace(&report, "false-resurrection-sequence");
         assert_eq!(adversarial.total_required_revalidation_units, 10);
         assert_eq!(adversarial.total_fresh_revalidation_units, 9);
@@ -1021,6 +1024,38 @@ mod tests {
         );
         assert_eq!(report.restoration_control.false_resurrection_count, 0);
         assert_eq!(report.restoration_control.valid_reused_obligations.len(), 4);
+    }
+
+
+    #[test]
+    fn rejects_synthetic_gold_label_disagreement_with_declared_dependencies() {
+        let mut value = fixture_value();
+        value["gold_overlay"]["required_revalidation_by_epoch"][0]["required_revalidation_obligations"]
+            .as_array_mut().expect("gold set")
+            .retain(|item| item != "build-repro");
+        value["gold_overlay"]["required_revalidation_by_epoch"][0]["reason_by_obligation"]
+            .as_array_mut().expect("reasons")
+            .retain(|item| item["obligation_id"] != "build-repro");
+        let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("synthetic gold impact disagrees with dependency-implied impact"));
+    }
+
+    #[test]
+    fn independent_gold_disagreement_is_reported_not_silently_rewritten() {
+        let mut value = fixture_value();
+        value["gold_overlay"]["adjudication_status"] = json!("independently_adjudicated");
+        value["gold_overlay"]["required_revalidation_by_epoch"][0]["required_revalidation_obligations"]
+            .as_array_mut().expect("gold set")
+            .retain(|item| item != "build-repro");
+        value["gold_overlay"]["required_revalidation_by_epoch"][0]["reason_by_obligation"]
+            .as_array_mut().expect("reasons")
+            .retain(|item| item["obligation_id"] != "build-repro");
+        let report = report_for(&value);
+        assert_eq!(report.gold_adjudication_status, "independently_adjudicated");
+        let conformant = trace(&report, "conformant-sequence");
+        assert_eq!(conformant.epochs[0].dependency_only_impact_obligations, vec!["build-repro".to_owned()]);
+        assert!(conformant.epochs[0].gold_only_impact_obligations.is_empty());
+        assert_eq!(conformant.total_dependency_only_impact_labels, 1);
     }
 
     #[test]
