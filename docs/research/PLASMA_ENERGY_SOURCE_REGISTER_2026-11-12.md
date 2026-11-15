@@ -577,3 +577,42 @@ The source crosswalk deliberately marks current literature gaps:
 Ten frozen negative controls block nameplate-as-meter, absent auxiliary-as-zero, setpoint-as-sample-temperature, dried/pre-fired pooling, material-quality-as-efficiency, and other boundary errors. The JSON round-trip and identity checks passed at authoring time; this is contract validation, not instrument validation or physical experiment.
 
 This adds a practical next-step question to the science programme: what additional calibrated measurements would make a source case comparable, and which missing measurement changes the design decision? It does not authorize a high-temperature or plasma experiment.
+
+
+## 9.13 Updated ammonia-plasma frontier — 2026-11-15
+
+Two September 2026 publications materially improve the ammonia cracking comparison.
+
+### Microwave decomposition: conversion and specific-energy Pareto points
+
+Quiroz Marnef et al., *Microwave plasma-based NH3 decomposition: Reaching optimum performance by understanding the mechanisms*, International Journal of Hydrogen Energy 265 (2026), DOI https://doi.org/10.1016/j.ijhydene.2026.156912.
+
+The paper reports:
+- near-complete conversion (>99%) at a hydrogen energy yield of 45 g H2/kWh and a production rate of 150 g/h;
+- the highest reported energy yield of 51 g H2/kWh at a separate 76% NH3 conversion operating point;
+- a 2D-axisymmetric model coupling gas dynamics, heat transfer, electromagnetic fields and chemical reactions.
+
+Reciprocal energy-yield checks give approximately 22.22 kWh/kg H2 at the >99% conversion point and 19.61 kWh/kg H2 at the 76% conversion point. These are two operating points, not one performance point. The higher energy yield at 76% conversion must not be combined with the >99% conversion figure.
+
+The complete wall-plug boundary, H2 separation/purification, compression, cooling, auxiliaries and lifetime must be independently reconciled before system-level ranking. The feed is pure NH3 at atmospheric pressure, which differs from the 2025 atmospheric NH3/N2 mixture and reduced-pressure pure-NH3 cases.
+
+### Turbulent transport: a counter-intuitive model-form result
+
+Maerivoet et al., *Effect of turbulent transport on plasma-based NH3 cracking into H2: Insights from a RANS computational fluid dynamics model*, Energy Conversion and Management 364 (2026), DOI https://doi.org/10.1016/j.enconman.2026.121741.
+
+The source reports a coupled 2D-axisymmetric flow/heat/chemistry/species/current model compared with experiments over flow-rate and current ranges. In the studied warm-plasma reactor, increased turbulence reduced NH3 conversion and increased energy cost because it suppressed the hot afterglow that supports additional conversion.
+
+This is an important model-discrimination challenge: do not assume that more turbulence or mixing universally improves plasma conversion. The effect is chemistry- and regime-specific. The result is not a universal law and is not directly transferable to microwave NH3 cracking, RF cold plasma, CO2 splitting or fusion.
+
+### Benchmark update
+
+The ammonia lane should now retain at least these separate Pareto dimensions:
+- NH3 conversion per pass;
+- H2 energy yield (g/kWh) and reciprocal specific energy (kWh/kg H2);
+- H2 production rate;
+- exact feed composition, pressure, reactor/source family and operating point;
+- full grid-side energy boundary and accepted H2 purity/pressure;
+- separation/recycle energy and unconverted NH3 recovery;
+- uptime, start/stop response, maintenance and consumables.
+
+Compare complete process chains rather than isolated conversion figures. A lower single-pass conversion can be preferable only if separation and recycle produce lower total energy and cost per kg of delivered accepted H2. That proposition remains a hypothesis to benchmark, not a claimed result.
