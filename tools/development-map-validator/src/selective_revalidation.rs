@@ -338,58 +338,68 @@ mod tests {
         use sha2::{Digest, Sha256};
 
         #[derive(Serialize)]
-        struct ReceiptMaterial<'a> {
-            schema_version: &'a str,
-            scenario_id: &'a str,
-            repository_full_name: &'a str,
-            arm_id: &'a str,
-            receipt_id: &'a str,
-            obligation_id: &'a str,
-            check_id: &'a str,
-            outcome: &'a str,
+        struct ReceiptMaterial {
+            schema_version: String,
+            scenario_id: String,
+            repository_full_name: String,
+            arm_id: String,
+            receipt_id: String,
+            obligation_id: String,
+            check_id: String,
+            outcome: String,
             source_epoch: u64,
-            observed_at: &'a str,
-            available_at: &'a str,
-            revision: &'a str,
-            tree_oid: &'a str,
-            configuration_world_digest: &'a str,
+            observed_at: String,
+            available_at: String,
+            revision: String,
+            tree_oid: String,
+            configuration_world_digest: String,
         }
 
-        let source_epoch = scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index]["source_epoch"].as_u64().unwrap();
-        let source = scenario["arms"][arm_index]["epochs"].as_array().unwrap().iter()
+        let source_epoch = scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index]["source_epoch"]
+            .as_u64()
+            .unwrap();
+        let source = scenario["arms"][arm_index]["epochs"]
+            .as_array()
+            .unwrap()
+            .iter()
             .find(|epoch| epoch["epoch"].as_u64() == Some(source_epoch))
             .unwrap();
         let revision = source["snapshot"]["revision"].clone();
         let tree_oid = source["snapshot"]["tree_oid"].clone();
         let configuration_world_digest =
             source["snapshot"]["configuration_world_digest"].clone();
-        let receipt = &mut scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index];
-        receipt["revision"] = revision;
-        receipt["tree_oid"] = tree_oid;
-        receipt["configuration_world_digest"] = configuration_world_digest;
-        if source_epoch == 0 {
-            receipt["observed_at"] = json!("2026-11-15T07:01:00Z");
-            receipt["available_at"] = json!("2026-11-15T07:02:00Z");
-        } else {
-            receipt["observed_at"] = json!("2026-11-15T07:12:00Z");
-            receipt["available_at"] = json!("2026-11-15T07:13:00Z");
+
+        {
+            let receipt = &mut scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index];
+            receipt["revision"] = revision;
+            receipt["tree_oid"] = tree_oid;
+            receipt["configuration_world_digest"] = configuration_world_digest;
+            if source_epoch == 0 {
+                receipt["observed_at"] = json!("2026-11-15T07:01:00Z");
+                receipt["available_at"] = json!("2026-11-15T07:02:00Z");
+            } else {
+                receipt["observed_at"] = json!("2026-11-15T07:12:00Z");
+                receipt["available_at"] = json!("2026-11-15T07:13:00Z");
+            }
         }
-        let arm = &scenario["arms"][arm_index];
+
+        let arm_id = scenario["arms"][arm_index]["arm_id"].as_str().unwrap().to_owned();
+        let receipt = &scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index];
         let material = ReceiptMaterial {
-            schema_version: scenario["schema_version"].as_str().unwrap(),
-            scenario_id: scenario["scenario_id"].as_str().unwrap(),
-            repository_full_name: scenario["repository_full_name"].as_str().unwrap(),
-            arm_id: arm["arm_id"].as_str().unwrap(),
-            receipt_id: receipt["receipt_id"].as_str().unwrap(),
-            obligation_id: receipt["obligation_id"].as_str().unwrap(),
-            check_id: receipt["check_id"].as_str().unwrap(),
-            outcome: receipt["outcome"].as_str().unwrap(),
+            schema_version: scenario["schema_version"].as_str().unwrap().to_owned(),
+            scenario_id: scenario["scenario_id"].as_str().unwrap().to_owned(),
+            repository_full_name: scenario["repository_full_name"].as_str().unwrap().to_owned(),
+            arm_id,
+            receipt_id: receipt["receipt_id"].as_str().unwrap().to_owned(),
+            obligation_id: receipt["obligation_id"].as_str().unwrap().to_owned(),
+            check_id: receipt["check_id"].as_str().unwrap().to_owned(),
+            outcome: receipt["outcome"].as_str().unwrap().to_owned(),
             source_epoch: receipt["source_epoch"].as_u64().unwrap(),
-            observed_at: receipt["observed_at"].as_str().unwrap(),
-            available_at: receipt["available_at"].as_str().unwrap(),
-            revision: receipt["revision"].as_str().unwrap(),
-            tree_oid: receipt["tree_oid"].as_str().unwrap(),
-            configuration_world_digest: receipt["configuration_world_digest"].as_str().unwrap(),
+            observed_at: receipt["observed_at"].as_str().unwrap().to_owned(),
+            available_at: receipt["available_at"].as_str().unwrap().to_owned(),
+            revision: receipt["revision"].as_str().unwrap().to_owned(),
+            tree_oid: receipt["tree_oid"].as_str().unwrap().to_owned(),
+            configuration_world_digest: receipt["configuration_world_digest"].as_str().unwrap().to_owned(),
         };
         let bytes = serde_json::to_vec(&material).unwrap();
         let digest = Sha256::digest(bytes);
