@@ -481,6 +481,14 @@ At minimum include:
 9. Survey named local machine/CMT capabilities and actual fabric suppliers before selecting exact equipment or capacity.
 10. Use Phase 0 external partners to build real cost/lead-time/quality data before committing to a Phase 1 building.
 
-## 15. Claim ceiling
+## 15.1 Machine-readable layout and FactoryBench companion
+
+The machine-readable facility catalogue is in [factory-layout-catalog.v0.1.json](factory-layout-catalog.v0.1.json). It records 16 zones, 13 directed material-flow edges, four layout alternatives, five deployment phases, utility profiles, ten facility disruption scenarios and non-compensatory constraints. Exact dimensions, coordinates, machine counts, staffing and capacity remain deliberately unassigned.
+
+The matched layout/production benchmark is separately owned by [ATELIER-FACTORYBENCH-001 #12289](https://github.com/Luminous-Dynamics/symthaea/issues/12289), with a synthetic four-product operation-graph corpus and From-To matrix. The initial read-back check found 42 operations across AO-01/K-01/T-01/CR-01, all four precedence graphs acyclic, four layout alternatives, 12 scenarios and ten zone-to-zone flow rows. The workload ticks and batch quantities are synthetic and are not minutes, standard minute values, observed demand or production capacity.
+
+The next step is to add declared floor geometry and actual named-machine/workforce capability only after a site or partner facility is surveyed. Until then, travel-distance and capacity outputs cannot be reported as physical factory results.
+
+## 16. Claim ceiling
 
 This is a reference architecture and benchmark proposal. It does not establish a selected site, building size, capex, factory capacity, legal compliance, safe occupancy, environmental benefit, production cost, local-content percentage or commercial viability. Layout simulation does not establish physical feasibility. Vendor claims and published case-study improvements are not Atelier results. A building, once selected, needs qualified site, building, fire, electrical, ventilation, occupational-safety, environmental and commissioning professionals before any production use.
