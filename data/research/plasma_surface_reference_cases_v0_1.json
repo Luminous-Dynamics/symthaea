@@ -95,6 +95,14 @@
           "specimens_per_treatment_category": 3,
           "bond_timing": "immediately_after_treatment",
           "bondline_thickness_measured": false
+        },
+        "nitrogen_overexposure_damage": {
+          "pp_first_visible_burning_head_speed_mm_per_min": 500,
+          "pvc_first_visible_damage_head_speed_mm_per_min": 250,
+          "hips_first_visible_damage_head_speed_mm_per_min": 250,
+          "all_polymers_visible_damage_below_mm_per_min": 250,
+          "argon_visible_damage_in_tested_window": false,
+          "bonding_of_damaged_conditions": "excluded_from_subsequent_lap_shear_tests"
         }
       },
       "selected_reported_observations": [
@@ -153,14 +161,30 @@
           },
           "reported_failure_mode": "substrate_failure",
           "interpretation": "Nitrogen was highly effective for this exact material/adhesive combination; this prevents an argon-superiority generalization."
+        },
+        {
+          "material": "PP",
+          "adhesive": "Loctite EA 9466",
+          "nitrogen_lap_shear_mpa": {
+            "mean": 11.6,
+            "uncertainty": 0.7
+          },
+          "untreated_lap_shear_mpa": {
+            "mean": 0.5,
+            "uncertainty": 0.1
+          },
+          "nitrogen_water_contact_angle_deg": 17,
+          "untreated_water_contact_angle_deg": 94,
+          "nitrogen_failure_mode": "substrate_failure",
+          "qualifier": "N2 treatment, 3 specimens in treatment category; immediate post-treatment bond, source-specific processing conditions"
         }
       ],
       "comparison_status": "SOURCE_SPECIFIC_LAB_RESULTS_NOT_A_LIFETIME_OR_INDUSTRIAL_COMPARISON",
       "blockers": [
-        "Only three specimens per treatment category were tested.",
+        "Only three specimens per treatment category were tested; source-specific standard deviations/uncertainties must be retained and no production reliability claim follows.",
         "Bonding was immediate; no delayed-bonding or bondability-window data were produced.",
-        "Exact bondline thickness was not measured.",
-        "The substrate temperature was not measured directly.",
+        "Exact bondline thickness was not measured, and substrate temperature was not directly measured.",
+        "Only non-visibly-damaged treatment conditions were used for the reported lap-shear tests; the damage observations do not provide bond-strength results for damaged surfaces.",
         "The reported 529 W is measured discharge power, not a complete grid-to-accepted-bonded-area energy balance.",
         "Different polymer/adhesive combinations are distinct service profiles and must not be pooled."
       ],
@@ -329,6 +353,21 @@
     {
       "control_id": "SURF-NC-008",
       "claim": "an immediate-bond ISO 4587 result can be pooled with another test standard or joint geometry",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-009",
+      "claim": "PP + Loctite EA 9466 N2 result (11.6 ± 0.7 MPa) transfers to PP + Soudal Fix All Flexi without a separate adhesive-specific qualification.",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-010",
+      "claim": "Nitrogen plasma's first visible PP burning at 500 mm/min can be ignored because the contact angle remains low or the bond-strength result was strong at a different non-damaged condition.",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-011",
+      "claim": "Immediate ISO 4587 lap-shear results establish delayed bondability-window performance or post-bond service lifetime.",
       "expected_disposition": "REJECTED"
     }
   ]
