@@ -12,7 +12,7 @@ This directory separates three questions that are often collapsed into one AI sc
 |---|---|---|
 | Symthaea Psych-Bench | Does the architecture exhibit the cognitive and psychometric behaviours represented by its test suite? | Existing suite; see its own README and calibration transparency report |
 | Agent-operations interoperability | How does a Symthaea-driven agent compare on external, role-aware operations evaluations? | Adapter semantics, protocol contract, Rust decision guard, and schemas drafted; no AOBench run yet |
-| SympoeticBench | Does human-AI collaboration produce useful joint capability without eroding agency, diversity, consent, or provenance? | v0.1 protocol, 16-scenario seed set, JSON schemas, Rust validators, metrics, and agent-protocol guard; human validation pending |
+| SympoeticBench | Does human-AI collaboration produce useful joint capability without eroding agency, diversity, consent, or provenance? | v0.1 protocol, 17-scenario seed set, JSON schemas, Rust validators, metrics, and agent-protocol guard; human validation pending |
 
 These programmes are complementary, not interchangeable. Psych-Bench is not a human-AI collaboration benchmark. An operations score is not evidence of general intelligence. A creative artifact's quality is not evidence that collaboration was reciprocal.
 
@@ -51,6 +51,7 @@ Hard safety failures are reported separately and cannot be averaged away by high
 - [Adaptive intervention policy](sympoetic/ADAPTIVE_INTERVENTION_POLICY.md) — when the system should ask, challenge, delegate, defer, or step back.
 - [Capability amplification](sympoetic/CAPABILITY_AMPLIFICATION.md) — independent human learning, delayed retention, and transfer.
 - [Epistemic resilience and metacognition](sympoetic/EPISTEMIC_RESILIENCE_AND_METACOGNITION.md) — provenance, belief/fact distinction, calibration and cognitive process integrity.
+- [Persistent team trajectories](sympoetic/PERSISTENT_TEAM_TRAJECTORIES.md) — continuity, role and authority revalidation, consent-scoped memory, and evidence required for collective-intelligence claims.
 - [Causal contribution and trace protocol](sympoetic/TRACE_AND_CAUSAL_ATTRIBUTION.md) — event provenance and counterfactual replay.
 - [Symthaea agent decision protocol](AGENT_DECISION_PROTOCOL.md) — proposal-only tool decisions and harness-owned execution authority.
 - [AOBench interoperability](AGENT_OPERATIONS_INTEROP.md) — fair external comparison and current adapter gap.
@@ -61,7 +62,7 @@ SympoeticBench evaluates observable interaction behaviour and participant-report
 
 ## Current release status
 
-Version 0.1 is a design and development release. It contains a proposed protocol, scenario schema, and 16-scenario development seed corpus. It does not contain human-subject study results, validated scales, a public leaderboard, or SOTA claims. The seed corpus is for harness development and pilot design; it is not a locked test set.
+Version 0.1 is a design and development release. It contains a proposed protocol, scenario schema, and 17-scenario development seed corpus. It does not contain human-subject study results, validated scales, a public leaderboard, or SOTA claims. The seed corpus is for harness development and pilot design; it is not a locked test set.
 
 ## Next steps
 
