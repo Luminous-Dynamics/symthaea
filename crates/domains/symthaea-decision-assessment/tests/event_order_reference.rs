@@ -695,3 +695,73 @@ fn cancellation_acknowledgement_must_follow_a_matching_request() {
         .reason_codes
         .contains(&"CANCELLATION_ACK_WITHOUT_PRIOR_REQUEST:OP-CANCEL".to_owned()));
 }
+
+
+#[test]
+fn distributed_event_order_mutation_manifest_is_preregistered_and_well_bound() {
+    let trace_fixture = fixture();
+    let mutations: Value = serde_json::from_str(include_str!(
+        "../../../../benchmarks/engineering-change-impact/action-event-order-mutations-v0.1.json"
+    ))
+    .expect("event-order mutation manifest must be valid JSON");
+
+    assert_eq!(
+        mutations["schema_version"].as_str(),
+        Some("engineering-decision-event-order-mutations-v0.1")
+    );
+    assert_eq!(
+        mutations["status"].as_str(),
+        Some("preregistered_mutation_controls_not_execution_results")
+    );
+    assert_eq!(
+        mutations["execution_status"].as_str(),
+        Some("not_run")
+    );
+
+    let cases: BTreeSet<String> = trace_fixture["cases"]
+        .as_array()
+        .expect("frozen trace cases")
+        .iter()
+        .map(|case| case["id"].as_str().expect("case ID").to_owned())
+        .collect();
+    let controls = mutations["controls"]
+        .as_array()
+        .expect("mutation controls");
+    assert_eq!(
+        controls.len(),
+        mutations["control_count"].as_u64().unwrap() as usize
+    );
+    assert_eq!(controls.len(), 26);
+
+    let mut seen_ids = BTreeSet::new();
+    for control in controls {
+        let id = control["id"].as_str().expect("mutation ID");
+        assert!(seen_ids.insert(id.to_owned()), "duplicate mutation ID {id}");
+        let base_case = control["base_case"].as_str().expect("base case ID");
+        assert!(
+            cases.contains(base_case),
+            "{id}: unknown base case {base_case}"
+        );
+        assert!(
+            !control["mutation_family"].as_str().unwrap().is_empty(),
+            "{id}: mutation family must be non-empty"
+        );
+        assert!(
+            !control["transform"].as_str().unwrap().is_empty(),
+            "{id}: transform must be non-empty"
+        );
+        let expected = &control["expected_behavior"];
+        assert!(
+            matches!(
+                expected["disposition"].as_str(),
+                Some("safe" | "critical_failure" | "indeterminate" | "invalid_event_trace" | "invariant")
+            ),
+            "{id}: unknown expected disposition"
+        );
+        assert!(
+            !expected["reason_code"].as_str().unwrap().is_empty(),
+            "{id}: reason code must be non-empty"
+        );
+    }
+    assert_eq!(seen_ids.len(), 26);
+}
