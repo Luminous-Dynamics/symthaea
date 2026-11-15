@@ -31,7 +31,9 @@ fn main() -> ExitCode {
                 "PASS: {} validation-domain fixtures; ACCEPT={accept}, REJECT={reject}",
                 REQUIRED.len()
             );
-            println!("SCOPE: inventory integrity only; split validator and physical validity are not evaluated");
+            println!(
+                "SCOPE: inventory integrity only; split validator and physical validity are not evaluated"
+            );
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -72,7 +74,11 @@ fn audit() -> Result<(usize, usize), String> {
     }
 
     if ids.len() != REQUIRED.len() {
-        return Err(format!("expected {} fixtures, found {}", REQUIRED.len(), ids.len()));
+        return Err(format!(
+            "expected {} fixtures, found {}",
+            REQUIRED.len(),
+            ids.len()
+        ));
     }
     for required in REQUIRED {
         if !ids.contains(required) {
@@ -80,7 +86,9 @@ fn audit() -> Result<(usize, usize), String> {
         }
     }
     if accept != 3 || reject != 13 {
-        return Err(format!("unexpected disposition counts: ACCEPT={accept}, REJECT={reject}"));
+        return Err(format!(
+            "unexpected disposition counts: ACCEPT={accept}, REJECT={reject}"
+        ));
     }
     Ok((accept, reject))
 }
