@@ -66,6 +66,23 @@ Our competitive hypothesis is not "AI replaces factory planning" or "one factory
 
 Standards references inform interoperability requirements; they do not establish conformance by themselves.
 
+## 3A. Industrial-intelligence benchmark: context and grounding ablations
+
+NIST's 2026 Super Intelligence for Manufacturing programme is building an integration test bench spanning discrete, additive and continuous processes. Its initial process benchmark is the Tennessee Eastman Process, with later extension to NIST digital-twin and additive-manufacturing equipment. The published programme lists accuracy, latency, cost and grounding as evaluation dimensions, and weights fault-detection recall ahead of precision for diagnosis tasks.
+
+We should add a separate Symthaea agent-context experiment matrix, not conflate it with factory throughput:
+1. raw untyped tags / dashboard-only baseline;
+2. typed asset, process, product, unit and configuration context;
+3. process route, material/lot genealogy and maintenance history;
+4. exact digital-twin state, model applicability and uncertainty context;
+5. federated partner/utility/supplier context with rights, provenance and stale-data markers.
+
+Tasks: locate the current qualified capability, explain why a route is blocked, identify the next decision-relevant measurement, detect a stale calibration or recipe, isolate an outage/quality escape, and recommend a reconfiguration/rollback sequence. Include adversarial stale, missing, conflicting and out-of-domain context.
+
+Report exact answer correctness, false-admission rate, fault-detection recall and precision separately, localization accuracy, time/latency, compute and human-review cost, evidence-grounding precision, unsupported-claim rate and OOD abstention precision/recall. A correct-sounding explanation without a source-bound evidence path does not count as grounded.
+
+This is a decision-support benchmark. Symthaea does not issue PLC commands or authorize a machine-state change; Symtropy retains deterministic execution and existing physical interlocks. NIST programme reference: https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing.
+
 ## 4. Capability contract
 
 Each module binds:
