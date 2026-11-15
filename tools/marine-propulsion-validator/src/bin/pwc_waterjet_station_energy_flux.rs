@@ -209,9 +209,9 @@ fn validate_measurement(
         return;
     };
     if available < observed { findings.invalid(path, "availability cannot precede observation"); }
-    if let Some(start) = start { if observed < *start { findings.invalid(path, "observation precedes the measurement window"); } }
-    if let Some(end) = end { if observed > *end { findings.invalid(path, "observation follows the measurement window"); } }
-    if let Some(evaluation) = evaluation { if available > *evaluation { findings.invalid(path, "measurement was not available at evaluation time (future-data leakage)"); } }
+    if let Some(start) = start { if &observed < start { findings.invalid(path, "observation precedes the measurement window"); } }
+    if let Some(end) = end { if &observed > end { findings.invalid(path, "observation follows the measurement window"); } }
+    if let Some(evaluation) = evaluation { if &available > evaluation { findings.invalid(path, "measurement was not available at evaluation time (future-data leakage)"); } }
 }
 
 fn validate_cell(
@@ -351,10 +351,12 @@ fn audit(record: &Record) -> AuditReport {
     let evaluation = parse_time(&record.evaluation_time_utc);
     if start.is_none() || end.is_none() || evaluation.is_none() {
         findings.invalid("/measurement_window", "window and evaluation timestamps must be RFC3339");
-    } else if start >= end {
-        findings.invalid("/measurement_window", "measurement window must have positive duration");
-    } else if evaluation < end {
-        findings.invalid("/evaluation_time_utc", "evaluation time cannot precede the end of the declared measurement window");
+    }
+    if let (Some(start), Some(end)) = (start.as_ref(), end.as_ref()) {
+        if start >= end { findings.invalid("/measurement_window", "measurement window must have positive duration"); }
+    }
+    if let (Some(evaluation), Some(end)) = (evaluation.as_ref(), end.as_ref()) {
+        if evaluation < end { findings.invalid("/evaluation_time_utc", "evaluation time cannot precede the end of the declared measurement window"); }
     }
 
     validate_measurement("/fluid/density", &record.fluid.density, "kg/m3", start.as_ref(), end.as_ref(), evaluation.as_ref(), &mut findings);
