@@ -211,7 +211,7 @@ pub fn evaluate_transition_adjusted_vmg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TackSide;
+    use crate::{EvidenceState, TackSide};
 
     const CONFIG: [u8; 32] = [0x5a; 32];
     const POLAR: [u8; 32] = [0xb6; 32];
