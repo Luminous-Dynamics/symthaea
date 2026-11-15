@@ -294,11 +294,11 @@ fn assess_receipt(
     let mut context_mismatch_dimensions = Vec::new();
     let mut source_context_mismatch_dimensions = Vec::new();
     for dimension in &obligation.dependency_dimensions {
-        if context.get(dimension) != source_state.get(dimension) {
+        if context.get(dimension.as_str()) != source_state.get(dimension.as_str()) {
             source_context_mismatch_dimensions.push(dimension.clone());
             reasons.push(format!("receipt_source_context_mismatch:{dimension}"));
         }
-        if context.get(dimension) != current_state.get(dimension) {
+        if context.get(dimension.as_str()) != current_state.get(dimension.as_str()) {
             context_mismatch_dimensions.push(dimension.clone());
             reasons.push(format!("context_mismatch:{dimension}"));
         }
