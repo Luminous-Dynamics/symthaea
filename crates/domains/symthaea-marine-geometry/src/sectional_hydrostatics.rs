@@ -428,7 +428,8 @@ fn intersect_mesh_at_x(
                     return Err(violation(
                         "triangle_slice_topology",
                         format!(
-                            "mesh face {face_index} produced {count} intersections at an interior bay plane; expected zero or two"
+                            "mesh face {face_index} produced {count} intersections at an interior bay plane; \
+                             expected zero or two"
                         ),
                     ));
                 }
