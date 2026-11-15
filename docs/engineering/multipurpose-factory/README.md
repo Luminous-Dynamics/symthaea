@@ -98,6 +98,12 @@ The architectures are dedicated line, job shop, U-cell, flexible manufacturing s
 
 No architecture is presumed to win across every product mix, process envelope, volume or disruption family.
 
+
+
+### Continuous-process coverage
+
+The benchmark includes a synthetic continuous chemical-process skid as a distinct process family. It requires feedstock characterization, process instrumentation, thermal/fluid utilities, emergency isolation, effluent treatment, a classified process zone, trained operators and laboratory acceptance. This is intentionally separate from discrete assembly and thermal batch processing. NIST's Super Intelligence for Manufacturing initiative identifies the Tennessee Eastman Process as an initial integration/diagnosis benchmark, with extensions planned to physical digital-twin and additive-manufacturing testbeds: https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing. Our corpus does not reproduce Tennessee Eastman or claim chemical-process control fidelity; it adds a capability/segregation/restart admission case so process industries are not omitted from the architecture.
+
 ## 6. Reconfiguration acceptance
 
 A transition is not complete when a module is physically connected. It becomes a synthetic accepted configuration only after:
