@@ -15,20 +15,57 @@ use sha2::{Digest, Sha256};
 use std::fmt;
 
 pub const PROFILE_ID: &str = "drand-quicknet-bls-unchained-g1-rfc9380-v1";
-pub const CHAIN_HASH_HEX: &str =
-    "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971";
 pub const SCHEME_ID: &str = "bls-unchained-g1-rfc9380";
 pub const BEACON_ID: &str = "quicknet";
-pub const GENESIS_UNIX_SECONDS: u64 = 1_692_803_367;
-pub const ROUND_PERIOD_SECONDS: u64 = 3;
+pub const TRUST_ROOT_MANIFEST_SHA256: &str =
+    "8a74f38b67081c9483f2a640fc4ac8d0275318d758a7c6f9cb7b1ffc374485c4";
 
-const PUBLIC_KEY_HEX: &str = concat!(
-    "83cf0f2896adee7eb8b5f01fcad3912212c437e0073e911fb90022d3e760183c",
-    "8c4b450b6a0a6c3ac6a5776a2d1064510d1fec758c921cc22b0e17e63aaf4bcb",
-    "5ed66304de9cf809bd274ca73bab4af5a6e9c76a4bc09e76eae8991ef5ece45a"
-);
-const GENESIS_SEED_HEX: &str =
-    "f477d5c89f21a17c863a7f937c6a6d15859414d2be09cd448d4279af331c5d3e";
+const TRUST_ROOT_BYTES: &[u8] =
+    include_bytes!("../fixtures/quicknet-trust-root-v1.json");
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrustRootManifest {
+    schema_version: String,
+    profile_id: String,
+    beacon_id: String,
+    chain_hash: String,
+    scheme_id: String,
+    public_key: String,
+    genesis_seed: String,
+    genesis_unix_seconds: u64,
+    period_seconds: u64,
+    source_references: Vec<String>,
+    source_retrieved_on: String,
+}
+
+fn load_trust_root() -> Result<(TrustRootManifest, [u8; 32], String), VerificationError> {
+    let digest: [u8; 32] = Sha256::digest(TRUST_ROOT_BYTES).into();
+    let digest_hex = encode_hex(&digest);
+    if digest_hex != TRUST_ROOT_MANIFEST_SHA256 {
+        return Err(VerificationError::TrustRoot(
+            "embedded trust-root manifest digest differs from the pinned digest".into(),
+        ));
+    }
+    let root: TrustRootManifest = serde_json::from_slice(TRUST_ROOT_BYTES)
+        .map_err(|error| VerificationError::TrustRoot(format!("trust-root JSON failed: {error}")))?;
+    if root.schema_version != "sympsi.drand-trust-root.v0.1"
+        || root.profile_id != PROFILE_ID
+        || root.beacon_id != BEACON_ID
+        || root.scheme_id != SCHEME_ID
+        || root.genesis_unix_seconds == 0
+        || root.period_seconds == 0
+        || root.source_references.is_empty()
+        || root.source_retrieved_on != "2026-11-15"
+    {
+        return Err(VerificationError::TrustRoot(
+            "trust-root manifest fields do not match the compiled Quicknet profile".into(),
+        ));
+    }
+    let chain_hash = decode_hex::<32>(&root.chain_hash)
+        .ok_or_else(|| VerificationError::TrustRoot("invalid chain hash in trust root".into()))?;
+    Ok((root, chain_hash, digest_hex))
+}
 
 /// Strict Quicknet v1 relay payload. Unknown fields, including an unexpected
 /// previous-signature link, are rejected rather than silently ignored.
@@ -42,12 +79,13 @@ pub struct QuicknetBeaconResponse {
 
 /// Separate predicates prevent a valid BLS signature from being mistaken for
 /// proof of freshness or response chronology.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct VerificationReceipt {
     pub receipt_schema_version: String,
     pub profile_id: String,
     pub chain_hash: String,
+    pub trust_root_manifest_sha256: String,
     pub scheme_id: String,
     pub beacon_id: String,
     pub requested_round: u64,
@@ -113,24 +151,23 @@ pub fn verify_quicknet_response(
     let published_randomness = decode_hex::<32>(&response.randomness)
         .ok_or(VerificationError::InvalidHex("randomness"))?;
 
-    let public_key = decode_hex::<96>(PUBLIC_KEY_HEX)
-        .expect("constant Quicknet public key must have 96 bytes");
-    let genesis_seed = decode_hex::<32>(GENESIS_SEED_HEX)
-        .expect("constant Quicknet genesis seed must have 32 bytes");
-    let chain_hash = decode_hex::<32>(CHAIN_HASH_HEX)
-        .expect("constant Quicknet chain hash must have 32 bytes");
-
+    let (trust_root, chain_hash, trust_root_manifest_sha256) = load_trust_root()?;
+    let public_key = decode_hex::<96>(&trust_root.public_key)
+        .ok_or_else(|| VerificationError::TrustRoot("invalid public key in trust root".into()))?;
+    let genesis_seed = decode_hex::<32>(&trust_root.genesis_seed)
+        .ok_or_else(|| VerificationError::TrustRoot("invalid genesis seed in trust root".into()))?;
+    let period = Period::from_secs(trust_root.period_seconds)
+        .ok_or_else(|| VerificationError::TrustRoot("invalid round period in trust root".into()))?;
     let timeline = Timeline::new(
-        UnixTimestamp::from_secs(GENESIS_UNIX_SECONDS),
-        Period::from_secs(ROUND_PERIOD_SECONDS)
-            .expect("pinned three-second period is valid"),
+        UnixTimestamp::from_secs(trust_root.genesis_unix_seconds),
+        period,
     );
     let verifier = AnyVerifier::new(
         SchemeId::BlsUnchainedG1Rfc9380,
         &public_key,
         timeline,
         Some(GenesisSeed::new(genesis_seed)),
-        BEACON_ID,
+        &trust_root.beacon_id,
         ChainHash::new(chain_hash),
     )
     .map_err(|error| VerificationError::TrustRoot(error.to_string()))?;
@@ -157,8 +194,10 @@ pub fn verify_quicknet_response(
     Ok(VerificationReceipt {
         receipt_schema_version: "sympsi.quicknet-verification.v0.1".into(),
         profile_id: PROFILE_ID.into(),
-        chain_hash: CHAIN_HASH_HEX.into(),
-        scheme_id: SCHEME_ID.into(),
+        chain_hash: trust_root.chain_hash,
+        trust_root_manifest_sha256,
+        scheme_id: trust_root.scheme_id,
+        
         beacon_id: BEACON_ID.into(),
         requested_round,
         returned_round: response.round,
@@ -221,7 +260,9 @@ mod tests {
     fn published_quicknet_round_1000_signature_verifies() {
         let receipt = verify_quicknet_response(1000, &known_answer_response()).unwrap();
         assert_eq!(receipt.profile_id, PROFILE_ID);
-        assert_eq!(receipt.chain_hash, CHAIN_HASH_HEX);
+        let (root, _, root_digest) = load_trust_root().unwrap();
+        assert_eq!(receipt.chain_hash, root.chain_hash);
+        assert_eq!(receipt.trust_root_manifest_sha256, root_digest);
         assert_eq!(receipt.scheme_id, SCHEME_ID);
         assert_eq!(
             receipt.verified_randomness,
@@ -286,10 +327,24 @@ mod tests {
     }
 
     #[test]
+    fn trust_root_manifest_hash_and_profile_are_pinned() {
+        let (root, chain_hash, digest) = load_trust_root().unwrap();
+        assert_eq!(digest, TRUST_ROOT_MANIFEST_SHA256);
+        assert_eq!(root.profile_id, PROFILE_ID);
+        assert_eq!(root.beacon_id, BEACON_ID);
+        assert_eq!(root.scheme_id, SCHEME_ID);
+        assert_eq!(
+            encode_hex(&chain_hash),
+            "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971"
+        );
+    }
+
+    #[test]
     fn trust_root_profile_is_not_inferred_from_chain_hash_alone() {
         // The receipt binds an explicit scheme ID in addition to the chain hash.
         let receipt = verify_quicknet_response(1000, &known_answer_response()).unwrap();
-        assert_eq!(receipt.scheme_id, "bls-unchained-g1-rfc9380");
-        assert_eq!(receipt.beacon_id, "quicknet");
+        assert_eq!(receipt.scheme_id, SCHEME_ID);
+        assert_eq!(receipt.beacon_id, BEACON_ID);
+        assert_eq!(receipt.trust_root_manifest_sha256, TRUST_ROOT_MANIFEST_SHA256);
     }
 }
