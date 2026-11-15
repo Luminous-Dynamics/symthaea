@@ -130,6 +130,27 @@ pub struct Attribution {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct MetricEvidence {
+    pub metric_name: String,
+    pub value: f64,
+    pub scorer_kind: String,
+    pub sample_unit: String,
+    pub sample_size: u64,
+    pub measurement_method: String,
+    pub scorer_revision: String,
+    pub evidence_refs: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numerator: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub denominator: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ci_lower: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ci_upper: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct Scorecard {
     pub schema_version: String,
     pub benchmark_version: String,
@@ -141,6 +162,7 @@ pub struct Scorecard {
     pub execution: ExecutionInfo,
     pub provenance: ProvenanceInfo,
     pub scores: Scores,
+    pub metric_evidence: Vec<MetricEvidence>,
     pub hard_gates: HardGates,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
@@ -265,6 +287,63 @@ pub struct Scores {
     pub ai_core_step_substitution_rate: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub human_verification_rate: Option<f64>,
+}
+
+impl Scores {
+    /// Return the complete, versioned metric-name/value table for evidence binding.
+    pub fn entries(&self) -> Vec<(&'static str, Option<f64>)> {
+        vec![
+            ("task_quality", self.task_quality),
+            ("constraint_satisfaction", self.constraint_satisfaction),
+            ("participant_agency_mean", self.participant_agency_mean),
+            ("agency_delta_sd_vs_reference", self.agency_delta_sd_vs_reference),
+            ("common_ground_accuracy", self.common_ground_accuracy),
+            ("repair_success_rate", self.repair_success_rate),
+            ("attribution_precision", self.attribution_precision),
+            ("attribution_recall", self.attribution_recall),
+            ("attribution_f1", self.attribution_f1),
+            ("quality_matched_diversity_ratio", self.quality_matched_diversity_ratio),
+            ("expert_rater_agreement", self.expert_rater_agreement),
+            ("synergy_delta", self.synergy_delta),
+            ("collaboration_gap", self.collaboration_gap),
+            ("partner_order_sensitivity", self.partner_order_sensitivity),
+            ("handoff_recovery_rate", self.handoff_recovery_rate),
+            ("intervention_appropriateness", self.intervention_appropriateness),
+            ("unnecessary_intervention_rate", self.unnecessary_intervention_rate),
+            ("missed_critical_intervention_rate", self.missed_critical_intervention_rate),
+            ("intervention_regret", self.intervention_regret),
+            ("participant_capability_gain_delta", self.participant_capability_gain_delta),
+            ("delayed_retention_gain_delta", self.delayed_retention_gain_delta),
+            ("transfer_gain_delta", self.transfer_gain_delta),
+            ("agent_confidence_brier_score", self.agent_confidence_brier_score),
+            ("agent_expected_calibration_error", self.agent_expected_calibration_error),
+            ("agent_metacognitive_sensitivity_auc", self.agent_metacognitive_sensitivity_auc),
+            (
+                "agent_selective_accuracy_at_80pct_coverage",
+                self.agent_selective_accuracy_at_80pct_coverage,
+            ),
+            ("participant_confidence_brier_score", self.participant_confidence_brier_score),
+            (
+                "participant_expected_calibration_error",
+                self.participant_expected_calibration_error,
+            ),
+            (
+                "participant_metacognitive_sensitivity_auc",
+                self.participant_metacognitive_sensitivity_auc,
+            ),
+            (
+                "participant_selective_accuracy_at_80pct_coverage",
+                self.participant_selective_accuracy_at_80pct_coverage,
+            ),
+            ("human_planning_rate", self.human_planning_rate),
+            ("human_first_attempt_rate", self.human_first_attempt_rate),
+            ("human_monitoring_rate", self.human_monitoring_rate),
+            ("human_reflection_rate", self.human_reflection_rate),
+            ("ai_core_step_supply_rate", self.ai_core_step_supply_rate),
+            ("ai_core_step_substitution_rate", self.ai_core_step_substitution_rate),
+            ("human_verification_rate", self.human_verification_rate),
+        ]
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
