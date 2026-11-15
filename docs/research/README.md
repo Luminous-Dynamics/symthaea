@@ -330,3 +330,7 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+### Industry comparison and economics
+- [Verified Capability Cost Accounting Crosswalk V0.1](VERIFIED_CAPABILITY_COST_ACCOUNTING_CROSSWALK_V0_1_2026-11-13.md) — full-cost boundary, evidence quality, double-counting controls and cost-per-verified-outcome metrics for the industry-stack comparison.
