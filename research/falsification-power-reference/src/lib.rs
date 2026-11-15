@@ -403,6 +403,12 @@ mod tests {
     }
 
     #[test]
+    fn known_direction_power_matches_normal_reference_value() {
+        let result = known_direction_power(&[0.24, 0.24, 0.24], 0.15, 0.05).unwrap();
+        assert!((result.power - 0.870_007_728_878_440_5).abs() < 2.0e-7);
+    }
+
+    #[test]
     fn reversing_the_declared_discrepancy_does_not_change_one_sided_power() {
         let positive = known_direction_power(&[0.1, 0.2, 0.3], 0.15, 0.05).unwrap();
         let negative = known_direction_power(&[-0.1, -0.2, -0.3], 0.15, 0.05).unwrap();
