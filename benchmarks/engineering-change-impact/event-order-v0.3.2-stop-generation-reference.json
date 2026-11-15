@@ -4,10 +4,12 @@
   "runtime": "V8 JavaScript via functions.exec",
   "seed": "0x4c554d49",
   "policy_history_cases": 100000,
+  "valid_historical_discharges": 109887,
   "historical_discharge_false_rejects": 0,
   "stale_or_substituted_discharge_false_accepts": 0,
-  "final_policy_false_safes": 0,
   "scope_narrowing_false_accepts": 0,
-  "valid_widened_final_discharges": 12822,
-  "interpretation": "Reference-model execution only. Does not execute the Rust projector, authenticate owner receipts, or estimate production reliability."
+  "final_policy_projection_mismatches": 0,
+  "valid_widened_final_discharges": 17469,
+  "all_invariants_hold": true,
+  "interpretation": "Reference-model execution only. It does not execute the Rust projector, authenticate owner receipts, or estimate production reliability. The checked-in .mjs file is Node.js-compatible but the recorded run was in V8 via functions.exec."
 }
