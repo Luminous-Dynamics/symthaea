@@ -31,6 +31,9 @@ pub use symthaea_formal_safety as formal_safety;
 pub use symthaea_memory as memory;
 pub use symthaea_sim_bridge as sim_bridge;
 
+/// Dry-run proposal contract for cislunar and artificial-gravity structural analysis.
+pub mod space_structural_codesign;
+
 /// Debug-friendly wrapper for the fabrication autonomy loop.
 pub struct DebugFabricationLoop(pub AutonomyLoop);
 impl std::fmt::Debug for DebugFabricationLoop {
