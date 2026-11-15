@@ -18,6 +18,16 @@ The upstream roadmap documents REST and MCP access, A2A evaluation, terminal eva
 
 AOBench itself states important limits: its mock environments do not expose real production consequences, its authorization policies are synthetic, role granularity is coarse, and a benchmark score is not a production safety certification or a substitute for security review.
 
+## Public leaderboard snapshot (2026-11-15)
+
+The upstream public leaderboard currently lists one community result: Claude Sonnet 4.6 with mean score **0.622 across three runs** on the v0.4.1 development split (67 tasks), with **two hard failures** and an approximate cost of **$2.06 per run**. The three scores were 0.6132, 0.6192, and 0.6335. The upstream tool-free `direct_qa` floor is 0.334.
+
+Important qualification: the submitted profile uses 42 `alpha1_grounding` tasks and 25 `default_hpc_v01` tasks. Robustness and workflow fields are unset in that submission. This is a single public community row, not a complete industry ranking or an uncontested state-of-the-art reference. Its result cannot justify broad claims about agent superiority, production safety, or performance outside the tested HPC task mix.
+
+A fair Luminous comparison should first reproduce this exact release, task mix, model snapshot, scoring profile, and adapter conditions. Any new Luminous tasks or stricter safety checks must be reported as a separate extension, not folded into the upstream score.
+
+Source: [AOBench v0.4.1 public leaderboard](https://mskazemi.com/aobench/latest/leaderboard/) (checked 2026-11-15).
+
 ## Proposed Luminous evaluation path
 
 1. Pin the upstream AOBench release and verify its repository commit and corpus digest.
