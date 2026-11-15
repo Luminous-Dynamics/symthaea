@@ -43,9 +43,7 @@
           "payload_storage",
           "consent_scope",
           "external_side_effect",
-          "reversible",
-          "reconciled_status",
-          "reconciliation_state_digest"
+          "reversible"
         ],
         "properties": {
           "event_id": {
@@ -234,7 +232,27 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "execution_reconciled"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "reconciled_status",
+                "reconciliation_state_digest"
+              ]
+            }
+          }
+        ]
       }
     }
   }
