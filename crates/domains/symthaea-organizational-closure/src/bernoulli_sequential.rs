@@ -448,20 +448,23 @@ pub fn evaluate_bernoulli_sequential(
 
         let next_cost = total_cost.checked_add(scenario.sample_cost_units);
         let next_risk = total_risk.checked_add(scenario.sample_risk_units);
-        if next_cost.is_none_or(|value| value > scenario.max_cost_units) {
-            push_finding(&mut findings, BernoulliFindingCode::CostBudgetExceeded,
-                Some(trial_index), "attempted sample exceeds cumulative cost budget");
-            total_cost = next_cost.unwrap_or(u64::MAX);
-            break;
-        }
-        if next_risk.is_none_or(|value| value > scenario.max_risk_units) {
-            push_finding(&mut findings, BernoulliFindingCode::RiskBudgetExceeded,
-                Some(trial_index), "attempted sample exceeds cumulative risk budget");
-            total_risk = next_risk.unwrap_or(u64::MAX);
-            break;
-        }
+        let cost_exceeded = next_cost.is_none_or(|value| value > scenario.max_cost_units);
+        let risk_exceeded = next_risk.is_none_or(|value| value > scenario.max_risk_units);
+        // Charge both dimensions for every attempted sample, even when either
+        // budget is exceeded. Cost and risk are deliberately non-compensatory.
         total_cost = next_cost.unwrap_or(u64::MAX);
         total_risk = next_risk.unwrap_or(u64::MAX);
+        if cost_exceeded {
+            push_finding(&mut findings, BernoulliFindingCode::CostBudgetExceeded,
+                Some(trial_index), "attempted sample exceeds cumulative cost budget");
+        }
+        if risk_exceeded {
+            push_finding(&mut findings, BernoulliFindingCode::RiskBudgetExceeded,
+                Some(trial_index), "attempted sample exceeds cumulative risk budget");
+        }
+        if cost_exceeded || risk_exceeded {
+            break;
+        }
 
         if trial_index > scenario.max_total_samples {
             push_finding(&mut findings, BernoulliFindingCode::TotalSampleBudgetExceeded,
@@ -746,6 +749,87 @@ mod tests {
         assert_eq!(report.boundary, BernoulliBoundary::Benefit);
         assert_eq!(report.claim_correct, Some(false));
         assert!(report.false_positive_claim);
+    }
+
+
+    #[test]
+    fn cost_and_risk_are_both_charged_and_fail_independently() {
+        let mut scenario = scenario();
+        scenario.max_total_samples = 1;
+        scenario.max_samples_per_arm = 1;
+        scenario.max_cost_units = 0;
+        scenario.max_risk_units = 0;
+        let trace = BernoulliSequentialTrace {
+            trials: vec![BernoulliTrial::qualified(BernoulliArm::Control, false)],
+            terminal: BernoulliTerminalDecision::Abstain { reason: "budgets exhausted".into() },
+        };
+        let report = evaluate_bernoulli_sequential(&scenario, &BernoulliOracle::new(0.5, 0.5), &trace);
+        assert_eq!(report.total_cost_units, 1);
+        assert_eq!(report.total_risk_units, 1);
+        assert!(report.findings.iter().any(|f| f.code == BernoulliFindingCode::CostBudgetExceeded));
+        assert!(report.findings.iter().any(|f| f.code == BernoulliFindingCode::RiskBudgetExceeded));
+    }
+
+    #[test]
+    fn harm_control_stops_only_after_the_negative_anytime_boundary() {
+        let scenario = scenario();
+        let mut control = ArmCounts::default();
+        let mut treatment = ArmCounts::default();
+        let mut trials = Vec::new();
+        for _ in 0..scenario.max_samples_per_arm {
+            trials.push(BernoulliTrial::qualified(BernoulliArm::Control, true));
+            control.attempted += 1;
+            control.qualified += 1;
+            control.successes += 1;
+            trials.push(BernoulliTrial::qualified(BernoulliArm::Treatment, false));
+            treatment.attempted += 1;
+            treatment.qualified += 1;
+            if boundary(effect_interval(&control, &treatment, scenario.alpha),
+                scenario.minimum_effect) != BernoulliBoundary::Continue {
+                break;
+            }
+        }
+        let trace = BernoulliSequentialTrace {
+            trials,
+            terminal: BernoulliTerminalDecision::Stop { claim: BernoulliClaim::Harm },
+        };
+        let report = evaluate_bernoulli_sequential(&scenario, &BernoulliOracle::new(1.0, 0.0), &trace);
+        assert_eq!(report.qualification, BernoulliQualification::Qualified);
+        assert_eq!(report.boundary, BernoulliBoundary::Harm);
+        assert_eq!(report.claim_correct, Some(true));
+    }
+
+    #[test]
+    fn no_material_effect_requires_the_full_interval_inside_the_equivalence_region() {
+        let scenario = BernoulliSequentialScenario::new(0.05, 0.50, 500, 250, 1, 500, 1, 500);
+        let mut control = ArmCounts::default();
+        let mut treatment = ArmCounts::default();
+        let mut trials = Vec::new();
+        for i in 0..scenario.max_samples_per_arm {
+            let outcome = i % 2 == 0;
+            trials.push(BernoulliTrial::qualified(BernoulliArm::Control, outcome));
+            control.attempted += 1;
+            control.qualified += 1;
+            if outcome { control.successes += 1; }
+            trials.push(BernoulliTrial::qualified(BernoulliArm::Treatment, outcome));
+            treatment.attempted += 1;
+            treatment.qualified += 1;
+            if outcome { treatment.successes += 1; }
+            if boundary(effect_interval(&control, &treatment, scenario.alpha),
+                scenario.minimum_effect) == BernoulliBoundary::NoMaterialEffect {
+                break;
+            }
+        }
+        let trace = BernoulliSequentialTrace {
+            trials,
+            terminal: BernoulliTerminalDecision::Stop { claim: BernoulliClaim::NoMaterialEffect },
+        };
+        let report = evaluate_bernoulli_sequential(&scenario, &BernoulliOracle::new(0.5, 0.5), &trace);
+        assert_eq!(report.qualification, BernoulliQualification::Qualified);
+        assert_eq!(report.boundary, BernoulliBoundary::NoMaterialEffect);
+        assert_eq!(report.claim_correct, Some(true));
+        assert!(report.effect_interval.lower >= -0.50);
+        assert!(report.effect_interval.upper <= 0.50);
     }
 
     #[test]
