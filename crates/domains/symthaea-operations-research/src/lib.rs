@@ -32,4 +32,7 @@ pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
 pub use queue::MM1;
 
-pub use facility_layout::{evaluate_layout, FlowMode, LayoutInput, LayoutReport};
+pub use facility_layout::{
+    evaluate_layout, DistanceBasis, FlowDemand, FlowMode, FlowMetric, LayoutError, LayoutInput,
+    LayoutReport, PathEdgeSource, TravelEdge, Zone, ZonePair,
+};
