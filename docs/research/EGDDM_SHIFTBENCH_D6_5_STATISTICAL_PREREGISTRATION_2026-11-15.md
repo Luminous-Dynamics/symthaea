@@ -30,22 +30,23 @@ References:
 
 The paired experimental unit is \`scenario_pair_id\`: a clean and shifted continuation from the same frozen initial task/workspace state. The paired unit is evaluated within the same pinned model, agent harness, tool configuration, repository block and trial.
 
-The proposed final research corpus remains:
+The proposed final research corpus is:
 - 12 intervention families;
-- early, middle and late positions;
-- 10 independently authored seeds per family/position cell;
-- 360 matched clean/shifted scenario pairs;
+- nine planned-work positions: p10, p20, p30, p40, p50, p60, p70, p80 and p90;
+- five independently authored seeds per family/position cell;
+- 540 matched clean/shifted scenario pairs;
+- 1,080 trajectories per model per trial;
 - three independent trials where compute permits;
 - at least three model/harness families.
 
-The 36 family/position cells are first a validity pilot: one candidate task seed per cell plus controls. They are not, by themselves, a powered final evaluation. D6.4 task-admission gates must pass before agent scores are collected.
+Early (10–30%), middle (40–60%) and late (70–90%) are reporting aggregates, not the experiment's actual position resolution. The 108 family/position cells are first a validity pilot: one candidate task seed per cell plus controls. The full target would imply 9,720 trajectories across three model/harness families and three trials, before baseline and expert runs. The pilot is a validity stage, not a powered final evaluation. D6.4 task-admission gates must pass before agent scores are collected.
 
 ### Blocking and holdouts
 
 Block and report by:
 - repository family;
 - intervention family;
-- intervention position;
+- exact planned-work position percentile and its early/middle/late reporting aggregate;
 - task seed;
 - model/harness family;
 - repeated trial.
@@ -99,7 +100,7 @@ Report:
 - revalidation runner cost, recovery latency and pass-all-trials reliability;
 - risk/coverage curve for abstention or requests for independent evidence.
 
-Never hide a weak intervention family or late-position failure inside a single overall average. Publish all 12 family and three position strata, exact denominators, excluded tasks and exclusion reasons.
+Never hide a weak intervention family or late-position failure inside a single overall average. Publish all 12 family × 9 exact-position strata, plus early/middle/late aggregates, exact denominators, excluded tasks and exclusion reasons.
 
 ## 6. Statistical methods
 
@@ -107,7 +108,7 @@ Never hide a weak intervention family or late-position failure inside a single o
 - Estimate paired continuous differences and ratios with a hierarchical cluster bootstrap. Resample task-seed clusters while preserving repository-family and intervention strata. The target is 10,000 bootstrap replicates.
 - Preserve task-level pairing and repeated-trial structure. Three runs of the same task are not three independent tasks.
 - Use 95% confidence intervals and familywise alpha 0.05 for the preregistered primary analysis.
-- Target at least 90% power for the primary estimand. Determine the final sample size by simulation using pilot estimates of discordance, variance, clustering and missingness. If the 360-pair target is not sufficient, disclose the power limit and do not claim superiority; expand only under the frozen rules.
+- Target at least 90% power for the primary estimand. Determine the final sample size by simulation using pilot estimates of discordance, variance, clustering and missingness. If the 540-pair target is not sufficient, disclose the power limit and do not claim superiority; expand only under the frozen rules.
 - Apply Holm-Bonferroni correction to declared secondary comparisons.
 - Report pass@1, each independent trial, and pass-all-three reliability. Do not publish only best-of-N.
 - Missing or timed-out candidate runs count as shifted failure; retain incurred cost and report censoring/missingness separately. A missing grader result is not a pass.
