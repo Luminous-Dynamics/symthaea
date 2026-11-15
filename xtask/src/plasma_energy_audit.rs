@@ -1418,17 +1418,6 @@ mod tests {
                 "matched_thermal_and_electrical_controls_required": true,
                 "full_grid_to_accepted_nh3_boundary_required": true
             })
-        } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
-            serde_json::json!({
-                "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required": true,
-                "modelled_state_temperature_remains_model_evidence": true,
-                "measured_intermediate_and_quantitative_flux_remain_distinct_measurands": true,
-                "plasma_only_and_electrolysis_only_controls_required": true,
-                "isotope_product_attribution_required_for_nitrogen_source_claim": true,
-                "catalyst_lot_and_surface_identity_must_match": true,
-                "all_energy_inputs_and_accepted_product_separation_included": true,
-                "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls": true
-            })
         } else if lane == "AMMONIA_CRACKING_THERMAL_INTEGRATION" {
             serde_json::json!({
                 "ammonia_conversion_min_fraction": 0.99,
@@ -1460,6 +1449,17 @@ mod tests {
                 "gas_feed_and_product_separation_energy_included": true,
                 "accepted_nh3_product_purity_and_pressure_contract_required": true,
                 "matched_haber_bosch_baseline_includes_hydrogen_energy": true
+            })
+        } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
+            serde_json::json!({
+                "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required": true,
+                "modelled_state_temperature_remains_model_evidence": true,
+                "measured_intermediate_and_quantitative_flux_remain_distinct_measurands": true,
+                "plasma_only_and_electrolysis_only_controls_required": true,
+                "isotope_product_attribution_required_for_nitrogen_source_claim": true,
+                "catalyst_lot_and_surface_identity_must_match": true,
+                "all_energy_inputs_and_accepted_product_separation_included": true,
+                "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls": true
             })
         } else if lane == "AMMONIA_CRACKING_THERMAL_INTEGRATION" {
             serde_json::json!({
