@@ -65,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "MEL_BENCHMARK_REGISTRY_REVISION=$actual" >> "$GITHUB_ENV"
       - name: Install pinned Rust
@@ -106,7 +106,7 @@ jobs:
       - name: Upload registry evidence
         uses: actions/upload-artifact@v4
         with:
-          name: mel-benchmark-registry-\${{ github.event.pull_request.head.sha || github.sha }}
-          path: \${{ runner.temp }}/mel-benchmark-registry-evidence/
+          name: mel-benchmark-registry-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-benchmark-registry-evidence/
           if-no-files-found: error
           retention-days: 90
