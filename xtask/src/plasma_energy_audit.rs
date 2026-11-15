@@ -1290,9 +1290,15 @@ mod tests {
                 "levelized_cost_hydrogen_max_usd_per_kg": 0.70,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
-        } else {
+        } else if lane == "AMMONIA_SYNTHESIS" {
             serde_json::json!({
                 "ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh": 3.0,
+                "all_thresholds_must_hold_at_same_operating_point": true
+            })
+        } else {
+            serde_json::json!({
+                "syngas_cost_eur_per_tonne_max": 600.0,
+                "plant_efficiency_min_fraction": 0.44,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
         };
@@ -1305,13 +1311,21 @@ mod tests {
                 "no_credit_baseline_required": true,
                 "avoided_product_credit_requires_independent_carbon_grade_qualification": true
             })
-        } else {
+        } else if lane == "AMMONIA_SYNTHESIS" {
             serde_json::json!({
                 "hydrogen_generation_energy_included": true,
                 "plasma_and_electrolysis_electricity_included": true,
                 "gas_feed_and_product_separation_energy_included": true,
                 "accepted_nh3_product_purity_and_pressure_contract_required": true,
                 "matched_haber_bosch_baseline_includes_hydrogen_energy": true
+            })
+        } else {
+            serde_json::json!({
+                "matched_syngas_composition_and_quality_required": true,
+                "full_plant_grid_side_energy_boundary_required": true,
+                "electricity_price_and_capacity_factor_scenario_required": true,
+                "downstream_product_service_boundary_required": true,
+                "unqualified_coproduct_credit_forbidden": true
             })
         };
         serde_json::json!({
@@ -1370,6 +1384,22 @@ mod tests {
             serde_json::json!(false);
         let error = audit_source_value(&source, "ammonia-synthesis-target.json").unwrap_err();
         assert!(error.to_string().contains("hydrogen_generation_energy_included"));
+    }
+
+    #[test]
+    fn source_manifest_accepts_biogas_syngas_pareto_target() {
+        let source = minimal_benchmark_target_manifest("PLASMA_POWER_TO_X_BIOGAS_REFORMING");
+        let summary = audit_source_value(&source, "biogas-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_biogas_target_without_energy_price_scenario() {
+        let mut source = minimal_benchmark_target_manifest("PLASMA_POWER_TO_X_BIOGAS_REFORMING");
+        source["benchmark_targets"][0]["claim_guards"]["electricity_price_and_capacity_factor_scenario_required"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "biogas-target.json").unwrap_err();
+        assert!(error.to_string().contains("electricity_price_and_capacity_factor_scenario_required"));
     }
 
     #[test]
@@ -2076,6 +2106,31 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                         .and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
                     "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
                 );
+            }
+            "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: Power-to-X target {target_id} must bind cost and efficiency to one operating point"
+                );
+                for key in [
+                    "matched_syngas_composition_and_quality_required",
+                    "full_plant_grid_side_energy_boundary_required",
+                    "electricity_price_and_capacity_factor_scenario_required",
+                    "downstream_product_service_boundary_required",
+                    "unqualified_coproduct_credit_forbidden",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: Power-to-X target {target_id} is missing required guard {key}"
+                    );
+                }
+                for key in ["syngas_cost_eur_per_tonne_max", "plant_efficiency_min_fraction"] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                        "{display_name}: Power-to-X target {target_id} has invalid or missing threshold {key}"
+                    );
+                }
             }
             _ => {}
         }
