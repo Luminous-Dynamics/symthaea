@@ -848,8 +848,7 @@ mod tests {
         for face in &mut candidate.geometry.faces {
             face.swap(1, 2);
         }
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
         assert!(report.checks.iter().any(|c| {
@@ -892,8 +891,7 @@ mod tests {
     fn non_metric_units_are_incomparable_not_converted() {
         let mut candidate = tetrahedron();
         candidate.geometry.units = "ft".into();
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Incomparable);
     }
@@ -910,8 +908,7 @@ mod tests {
     fn repeated_vertex_index_is_rejected() {
         let mut candidate = tetrahedron();
         candidate.geometry.faces.push([0, 0, 1]);
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
     }
@@ -920,8 +917,7 @@ mod tests {
     fn out_of_range_vertex_index_is_rejected() {
         let mut candidate = tetrahedron();
         candidate.geometry.faces.push([0, 1, 99]);
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
     }
@@ -930,8 +926,7 @@ mod tests {
     fn duplicate_triangle_is_rejected() {
         let mut candidate = tetrahedron();
         candidate.geometry.faces.push([0, 2, 1]);
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
         assert!(report.metrics.duplicate_face_count > 0);
@@ -964,8 +959,7 @@ mod tests {
         for [a, b, c] in offset_faces {
             candidate.geometry.faces.push([a + 4, c + 4, b + 4]);
         }
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert!(report.metrics.signed_volume_m3.unwrap() > 0.0);
         assert_eq!(report.metrics.component_signed_volumes_m3.len(), 2);
@@ -988,14 +982,11 @@ mod tests {
             .extend([[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]);
         // The second tetrahedron shares the first tetrahedron's vertex 0,
         // but shares no edges. Its local winding is outward.
-        candidate.geometry.faces.extend([
-            [0, 5, 4],
-            [0, 4, 6],
-            [0, 6, 5],
-            [4, 5, 6],
-        ]);
-        candidate.geometry_digest_blake3 =
-            compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate
+            .geometry
+            .faces
+            .extend([[0, 5, 4], [0, 4, 6], [0, 6, 5], [4, 5, 6]]);
+        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
         assert!(report.metrics.non_manifold_vertex_link_count > 0);
