@@ -24,6 +24,7 @@ This directory contains AOBench's benchmark contract, operational model, runtime
 18. [Sequential experiment design evaluator](AOBENCH_SEQUENTIAL_EXPERIMENT_EVALUATOR_2026-11-14.md) — adaptive probe selection, information gain, delivery/isolation evidence, budgeted stopping and oracle-efficiency regret.
 19. [Model-class adequacy and held-out refinement](AOBENCH_MODEL_ADEQUACY_AND_REFINEMENT_2026-11-14.md) — detect when every current hypothesis is falsified and require new models to predict sealed probes; tracked by [AOBENCH-012 #12200](https://github.com/Luminous-Dynamics/symthaea/issues/12200).
 20. [Decision-focused partial identification and max-potency experiments](AOBENCH_PARTIAL_IDENTIFICATION_AND_MAX_POTENCY_2026-11-14.md) — select interventions that guarantee causal-effect bound contraction and authorize robust decisions without requiring full graph identification; tracked by [AOBENCH-013 #12206](https://github.com/Luminous-Dynamics/symthaea/issues/12206).
+21. [Evidence-backed residual gains beyond algorithm portfolios](AOBENCH_ALGORITHMIC_RESIDUAL_GAINS_2026-11-15.md) — measure auditable agent edge corrections beyond a calibration-frozen causal algorithm, with evaluator-only graph truth and receipt-qualified edits; tracked by [AOBENCH-016 #12238](https://github.com/Luminous-Dynamics/symthaea/issues/12238).
 18. [Sequential experiment design evaluator](AOBENCH_SEQUENTIAL_EXPERIMENT_EVALUATOR_2026-11-14.md) — adaptive probe selection, information gain, delivery/isolation evidence, budgeted stopping and oracle-efficiency regret; implementation in `src/experiment_design.rs`.
 
 ## Current implementation
@@ -39,7 +40,7 @@ The first executable package is a standalone nested Cargo workspace:
   - `src/semantic_continuity.rs`: typed authority, consent, effect, provenance and substrate continuity evaluator; evidence dispositions are supplied by independent adapters and are not authenticated by this module.
   - `src/experiment_design.rs`: sequential deterministic experiment evaluator with evaluator-only hidden truth, target-class information gain, intervention/cost/risk budgets and stop/abstain qualification; no stochastic power claim.
   - `src/model_refinement.rs`: model-class adequacy and held-out hypothesis refinement evaluator. A proposed model must fit the complete qualified discovery trace and sealed validation probes against an evaluator-only oracle.
-  - `src/experiment_design.rs`: sequential deterministic experiment evaluator with hidden evaluator oracle, target-class information gain, intervention/cost/risk budgets and stop/abstain qualification. It does not claim stochastic statistical power.
+  - `src/algorithmic_residual.rs`: evidence-backed residual graph-edit evaluator. It compares final agent edits with a calibration-frozen algorithm baseline, reports an evaluator-only suite ceiling and scores novel true-edge recovery.
 
 It has exact serde / sha2 dependency pins and its own lockfile, and is explicitly excluded from the root workspace's crates/domains glob. Its focused CI builds the nested workspace independently.
 
