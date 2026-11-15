@@ -1,0 +1,449 @@
+{
+  "schema_version": "0.1.0",
+  "status": "REFERENCE_LEDGER_ONLY_NOT_BENCHMARK_RESULT",
+  "created_utc": "2026-11-15T20:00:00Z",
+  "issue_url": "https://github.com/Luminous-Dynamics/symthaea/issues/12392",
+  "source_records": [
+    {
+      "id": "TOROIDAL-EXPERIMENT-OPT-2026-11",
+      "title": "An integrated data-driven and experimental methodology for toroidal propeller design improvement",
+      "authors": [
+        "Xiaozuo Liu",
+        "Xinjing Wang",
+        "Ruixuan He",
+        "Huachao Dong",
+        "Jingxue Shen",
+        "Zonglin Li",
+        "Peng Wang"
+      ],
+      "venue": "Engineering Applications of Artificial Intelligence",
+      "published_on": "2026-11-15",
+      "doi": "10.1016/j.engappai.2026.116126",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0952197626024103",
+      "architecture_families": [
+        "TOROIDAL_PROPELLER"
+      ],
+      "evidence_class": "EXPERIMENTALLY_VALIDATED_CFD",
+      "comparators": [
+        {
+          "id": "prototype_matched_thrust",
+          "description": "The study's toroidal prototype at matched required thrust.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        },
+        {
+          "id": "best_sampled_design",
+          "description": "The best sampled candidate in the study's design search; used for the reported noise and vortex-coherence comparisons.",
+          "cross_source_comparability": "NOT_COMPARABLE"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "power_reduction_at_matched_thrust",
+          "reported_value": 7.26,
+          "unit": "percent",
+          "direction": "DECREASE",
+          "comparator_id": "prototype_matched_thrust",
+          "condition": "Study design condition; matched thrust; 14 parametric design variables.",
+          "reported_interpretation": "The optimized design reports 7.26% lower power than the study prototype at matched thrust."
+        },
+        {
+          "metric": "sound_pressure_level_reduction",
+          "reported_value": 1.74,
+          "unit": "dB",
+          "direction": "DECREASE",
+          "comparator_id": "best_sampled_design",
+          "condition": "Study acoustic directivity analysis; comparison with the best sampled design.",
+          "reported_interpretation": "The optimized design reports 1.74 dB lower noise than the best sampled design, not necessarily than the prototype or a conventional propeller."
+        },
+        {
+          "metric": "primary_vortex_coherence_lifetime",
+          "reported_value": null,
+          "unit": "rotational cycles",
+          "direction": "DECREASE",
+          "comparator_id": "best_sampled_design",
+          "condition": "Flow-field analysis of the optimized design and best sampled candidate.",
+          "reported_interpretation": "Primary vortices are reported to dissipate within 3–4 rotational cycles versus 7–8 cycles for the best sampled design."
+        }
+      ],
+      "data_availability": "NOT_LOCATED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "The 7.26% power and 1.74 dB noise results use different comparators.",
+        "The paper's design-condition result is not a general mission-level or full-scale vessel improvement.",
+        "Raw test traces, geometry files, optimization inputs and redistribution permissions have not been verified in this intake."
+      ],
+      "admitted_for_cross_source_ranking": false
+    },
+    {
+      "id": "TOROIDAL-DTC-2026-01",
+      "title": "Study on the hydrodynamic performance of toroidal propellers",
+      "authors": [
+        "Il-Rryong Park",
+        "Bu-Gun Paik",
+        "So-Won Jung",
+        "Je-in Kim",
+        "Myeong-Eun Kim",
+        "Jong-Woo Ahn",
+        "Sang-Hwan Kim"
+      ],
+      "venue": "Ocean Engineering",
+      "published_on": "2026-01-30",
+      "doi": "10.1016/j.oceaneng.2025.123877",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0029801825035590",
+      "architecture_families": [
+        "TOROIDAL_PROPELLER",
+        "CONVENTIONAL_OPEN_PROPELLER"
+      ],
+      "evidence_class": "EXPERIMENTALLY_VALIDATED_CFD",
+      "comparators": [
+        {
+          "id": "conventional_reference",
+          "description": "The study's conventional reference propeller for a 14,000-TEU-class container-ship/DTC application.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "tip_vortex_cavitation",
+          "reported_value": null,
+          "unit": "qualitative",
+          "direction": "DECREASE",
+          "comparator_id": "conventional_reference",
+          "condition": "DTC/container-ship toroidal propeller; cavitation-tunnel tests and DDES CFD.",
+          "reported_interpretation": "The study reports significantly reduced tip-vortex cavitation and near elimination in the tested configuration."
+        },
+        {
+          "metric": "thrust",
+          "reported_value": null,
+          "unit": "qualitative",
+          "direction": "DECREASE",
+          "comparator_id": "conventional_reference",
+          "condition": "Study-specific open-water and ship-propulsion comparison.",
+          "reported_interpretation": "The toroidal propeller is reported to have slightly lower thrust than the conventional reference."
+        },
+        {
+          "metric": "propulsive_efficiency",
+          "reported_value": null,
+          "unit": "qualitative",
+          "direction": "DECREASE",
+          "comparator_id": "conventional_reference",
+          "condition": "Study-specific open-water comparison.",
+          "reported_interpretation": "The toroidal propeller is reported to have slightly lower efficiency than the conventional reference."
+        }
+      ],
+      "data_availability": "NOT_LOCATED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "This result is a counterexample to universal toroidal superiority, not proof that conventional propellers always win.",
+        "Exact numerical deltas and raw cavitation-tunnel data were not verified in this intake.",
+        "Results are specific to the studied DTC/container-ship propeller and operating conditions."
+      ],
+      "admitted_for_cross_source_ranking": false
+    },
+    {
+      "id": "TOROIDAL-CAVITATION-2026-07",
+      "title": "Experimental and numerical investigation of cavitation performance in a toroidal propeller",
+      "authors": [
+        "Chunhui Wang",
+        "Shun Liu",
+        "Wei Zhao",
+        "Yun Long",
+        "Chao Wang",
+        "Liyu Ye"
+      ],
+      "venue": "Ocean Engineering",
+      "published_on": "2026-07-30",
+      "doi": "10.1016/j.oceaneng.2026.126421",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0029801826022559",
+      "architecture_families": [
+        "TOROIDAL_PROPELLER"
+      ],
+      "evidence_class": "EXPERIMENTALLY_VALIDATED_CFD",
+      "comparators": [
+        {
+          "id": "study_operating_point",
+          "description": "The study's toroidal propeller at its specified open-water operating point; no cross-study comparator is implied.",
+          "cross_source_comparability": "NOT_COMPARABLE"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "open_water_efficiency",
+          "reported_value": 70.9,
+          "unit": "percent",
+          "direction": "QUALITATIVE",
+          "comparator_id": "study_operating_point",
+          "condition": "Advance coefficient J = 1.4; study's tested toroidal configuration.",
+          "reported_interpretation": "The study reports 70.9% open-water efficiency at J = 1.4; this is not directly comparable with efficiency values at other advance coefficients."
+        },
+        {
+          "metric": "cavitation_inception_and_location",
+          "reported_value": null,
+          "unit": "qualitative",
+          "direction": "QUALITATIVE",
+          "comparator_id": "study_operating_point",
+          "condition": "Across the study's advance-coefficient range and vertical-angle adjustments.",
+          "reported_interpretation": "Cavitation inception type and location vary with advance coefficient; vertical-angle adjustment changes low-pressure regions and cavitation behavior."
+        }
+      ],
+      "data_availability": "NOT_LOCATED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "The 70.9% value is tied to J = 1.4 and the study configuration.",
+        "Do not rank against a different propeller without matched diameter, Reynolds number, loading, cavitation number and test boundary.",
+        "Raw measurements and geometry artifacts were not verified in this intake."
+      ],
+      "admitted_for_cross_source_ranking": false
+    },
+    {
+      "id": "TOROIDAL-KCS-SELFPROP-2026-10",
+      "title": "Self-propulsion performance and energy-saving potential of a toroidal propeller for marine applications",
+      "authors": [
+        "Yu Lu",
+        "Yilang Tu"
+      ],
+      "venue": "Ocean Engineering",
+      "published_on": "2026-10-15",
+      "doi": "10.1016/j.oceaneng.2026.127671",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0029801826035055",
+      "architecture_families": [
+        "TOROIDAL_PROPELLER",
+        "CONVENTIONAL_OPEN_PROPELLER"
+      ],
+      "evidence_class": "CFD_ONLY",
+      "comparators": [
+        {
+          "id": "kp505",
+          "description": "KP505 conventional propeller benchmark used in the study's open-water and KCS self-propulsion comparisons.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "open_water_efficiency",
+          "reported_value": 69.4,
+          "unit": "percent",
+          "direction": "INCREASE",
+          "comparator_id": "kp505",
+          "condition": "Advance coefficient J = 0.8; optimized toroidal propeller versus KP505.",
+          "reported_interpretation": "The paper reports 69.4% efficiency at J = 0.8, about 2% above KP505, with a reported peak of 72.1%."
+        },
+        {
+          "metric": "self_propulsion_delivered_power_reduction",
+          "reported_value": null,
+          "unit": "percent_range",
+          "direction": "DECREASE",
+          "comparator_id": "kp505",
+          "condition": "KCS self-propulsion simulations at model-scale speeds corresponding to full-scale 18, 21 and 24 kn.",
+          "reported_interpretation": "The study reports 4.14–13.5% lower delivered power than KP505, with the benefit varying by speed."
+        },
+        {
+          "metric": "voyage_fuel_saving",
+          "reported_value": null,
+          "unit": "tonnes_per_voyage_range",
+          "direction": "DECREASE",
+          "comparator_id": "kp505",
+          "condition": "Study's route and operating-profile assumptions.",
+          "reported_interpretation": "The study reports 60.97–94.82 t/voyage savings and a 163–239 day payback estimate under its stated scenario assumptions."
+        }
+      ],
+      "data_availability": "ACCESS_RESTRICTED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "The self-propulsion findings are CFD results, not a physical sea-trial validation.",
+        "KCS geometry, speed mapping and route/economic assumptions are study-specific.",
+        "Do not promote its numerical savings to another ship or operating profile."
+      ],
+      "admitted_for_cross_source_ranking": false
+    },
+    {
+      "id": "FLEXIBLE-BLADE-EXPERIMENT-2025-11",
+      "title": "Comparison investigation of hydrodynamic and acoustic performance for metal and flexible marine propeller using experimental method",
+      "authors": [
+        "Wei Wang",
+        "Weiwei Jin",
+        "Wei Chen",
+        "Aichun Feng"
+      ],
+      "venue": "Ocean Engineering",
+      "published_on": "2025-11-30",
+      "doi": "10.1016/j.oceaneng.2025.122278",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0029801825019626",
+      "architecture_families": [
+        "FLEXIBLE_COMPOSITE_BLADE",
+        "CONVENTIONAL_OPEN_PROPELLER"
+      ],
+      "evidence_class": "EXPERIMENTAL",
+      "comparators": [
+        {
+          "id": "metal_same_geometry",
+          "description": "Metal propeller with identical DTMB 4381 geometry used as the flexible propeller comparator.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "radiated_noise_reduction_max",
+          "reported_value": 43.43,
+          "unit": "percent",
+          "direction": "DECREASE",
+          "comparator_id": "metal_same_geometry",
+          "condition": "Cavitation-tunnel experiment; maximum at high advance coefficients.",
+          "reported_interpretation": "The paper reports a maximum 43.43% noise reduction; its reported average reduction is 35.22%."
+        },
+        {
+          "metric": "propulsive_efficiency_change_average",
+          "reported_value": 7.95,
+          "unit": "percent_reduction",
+          "direction": "DECREASE",
+          "comparator_id": "metal_same_geometry",
+          "condition": "Advance coefficient J = 0.7 to 1.2; cavitating test conditions.",
+          "reported_interpretation": "The flexible design has an average efficiency reduction of 7.95% relative to the metal design."
+        },
+        {
+          "metric": "propulsive_efficiency_reduction_max",
+          "reported_value": 21.27,
+          "unit": "percent",
+          "direction": "DECREASE",
+          "comparator_id": "metal_same_geometry",
+          "condition": "At J = 1.2 in the reported test range.",
+          "reported_interpretation": "The maximum reported efficiency reduction is 21.27% at J = 1.2."
+        },
+        {
+          "metric": "unsteady_axial_force_reduction_max",
+          "reported_value": 9,
+          "unit": "percent",
+          "direction": "DECREASE",
+          "comparator_id": "metal_same_geometry",
+          "condition": "First and second blade-passing-frequency force components in the study's tunnel tests.",
+          "reported_interpretation": "The paper reports up to 9% lower unsteady axial forces."
+        }
+      ],
+      "data_availability": "NOT_LOCATED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "Noise and efficiency results are tied to this flexible metal-TPU shell-core construction and its test conditions.",
+        "The result is a trade-off: reduced noise/force does not imply improved efficiency.",
+        "Raw data and geometry redistribution permissions were not verified in this intake."
+      ],
+      "admitted_for_cross_source_ranking": false
+    },
+    {
+      "id": "DUCTED-CPP-WAVY-LE-2025-07",
+      "title": "Hydrodynamic performance of a ducted controllable pitch propeller with wavy leading edge",
+      "authors": [
+        "Tapas K. Das",
+        "Zehao Sun",
+        "Chang Li",
+        "Mina Tadros",
+        "Weichao Shi"
+      ],
+      "venue": "Ocean Engineering",
+      "published_on": "2025-07-01",
+      "doi": "10.1016/j.oceaneng.2025.121349",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0029801825010625",
+      "architecture_families": [
+        "DUCTED_PROPELLER"
+      ],
+      "evidence_class": "EXPERIMENTAL",
+      "comparators": [
+        {
+          "id": "reference_ducted_cpp",
+          "description": "The study's reference ducted controllable-pitch propeller configuration.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "open_water_efficiency_improvement_max",
+          "reported_value": 3.5,
+          "unit": "percent",
+          "direction": "INCREASE",
+          "comparator_id": "reference_ducted_cpp",
+          "condition": "Cavitation-tunnel test across three pitch conditions.",
+          "reported_interpretation": "The paper reports up to 3.5% efficiency improvement for the wavy-leading-edge propeller."
+        },
+        {
+          "metric": "bollard_pull_thrust",
+          "reported_value": null,
+          "unit": "qualitative",
+          "direction": "INCREASE",
+          "comparator_id": "reference_ducted_cpp",
+          "condition": "Bollard-pull condition; wavy leading edge applied to the duct.",
+          "reported_interpretation": "The paper reports improved thrust in bollard-pull condition for the wavy-leading-edge duct."
+        }
+      ],
+      "data_availability": "OPEN_ARTIFACTS_UNVERIFIED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "The improvement is condition-specific and cannot be promoted to an arbitrary vessel or propulsor.",
+        "The reported three pitch settings do not establish performance across a complete mission envelope.",
+        "Raw data licensing and exportable geometry are not verified in this intake."
+      ],
+      "admitted_for_cross_source_ranking": false
+    },
+    {
+      "id": "CONTRA-ROTATING-ML-SCREEN-2026-11",
+      "title": "Performance prediction of contra-rotating propellers based on artificial neural network and optimisation technique",
+      "authors": [],
+      "venue": "Journal of Marine Engineering & Technology",
+      "published_on": "2026-11-05",
+      "doi": "10.1080/20464177.2026.2763301",
+      "source_url": "https://doi.org/10.1080/20464177.2026.2763301",
+      "architecture_families": [
+        "CONTRA_ROTATING_PROPELLER",
+        "CONVENTIONAL_OPEN_PROPELLER"
+      ],
+      "evidence_class": "MODEL_SCREENING",
+      "comparators": [
+        {
+          "id": "kp505",
+          "description": "KP505 reference propeller in the published design-screening comparison.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        },
+        {
+          "id": "optimized_fixed_pitch",
+          "description": "Best optimized fixed-pitch propeller from the same model-screening study.",
+          "cross_source_comparability": "MATCHED_WITHIN_SOURCE_ONLY"
+        }
+      ],
+      "claims": [
+        {
+          "metric": "maximum_predicted_efficiency",
+          "reported_value": 70.3,
+          "unit": "percent",
+          "direction": "INCREASE",
+          "comparator_id": "kp505",
+          "condition": "Study's preliminary model-based design screening; not yet independently confirmed by high-fidelity CFD or experiment.",
+          "reported_interpretation": "The study reports a maximum predicted efficiency of 70.30% versus 65.0% for KP505."
+        },
+        {
+          "metric": "maximum_predicted_efficiency",
+          "reported_value": 70.3,
+          "unit": "percent",
+          "direction": "INCREASE",
+          "comparator_id": "optimized_fixed_pitch",
+          "condition": "Study's preliminary model-based design screening; not yet independently confirmed by high-fidelity CFD or experiment.",
+          "reported_interpretation": "The study reports 70.30% versus 66.71% for its best optimized fixed-pitch propeller."
+        },
+        {
+          "metric": "cavitation_constraint",
+          "reported_value": null,
+          "unit": "qualitative",
+          "direction": "UNKNOWN",
+          "comparator_id": "optimized_fixed_pitch",
+          "condition": "Some high-efficiency candidate solutions in the screened design space.",
+          "reported_interpretation": "Some high-efficiency candidates marginally violate the cavitation constraint and are reported as near-feasible boundaries, not fully feasible winners."
+        }
+      ],
+      "data_availability": "ACCESS_RESTRICTED",
+      "rights_status": "REVIEW_REQUIRED",
+      "limitations": [
+        "This is preliminary model screening, not validated CFD or experimental performance.",
+        "Near-feasible cavitation-constraint violations must not be promoted as feasible results.",
+        "The article's accepted/in-press status and underlying data availability require review."
+      ],
+      "admitted_for_cross_source_ranking": false
+    }
+  ]
+}
