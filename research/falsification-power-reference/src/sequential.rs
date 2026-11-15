@@ -583,6 +583,20 @@ fn log_sum_exp(values: &[f64]) -> f64 {
 mod tests {
     use super::*;
 
+    fn deterministic_standard_normal(state: &mut u64) -> f64 {
+        let mut next = || {
+            *state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+            let mut value = *state;
+            value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+            value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+            value ^= value >> 31;
+            ((value >> 11) as f64 + 0.5) / 9_007_199_254_740_992.0
+        };
+        let u1 = next();
+        let u2 = next();
+        (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+    }
+
     #[test]
     fn known_gaussian_log_likelihood_increment_matches_reference() {
         let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
@@ -708,6 +722,58 @@ mod tests {
         );
         assert!(process.has_pending_prediction());
         assert_eq!(process.observations, 0);
+    }
+
+    #[test]
+    fn adaptive_heteroskedastic_null_stays_within_anytime_boundary_smoke_rate() {
+        const PATHS: u64 = 20_000;
+        const HORIZON: u64 = 100;
+        let mut state = 0x5eed_cafe_d00d_f00d_u64;
+        let mut false_alarms = 0_u64;
+
+        for path in 0..PATHS {
+            let mut process = PredictableGaussianEProcess::new(1.0, 0.05).unwrap();
+            let mut previous_observation = 0.0;
+            let mut crossed = false;
+
+            for step in 0..HORIZON {
+                // Both the discrepancy and measurement precision adapt only
+                // to the previous observation, never the current draw.
+                let (discrepancy, sigma) = if previous_observation >= 0.0 {
+                    (0.25, 0.7)
+                } else {
+                    (-0.25, 1.3)
+                };
+                let observed = sigma * deterministic_standard_normal(&mut state);
+                let observation_id = format!("path-{path}-step-{step}");
+                let decision_digest = format!("decision-{path}-{step}");
+                process
+                    .commit_prediction_with_sigma(
+                        &observation_id,
+                        &decision_digest,
+                        discrepancy,
+                        sigma,
+                    )
+                    .unwrap();
+                let update = process
+                    .observe(&observation_id, &decision_digest, observed)
+                    .unwrap();
+                if update.crossed_alpha_boundary {
+                    crossed = true;
+                    break;
+                }
+                previous_observation = observed;
+            }
+            if crossed {
+                false_alarms += 1;
+            }
+        }
+
+        let empirical_rate = false_alarms as f64 / PATHS as f64;
+        assert!(
+            empirical_rate <= 0.06,
+            "empirical anytime-null crossing rate {empirical_rate:.4} exceeded the 0.06 smoke bound"
+        );
     }
 
     #[test]
