@@ -1845,6 +1845,58 @@
         "Heat recovery, auxiliaries, gas composition, throughput, maintenance and downstream separation require separate measurements."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-DBD-HUMIDIFIED-SYNGAS-EXPERIMENT-2026",
+      "lane": "CO2_DBD_HUMIDIFIED_SYNGAS",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Direct synthesis of syngas from humidified CO2 using a coaxial dielectric barrier discharge plasma reactor",
+        "publisher": "RSC Advances",
+        "publication_date": "2026",
+        "volume": 16,
+        "doi": "10.1039/D5YA00293A",
+        "url": "https://doi.org/10.1039/D5YA00293A"
+      },
+      "configuration": {
+        "reactor": "coaxial dielectric barrier discharge",
+        "feed": "humidified CO2 / H2O mixture",
+        "process_goal": "direct syngas formation, not pure CO production",
+        "pressure": "source-specific reactor conditions; exact pressure and boundary must be pinned from article/supplement before matching",
+        "operating_points_status": "source reports a range across humidity/feed conditions; individual conditions must remain separate when raw tables are ingested"
+      },
+      "observations": [
+        {
+          "metric": "energy_efficiency",
+          "value_min": 0.045,
+          "value_max": 0.233,
+          "unit": "fraction",
+          "qualifier": "source-reported range across tested humidified CO2 feed conditions"
+        },
+        {
+          "metric": "h2_to_co_molar_ratio",
+          "value_min": 0.1,
+          "value_max": 0.2,
+          "unit": "ratio",
+          "qualifier": "source-reported syngas composition range"
+        },
+        {
+          "metric": "energy_efficiency_pure_co2_feed",
+          "value": 0.133,
+          "unit": "fraction",
+          "qualifier": "source-reported pure-CO2 comparator condition; product is primarily CO and must not be conflated with humidified syngas points"
+        }
+      ],
+      "source_conclusion": "The experimental study demonstrates direct syngas formation from humidified CO2 in a coaxial DBD plasma reactor. It reports energy-efficiency values ranging from 4.5% to 23.3% and H2/CO ratios from 0.1 to 0.2 across the tested feed conditions. A pure CO2 feed condition is separately reported with 13.3% energy efficiency and predominantly CO product.",
+      "comparison_status": "DBD_HUMIDIFIED_SYNGAS_NOT_DIRECTLY_COMPARABLE_TO_DRY_WARM_ARC_CO_ONLY_CASES",
+      "blockers": [
+        "Humidified CO2/H2O feed and syngas output differ from dry CO2-to-CO warm-arc quench cases.",
+        "Retain the pure-CO2 feed point as a separate operating condition; do not combine it with the humidified syngas range.",
+        "The source-specific energy-efficiency denominator and full grid-side auxiliary boundary must be extracted before cross-paper comparison.",
+        "H2/CO ratio is a product-composition metric, not a CO2 conversion or CO selectivity measurement.",
+        "Individual humidity / feed operating points require separate identities and cannot be collapsed into one representative value."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -2077,6 +2129,21 @@
       "control_id": "NC-CO2-QUENCH-008",
       "condition": "Compare a DBD CO2 model, a warm arc experiment and a kinetic afterglow model as one matched performance leaderboard without harmonizing denominators and observables.",
       "expected_disposition": "NOT_COMPARABLE_REGIME_AND_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-DBD-001",
+      "condition": "Treat humidified CO2-to-syngas energy efficiency and H2/CO composition as directly comparable to dry CO2-to-CO warm-arc quenching without matching feed and product boundary.",
+      "expected_disposition": "NOT_COMPARABLE_FEED_AND_PRODUCT_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-DBD-002",
+      "condition": "Combine the pure-CO2 13.3% efficiency point with the humidified-feed 4.5–23.3% range as if they share one operating condition.",
+      "expected_disposition": "REJECT_OPERATING_POINT_MIX"
+    },
+    {
+      "control_id": "NC-CO2-DBD-003",
+      "condition": "Use H2/CO molar ratio as a substitute for CO2 conversion or CO product selectivity.",
+      "expected_disposition": "REJECT_METRIC_SEMANTICS_MISMATCH"
     }
   ],
   "derived_reference_checks": [
