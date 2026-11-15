@@ -303,3 +303,13 @@ The Rust validator checks all five guards, the numeric threshold, comparator IDs
 ## 9.19 Power-to-X syngas target validation
 
 The source manifest now includes `BIOGAS-PLASMA-SYNGAS-COST-001`, marked `RESEARCH_TARGET_NOT_RESULT`. The auditor requires same-point cost/efficiency thresholds and the five plant-boundary guards for syngas quality, grid-side input, electricity-price/capacity-factor assumptions, downstream service, and no unqualified coproduct credit.
+
+
+## 9.20 Three-point ammonia operating-point integrity
+
+The NH3 microwave source record now stores three explicit `operating_points`:
+- `NH3-MW-ATM-HIGH-CONVERSION`: >99% / 45 g H2/kWh / 242 kJ/mol;
+- `NH3-MW-ATM-HIGH-THROUGHPUT`: 92.4% / 150 g H2/h / 50 g H2/kWh / 217 kJ/mol;
+- `NH3-MW-ATM-HIGH-ENERGY-YIELD`: 76% / 51 g H2/kWh / 210 kJ/mol.
+
+The Rust auditor requires exactly these three unique operating-point identities and checks the metric pairings. It rejects moving the 150 g/h throughput value onto the >99% point or copying the 45 g/kWh yield into the 92.4% / 150 g/h point.
