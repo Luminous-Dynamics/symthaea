@@ -169,6 +169,7 @@ pub struct BernoulliTrialAssessment {
     pub qualified_treatment_samples: usize,
     pub treatment_minus_control: BernoulliInterval,
     pub boundary: BernoulliBoundary,
+    pub confidence_interval_covers_truth_for_scoring: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -220,6 +221,7 @@ pub struct BernoulliSequentialReport {
     /// Evaluator-only score fields, consumed only after the episode closes.
     pub true_effect_for_scoring: f64,
     pub confidence_interval_covers_truth: bool,
+    pub confidence_sequence_covers_truth_at_all_looks: bool,
     pub claim_correct: Option<bool>,
     pub false_positive_claim: bool,
     pub trial_assessments: Vec<BernoulliTrialAssessment>,
@@ -420,6 +422,7 @@ pub fn evaluate_bernoulli_sequential(
             claim: terminal_claim(&trace.terminal),
             true_effect_for_scoring: true_effect,
             confidence_interval_covers_truth: interval.lower <= true_effect && true_effect <= interval.upper,
+            confidence_sequence_covers_truth_at_all_looks: interval.lower <= true_effect && true_effect <= interval.upper,
             claim_correct: None,
             false_positive_claim: false,
             trial_assessments: Vec::new(),
@@ -432,6 +435,8 @@ pub fn evaluate_bernoulli_sequential(
     let mut total_cost = 0_u64;
     let mut total_risk = 0_u64;
     let mut unqualified_samples = 0_usize;
+    let mut confidence_sequence_covers_truth_at_all_looks = true;
+    let true_effect = oracle.true_effect();
     let mut assessments = Vec::new();
 
     for (index, trial) in trace.trials.iter().enumerate() {
@@ -532,6 +537,9 @@ pub fn evaluate_bernoulli_sequential(
 
         let interval = effect_interval(&control, &treatment, scenario.alpha);
         let current_boundary = boundary(interval, scenario.minimum_effect);
+        let confidence_interval_covers_truth =
+            interval.lower <= true_effect && true_effect <= interval.upper;
+        confidence_sequence_covers_truth_at_all_looks &= confidence_interval_covers_truth;
         assessments.push(BernoulliTrialAssessment {
             trial_index,
             arm: trial.arm,
@@ -540,6 +548,7 @@ pub fn evaluate_bernoulli_sequential(
             qualified_treatment_samples: treatment.qualified,
             treatment_minus_control: interval,
             boundary: current_boundary,
+            confidence_interval_covers_truth_for_scoring: confidence_interval_covers_truth,
         });
     }
 
@@ -569,7 +578,6 @@ pub fn evaluate_bernoulli_sequential(
         }
     }
 
-    let true_effect = oracle.true_effect();
     let actual_class = oracle_class(true_effect, scenario.minimum_effect);
     let claim_correct = claim.map(|declared| declared == actual_class);
     let false_positive_claim = match claim {
@@ -601,6 +609,7 @@ pub fn evaluate_bernoulli_sequential(
         claim,
         true_effect_for_scoring: true_effect,
         confidence_interval_covers_truth: interval.lower <= true_effect && true_effect <= interval.upper,
+        confidence_sequence_covers_truth_at_all_looks,
         claim_correct,
         false_positive_claim,
         trial_assessments: assessments,
@@ -706,6 +715,8 @@ mod tests {
         assert_eq!(report.qualification, BernoulliQualification::Qualified);
         assert_eq!(report.boundary, BernoulliBoundary::Benefit);
         assert!(report.confidence_interval_covers_truth);
+        assert!(report.confidence_sequence_covers_truth_at_all_looks);
+        assert!(report.trial_assessments.iter().all(|a| a.confidence_interval_covers_truth_for_scoring));
         assert_eq!(report.claim_correct, Some(true));
         assert!(!report.false_positive_claim);
     }
@@ -749,6 +760,7 @@ mod tests {
         assert_eq!(report.boundary, BernoulliBoundary::Benefit);
         assert_eq!(report.claim_correct, Some(false));
         assert!(report.false_positive_claim);
+        assert!(!report.confidence_sequence_covers_truth_at_all_looks);
     }
 
 
