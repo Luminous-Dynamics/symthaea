@@ -118,7 +118,7 @@
               "build-repro",
               "api-compat"
             ],
-            "uses_prior_evidence": false
+            "uses_prior_evidence": true
           },
           {
             "decision_id": "decision-detected",
@@ -135,7 +135,7 @@
               "build-repro",
               "api-compat"
             ],
-            "uses_prior_evidence": false
+            "uses_prior_evidence": true
           }
         ],
         "probe_responses": [
@@ -189,7 +189,7 @@
         "episode_id": "sham-load-noise",
         "observations": [
           {
-            "observation_id": "obs-runner-baseline",
+            "observation_id": "obs-sham-runner-baseline",
             "available_at": "2026-11-15T09:58:01Z",
             "observed_at": "2026-11-15T09:58:00Z",
             "source_family": "runner-attestation",
@@ -310,7 +310,7 @@
             "source_family": "runner-attestation",
             "signal_kind": "probe_result",
             "value": "runner fingerprint r1",
-            "upstream_source_id": "runner-root-2"
+            "upstream_source_id": "runner-root-1"
           }
         ]
       },
