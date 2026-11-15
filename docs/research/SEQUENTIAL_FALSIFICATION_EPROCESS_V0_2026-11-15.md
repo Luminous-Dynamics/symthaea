@@ -1,7 +1,7 @@
 # Sequential falsification e-process reference v0
 
 **Date:** 2026-11-15  
-**Status:** implementation candidate; exact-head Rust qualification pending  
+**Status:** exact-head Rust qualification passed on `5306643249e57128c8bd0849f1e9db52d4a8ae27`; Rust 1.96.0, rustfmt, 24/24 tests and strict Clippy passed in [focused workflow run #19](https://github.com/Luminous-Dynamics/symthaea/actions/runs/43765998717)  
 **Owner:** Symthaea #12402  
 **Stacked implementation:** PR #12399 branch research/falsification-power-reference-v0-1
 
@@ -45,6 +45,8 @@ The API uses a two-stage transition:
 
 1. commit_prediction(observation_id, decision_digest, d_t) (or the mixture variant) records the discrepancy for the next observation. Use commit_prediction_with_sigma / commit_predictions_with_sigma to bind a known action-dependent sigma_t in the same step.
 2. observe(observation_id, decision_digest, Y_t) consumes only the matching observation.
+
+The returned update includes the alpha level, committed discrepancy, per-step sigma_t, observation and decision identities, running-maximum log-evidence, anytime p-value and boundary disposition. Mixture component rows also include each precommitted discrepancy and fixed weight so an independent evaluator can reconstruct each LR increment.
 
 The implementation rejects:
 - observation before prediction;
@@ -121,7 +123,8 @@ Use independent null calibration and sealed alternative confirmation. A green un
 
 ## 8. Cross-project ownership
 
-- **Symthaea #12375 / #12402:** alternative semantics, power accounting, predictable policy interface and sequential qualification.
+- **Symthaea #12375 / #12402:** Gaussian model-discrepancy power accounting and this specialist predictable sequential reference.
+- **AOBench #12197 / #12242 / #12248 / PR #12271:** generic anytime-valid method league, causal confidence sequences and Monte Carlo calibration. This Gaussian lane is a specialist comparator, not a second generic confidence-sequence framework.
 - **Symthaea #11060 / #11171:** blind episodes and actual research-policy adapter; the finite baseline is not the learned researcher.
 - **Symtropy #3784 / #3973:** physical parameter identifiability, covariance-aware observation models and numerical/physical qualification.
 - **Symtropy #5328 / Mycelix #6031:** sealed alternative custody and purpose-bound access evidence.
@@ -130,6 +133,8 @@ Use independent null calibration and sealed alternative confirmation. A green un
 The sequential evaluator records evidence; it does not promote itself to a scientific authority.
 
 ## 9. Acceptance gates
+
+The current exact-head focused workflow passed formatting, all 24 tests and strict Clippy. Thirteen tests cover the sequential module; the remaining eleven cover the fixed-design Gaussian power reference. One sequential test is a deterministic 20,000-path, 100-look null smoke simulation with predictable action choice and known changing sigma_t; it asserts an empirical crossing rate no greater than 6% at nominal alpha 5%. This smoke gate is not a Monte Carlo confidence interval and does not prove 5% calibration.
 
 Before calling the implementation slice qualified:
 - exact-head Rust format, all-target tests and strict Clippy;
@@ -148,4 +153,4 @@ Before claiming statistical validity in a campaign:
 - sealed alternative-specific power and detection-delay evaluation;
 - independent review of the alternative custody and action-prediction event log.
 
-A successful implementation test is not a scientific result, an external benchmark result, or physical validation.
+A successful implementation test is not a scientific result, an external benchmark result, or physical validation. The exact-head smoke simulation is calibration evidence for one frozen synthetic generator only; a campaign still needs independently custodied null families, confidence intervals, terminal-test parity and matched baselines.
