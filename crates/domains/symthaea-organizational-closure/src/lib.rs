@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 pub mod algorithmic_residual;
+pub mod anytime_valid;
 pub mod assay;
 pub mod experiment_design;
 pub mod identity;
@@ -35,6 +36,15 @@ pub use algorithmic_residual::{
     EvidenceReceiptStatus, GraphQualityMetrics, ResidualDirectedEdge, ResidualDiscoveryOracle,
     ResidualDiscoveryReport, ResidualDiscoveryScenario, ResidualDiscoveryTrace, ResidualFinding,
     ResidualFindingCode, ResidualQualification, evaluate_algorithmic_residual,
+};
+pub use anytime_valid::{
+    AnytimeValidCausalOracle, AnytimeValidCausalReport, AnytimeValidCausalScenario,
+    AnytimeValidCausalTrace, AnytimeValidDecision, AnytimeValidDecisionQuality,
+    AnytimeValidEvidenceOracle, AnytimeValidEvidenceReceipt, AnytimeValidFinding,
+    AnytimeValidFindingCode, AnytimeValidPolicy, AnytimeValidQualification,
+    AnytimeValidQueryReport, CausalEffectInterval, RandomizedArm, SequentialCausalClaim,
+    SequentialCausalObservation, SequentialCausalQuery, evaluate_anytime_valid_causal_effects,
+    hoeffding_alpha_spending_radius,
 };
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
