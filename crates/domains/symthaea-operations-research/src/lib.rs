@@ -23,6 +23,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod facility_layout;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
@@ -30,3 +31,5 @@ pub mod queue;
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
 pub use queue::MM1;
+
+pub use facility_layout::{evaluate_layout, FlowMode, LayoutInput, LayoutReport};
