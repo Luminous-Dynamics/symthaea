@@ -2339,6 +2339,20 @@ fn receipt_assessment_for_action(
     }
 }
 
+fn stop_scope_covers(candidate: &StopScope, required: &StopScope) -> bool {
+    match (candidate, required) {
+        (StopScope::Global, _) => true,
+        (StopScope::LogicalOperations(_), StopScope::Global) => false,
+        (StopScope::LogicalOperations(candidate), StopScope::LogicalOperations(required)) => {
+            required.is_subset(candidate)
+        }
+    }
+}
+
+fn stop_scope_revision_is_monotonic(original: &StopScope, revised: &StopScope) -> bool {
+    stop_scope_covers(revised, original)
+}
+
 fn action_projection_failure(fault: ProjectionFault) -> ActionHistoryProjectionReport {
     let (disposition, code) = match fault {
         ProjectionFault::Indeterminate(code) => (EventTraceDisposition::Indeterminate, code),
@@ -2855,18 +2869,27 @@ pub fn project_action_history(
                     }
                 }
                 if revision_is_ordered {
-                    stop_evidence.push(ProjectedStopEvidence {
-                        action_id: action.action_id.clone(),
-                        obligation_id: obligation_id.clone(),
-                        kind: ProjectedStopEvidenceKind::PolicyRevision,
-                        policy_revision: policy_revision.clone(),
-                        scope: scope.clone(),
-                        owner_time: owner_time.clone(),
-                        receipt_ref,
-                        receipt_sha256,
-                        receipt_qualification: assessment.receipt_qualification(),
-                    });
-                    latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
+                    let original_scope = stop_trigger_actions.get(obligation_id)
+                        .map(|entry| &entry.1);
+                    if original_scope.is_some_and(|original| {
+                        !stop_scope_revision_is_monotonic(original, &scope)
+                    }) {
+                        critical = true;
+                        reasons.insert(format!("STOP_POLICY_SCOPE_NARROWED:{obligation_id}"));
+                    } else {
+                        stop_evidence.push(ProjectedStopEvidence {
+                            action_id: action.action_id.clone(),
+                            obligation_id: obligation_id.clone(),
+                            kind: ProjectedStopEvidenceKind::PolicyRevision,
+                            policy_revision: policy_revision.clone(),
+                            scope: scope.clone(),
+                            owner_time: owner_time.clone(),
+                            receipt_ref,
+                            receipt_sha256,
+                            receipt_qualification: assessment.receipt_qualification(),
+                        });
+                        latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
+                    }
                 }
                 let _ = trigger_action;
             }
@@ -3035,13 +3058,13 @@ pub fn project_action_history(
                 continue;
             }
         };
-        if scope != *trigger_scope || scope != *current_scope {
+        if scope != *current_scope || !stop_scope_revision_is_monotonic(trigger_scope, &scope) {
             critical = true;
-            reasons.insert(format!("STOP_DISCHARGE_SCOPE_MISMATCH:{obligation_id}"));
+            reasons.insert(format!("STOP_DISCHARGE_SCOPE_MISMATCH_OR_NARROWING:{obligation_id}"));
             continue;
         }
         let inventory_match = inventories.iter().filter(|(inventory, _)| {
-            inventory.scope == scope
+            stop_scope_covers(&inventory.scope, &scope)
                 && inventory.inventory_frontier_event_id == frontier
                 && inventory.attempt_manifest_sha256 == manifest
         }).collect::<Vec<_>>();
@@ -3220,7 +3243,7 @@ pub fn project_action_history(
             let parent = attempt_index.get(&parent_id).copied();
             if let Some(parent_index) = parent {
                 let parent_record = &attempts[parent_index];
-                attempts[index].retry_predecessor_start_event_id = parent_record.start_event_ids.first().cloned();
+                attempts[index].retry_predecessor_start_event_id = attempts[index].start_event_ids.first().cloned();
                 attempts[index].retry_predecessor_terminal_event_id =
                     parent_record.terminal_reconciliation.as_ref().map(|terminal| terminal.event_id.clone());
                 if let (Some(parent_terminal_time), Some(current_start_time)) = (
