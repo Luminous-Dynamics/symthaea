@@ -81,7 +81,11 @@ fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
         || metric_name == "quality_matched_diversity_ratio"
     {
         "task"
-    } else if metric_name == "task_quality" || metric_name == "expert_rater_agreement" {
+    } else if metric_name == "task_quality"
+        || metric_name == "expert_rater_agreement"
+        || metric_name == "cohen_kappa_nominal"
+        || metric_name == "krippendorff_alpha_nominal"
+    {
         "rater"
     } else {
         "run"
