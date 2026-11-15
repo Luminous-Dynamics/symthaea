@@ -46,7 +46,7 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 - `trace_digest`, when present, is SHA-256 over the trace JSON parsed into a `serde_json::Value`, with the `trace_digest` key removed, then serialized by `serde_json` (deterministic map-key ordering). This is the v0.1 canonicalization rule; it is not claimed to be RFC 8785.
 - Scenario, trace, artifact, prompt, and environment digests in a scorecard identify the exact inputs used. The scorer revision must identify the scoring implementation.
 
-The epistemic resilience track also reports confidence calibration (Brier/ECE), metacognitive sensitivity (AUC), selective accuracy, human-first attempts, AI core-step substitution, and human verification rates. These measures are separate; no single cognitive-sovereignty aggregate is asserted.
+The epistemic resilience track also reports confidence calibration (Brier/ECE), metacognitive sensitivity (AUC), selective accuracy, human-first attempts, AI core-step supply, AI substitution among supplied steps, and human verification rates. These measures are separate; no single cognitive-sovereignty aggregate is asserted.
 
 ## Agent decision bridge
 
