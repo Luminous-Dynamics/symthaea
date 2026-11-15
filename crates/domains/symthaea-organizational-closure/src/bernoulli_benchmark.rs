@@ -304,6 +304,8 @@ mod tests {
         assert_eq!(summary.episode_count, 4);
         assert_eq!(summary.oracle_valid_episodes, 3);
         assert_eq!(summary.oracle_invalid_episodes, 1);
+        assert_eq!(summary.truth_scoring_eligible_episodes, 3);
+        assert_eq!(summary.non_evaluable_episodes, 1);
         assert_eq!(summary.qualified_episodes, 2);
         assert_eq!(summary.inconclusive_episodes, 2);
         assert_eq!(summary.null_episodes, 2);
@@ -367,5 +369,27 @@ mod tests {
         assert_eq!(summary.null_episodes, 0);
         assert_eq!(summary.false_positive_rate_on_null.episodes, 0);
         assert_eq!(summary.false_positive_rate_on_null.estimate, None);
+    } 
+    #[test]
+    fn invalid_scenario_is_not_included_in_truth_or_coverage_denominators() {
+        let mut invalid_scenario = scenario();
+        invalid_scenario.minimum_effect = 0.0;
+        let trace = BernoulliSequentialTrace {
+            trials: Vec::new(),
+            terminal: BernoulliTerminalDecision::Stop { claim: BernoulliClaim::Benefit },
+        };
+        let invalid_report = evaluate_bernoulli_sequential(
+            &invalid_scenario,
+            &BernoulliOracle::new(0.5, 0.5),
+            &trace,
+        );
+        let summary = summarize_bernoulli_episodes(&[invalid_report], 0.1).unwrap();
+        assert_eq!(summary.oracle_valid_episodes, 1);
+        assert_eq!(summary.truth_scoring_eligible_episodes, 0);
+        assert_eq!(summary.non_evaluable_episodes, 1);
+        assert_eq!(summary.null_episodes, 0);
+        assert_eq!(summary.false_positive_rate_on_null.episodes, 0);
+        assert_eq!(summary.coverage_eligible_episodes, 0);
     }
+
 }
