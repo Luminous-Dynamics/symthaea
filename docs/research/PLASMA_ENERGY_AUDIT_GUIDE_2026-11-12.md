@@ -313,3 +313,16 @@ The NH3 microwave source record now stores three explicit `operating_points`:
 - `NH3-MW-ATM-HIGH-ENERGY-YIELD`: 76% / 51 g H2/kWh / 210 kJ/mol.
 
 The Rust auditor requires exactly these three unique operating-point identities and checks the metric pairings. It rejects moving the 150 g/h throughput value onto the >99% point or copying the 45 g/kWh yield into the 92.4% / 150 g/h point.
+
+
+## 9.23 Ammonia cracking thermal integration target
+
+The fifth machine-readable target, `NH3-THERMAL-INTEGRATION-FULL-CHAIN-001`, binds the 2026 microwave NH3 source case to a matched no-recovery baseline and a same-operating-point engineering challenge:
+- >99% conversion;
+- at least 150 g H2/h;
+- at least 15% reduction in net grid-to-accepted-H2 specific energy;
+- heat-balance absolute residual no greater than 5% of declared thermal input.
+
+The Rust audit requires all thresholds at the same point and validates the paired baseline, full-grid boundary, measured useful heat, exchanger/insulation pressure drop and auxiliary loads, thermal storage losses, no double counting of heat/reaction enthalpy, thermal closure with uncertainty, unchanged product contract, matched duty cycle, and grouped uncertainty-supported repeats.
+
+Four new tests check the valid target and reject a missing no-double-count guard, a reduction below the 15% floor, and a target that allows metrics to come from different operating points. This benchmark is a research objective and does not assert that the paper's 150 g/h point also achieved >99% conversion.
