@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "candidate_id": "triangular-prism-known-answer-001",
+  "length_m": 100.0,
+  "beam_m": 20.0,
+  "draft_m": 6.0,
+  "coordinate_frame": {
+    "id": "ship-local",
+    "axis_convention": "x-forward,y-starboard,z-down",
+    "handedness": "right-handed"
+  },
+  "samples_per_segment": 1,
+  "stations": [
+    {
+      "x_over_length": 0.0,
+      "half_breadth_fraction": 1.0,
+      "draft_fraction": 1.0,
+      "control_points": [
+        { "breadth_fraction": 0.0, "depth_fraction": 1.0 },
+        { "breadth_fraction": 1.0, "depth_fraction": 0.0 }
+      ]
+    },
+    {
+      "x_over_length": 1.0,
+      "half_breadth_fraction": 1.0,
+      "draft_fraction": 1.0,
+      "control_points": [
+        { "breadth_fraction": 0.0, "depth_fraction": 1.0 },
+        { "breadth_fraction": 1.0, "depth_fraction": 0.0 }
+      ]
+    }
+  ]
+}

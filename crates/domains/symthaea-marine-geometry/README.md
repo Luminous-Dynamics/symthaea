@@ -2,6 +2,10 @@
 
 Deterministic candidate manifests and a deliberately narrow Rust geometry-admission adapter for the MARINE-GEOMETRY-MANIFOLD-001 programme (#12302).
 
+## G2a section-family generator
+
+A separate implementation increment is under development on branch `research/marine-section-generator-g2a-20261115` for issue #12338. It accepts bounded, normalized keel-to-sheer half-section control polylines at strictly ordered x/L stations and deterministically samples physical starboard-side sections in metres. The section-family artifact carries separate BLAKE3 digests for the normalized source specification and generated sample coordinates, along with dimensions and frame metadata. The input is bounded to 512 stations, 128 controls per station, 64 subdivisions per segment, and 1,000,000 output points. It is a parametric section baseline, not a completed hull loft, watertight vessel surface, spline fairing or validated naval-architecture generator.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.

@@ -1,8 +1,12 @@
 //! Deterministic, deliberately scoped marine geometry admission.
+
 //!
 //! This crate validates a versioned triangle-mesh interchange artifact. It is
 //! not a CAD kernel, hydrostatics solver, self-intersection detector, DFM
 //! checker, CFD solver, or vessel-approval system.
+
+pub mod section;
+
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -34,7 +38,7 @@ pub struct MeshGeometry {
     pub faces: Vec<[u32; 3]>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinateFrame {
     pub id: String,
