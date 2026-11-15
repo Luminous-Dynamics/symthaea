@@ -6,9 +6,9 @@
 
 ## 1. Purpose
 
-Add a distinct RISC Zero guest path that binds the balance-threshold computation to one exact request context.
+Add a distinct RISC Zero guest package/image that binds the balance-threshold computation to one exact request context.
 
-The legacy tag-1 path remains unchanged. The new tag-2 path is deliberately versioned and commits a domain-separated request digest into the public journal.
+The existing guest package is preserved byte-for-byte. The new request-bound guest is a separate package with its own generated ELF and ImageID, so existing tag-0/tag-1 receipts continue to verify against the original guest identity when the old verifier binary is retained. The new guest commits a domain-separated request digest into its public journal.
 
 This is a first integration step, not the completed issuer-bound private-claim theorem.
 
@@ -65,7 +65,7 @@ Guest tag 2 receives:
 - private `balance: u64`;
 - public `BalanceProofRequestV1`.
 
-The guest rejects structurally malformed request contexts, computes the threshold predicate, and commits only:
+The new guest rejects structurally malformed request contexts, computes the threshold predicate, and commits only:
 
 - `sufficient`;
 - `required_minimum`;
@@ -84,10 +84,22 @@ A proof with `sufficient == false` is still a valid proof of the declared comput
 
 ## 5. Compatibility
 
-- Guest tag 0 remains the existing evolution computation.
-- Guest tag 1 and the existing `BalanceProofInput` / `BalanceProofOutput` API remain unchanged.
-- Guest tag 2 and `BalanceProofRequestBoundProverV1` are additive.
+- The existing `guest` package remains byte-for-byte unchanged; its generated ImageID remains the authority for legacy tag-0/tag-1 receipts.
+- `guest-request-bound` is an additional package listed in the `risc0-build` methods manifest and receives its own ImageID.
+- `BalanceProofRequestBoundProverV1` proves/verifies only against the dedicated request-bound guest ELF/ImageID.
+- Legacy APIs continue to use the original `SYMTHAEA_ZKPROOF_GUEST_ELF` and `SYMTHAEA_ZKPROOF_GUEST_ID` constants.
 - The shared core uses SHA-256 0.10 with default features disabled so the same digest function is available to the no-std guest and host.
+
+## 5a. Image identity and receipt compatibility
+
+A RISC Zero ImageID identifies the exact guest program. Adding code to an existing guest changes its ELF and therefore its ImageID, even when old dispatch branches are logically unchanged.
+
+This implementation therefore keeps the original guest package untouched and adds a second guest package. The build manifest lists both packages, and the generated host constants are intentionally separate:
+
+- legacy: `SYMTHAEA_ZKPROOF_GUEST_ELF` / `SYMTHAEA_ZKPROOF_GUEST_ID`;
+- request-bound: `SYMTHAEA_ZKPROOF_REQUEST_BOUND_GUEST_ELF` / `SYMTHAEA_ZKPROOF_REQUEST_BOUND_GUEST_ID`.
+
+The exact generated symbols must be confirmed by the methods build. Existing historical receipts still require the historical ELF/ImageID and verifier policy that produced them; this branch does not claim that old receipt bytes can be verified by the new request-bound ImageID.
 
 ## 6. Security and privacy claim ceiling
 
