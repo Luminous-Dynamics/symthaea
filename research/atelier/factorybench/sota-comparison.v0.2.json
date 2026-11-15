@@ -289,16 +289,16 @@
     "claim_boundary": "A result on a synthetic case, paper reproduction or simulation is not a measured physical factory improvement.",
     "soft_first_reconfiguration": {
       "principle": "Prefer logical allocation and qualified route changes before physical module movement; physical changes are selected only after accounting for changeover, interface inspection and requalification burden.",
-      "appparel_baseline": {
+      "atelier_gap": "Diagnosability and requalification-aware transition planning: explain why a module/route became unavailable, identify which evidence dependencies changed, and quantify whether soft reallocation dominates a physical change.",
+      "benchmark": "ReconfigBench v0.1.0",
+      "apparel_baseline": {
         "paper": "Toward smart and adaptive apparel manufacturing: pattern-driven genetic algorithm optimization for modular garment assembly",
         "published": "2026-09-01",
         "doi": "10.1108/IJCST-01-2026-0029",
         "result": "The study reports simulated production-time and workload-balance improvements from pattern-driven machine allocation, including additional-order rescheduling in a fixed modular structure without physical line reconfiguration.",
         "numeric_effect_size": "not extracted; do not invent a transferable percentage",
         "scope": "fixed modular apparel assembly structure evaluated by deterministic event-based simulation"
-      },
-      "atelier_gap": "Diagnosability and requalification-aware transition planning: explain why a module/route became unavailable, identify which evidence dependencies changed, and quantify whether soft reallocation dominates a physical change.",
-      "benchmark": "ReconfigBench v0.1.0"
+      }
     }
   }
 }
