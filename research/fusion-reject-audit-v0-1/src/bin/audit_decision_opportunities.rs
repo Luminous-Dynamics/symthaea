@@ -118,7 +118,7 @@ fn main() {
             "accepted-3",
             AuditOutcome::ConfirmedFeasible,
             true,
-            objective_values(130.0, 0.97),
+            objective_values(150.0, 0.70),
         ),
     ];
 
