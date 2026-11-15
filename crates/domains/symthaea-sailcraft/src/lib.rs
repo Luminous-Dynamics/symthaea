@@ -13,6 +13,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod robust;
+pub use robust::{
+    CurrentUncertainty, DirectionInterval, PolarErrorBound, RobustCourseCandidate,
+    RobustPlanStatus, RobustRouteEvaluation, RobustRouteRequest, ScalarInterval,
+    WindUncertainty, evaluate_robust_route_candidates,
+};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceState {
     Qualified,
