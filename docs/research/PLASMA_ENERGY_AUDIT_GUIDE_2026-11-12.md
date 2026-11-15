@@ -274,3 +274,12 @@ Every methane-pyrolysis source case now carries a `coproduct_accounting` contrac
 - `no_credit_baseline_required=true`.
 
 This is a source/claim floor. It does not preclude future evidence from qualifying a product, market or offtake; it prevents source-reported modeling assumptions from being promoted into Luminous physical or commercial evidence. The Rust auditor now enforces these conservative conditions.
+
+
+### Corrected ammonia operating-point identity — 2026-11-15
+
+The September 2026 microwave NH3 source now stores three explicit operating-point records. The 150 g/h throughput point is 92.4% conversion at 50 g H2/kWh (217 kJ/mol); it is not the >99% conversion point (45 g/kWh; 242 kJ/mol). The highest energy yield is 51 g/kWh (210 kJ/mol) at 76% conversion.
+
+The derived check now independently calculates 22.22, 20.00 and 19.61 kWh/kg H2 respectively, and separate relative improvements versus the high-conversion point. A new negative unit test mutates the throughput point's derived specific energy to ensure the points cannot be cross-paired.
+
+The audit module now has 36 authored Rust tests. These are test definitions; the focused workflow's result is separately tracked.
