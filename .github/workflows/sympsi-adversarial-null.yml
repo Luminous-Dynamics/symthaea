@@ -1,0 +1,57 @@
+name: SYMPsi Adversarial Null Benchmark
+
+on:
+  pull_request:
+    paths:
+      - "tools/sympsi-adversarial-null/**"
+      - ".github/workflows/sympsi-adversarial-null.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sympsi-adversarial-null-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  adversarial-null:
+    name: Synthetic adversarial null worlds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --manifest-path tools/sympsi-adversarial-null/Cargo.toml --all -- --check
+
+      - name: Unit tests
+        run: cargo test --manifest-path tools/sympsi-adversarial-null/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/sympsi-adversarial-null/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run adversarial null-world campaigns
+        env:
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          cargo run --manifest-path tools/sympsi-adversarial-null/Cargo.toml -- \
+            --git-head "$EXACT_HEAD" \
+            --manifest tools/sympsi-adversarial-null/fixtures/manifest-v0.1.json \
+            --out "$RUNNER_TEMP/sympsi-adversarial-null-receipt.json"
+          cat "$RUNNER_TEMP/sympsi-adversarial-null-receipt.json"
+
+      - name: Upload adversarial-null receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: sympsi-adversarial-null-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/sympsi-adversarial-null-receipt.json
+          if-no-files-found: error
+          retention-days: 90
