@@ -1,0 +1,9 @@
+[package]
+name = "falsification-power-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Dependency-free Gaussian power envelope reference for scientific model adequacy"
+
+[lib]
+path = "src/lib.rs"
