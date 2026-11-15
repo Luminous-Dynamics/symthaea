@@ -26,4 +26,4 @@ The crate is intentionally outside Symthaea's default Cargo workspace. Direct de
 
 A preflight pass means only that the plan is structurally admissible under this prototype and its semantic checks. Output deliberately keeps source authenticity, proof validity, issuer qualification, currentness and authority unevaluated. No TLS verifier, notary signature, credential, proof backend, status-list network retrieval, LISE adapter, nullifier ledger or Xenia action boundary is implemented.
 
-The implementation is research code. It is **not compiled or tested in the authoring environment** because rustc/Cargo are unavailable. Authored tests are not passed tests.
+The authored tests additionally pin RFC 8785 UTF-16 property-key ordering with a BMP/astral pair. The implementation is research code. It is **not compiled or tested in the authoring environment** because rustc/Cargo are unavailable. Authored tests are not passed tests.
