@@ -17,20 +17,33 @@
     ],
     "intervention_families": 12,
     "intervention_positions": [
-      "early",
-      "middle",
-      "late"
+      "p10",
+      "p20",
+      "p30",
+      "p40",
+      "p50",
+      "p60",
+      "p70",
+      "p80",
+      "p90"
     ],
-    "seeds_per_family_position_cell_target": 10,
-    "matched_scenario_pairs_target": 360,
-    "validation_pilot_candidate_seeds": 36,
+    "seeds_per_family_position_cell_target": 5,
+    "matched_scenario_pairs_target": 540,
+    "validation_pilot_candidate_seeds": 108,
     "independent_trials_per_model_harness_target": 3,
     "model_harness_families_target": 3,
     "holdouts": {
       "repository_family_holdout": true,
       "forward_time_holdout": true,
       "lock_task_and_gold_labels_before_agent_runs": true
-    }
+    },
+    "phase_aggregates": [
+      "early:p10-p30",
+      "middle:p40-p60",
+      "late:p70-p90"
+    ],
+    "trajectories_per_model_per_trial_target": 1080,
+    "total_trajectories_across_three_models_and_trials_target": 9720
   },
   "arms": {
     "baseline_candidates": [
@@ -40,7 +53,8 @@
       "static_dependency_traversal",
       "temporal_replay_only",
       "temporal_replay_plus_evidence_acquisition",
-      "expert_maintainer"
+      "expert_maintainer",
+      "selective_revalidation_oracle"
     ],
     "candidate": "full_egddm",
     "primary_comparator_selection": "select strongest eligible baseline on validation pilot and freeze before held-out evaluation",
