@@ -60,6 +60,20 @@ All endpoint products are evaluated. Negative transition progress is preserved. 
 
 This is an interval arithmetic contract, not a physical tack/gybe model. The input bounds must be justified by a vessel-specific model or instrumented manoeuvre campaign before use in a physical claim. The module has no helm, rudder, sail-sheet, reef or furl actuator output.
 
+## Tack and gybe transition-cost envelopes
+
+The `transition` module adjusts a robust steady-course VMG interval over a fixed route-scoring horizon. It requires a source-bound interval for transition duration and signed ground progress, together with exact craft/configuration, polar-artifact and actuator-model digests. The transition evidence must also satisfy the existing source-digest, freshness and common-timebase checks.
+
+For fixed horizon (H), transition duration interval (T_m), signed progress interval (D_m), and post-transition steady VMG interval (V_s):
+
+`D_total = D_m + V_s × (H - T_m)`
+
+`V_effective = D_total / H`
+
+All endpoint products are evaluated. Negative transition progress is preserved. The transition must fit strictly inside the scoring horizon. Unknown, stale, conflicted, mismatched or malformed transition evidence is not scored.
+
+This is interval arithmetic only. It does not simulate tack/gybe dynamics, calculate universal transition times, model aerodynamic or hydrodynamic forces, or issue sail/helm commands. The transition bounds must come from the exact vessel's independently reviewed model or instrumented manoeuvre campaign before any physical claim.
+
 ## Explicit exclusions
 
 This P0 kernel does not implement or validate:
