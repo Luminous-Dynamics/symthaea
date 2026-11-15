@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-audio-sequence-v1.schema.json",
+  "title": "Melothaea PCM Audio Sequence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request", "steps"],
+  "properties": {
+    "request": { "$ref": "#/$defs/request" },
+    "steps": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/step" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "window": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start_frame", "end_frame"],
+      "properties": {
+        "start_frame": { "type": "integer", "minimum": 0 },
+        "end_frame": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "format": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sample_rate_hz", "channels", "encoding"],
+      "properties": {
+        "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+        "channels": { "enum": [1, 2] },
+        "encoding": { "const": "signed_int16_little_endian" }
+      }
+    },
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "session_id", "source_lineage_sha256",
+        "source_audio_sha256", "operation_plan_sha256",
+        "expected_step_count", "format", "frame_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-music-audio-sequence-v1" },
+        "session_id": { "type": "string", "minLength": 1 },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "source_audio_sha256": { "$ref": "#/$defs/sha256" },
+        "operation_plan_sha256": { "$ref": "#/$defs/sha256" },
+        "expected_step_count": { "enum": [1, 2, 4, 8] },
+        "format": { "$ref": "#/$defs/format" },
+        "frame_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "boundary_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "measurement_radius_frames", "maximum_jump_delta_samples", "maximum_side_rms_delta_samples"],
+      "properties": {
+        "kind": { "enum": ["hard_cut", "equal_power_crossfade", "transient_preserving_splice", "operation_specific"] },
+        "measurement_radius_frames": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "maximum_jump_delta_samples": { "type": ["integer", "null"], "minimum": 0 },
+        "maximum_side_rms_delta_samples": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "gates": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rights_admission", "source_lineage", "realization_receipt", "transaction_admission"],
+      "properties": {
+        "rights_admission": { "enum": ["verified", "rejected", "unknown"] },
+        "source_lineage": { "enum": ["verified", "rejected", "unknown"] },
+        "realization_receipt": { "enum": ["verified", "rejected", "unknown"] },
+        "transaction_admission": { "enum": ["verified", "rejected", "unknown"] }
+      }
+    },
+    "step": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "sequence", "step_id", "operation_id",
+        "instruction_sha256", "source_lineage_sha256", "parent_audio_sha256",
+        "output_audio_sha256", "edit_regions", "transition_support",
+        "boundary_policy", "upstream_gates", "candidate_attempt_count",
+        "failed_candidate_attempt_count", "render_call_count", "retry_count",
+        "manual_intervention_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-music-audio-step-v1" },
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "step_id": { "type": "string", "minLength": 1 },
+        "operation_id": { "type": "string", "minLength": 1 },
+        "instruction_sha256": { "$ref": "#/$defs/sha256" },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "parent_audio_sha256": { "$ref": "#/$defs/sha256" },
+        "output_audio_sha256": { "$ref": "#/$defs/sha256" },
+        "edit_regions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/window" } },
+        "transition_support": { "type": "array", "items": { "$ref": "#/$defs/window" } },
+        "boundary_policy": { "$ref": "#/$defs/boundary_policy" },
+        "upstream_gates": { "$ref": "#/$defs/gates" },
+        "candidate_attempt_count": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "failed_candidate_attempt_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "render_call_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "retry_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "manual_intervention_count": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    }
+  }
+}
