@@ -49,7 +49,7 @@ No external Rust crates are required.
 
 ## Known-answer controls
 
-The test suite includes:
+The 11-test suite includes:
 - null power equals nominal alpha;
 - the 5% one-sided normal critical value;
 - an external normal-tail known answer (three observations, delta=0.24, sigma=0.15, alpha=0.05);
