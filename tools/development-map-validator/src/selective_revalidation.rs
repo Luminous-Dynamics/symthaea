@@ -355,8 +355,23 @@ mod tests {
             configuration_world_digest: &'a str,
         }
 
+        let source_epoch = scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index]["source_epoch"].as_u64().unwrap();
+        let source = scenario["arms"][arm_index]["epochs"].as_array().unwrap().iter()
+            .find(|epoch| epoch["epoch"].as_u64() == Some(source_epoch))
+            .unwrap();
+        let snapshot = &source["snapshot"];
+        let receipt = &mut scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index];
+        receipt["revision"] = snapshot["revision"].clone();
+        receipt["tree_oid"] = snapshot["tree_oid"].clone();
+        receipt["configuration_world_digest"] = snapshot["configuration_world_digest"].clone();
+        if source_epoch == 0 {
+            receipt["observed_at"] = json!("2026-11-15T07:01:00Z");
+            receipt["available_at"] = json!("2026-11-15T07:02:00Z");
+        } else {
+            receipt["observed_at"] = json!("2026-11-15T07:12:00Z");
+            receipt["available_at"] = json!("2026-11-15T07:13:00Z");
+        }
         let arm = &scenario["arms"][arm_index];
-        let receipt = &arm["checkpoints"][checkpoint_index]["receipts"][receipt_index];
         let material = ReceiptMaterial {
             schema_version: scenario["schema_version"].as_str().unwrap(),
             scenario_id: scenario["scenario_id"].as_str().unwrap(),
