@@ -1380,7 +1380,11 @@ mod tests {
                 for true_mean in [control_mean, treatment_mean] {
                     let mut sample_mean = 0.0;
                     for n in 1..=maximum_prefix {
-                        let outcome = if rng.unit_interval() < true_mean { 1.0 } else { 0.0 };
+                        let outcome = if rng.unit_interval() < true_mean {
+                            1.0
+                        } else {
+                            0.0
+                        };
                         sample_mean += (outcome - sample_mean) / n as f64;
                         let radius =
                             hoeffding_alpha_spending_radius(1.0, n, armwise_alpha).unwrap();
@@ -1397,8 +1401,7 @@ mod tests {
             }
         }
 
-        let empirical_coverage =
-            (repetitions - familywise_misses) as f64 / repetitions as f64;
+        let empirical_coverage = (repetitions - familywise_misses) as f64 / repetitions as f64;
         assert!(
             empirical_coverage >= 0.93,
             "simultaneous coverage was {empirical_coverage:.4} with {familywise_misses} family-wise misses",
