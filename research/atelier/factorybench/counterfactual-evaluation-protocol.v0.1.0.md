@@ -256,3 +256,27 @@ A claim such as "Atelier is better than SOTA" is not an admissible result. A cla
 ## 12. Claim ceiling
 
 This protocol defines how to compare methods. It does not show that any Atelier optimizer is currently faster, cheaper, safer, more sustainable or more productive. The current corpus remains synthetic until actual source evidence and physical observations are supplied.
+
+## 13. Track-specific proposed challenge targets
+
+These are proposed stretch targets for future matched experiments, not achieved results or universal standards.
+
+### SewingPlanBench
+- 100% of accepted plans satisfy typed graph, piece/edge identity, precedence, seam-compatibility and operation-completeness invariants.
+- Zero invalid plans are accepted by the independent graph verifier.
+- Report exact expert-agreement and correction burden on held-out patterns; do not replace physical construction acceptance with an LLM judge.
+- When information is insufficient, calibrated abstention and targeted clarification are preferable to a plausible but unverified plan.
+
+### Cloth manipulation and robotic seam execution
+A September 2026 research prototype reports mean seam deviation around 1.2 mm, standard deviation 0.9 mm, maximum 2.5 mm, and 79% of seam points inside its desired offset tolerance in its own experimental setup. This is a comparator, not a general production specification.
+
+Proposed Atelier stretch target:
+- at least 95% of measured seam samples fall within a preregistered ±2.5 mm path-offset tolerance on held-out fabric lots and seam topologies;
+- separately report mean, standard deviation, P95 and maximum error, plus stitch continuity, seam strength/appearance acceptance and first-pass quality;
+- report cloth pickup/grasp failure, slip, human intervention, recovery, setup and time per independently accepted seam;
+- match robot, sewing head, material, seam geometry, measurement method and tolerance before claiming a direct improvement over the paper.
+
+A path that tracks within tolerance but produces an unacceptable stitch is a failed seam. A simulator result is not a physical pass.
+
+### FactoryBench
+Retain the Gate A–I requirements above: zero false-eligible plans on the adversarial suite; exact small-instance agreement; held-out generalization; and proposed 20% improvements against frozen physical baselines without quality, worker or hard-constraint regression.
