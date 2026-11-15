@@ -1430,6 +1430,70 @@
         "The design implication must be evaluated with matched geometry, residence-time, energy and product boundaries before claiming process improvement."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-POWERT0X-BIOGAS-REFORMING-TEA-2026",
+      "lane": "PLASMA_POWER_TO_X_BIOGAS_REFORMING",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "Electrification of the chemical industry via plasma power to X – A techno economic view",
+        "publisher": "Energy",
+        "publication_date": "2026-09-01",
+        "volume": "358",
+        "article_number": "141338",
+        "doi": "10.1016/j.energy.2026.141338",
+        "url": "https://doi.org/10.1016/j.energy.2026.141338"
+      },
+      "configuration": {
+        "pathway": "plasma-based biogas reforming to renewable syngas",
+        "scale_mw": 300,
+        "modelled_process_variants": [
+          "plasma dry reforming",
+          "methane pyrolysis",
+          "CO2 conversion"
+        ],
+        "downstream_routes": [
+          "Fischer-Tropsch fuels",
+          "methanol"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "syngas_cost",
+          "value": 840,
+          "qualifier": "reported for the leading biogas reforming pathway at about 44% plant efficiency and 300 MW scale",
+          "unit": "EUR/tonne_syngas"
+        },
+        {
+          "metric": "plant_efficiency",
+          "value": 0.44,
+          "qualifier": "source-reported for the leading biogas reforming pathway; not plasma coupling efficiency",
+          "unit": "fraction"
+        },
+        {
+          "metric": "electricity_share_of_total_syngas_cost",
+          "value_min": 0.5,
+          "value_max": 0.6,
+          "qualifier": "source-reported cost contribution range",
+          "unit": "fraction"
+        },
+        {
+          "metric": "syngas_cost_favourable_renewable_scenario",
+          "value_less_than": 600,
+          "qualifier": "modelled cost-optimized renewable-electricity scenarios with favourable locations and reduced full-load hours",
+          "unit": "EUR/tonne_syngas"
+        }
+      ],
+      "source_conclusion": "The techno-economic study models plasma power-to-X routes from biogas to syngas and downstream fuels/chemicals. It reports a leading biogas-reforming pathway at approximately 840 EUR/t syngas and 44% plant efficiency at 300 MW scale. Electricity contributes about 50–60% of total syngas cost. Cost-optimized flexible operation under favourable renewable electricity conditions can produce modelled syngas costs below 600 EUR/t.",
+      "comparison_status": "PUBLISHED_TECHNO_ECONOMIC_MODEL_NOT_PHYSICAL_PRODUCT_PRICE",
+      "blockers": [
+        "The source is a techno-economic model, not a physical industrial demonstration or market transaction.",
+        "The reported 44% is a plant-pathway efficiency with a study-specific boundary; it is not generic plasma coupling efficiency.",
+        "The <600 EUR/t scenario depends on source-specific renewable-electricity prices, location and reduced full-load-hour assumptions.",
+        "A matched comparison needs the same syngas composition/quality, biogas input, plant boundary, electricity price, capacity factor, coproducts and downstream integration.",
+        "CAPEX, electricity price, power-supply efficiency, conversion performance and methane conversion assumptions must be frozen and sensitivity-tested."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1597,6 +1661,21 @@
       "control_id": "NC-027",
       "condition": "Treat the 2026 RANS/chemistry model's experimentally compared predictions as a new physical Luminous result or as independent experimental measurement.",
       "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-028",
+      "condition": "Treat the modelled 840 EUR/t syngas or favourable-scenario <600 EUR/t estimate as a measured industrial sale price or demonstrated plant output.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-029",
+      "condition": "Promote the 44% plant-pathway efficiency to plasma coupling efficiency or a transferable source efficiency.",
+      "expected_disposition": "REJECT_DENOMINATOR_AND_SYSTEM_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-030",
+      "condition": "Claim plasma Power-to-X cost competitiveness without preserving the study's electricity-price, capacity-factor, location and 50–60% electricity-cost sensitivity.",
+      "expected_disposition": "BLOCKED_MISSING_ECONOMIC_SCENARIO_BASIS"
     }
   ],
   "derived_reference_checks": [
