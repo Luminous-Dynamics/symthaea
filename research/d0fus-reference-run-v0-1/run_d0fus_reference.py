@@ -339,6 +339,18 @@ def main() -> int:
         and power_balance["calculated_net_electric_mwe"] is not None
         else None
     )
+    balance_tolerance_mw = 1e-6
+    for residual_name in (
+        "total_recirculated_residual_mw",
+        "net_electric_residual_mw",
+    ):
+        residual = power_balance[residual_name]
+        if residual is None or abs(residual) > balance_tolerance_mw:
+            raise RuntimeError(
+                f"D0FUS ITER power-balance identity {residual_name} "
+                f"exceeds {balance_tolerance_mw} MW: {residual}"
+            )
+    power_balance["absolute_balance_tolerance_mw"] = balance_tolerance_mw
     receipt = {
         "receipt_version": "d0fus-reference-run/0.2",
         "mode": args.mode,
