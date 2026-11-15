@@ -76,14 +76,14 @@ A scorer that passes only on the evaluated system's own traces is not independen
 
 ## 6.1 Unknown execution outcomes and reconciliation
 
-A tool result with status `unknown` leaves the execution state unresolved. The runner must not issue a subsequent tool invocation until an independently observed `execution_reconciled` event:
+A tool result with status `unknown` leaves the execution state unresolved. The runner must not issue a subsequent tool invocation or any other external side effect until an independently observed `execution_reconciled` event:
 
 - Names the unknown tool-result event as a causal parent.
 - Is authored by the tool, environment, or evaluator rather than self-attested by the agent.
 - States whether the action succeeded, failed, or was not executed.
 - Includes a SHA-256 digest of the observed reconciled state.
 
-For state-changing results whose outcome is known, record a postcondition digest. A failed call may still have partial effects, so failure status alone is not proof of no mutation. A trace with an unresolved unknown result is structurally incomplete and must not be scored as a completed successful run.
+For state-changing results whose outcome is known, record a postcondition digest. A failed call may still have partial effects, so failure status alone is not proof of no mutation. A trace with an unresolved unknown result is structurally incomplete and must not be scored as a completed successful run. This guard applies to every event marked as an external side effect, not only events whose type is tool_invocation.
 
 ## 6.2 Digest canonicalization
 
