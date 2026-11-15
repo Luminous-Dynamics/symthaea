@@ -1550,6 +1550,301 @@
         "A matched reproduction requires exact geometry, conductivity ratios, Hartmann/Reynolds/interaction parameters, applied-field profile, boundary conditions, solver revisions and experimental measurement uncertainty."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026",
+      "lane": "CO2_WARM_PLASMA_QUENCHING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Enhanced CO2 decomposition by plasma-cold gas counter flow",
+        "publisher": "Journal of Environmental Chemical Engineering",
+        "publication_date": "2026-06",
+        "volume": 14,
+        "issue": 3,
+        "article_number": "122322",
+        "doi": "10.1016/j.jece.2026.122322",
+        "url": "https://doi.org/10.1016/j.jece.2026.122322"
+      },
+      "configurations": [
+        {
+          "id": "counterflow-magd-792w",
+          "reactor": "atmospheric gliding arc with magnetic acceleration stabilization and coaxial cold-gas counterflow",
+          "feed": "CO2",
+          "gas_flow_slm": 4,
+          "electrical_power_w": 792,
+          "observations": [
+            {
+              "metric": "co2_conversion",
+              "value": 0.236,
+              "unit": "fraction",
+              "qualifier": "reported at the 4 slm / 792 W MAGD-stabilized configuration"
+            },
+            {
+              "metric": "energy_efficiency",
+              "value": 0.251,
+              "unit": "fraction",
+              "qualifier": "reported at the same 4 slm / 792 W MAGD-stabilized configuration"
+            }
+          ]
+        },
+        {
+          "id": "counterflow-low-power-302w",
+          "reactor": "low-power counterflow configuration",
+          "electrical_power_w": 302,
+          "observations": [
+            {
+              "metric": "energy_efficiency",
+              "value": 0.462,
+              "unit": "fraction",
+              "qualifier": "source highlight reports this value at 302 W; do not pair it with the 23.6% conversion from the separate 792 W configuration"
+            },
+            {
+              "metric": "co2_conversion",
+              "value": null,
+              "unit": "fraction",
+              "qualifier": "not stated in the cited highlight; keep unknown until source table is extracted"
+            }
+          ]
+        },
+        {
+          "id": "counterflow-ratio-distance-optimization",
+          "reactor": "coaxial plasma-cold gas counterflow",
+          "observations": [
+            {
+              "metric": "counterflow_gas_ratio",
+              "value": 2.5,
+              "unit": "ratio",
+              "qualifier": "reported optimum in the studied parameter sweep"
+            },
+            {
+              "metric": "counterflow_distance",
+              "value": 30,
+              "unit": "mm",
+              "qualifier": "reported optimum in the studied parameter sweep"
+            },
+            {
+              "metric": "relative_conversion_increase",
+              "value": 2.073,
+              "unit": "fractional_increase",
+              "qualifier": "207.3% improvement relative to source-defined conventional gliding-arc baseline; not an absolute conversion"
+            },
+            {
+              "metric": "relative_energy_efficiency_increase",
+              "value": 2.036,
+              "unit": "fractional_increase",
+              "qualifier": "203.6% improvement relative to source-defined conventional gliding-arc baseline; not an absolute efficiency"
+            }
+          ]
+        }
+      ],
+      "source_conclusion": "The paper studies coaxial cold-gas counterflow quenching of an atmospheric gliding-arc CO2 plasma. It reports non-monotonic cooling effects: moderate counterflow suppresses recombination, but excessive cooling can disturb arc dynamics and discharge stability. A MAGD-stabilized case reports 23.6% conversion and 25.1% energy efficiency at 4 slm / 792 W; a separate 302 W point reports 46.2% energy efficiency, with conversion not to be inferred from the other operating point.",
+      "comparison_status": "SOURCE_SPECIFIC_EXPERIMENTAL_OPERATING_POINTS_NOT_FULL_PLANT_BOUNDARY",
+      "blockers": [
+        "The 302 W / 46.2% energy-efficiency point must not be combined with the 792 W / 23.6% conversion point.",
+        "Relative improvements of 207.3% and 203.6% are not absolute conversion or efficiency values.",
+        "The source-defined efficiency boundary must be extracted before comparison with wall-plug-to-accepted-product metrics.",
+        "Quench gas, separation, compression, cooling, exhaust and maintenance loads require full-system reconciliation.",
+        "The optimum is specific to its geometry, flow, MAGD stabilization, pressure and arc dynamics."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-QUENCH-PARTICLE-CATALYTIC-KINETIC-MODEL-2026",
+      "lane": "CO2_WARM_PLASMA_QUENCHING_MODEL",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Improving CO2 conversion in warm plasma by suppressing CO-O back-reactions through particle-assisted rapid cooling and catalytic O-O recombination",
+        "publisher": "Journal of CO2 Utilization",
+        "publication_date": "2026-10",
+        "volume": 112,
+        "article_number": "103579",
+        "doi": "10.1016/j.jcou.2026.103579",
+        "url": "https://doi.org/10.1016/j.jcou.2026.103579"
+      },
+      "configuration": {
+        "model": "chemical kinetic model",
+        "modeled_effluent_temperature_k": 3500,
+        "process_family": "atmospheric-pressure warm CO2 plasma",
+        "quench_candidates": [
+          "particle-assisted cooling with suspended Al2O3",
+          "SO2-assisted gas-phase catalysis"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "baseline_conversion",
+          "value": 0.49,
+          "unit": "fraction",
+          "qualifier": "model result for conventional quenching in the studied source model"
+        },
+        {
+          "metric": "baseline_energy_efficiency",
+          "value": 0.29,
+          "unit": "fraction",
+          "qualifier": "model result for conventional quenching in the studied source model"
+        },
+        {
+          "metric": "particle_assisted_conversion",
+          "value": 0.79,
+          "unit": "fraction",
+          "qualifier": "model prediction with particle-assisted catalytic quenching; not measured experiment"
+        },
+        {
+          "metric": "particle_assisted_energy_efficiency",
+          "value": 0.47,
+          "unit": "fraction",
+          "qualifier": "model prediction with particle-assisted catalytic quenching; not measured experiment"
+        },
+        {
+          "metric": "particle_assisted_quench_temperature_k",
+          "value": 1500,
+          "unit": "K",
+          "qualifier": "modeled quench exit temperature; conventional case required near-ambient cooling for similar performance"
+        },
+        {
+          "metric": "sulfur_dioxide_assisted_conversion",
+          "value": 0.72,
+          "unit": "fraction",
+          "qualifier": "model prediction for SO2-assisted quenching"
+        },
+        {
+          "metric": "sulfur_dioxide_assisted_energy_efficiency",
+          "value": 0.43,
+          "unit": "fraction",
+          "qualifier": "model prediction for SO2-assisted quenching"
+        },
+        {
+          "metric": "conventional_quench_cooling_rate_lower_bound",
+          "value": 100000000,
+          "unit": "K/s",
+          "qualifier": "source model states conventional pure-CO2 quenching needs 1e8–1e9 K/s to exceed 40% efficiency in the studied scenario"
+        }
+      ],
+      "source_conclusion": "The kinetic model predicts that particle-assisted rapid cooling plus catalytic O-O recombination can suppress CO-O back-reactions and raise modeled conversion/energy efficiency from 49%/29% to 79%/47%; SO2-assisted catalysis is modeled at 72%/43%. These are numerical predictions, not experimentally demonstrated performance.",
+      "comparison_status": "PUBLISHED_KINETIC_MODEL_NOT_EXPERIMENTAL_PERFORMANCE",
+      "blockers": [
+        "79% conversion and 47% energy efficiency are model predictions, not physical experimental outcomes.",
+        "Particle loading, catalyst properties, separation/recovery and particle contamination/lifetime require experimental measurement.",
+        "Heat recovery and auxiliary power must be added to the source-specific energy boundary.",
+        "Do not infer model validity outside the stated warm-plasma composition and effluent regime."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-ARC-QUENCH-MULTIDIMENSIONAL-CFD-2026",
+      "lane": "CO2_WARM_PLASMA_QUENCHING_MODEL",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Predictive multidimensional modeling as a tool to optimize quenching designs for improved CO2 conversion in arc plasma",
+        "publisher": "Chemical Engineering Journal",
+        "publication_date": "2026",
+        "article_number": "176010",
+        "doi": "10.1016/j.cej.2026.176010",
+        "url": "https://doi.org/10.1016/j.cej.2026.176010"
+      },
+      "configuration": {
+        "model": "2D axisymmetric coupled turbulent flow, heat transfer, electric currents, species transport and chemistry",
+        "reactor_family": "atmospheric CO2 arc plasma",
+        "validation_data": "published experimental data for nozzle-based and heat-exchanger quenching",
+        "quench_architectures": [
+          "downstream nozzle constriction",
+          "actively cooled multi-channel heat exchanger"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "predicted_conversion_under_stable_takeover",
+          "value": 0.2,
+          "unit": "fraction",
+          "qualifier": "model reports predicted values up to around 20% for experimentally compared operating ranges"
+        },
+        {
+          "metric": "predicted_energy_efficiency_under_stable_takeover",
+          "value": 0.3,
+          "unit": "fraction",
+          "qualifier": "model reports efficiency approaching 30% for experimentally compared stable-takeover cases"
+        },
+        {
+          "metric": "heat_exchanger_efficiency",
+          "value": 0.3,
+          "operator": "greater_than",
+          "unit": "fraction",
+          "qualifier": "model predicts >30% up to approximately 5 eV/molecule (480 kJ/mol) specific energy input"
+        },
+        {
+          "metric": "heat_exchanger_conversion",
+          "value": 0.5,
+          "operator": "greater_than",
+          "unit": "fraction",
+          "qualifier": "conditional model result assuming perfect wall cooling; not experimental performance"
+        }
+      ],
+      "source_conclusion": "The 2D axisymmetric model reports good agreement with experimental data for nozzle and heat-exchanger quenching under stable takeover operation. It predicts conversion up to around 20% and energy efficiency approaching 30% in source-comparable conditions. Heat-exchanger modeling predicts efficiencies above 30% to about 5 eV/molecule and conversion above 50% only under perfect-wall-cooling assumptions.",
+      "comparison_status": "NUMERICAL_MODEL_WITH_EXPERIMENTAL_COMPARISON_AND_CONDITIONAL_PREDICTIONS",
+      "blockers": [
+        "Separate measured source points, model-predicted matched points, and perfect-wall-cooling sensitivity predictions.",
+        "Perfect wall cooling is an ideal boundary assumption, not demonstrated hardware.",
+        "The model is 2D axisymmetric and its source states low-SEI non-equilibrium / complex 3D effects require further refinement.",
+        "Do not transfer warm CO2 arc assumptions to microwave, DBD, NH3 or fusion plasma without validation."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-THERMAL-MANAGEMENT-REACTOR-2026",
+      "lane": "CO2_WARM_PLASMA_THERMAL_MANAGEMENT",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Temperature management as decisive optimization parameter for plasma-based CO2 splitting and biogas reforming",
+        "publisher": "Results in Chemistry",
+        "publication_date": "2026-07-15",
+        "volume": 27,
+        "article_number": "103513",
+        "doi": "10.1016/j.rechem.2026.103513",
+        "url": "https://doi.org/10.1016/j.rechem.2026.103513"
+      },
+      "configuration": {
+        "reactor": "magnetically rotating discharge with vertical slow flow",
+        "methods": [
+          "experimental temperature measurements",
+          "thermal modeling",
+          "energy-flow balancing"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "radiation_loss_share",
+          "value": 0.7,
+          "unit": "fraction",
+          "qualifier": "reported up to this share of plasma power in the studied configuration"
+        },
+        {
+          "metric": "temperature_gradient",
+          "value": 110,
+          "unit": "K/mm",
+          "qualifier": "reported maximum source-specific gradient"
+        },
+        {
+          "metric": "temperature_change_rate",
+          "value": 1000,
+          "unit": "K/s",
+          "qualifier": "reported source-specific characteristic/maximum scale; preserve exact article definition when extracting raw dataset"
+        },
+        {
+          "metric": "catalyst_zone_temperature",
+          "value": 800,
+          "operator": "greater_than",
+          "unit": "degC",
+          "qualifier": "temperature reached after insulation/aluminium-lining optimization in the studied dry-reforming catalyst zone"
+        }
+      ],
+      "source_conclusion": "The paper combines experimental thermal measurements, thermal modeling and energy-flow balance for a magnetically rotating plasma reactor. It identifies radiation as up to 70% of plasma power and investigates insulation / aluminum lining to alter thermal gradients and catalyst-zone temperatures.",
+      "comparison_status": "SOURCE_SPECIFIC_THERMAL_MEASUREMENTS_AND_MODEL_NOT_A_COMPLETE_PRODUCT_EFFICIENCY",
+      "blockers": [
+        "Radiation-loss fraction and thermal gradients are specific to the studied geometry and operation.",
+        "The reported quantities do not by themselves establish CO2 conversion, CO yield or complete wall-plug-to-product efficiency.",
+        "Heat recovery, auxiliaries, gas composition, throughput, maintenance and downstream separation require separate measurements."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1742,6 +2037,46 @@
       "control_id": "NC-032",
       "condition": "Treat conducting square/round duct validation as insulating-duct or full fusion-blanket qualification.",
       "expected_disposition": "REJECT_GEOMETRY_AND_WALL_MODEL_APPLICABILITY_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-001",
+      "condition": "Pair the 46.2% energy-efficiency highlight at 302 W with the 23.6% conversion reported at 792 W as if both were one operating point.",
+      "expected_disposition": "REJECT_OPERATING_POINT_IDENTITY_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-002",
+      "condition": "Treat the 207.3% and 203.6% relative counterflow improvements as absolute conversion and energy efficiency.",
+      "expected_disposition": "REJECT_RELATIVE_VS_ABSOLUTE_METRIC"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-003",
+      "condition": "Promote the particle-assisted kinetic-model 79% conversion / 47% efficiency prediction into an experimental result.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-004",
+      "condition": "Treat the >50% heat-exchanger conversion under perfect-wall-cooling assumptions as demonstrated physical performance.",
+      "expected_disposition": "REJECT_IDEAL_BOUNDARY_AS_EXPERIMENT"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-005",
+      "condition": "Transfer the warm-NH3 turbulence-suppression result to CO2, or the CO2 counterflow result to NH3, without chemistry- and regime-matched validation.",
+      "expected_disposition": "REJECT_CHEMISTRY_REGIME_TRANSFER"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-006",
+      "condition": "Count heat-exchanger or cold-gas quench as zero energy/pressure-drop/maintenance burden while reporting improved plasma energy efficiency.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_SYSTEM_BOUNDARY"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-007",
+      "condition": "Treat radiation-loss fraction from one magnetically rotating reactor as a universal warm-plasma constant.",
+      "expected_disposition": "REJECT_MODEL_APPLICABILITY_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-QUENCH-008",
+      "condition": "Compare a DBD CO2 model, a warm arc experiment and a kinetic afterglow model as one matched performance leaderboard without harmonizing denominators and observables.",
+      "expected_disposition": "NOT_COMPARABLE_REGIME_AND_BOUNDARY_MISMATCH"
     }
   ],
   "derived_reference_checks": [
