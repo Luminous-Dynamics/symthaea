@@ -2271,6 +2271,94 @@ mod tests {
     }
 
     #[test]
+    fn observer_and_store_mapping_qualification_states_fail_closed() {
+        let mut observation_unqualified = generate_clocked_observation_persistence_schedule(97)
+            .expect("clocked schedule");
+        if let Some(action) = observation_unqualified.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventObserved { .. })
+        }) {
+            if let ScheduleAction::EventObserved { qualification, .. } = &mut action.action {
+                *qualification = GateState::Indeterminate;
+            }
+        }
+        let observation_report = replay_virtual_schedule(&observation_unqualified).expect("replay");
+        assert!(observation_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ObservationUnqualified
+        }));
+
+        let mut persistence_unqualified = generate_clocked_observation_persistence_schedule(101)
+            .expect("clocked schedule");
+        if let Some(action) = persistence_unqualified.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventPersisted { .. })
+        }) {
+            if let ScheduleAction::EventPersisted { qualification, .. } = &mut action.action {
+                *qualification = GateState::Indeterminate;
+            }
+        }
+        let persistence_report = replay_virtual_schedule(&persistence_unqualified).expect("replay");
+        assert!(persistence_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventPersisted { .. })
+                && record.disposition == SchedulerDisposition::PersistenceUnqualified
+        }));
+    }
+
+    #[test]
+    fn observer_clock_validity_windows_are_enforced_independently() {
+        let mut not_yet_valid = generate_clocked_observation_persistence_schedule(103)
+            .expect("clocked schedule");
+        for action in &mut not_yet_valid.actions {
+            if let ScheduleAction::ClockAdvance {
+                clock_domain, mapping_valid_from_ns, ..
+            } = &mut action.action {
+                if clock_domain.starts_with("observer-clock-") {
+                    *mapping_valid_from_ns = 2_000;
+                }
+            }
+        }
+        let not_yet_valid_report = replay_virtual_schedule(&not_yet_valid).expect("replay");
+        assert!(not_yet_valid_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ClockMappingNotYetValid
+        }));
+
+        let mut expired = generate_clocked_observation_persistence_schedule(107)
+            .expect("clocked schedule");
+        for action in &mut expired.actions {
+            if let ScheduleAction::ClockAdvance {
+                clock_domain, mapping_valid_through_ns, ..
+            } = &mut action.action {
+                if clock_domain.starts_with("observer-clock-") {
+                    *mapping_valid_through_ns = 800;
+                }
+            }
+        }
+        let expired_report = replay_virtual_schedule(&expired).expect("replay");
+        assert!(expired_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ClockMappingExpired
+        }));
+
+        let mut invalid = generate_clocked_observation_persistence_schedule(109)
+            .expect("clocked schedule");
+        for action in &mut invalid.actions {
+            if let ScheduleAction::ClockAdvance {
+                clock_domain, mapping_valid_from_ns, mapping_valid_through_ns, ..
+            } = &mut action.action {
+                if clock_domain.starts_with("observer-clock-") {
+                    *mapping_valid_from_ns = 2_000;
+                    *mapping_valid_through_ns = 800;
+                }
+            }
+        }
+        let invalid_report = replay_virtual_schedule(&invalid).expect("replay");
+        assert!(invalid_report.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+                && record.disposition == SchedulerDisposition::ClockMappingValidityInvalid
+        }));
+    }
+
+    #[test]
     fn observer_and_persistence_receipt_conflicts_are_explicit() {
         let mut observation_schedule = generate_clocked_observation_persistence_schedule(79)
             .expect("clocked schedule");
