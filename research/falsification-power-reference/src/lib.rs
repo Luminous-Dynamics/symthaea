@@ -32,14 +32,20 @@ impl fmt::Display for PowerError {
             Self::EmptyAlternativeId => write!(f, "alternative identifier must not be empty"),
             Self::DuplicateAlternativeId(id) => write!(f, "duplicate alternative identifier: {id}"),
             Self::MismatchedObservationCount { expected, actual } => {
-                write!(f, "alternative has {actual} observations; expected {expected}")
+                write!(
+                    f,
+                    "alternative has {actual} observations; expected {expected}"
+                )
             }
             Self::NonFiniteResidual { index } => {
                 write!(f, "expected residual at index {index} is not finite")
             }
             Self::InvalidSigma => write!(f, "noise sigma must be finite and strictly positive"),
             Self::InvalidAlpha => write!(f, "alpha must be finite and in (1e-12, 1 - 1e-12)"),
-            Self::InvalidTargetPower => write!(f, "target power must be finite and strictly between alpha and 1"),
+            Self::InvalidTargetPower => write!(
+                f,
+                "target power must be finite and strictly between alpha and 1"
+            ),
         }
     }
 }
@@ -326,11 +332,7 @@ fn normal_cdf(x: f64) -> f64 {
             + t * (-0.356_563_782
                 + t * (1.781_477_937 + t * (-1.821_255_978 + t * 1.330_274_429))));
     let tail = density * polynomial;
-    if x > 0.0 {
-        1.0 - tail
-    } else {
-        tail
-    }
+    if x > 0.0 { 1.0 - tail } else { tail }
 }
 
 /// Acklam's rational approximation to the standard normal quantile.
@@ -375,8 +377,7 @@ fn normal_quantile(probability: f64) -> f64 {
     if probability <= HIGH {
         let q = probability - 0.5;
         let r = q * q;
-        return (((((A[0] * r + A[1]) * r + A[2]) * r + A[3]) * r + A[4]) * r + A[5])
-            * q
+        return (((((A[0] * r + A[1]) * r + A[2]) * r + A[3]) * r + A[4]) * r + A[5]) * q
             / (((((B[0] * r + B[1]) * r + B[2]) * r + B[3]) * r + B[4]) * r + 1.0);
     }
 
