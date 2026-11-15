@@ -401,6 +401,15 @@ mod tests {
     }
 
     #[test]
+    fn matches_committed_known_answer_report() {
+        const EXPECTED: &str = include_str!("../../../docs/development-map/fixtures/egddm-selective-revalidation-oracle-v0.1.expected.json");
+        let actual = score_selective_revalidation_oracle_json(FIXTURE).unwrap();
+        let actual_value = serde_json::to_value(actual).unwrap();
+        let expected_value: Value = serde_json::from_str(EXPECTED).unwrap();
+        assert_eq!(actual_value, expected_value);
+    }
+
+    #[test]
     fn clean_arm_needs_no_post_baseline_revalidation() {
         let report = score_selective_revalidation_oracle_json(FIXTURE).unwrap();
         let clean = report.arm_reports.iter()
