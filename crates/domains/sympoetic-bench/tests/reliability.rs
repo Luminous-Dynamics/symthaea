@@ -65,6 +65,28 @@ fn krippendorff_alpha_is_one_for_perfect_agreement() {
 }
 
 #[test]
+fn krippendorff_alpha_excludes_singleton_items_from_pairwise_marginals() {
+    let pairable = vec![
+        vec![Some("A"), Some("A")],
+        vec![Some("B"), Some("B")],
+        vec![Some("A"), Some("B")],
+        vec![Some("B"), Some("B")],
+    ];
+    let with_singletons = vec![
+        vec![Some("A"), Some("A")],
+        vec![Some("B"), Some("B")],
+        vec![Some("A"), Some("B")],
+        vec![Some("B"), Some("B")],
+        vec![Some("C"), None],
+        vec![None, Some("D")],
+    ];
+    assert_eq!(
+        krippendorff_alpha_nominal(&pairable).unwrap(),
+        krippendorff_alpha_nominal(&with_singletons).unwrap()
+    );
+}
+
+#[test]
 fn krippendorff_alpha_preserves_worse_than_chance_agreement() {
     let ratings = vec![
         vec![Some("A"), Some("B")],
