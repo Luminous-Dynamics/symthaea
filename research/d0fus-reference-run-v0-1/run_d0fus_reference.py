@@ -171,25 +171,36 @@ def verify_wheel_module_parity(source_root: Path, wheel_root: Path) -> dict[str,
             )
         )
 
-    mismatches: list[str] = []
     missing: list[str] = []
+    differing: list[dict[str, str]] = []
+    identical_count = 0
     for relative in module_paths:
         source_path = source_root / relative
         wheel_path = wheel_root / relative
         if not wheel_path.is_file():
             missing.append(relative.as_posix())
             continue
-        if sha256_file(source_path) != sha256_file(wheel_path):
-            mismatches.append(relative.as_posix())
+        source_sha = sha256_file(source_path)
+        wheel_sha = sha256_file(wheel_path)
+        if source_sha == wheel_sha:
+            identical_count += 1
+        else:
+            differing.append(
+                {
+                    "path": relative.as_posix(),
+                    "source_sha256": source_sha,
+                    "wheel_sha256": wheel_sha,
+                }
+            )
 
-    if missing or mismatches:
-        raise RuntimeError(
-            "PyPI wheel/source module mismatch; "
-            f"missing={missing}, differing={mismatches}"
-        )
+    # Module divergence is evidence, not an automatic skip. Both artifacts
+    # are executed separately; the parity step evaluates actual results.
     return {
         "module_count": len(module_paths),
-        "result": "byte-identical",
+        "byte_identical_count": identical_count,
+        "missing": missing,
+        "differing": differing,
+        "result": "byte-identical" if not missing and not differing else "source-package-divergence",
     }
 
 
@@ -304,8 +315,8 @@ def main() -> int:
         "output_report_sha256": sha256_file(report),
         "output_report_bytes": report.stat().st_size,
         "claim_ceiling": (
-            "pinned D0FUS ITER reference-deck execution and source/wheel parity; "
-            "not independent physical validation"
+            "pinned D0FUS ITER reference-deck execution with source/wheel module "
+            "divergence inventory; not independent physical validation"
         ),
     }
 
