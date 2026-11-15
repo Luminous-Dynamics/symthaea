@@ -97,6 +97,17 @@ struct SourceObservationCommitmentV1<'a> {
     occurrences: &'a [SourceOccurrenceV1],
 }
 
+/// Expected source identities supplied by the caller from an independently
+/// verified upstream source-observation/grounding receipt. These values are
+/// comparison inputs, not a self-authenticating proof token.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpectedSourceObservationBindingV1 {
+    pub source_artifact_sha256: String,
+    pub source_lineage_sha256: String,
+    pub observation_evidence_receipt_sha256: String,
+    pub observation_sha256: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MusicEditOperationV1 {
@@ -796,6 +807,33 @@ pub fn verify_music_edit_intent_plan_v1(
     }
 }
 
+/// Verify the plan only after checking the observation against identities
+/// supplied by the caller from its upstream verified source/evidence context.
+pub fn verify_music_edit_intent_plan_with_expected_source_v1(
+    observation: &SourceObservationV1,
+    plan: &MusicEditIntentPlanV1,
+    expected: &ExpectedSourceObservationBindingV1,
+) -> Result<(), IntentPlanIssueV1> {
+    for digest in [
+        &expected.source_artifact_sha256,
+        &expected.source_lineage_sha256,
+        &expected.observation_evidence_receipt_sha256,
+        &expected.observation_sha256,
+    ] {
+        if !valid_sha256(digest) {
+            return Err(IntentPlanIssueV1::InvalidDigest);
+        }
+    }
+    if observation.source_artifact_sha256 != expected.source_artifact_sha256
+        || observation.source_lineage_sha256 != expected.source_lineage_sha256
+        || observation.observation_evidence_receipt_sha256 != expected.observation_evidence_receipt_sha256
+        || observation.observation_sha256 != expected.observation_sha256
+    {
+        return Err(IntentPlanIssueV1::SourceBindingMismatch);
+    }
+    verify_music_edit_intent_plan_v1(observation, plan)
+}
+
 pub fn intent_plan_commitment_v1(
     plan: &MusicEditIntentPlanV1,
 ) -> Result<String, IntentPlanIssueV1> {
@@ -975,6 +1013,36 @@ mod tests {
             abstention_reason: Some("The source observation contains only two matching occurrences.".to_owned()),
             confidence_bp: 9_800,
         }
+    }
+
+    fn expected_source_binding(observation: &SourceObservationV1) -> ExpectedSourceObservationBindingV1 {
+        ExpectedSourceObservationBindingV1 {
+            source_artifact_sha256: observation.source_artifact_sha256.clone(),
+            source_lineage_sha256: observation.source_lineage_sha256.clone(),
+            observation_evidence_receipt_sha256: observation.observation_evidence_receipt_sha256.clone(),
+            observation_sha256: observation.observation_sha256.clone(),
+        }
+    }
+
+    #[test]
+    fn expected_source_binding_replays_the_verified_upstream_identities() {
+        let observation = source();
+        let plan = base_plan(&observation);
+        verify_music_edit_intent_plan_with_expected_source_v1(
+            &observation, &plan, &expected_source_binding(&observation)
+        ).unwrap();
+    }
+
+    #[test]
+    fn expected_source_binding_rejects_source_artifact_substitution() {
+        let observation = source();
+        let plan = base_plan(&observation);
+        let mut expected = expected_source_binding(&observation);
+        expected.source_artifact_sha256 = h(999);
+        assert_eq!(
+            verify_music_edit_intent_plan_with_expected_source_v1(&observation, &plan, &expected),
+            Err(IntentPlanIssueV1::SourceBindingMismatch)
+        );
     }
 
     #[test]
