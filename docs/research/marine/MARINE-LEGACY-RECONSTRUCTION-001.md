@@ -159,7 +159,7 @@ For each negative control, expected disposition is INCOMPLETE, REJECTED or REVIE
 
 This branch adds:
 - the versioned JSON Schema for source rights, views, calibrations, constraints, conflicts, unresolved regions, candidate lineage and claim ceilings;
-- a synthetic fixture with two orthogonal views, exact byte digests, one explicit conflicting station observation and an occluded bow region;
+- a synthetic fixture with two inspectable orthogonal SVG view drawings (body plan and half-breadth), exact byte digests, one explicit conflicting station observation and an occluded bow region;
 - separate synthetic source, candidate point-cloud and pipeline-configuration bytes so each digest can be recomputed.
 
 The fixture is intentionally INCOMPLETE, NOT_REVIEWED, has partial uncertainty, and does not claim geometry admission or as-built identity. It is a contract test fixture, not a Raster2Hull reproduction or a real-vessel reconstruction.
