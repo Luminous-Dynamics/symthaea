@@ -911,7 +911,7 @@ pub fn generate_cancellation_commit_race_schedule(
     let operation_id = format!("operation-{seed:016x}");
     let attempt_id = format!("attempt-{seed:016x}");
     let obligation_id = format!("stop-{seed:016x}");
-    let trigger_action_id = format!("action-{ordinal:06}");
+
     push_action(
         &mut actions,
         &mut ordinal,
@@ -921,6 +921,7 @@ pub fn generate_cancellation_commit_race_schedule(
             attempt_id: attempt_id.clone(),
         },
     );
+    // The next ordinal is the exact ID of the trigger action below.
     let trigger_action_id = format!("action-{ordinal:06}");
     push_action(
         &mut actions,
@@ -941,33 +942,18 @@ pub fn generate_cancellation_commit_race_schedule(
         },
     );
 
-    let mut push_commit = || {
-        push_action(
-            &mut actions,
-            &mut ordinal,
-            4,
-            ScheduleAction::EffectCommitted {
-                operation_id: operation_id.clone(),
-                attempt_id: attempt_id.clone(),
-                effect_id: format!("effect-{seed:016x}"),
-            },
-        );
-    };
-    let mut push_ack = || {
-        push_action(
-            &mut actions,
-            &mut ordinal,
-            4,
-            ScheduleAction::CancellationAcknowledged {
-                operation_id: operation_id.clone(),
-                attempt_id: attempt_id.clone(),
-                accepted: true,
-            },
-        );
-    };
     match order {
         CancellationCommitOrder::CommitBeforeAcknowledgement => {
-            push_commit();
+            push_action(
+                &mut actions,
+                &mut ordinal,
+                4,
+                ScheduleAction::EffectCommitted {
+                    operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    effect_id: format!("effect-{seed:016x}"),
+                },
+            );
             push_action(
                 &mut actions,
                 &mut ordinal,
@@ -980,7 +966,16 @@ pub fn generate_cancellation_commit_race_schedule(
             );
         }
         CancellationCommitOrder::CommitAfterAcknowledgement => {
-            push_ack();
+            push_action(
+                &mut actions,
+                &mut ordinal,
+                4,
+                ScheduleAction::CancellationAcknowledged {
+                    operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    accepted: true,
+                },
+            );
             push_action(
                 &mut actions,
                 &mut ordinal,
@@ -1011,7 +1006,7 @@ pub fn generate_cancellation_commit_race_schedule(
         7,
         ScheduleAction::StopDischarged {
             obligation_id,
-            trigger_action_id,
+            trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: trigger_action_id,
             policy_revision: "policy-v1".to_owned(),
             receipt_ref: format!("synthetic://stop-discharge/{seed:016x}"),
