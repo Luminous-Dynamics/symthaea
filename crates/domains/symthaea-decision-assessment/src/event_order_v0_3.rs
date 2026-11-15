@@ -2197,7 +2197,7 @@ pub fn project_action_history(
                     continue;
                 }
                 if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
-                    indeterminate = true;
+                    critical = true;
                     reasons.insert(format!("ATTEMPT_START_NOT_REPLAY_APPLIED:{attempt_id}"));
                     continue;
                 }
@@ -2439,6 +2439,11 @@ pub fn project_action_history(
     for action in &canonical_actions {
         match &action.action {
             ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert(format!("STOP_TRIGGER_NOT_REPLAY_APPLIED:{obligation_id}"));
+                    continue;
+                }
                 let (scope, receipt_ref, receipt_sha256) = match &action.evidence {
                     Some(ActionEvidence::StopTrigger { scope, receipt_ref, receipt_sha256 }) => {
                         (scope.clone(), receipt_ref.clone(), receipt_sha256.clone())
@@ -2484,6 +2489,11 @@ pub fn project_action_history(
                 latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
             }
             ScheduleAction::StopPolicyRevised { obligation_id, policy_revision } => {
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert(format!("STOP_POLICY_REVISION_NOT_REPLAY_APPLIED:{obligation_id}"));
+                    continue;
+                }
                 let (scope, receipt_ref, receipt_sha256) = match &action.evidence {
                     Some(ActionEvidence::StopPolicyRevision { scope, receipt_ref, receipt_sha256 }) => {
                         (scope.clone(), receipt_ref.clone(), receipt_sha256.clone())
@@ -2562,6 +2572,11 @@ pub fn project_action_history(
             ScheduleAction::AttemptInventoryAttested {
                 scope, inventory_frontier_event_id, attempt_manifest_sha256,
             } => {
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_ATTESTATION_NOT_REPLAY_APPLIED".to_owned());
+                    continue;
+                }
                 let (evidence_scope, evidence_frontier, evidence_manifest, receipt_ref, receipt_sha256) =
                     match &action.evidence {
                         Some(ActionEvidence::InventoryAttestation {
@@ -2630,6 +2645,11 @@ pub fn project_action_history(
             obligation_id, trigger_action_id, policy_revision_action_id, policy_revision,
             receipt_ref, receipt_sha256,
         } = &action.action else { continue; };
+        if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_NOT_REPLAY_APPLIED:{obligation_id}"));
+            continue;
+        }
         let Some((trigger_action, trigger_scope, _trigger_policy, trigger_time)) = stop_trigger_actions.get(obligation_id) else {
             critical = true;
             reasons.insert(format!("STOP_DISCHARGE_WITHOUT_TRIGGER:{obligation_id}"));
@@ -4098,6 +4118,19 @@ mod tests {
         assert_eq!(report.obligations[0].discharge.as_ref().map(|receipt| receipt.qualification), Some(GateState::Pass));
         assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
         assert_eq!(report.effect_commits.len(), 1);
+    }
+
+    #[test]
+    fn action_history_projection_is_invariant_under_action_vector_permutation() {
+        let (schedule, resolutions, receipts, _) = action_history_fixture();
+        let original = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("original projection");
+        let mut permuted = schedule.clone();
+        permuted.actions.reverse();
+        let shuffled = project_action_history(&permuted, "robot-1", &resolutions, &receipts)
+            .expect("permuted projection");
+        assert_eq!(original, shuffled);
+        assert_eq!(original.disposition, EventTraceDisposition::Safe);
     }
 
     #[test]
