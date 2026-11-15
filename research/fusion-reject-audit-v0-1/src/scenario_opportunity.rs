@@ -244,8 +244,8 @@ pub struct ScenarioOpportunityReport {
     pub primary_scenario_id: String,
     pub familywise_confidence_level: f64,
     pub target_opportunity_recall: f64,
-    /// Number of simultaneous bounds: every stratum × every scenario, plus
-    /// every stratum × the any-scenario union claim.
+    /// Number of simultaneous bounds: every stratum × (feasibility, union,
+    /// plus every scenario-specific claim).
     pub simultaneous_bound_count: u64,
     pub familywise_error_probability: f64,
     pub feasible_recall_lower_bound: Option<f64>,
@@ -265,7 +265,9 @@ pub struct ScenarioOpportunityReport {
 pub fn audit_scenario_opportunities(
     plan: &ScenarioOpportunityPlan,
 ) -> Result<ScenarioOpportunityReport, Vec<ScenarioOpportunityError>> {
-    let feasibility_report = audit_rejected_candidates(&plan.base_plan)
+    // First run the base audit at its declared confidence to validate its
+    // frozen partition, sampling receipts and numeric inputs.
+    let base_validation_report = audit_rejected_candidates(&plan.base_plan)
         .map_err(|errors| vec![ScenarioOpportunityError::BaseAuditRefused(errors)])?;
 
     let mut errors = validate_plan(plan);
@@ -275,14 +277,34 @@ pub fn audit_scenario_opportunities(
 
     let scenario_count = plan.scenarios.len();
     let stratum_count = plan.base_plan.strata.len();
+    // One simultaneous hypothesis per stratum for feasibility, one for the
+    // any-scenario union, and one for every scenario-specific opportunity bound.
     let hypothesis_count = stratum_count
-        .checked_mul(scenario_count.saturating_add(1))
+        .checked_mul(
+            scenario_count
+                .checked_add(2)
+                .ok_or_else(|| vec![ScenarioOpportunityError::ScenarioCountOverflow])?,
+        )
         .ok_or_else(|| vec![ScenarioOpportunityError::ScenarioCountOverflow])?;
     let familywise_alpha = 1.0 - plan.base_plan.familywise_confidence_level;
     let per_hypothesis_alpha = if hypothesis_count == 0 {
         familywise_alpha
     } else {
         familywise_alpha / hypothesis_count as f64
+    };
+
+    // The inherited feasibility metric is part of this combined report, so
+    // tighten its per-stratum allocation to the same alpha used by every
+    // scenario and union hypothesis. This makes all reported bounds jointly
+    // covered by the original familywise confidence level.
+    let feasibility_report = if stratum_count == 0 {
+        base_validation_report
+    } else {
+        let mut adjusted_base_plan = plan.base_plan.clone();
+        adjusted_base_plan.familywise_confidence_level =
+            1.0 - per_hypothesis_alpha * stratum_count as f64;
+        audit_rejected_candidates(&adjusted_base_plan)
+            .map_err(|errors| vec![ScenarioOpportunityError::BaseAuditRefused(errors)])?
     };
 
     let accepted_map: BTreeMap<&str, &CandidateScenarioBundle> = plan
@@ -1299,7 +1321,7 @@ mod tests {
     fn reports_scenario_specific_and_union_recall_separately() {
         let report = audit_scenario_opportunities(&plan()).unwrap();
         assert_eq!(report.scenarios.len(), 2);
-        assert_eq!(report.simultaneous_bound_count, 3);
+        assert_eq!(report.simultaneous_bound_count, 4);
         assert_eq!(report.evaluation_receipts.len(), 12);
         assert_eq!(report.bound_method, BOUND_METHOD);
         assert_eq!(report.sampling_algorithm, SAMPLING_ALGORITHM);
@@ -1476,12 +1498,12 @@ mod tests {
     fn familywise_error_is_allocated_across_union_and_scenario_strata() {
         let report = audit_scenario_opportunities(&plan()).unwrap();
         assert_eq!(report.simultaneous_bound_count, 3);
-        assert!((report.union.per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12);
+        assert!((report.union.per_hypothesis_error_probability - (0.05 / 4.0)).abs() < 1e-12);
         assert!(
-            (report.scenarios[0].per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12
+            (report.scenarios[0].per_hypothesis_error_probability - (0.05 / 4.0)).abs() < 1e-12
         );
         assert!(
-            (report.scenarios[1].per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12
+            (report.scenarios[1].per_hypothesis_error_probability - (0.05 / 4.0)).abs() < 1e-12
         );
     }
 
