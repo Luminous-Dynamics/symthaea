@@ -62,6 +62,27 @@ pub fn handoff_recovery_rate(recovered: u64, attempted: u64) -> Result<Option<f6
     Ok(Some(recovered as f64 / attempted as f64))
 }
 
+
+/// Counterfactual marginal impact of a contribution on a bounded outcome.
+/// Returns None when the replay is not causally identifiable (for example,
+/// removing the event invalidates later dependent actions). This is not a legal
+/// authorship or ownership measure.
+pub fn marginal_contribution_impact(
+    full_quality: f64,
+    replay_quality: f64,
+    replay_identifiable: bool,
+) -> Result<Option<f64>> {
+    for (name, score) in [("full_quality", full_quality), ("replay_quality", replay_quality)] {
+        if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+            bail!("{name} must be finite and in [0, 1]");
+        }
+    }
+    if !replay_identifiable {
+        return Ok(None);
+    }
+    Ok(Some(full_quality - replay_quality))
+}
+
 /// Paired cluster bootstrap for participant-level means. Each array must contain
 /// one pre-aggregated value per participant, in matched participant order.
 /// This does not replace a multi-level participant/task model where task-level
@@ -174,12 +195,19 @@ mod tests {
     }
 
     #[test]
+    fn non_identifiable_counterfactual_is_reported_as_unavailable() {
+        assert_eq!(marginal_contribution_impact(0.8, 0.6, false).unwrap(), None);
+        assert_eq!(marginal_contribution_impact(0.8, 0.6, true).unwrap(), Some(0.2));
+        assert!(marginal_contribution_impact(1.1, 0.6, true).is_err());
+    }
+
+    #[test]
     fn paired_bootstrap_is_seed_reproducible() {
         let a = [0.3, 0.4, 0.5, 0.6];
         let b = [0.5, 0.6, 0.7, 0.8];
         let first = paired_cluster_bootstrap_difference(&a, &b, 2_000, 42).unwrap();
         let second = paired_cluster_bootstrap_difference(&a, &b, 2_000, 42).unwrap();
-        assert_eq!(first.mean_difference, 0.2);
+        assert!((first.mean_difference - 0.2).abs() < 1e-12);
         assert_eq!(first.ci_95_lower, second.ci_95_lower);
         assert_eq!(first.ci_95_upper, second.ci_95_upper);
         assert!(first.ci_95_lower <= first.mean_difference);
