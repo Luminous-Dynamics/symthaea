@@ -233,13 +233,11 @@ fn validate_manifest(
 fn maximum_pairs(scenario: &BernoulliSequentialScenario) -> usize {
     let mut pairs = (scenario.max_total_samples / 2).min(scenario.max_samples_per_arm);
     if scenario.sample_cost_units > 0 {
-        let per_pair = scenario.sample_cost_units.saturating_mul(2);
-        let affordable = scenario.max_cost_units / per_pair;
+        let affordable = (scenario.max_cost_units / scenario.sample_cost_units) / 2;
         pairs = pairs.min(usize::try_from(affordable).unwrap_or(usize::MAX));
     }
     if scenario.sample_risk_units > 0 {
-        let per_pair = scenario.sample_risk_units.saturating_mul(2);
-        let affordable = scenario.max_risk_units / per_pair;
+        let affordable = (scenario.max_risk_units / scenario.sample_risk_units) / 2;
         pairs = pairs.min(usize::try_from(affordable).unwrap_or(usize::MAX));
     }
     pairs
