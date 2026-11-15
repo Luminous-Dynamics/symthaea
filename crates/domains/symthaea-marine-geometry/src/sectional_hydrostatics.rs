@@ -1273,6 +1273,7 @@ mod tests {
         assert_eq!(report.disposition, CrossCheckDisposition::Consistent);
         assert!(report.metrics.iter().all(|metric| metric.disposition == MetricDisposition::Pass));
         verify_sectional_reference_integrity(&reference).unwrap();
+        verify_sectional_cross_check_report_integrity(&report).unwrap();
     }
 
     #[test]
@@ -1318,6 +1319,35 @@ mod tests {
             metric.metric_id == "displacement_volume_m3"
                 && metric.disposition == MetricDisposition::Fail
         }));
+    }
+
+
+    #[test]
+    fn cross_check_receipt_binds_exact_tolerance_values() {
+        let (sections, loft) = triangular_prism();
+        let reference = calculate_sectional_reference(&sections, &loft, 1_025.0).unwrap();
+        let polyhedral = calculate_hydrostatic_properties(&loft, 1_025.0).unwrap();
+        let mut report =
+            compare_with_polyhedral_hydrostatics(&reference, &polyhedral, &test_tolerance()).unwrap();
+        verify_sectional_cross_check_report_integrity(&report).unwrap();
+
+        report.tolerance.displacement_volume_m3.absolute += 1.0;
+        assert_eq!(
+            verify_sectional_cross_check_report_integrity(&report).unwrap_err().code,
+            "report_digest"
+        );
+    }
+
+    #[test]
+    fn non_finite_polyhedral_observable_is_refused() {
+        let (sections, loft) = triangular_prism();
+        let reference = calculate_sectional_reference(&sections, &loft, 1_025.0).unwrap();
+        let mut polyhedral = calculate_hydrostatic_properties(&loft, 1_025.0).unwrap();
+        polyhedral.waterplane_area_m2 = f64::NAN;
+        let error =
+            compare_with_polyhedral_hydrostatics(&reference, &polyhedral, &test_tolerance())
+                .unwrap_err();
+        assert_eq!(error.code, "comparison_non_finite");
     }
 
     #[test]
