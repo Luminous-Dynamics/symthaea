@@ -36,7 +36,7 @@ pub struct MeshGeometry {
     pub faces: Vec<[u32; 3]>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinateFrame {
     pub id: String,
