@@ -1,0 +1,254 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-PWC-STATION-FLUX-FLOW-MISMATCH-0001",
+  "record_status": "synthetic",
+  "method": {
+    "document": "ITTC 7.5-02-05-03.1",
+    "revision": "02",
+    "effective_year": 2011,
+    "calculation": "direct_station_energy_flux",
+    "axis_definition": "local_axial_xi",
+    "scope_note": "Synthetic discrete quadrature of ITTC Eq. 11 across station 1 and station 7; not a PWC test."
+  },
+  "measurement_window": {
+    "start_utc": "2026-11-15T00:00:00Z",
+    "end_utc": "2026-11-15T00:01:00Z"
+  },
+  "evaluation_time_utc": "2026-11-15T00:01:00Z",
+  "fluid": {
+    "density": {
+      "value": 1000,
+      "lower": 1000,
+      "upper": 1000,
+      "unit": "kg/m3",
+      "observed_at_utc": "2026-11-15T00:00:30Z",
+      "available_at_utc": "2026-11-15T00:00:45Z",
+      "calibration_status": "synthetic"
+    }
+  },
+  "pressure_reference": {
+    "kind": "absolute",
+    "reference_id": "SYNTHETIC-ABSOLUTE-PRESSURE-001"
+  },
+  "elevation_datum": {
+    "datum_id": "SYNTHETIC-SURVEY-DATUM-001"
+  },
+  "flow_balance_tolerance": {
+    "absolute_m3_s": 1e-9,
+    "relative_fraction": 1e-9
+  },
+  "station_1": {
+    "station_number": 1,
+    "station_id": "SYNTHETIC-CAPTURE-PLANE-1",
+    "pressure_reference_id": "SYNTHETIC-ABSOLUTE-PRESSURE-001",
+    "elevation_datum_id": "SYNTHETIC-SURVEY-DATUM-001",
+    "cells": [
+      {
+        "cell_id": "S1-CELL-A",
+        "axial_velocity": {
+          "value": 1,
+          "lower": 1,
+          "upper": 1,
+          "unit": "m/s",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "normal_x": {
+          "value": 1,
+          "lower": 1,
+          "upper": 1,
+          "unit": "1",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "static_pressure": {
+          "value": 101325,
+          "lower": 101325,
+          "upper": 101325,
+          "unit": "Pa",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "elevation": {
+          "value": 0,
+          "lower": 0,
+          "upper": 0,
+          "unit": "m",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "area": {
+          "value": 0.5,
+          "lower": 0.5,
+          "upper": 0.5,
+          "unit": "m2",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        }
+      },
+      {
+        "cell_id": "S1-CELL-B",
+        "axial_velocity": {
+          "value": 3,
+          "lower": 3,
+          "upper": 3,
+          "unit": "m/s",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "normal_x": {
+          "value": 1,
+          "lower": 1,
+          "upper": 1,
+          "unit": "1",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "static_pressure": {
+          "value": 101325,
+          "lower": 101325,
+          "upper": 101325,
+          "unit": "Pa",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "elevation": {
+          "value": 0,
+          "lower": 0,
+          "upper": 0,
+          "unit": "m",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "area": {
+          "value": 0.5,
+          "lower": 0.5,
+          "upper": 0.5,
+          "unit": "m2",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        }
+      }
+    ]
+  },
+  "station_7": {
+    "station_number": 7,
+    "station_id": "SYNTHETIC-NOZZLE-PLANE-7",
+    "pressure_reference_id": "SYNTHETIC-ABSOLUTE-PRESSURE-001",
+    "elevation_datum_id": "SYNTHETIC-SURVEY-DATUM-001",
+    "cells": [
+      {
+        "cell_id": "S7-CELL-A",
+        "axial_velocity": {
+          "value": 8,
+          "lower": 8,
+          "upper": 8,
+          "unit": "m/s",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "normal_x": {
+          "value": 1,
+          "lower": 1,
+          "upper": 1,
+          "unit": "1",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "static_pressure": {
+          "value": 101325,
+          "lower": 101325,
+          "upper": 101325,
+          "unit": "Pa",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "elevation": {
+          "value": 0,
+          "lower": 0,
+          "upper": 0,
+          "unit": "m",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "area": {
+          "value": 0.125,
+          "lower": 0.125,
+          "upper": 0.125,
+          "unit": "m2",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        }
+      },
+      {
+        "cell_id": "S7-CELL-B",
+        "axial_velocity": {
+          "value": 12,
+          "lower": 12,
+          "upper": 12,
+          "unit": "m/s",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "normal_x": {
+          "value": 1,
+          "lower": 1,
+          "upper": 1,
+          "unit": "1",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "static_pressure": {
+          "value": 101325,
+          "lower": 101325,
+          "upper": 101325,
+          "unit": "Pa",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "elevation": {
+          "value": 0,
+          "lower": 0,
+          "upper": 0,
+          "unit": "m",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        },
+        "area": {
+          "value": 0.1,
+          "lower": 0.1,
+          "upper": 0.1,
+          "unit": "m2",
+          "observed_at_utc": "2026-11-15T00:00:30Z",
+          "available_at_utc": "2026-11-15T00:00:45Z",
+          "calibration_status": "synthetic"
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Synthetic only; no real PWC, waterjet or hull validation.",
+    "Pressure reference and elevation datum are identical across both station planes.",
+    "No station-6 shortcut, nozzle parallel-outflow assumption, NVR, interaction efficiency or overall propulsion efficiency is asserted.",
+    "Station-1 and station-7 integrated volume flows intentionally mismatch; P_JSE must remain unavailable."
+  ]
+}
