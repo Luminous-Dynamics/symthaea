@@ -293,6 +293,10 @@ pub struct OperationAttemptRecord {
     pub start_event_ids: Vec<String>,
     pub terminal_reconciliation_event_ids: Vec<String>,
     pub terminal_reconciliation: Option<AttemptTerminalReconciliation>,
+    /// Exact predecessor terminal event to which the retry relation applies.
+    pub retry_predecessor_terminal_event_id: Option<String>,
+    /// Exact current start event to which the retry relation applies.
+    pub retry_predecessor_start_event_id: Option<String>,
     /// Relation of the predecessor terminal to this attempt's start.
     pub retry_predecessor_terminal_to_start_order: Option<EventOrder>,
 }
@@ -414,9 +418,12 @@ pub fn validate_attempt_lifecycle(
     for attempt in attempts {
         match attempt.identity.retry_of_attempt_id.as_deref() {
             None => {
-                if attempt.retry_predecessor_terminal_to_start_order.is_some() {
+                if attempt.retry_predecessor_terminal_event_id.is_some()
+                    || attempt.retry_predecessor_start_event_id.is_some()
+                    || attempt.retry_predecessor_terminal_to_start_order.is_some()
+                {
                     critical = true;
-                    reasons.insert(format!("ROOT_ATTEMPT_HAS_RETRY_ORDER:{}", attempt.identity.attempt_id));
+                    reasons.insert(format!("ROOT_ATTEMPT_HAS_RETRY_BINDING:{}", attempt.identity.attempt_id));
                 }
             }
             Some(predecessor_id) => {
@@ -435,6 +442,16 @@ pub fn validate_attempt_lifecycle(
                             && terminal.qualification == GateState::Pass
                             && terminal.start_to_terminal_order == EventOrder::Before =>
                     {
+                        let exact_event_binding = attempt
+                            .retry_predecessor_terminal_event_id
+                            .as_deref()
+                            == Some(terminal.event_id.as_str())
+                            && attempt.retry_predecessor_start_event_id.as_deref()
+                                == attempt.start_event_ids.first().map(String::as_str);
+                        if !exact_event_binding {
+                            critical = true;
+                            reasons.insert(format!("RETRY_EVENT_BINDING_INVALID:{}", attempt.identity.attempt_id));
+                        }
                         match attempt.retry_predecessor_terminal_to_start_order {
                             Some(EventOrder::Before) => {}
                             Some(EventOrder::After | EventOrder::Inconsistent) | None => {
@@ -776,6 +793,7 @@ mod tests {
         start_id: &str,
         terminal_value: Option<AttemptTerminalReconciliation>,
         retry_order: Option<EventOrder>,
+        retry_terminal_event_id: Option<&str>,
     ) -> OperationAttemptRecord {
         OperationAttemptRecord {
             identity: AttemptIdentity {
@@ -789,6 +807,8 @@ mod tests {
                 .map(|value| vec![value.event_id.clone()])
                 .unwrap_or_default(),
             terminal_reconciliation: terminal_value,
+            retry_predecessor_terminal_event_id: retry_terminal_event_id.map(str::to_owned),
+            retry_predecessor_start_event_id: retry_of.map(|_| start_id.to_owned()),
             retry_predecessor_terminal_to_start_order: retry_order,
         }
     }
@@ -905,6 +925,7 @@ mod tests {
             "start-1",
             Some(terminal("terminal-1", ReconciledOperationOutcome::NotApplied)),
             None,
+            None,
         );
         let retry = attempt(
             "valve-1",
@@ -913,6 +934,7 @@ mod tests {
             "start-2",
             None,
             Some(EventOrder::Before),
+            Some("terminal-1"),
         );
         let report = validate_attempt_lifecycle(&[retry.clone(), first.clone()]);
         assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
@@ -927,7 +949,7 @@ mod tests {
 
     #[test]
     fn unknown_predecessor_outcome_cannot_be_retried() {
-        let first = attempt("pump-1", "attempt-a", None, "start-a", None, None);
+        let first = attempt("pump-1", "attempt-a", None, "start-a", None, None, None);
         let retry = attempt(
             "pump-1",
             "attempt-b",
@@ -935,6 +957,7 @@ mod tests {
             "start-b",
             None,
             Some(EventOrder::Before),
+            None,
         );
         let report = validate_attempt_lifecycle(&[first, retry]);
         assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
@@ -949,6 +972,7 @@ mod tests {
             None,
             "start-1",
             Some(terminal("terminal-1", ReconciledOperationOutcome::Applied)),
+            None,
             None,
         );
         malformed.start_event_ids.push("start-duplicate".to_owned());
@@ -967,6 +991,7 @@ mod tests {
             None,
             "start-1",
             Some(terminal("terminal-1", ReconciledOperationOutcome::NotApplied)),
+            None,
             None,
         )];
         let first = scoped_obligation("obligation-a", "robot-7");
@@ -1023,9 +1048,36 @@ mod tests {
     }
 
     #[test]
+    fn retry_order_must_bind_exact_predecessor_terminal_and_current_start() {
+        let first = attempt(
+            "pump-1",
+            "attempt-1",
+            None,
+            "start-1",
+            Some(terminal("terminal-1", ReconciledOperationOutcome::NotApplied)),
+            None,
+            None,
+        );
+        let retry = attempt(
+            "pump-1",
+            "attempt-2",
+            Some("attempt-1"),
+            "start-2",
+            None,
+            Some(EventOrder::Before),
+            Some("substituted-terminal"),
+        );
+        let report = validate_attempt_lifecycle(&[first, retry]);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "RETRY_EVENT_BINDING_INVALID:attempt-2"
+        }));
+    }
+
+    #[test]
     fn retry_lineage_cannot_fork_or_create_multiple_roots() {
-        let root_a = attempt("pump-1", "root-a", None, "start-root-a", None, None);
-        let root_b = attempt("pump-1", "root-b", None, "start-root-b", None, None);
+        let root_a = attempt("pump-1", "root-a", None, "start-root-a", None, None, None);
+        let root_b = attempt("pump-1", "root-b", None, "start-root-b", None, None, None);
         let report = validate_attempt_lifecycle(&[root_a.clone(), root_b]);
         assert!(report.reason_codes.iter().any(|reason| {
             reason == "MULTIPLE_ROOT_ATTEMPTS_FOR_LOGICAL_OPERATION:pump-1"
@@ -1038,6 +1090,7 @@ mod tests {
             "start-child-a",
             None,
             Some(EventOrder::Before),
+            None,
         );
         let child_b = attempt(
             "pump-1",
@@ -1046,6 +1099,7 @@ mod tests {
             "start-child-b",
             None,
             Some(EventOrder::Before),
+            None,
         );
         let report = validate_attempt_lifecycle(&[root_a, child_a, child_b]);
         assert!(report.reason_codes.iter().any(|reason| reason == "ATTEMPT_RETRY_FORK:root-a"));
@@ -1060,6 +1114,7 @@ mod tests {
             "start-a1",
             Some(terminal("term-a1", ReconciledOperationOutcome::NotApplied)),
             None,
+            None,
         );
         let second = attempt(
             "pump-1",
@@ -1068,6 +1123,7 @@ mod tests {
             "start-a2",
             None,
             Some(EventOrder::Before),
+            Some("term-a1"),
         );
         let forward = vec![first.clone(), second.clone()];
         let reverse = vec![second, first];

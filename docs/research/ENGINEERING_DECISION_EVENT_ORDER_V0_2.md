@@ -53,7 +53,7 @@ The invariant-bearing unit is an execution attempt, not a logical operation.
 - It contains zero or one terminal reconciliation event ID.
 - A retry links to exactly one predecessor attempt of the same logical operation.
 - The predecessor must have one qualified PASS terminal reconciliation with outcome NOT_APPLIED.
-- The predecessor terminal event must be definitely BEFORE the retry start.
+- The ordering receipt must bind the exact predecessor terminal event ID and exact current retry-start event ID, and the predecessor terminal must be definitely BEFORE that start.
 - APPLIED, missing, unqualified, overlapping, or unknown predecessor outcomes do not admit retry.
 
 The report sorts pending IDs and reason codes, and validation builds its identity index independent of input delivery order.
@@ -89,6 +89,7 @@ The source includes unit tests for:
 - exact NOT_APPLIED retry lineage;
 - retry before reconciliation;
 - multiple roots and retry forks are rejected;
+- retry ordering cannot be reused for a different pair of event IDs;
 - duplicate start and terminal cardinality;
 - independent overlapping stop obligations;
 - owner in-flight-inventory qualification required for discharge;
