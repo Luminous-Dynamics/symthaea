@@ -113,7 +113,7 @@ pub fn parse_http11_single_json_response_header_v1(
         if line.is_empty() {
             return Err(Http11ResponseError::InvalidSyntax);
         }
-        if matches!(line.first(), Some(b' ' | b'\t')) {
+        if line.first().is_some_and(|byte| *byte == b' ' || *byte == b'\t') {
             return Err(Http11ResponseError::ObsoleteFoldedHeader);
         }
         let colon = line.iter().position(|b| *b == b':').ok_or(Http11ResponseError::InvalidSyntax)?;
@@ -278,8 +278,8 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 fn trim_ows(mut value: &[u8]) -> &[u8] {
-    while matches!(value.first(), Some(b' ' | b'\t')) { value = &value[1..]; }
-    while matches!(value.last(), Some(b' ' | b'\t')) { value = &value[..value.len() - 1]; }
+    while value.first().is_some_and(|byte| *byte == b' ' || *byte == b'\t') { value = &value[1..]; }
+    while value.last().is_some_and(|byte| *byte == b' ' || *byte == b'\t') { value = &value[..value.len() - 1]; }
     value
 }
 
