@@ -18,6 +18,7 @@ const SCENARIO_DOMAINS: &[&str] = &[
     "consent_governance",
     "longitudinal_adaptation",
     "partner_coordination",
+    "adaptive_intervention",
 ];
 const DIFFICULTIES: &[&str] = &["introductory", "moderate", "advanced"];
 const SPLITS: &[&str] = &["development", "pilot", "confirmatory_locked"];
@@ -617,6 +618,10 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ("attribution_f1", scorecard.scores.attribution_f1),
         ("expert_rater_agreement", scorecard.scores.expert_rater_agreement),
         ("handoff_recovery_rate", scorecard.scores.handoff_recovery_rate),
+        ("intervention_appropriateness", scorecard.scores.intervention_appropriateness),
+        ("unnecessary_intervention_rate", scorecard.scores.unnecessary_intervention_rate),
+        ("missed_critical_intervention_rate", scorecard.scores.missed_critical_intervention_rate),
+        ("intervention_regret", scorecard.scores.intervention_regret),
     ] {
         validate_optional_unit_interval(name, value)?;
     }
