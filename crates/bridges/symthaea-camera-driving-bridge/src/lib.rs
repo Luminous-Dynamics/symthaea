@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
-use symthaea_vehicle::{VehicleCommand, VehicleHdcEncoder, VehicleState};
+use symthaea_vehicle::{VehicleHdcEncoder, VehicleState};
 use symthaea_vision_manifold::{VisionConfig, VisionManifold, VisionTelemetry};
 
 pub mod policy_compatibility;
