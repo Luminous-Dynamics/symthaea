@@ -782,7 +782,7 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
 
         let score_value = metric_values
             .iter()
-            .find(|(name, _)| *name == receipt.metric_name)
+            .find(|(name, _)| *name == receipt.metric_name.as_str())
             .with_context(|| {
                 format!(
                     "metric evidence references unknown metric {:?}",
@@ -827,7 +827,12 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
 
         match (receipt.ci_lower, receipt.ci_upper) {
             (Some(lower), Some(upper)) => {
-                if !lower.is_finite() || !upper.is_finite() || lower > receipt.value || upper < receipt.value || lower > upper {
+                if !lower.is_finite()
+                    || !upper.is_finite()
+                    || lower > receipt.value
+                    || upper < receipt.value
+                    || lower > upper
+                {
                     bail!(
                         "metric {:?} has an invalid uncertainty interval",
                         receipt.metric_name
@@ -843,7 +848,11 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
     }
 
     for (metric_name, value) in metric_values {
-        if value.is_some() && !evidenced_metrics.contains(metric_name) {
+        if value.is_some()
+            && !evidenced_metrics
+                .iter()
+                .any(|evidenced| *evidenced == metric_name)
+        {
             bail!(
                 "scorecard metric {:?} has a value but no evidence receipt",
                 metric_name
