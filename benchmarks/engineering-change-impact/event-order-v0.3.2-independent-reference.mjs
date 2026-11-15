@@ -46,20 +46,29 @@ function retryPermitted(parent, retry) {
   return parent.logicalId === retry.logicalId
     && retry.retryOf === parent.attemptId
     && parent.terminalStartActionId === parent.startActionId
+    && retry.predecessorTerminalActionId === parent.terminalActionId
+    && retry.predecessorStartActionId === retry.startActionId
     && parent.terminalOutcome === "not_applied"
     && parent.terminalQualification === "pass"
     && parent.terminalToRetryStart === "before";
+}
+function scopeCovers(candidate, required) {
+  if (candidate === "global") return true;
+  if (required === "global") return false;
+  const candidateIds = new Set(candidate.replace(/^logical_operations:/, "").split(","));
+  const requiredIds = required.replace(/^logical_operations:/, "").split(",");
+  return requiredIds.every(id => candidateIds.has(id));
 }
 function stopPermitted(stop, inventory) {
   return stop.triggerActionId === stop.dischargeTriggerActionId
     && stop.policyActionId === stop.dischargePolicyActionId
     && stop.policy === stop.dischargePolicy
-    && stop.scope === stop.dischargeScope
+    && scopeCovers(stop.dischargeScope, stop.scope)
     && stop.receiptQualification === "pass"
     && stop.inFlightReconciliation === "pass"
     && !!inventory
     && inventory.qualification === "pass"
-    && inventory.scope === stop.scope
+    && scopeCovers(inventory.scope, stop.dischargeScope)
     && inventory.frontierId === stop.frontierId
     && inventory.manifestSha256 === stop.manifestSha256
     && inventory.frontierToAttestation === "before"
@@ -114,9 +123,16 @@ for (let i = 0; i < 100_000; i++) {
   const parent = {
     logicalId: "robot-A", attemptId: "attempt-" + i,
     startActionId: "start-" + i, terminalStartActionId: "start-" + i,
+    terminalActionId: "terminal-" + i,
     terminalOutcome: "not_applied", terminalQualification: "pass", terminalToRetryStart: "before",
   };
-  const retry = { logicalId: "robot-A", retryOf: parent.attemptId };
+  const retryStartActionId = "retry-start-" + i;
+  const retry = {
+    logicalId: "robot-A", retryOf: parent.attemptId,
+    startActionId: retryStartActionId,
+    predecessorTerminalActionId: parent.terminalActionId,
+    predecessorStartActionId: retryStartActionId,
+  };
   if (kind === "applied") parent.terminalOutcome = "applied";
   if (kind === "unknown") parent.terminalOutcome = "unknown";
   if (kind === "unqualified") parent.terminalQualification = "indeterminate";
@@ -124,6 +140,8 @@ for (let i = 0; i < 100_000; i++) {
   if (kind === "terminal_unknown_order") parent.terminalToRetryStart = "overlapping";
   if (kind === "start_substituted") parent.terminalStartActionId = "other-start-" + i;
   if (kind === "logical_operation_substituted") retry.logicalId = "robot-B";
+  if (kind === "terminal_action_substituted") retry.predecessorTerminalActionId = "other-terminal-" + i;
+  if (kind === "child_start_action_substituted") retry.predecessorStartActionId = "other-retry-start-" + i;
   const accepted = retryPermitted(parent, retry);
   const expected = kind === "not_applied_exact_before";
   if (accepted !== expected) retryUnexpectedAdmissions++;
@@ -133,34 +151,53 @@ for (let i = 0; i < 100_000; i++) {
 
 const stopFaults = [
   "exact", "receipt_fail", "trigger_substitution", "policy_substitution",
-  "scope_substitution", "manifest_substitution", "inventory_missing",
-  "frontier_after", "discharge_before_trigger",
+  "scope_narrowed", "manifest_substitution", "inventory_missing",
+  "frontier_after", "discharge_before_trigger", "inventory_scope_too_narrow",
+  "broader_inventory", "scope_expansion_global",
 ];
 let stopChecks = 0, stopUnexpectedAdmissions = 0, stopAccepted = 0;
 for (let i = 0; i < 90_000; i++) {
-  const kind = stopFaults[i % stopFaults.length], scope = "global";
+  const kind = stopFaults[i % stopFaults.length];
   const stop = {
     triggerActionId: "trigger-1", dischargeTriggerActionId: "trigger-1",
     policyActionId: "policy-1", dischargePolicyActionId: "policy-1",
-    policy: "rev-1", dischargePolicy: "rev-1", scope, dischargeScope: scope,
+    policy: "rev-1", dischargePolicy: "rev-1",
+    scope: "global", dischargeScope: "global",
     receiptQualification: "pass", inFlightReconciliation: "pass",
     frontierId: "frontier-1", manifestSha256: "a".repeat(64),
     attestationToDischarge: "before", triggerToDischarge: "before",
   };
   const inventory = {
-    qualification: "pass", scope, frontierId: stop.frontierId,
+    qualification: "pass", scope: "global", frontierId: stop.frontierId,
     manifestSha256: stop.manifestSha256, frontierToAttestation: "before",
   };
+  if (kind === "broader_inventory") {
+    stop.scope = "logical_operations:robot-1";
+    stop.dischargeScope = "logical_operations:robot-1";
+  }
+  if (kind === "scope_expansion_global") {
+    stop.scope = "logical_operations:robot-1";
+    stop.dischargeScope = "global";
+  }
+  if (kind === "scope_narrowed") {
+    stop.scope = "global";
+    stop.dischargeScope = "logical_operations:robot-1";
+  }
+  if (kind === "inventory_scope_too_narrow") {
+    stop.scope = "global";
+    stop.dischargeScope = "global";
+    inventory.scope = "logical_operations:robot-1";
+  }
   if (kind === "receipt_fail") stop.receiptQualification = "fail";
   if (kind === "trigger_substitution") stop.dischargeTriggerActionId = "other-trigger";
   if (kind === "policy_substitution") stop.dischargePolicyActionId = "other-policy";
-  if (kind === "scope_substitution") stop.dischargeScope = "logical_operations:robot-1";
+
   if (kind === "manifest_substitution") stop.manifestSha256 = "b".repeat(64);
   if (kind === "inventory_missing") inventory.qualification = "missing";
   if (kind === "frontier_after") inventory.frontierToAttestation = "after";
   if (kind === "discharge_before_trigger") stop.triggerToDischarge = "after";
   const accepted = stopPermitted(stop, kind === "inventory_missing" ? null : inventory) === true;
-  const expected = kind === "exact";
+  const expected = ["exact", "broader_inventory", "scope_expansion_global"].includes(kind);
   if (accepted !== expected) stopUnexpectedAdmissions++;
   if (accepted) stopAccepted++;
   stopChecks++;
