@@ -137,13 +137,23 @@
             ],
             "uses_prior_evidence": false
           }
+        ],
+        "probe_responses": [
+          {
+            "observation_id": "obs-runner-r2",
+            "available_at": "2026-11-15T10:04:00Z",
+            "observed_at": "2026-11-15T10:03:55Z",
+            "source_family": "runner-attestation",
+            "signal_kind": "probe_result",
+            "value": "runner fingerprint r2",
+            "upstream_source_id": "runner-root-2"
+          }
         ]
       },
       "gold_overlay": {
         "visibility": "evaluator_only",
         "truth_kind": "latent_shift",
         "hidden_event_time": "2026-11-15T10:01:00Z",
-        "hidden_availability_time": "2026-11-15T10:04:00Z",
         "changed_dimensions": [
           "runner_image"
         ],
@@ -160,7 +170,8 @@
             "obs-latency-spike",
             "obs-cache-miss-spike"
           ]
-        ]
+        ],
+        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z"
       },
       "expected_summary": {
         "detected": true,
@@ -290,13 +301,23 @@
             "blocked_obligations": [],
             "uses_prior_evidence": true
           }
+        ],
+        "probe_responses": [
+          {
+            "observation_id": "obs-runner-r1",
+            "available_at": "2026-11-15T10:04:00Z",
+            "observed_at": "2026-11-15T10:03:55Z",
+            "source_family": "runner-attestation",
+            "signal_kind": "probe_result",
+            "value": "runner fingerprint r1",
+            "upstream_source_id": "runner-root-2"
+          }
         ]
       },
       "gold_overlay": {
         "visibility": "evaluator_only",
         "truth_kind": "sham_no_shift",
         "hidden_event_time": "2026-11-15T10:01:00Z",
-        "hidden_availability_time": "2026-11-15T10:04:00Z",
         "changed_dimensions": [],
         "affected_obligations": [],
         "unaffected_obligations": [
@@ -310,7 +331,8 @@
             "obs-sham-latency-spike",
             "obs-sham-cache-miss-spike"
           ]
-        ]
+        ],
+        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z"
       },
       "expected_summary": {
         "detected": false,
