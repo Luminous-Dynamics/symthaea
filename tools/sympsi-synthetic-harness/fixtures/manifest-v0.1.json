@@ -1,0 +1,24 @@
+{
+  "schema_version": "sympsi.synthetic-manifest.v0.1",
+  "synthetic_only": true,
+  "seed": 20261115,
+  "alpha": 0.005,
+  "null_campaigns": 100000,
+  "power_campaigns": 20000,
+  "confidence_z": 2.5758293035489004,
+  "profiles": {
+    "four-choice": {
+      "choice_count": 4,
+      "analysis_trials": 7300,
+      "smallest_effect_increment": 0.02,
+      "planted_hit_rate": 0.4
+    },
+    "five-choice": {
+      "choice_count": 5,
+      "analysis_trials": 6300,
+      "smallest_effect_increment": 0.02,
+      "planted_hit_rate": 0.35
+    }
+  },
+  "optional_stopping_looks": 10
+}

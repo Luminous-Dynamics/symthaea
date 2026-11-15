@@ -1,0 +1,126 @@
+name: SYMPsi Synthetic Qualification
+
+on:
+  pull_request:
+    paths:
+      - "tools/sympsi-synthetic-harness/**"
+      - "tools/sympsi-mapping-verifier-go/**"
+      - ".github/workflows/sympsi-synthetic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sympsi-synthetic-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-qualification:
+    name: Synthetic-only four/five-choice qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --all -- --check
+
+      - name: Unit tests
+        run: cargo test --manifest-path tools/sympsi-synthetic-harness/Cargo.toml
+
+      - name: Independent Python target-mapping reference
+        run: python3 tools/sympsi-synthetic-harness/tests/target_mapping_reference.py
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --all-targets -- -D warnings
+
+      - name: Install pinned Go for independent mapping verifier
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+          cache: false
+
+      - name: Format independent Go verifier
+        run: test -z "$(gofmt -l tools/sympsi-mapping-verifier-go/*.go)"
+
+      - name: Cross-language target mapping vectors
+        working-directory: tools/sympsi-mapping-verifier-go
+        run: go test -count=1 -v ./...
+
+      - name: Qualify four-choice synthetic profile
+        env:
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          cargo run --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --
+          --profile four-choice
+          --git-head "$EXACT_HEAD"
+          --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json
+          --out "$RUNNER_TEMP/sympsi-four-choice-receipt.json"
+
+      - name: Qualify five-choice synthetic profile
+        env:
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: >-
+          cargo run --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --
+          --profile five-choice
+          --git-head "$EXACT_HEAD"
+          --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json
+          --out "$RUNNER_TEMP/sympsi-five-choice-receipt.json"
+      - name: Summarize synthetic receipts
+        run: |
+          for receipt in \
+            "$RUNNER_TEMP/sympsi-four-choice-receipt.json" \
+            "$RUNNER_TEMP/sympsi-five-choice-receipt.json"; do
+            jq -c '.receipt | {
+              profile,
+              choice_count,
+              chance_rate,
+              smallest_effect_hit_rate,
+              alpha,
+              git_head,
+              manifest_sha256,
+              null_calibration: {
+                campaigns: .null_calibration.campaigns,
+                critical_hits: .null_calibration.critical_hits,
+                exact_discrete_type_i_rate: .null_calibration.exact_discrete_type_i_rate,
+                empirical_false_positive_rate: .null_calibration.empirical_false_positive_rate,
+                monte_carlo_within_four_standard_errors: .null_calibration.monte_carlo_within_four_standard_errors
+              },
+              power_calibration: {
+                campaigns: .power_calibration.campaigns,
+                exact_binomial_power: .power_calibration.exact_binomial_power,
+                empirical_power: .power_calibration.empirical_power,
+                monte_carlo_within_four_standard_errors: .power_calibration.monte_carlo_within_four_standard_errors
+              },
+              sequential_look_calibration: {
+                campaigns: .sequential_look_calibration.campaigns,
+                looks: .sequential_look_calibration.looks,
+                empirical_familywise_false_positive_rate: .sequential_look_calibration.empirical_familywise_false_positive_rate,
+                nominal_fixed_sample_alpha: .sequential_look_calibration.nominal_fixed_sample_alpha,
+                inflation_multiple: .sequential_look_calibration.inflation_multiple,
+                demonstrates_optional_stopping_inflation: .sequential_look_calibration.demonstrates_optional_stopping_inflation
+              },
+              control_count: (.controls | length),
+              failed_controls: [.controls[] | select(.passed == false) | .id],
+              all_controls_passed
+            }' "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload synthetic-only receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sympsi-synthetic-receipts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/sympsi-four-choice-receipt.json
+            ${{ runner.temp }}/sympsi-five-choice-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
