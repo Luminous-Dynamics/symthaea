@@ -954,13 +954,13 @@ mod tests {
         let shifted = report.arm_scores.iter()
             .find(|score| score.condition == ArmCondition::Shifted).expect("shifted score");
         assert_eq!(clean.active_obligation_seconds, 1_800);
-        assert_eq!(clean.unverified_obligation_seconds, 120);
-        assert_eq!(clean.critical_unverified_obligation_seconds, 60);
-        assert_eq!(clean.time_weighted_requirement_conformance, Some(1.0 - 120.0 / 1_800.0));
+        assert_eq!(clean.unverified_obligation_seconds, 240);
+        assert_eq!(clean.critical_unverified_obligation_seconds, 120);
+        assert_eq!(clean.time_weighted_requirement_conformance, Some(1.0 - 240.0 / 1_800.0));
         assert_eq!(shifted.active_obligation_seconds, 2_100);
-        assert_eq!(shifted.unverified_obligation_seconds, 480);
-        assert_eq!(shifted.critical_unverified_obligation_seconds, 420);
-        assert_eq!(shifted.critical_time_weighted_conformance, Some(0.65));
+        assert_eq!(shifted.unverified_obligation_seconds, 600);
+        assert_eq!(shifted.critical_unverified_obligation_seconds, 540);
+        assert_eq!(shifted.critical_time_weighted_conformance, Some(0.6));
         assert_eq!(shifted.max_unverified_gap_seconds, 180);
     }
 
