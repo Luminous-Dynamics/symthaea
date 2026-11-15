@@ -3653,7 +3653,7 @@ mod tests {
         let inventory_action_id = push_clocked_action(
             &mut actions,
             &mut ordinal,
-            10,
+            12,
             ScheduleAction::AttemptInventoryAttested {
                 scope: StopScope::Global,
                 inventory_frontier_event_id: inventory_frontier.clone(),
