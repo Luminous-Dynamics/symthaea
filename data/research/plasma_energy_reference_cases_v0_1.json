@@ -1126,6 +1126,62 @@
         "CAPEX, electricity price, power-supply efficiency, conversion performance and methane conversion assumptions must be frozen and sensitivity-tested."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-BLANKET-MHD-SAM-NEKRS-ALEX-2026",
+      "lane": "FUSION_BLANKET_LIQUID_METAL_MHD",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "MHD capabilities in SAM and NekRS for fusion liquid metal blanket applications",
+        "publisher": "Fusion Engineering and Design",
+        "publication_date": "2026-09",
+        "article_number": "115888",
+        "doi": "10.1016/j.fusengdes.2026.115888",
+        "url": "https://doi.org/10.1016/j.fusengdes.2026.115888"
+      },
+      "configuration": {
+        "system_model": "SAM reduced-order liquid-metal MHD for high Hartmann number and interaction-parameter system analysis",
+        "high_fidelity_model": "NekRS full MHD CFD",
+        "geometries": [
+          "conducting square duct",
+          "conducting round duct"
+        ],
+        "field_cases": [
+          "uniform magnetic field",
+          "non-uniform magnetic field"
+        ],
+        "experimental_reference": "Argonne Liquid Metal Experiment (ALEX)"
+      },
+      "observations": [
+        {
+          "metric": "analytical_verification",
+          "value": "reported_good_agreement",
+          "qualifier": "SAM and NekRS predictions compared with analytical solutions for conducting square ducts in uniform magnetic fields",
+          "unit": "qualitative"
+        },
+        {
+          "metric": "code_to_code_comparison",
+          "value": "reported_good_agreement",
+          "qualifier": "reduced-order SAM and high-fidelity NekRS compared for the source's supported cases",
+          "unit": "qualitative"
+        },
+        {
+          "metric": "experimental_validation",
+          "value": "reported_good_agreement",
+          "qualifier": "SAM model predictions compared with ALEX measurements for square and round ducts under varying magnetic fields",
+          "unit": "qualitative"
+        }
+      ],
+      "source_conclusion": "The paper presents reduced-order MHD modelling in SAM and high-fidelity MHD CFD in NekRS for liquid-metal fusion blanket applications. It reports analytical verification, code-to-code comparison, and validation of SAM predictions against historical ALEX experimental data for square and round duct configurations. Insulating-duct validation and further NekRS development remain future work.",
+      "comparison_status": "VALIDATED_DUCT_REFERENCE_NOT_FULL_BLANKET_QUALIFICATION",
+      "blockers": [
+        "The tested conducting square/round duct configurations do not establish arbitrary manifold, bend, expansion/contraction or full blanket validation.",
+        "Insulating-duct validation is explicitly future work; insulating-wall performance cannot be inferred from conducting-duct cases.",
+        "Agreement between SAM and NekRS is not itself experimental validation; preserve the distinct evidence paths.",
+        "Duct-level pressure-drop and flow validation does not establish integrated blanket heat extraction, tritium breeding, materials compatibility or plant net electricity.",
+        "A matched reproduction requires exact geometry, conductivity ratios, Hartmann/Reynolds/interaction parameters, applied-field profile, boundary conditions, solver revisions and experimental measurement uncertainty."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1278,6 +1334,16 @@
       "control_id": "NC-030",
       "condition": "Claim plasma Power-to-X cost competitiveness without preserving the study's electricity-price, capacity-factor, location and 50–60% electricity-cost sensitivity.",
       "expected_disposition": "BLOCKED_MISSING_ECONOMIC_SCENARIO_BASIS"
+    },
+    {
+      "control_id": "NC-031",
+      "condition": "Promote SAM reduced-order MHD predictions to NekRS high-fidelity CFD outputs or ALEX experimental observations.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_AND_MODEL_IDENTITY_MISMATCH"
+    },
+    {
+      "control_id": "NC-032",
+      "condition": "Treat conducting square/round duct validation as insulating-duct or full fusion-blanket qualification.",
+      "expected_disposition": "REJECT_GEOMETRY_AND_WALL_MODEL_APPLICABILITY_MISMATCH"
     }
   ],
   "derived_reference_checks": [
