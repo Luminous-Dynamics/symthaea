@@ -1,0 +1,355 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "SYNTHETIC-PWC-COMPOSITION-KNOWN-ANSWER-001",
+  "record_status": "synthetic",
+  "test_path": "composite_independent_tests",
+  "comparison_tolerances": {
+    "flow_rate_abs_m3_s": 0.0001,
+    "craft_speed_abs_m_s": 0.02,
+    "nvr_abs": 0.01,
+    "density_abs_kg_m3": 0.5,
+    "temperature_abs_c": 0.5,
+    "power_abs_w": 1,
+    "efficiency_abs": 0.001
+  },
+  "propulsion_test": {
+    "source_record_id": "PROPULSION-001",
+    "source_record_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "method_id": "ITTC-7.5-02-05-03.1",
+    "condition": {
+      "craft_configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pump_configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scale_context_id": "SYNTHETIC-PWC-MODEL-SCALE-1-10",
+      "craft_speed_mps": {
+        "value": 5,
+        "lower": 5,
+        "upper": 5,
+        "unit": "m/s"
+      },
+      "flow_rate_m3_s": {
+        "value": 0.02,
+        "lower": 0.02,
+        "upper": 0.02,
+        "unit": "m3/s"
+      },
+      "nvr": {
+        "value": 2,
+        "lower": 2,
+        "upper": 2,
+        "unit": "1"
+      },
+      "water_density_kg_m3": {
+        "value": 998,
+        "lower": 998,
+        "upper": 998,
+        "unit": "kg/m3"
+      },
+      "water_temperature_c": {
+        "value": 20,
+        "lower": 20,
+        "upper": 20,
+        "unit": "degC"
+      }
+    },
+    "measurement_window": {
+      "start_utc": "2026-11-10T10:00:00Z",
+      "end_utc": "2026-11-10T10:10:00Z"
+    },
+    "calibration_reference": "CAL-PROPULSION-001",
+    "timebase_reference": "TIMEBASE-PROPULSION-001",
+    "interaction_terms": {
+      "one_minus_thrust_deduction": {
+        "value": 0.9,
+        "lower": 0.9,
+        "upper": 0.9,
+        "unit": "1"
+      },
+      "eta_eI": {
+        "value": 0.8,
+        "lower": 0.8,
+        "upper": 0.8,
+        "unit": "1"
+      },
+      "eta_mI": {
+        "value": 1,
+        "lower": 1,
+        "upper": 1,
+        "unit": "1"
+      },
+      "nvr_method_reference": "SYNTHETIC-PROPULSION-NVR-REPORT-001"
+    }
+  },
+  "station_flux_test": {
+    "source_record_id": "STATION-FLUX-001",
+    "source_record_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "method_id": "ITTC-7.5-02-05-03.1-EQ11",
+    "condition": {
+      "craft_configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pump_configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scale_context_id": "SYNTHETIC-PWC-MODEL-SCALE-1-10",
+      "craft_speed_mps": {
+        "value": 5,
+        "lower": 5,
+        "upper": 5,
+        "unit": "m/s"
+      },
+      "flow_rate_m3_s": {
+        "value": 0.02,
+        "lower": 0.02,
+        "upper": 0.02,
+        "unit": "m3/s"
+      },
+      "nvr": {
+        "value": 2,
+        "lower": 2,
+        "upper": 2,
+        "unit": "1"
+      },
+      "water_density_kg_m3": {
+        "value": 998,
+        "lower": 998,
+        "upper": 998,
+        "unit": "kg/m3"
+      },
+      "water_temperature_c": {
+        "value": 20,
+        "lower": 20,
+        "upper": 20,
+        "unit": "degC"
+      }
+    },
+    "measurement_window": {
+      "start_utc": "2026-11-11T10:00:00Z",
+      "end_utc": "2026-11-11T10:10:00Z"
+    },
+    "calibration_reference": "CAL-STATION-FLUX-001",
+    "timebase_reference": "TIMEBASE-STATION-FLUX-001",
+    "integrated_station_1_flow_m3_s": {
+      "value": 0.02,
+      "lower": 0.02,
+      "upper": 0.02,
+      "unit": "m3/s"
+    },
+    "integrated_station_7_flow_m3_s": {
+      "value": 0.02,
+      "lower": 0.02,
+      "upper": 0.02,
+      "unit": "m3/s"
+    },
+    "energy_flux_e1_w": {
+      "value": 3000,
+      "lower": 3000,
+      "upper": 3000,
+      "unit": "W"
+    },
+    "energy_flux_e7_w": {
+      "value": 4000,
+      "lower": 4000,
+      "upper": 4000,
+      "unit": "W"
+    },
+    "effective_jet_system_power_p_jse_w": {
+      "value": 1000,
+      "lower": 1000,
+      "upper": 1000,
+      "unit": "W"
+    }
+  },
+  "inlet_duct_test": {
+    "source_record_id": "INLET-DUCT-001",
+    "source_record_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "method_id": "ITTC-7.5-02-05-03.2-INLET",
+    "condition": {
+      "craft_configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pump_configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scale_context_id": "SYNTHETIC-PWC-MODEL-SCALE-1-10",
+      "craft_speed_mps": {
+        "value": 5,
+        "lower": 5,
+        "upper": 5,
+        "unit": "m/s"
+      },
+      "flow_rate_m3_s": {
+        "value": 0.02,
+        "lower": 0.02,
+        "upper": 0.02,
+        "unit": "m3/s"
+      },
+      "nvr": {
+        "value": 2,
+        "lower": 2,
+        "upper": 2,
+        "unit": "1"
+      },
+      "water_density_kg_m3": {
+        "value": 998,
+        "lower": 998,
+        "upper": 998,
+        "unit": "kg/m3"
+      },
+      "water_temperature_c": {
+        "value": 20,
+        "lower": 20,
+        "upper": 20,
+        "unit": "degC"
+      }
+    },
+    "measurement_window": {
+      "start_utc": "2026-11-12T10:00:00Z",
+      "end_utc": "2026-11-12T10:10:00Z"
+    },
+    "calibration_reference": "CAL-INLET-DUCT-001",
+    "timebase_reference": "TIMEBASE-INLET-DUCT-001",
+    "energy_flux_e0_w": {
+      "value": 4000,
+      "lower": 4000,
+      "upper": 4000,
+      "unit": "W"
+    },
+    "energy_flux_e1_w": {
+      "value": 3000,
+      "lower": 3000,
+      "upper": 3000,
+      "unit": "W"
+    },
+    "energy_flux_e3_w": {
+      "value": 2800,
+      "lower": 2800,
+      "upper": 2800,
+      "unit": "W"
+    }
+  },
+  "pump_loop_test": {
+    "source_record_id": "PUMP-LOOP-001",
+    "source_record_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "method_id": "ITTC-7.5-02-05-03.2-PUMP-LOOP",
+    "condition": {
+      "craft_configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pump_configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scale_context_id": "SYNTHETIC-PWC-MODEL-SCALE-1-10",
+      "craft_speed_mps": {
+        "value": 5,
+        "lower": 5,
+        "upper": 5,
+        "unit": "m/s"
+      },
+      "flow_rate_m3_s": {
+        "value": 0.02,
+        "lower": 0.02,
+        "upper": 0.02,
+        "unit": "m3/s"
+      },
+      "nvr": {
+        "value": 2,
+        "lower": 2,
+        "upper": 2,
+        "unit": "1"
+      },
+      "water_density_kg_m3": {
+        "value": 998,
+        "lower": 998,
+        "upper": 998,
+        "unit": "kg/m3"
+      },
+      "water_temperature_c": {
+        "value": 20,
+        "lower": 20,
+        "upper": 20,
+        "unit": "degC"
+      }
+    },
+    "measurement_window": {
+      "start_utc": "2026-11-13T10:00:00Z",
+      "end_utc": "2026-11-13T10:10:00Z"
+    },
+    "calibration_reference": "CAL-PUMP-LOOP-001",
+    "timebase_reference": "TIMEBASE-PUMP-LOOP-001",
+    "free_stream_pump_efficiency_eta_p0": {
+      "value": 0.8,
+      "lower": 0.8,
+      "upper": 0.8,
+      "unit": "1"
+    }
+  },
+  "waterjet_system_test": {
+    "source_record_id": "WATERJET-SYSTEM-001",
+    "source_record_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "method_id": "ITTC-7.5-02-05-03.2-SYSTEM",
+    "condition": {
+      "craft_configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "pump_configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "scale_context_id": "SYNTHETIC-PWC-MODEL-SCALE-1-10",
+      "craft_speed_mps": {
+        "value": 5,
+        "lower": 5,
+        "upper": 5,
+        "unit": "m/s"
+      },
+      "flow_rate_m3_s": {
+        "value": 0.02,
+        "lower": 0.02,
+        "upper": 0.02,
+        "unit": "m3/s"
+      },
+      "nvr": {
+        "value": 2,
+        "lower": 2,
+        "upper": 2,
+        "unit": "1"
+      },
+      "water_density_kg_m3": {
+        "value": 998,
+        "lower": 998,
+        "upper": 998,
+        "unit": "kg/m3"
+      },
+      "water_temperature_c": {
+        "value": 20,
+        "lower": 20,
+        "upper": 20,
+        "unit": "degC"
+      }
+    },
+    "measurement_window": {
+      "start_utc": "2026-11-14T10:00:00Z",
+      "end_utc": "2026-11-14T10:10:00Z"
+    },
+    "calibration_reference": "CAL-WATERJET-SYSTEM-001",
+    "timebase_reference": "TIMEBASE-WATERJET-SYSTEM-001",
+    "impeller_shaft_power_w": {
+      "value": 2000,
+      "lower": 2000,
+      "upper": 2000,
+      "unit": "W"
+    },
+    "effective_pump_power_w": {
+      "value": 1400,
+      "lower": 1400,
+      "upper": 1400,
+      "unit": "W"
+    },
+    "pump_total_head_rise_m": {
+      "value": 7.152318127099698,
+      "lower": 7.152318127099698,
+      "upper": 7.152318127099698,
+      "unit": "m"
+    },
+    "nozzle_loss_coefficient_zeta57": {
+      "value": 0.05,
+      "lower": 0.05,
+      "upper": 0.05,
+      "unit": "1"
+    },
+    "installation_efficiency_eta_inst": {
+      "value": 0.875,
+      "lower": 0.875,
+      "upper": 0.875,
+      "unit": "1"
+    }
+  },
+  "limitations": [
+    "Synthetic composition vector only; all tests are fabricated known-answer records.",
+    "The NVR value is supplied as a propulsion-test output and is not derived by this contract.",
+    "No measured PWC, pump, inlet, propulsion or full-scale performance is represented."
+  ]
+}
