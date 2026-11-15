@@ -1,0 +1,59 @@
+name: REA Investigator Planner
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/lib.rs"
+      - "src/rea_investigator.rs"
+      - "crates/domains/symthaea-rea-investigator/**"
+      - "tools/rea-investigator-harness/**"
+      - ".github/workflows/rea-investigator-planner.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/lib.rs"
+      - "src/rea_investigator.rs"
+      - "crates/domains/symthaea-rea-investigator/**"
+      - "tools/rea-investigator-harness/**"
+      - ".github/workflows/rea-investigator-planner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-investigator-planner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  investigator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Validate isolated planner harness
+        run: |
+          cargo metadata \
+            --manifest-path tools/rea-investigator-harness/Cargo.toml \
+            --locked --no-deps --format-version 1 \
+            > "$RUNNER_TEMP/rea-investigator-metadata.json"
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/rea-investigator-harness/Cargo.toml -- --check
+
+      - name: Bayesian planner and fail-closed tests
+        run: cargo test --manifest-path tools/rea-investigator-harness/Cargo.toml --locked
