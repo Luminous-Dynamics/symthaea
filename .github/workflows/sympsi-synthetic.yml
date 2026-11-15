@@ -57,3 +57,45 @@ jobs:
           --git-head "$EXACT_HEAD"
           --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json
           --out "$RUNNER_TEMP/sympsi-five-choice-receipt.json"
+      - name: Summarize synthetic receipts
+        run: |
+          for receipt in \
+            "$RUNNER_TEMP/sympsi-four-choice-receipt.json" \
+            "$RUNNER_TEMP/sympsi-five-choice-receipt.json"; do
+            jq -c '.receipt | {
+              profile,
+              choice_count,
+              chance_rate,
+              smallest_effect_hit_rate,
+              alpha,
+              git_head,
+              manifest_sha256,
+              null_calibration: {
+                campaigns: .null_calibration.campaigns,
+                critical_hits: .null_calibration.critical_hits,
+                exact_discrete_type_i_rate: .null_calibration.exact_discrete_type_i_rate,
+                empirical_false_positive_rate: .null_calibration.empirical_false_positive_rate,
+                monte_carlo_within_four_standard_errors: .null_calibration.monte_carlo_within_four_standard_errors
+              },
+              power_calibration: {
+                campaigns: .power_calibration.campaigns,
+                exact_binomial_power: .power_calibration.exact_binomial_power,
+                empirical_power: .power_calibration.empirical_power,
+                monte_carlo_within_four_standard_errors: .power_calibration.monte_carlo_within_four_standard_errors
+              },
+              control_count: (.controls | length),
+              failed_controls: [.controls[] | select(.passed == false) | .id],
+              all_controls_passed
+            }' "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload synthetic-only receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sympsi-synthetic-receipts-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/sympsi-four-choice-receipt.json
+            ${{ runner.temp }}/sympsi-five-choice-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+
