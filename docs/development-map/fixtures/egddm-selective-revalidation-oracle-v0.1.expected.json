@@ -1,0 +1,89 @@
+{
+  "scenario_id": "egddm-shiftbench-selective-revalidation-001",
+  "arm_reports": [
+    {
+      "arm_id": "clean",
+      "condition": "clean",
+      "epochs": [
+        {
+          "epoch": 1,
+          "active_obligation_count": 2,
+          "gold_required_revalidation_obligations": [],
+          "agent_freshly_revalidated_obligations": [],
+          "agent_fresh_pass_obligations": [],
+          "unnecessary_revalidation_obligations": [],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "oracle_minimum_revalidation_units": 0,
+          "agent_fresh_revalidation_units": 0,
+          "full_rerun_reference_units": 2,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "selection_set_distance_units": 0,
+          "oracle_lower_bound_savings_fraction": 1,
+          "agent_observed_refresh_fraction": 0,
+          "revalidation_precision": null,
+          "revalidation_recall": null
+        }
+      ],
+      "total_oracle_minimum_revalidation_units": 0,
+      "total_agent_fresh_revalidation_units": 0,
+      "total_full_rerun_reference_units": 2,
+      "total_over_revalidation_units": 0,
+      "total_under_revalidation_units": 0,
+      "total_selection_set_distance_units": 0,
+      "oracle_lower_bound_savings_fraction": 1,
+      "agent_observed_refresh_fraction": 0,
+      "aggregate_revalidation_precision": null,
+      "aggregate_revalidation_recall": null,
+      "claim_ceiling": "Count-based lower bound from supplied evaluator-side impact labels. Assumes one equal-cost revalidation unit per active obligation; does not authenticate gold labels, execute checks, measure heterogeneous real check costs, or prove safe reuse."
+    },
+    {
+      "arm_id": "shifted",
+      "condition": "shifted",
+      "epochs": [
+        {
+          "epoch": 1,
+          "active_obligation_count": 3,
+          "gold_required_revalidation_obligations": [
+            "api-contract",
+            "audit-requirement"
+          ],
+          "agent_freshly_revalidated_obligations": [
+            "api-contract",
+            "audit-requirement"
+          ],
+          "agent_fresh_pass_obligations": [
+            "api-contract",
+            "audit-requirement"
+          ],
+          "unnecessary_revalidation_obligations": [],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "oracle_minimum_revalidation_units": 2,
+          "agent_fresh_revalidation_units": 2,
+          "full_rerun_reference_units": 3,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "selection_set_distance_units": 0,
+          "oracle_lower_bound_savings_fraction": 0.33333333333333337,
+          "agent_observed_refresh_fraction": 0.6666666666666666,
+          "revalidation_precision": 1,
+          "revalidation_recall": 1
+        }
+      ],
+      "total_oracle_minimum_revalidation_units": 2,
+      "total_agent_fresh_revalidation_units": 2,
+      "total_full_rerun_reference_units": 3,
+      "total_over_revalidation_units": 0,
+      "total_under_revalidation_units": 0,
+      "total_selection_set_distance_units": 0,
+      "oracle_lower_bound_savings_fraction": 0.33333333333333337,
+      "agent_observed_refresh_fraction": 0.6666666666666666,
+      "aggregate_revalidation_precision": 1,
+      "aggregate_revalidation_recall": 1,
+      "claim_ceiling": "Count-based lower bound from supplied evaluator-side impact labels. Assumes one equal-cost revalidation unit per active obligation; does not authenticate gold labels, execute checks, measure heterogeneous real check costs, or prove safe reuse."
+    }
+  ],
+  "claim_ceiling": "Deterministic lower-bound analysis of a supplied, D6-validated trace using evaluator-side gold impact labels. Not a candidate-facing signal, execution oracle, signature, causal proof, or empirical agent result."
+}
