@@ -463,12 +463,12 @@ mod tests {
     #[test]
     fn positive_net_export_below_required_reserve_is_not_qualified() {
         let mut threshold = profile();
-        threshold.required_net_export_reserve_mw = 100.0;
+        threshold.required_net_export_reserve_mw = 200.0;
         let source = run(300.0, 100.0, 50.0, 150.0, 150.0);
         let report = evaluate_plant_power_balance(&threshold, &source);
         assert_eq!(
             report.disposition,
-            PowerBalanceDisposition::NetExportQualifiedForDeclaredBoundary
+            PowerBalanceDisposition::NetExportBelowReserve
         );
     }
 
