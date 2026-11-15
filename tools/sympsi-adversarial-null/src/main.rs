@@ -61,6 +61,19 @@ fn run() -> Result<(), String> {
             "all_controls_passed={}",
             envelope.receipt.all_controls_passed
         );
+        for failed in envelope.receipt.controls.iter().filter(|item| !item.passed) {
+            eprintln!("failed_control={}", failed.id);
+        }
+        for scenario in &envelope.receipt.scenarios {
+            eprintln!(
+                "scenario={} profile={} naive_fpr={:.6} global_conditional_fpr={:.6} block_conditional_fpr={:.6}",
+                scenario.scenario_id,
+                scenario.profile,
+                scenario.naive_fixed_1_over_k.empirical_rate,
+                scenario.global_conditional_target_randomization.empirical_rate,
+                scenario.block_conditional_target_randomization.empirical_rate
+            );
+        }
         if !envelope.receipt.all_controls_passed {
             return Err("one or more adversarial-null benchmark controls failed".into());
         }
