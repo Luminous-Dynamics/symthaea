@@ -9,3 +9,5 @@ anyhow = "1.0"
 risc0-zkvm = "3.0"
 symthaea-zkproof-core = { path = "../core" }
 symthaea-zkproof-methods = { path = "../methods" }
+
+symthaea-zkproof-request-bound-core = { path = "../request-bound-core" }
