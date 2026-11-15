@@ -345,10 +345,7 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
     StructuralProposalResult {
         disposition: ProposalDisposition::EmittedForSymtropyAdmission,
         proposal: Some(proposal),
-        reason_codes: vec![ProposalReason::IntendedUseExceedsDraftClaimCeiling]
-            .into_iter()
-            .filter(|_| false)
-            .collect(),
+        reason_codes: Vec::new(),
         solver_execution_invoked: false,
         design_release_authorized: false,
         physical_validation: "UNRESOLVED".to_owned(),
