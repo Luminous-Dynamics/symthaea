@@ -4867,6 +4867,109 @@ mod tests {
     }
 
     #[test]
+    fn action_history_projection_rejects_terminal_after_inventory_frontier() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let terminal_reference = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::AttemptReconciled { .. }) {
+                action.owner_time_ref.as_ref().map(|reference| {
+                    (reference.clock_mapping_action_id.clone(), reference.local_timestamp_ns)
+                })
+            } else {
+                None
+            }
+        }).expect("terminal owner-time reference");
+        let terminal_time = resolutions.get_mut(&terminal_reference).expect("terminal time");
+        terminal_time.interval.earliest_ns = 1_180;
+        terminal_time.interval.latest_ns = 1_180;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("terminal/frontier order assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_TERMINAL_AFTER_INVENTORY_FRONTIER:attempt-1"));
+    }
+
+    #[test]
+    fn action_history_projection_rejects_policy_revision_after_inventory_frontier() {
+        let (mut schedule, mut resolutions, mut receipts, _) = action_history_fixture();
+        let policy_mapping = ScheduledAction {
+            action_id: "action-000014".to_owned(),
+            at_ns: 13,
+            ordinal: 14,
+            owner_time_ref: None,
+            evidence: None,
+            action: ScheduleAction::ClockAdvance {
+                clock_domain: "policy-clock".to_owned(),
+                basis_id: "policy-basis".to_owned(),
+                epoch: "policy-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                local_tick_ns: 150,
+                offset_ns: 0,
+                uncertainty_ns: 0,
+                calibration_id: "policy-cal-150".to_owned(),
+                mapping_valid_from_ns: 0,
+                mapping_valid_through_ns: 10_000,
+                mapping_receipt_ref: "synthetic://policy-clock/150".to_owned(),
+                mapping_receipt_sha256: "9".repeat(64),
+                qualification: GateState::Pass,
+            },
+        };
+        let policy_revision = ScheduledAction {
+            action_id: "action-000015".to_owned(),
+            at_ns: 13,
+            ordinal: 15,
+            owner_time_ref: Some(ActionClockTimeReference {
+                clock_mapping_action_id: "action-000014".to_owned(),
+                local_timestamp_ns: 138,
+            }),
+            evidence: Some(ActionEvidence::StopPolicyRevision {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://policy-revision/1".to_owned(),
+                receipt_sha256: "8".repeat(64),
+            }),
+            action: ScheduleAction::StopPolicyRevised {
+                obligation_id: "global-stop-1".to_owned(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+        };
+        schedule.actions.push(policy_mapping);
+        schedule.actions.push(policy_revision);
+        let discharge = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::StopDischarged { .. })
+        }).expect("stop discharge");
+        if let ScheduleAction::StopDischarged { policy_revision_action_id, policy_revision, .. } = &mut discharge.action {
+            *policy_revision_action_id = "action-000015".to_owned();
+            *policy_revision = "policy-v2".to_owned();
+        }
+        resolutions.insert(
+            ("action-000014".to_owned(), 138),
+            QualifiedEventTime {
+                source_clock_domain_id: "policy-clock".to_owned(),
+                time_basis: TimeBasisDescriptor {
+                    basis_id: "owner-normalized-tai-v1".to_owned(),
+                    epoch: "tai-epoch-0".to_owned(),
+                    scale: "TAI".to_owned(),
+                    unit: EventTimeUnit::Nanoseconds,
+                },
+                mapping_receipt_ref: "synthetic://policy-clock/150".to_owned(),
+                mapping_receipt_sha256: "9".repeat(64),
+                mapping_qualification: GateState::Pass,
+                mapping_valid_from_ns: 0,
+                mapping_valid_through_ns: 10_000,
+                max_interval_width_ns: 0,
+                interval: EventTimeIntervalNs { earliest_ns: 1_190, latest_ns: 1_190 },
+            },
+        );
+        receipts.insert(
+            "action-000015".to_owned(),
+            passing_owner_receipt("synthetic://policy-revision/1", &"8".repeat(64)),
+        );
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("policy/frontier order assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "STOP_POLICY_AFTER_INVENTORY_FRONTIER:global-stop-1"));
+    }
+
+    #[test]
     fn action_history_projection_requires_frontier_event_and_exact_discharge_manifest() {
         let (mut schedule, resolutions, receipts, _) = action_history_fixture();
         let frontier = schedule.actions.iter_mut().find(|action| {
