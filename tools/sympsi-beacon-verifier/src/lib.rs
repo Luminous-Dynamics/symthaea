@@ -7,9 +7,9 @@
 //! beacon publication time, response-before-target chronology, or the
 //! independence of any timestamp witness.
 
+use drandite_core::Timeline;
 use drandite_core::any::{AnyVerifier, SchemeId};
 use drandite_core::types::{ChainHash, GenesisSeed, Period, Round, UnixTimestamp};
-use drandite_core::Timeline;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -20,8 +20,7 @@ pub const BEACON_ID: &str = "quicknet";
 pub const TRUST_ROOT_MANIFEST_SHA256: &str =
     "8a74f38b67081c9483f2a640fc4ac8d0275318d758a7c6f9cb7b1ffc374485c4";
 
-const TRUST_ROOT_BYTES: &[u8] =
-    include_bytes!("../fixtures/quicknet-trust-root-v1.json");
+const TRUST_ROOT_BYTES: &[u8] = include_bytes!("../fixtures/quicknet-trust-root-v1.json");
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -47,8 +46,9 @@ fn load_trust_root() -> Result<(TrustRootManifest, [u8; 32], String), Verificati
             "embedded trust-root manifest digest differs from the pinned digest".into(),
         ));
     }
-    let root: TrustRootManifest = serde_json::from_slice(TRUST_ROOT_BYTES)
-        .map_err(|error| VerificationError::TrustRoot(format!("trust-root JSON failed: {error}")))?;
+    let root: TrustRootManifest = serde_json::from_slice(TRUST_ROOT_BYTES).map_err(|error| {
+        VerificationError::TrustRoot(format!("trust-root JSON failed: {error}"))
+    })?;
     if root.schema_version != "sympsi.drand-trust-root.v0.1"
         || root.profile_id != PROFILE_ID
         || root.beacon_id != BEACON_ID
@@ -112,18 +112,31 @@ pub enum VerificationError {
 impl fmt::Display for VerificationError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyOrInvalidRound => write!(formatter, "requested round must be greater than zero"),
-            Self::RoundMismatch { requested, returned } => write!(
+            Self::EmptyOrInvalidRound => {
+                write!(formatter, "requested round must be greater than zero")
+            }
+            Self::RoundMismatch {
+                requested,
+                returned,
+            } => write!(
                 formatter,
                 "relay returned round {returned}, but round {requested} was requested"
             ),
-            Self::InvalidHex(field) => write!(formatter, "{field} is not valid fixed-length hexadecimal"),
-            Self::InvalidSignature(detail) => write!(formatter, "Quicknet signature verification failed: {detail}"),
+            Self::InvalidHex(field) => {
+                write!(formatter, "{field} is not valid fixed-length hexadecimal")
+            }
+            Self::InvalidSignature(detail) => write!(
+                formatter,
+                "Quicknet signature verification failed: {detail}"
+            ),
             Self::RandomnessMismatch => write!(
                 formatter,
                 "relay randomness does not match the randomness derived from the verified signature"
             ),
-            Self::TrustRoot(detail) => write!(formatter, "pinned Quicknet trust-root initialization failed: {detail}"),
+            Self::TrustRoot(detail) => write!(
+                formatter,
+                "pinned Quicknet trust-root initialization failed: {detail}"
+            ),
         }
     }
 }
@@ -146,8 +159,8 @@ pub fn verify_quicknet_response(
         });
     }
 
-    let signature = decode_hex::<48>(&response.signature)
-        .ok_or(VerificationError::InvalidHex("signature"))?;
+    let signature =
+        decode_hex::<48>(&response.signature).ok_or(VerificationError::InvalidHex("signature"))?;
     let published_randomness = decode_hex::<32>(&response.randomness)
         .ok_or(VerificationError::InvalidHex("randomness"))?;
 
@@ -206,7 +219,8 @@ pub fn verify_quicknet_response(
         signature_valid_for_pinned_profile_and_round: true,
         freshness_verified: false,
         response_chronology_verified: false,
-        claim_ceiling: "PINNED_QUICKNET_SIGNATURE_AND_ROUND_ONLY_NOT_FRESHNESS_OR_CHRONOLOGY".into(),
+        claim_ceiling: "PINNED_QUICKNET_SIGNATURE_AND_ROUND_ONLY_NOT_FRESHNESS_OR_CHRONOLOGY"
+            .into(),
     })
 }
 
@@ -327,7 +341,8 @@ mod tests {
 
     #[test]
     fn strict_relay_response_rejects_unknown_fields() {
-        let bytes = br#"{"round":1000,"randomness":"00","signature":"00","previous_signature":"00"}"#;
+        let bytes =
+            br#"{"round":1000,"randomness":"00","signature":"00","previous_signature":"00"}"#;
         assert!(serde_json::from_slice::<QuicknetBeaconResponse>(bytes).is_err());
     }
 
@@ -350,6 +365,9 @@ mod tests {
         let receipt = verify_quicknet_response(1000, &known_answer_response()).unwrap();
         assert_eq!(receipt.scheme_id, SCHEME_ID);
         assert_eq!(receipt.beacon_id, BEACON_ID);
-        assert_eq!(receipt.trust_root_manifest_sha256, TRUST_ROOT_MANIFEST_SHA256);
+        assert_eq!(
+            receipt.trust_root_manifest_sha256,
+            TRUST_ROOT_MANIFEST_SHA256
+        );
     }
 }
