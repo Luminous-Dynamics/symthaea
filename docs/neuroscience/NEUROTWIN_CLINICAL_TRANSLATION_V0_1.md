@@ -122,6 +122,8 @@ These are useful published comparators, not a directly comparable leaderboard. T
 
 There is no single universal SOTA score for personalized clinical connectomics. The studies above answer different questions. Do not rank AUROC, balanced accuracy, R-squared and correlation as if they were the same metric.
 
+The complete locked reproduction protocol is [NEUROTWIN_CROSS_TRIAL_BENCHMARK_V0_1.md](./NEUROTWIN_CROSS_TRIAL_BENCHMARK_V0_1.md). It specifies the exact train/test directions, the clinical and dACC baselines, preprocessing constraints, matched participant requirements, metrics and superiority gates.
+
 The current strongest operational benchmark for this programme is the **EMBARC ↔ CAN-BIND cross-trial experiment**. Its reported dACC + clinical models reach cross-trial AUC up to 0.68, with balanced accuracy depending on direction and treatment arm. NeuroTwin's first serious target is to reproduce this evaluation exactly. Only after reproduction should we claim a gain; the superiority margin must be preregistered, the paired confidence interval must exclude zero, and calibration/decision benefit must not regress. A nominal AUC improvement on a different cohort or endpoint is not a valid SOTA comparison.
 
 
