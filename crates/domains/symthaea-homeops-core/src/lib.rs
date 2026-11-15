@@ -65,7 +65,7 @@ pub enum SealState {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TransportMode {
     Road,
     GroundRobot,
@@ -119,7 +119,7 @@ impl PackageManifest {
                 return Err(ManifestError::CentreOfMassOutsidePackage);
             }
         }
-        if matches!(self.handling_class, HandlingClass::Chilled | HandlingClass::Frozen)
+        if matches!(&self.handling_class, HandlingClass::Chilled | HandlingClass::Frozen)
             && self.required_temperature.is_none()
         {
             return Err(ManifestError::MissingTemperatureBand);
@@ -253,7 +253,7 @@ pub fn assess_placement(
         return PlacementDecision::Hold(PlacementHoldReason::CapacityUnavailable);
     }
 
-    match package.handling_class {
+    match &package.handling_class {
         HandlingClass::Restricted | HandlingClass::HumanReview => {
             if compartment.storage_class != StorageClass::Quarantine {
                 return PlacementDecision::Reject(
