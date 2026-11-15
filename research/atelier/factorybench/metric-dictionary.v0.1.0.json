@@ -460,6 +460,135 @@
       "cautions": [
         "Utilization is not wellbeing; do not infer fatigue, comfort or safety from utilization alone."
       ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-001",
+      "name": "Soft reallocation share of eligible demand changes",
+      "dimension": "reconfigurability",
+      "unit": "percent",
+      "formula": "100 * eligible_demand_changes_resolved_without_physical_module_or_connection_change / all_eligible_demand_changes",
+      "numerator": "Demand or order-mix changes resolved by reassignment within the unchanged, currently qualified physical configuration.",
+      "denominator": "All demand changes adjudicated as feasible under the frozen capability pool and safety/quality constraints.",
+      "boundary": "Named cell configuration, operation graph, demand-change corpus and time interval.",
+      "required_metadata": [
+        "current_configuration_digest",
+        "target_configuration_digest",
+        "transition_evaluator_version",
+        "demand_change_case_ref",
+        "qualification_status"
+      ],
+      "cautions": [
+        "Do not count an infeasible or quality-degrading assignment as successful soft reallocation.",
+        "This measures the share of changes handled without physical movement, not overall productivity."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-002",
+      "name": "Time to first independently accepted unit after a configuration change",
+      "dimension": "reconfigurability",
+      "unit": "minutes",
+      "formula": "independent_first_good_unit_acceptance_timestamp - change_trigger_timestamp",
+      "numerator": "Elapsed time from the triggering demand/configuration event to the first independently accepted product under the target configuration.",
+      "denominator": "One reconfiguration event; report median, P95 and all event outcomes.",
+      "boundary": "Include planning, physical moves, connection inspection, commissioning, requalification, operator handoff, ramp-up and first inspection; identify partner/transport boundary.",
+      "required_metadata": [
+        "change_trigger_event_ref",
+        "target_configuration_ref",
+        "commissioning_evidence_ref",
+        "first_acceptance_event_ref",
+        "inspection_plan_ref"
+      ],
+      "cautions": [
+        "A physically installed module or successful machine restart is not the endpoint.",
+        "Failed or censored reconfiguration events remain in the result set."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-003",
+      "name": "Physical reconfiguration downtime",
+      "dimension": "reconfigurability",
+      "unit": "minutes",
+      "formula": "qualified_production_stop_to_qualified_production_resume_elapsed_minutes",
+      "numerator": "Elapsed time from the first planned stop for physical change until the new configuration has completed its required independent requalification and is permitted by the responsible owners for production consideration.",
+      "denominator": "One physical configuration-change event.",
+      "boundary": "Named cell, exact before/after configuration digests and all independent qualification steps.",
+      "required_metadata": [
+        "stop_event_ref",
+        "resume_event_ref",
+        "before_configuration_digest",
+        "after_configuration_digest",
+        "requalification_obligation_refs"
+      ],
+      "cautions": [
+        "The benchmark evaluator's planned actions are not observed downtime.",
+        "Report labour-hours and external downtime separately where available."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-004",
+      "name": "Injected-fault diagnostic coverage",
+      "dimension": "diagnosability",
+      "unit": "percent",
+      "formula": "100 * injected_faults_correctly_localized_within_declared_time / all_injected_faults",
+      "numerator": "Injected fault cases localized to the correct module, interface, process revision, evidence dependency or utility within the preregistered time bound.",
+      "denominator": "All injected fault cases, including unresolved and false diagnoses.",
+      "boundary": "Frozen fault taxonomy, exact ground-truth labels, module graph and diagnostic algorithm revision.",
+      "required_metadata": [
+        "fault_corpus_digest",
+        "ground_truth_revision",
+        "diagnostic_algorithm_ref",
+        "time_bound_seconds",
+        "false_positive_count"
+      ],
+      "cautions": [
+        "Report false positives and localization time separately; detecting an alarm is not diagnosis.",
+        "Synthetic diagnosability does not establish field MTTR."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-005",
+      "name": "Requalification obligation count per physical transition",
+      "dimension": "qualification_burden",
+      "unit": "obligations_per_transition",
+      "formula": "count_of_distinct_independent_requalification_obligations_for_transition",
+      "numerator": "Distinct required requalification obligations emitted by the frozen dependency/invalidation rules.",
+      "denominator": "One physical reconfiguration event; publish distribution across events.",
+      "boundary": "Named profile, process, layout, tooling, utility, workforce and inspection evidence dependencies.",
+      "required_metadata": [
+        "before_configuration_digest",
+        "after_configuration_digest",
+        "invalidation_rule_revision",
+        "obligation_set_digest",
+        "independent_reviewer_ref"
+      ],
+      "cautions": [
+        "Lower counts are not inherently better; omitted required obligations are a safety/capability failure.",
+        "Compare only under matched change types and dependency graphs."
+      ]
+    },
+    {
+      "metric_id": "AT-FB-RECONF-006",
+      "name": "Qualified module reuse rate",
+      "dimension": "circularity_and_capacity",
+      "unit": "percent",
+      "formula": "100 * previously_qualified_modules_reused_in_target_configurations / all_modules_installed_in_target_configurations",
+      "numerator": "Distinct module instances reused without creating a new module identity, while their qualification remains valid for the target site/configuration.",
+      "denominator": "All module instances installed across target configurations in the measurement interval.",
+      "boundary": "Named module pool, facility/site identity and qualification dependencies.",
+      "required_metadata": [
+        "module_profile_revision_refs",
+        "before_after_configuration_refs",
+        "site_ref",
+        "module_identity_policy",
+        "qualification_validity_intervals"
+      ],
+      "cautions": [
+        "A reused module at a different site is not qualified by identity alone.",
+        "Reuse is not beneficial when it creates excessive changeover or requalification burden."
+      ]
     }
-  ]
+  ],
+  "synthesis": {
+    "reconfigurability_measurement": "ReconfigBench reports soft reallocation, time to first accepted unit, physical downtime, diagnostic coverage, requalification burden and qualified module reuse separately. Do not collapse them into a single modularity score."
+  }
 }
