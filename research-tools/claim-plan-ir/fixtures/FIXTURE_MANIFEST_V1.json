@@ -43,6 +43,11 @@
       "path": "negative/invalid_json_pointer_escape.json",
       "expected": "reject-semantic-preflight",
       "reason": "RFC 6901 permits only ~0 and ~1 escapes in a JSON Pointer token; ~2 must reject before field selection."
+    },
+    {
+      "path": "negative/expiry_not_after_issued_at.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "A verifier challenge must expire strictly after its issue time; zero or negative validity windows are invalid."
     }
   ],
   "nonclaims": [
