@@ -27,9 +27,15 @@ impl AuditOutcome {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AcceptedFeasibleCandidate {
+    pub candidate_id: String,
+    pub evidence_ref: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AcceptedFeasibleManifest {
-    /// Number of reference-confirmed feasible candidates retained by screening.
-    pub count_lower_bound: u64,
+    /// Explicit, lexicographically ordered reference-confirmed feasible identities.
+    pub candidates: Vec<AcceptedFeasibleCandidate>,
     /// Declared identity of the manifest listing those candidates and evidence.
     pub manifest_sha256: String,
     /// Reference to the independently checkable high-fidelity evidence manifest.
@@ -281,9 +287,42 @@ pub fn audit_rejected_candidates(
         }
     }
 
-    // The manifest count and digest are declarations. The raw manifest payload
-    // must be independently verified by the caller before this report is trusted.
-    let accepted_count = plan.accepted_feasible.count_lower_bound;
+    // Explicit accepted identities prevent double-counting a candidate that also
+    // appears in the rejected population. The digest's source bytes remain the
+    // caller's independent verification responsibility.
+    let mut accepted_ids = BTreeSet::new();
+    let mut previous_accepted: Option<&str> = None;
+    for candidate in &plan.accepted_feasible.candidates {
+        if candidate.candidate_id.trim().is_empty() {
+            errors.push(AuditError::EmptyIdentity(
+                "accepted_feasible.candidate_id",
+            ));
+        }
+        if candidate.evidence_ref.trim().is_empty() {
+            errors.push(AuditError::EmptyIdentity(
+                "accepted_feasible.candidate.evidence_ref",
+            ));
+        }
+        if let Some(previous) = previous_accepted {
+            if candidate.candidate_id.as_str() <= previous {
+                errors.push(AuditError::UnsortedCandidatePopulation(
+                    "accepted-feasible".to_string(),
+                ));
+                break;
+            }
+        }
+        previous_accepted = Some(&candidate.candidate_id);
+        if !accepted_ids.insert(candidate.candidate_id.clone())
+            || population_ids.contains(&candidate.candidate_id)
+        {
+            errors.push(AuditError::DuplicateCandidateId(
+                candidate.candidate_id.clone(),
+            ));
+        }
+    }
+
+    let accepted_count = u64::try_from(plan.accepted_feasible.candidates.len())
+        .map_err(|_| vec![AuditError::IntegerOverflow])?;
     if !errors.is_empty() {
         return Err(errors);
     }
@@ -324,7 +363,7 @@ pub fn audit_rejected_candidates(
             potential_false_negatives as f64 / sample_size as f64
         } else {
             let observed_rate = potential_false_negatives as f64 / sample_size as f64;
-            let epsilon = (per_stratum_alpha.ln().neg() / (2.0 * sample_size as f64)).sqrt();
+            let epsilon = (-per_stratum_alpha.ln() / (2.0 * sample_size as f64)).sqrt();
             (observed_rate + epsilon).min(1.0)
         };
 
@@ -477,7 +516,12 @@ mod tests {
             familywise_confidence_level: 0.95,
             target_feasible_recall: 0.99,
             accepted_feasible: AcceptedFeasibleManifest {
-                count_lower_bound: accepted,
+                candidates: (0..accepted)
+                    .map(|index| AcceptedFeasibleCandidate {
+                        candidate_id: format!("accepted-feasible-{index:08}"),
+                        evidence_ref: format!("accepted-solver-run-{index:08}"),
+                    })
+                    .collect(),
                 manifest_sha256: digest('c'),
                 evidence_ref: "accepted-feasible-evidence-manifest".to_string(),
             },
