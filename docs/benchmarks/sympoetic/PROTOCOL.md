@@ -97,8 +97,26 @@ Where feasible, randomize participants to matched conditions:
 5. **Reflective human-led:** the AI primarily asks questions or offers bounded suggestions, leaving the participant in control.
 6. **Reciprocal co-creation:** both parties may propose, critique, ask, revise, and redirect, with explicit permission and reversible actions.
 7. **Human-human reference:** a human dyad completes a comparable collaborative task where practical.
+8. **Multi-agent reference:** two or more AI agents collaborate without a human co-creator, with the same task information and resource budget.
+9. **Human-AI team:** a human participant collaborates with two or more specialist AI agents through a shared coordinator or explicit handoff protocol.
+
+For the multi-agent and team conditions, randomize who begins, who synthesizes, and whether a handoff occurs. A specialist's authority is not inherited by another agent; each principal has its own permission boundary.
 
 Record time, tool access, task information, and intervention opportunities. If a domain cannot support all conditions, document the omitted conditions and do not compare unlike scores.
+
+### 4.1 Collaboration gap, relay, and handoff
+
+For multi-agent scenarios, measure whether team performance falls below the best solo member:
+
+**collaboration_gap = max(Q(A), Q(B)) - Q(A+B)**
+
+Positive values indicate a collaboration gap; negative values indicate synergy. For human-AI conditions, use matched human-only and AI-only baselines.
+
+Measure partner-order sensitivity as the absolute difference between A→B and B→A runs. Measure handoff recovery as successful post-handoff continuations divided by valid handoff attempts. A valid handoff must preserve goals, constraints, evidence, assumptions, unresolved questions, and authority boundaries.
+
+Include blind handoff, structured handoff, strong-first relay, weak-first relay, and role-specialized parallel work where the task supports them. Counterbalance order. Do not assume that strongest-first or any other ordering is universally optimal.
+
+Use the separate [Collaboration Gap and Relay Protocol](COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) for the detailed experimental matrix and reporting rules.
 
 ## 5. Scenario domains
 
@@ -110,6 +128,7 @@ The first suite covers:
 - Collective planning with heterogeneous stakeholder goals.
 - Conceptual and philosophical exploration with legitimate plural outcomes.
 - Longitudinal collaboration with evolving preferences and consent boundaries.
+- Partner coordination, role specialization, team handoffs, and order-sensitive collaboration.
 
 The development corpus in SEED_CORPUS.v0.1.jsonl contains thirteen task templates. It is not a representative sample of human creativity and is not a locked test set.
 
@@ -167,6 +186,8 @@ Targets below are design goals for the first research cycle, not measured result
 | Attribution F1 | ≥0.95 | Against blinded human annotation |
 | Common-ground accuracy | ≥0.95 | On explicitly checkable critical constraints |
 | Repair success | ≥0.90 | Report separately by perturbation type |
+| Handoff recovery | ≥0.90 | Only on valid, independently adjudicated handoffs |
+| Reconciliation bypasses | 0 | No new tool invocation while an unknown outcome is unresolved |
 | Agency | Non-inferior within 0.20 SD | Against the preregistered human-led reflective condition; validate margin first |
 | Quality-matched diversity ratio | ≥0.90 | Human-AI versus human-only condition; aspirational |
 | Synergy | Positive with interval excluding zero | Only on tasks with matched, randomized baselines |
