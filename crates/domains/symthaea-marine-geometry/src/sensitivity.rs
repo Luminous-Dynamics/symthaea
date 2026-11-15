@@ -76,14 +76,25 @@ pub struct HydrostaticSensitivity {
     pub base_spec_digest_blake3: String,
     pub minus_spec_digest_blake3: String,
     pub plus_spec_digest_blake3: String,
+    pub minus_half_step_spec_digest_blake3: String,
+    pub plus_half_step_spec_digest_blake3: String,
     pub base_geometry_digest_blake3: String,
     pub minus_geometry_digest_blake3: String,
     pub plus_geometry_digest_blake3: String,
+    pub minus_half_step_geometry_digest_blake3: String,
+    pub plus_half_step_geometry_digest_blake3: String,
     pub base_value: f64,
     pub minus_value: f64,
     pub plus_value: f64,
-    /// Central difference: (plus_value - minus_value) / (2 * step).
+    pub minus_half_step_value: f64,
+    pub plus_half_step_value: f64,
+    pub coarse_derivative_per_parameter_unit: f64,
+    pub fine_derivative_per_parameter_unit: f64,
+    pub estimated_truncation_error: f64,
+    /// Richardson-extrapolated central difference using h and h/2.
     pub derivative_per_parameter_unit: f64,
+    /// BLAKE3 of this result with the digest field cleared.
+    pub result_digest_blake3: String,
 }
 
 fn violation(
@@ -284,6 +295,35 @@ fn evaluate_spec(
     ))
 }
 
+/// Compute the deterministic digest of a sensitivity receipt payload.
+/// The digest field is cleared before serialization to avoid recursion.
+pub fn compute_sensitivity_digest(
+    result: &HydrostaticSensitivity,
+) -> Result<String, serde_json::Error> {
+    let mut payload = result.clone();
+    payload.result_digest_blake3.clear();
+    let bytes = serde_json::to_vec(&payload)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+/// Verify all sensitivity provenance fields remain bound to the result digest.
+pub fn verify_sensitivity_result(
+    result: &HydrostaticSensitivity,
+) -> Result<(), SensitivityViolation> {
+    let actual = compute_sensitivity_digest(result).map_err(|error| SensitivityViolation {
+        code: "sensitivity_digest".into(),
+        detail: format!("could not serialize sensitivity result: {error}"),
+    })?;
+    if actual.eq_ignore_ascii_case(&result.result_digest_blake3) {
+        Ok(())
+    } else {
+        Err(SensitivityViolation {
+            code: "sensitivity_digest_mismatch".into(),
+            detail: "sensitivity receipt payload does not match its result digest".into(),
+        })
+    }
+}
+
 /// Compute a central finite-difference derivative of one hydrostatic
 /// observable with respect to one section-family parameter.
 ///
@@ -323,6 +363,18 @@ pub fn calculate_hydrostatic_sensitivity(
     let minus_spec = perturb_spec(source, parameter, -step).map_err(|error| vec![error])?;
     let plus_spec = perturb_spec(source, parameter, step).map_err(|error| vec![error])?;
 
+    let half_step = step * 0.5;
+    if !half_step.is_finite() || half_step <= 0.0 {
+        return Err(vec![SensitivityViolation {
+            code: "half_step_underflow".into(),
+            detail: "half-step underflowed or is not representable".into(),
+        }]);
+    }
+    let minus_half_spec =
+        perturb_spec(source, parameter, -half_step).map_err(|error| vec![error])?;
+    let plus_half_spec =
+        perturb_spec(source, parameter, half_step).map_err(|error| vec![error])?;
+
     let (base_spec_digest, base_geometry_digest, base_properties) =
         evaluate_spec(source, profile, water_density_kg_m3)?;
     let (minus_spec_digest, minus_geometry_digest, minus_properties) =
@@ -331,7 +383,7 @@ pub fn calculate_hydrostatic_sensitivity(
                 0,
                 SensitivityViolation {
                     code: "minus_perturbation_invalid".into(),
-                    detail: "negative perturbation did not pass the unchanged geometry/hydrostatic pipeline".into(),
+                    detail: "negative h perturbation did not pass the unchanged geometry/hydrostatic pipeline".into(),
                 },
             );
             errors
@@ -342,7 +394,29 @@ pub fn calculate_hydrostatic_sensitivity(
                 0,
                 SensitivityViolation {
                     code: "plus_perturbation_invalid".into(),
-                    detail: "positive perturbation did not pass the unchanged geometry/hydrostatic pipeline".into(),
+                    detail: "positive h perturbation did not pass the unchanged geometry/hydrostatic pipeline".into(),
+                },
+            );
+            errors
+        })?;
+    let (minus_half_spec_digest, minus_half_geometry_digest, minus_half_properties) =
+        evaluate_spec(&minus_half_spec, profile, water_density_kg_m3).map_err(|mut errors| {
+            errors.insert(
+                0,
+                SensitivityViolation {
+                    code: "minus_half_step_invalid".into(),
+                    detail: "negative h/2 perturbation did not pass the unchanged geometry/hydrostatic pipeline".into(),
+                },
+            );
+            errors
+        })?;
+    let (plus_half_spec_digest, plus_half_geometry_digest, plus_half_properties) =
+        evaluate_spec(&plus_half_spec, profile, water_density_kg_m3).map_err(|mut errors| {
+            errors.insert(
+                0,
+                SensitivityViolation {
+                    code: "plus_half_step_invalid".into(),
+                    detail: "positive h/2 perturbation did not pass the unchanged geometry/hydrostatic pipeline".into(),
                 },
             );
             errors
@@ -351,11 +425,26 @@ pub fn calculate_hydrostatic_sensitivity(
     let base_value = observable_value(&base_properties, observable);
     let minus_value = observable_value(&minus_properties, observable);
     let plus_value = observable_value(&plus_properties, observable);
-    let derivative = (plus_value - minus_value) / (2.0 * step);
+    let minus_half_step_value = observable_value(&minus_half_properties, observable);
+    let plus_half_step_value = observable_value(&plus_half_properties, observable);
+    let coarse_derivative = (plus_value - minus_value) / (2.0 * step);
+    let fine_derivative = (plus_half_step_value - minus_half_step_value) / (2.0 * half_step);
+    let estimated_truncation_error = (fine_derivative - coarse_derivative).abs() / 3.0;
+    let derivative = fine_derivative + (fine_derivative - coarse_derivative) / 3.0;
 
-    if [base_value, minus_value, plus_value, derivative]
-        .iter()
-        .any(|value| !value.is_finite())
+    if [
+        base_value,
+        minus_value,
+        plus_value,
+        minus_half_step_value,
+        plus_half_step_value,
+        coarse_derivative,
+        fine_derivative,
+        estimated_truncation_error,
+        derivative,
+    ]
+    .iter()
+    .any(|value| !value.is_finite())
     {
         return Err(vec![SensitivityViolation {
             code: "non_finite_sensitivity".into(),
@@ -371,7 +460,7 @@ pub fn calculate_hydrostatic_sensitivity(
     })?;
     let profile_digest_blake3 = blake3::hash(&profile_bytes).to_hex().to_string();
 
-    Ok(HydrostaticSensitivity {
+    let mut result = HydrostaticSensitivity {
         result_schema_version: 1,
         candidate_id: source.candidate_id.clone(),
         profile_id: profile.id.clone(),
@@ -387,14 +476,32 @@ pub fn calculate_hydrostatic_sensitivity(
         base_spec_digest_blake3: base_spec_digest,
         minus_spec_digest_blake3: minus_spec_digest,
         plus_spec_digest_blake3: plus_spec_digest,
+        minus_half_step_spec_digest_blake3: minus_half_spec_digest,
+        plus_half_step_spec_digest_blake3: plus_half_spec_digest,
         base_geometry_digest_blake3: base_geometry_digest,
         minus_geometry_digest_blake3: minus_geometry_digest,
         plus_geometry_digest_blake3: plus_geometry_digest,
+        minus_half_step_geometry_digest_blake3: minus_half_geometry_digest,
+        plus_half_step_geometry_digest_blake3: plus_half_geometry_digest,
         base_value,
         minus_value,
         plus_value,
+        minus_half_step_value,
+        plus_half_step_value,
+        coarse_derivative_per_parameter_unit: coarse_derivative,
+        fine_derivative_per_parameter_unit: fine_derivative,
+        estimated_truncation_error,
         derivative_per_parameter_unit: derivative,
-    })
+        result_digest_blake3: String::new(),
+    };
+    result.result_digest_blake3 =
+        compute_sensitivity_digest(&result).map_err(|error| {
+            vec![SensitivityViolation {
+                code: "sensitivity_digest".into(),
+                detail: format!("could not serialize sensitivity receipt: {error}"),
+            }]
+        })?;
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -521,6 +628,33 @@ mod tests {
         .unwrap();
         assert!((result.base_value - 50.0).abs() < 1.0e-9);
         assert!((result.derivative_per_parameter_unit - 0.5).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn sensitivity_receipt_digest_binds_both_step_sizes_and_profile() {
+        let mut result = calculate_hydrostatic_sensitivity(
+            &prismatic_spec(),
+            &profile(),
+            SectionParameter::LengthM,
+            0.1,
+            HydrostaticObservable::DisplacementVolumeM3,
+            1_025.0,
+            "synthetic-prism-known-answer",
+        )
+        .unwrap();
+        assert!(verify_sensitivity_result(&result).is_ok());
+        assert!(
+            (result.coarse_derivative_per_parameter_unit
+                - result.fine_derivative_per_parameter_unit)
+                .abs()
+                < 1.0e-8
+        );
+        assert!(result.estimated_truncation_error < 1.0e-8);
+        result.water_density_source = "changed-source".into();
+        assert_eq!(
+            verify_sensitivity_result(&result).unwrap_err().code,
+            "sensitivity_digest_mismatch"
+        );
     }
 
     #[test]
