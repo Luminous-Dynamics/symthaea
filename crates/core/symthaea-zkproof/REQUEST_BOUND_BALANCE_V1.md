@@ -42,7 +42,7 @@ Domain:
 
 All context fields are fixed width and concatenated in the order above. The threshold is an unsigned 64-bit big-endian integer. Serde/JSON serialization bytes are not hashed.
 
-A fixed known-answer vector is included in the shared core tests:
+A fixed known-answer vector is included in the isolated request-bound core tests:
 
 - request ID: 16 bytes of `0x01`
 - source statement reference: 32 bytes of `0x02`
@@ -60,7 +60,7 @@ Expected digest:
 
 ## 4. Guest and host behavior
 
-Guest tag 2 receives:
+The separate request-bound guest receives:
 
 - private `balance: u64`;
 - public `BalanceProofRequestV1`.
@@ -76,7 +76,7 @@ The host API:
 - `BalanceProofRequestBoundProverV1::prove(balance, request)`
 - `BalanceProofRequestBoundProverV1::verify_for_request(prove_info, expected_request)`
 
-The verifier checks the receipt against the compiled `SYMTHAEA_ZKPROOF_GUEST_ID`, decodes the tag-2 output, recomputes the expected request digest and rejects a mismatch.
+The verifier checks the receipt against the dedicated `SYMTHAEA_ZKPROOF_REQUEST_BOUND_GUEST_ID`, decodes the request-bound output, recomputes the expected request digest and rejects a mismatch.
 
 A receipt for a different request, source reference, issuer-key reference, audience, verifier, purpose, policy, challenge or threshold must not be accepted by `verify_for_request`.
 
@@ -88,7 +88,8 @@ A proof with `sufficient == false` is still a valid proof of the declared comput
 - `guest-request-bound` is an additional package listed in the `risc0-build` methods manifest and receives its own ImageID.
 - `BalanceProofRequestBoundProverV1` proves/verifies only against the dedicated request-bound guest ELF/ImageID.
 - Legacy APIs continue to use the original `SYMTHAEA_ZKPROOF_GUEST_ELF` and `SYMTHAEA_ZKPROOF_GUEST_ID` constants.
-- The shared core uses SHA-256 0.10 with default features disabled so the same digest function is available to the no-std guest and host.
+- The new `symthaea-zkproof-request-bound-core` crate owns the request types and SHA-256 0.10 digest implementation with default features disabled; both request-bound guest and host depend on it.
+- The existing `symthaea-zkproof-core` crate and its dependency graph remain unchanged for legacy guest use.
 
 ## 5a. Image identity and receipt compatibility
 
@@ -99,7 +100,7 @@ This implementation therefore keeps the original guest package untouched and add
 - legacy: `SYMTHAEA_ZKPROOF_GUEST_ELF` / `SYMTHAEA_ZKPROOF_GUEST_ID`;
 - request-bound: `SYMTHAEA_ZKPROOF_REQUEST_BOUND_GUEST_ELF` / `SYMTHAEA_ZKPROOF_REQUEST_BOUND_GUEST_ID`.
 
-The exact generated symbols must be confirmed by the methods build. Existing historical receipts still require the historical ELF/ImageID and verifier policy that produced them; this branch does not claim that old receipt bytes can be verified by the new request-bound ImageID.
+The expected generated symbols are derived from the `symthaea-zkproof-request-bound-guest` binary target name. They still require confirmation by the methods build. Existing historical receipts still require the historical ELF/ImageID and verifier policy that produced them; this branch does not claim that old receipt bytes can be verified by the new request-bound ImageID.
 
 ## 6. Security and privacy claim ceiling
 
@@ -121,7 +122,7 @@ It does **not** establish:
 8. that the public request digest is unlinkable if callers reuse request fields across contexts;
 9. that the RISC Zero proof is a substitute for independent program-image and verifier qualification.
 
-The source and issuer digests are **references**, not cryptographic source bindings. The guest does not verify an issuer signature or commitment opening. Never label this tag as a completed issuer-bound PPAC proof.
+The source and issuer digests are **references**, not cryptographic source bindings. The guest does not verify an issuer signature or commitment opening. Never label this guest as a completed issuer-bound PPAC proof.
 
 ## 7. Required next tranche
 
