@@ -219,8 +219,8 @@ fn intervention_adjudications_produce_burden_and_missed_warning_rates() {
 #[test]
 fn committed_seed_corpus_validates() {
     let (scenarios, receipt) = validate_corpus(SEED_CORPUS.as_bytes()).unwrap();
-    assert_eq!(scenarios.len(), 15);
-    assert_eq!(receipt.scenario_count, 15);
+    assert_eq!(scenarios.len(), 16);
+    assert_eq!(receipt.scenario_count, 16);
     assert_eq!(receipt.status, "pass");
     assert_eq!(receipt.scenario_ids[0], "SP-CRE-001");
 }
