@@ -1025,6 +1025,8 @@ mod tests {
                 let mut failure_checkpoint = arm.checkpoints[1].clone();
                 failure_checkpoint.epoch = 2;
                 failure_checkpoint.checkpoint_at = "2026-11-15T07:16:00Z".to_owned();
+                failure_checkpoint.predicted_affected_obligation_ids.clear();
+                failure_checkpoint.revalidation_cost_units = 0.0;
                 let failure = failure_checkpoint.receipts.iter_mut()
                     .find(|receipt| receipt.obligation_id == "api-contract").expect("API receipt");
                 failure.receipt_id = "shifted-epoch2-api-fail".to_owned();
@@ -1068,7 +1070,7 @@ mod tests {
         assert!(shifted.final_checkpoint_success);
         assert_eq!(shifted.critical_unverified_obligation_seconds, 660);
         assert_eq!(shifted.max_critical_unverified_gap_seconds, 240);
-        assert_eq!(shifted.recovery_event_count, 4);
+        assert_eq!(shifted.recovery_event_count, 5);
     }
 
     #[test]
