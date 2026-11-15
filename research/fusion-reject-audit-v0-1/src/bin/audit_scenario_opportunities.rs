@@ -1,12 +1,13 @@
 use fusion_reject_audit::{
     AcceptedCandidate, AcceptedCandidateManifest, AuditOutcome, FrozenCandidateUniverse,
-    RejectAuditPlan, RejectStratum, deterministic_audit_sample_ids,
-    scenario_opportunity::{
-        CandidateScenarioBundle, ScenarioDefinition, ScenarioEvaluation,
-        ScenarioOpportunityPlan, StratumScenarioBundles, audit_scenario_opportunities,
-    },
+    RejectAuditPlan, RejectStratum,
     decision_opportunity::{
         IncumbentFrontierPoint, ObjectiveDefinition, ObjectiveDirection, ObjectiveValue,
+    },
+    deterministic_audit_sample_ids,
+    scenario_opportunity::{
+        CandidateScenarioBundle, ScenarioDefinition, ScenarioEvaluation, ScenarioOpportunityPlan,
+        StratumScenarioBundles, audit_scenario_opportunities,
     },
 };
 
@@ -289,12 +290,12 @@ fn main() {
             println!("scenario_count={}", report.scenarios.len());
             println!(
                 "simultaneous_bounds={},familywise_confidence={:.3}",
-                report.simultaneous_bound_count,
-                report.familywise_confidence_level
+                report.simultaneous_bound_count, report.familywise_confidence_level
             );
             println!(
                 "any_scenario_opportunity_recall_lower_bound={:.6}",
-                report.union
+                report
+                    .union
                     .conditional_any_scenario_recall_lower_bound
                     .unwrap_or(0.0)
             );
@@ -305,7 +306,9 @@ fn main() {
                     scenario.rejected_opportunities_observed,
                     scenario.rejected_unresolved_observed,
                     scenario.missed_opportunities_upper_bound,
-                    scenario.conditional_opportunity_recall_lower_bound.unwrap_or(0.0)
+                    scenario
+                        .conditional_opportunity_recall_lower_bound
+                        .unwrap_or(0.0)
                 );
             }
             println!(
