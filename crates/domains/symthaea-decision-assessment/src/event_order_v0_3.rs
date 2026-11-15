@@ -18,7 +18,7 @@ use crate::event_order_v0_2::{
     BitemporalEventEnvelope, QualifiedEventTime, compare_qualified_event_times,
 };
 
-pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3";
+pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.1";
 pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.2";
 pub const MAX_GENERATED_EVENTS: usize = 4_096;
 
