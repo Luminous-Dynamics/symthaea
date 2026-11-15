@@ -2998,4 +2998,58 @@ mod tests {
         }
     }
 
+
+    /// Exponential-relaxation reference paths should preserve state at zero dt.
+    /// This is a positive control for the identity regression fixtures.
+    #[test]
+    fn exponential_reference_paths_preserve_zero_dt_state() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            ..UnifiedConfig::default()
+        };
+        let initial = ContinuousHV::from_values(vec![0.25; dimension]);
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+
+        let mut exact = HdcLtcUnifiedNeuron::new(config.clone(), 42);
+        exact.set_state(initial.clone());
+        exact.evolve_closed_form_exact(0.0, &input);
+        assert_eq!(exact.state().values, initial.values);
+
+        let mut iterative = HdcLtcUnifiedNeuron::new(config, 42);
+        iterative.set_state(initial.clone());
+        iterative.evolve_closed_form_iterative(0.0, &input);
+        assert_eq!(iterative.state().values, initial.values);
+    }
+
+    /// Right-continuity acceptance regression for the adaptive-gate path.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn closed_form_small_positive_dt_tends_to_identity() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron.set_state(ContinuousHV::from_values(vec![0.25; dimension]));
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+        let before = neuron.state().clone();
+
+        neuron.evolve_closed_form(1e-6, &input);
+
+        let change = neuron
+            .state()
+            .values
+            .iter()
+            .zip(before.values.iter())
+            .map(|(a, b)| (a - b).powi(2))
+            .sum::<f32>()
+            .sqrt();
+        assert!(
+            change < 1e-3,
+            "state change must approach zero with dt, got {change}"
+        );
+    }
+
 }
