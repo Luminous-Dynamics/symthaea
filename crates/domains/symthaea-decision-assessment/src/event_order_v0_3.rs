@@ -519,6 +519,31 @@ fn require_id(value: &str, name: &'static str) -> Result<(), ReplayError> {
     }
 }
 
+fn classify_clock_mapping(
+    active_mapping_id: Option<&String>,
+    referenced_mapping_id: &str,
+    mapping: Option<&ClockMappingState>,
+    timestamp_ns: u64,
+) -> Option<SchedulerDisposition> {
+    if active_mapping_id.is_none_or(|active| active != referenced_mapping_id)
+        || mapping.is_none()
+    {
+        return Some(SchedulerDisposition::StaleClockMappingReference);
+    }
+    let mapping = mapping?;
+    if mapping.qualification != GateState::Pass {
+        Some(SchedulerDisposition::ClockMappingUnqualified)
+    } else if mapping.valid_from_ns > mapping.valid_through_ns {
+        Some(SchedulerDisposition::ClockMappingValidityInvalid)
+    } else if timestamp_ns < mapping.valid_from_ns {
+        Some(SchedulerDisposition::ClockMappingNotYetValid)
+    } else if timestamp_ns > mapping.valid_through_ns {
+        Some(SchedulerDisposition::ClockMappingExpired)
+    } else {
+        None
+    }
+}
+
 fn require_sha256(value: &str, field: &'static str) -> Result<(), ReplayError> {
     if value.len() == 64
         && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
@@ -579,7 +604,11 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut event_times = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
+    let mut observation_receipts =
+        BTreeMap::<(String, String), (String, u64, String, String, GateState)>::new();
     let mut persisted = BTreeSet::<(String, String)>::new();
+    let mut persistence_receipts =
+        BTreeMap::<(String, String), (String, u64, String, String, GateState)>::new();
     let mut cancel_requests = BTreeSet::<(String, String)>::new();
     let mut cancel_acknowledgements = BTreeMap::<(String, String), bool>::new();
     let mut stop_triggers = BTreeMap::<String, StopReplayState>::new();
@@ -594,7 +623,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
         let disposition = match &scheduled.action {
             ScheduleAction::ClockAdvance {
                 clock_domain, basis_id, epoch, scale, unit, local_tick_ns,
-                mapping_valid_through_ns, qualification, ..
+                mapping_valid_from_ns, mapping_valid_through_ns, qualification, ..
             } => {
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
                 let previous_mapping_id = active_clock_mapping_ids.insert(key, scheduled.action_id.clone());
@@ -606,6 +635,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     scheduled.action_id.clone(),
                     ClockMappingState {
                         local_tick_ns: *local_tick_ns,
+                        valid_from_ns: *mapping_valid_from_ns,
                         valid_through_ns: *mapping_valid_through_ns,
                         qualification: *qualification,
                     },
@@ -625,12 +655,13 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 let current_mapping = active_clock_mapping_ids.get(&key);
                 let mapping = clock_mapping_states.get(clock_mapping_action_id);
                 let previous = event_times.insert(key, *source_timestamp_ns);
-                if current_mapping != Some(clock_mapping_action_id) || mapping.is_none() {
-                    SchedulerDisposition::StaleClockMappingReference
-                } else if mapping.is_some_and(|mapping| mapping.qualification != GateState::Pass) {
-                    SchedulerDisposition::ClockMappingUnqualified
-                } else if mapping.is_some_and(|mapping| *source_timestamp_ns > mapping.valid_through_ns) {
-                    SchedulerDisposition::ClockMappingExpired
+                if let Some(disposition) = classify_clock_mapping(
+                    current_mapping,
+                    clock_mapping_action_id,
+                    mapping,
+                    *source_timestamp_ns,
+                ) {
+                    disposition
                 } else if previous.is_some_and(|timestamp| *source_timestamp_ns < timestamp) {
                     SchedulerDisposition::EventTimeRegression
                 } else {
@@ -673,29 +704,85 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     }
                 }
             }
-            ScheduleAction::EventObserved { event_id, observer_id } => {
+            ScheduleAction::EventObserved {
+                event_id, observer_id, clock_domain, basis_id, epoch, scale, unit,
+                clock_mapping_action_id, observed_at_ns, observation_receipt_ref,
+                observation_receipt_sha256, qualification,
+            } => {
                 let key = (event_id.clone(), observer_id.clone());
+                let clock_key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                let mapping_disposition = classify_clock_mapping(
+                    active_clock_mapping_ids.get(&clock_key),
+                    clock_mapping_action_id,
+                    clock_mapping_states.get(clock_mapping_action_id),
+                    *observed_at_ns,
+                );
+                let receipt_key = (
+                    clock_mapping_action_id.clone(),
+                    *observed_at_ns,
+                    observation_receipt_ref.clone(),
+                    observation_receipt_sha256.clone(),
+                    *qualification,
+                );
                 if crashed.contains(observer_id) {
                     SchedulerDisposition::BlockedByCrashedRecipient
                 } else if !delivered.contains(&key) {
                     SchedulerDisposition::PreconditionViolation
-                } else if observed.insert(key) {
-                    SchedulerDisposition::Applied
+                } else if let Some(disposition) = mapping_disposition {
+                    disposition
+                } else if *qualification != GateState::Pass {
+                    SchedulerDisposition::ObservationUnqualified
+                } else if let Some(previous) = observation_receipts.get(&key) {
+                    if previous == &receipt_key {
+                        SchedulerDisposition::Duplicate
+                    } else {
+                        SchedulerDisposition::ConflictingObservation
+                    }
                 } else {
-                    SchedulerDisposition::Duplicate
+                    observation_receipts.insert(key.clone(), receipt_key);
+                    observed.insert(key);
+                    SchedulerDisposition::Applied
                 }
             }
-            ScheduleAction::EventPersisted { event_id, observer_id, store_id } => {
+            ScheduleAction::EventPersisted {
+                event_id, observer_id, store_id, clock_domain, basis_id, epoch, scale, unit,
+                clock_mapping_action_id, persisted_at_ns, persistence_receipt_ref,
+                persistence_receipt_sha256, qualification,
+            } => {
                 let observation = (event_id.clone(), observer_id.clone());
                 let persistence = (event_id.clone(), store_id.clone());
-                if crashed.contains(observer_id) {
+                let clock_key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                let mapping_disposition = classify_clock_mapping(
+                    active_clock_mapping_ids.get(&clock_key),
+                    clock_mapping_action_id,
+                    clock_mapping_states.get(clock_mapping_action_id),
+                    *persisted_at_ns,
+                );
+                let receipt_key = (
+                    clock_mapping_action_id.clone(),
+                    *persisted_at_ns,
+                    persistence_receipt_ref.clone(),
+                    persistence_receipt_sha256.clone(),
+                    *qualification,
+                );
+                if crashed.contains(observer_id) || crashed.contains(store_id) {
                     SchedulerDisposition::BlockedByCrashedRecipient
                 } else if !observed.contains(&observation) {
                     SchedulerDisposition::PreconditionViolation
-                } else if persisted.insert(persistence) {
-                    SchedulerDisposition::Applied
+                } else if let Some(disposition) = mapping_disposition {
+                    disposition
+                } else if *qualification != GateState::Pass {
+                    SchedulerDisposition::PersistenceUnqualified
+                } else if let Some(previous) = persistence_receipts.get(&persistence) {
+                    if previous == &receipt_key {
+                        SchedulerDisposition::Duplicate
+                    } else {
+                        SchedulerDisposition::ConflictingPersistence
+                    }
                 } else {
-                    SchedulerDisposition::Duplicate
+                    persistence_receipts.insert(persistence.clone(), receipt_key);
+                    persisted.insert(persistence);
+                    SchedulerDisposition::Applied
                 }
             }
             ScheduleAction::CancellationRequested { operation_id, attempt_id } => {
@@ -1572,6 +1659,7 @@ mod tests {
             offset_ns: 0,
             uncertainty_ns: 10,
             calibration_id: "calibration-new-epoch".to_owned(),
+            mapping_valid_from_ns: 0,
             mapping_valid_through_ns: 100,
             mapping_receipt_ref: "synthetic://mapping/new-epoch".to_owned(),
             mapping_receipt_sha256: "e".repeat(64),
