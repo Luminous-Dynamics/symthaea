@@ -250,12 +250,15 @@ pub fn validate_corpus(bytes: &[u8]) -> Result<(Vec<Scenario>, CorpusValidation)
     Ok((scenarios, receipt))
 }
 
-fn canonical_trace_digest<T: Serialize>(trace: &T) -> Result<String> {
-    let mut value = serde_json::to_value(trace)?;
+fn canonical_trace_digest(original_bytes: &[u8]) -> Result<String> {
+    let mut value: Value = serde_json::from_slice(original_bytes)
+        .context("trace bytes are not valid JSON")?;
     let object = value
         .as_object_mut()
-        .context("trace serialization did not produce a JSON object")?;
+        .context("trace JSON root must be an object")?;
     object.remove("trace_digest");
+    // serde_json::Map uses deterministic key ordering. This is the benchmark's
+    // canonical serialization, not a claim of RFC 8785 canonical JSON.
     Ok(sha256_hex(&serde_json::to_vec(&value)?))
 }
 
@@ -334,7 +337,7 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
         previous_sequence = Some(event.sequence);
         previous_elapsed = Some(event.elapsed_ms);
 
-        if !seen.insert(event.event_id.as_str()) {
+        if seen.contains(event.event_id.as_str()) {
             bail!("duplicate trace event_id {:?}", event.event_id);
         }
         for parent in &event.parent_event_ids {
@@ -346,6 +349,10 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
                 );
             }
         }
+        if event.parent_event_ids.iter().any(|parent| parent == &event.event_id) {
+            bail!("event {:?} cannot be its own parent", event.event_id);
+        }
+        seen.insert(event.event_id.as_str());
 
         match event.event_type.as_str() {
             "tool_invocation" => {
@@ -443,7 +450,7 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
         }
     }
 
-    let canonical_digest = canonical_trace_digest(trace)?;
+    let canonical_digest = canonical_trace_digest(original_bytes)?;
     let digest_verified = match trace.trace_digest.as_deref() {
         Some(expected) => {
             if !is_sha256(expected) {
