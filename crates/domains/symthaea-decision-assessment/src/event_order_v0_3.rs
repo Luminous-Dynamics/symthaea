@@ -334,6 +334,8 @@ pub enum ReplayError {
     Serialization(String),
     #[error("the original schedule does not satisfy the counterexample predicate")]
     OriginalDoesNotReproduce,
+    #[error("action evidence does not match the scheduled action: {0}")]
+    ActionEvidenceMismatch(&'static str),
 }
 
 /// Validate structural schedule invariants. Intentionally does not reject
@@ -505,7 +507,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
             }
             ScheduleAction::CancellationRequested { operation_id, attempt_id }
             | ScheduleAction::CancellationAcknowledged { operation_id, attempt_id, .. }
-            | ScheduleAction::EffectAttempted { operation_id, attempt_id }
+            | ScheduleAction::EffectAttempted { operation_id, attempt_id, .. }
             | ScheduleAction::EffectCommitted { operation_id, attempt_id, .. }
             | ScheduleAction::AttemptReconciled { operation_id, attempt_id, .. } => {
                 require_id(operation_id, "operation_id")?;
@@ -534,6 +536,15 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(receipt_ref, "receipt_ref")?;
                 require_sha256(receipt_sha256, "stop_discharge_receipt_sha256")?;
             }
+            ScheduleAction::AttemptInventoryAttested {
+                scope, inventory_frontier_event_id, attempt_manifest_sha256,
+            } => {
+                if !scope.is_well_formed() {
+                    return Err(ReplayError::ActionEvidenceMismatch("inventory_scope"));
+                }
+                require_id(inventory_frontier_event_id, "inventory_frontier_event_id")?;
+                require_sha256(attempt_manifest_sha256, "attempt_manifest_sha256")?;
+            }
             ScheduleAction::ProcessCrashed { process_id }
             | ScheduleAction::ProcessRestarted { process_id } => {
                 require_id(process_id, "process_id")?;
@@ -543,6 +554,61 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(superseded_event_id, "superseded_event_id")?;
                 if !produced_events.contains(event_id) || !produced_events.contains(superseded_event_id) {
                     return Err(ReplayError::InvalidCausalPredecessor(event_id.clone()));
+                }
+            }
+        }
+
+        if let Some(owner_time_ref) = &scheduled.owner_time_ref {
+            require_id(&owner_time_ref.clock_mapping_action_id, "owner_time_mapping_action_id")?;
+            if !clock_mapping_action_history.values().any(|history| {
+                history.contains_key(&owner_time_ref.clock_mapping_action_id)
+            }) {
+                return Err(ReplayError::InvalidCausalPredecessor(
+                    owner_time_ref.clock_mapping_action_id.clone(),
+                ));
+            }
+        }
+
+        if let Some(evidence) = &scheduled.evidence {
+            let matches_action = matches!(
+                (&scheduled.action, evidence),
+                (ScheduleAction::EffectAttempted { .. }, ActionEvidence::AttemptStart { .. })
+                    | (ScheduleAction::EffectCommitted { .. }, ActionEvidence::EffectCommit { .. })
+                    | (ScheduleAction::CancellationAcknowledged { .. }, ActionEvidence::CancellationAcknowledgement { .. })
+                    | (ScheduleAction::AttemptReconciled { .. }, ActionEvidence::TerminalReconciliation { .. })
+                    | (ScheduleAction::StopTriggered { .. }, ActionEvidence::StopTrigger { .. })
+                    | (ScheduleAction::StopPolicyRevised { .. }, ActionEvidence::StopPolicyRevision { .. })
+                    | (ScheduleAction::StopDischarged { .. }, ActionEvidence::StopDischarge { .. })
+                    | (ScheduleAction::AttemptInventoryAttested { .. }, ActionEvidence::InventoryAttestation { .. })
+            );
+            if !matches_action {
+                return Err(ReplayError::ActionEvidenceMismatch("action_variant"));
+            }
+            match evidence {
+                ActionEvidence::AttemptStart { retry_of_attempt_id } => {
+                    if let Some(predecessor) = retry_of_attempt_id {
+                        require_id(predecessor, "retry_of_attempt_id")?;
+                    }
+                }
+                ActionEvidence::EffectCommit { receipt_ref, receipt_sha256 }
+                | ActionEvidence::CancellationAcknowledgement { receipt_ref, receipt_sha256 }
+                | ActionEvidence::StopTrigger { receipt_ref, receipt_sha256, .. }
+                | ActionEvidence::StopPolicyRevision { receipt_ref, receipt_sha256, .. }
+                | ActionEvidence::InventoryAttestation { receipt_ref, receipt_sha256, .. } => {
+                    require_id(receipt_ref, "action_evidence_receipt_ref")?;
+                    require_sha256(receipt_sha256, "action_evidence_receipt_sha256")?;
+                }
+                ActionEvidence::TerminalReconciliation { exact_start_action_id, .. } => {
+                    require_id(exact_start_action_id, "exact_start_action_id")?;
+                }
+                ActionEvidence::StopDischarge {
+                    scope, inventory_frontier_event_id, attempt_manifest_sha256,
+                } => {
+                    if !scope.is_well_formed() {
+                        return Err(ReplayError::ActionEvidenceMismatch("stop_discharge_scope"));
+                    }
+                    require_id(inventory_frontier_event_id, "inventory_frontier_event_id")?;
+                    require_sha256(attempt_manifest_sha256, "attempt_manifest_sha256")?;
                 }
             }
         }
