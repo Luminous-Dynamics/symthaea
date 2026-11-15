@@ -585,7 +585,7 @@ pub fn verify_loft_artifact_integrity(
     }
 
     if artifact.artifact_schema_version != LOFT_SCHEMA_VERSION
-        || artifact.generator != "symthaea-marine-waterplane-loft-v1"
+        || artifact.generator != "symthaea-marine-waterplane-loft-v2"
         || artifact.cap_semantics != "closed-displacement-volume-at-design-waterplane-z0"
         || artifact.candidate.schema_version != 1
     {
@@ -663,46 +663,99 @@ pub fn loft_waterplane_capped_hull(
         }]);
     }
 
-    let vertices_per_station = point_count
-        .checked_mul(2)
-        .and_then(|count| count.checked_sub(1));
-    let Some(vertices_per_station) = vertices_per_station else {
+    let mirrored_point_count = point_count.checked_sub(1);
+    let Some(mirrored_point_count) = mirrored_point_count else {
         return Err(vec![LoftViolation {
             code: "mesh_vertex_budget".into(),
-            detail: "mirrored vertex count overflowed".into(),
+            detail: "section point count is too small to mirror".into(),
         }]);
     };
-    let vertex_count = station_count
-        .checked_mul(vertices_per_station)
-        .and_then(|count| count.checked_add(2));
-    let Some(vertex_count) = vertex_count.filter(|count| *count <= MAX_MESH_VERTICES) else {
+    let bow_collapsed = sections.longitudinal_end_conditions.bow
+        == LongitudinalEndCondition::CollapsedCentreline;
+    let stern_collapsed = sections.longitudinal_end_conditions.stern
+        == LongitudinalEndCondition::CollapsedCentreline;
+    let bow_planar = !bow_collapsed;
+    let stern_planar = !stern_collapsed;
+
+    // Preflight every station independently: collapsed endpoints share every
+    // port/starboard sample ID; all other stations add mirrored samples except keel.
+    let mut vertex_count = 0_usize;
+    for station_index in 0..station_count {
+        let collapsed = (station_index == 0 && bow_collapsed)
+            || (station_index + 1 == station_count && stern_collapsed);
+        let station_vertices = point_count
+            .checked_add(if collapsed { 0 } else { mirrored_point_count });
+        let Some(station_vertices) = station_vertices else {
+            return Err(vec![LoftViolation {
+                code: "mesh_vertex_budget".into(),
+                detail: "per-station vertex count overflowed".into(),
+            }]);
+        };
+        let Some(total) = vertex_count.checked_add(station_vertices) else {
+            return Err(vec![LoftViolation {
+                code: "mesh_vertex_budget".into(),
+                detail: "total station vertex count overflowed".into(),
+            }]);
+        };
+        vertex_count = total;
+    }
+    let planar_cap_count = usize::from(bow_planar) + usize::from(stern_planar);
+    let Some(vertex_count) = vertex_count
+        .checked_add(planar_cap_count)
+        .filter(|count| *count <= MAX_MESH_VERTICES)
+    else {
         return Err(vec![LoftViolation {
             code: "mesh_vertex_budget".into(),
             detail: format!("loft exceeds the {MAX_MESH_VERTICES}-vertex budget"),
         }]);
     };
 
-    let interval_face_count = point_count
-        .checked_sub(1)
-        .and_then(|count| count.checked_mul(4))
-        .and_then(|count| count.checked_add(2));
-    let Some(interval_face_count) = interval_face_count else {
+    let side_faces_per_interval = mirrored_point_count.checked_mul(4);
+    let Some(side_faces_per_interval) = side_faces_per_interval else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
-            detail: "face count overflowed".into(),
+            detail: "side face count overflowed".into(),
         }]);
     };
-    let end_cap_face_count = point_count.checked_mul(4).and_then(|count| count.checked_sub(2));
-    let Some(end_cap_face_count) = end_cap_face_count else {
+    let side_face_count = (station_count - 1)
+        .checked_mul(side_faces_per_interval);
+    let Some(side_face_count) = side_face_count else {
+        return Err(vec![LoftViolation {
+            code: "mesh_face_budget".into(),
+            detail: "side face count overflowed".into(),
+        }]);
+    };
+    let waterplane_face_count = (station_count - 1)
+        .checked_mul(2)
+        .and_then(|count| count.checked_sub(usize::from(bow_collapsed)))
+        .and_then(|count| count.checked_sub(usize::from(stern_collapsed)));
+    let Some(waterplane_face_count) = waterplane_face_count else {
+        return Err(vec![LoftViolation {
+            code: "mesh_face_budget".into(),
+            detail: "waterplane face count underflowed or overflowed".into(),
+        }]);
+    };
+    let cap_faces_per_end = point_count.checked_mul(2).and_then(|count| count.checked_sub(1));
+    let Some(cap_faces_per_end) = cap_faces_per_end else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
             detail: "end-cap face count overflowed".into(),
         }]);
     };
-    let face_count = (station_count - 1)
-        .checked_mul(interval_face_count)
-        .and_then(|count| count.checked_add(end_cap_face_count));
-    let Some(face_count) = face_count.filter(|count| *count <= MAX_MESH_FACES) else {
+    let bow_end_cap_face_count = if bow_planar { cap_faces_per_end } else { 0 };
+    let stern_end_cap_face_count = if stern_planar { cap_faces_per_end } else { 0 };
+    let Some(end_cap_face_count) = bow_end_cap_face_count.checked_add(stern_end_cap_face_count)
+    else {
+        return Err(vec![LoftViolation {
+            code: "mesh_face_budget".into(),
+            detail: "combined end-cap face count overflowed".into(),
+        }]);
+    };
+    let Some(face_count) = side_face_count
+        .checked_add(waterplane_face_count)
+        .and_then(|count| count.checked_add(end_cap_face_count))
+        .filter(|count| *count <= MAX_MESH_FACES)
+    else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
             detail: format!("loft exceeds the {MAX_MESH_FACES}-face budget"),
@@ -732,20 +785,26 @@ pub fn loft_waterplane_capped_hull(
             vertices.push(*point);
         }
         port[station_index][0] = starboard[station_index][0];
-        for (point_index, point) in section.keel_to_sheer_m.iter().enumerate().skip(1) {
-            let index = u32::try_from(vertices.len()).map_err(|_| {
-                vec![LoftViolation {
-                    code: "mesh_index_budget".into(),
-                    detail: "vertex index exceeds u32".into(),
-                }]
-            })?;
-            port[station_index][point_index] = index;
-            vertices.push([point[0], -point[1], point[2]]);
+        let collapsed = (station_index == 0 && bow_collapsed)
+            || (station_index + 1 == station_count && stern_collapsed);
+        if collapsed {
+            for point_index in 1..point_count {
+                port[station_index][point_index] = starboard[station_index][point_index];
+            }
+        } else {
+            for (point_index, point) in section.keel_to_sheer_m.iter().enumerate().skip(1) {
+                let index = u32::try_from(vertices.len()).map_err(|_| {
+                    vec![LoftViolation {
+                        code: "mesh_index_budget".into(),
+                        detail: "vertex index exceeds u32".into(),
+                    }]
+                })?;
+                port[station_index][point_index] = index;
+                vertices.push([point[0], -point[1], point[2]]);
+            }
         }
     }
 
-    let side_face_count = (station_count - 1) * 4 * (point_count - 1);
-    let waterplane_face_count = (station_count - 1) * 2;
     let mut side_faces = Vec::with_capacity(side_face_count);
     let mut waterplane_faces = Vec::with_capacity(waterplane_face_count);
 
@@ -770,38 +829,50 @@ pub fn loft_waterplane_capped_hull(
         let starboard_here = starboard[station_index][point_count - 1];
         let starboard_next = starboard[station_index + 1][point_count - 1];
         let port_next = port[station_index + 1][point_count - 1];
-        waterplane_faces.push([port_here, starboard_here, starboard_next]);
-        waterplane_faces.push([port_here, starboard_next, port_next]);
+        let left_collapsed = station_index == 0 && bow_collapsed;
+        let right_collapsed = station_index + 1 == station_count - 1 && stern_collapsed;
+        match (left_collapsed, right_collapsed) {
+            (true, false) => waterplane_faces.push([port_here, starboard_next, port_next]),
+            (false, true) => waterplane_faces.push([port_here, starboard_here, starboard_next]),
+            (false, false) => {
+                waterplane_faces.push([port_here, starboard_here, starboard_next]);
+                waterplane_faces.push([port_here, starboard_next, port_next]);
+            }
+            (true, true) => {
+                return Err(vec![LoftViolation {
+                    code: "adjacent_collapsed_ends".into(),
+                    detail: "an interval cannot connect two collapsed longitudinal endpoints".into(),
+                }]);
+            }
+        }
     }
 
-    let bow_ring = {
-        let mut ring = starboard[0].clone();
-        ring.extend(port[0].iter().skip(1).rev().copied());
-        ring
+    let bow_centre = if bow_planar {
+        let index = u32::try_from(vertices.len()).map_err(|_| {
+            vec![LoftViolation {
+                code: "mesh_index_budget".into(),
+                detail: "bow centre index exceeds u32".into(),
+            }]
+        })?;
+        vertices.push(section_centre(&sections.sections[0]));
+        Some(index)
+    } else {
+        None
     };
-    let stern_ring = {
-        let last = station_count - 1;
-        let mut ring = starboard[last].clone();
-        ring.extend(port[last].iter().skip(1).rev().copied());
-        ring
+    let stern_centre = if stern_planar {
+        let index = u32::try_from(vertices.len()).map_err(|_| {
+            vec![LoftViolation {
+                code: "mesh_index_budget".into(),
+                detail: "stern centre index exceeds u32".into(),
+            }]
+        })?;
+        vertices.push(section_centre(
+            sections.sections.last().expect("validated sections are non-empty"),
+        ));
+        Some(index)
+    } else {
+        None
     };
-
-    let bow_centre = u32::try_from(vertices.len()).map_err(|_| {
-        vec![LoftViolation {
-            code: "mesh_index_budget".into(),
-            detail: "bow centre index exceeds u32".into(),
-        }]
-    })?;
-    vertices.push(section_centre(&sections.sections[0]));
-    let stern_centre = u32::try_from(vertices.len()).map_err(|_| {
-        vec![LoftViolation {
-            code: "mesh_index_budget".into(),
-            detail: "stern centre index exceeds u32".into(),
-        }]
-    })?;
-    vertices.push(section_centre(
-        sections.sections.last().expect("validated sections are non-empty"),
-    ));
 
     let side_face_range = FaceRange {
         first_face: 0,
@@ -815,18 +886,50 @@ pub fn loft_waterplane_capped_hull(
     faces.extend(side_faces);
     faces.extend(waterplane_faces);
 
-    let end_cap_face_range = FaceRange {
+    let bow_end_cap_face_range = FaceRange {
         first_face: faces.len(),
-        face_count: end_cap_face_count,
+        face_count: 0,
     };
-    for index in 0..bow_ring.len() {
-        let next = (index + 1) % bow_ring.len();
-        faces.push([bow_centre, bow_ring[index], bow_ring[next]]);
+    if let Some(centre) = bow_centre {
+        let ring = {
+            let mut points = starboard[0].clone();
+            points.extend(port[0].iter().skip(1).rev().copied());
+            points
+        };
+        for index in 0..ring.len() {
+            let next = (index + 1) % ring.len();
+            faces.push([centre, ring[index], ring[next]]);
+        }
     }
-    for index in 0..stern_ring.len() {
-        let next = (index + 1) % stern_ring.len();
-        faces.push([stern_centre, stern_ring[next], stern_ring[index]]);
+    let bow_end_cap_face_range = FaceRange {
+        face_count: faces.len() - bow_end_cap_face_range.first_face,
+        ..bow_end_cap_face_range
+    };
+
+    let stern_end_cap_face_range = FaceRange {
+        first_face: faces.len(),
+        face_count: 0,
+    };
+    if let Some(centre) = stern_centre {
+        let last = station_count - 1;
+        let ring = {
+            let mut points = starboard[last].clone();
+            points.extend(port[last].iter().skip(1).rev().copied());
+            points
+        };
+        for index in 0..ring.len() {
+            let next = (index + 1) % ring.len();
+            faces.push([centre, ring[next], ring[index]]);
+        }
     }
+    let stern_end_cap_face_range = FaceRange {
+        face_count: faces.len() - stern_end_cap_face_range.first_face,
+        ..stern_end_cap_face_range
+    };
+    let end_cap_face_range = FaceRange {
+        first_face: bow_end_cap_face_range.first_face,
+        face_count: bow_end_cap_face_range.face_count + stern_end_cap_face_range.face_count,
+    };
 
     if vertices.len() != vertex_count || faces.len() != face_count {
         return Err(vec![LoftViolation {
@@ -858,7 +961,7 @@ pub fn loft_waterplane_capped_hull(
 
     let mut artifact = LoftedHullArtifact {
         artifact_schema_version: LOFT_SCHEMA_VERSION,
-        generator: "symthaea-marine-waterplane-loft-v1".into(),
+        generator: "symthaea-marine-waterplane-loft-v2".into(),
         cap_semantics: "closed-displacement-volume-at-design-waterplane-z0".into(),
         source_spec_digest_blake3: sections.source_spec_digest_blake3.clone(),
         sampled_sections_digest_blake3: sections.sampled_sections_digest_blake3.clone(),
@@ -867,6 +970,11 @@ pub fn loft_waterplane_capped_hull(
         side_face_range,
         waterplane_face_range,
         end_cap_face_range,
+        bow_end_cap_face_range,
+        stern_end_cap_face_range,
+        station_count,
+        section_point_count: point_count,
+        longitudinal_end_conditions: sections.longitudinal_end_conditions,
         candidate,
         admission_report,
     };
