@@ -84,6 +84,14 @@ fn validate_section_family(
             "candidate_id must not be empty",
         );
     }
+    if artifact.units != "m" {
+        violation(
+            &mut violations,
+            "units",
+            "G2b accepts metres only; no implicit conversion is performed",
+        );
+    }
+
     for (name, value) in [
         ("length_m", artifact.length_m),
         ("beam_m", artifact.beam_m),
@@ -775,7 +783,7 @@ mod tests {
     #[test]
     fn non_convex_section_is_rejected_without_healing() {
         let mut source = artifact();
-        source.sections[1].keel_to_sheer_m[5][2] = 5.9;
+        source.sections[1].keel_to_sheer_m[5][1] = 4.6;
         source.sampled_sections_digest_blake3 =
             compute_sampled_sections_digest(&source.sections).unwrap();
         let error = loft_waterplane_capped_hull(&source, profile()).unwrap_err();
