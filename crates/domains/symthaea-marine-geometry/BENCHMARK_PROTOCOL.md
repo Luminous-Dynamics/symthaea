@@ -32,6 +32,14 @@ The frozen literature baseline includes:
 
 Commercial engineering systems are capability baselines, not claims that Symthaea must reproduce every proprietary feature. Simcenter STAR-CCM+ documents transient VOF free-surface simulation and up-to-six-degree-of-freedom dynamic fluid-body interaction in its hull-performance workflow. SHIPFLOW documents potential-flow, RANS, hull/propeller interaction and seakeeping/manoeuvring capabilities. OpenFOAM supplies an independently configured open solver path. We should initially interoperate with qualified solvers rather than claim an unvalidated replacement.
 
+
+## 2A. Additional subsystem and fleet-reconstruction comparators (15 Nov 2026)
+
+- Liu et al. (2026), *An integrated data-driven and experimental methodology for toroidal propeller design improvement*, Engineering Applications of Artificial Intelligence 184, 116126, DOI: https://doi.org/10.1016/j.engappai.2026.116126. Published 15 Nov 2026. It describes an experiment-simulation-optimization loop, with high-fidelity CFD checked against open-water experiments, PCHIP parametric geometry and adaptive radial-basis/evolutionary sampling-assisted optimization across 14 variables. It reports a study-specific 7.26% power reduction at matched thrust and 1.74 dB noise reduction against its best sampled design. Add this as a propulsor subsystem benchmark, not a hull generator arm. It is particularly relevant to the wake/propulsor co-design path.
+- *Raster2Hull: Learning 3D Ship Hull Geometry From Raster 2D General Arrangement and Lines Drawings*, IEEE Access 14 (31 Jul 2026), DOI: https://doi.org/10.1109/ACCESS.2026.3717961. Add this as a separate legacy-vessel geometry-reconstruction comparator. It addresses 2D drawing-to-3D hull reconstruction, not forward generative hull design or hydrodynamic optimization. Evaluate reconstruction error, lines-plan consistency, section recovery, topology, hydrostatic properties and uncertainty on held-out drawing sources.
+
+These extend the benchmark matrix without conflating generation, reconstruction and propulsor optimization into one score.
+
 ## 3. Matched comparison arms
 
 Every arm must use the same rights-cleared input hull families, displacement/payload and loading constraints, speed and mission envelope, environmental distribution, solver release, mesh policy, high-fidelity CFD budget, and independent holdout.
@@ -89,9 +97,27 @@ Report resistance and wave-elevation comparisons, sinkage/trim, motions/RAOs, ad
 
 Wake targets are **propulsor- and mission-conditioned flow fields**, not a blanket preference for uniform wake. Include full-vector coverage, coordinate frame, phase origin, radial/hub treatment, grid identity and transformation receipts. Axial-only data must be labelled axial-only.
 
+### R: reconstruction of legacy geometry
+
+Keep this track separate from forward generation. For Raster2Hull-like methods, report drawing-to-geometry alignment, section/offset error, deck/keel/centreline consistency, missing-view uncertainty, CAD reconstruction validity, hydrostatic coefficient error, manual repair time and provenance of the source drawing. Split by original vessel/drawing lineage, not patches or derived views. An uncertain or incomplete drawing must produce an uncertainty envelope or abstention rather than an invented surface.
+
+### P2: propulsion architecture subsystem
+
+In addition to hull/propulsor interaction, compare conventional open propellers, ducted/toroidal propellers and waterjets only within matched thrust, speed, diameter/installation and mission constraints. Report KT/KQ, delivered and electrical power, efficiency, pressure distribution, vortex metrics, cavitation indicators, underwater radiated noise and maintenance/ingestion risks. For the toroidal-propeller comparator, reproduce the experiment-to-CFD validation loop before comparing optimizer performance. Study-reported 7.26% power and 1.74 dB noise changes are contextual reference points, not target pass thresholds.
+
 ### O: operational usefulness
 
 Primary system outcome: energy per equivalent useful service, for example delivered tonne-nautical-mile or mission energy per completed harbour-assist task. Freeze the propulsion/electrical boundary, payload, service level, route, speeds, weather and reserve policy. Include annual operability and service availability across specified seasonal/sea-state distributions.
+
+### P3: manoeuvring and low-GM vessel dynamics
+
+Use the ITTC/SIMMAN benchmark cases for KVLCC1/KVLCC2, KCS and DTMB 5415 where raw data and reuse rights permit. Include free-running turning circles and zig-zag manoeuvres plus captive PMM/CMT test cases in deep and shallow water. Report trajectories, forces/moments, overshoot angles, tactical diameter, advance, transfer and speed loss with experimental and numerical uncertainty.
+
+Do not treat 3-DOF planar manoeuvring as a universal reference. The ITTC benchmark procedure reports that 3-DOF methods were inadequate for KCS manoeuvring predictions and notes that heel/roll inclusion is important for low-GM vessels; select at least a 4-DOF model where those couplings matter. The added DOF must be justified by the vessel/loading regime and independently checked rather than added as decoration.
+
+### P4: seakeeping screening calibration
+
+For AI screening, report both predicted screening operability and independently reevaluated operability on the selected candidate and parent baseline. The 2026 AI-assisted study evaluated multiple onboard locations, operational areas, seasons, speeds and relative wave headings; its screen's best candidate was reported at 99.05%, while independent BEM verification reported 95.55% versus 84.90% for the parent hull evaluated with the same solver. This is a strong example of why the screen-to-validation gap, rank stability, calibration and final decision regret must be measured separately. Treat all percentages as study-specific.
 
 ### M: manufacturing, maintenance and environment
 
@@ -117,7 +143,7 @@ Report:
 | V2 | Calm-water hull hydrodynamics | KCS, KVLCC2, Series 60, DTMB 5415 where data and reuse rights permit |
 | V3 | Propulsion and wake | Open-water propeller, self-propulsion and 3D propeller-plane measurements |
 | V4 | Seakeeping | Regular/irregular-wave RAOs, added resistance, motions and the KVLCC2 ten-facility campaign |
-| V5 | Integrated mission and operability | Hull + appendages + propulsor + motor/drive + energy + route + environment |
+| V5 | Integrated mission, manoeuvring and operability | Hull + appendages + propulsor + motor/drive + energy + route + environment + manoeuvring/heel dynamics |
 | V6 | Manufacturing and service | Independent Symtropy DFM, assembly, transport, inspection and repair disposition |
 | V7 | Physical experiments | Towing tank, PIV, load cells, cavitation tunnel, strain and instrumented model |
 | V8 | Operational validation | Mission-matched full-scale trials, deterioration, maintenance and lifecycle outcomes |

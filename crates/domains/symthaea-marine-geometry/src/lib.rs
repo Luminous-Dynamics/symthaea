@@ -5,6 +5,7 @@
 //! not a CAD kernel, hydrostatics solver, self-intersection detector, DFM
 //! checker, CFD solver, or vessel-approval system.
 
+pub mod loft;
 pub mod section;
 
 
@@ -14,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 const SCHEMA_VERSION: u32 = 1;
 const ADMISSION_SCOPE: &str = "triangle-mesh-integrity-v1";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CandidateInput {
     pub schema_version: u32,
@@ -26,7 +27,7 @@ pub struct CandidateInput {
     pub profile: AdmissionProfile,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MeshGeometry {
     /// This first adapter accepts metres only; no implicit conversion occurs.
@@ -48,7 +49,7 @@ pub struct CoordinateFrame {
     pub handedness: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AdmissionProfile {
     pub id: String,
@@ -70,7 +71,7 @@ pub enum CheckStatus {
     Unknown,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Check {
     pub code: String,
     pub status: CheckStatus,
@@ -87,7 +88,7 @@ pub enum Disposition {
     Blocked,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GeometryMetrics {
     pub vertex_count: usize,
     pub face_count: usize,
@@ -101,7 +102,7 @@ pub struct GeometryMetrics {
     pub signed_volume_m3: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AdmissionReport {
     pub report_schema_version: u32,
     pub admission_scope: String,
