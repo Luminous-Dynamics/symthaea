@@ -234,6 +234,30 @@ pub fn evaluate_cell_eligibility(
         }
     }
 
+    for (kind, references) in [
+        ("required_tooling_ref", requirement.required_tooling_refs.as_slice()),
+        ("required_skill_ref", requirement.required_skill_refs.as_slice()),
+        ("required_material_lot_ref", requirement.required_material_lot_refs.as_slice()),
+        ("required_clearance_ref", requirement.required_clearance_refs.as_slice()),
+    ] {
+        for reference in references {
+            if reference.trim().is_empty() {
+                out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, kind);
+            }
+        }
+    }
+    if requirement.required_material_envelope_ref.as_deref().is_some_and(|value| value.trim().is_empty()) {
+        out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, "required_material_envelope_ref");
+    }
+    for demand in &requirement.utility_requirements {
+        if demand.service_ref.trim().is_empty() {
+            out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, "utility_service_ref");
+        }
+        if demand.unit_ref.trim().is_empty() {
+            out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, "utility_unit_ref");
+        }
+    }
+
     if cell.resolution != SnapshotResolution::Complete {
         out.add(EligibilityReasonCode::SnapshotIncomplete, EligibilitySeverity::Indeterminate, &cell.profile_ref);
     }
@@ -306,6 +330,10 @@ pub fn evaluate_cell_eligibility(
         out.add(EligibilityReasonCode::AssetMissing, EligibilitySeverity::Indeterminate, &config.configuration_ref);
     }
     for asset_ref in &config.asset_refs {
+        if asset_ref.trim().is_empty() {
+            out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, &config.configuration_ref);
+            continue;
+        }
         let asset = match unique_match(&cell.assets, |candidate| candidate.asset_ref == *asset_ref) {
             Ok(Some(asset)) => asset,
             Ok(None) => {
@@ -751,6 +779,22 @@ mod tests {
         assert!(has_code(&report, EligibilityReasonCode::AssetCapabilityMismatch));
     }
 
+
+
+    #[test]
+    fn empty_required_reference_cannot_match_empty_owner_reference() {
+        let mut req = requirement();
+        let mut cell = qualified_cell();
+        req.required_skill_refs.push(String::new());
+        cell.skill_qualifications.push(SkillQualificationSnapshot {
+            skill_ref: String::new(),
+            availability: Availability::Available,
+            qualification_evidence: evidence("urn:example:evidence:empty-skill"),
+        });
+        let report = evaluate_cell_eligibility(&req, &cell);
+        assert_ne!(report.status, EligibilityStatus::Eligible);
+        assert!(has_code(&report, EligibilityReasonCode::EmptyRequiredReference));
+    }
 
     #[test]
     fn missing_independent_profile_verification_is_blocked_in_complete_snapshot() {
