@@ -1342,6 +1342,69 @@ mod tests {
         );
     }
 
+    struct SplitMix64 {
+        state: u64,
+    }
+
+    impl SplitMix64 {
+        fn new(seed: u64) -> Self {
+            Self { state: seed }
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut value = self.state;
+            value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            value ^ (value >> 31)
+        }
+
+        fn unit_interval(&mut self) -> f64 {
+            (self.next_u64() >> 11) as f64 / ((1_u64 << 53) as f64)
+        }
+    }
+
+    #[test]
+    fn seeded_bernoulli_streams_have_simultaneous_time_uniform_coverage() {
+        let familywise_alpha = 0.05;
+        let query_count = 2.0;
+        let armwise_alpha = familywise_alpha / (2.0 * query_count);
+        let repetitions = 3_000;
+        let maximum_prefix = 100;
+        let mut rng = SplitMix64::new(0xA0BE_017C_5EED_2026);
+        let mut familywise_misses = 0usize;
+
+        for _ in 0..repetitions {
+            let mut covered_all_queries_arms_and_times = true;
+            for (control_mean, treatment_mean) in [(0.35, 0.55), (0.65, 0.45)] {
+                for true_mean in [control_mean, treatment_mean] {
+                    let mut sample_mean = 0.0;
+                    for n in 1..=maximum_prefix {
+                        let outcome = if rng.unit_interval() < true_mean { 1.0 } else { 0.0 };
+                        sample_mean += (outcome - sample_mean) / n as f64;
+                        let radius =
+                            hoeffding_alpha_spending_radius(1.0, n, armwise_alpha).unwrap();
+                        let lower = (sample_mean - radius).max(0.0);
+                        let upper = (sample_mean + radius).min(1.0);
+                        if true_mean < lower || true_mean > upper {
+                            covered_all_queries_arms_and_times = false;
+                        }
+                    }
+                }
+            }
+            if !covered_all_queries_arms_and_times {
+                familywise_misses += 1;
+            }
+        }
+
+        let empirical_coverage =
+            (repetitions - familywise_misses) as f64 / repetitions as f64;
+        assert!(
+            empirical_coverage >= 0.93,
+            "simultaneous coverage was {empirical_coverage:.4} with {familywise_misses} family-wise misses",
+        );
+    }
+
     #[test]
     fn time_uniform_radius_does_not_depend_on_the_agent_stopping_rule() {
         let alpha_arm = 0.025;
