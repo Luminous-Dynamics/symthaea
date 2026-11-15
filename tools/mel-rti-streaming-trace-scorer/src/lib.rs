@@ -605,7 +605,7 @@ pub fn score_streaming_session_v1(
     let mut unambiguous_count = 0_u32;
     let mut unambiguous_correct = 0_u32;
     let mut ambiguous_count = 0_u32;
-    let mut ambiguous_accept = 0_u32;
+    let mut ambiguous_valid_set_accepts = 0_u32;
     let mut parse_failures = 0_u32;
     let mut wait_false_activations = 0_u32;
     let mut continue_premature_yields = 0_u32;
@@ -631,7 +631,7 @@ pub fn score_streaming_session_v1(
         let predicted_action = prediction.decision.action();
         let single_truth = (label.valid_actions.len() == 1).then(|| label.valid_actions[0]);
         let action_match = single_truth.map(|expected| predicted_action == Some(expected));
-        let ambiguous_accept = (label.valid_actions.len() > 1).then(|| {
+        let ambiguous_match = (label.valid_actions.len() > 1).then(|| {
             predicted_action.is_some_and(|action| label.valid_actions.contains(&action))
         });
 
@@ -655,8 +655,8 @@ pub fn score_streaming_session_v1(
             }
         } else {
             ambiguous_count += 1;
-            if ambiguous_accept == Some(true) {
-                ambiguous_accept += 1;
+            if ambiguous_match == Some(true) {
+                ambiguous_valid_set_accepts += 1;
             }
         }
 
@@ -664,7 +664,16 @@ pub fn score_streaming_session_v1(
             parse_failures += 1;
         }
 
-        let mut effect_latency = None;
+        // Latency includes every emitted effect, including false activations
+        // and wrong-action effects. Do not condition the latency sample on a
+        // reference match.
+        let effect_latency = prediction.effect_at_ns.map(|effect_at_ns| {
+            effect_at_ns.saturating_sub(prediction.decision_at_ns)
+        });
+        if let Some(latency) = effect_latency {
+            effect_latencies.push(latency);
+        }
+
         let mut effect_error = None;
         let mut effect_window_success = None;
         if let (Some(expected), Some(target), Some(window)) = (
@@ -672,24 +681,19 @@ pub fn score_streaming_session_v1(
             label.effect_target_frame,
             label.effect_window,
         ) {
-            let action_matches = prediction.decision.action() == Some(expected);
-            if action_matches {
-                if let (Some(effect_frame), Some(effect_at_ns)) =
-                    (prediction.effect_frame, prediction.effect_at_ns)
-                {
-                    effect_attempts += 1;
-                    effect_latency =
-                        Some(effect_at_ns.saturating_sub(prediction.decision_at_ns));
-                    effect_latencies.push(effect_latency.expect("just assigned"));
-                    let error = effect_frame as i64 - target as i64;
-                    effect_error = Some(error);
-                    effect_frame_errors.push(error.unsigned_abs());
-                    let success = window.start_frame <= effect_frame
-                        && effect_frame < window.end_frame;
-                    effect_window_success = Some(success);
-                    if success {
-                        effect_successes += 1;
-                    }
+            if let (Some(effect_frame), Some(_effect_at_ns)) =
+                (prediction.effect_frame, prediction.effect_at_ns)
+            {
+                effect_attempts += 1;
+                let error = effect_frame as i64 - target as i64;
+                effect_error = Some(error);
+                effect_frame_errors.push(error.unsigned_abs());
+                let success = prediction.decision.action() == Some(expected)
+                    && window.start_frame <= effect_frame
+                    && effect_frame < window.end_frame;
+                effect_window_success = Some(success);
+                if success {
+                    effect_successes += 1;
                 }
             }
         }
@@ -700,7 +704,7 @@ pub fn score_streaming_session_v1(
             valid_truth_actions: label.valid_actions.clone(),
             predicted_decision: prediction.decision,
             unambiguous_action_match: action_match,
-            ambiguous_valid_set_accept: ambiguous_accept,
+            ambiguous_valid_set_accept: ambiguous_match,
             decision_latency_ns: latency,
             effect_latency_ns: effect_latency,
             effect_frame_error: effect_error,
@@ -733,8 +737,8 @@ pub fn score_streaming_session_v1(
         action_metrics,
         macro_f1_bp,
         ambiguous_chunk_count: ambiguous_count,
-        ambiguous_valid_set_accept_count: ambiguous_accept,
-        ambiguous_valid_set_acceptance_bp: bp(ambiguous_accept, ambiguous_count),
+        ambiguous_valid_set_accept_count: ambiguous_valid_set_accepts,
+        ambiguous_valid_set_acceptance_bp: bp(ambiguous_valid_set_accepts, ambiguous_count),
         parse_failure_count: parse_failures,
         wait_false_activation_count: wait_false_activations,
         continue_premature_yield_count: continue_premature_yields,
