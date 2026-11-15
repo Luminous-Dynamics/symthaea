@@ -712,3 +712,12 @@ The counterflow paper's 792 W / 4 slm MAGD point (23.6% conversion / 25.1% effic
 ## 9.19 Corpus snapshot — 2026-11-15
 
 The source-register branch contains 31 unique source cases, 40 unique negative controls and 4 derived checks. The separate offline-audit branch merges the source-register content with six additional microplasma cases, for 37 cases / 46 controls / 5 derived checks. These counts refer to different branch snapshots.
+
+
+## 9.20 Separate DBD syngas comparator — 2026-11-15
+
+A further 2026 competitor has been added as a different product lane: *Direct synthesis of syngas from humidified CO2 using a coaxial dielectric barrier discharge plasma reactor*, RSC Advances 16 (2026), DOI https://doi.org/10.1039/D5YA00293A.
+
+The experimental study reports energy-efficiency values from 4.5% to 23.3% and H2/CO molar ratios from 0.1 to 0.2 across tested humidified CO2/H2O conditions. A pure-CO2 feed comparator is separately reported at 13.3% energy efficiency with predominantly CO product.
+
+This is a useful DBD technology comparator but not a direct leaderboard point against dry warm-arc CO2-to-CO quenching: feed, product, and possibly energy denominators differ. H2/CO ratio is not CO2 conversion or CO selectivity. The manifest keeps the pure-feed point separate from the humidified syngas ranges and adds three negative controls against feed/product and operating-point mixing.
