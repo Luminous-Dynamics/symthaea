@@ -2871,6 +2871,19 @@ mod tests {
         );
         assert_eq!(rate_sigma(0.0), 0.0);
 
+        // Changing the unit of time changes dt and tau together, but not the
+        // dimensionless interpolation or the resulting state transition.
+        for scale in [0.1_f32, 10.0_f32, 1000.0_f32] {
+            let scaled_tau = tau * scale;
+            let scaled_dt = dt * scale;
+            let scaled_lambda = stable_softplus(gate_logit) / scaled_tau;
+            let scaled_sigma = -(-scaled_lambda * scaled_dt).exp_m1();
+            assert!(
+                (scaled_sigma - rate_sigma(dt)).abs() < 2e-7,
+                "time-unit scaling changed interpolation at scale={scale}"
+            );
+        }
+
         let product_retention = |step: f32| {
             1.0 - sigma_base * (1.0 - (-step / tau).exp())
         };
