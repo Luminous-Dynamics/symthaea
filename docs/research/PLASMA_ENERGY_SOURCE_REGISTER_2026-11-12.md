@@ -616,3 +616,42 @@ The ammonia lane should now retain at least these separate Pareto dimensions:
 - uptime, start/stop response, maintenance and consumables.
 
 Compare complete process chains rather than isolated conversion figures. A lower single-pass conversion can be preferable only if separation and recycle produce lower total energy and cost per kg of delivered accepted H2. That proposition remains a hypothesis to benchmark, not a claimed result.
+
+
+## 9.13 Updated ammonia-plasma frontier — 2026-11-15
+
+Two September 2026 publications materially improve the ammonia cracking benchmark.
+
+### Microwave decomposition: conversion–energy Pareto points
+
+Quiroz Marnef et al., *Microwave plasma-based NH3 decomposition: Reaching optimum performance by understanding the mechanisms*, International Journal of Hydrogen Energy 265 (2026), DOI https://doi.org/10.1016/j.ijhydene.2026.156912.
+
+The paper reports:
+- near-complete conversion (>99%) with H2 energy yield of 45 g/kWh and production rate of 150 g/h;
+- a distinct best energy-yield point of 51 g/kWh at 76% NH3 conversion;
+- a 2D-axisymmetric model coupling gas dynamics, heat transfer, electromagnetic waves and chemical reactions.
+
+Reciprocal energy-yield arithmetic gives approximately 22.22 kWh/kg H2 at the >99% conversion point and 19.61 kWh/kg H2 at the 76% conversion point. These are two operating points, not one combined performance claim. The energy-yield optimum must not inherit the high-conversion result.
+
+The reported yield basis must be checked against complete wall-plug input, hydrogen separation/purification, compression, cooling, auxiliaries, startup, downtime and lifetime before system-level ranking. This atmospheric pure-NH3 case differs from the 2025 atmospheric NH3/N2 torch and reduced-pressure pure-NH3 study.
+
+### Turbulent transport: chemistry-specific model-form result
+
+Maerivoet et al., *Effect of turbulent transport on plasma-based NH3 cracking into H2: Insights from a RANS computational fluid dynamics model*, Energy Conversion and Management 364 (2026), DOI https://doi.org/10.1016/j.enconman.2026.121741.
+
+The source describes a coupled 2D-axisymmetric gas-flow, heating, chemical-kinetics, species-transport and current model, with reported agreement against experiments across flow-rate and current ranges. For the studied warm-plasma process, increased turbulence reduced NH3 conversion and increased energy cost by suppressing the hot afterglow that supports additional conversion.
+
+This is a valuable counterexample to the assumption that more turbulence or mixing universally improves plasma conversion. It is specific to the studied reactor/chemistry and must not be transferred to microwave NH3, CO2 splitting, NOx formation, RF cold plasma or fusion plasma without validation.
+
+### Benchmark implication
+
+Keep these as independent Pareto dimensions:
+- NH3 conversion per pass;
+- H2 energy yield (g/kWh) and reciprocal specific energy (kWh/kg H2);
+- production rate;
+- feed composition, pressure, reactor/source family and exact operating point;
+- complete grid-side energy and accepted H2 purity/pressure;
+- separation/recycle energy and recovery of unconverted NH3;
+- duty-cycle, start/stop response, maintenance and consumables.
+
+A lower single-pass conversion could be preferable only if the full separation/recycle chain achieves lower total energy and cost per kg of accepted delivered H2. That is a falsifiable benchmark hypothesis, not an established result.
