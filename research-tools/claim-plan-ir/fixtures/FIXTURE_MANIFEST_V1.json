@@ -38,6 +38,11 @@
       "path": "negative/duplicate_member_name.raw.json",
       "expected": "reject-raw-json-admission-before-schema",
       "reason": "Duplicate JSON object member names violate the JCS/I-JSON input contract and cannot be safely detected after lossy object parsing."
+    },
+    {
+      "path": "negative/invalid_json_pointer_escape.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "RFC 6901 permits only ~0 and ~1 escapes in a JSON Pointer token; ~2 must reject before field selection."
     }
   ],
   "nonclaims": [
