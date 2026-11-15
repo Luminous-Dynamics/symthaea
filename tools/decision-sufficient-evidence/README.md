@@ -34,4 +34,4 @@ This is a decision-theoretic ranking over supplied assumptions. It does not esti
 
 The acquisition cost utility must be expressed in the same declared utility units as action loss. The individual resource dimensions remain visible and separately budgeted; the planner does not silently convert dollars, latency, review time and compute into one score.
 
-Eight Rust unit-test definitions are authored. They have not been compiled or executed. Do not treat them as passing.
+Nine Rust unit-test definitions are authored. They have not been compiled or executed. Do not treat them as passing.
