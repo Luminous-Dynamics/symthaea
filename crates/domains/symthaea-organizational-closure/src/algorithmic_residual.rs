@@ -184,6 +184,7 @@ pub enum ResidualFindingCode {
     EmptyEdgeEndpoint,
     UnknownEdgeEndpoint,
     SelfEdge,
+    DirectedCycle,
     AddExistingEdge,
     RemoveMissingEdge,
     ReorientMissingSource,
