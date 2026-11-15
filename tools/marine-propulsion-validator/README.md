@@ -434,3 +434,9 @@ INCOMPARABLE with no effective power output. The result remains INCOMPLETE becau
 the source data are synthetic.
 
 Research specification: `../../docs/research/marine/PWC-WATERJET-STATION-FLUX-001.md`.
+
+
+The station-flux record also declares `maximum_observation_skew_ms`. The auditor checks the
+maximum observed timestamp spread across fluid density and both complete station planes.
+A transient record that exceeds this tolerance is INCOMPARABLE, even when its integrated
+flows happen to match. The observation-skew negative control is part of the focused workflow.
