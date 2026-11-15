@@ -17,6 +17,9 @@ It is an integration contract, not another fusion system code. It does not repla
 - Explicit distinction between blocked and indeterminate candidates.
 - Evidence-to-claim class and revision/scope binding.
 - Pairwise solver dependence classification across declared dataset, code and assumption groups; empty or missing dependency identities remain unknown.
+- Observable-scoped dependency inventories for solver-build lineage, equations/closures, input/calibration datasets, boundary and initial conditions, geometry, transformations, measurement systems/data, material properties and shared scenario assumptions.
+- Partial overlap is retained per observable; same source node with different revisions and byte-identical payloads under different local names are detected as shared dependencies.
+- Incomplete inventories remain unknown; complete disjoint declarations mean only that no shared dependency was found in the declared inventory, not proof of physical/statistical independence.
 - Deterministic transitive invalidation of downstream dependency nodes.
 - Fixed claim ceiling: eligible candidates are only eligible for further engineering review.
 - Candidate-funnel audit across the frozen universe at analytical, low-fidelity and high-fidelity stages; every candidate/stage pair must have an explicit disposition, including NotEvaluated.
@@ -42,6 +45,10 @@ A claim must cite evidence with an exact compatible class and the same subject r
 
 Two runs are only classified as independent under declared dependencies when dataset, code and assumption groups are all present and pairwise distinct. Any shared group is marked common-mode. Missing group identity is marked unknown. This is not a statistical proof of independence.
 
+## Observable-scoped solver dependence
+
+The initial run-level comparison uses declared dataset, code and assumption groups. The follow-on observable-scoped module refines this with per-output dependency inventories. It can distinguish a shared equilibrium source for one output from an independent empirical closure used for another. A shared source node remains shared across version changes; an identical payload digest exposes aliases. Missing completeness declarations remain unknown. The strongest no-overlap result means only that no shared dependency was found within two declared-complete inventories; it is not a physical or statistical independence proof. The module does not calculate covariance; missing cross-covariance remains the responsibility of the separate Symtropy covariance contract and must not be replaced with zero.
+
 ## Dependency invalidation
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
@@ -58,7 +65,7 @@ cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. Total authored Rust test declarations across the three source modules: 64. These are authored test cases, not executed test results.
+The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The observable-dependence module adds 11 authored tests for per-output dependency overlap, source aliases, incomplete inventories, conflicting identities and deterministic ordering. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. Total authored Rust test declarations across the current four source modules: 75. These are authored test cases, not executed test results.
 
 The separate validation-domain inventory binary checks fixture structure without calling the split validator. Its 16 synthetic cases contain 3 expected acceptances and 13 expected refusals.
 
