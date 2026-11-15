@@ -1134,10 +1134,10 @@ mod tests {
 
         let mut schedule = generate_delivery_schedule(59, 1).expect("valid schedule");
         let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let trigger_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, 20_000, ScheduleAction::StopTriggered {
             obligation_id: "digest-stop".to_owned(), policy_revision: "policy-1".to_owned(),
         });
-        let trigger_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, 20_001, ScheduleAction::StopDischarged {
             obligation_id: "digest-stop".to_owned(), trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: trigger_action_id, policy_revision: "policy-1".to_owned(),
