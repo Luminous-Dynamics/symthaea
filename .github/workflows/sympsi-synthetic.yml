@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/sympsi-synthetic-harness/**"
+      - "tools/sympsi-mapping-verifier-go/**"
       - ".github/workflows/sympsi-synthetic.yml"
   workflow_dispatch:
 
@@ -37,6 +38,18 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --all-targets -- -D warnings
+
+      - name: Install pinned Go for independent mapping verifier
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.4"
+          cache: false
+
+      - name: Format independent Go verifier
+        run: test -z "$(gofmt -l tools/sympsi-mapping-verifier-go/*.go)"
+
+      - name: Cross-language target mapping vectors
+        run: go test -count=1 -v ./tools/sympsi-mapping-verifier-go/...
 
       - name: Qualify four-choice synthetic profile
         env:
