@@ -24,6 +24,12 @@ pub struct LoftViolation {
     pub detail: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FaceRange {
+    pub first_face: usize,
+    pub face_count: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LoftedHullArtifact {
     pub artifact_schema_version: u32,
@@ -34,6 +40,9 @@ pub struct LoftedHullArtifact {
     pub source_spec_digest_blake3: String,
     pub sampled_sections_digest_blake3: String,
     pub mesh_digest_blake3: String,
+    pub side_face_range: FaceRange,
+    pub waterplane_face_range: FaceRange,
+    pub end_cap_face_range: FaceRange,
     pub candidate: CandidateInput,
     pub admission_report: AdmissionReport,
 }
@@ -490,7 +499,10 @@ pub fn loft_waterplane_capped_hull(
         }
     }
 
-    let mut faces = Vec::with_capacity(face_count);
+    let side_face_count = (station_count - 1) * 4 * (point_count - 1);
+    let waterplane_face_count = (station_count - 1) * 2;
+    let mut side_faces = Vec::with_capacity(side_face_count);
+    let mut waterplane_faces = Vec::with_capacity(waterplane_face_count);
 
     for station_index in 0..station_count - 1 {
         for point_index in 0..point_count - 1 {
@@ -498,23 +510,23 @@ pub fn loft_waterplane_capped_hull(
             let b = starboard[station_index + 1][point_index];
             let c = starboard[station_index + 1][point_index + 1];
             let d = starboard[station_index][point_index + 1];
-            faces.push([a, b, c]);
-            faces.push([a, c, d]);
+            side_faces.push([a, b, c]);
+            side_faces.push([a, c, d]);
 
             let a = port[station_index][point_index];
             let b = port[station_index + 1][point_index];
             let c = port[station_index + 1][point_index + 1];
             let d = port[station_index][point_index + 1];
-            faces.push([a, c, b]);
-            faces.push([a, d, c]);
+            side_faces.push([a, c, b]);
+            side_faces.push([a, d, c]);
         }
 
         let port_here = port[station_index][point_count - 1];
         let starboard_here = starboard[station_index][point_count - 1];
         let starboard_next = starboard[station_index + 1][point_count - 1];
         let port_next = port[station_index + 1][point_count - 1];
-        faces.push([port_here, starboard_here, starboard_next]);
-        faces.push([port_here, starboard_next, port_next]);
+        waterplane_faces.push([port_here, starboard_here, starboard_next]);
+        waterplane_faces.push([port_here, starboard_next, port_next]);
     }
 
     let bow_ring = {
@@ -546,6 +558,22 @@ pub fn loft_waterplane_capped_hull(
         sections.sections.last().expect("validated sections are non-empty"),
     ));
 
+    let side_face_range = FaceRange {
+        first_face: 0,
+        face_count: side_faces.len(),
+    };
+    let waterplane_face_range = FaceRange {
+        first_face: side_faces.len(),
+        face_count: waterplane_faces.len(),
+    };
+    let mut faces = Vec::with_capacity(face_count);
+    faces.extend(side_faces);
+    faces.extend(waterplane_faces);
+
+    let end_cap_face_range = FaceRange {
+        first_face: faces.len(),
+        face_count: end_cap_face_count,
+    };
     for index in 0..bow_ring.len() {
         let next = (index + 1) % bow_ring.len();
         faces.push([bow_centre, bow_ring[index], bow_ring[next]]);
@@ -590,6 +618,9 @@ pub fn loft_waterplane_capped_hull(
         source_spec_digest_blake3: sections.source_spec_digest_blake3.clone(),
         sampled_sections_digest_blake3: sections.sampled_sections_digest_blake3.clone(),
         mesh_digest_blake3: geometry_digest_blake3,
+        side_face_range,
+        waterplane_face_range,
+        end_cap_face_range,
         candidate,
         admission_report,
     })
@@ -732,6 +763,24 @@ mod tests {
         assert_eq!(result.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(result.admission_report.metrics.non_manifold_edge_count, 0);
         assert_eq!(result.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(result.side_face_range.first_face, 0);
+        assert_eq!(
+            result.waterplane_face_range.first_face,
+            result.side_face_range.face_count
+        );
+        assert_eq!(
+            result.end_cap_face_range.first_face,
+            result.waterplane_face_range.first_face + result.waterplane_face_range.face_count
+        );
+        for face in result.candidate.geometry.faces
+            [result.waterplane_face_range.first_face
+                ..result.waterplane_face_range.first_face + result.waterplane_face_range.face_count]
+            .iter()
+        {
+            assert!(face.iter().all(|index| {
+                result.candidate.geometry.vertices[*index as usize][2].abs() < 1.0e-12
+            }));
+        }
         assert!(result.admission_report.metrics.signed_volume_m3.unwrap() > 0.0);
         assert_eq!(
             result.mesh_digest_blake3,
