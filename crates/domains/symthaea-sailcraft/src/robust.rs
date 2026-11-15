@@ -14,7 +14,9 @@
 //! The resulting interval is a deterministic envelope under the declared
 //! input bounds. It is not a probabilistic forecast or physical validation.
 
-use super::{Evidence, PlanStatus, PolarDiagram, PolarError, TackSide, evidence_gate, signed_angle_deg};
+use super::{
+    Evidence, PlanStatus, PolarDiagram, PolarError, TackSide, evidence_gate, signed_angle_deg,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScalarInterval {
@@ -174,9 +176,15 @@ fn polar_speed_envelope(
     }
 
     let wind_min = polar.true_wind_speeds_mps[0];
-    let wind_max = *polar.true_wind_speeds_mps.last().ok_or(PolarError::Invalid)?;
+    let wind_max = *polar
+        .true_wind_speeds_mps
+        .last()
+        .ok_or(PolarError::Invalid)?;
     let twa_min = polar.true_wind_angles_deg[0];
-    let twa_max = *polar.true_wind_angles_deg.last().ok_or(PolarError::Invalid)?;
+    let twa_max = *polar
+        .true_wind_angles_deg
+        .last()
+        .ok_or(PolarError::Invalid)?;
 
     if wind_speed.lower < wind_min
         || wind_speed.upper > wind_max
@@ -192,7 +200,9 @@ fn polar_speed_envelope(
 
     for wind_cell in 0..polar.true_wind_speeds_mps.len() - 1 {
         let cell_wind_lower = wind_speed.lower.max(polar.true_wind_speeds_mps[wind_cell]);
-        let cell_wind_upper = wind_speed.upper.min(polar.true_wind_speeds_mps[wind_cell + 1]);
+        let cell_wind_upper = wind_speed
+            .upper
+            .min(polar.true_wind_speeds_mps[wind_cell + 1]);
         if cell_wind_lower > cell_wind_upper {
             continue;
         }
@@ -231,10 +241,7 @@ fn polar_speed_envelope(
     Ok(envelope)
 }
 
-fn absolute_twa_interval(
-    wind_from: DirectionInterval,
-    heading_deg: f64,
-) -> ScalarInterval {
+fn absolute_twa_interval(wind_from: DirectionInterval, heading_deg: f64) -> ScalarInterval {
     let centre_distance = signed_angle_deg(wind_from.center_deg, heading_deg).abs();
     ScalarInterval {
         lower: (centre_distance - wind_from.half_width_deg).max(0.0),
@@ -460,11 +467,8 @@ pub fn evaluate_robust_route_candidates(
 
     let direct_twa = absolute_twa_interval(wind.from_direction, target_bearing);
     let direct_admissible = direct_twa.lower > polar.no_go_angle_deg;
-    let current_vmg = direction_projection(
-        current.speed_mps,
-        current.toward_direction,
-        target_bearing,
-    );
+    let current_vmg =
+        direction_projection(current.speed_mps, current.toward_direction, target_bearing);
     if !current_vmg.is_finite_ordered() {
         return RobustRouteEvaluation::blocked(
             RobustPlanStatus::NotEvaluated,
@@ -515,8 +519,7 @@ pub fn evaluate_robust_route_candidates(
                 "propagated VMG interval overflowed the finite arithmetic contract",
             );
         }
-        let signed_centre_twa =
-            signed_angle_deg(wind.from_direction.center_deg, heading_deg);
+        let signed_centre_twa = signed_angle_deg(wind.from_direction.center_deg, heading_deg);
         let tack_side = if signed_centre_twa > 0.0 {
             TackSide::Starboard
         } else if signed_centre_twa < 0.0 && signed_centre_twa > -180.0 {
@@ -540,13 +543,13 @@ pub fn evaluate_robust_route_candidates(
 
         match tack_side {
             TackSide::Port => {
-                port_max_possible_vmg = port_max_possible_vmg
-                    .max(candidate.ground_velocity_made_good_mps.upper);
+                port_max_possible_vmg =
+                    port_max_possible_vmg.max(candidate.ground_velocity_made_good_mps.upper);
                 best_port = best_for_tack(best_port, candidate);
             }
             TackSide::Starboard => {
-                starboard_max_possible_vmg = starboard_max_possible_vmg
-                    .max(candidate.ground_velocity_made_good_mps.upper);
+                starboard_max_possible_vmg =
+                    starboard_max_possible_vmg.max(candidate.ground_velocity_made_good_mps.upper);
                 best_starboard = best_for_tack(best_starboard, candidate);
             }
             TackSide::DeadDownwind => {}
@@ -589,8 +592,10 @@ pub fn evaluate_robust_route_candidates(
             status: RobustPlanStatus::NoGuaranteedProgress,
             direct_course_robustly_admissible: Some(direct_admissible),
             candidates,
-            port_max_possible_ground_vmg_mps: (best_port.is_some()).then_some(port_max_possible_vmg),
-            starboard_max_possible_ground_vmg_mps: (best_starboard.is_some()).then_some(starboard_max_possible_vmg),
+            port_max_possible_ground_vmg_mps: (best_port.is_some())
+                .then_some(port_max_possible_vmg),
+            starboard_max_possible_ground_vmg_mps: (best_starboard.is_some())
+                .then_some(starboard_max_possible_vmg),
             unique_best_tack: None,
             reason: "no candidate guarantees positive ground VMG across the declared uncertainty bounds",
         };
@@ -612,7 +617,8 @@ pub fn evaluate_robust_route_candidates(
         direct_course_robustly_admissible: Some(direct_admissible),
         candidates,
         port_max_possible_ground_vmg_mps: (best_port.is_some()).then_some(port_max_possible_vmg),
-        starboard_max_possible_ground_vmg_mps: (best_starboard.is_some()).then_some(starboard_max_possible_vmg),
+        starboard_max_possible_ground_vmg_mps: (best_starboard.is_some())
+            .then_some(starboard_max_possible_vmg),
         unique_best_tack,
         reason: if unique_best_tack.is_some() {
             "one tack dominates the alternative across the complete declared VMG envelopes"
@@ -644,13 +650,7 @@ mod tests {
     }
 
     fn fresh<T>(value: T) -> Evidence<T> {
-        Evidence::qualified_with_freshness(
-            value,
-            [0xc7; 32],
-            "robust-synthetic-clock",
-            0.0,
-            2.0,
-        )
+        Evidence::qualified_with_freshness(value, [0xc7; 32], "robust-synthetic-clock", 0.0, 2.0)
     }
 
     fn request() -> RobustRouteRequest {
@@ -692,9 +692,12 @@ mod tests {
         assert_eq!(result.direct_course_robustly_admissible, Some(false));
         assert_eq!(result.candidates.len(), 2);
         assert_eq!(result.unique_best_tack, None);
-        assert!(result.candidates.iter().all(|candidate| {
-            candidate.ground_velocity_made_good_mps.lower > 0.0
-        }));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| { candidate.ground_velocity_made_good_mps.lower > 0.0 })
+        );
     }
 
     #[test]
@@ -702,20 +705,50 @@ mod tests {
         let port = RobustCourseCandidate {
             heading_deg: 45.0,
             tack_side: TackSide::Port,
-            true_wind_angle_deg: ScalarInterval { lower: 45.0, upper: 45.0 },
-            boat_speed_mps: ScalarInterval { lower: 10.0, upper: 10.0 },
-            boat_velocity_made_good_mps: ScalarInterval { lower: 10.0, upper: 10.0 },
-            current_velocity_made_good_mps: ScalarInterval { lower: 0.0, upper: 0.0 },
-            ground_velocity_made_good_mps: ScalarInterval { lower: 10.0, upper: 10.0 },
+            true_wind_angle_deg: ScalarInterval {
+                lower: 45.0,
+                upper: 45.0,
+            },
+            boat_speed_mps: ScalarInterval {
+                lower: 10.0,
+                upper: 10.0,
+            },
+            boat_velocity_made_good_mps: ScalarInterval {
+                lower: 10.0,
+                upper: 10.0,
+            },
+            current_velocity_made_good_mps: ScalarInterval {
+                lower: 0.0,
+                upper: 0.0,
+            },
+            ground_velocity_made_good_mps: ScalarInterval {
+                lower: 10.0,
+                upper: 10.0,
+            },
         };
         let starboard = RobustCourseCandidate {
             heading_deg: 315.0,
             tack_side: TackSide::Starboard,
-            true_wind_angle_deg: ScalarInterval { lower: 45.0, upper: 45.0 },
-            boat_speed_mps: ScalarInterval { lower: 5.0, upper: 6.0 },
-            boat_velocity_made_good_mps: ScalarInterval { lower: 5.0, upper: 6.0 },
-            current_velocity_made_good_mps: ScalarInterval { lower: 0.0, upper: 0.0 },
-            ground_velocity_made_good_mps: ScalarInterval { lower: 5.0, upper: 6.0 },
+            true_wind_angle_deg: ScalarInterval {
+                lower: 45.0,
+                upper: 45.0,
+            },
+            boat_speed_mps: ScalarInterval {
+                lower: 5.0,
+                upper: 6.0,
+            },
+            boat_velocity_made_good_mps: ScalarInterval {
+                lower: 5.0,
+                upper: 6.0,
+            },
+            current_velocity_made_good_mps: ScalarInterval {
+                lower: 0.0,
+                upper: 0.0,
+            },
+            ground_velocity_made_good_mps: ScalarInterval {
+                lower: 5.0,
+                upper: 6.0,
+            },
         };
         // The selected starboard maximin representative tops out at 6, but
         // another admitted starboard heading can reach 12. Port is not dominant.
@@ -732,30 +765,55 @@ mod tests {
     #[test]
     fn no_go_boundary_is_inclusive_for_uncertainty_sets() {
         let mut input = request();
-        input.wind.value.as_mut().unwrap().from_direction.half_width_deg = 0.0;
+        input
+            .wind
+            .value
+            .as_mut()
+            .unwrap()
+            .from_direction
+            .half_width_deg = 0.0;
         let mut data = polar();
         data.no_go_angle_deg = 45.0;
         let result = polar_speed_envelope(
             &data,
-            ScalarInterval { lower: 8.0, upper: 8.0 },
-            ScalarInterval { lower: 45.0, upper: 45.0 },
+            ScalarInterval {
+                lower: 8.0,
+                upper: 8.0,
+            },
+            ScalarInterval {
+                lower: 45.0,
+                upper: 45.0,
+            },
             0.0,
         );
         assert!(result.is_ok());
         let route = evaluate_robust_route_candidates(&data, input);
-        assert!(route.candidates.iter().all(|candidate| candidate.true_wind_angle_deg.lower > 45.0));
+        assert!(
+            route
+                .candidates
+                .iter()
+                .all(|candidate| candidate.true_wind_angle_deg.lower > 45.0)
+        );
     }
 
     #[test]
     fn wind_direction_uncertainty_intersecting_no_go_rejects_candidate() {
         let mut input = request();
-        input.wind.value.as_mut().unwrap().from_direction.half_width_deg = 15.0;
+        input
+            .wind
+            .value
+            .as_mut()
+            .unwrap()
+            .from_direction
+            .half_width_deg = 15.0;
         let result = evaluate_robust_route_candidates(&polar(), input);
         assert_eq!(result.status, RobustPlanStatus::RankingUnresolved);
-        assert!(result
-            .candidates
-            .iter()
-            .all(|candidate| candidate.true_wind_angle_deg.lower >= 40.0));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| candidate.true_wind_angle_deg.lower >= 40.0)
+        );
     }
 
     #[test]
@@ -772,10 +830,12 @@ mod tests {
         let mut input = request();
         input.polar_error.maximum_absolute_speed_error_mps = Some(0.25);
         let result = evaluate_robust_route_candidates(&polar(), input);
-        assert!(result
-            .candidates
-            .iter()
-            .all(|candidate| candidate.boat_speed_mps.lower >= 0.0));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| candidate.boat_speed_mps.lower >= 0.0)
+        );
         assert!(result.candidates.iter().any(|candidate| {
             (candidate.boat_speed_mps.upper - candidate.boat_speed_mps.lower) >= 0.5
         }));
@@ -836,12 +896,21 @@ mod tests {
             lower: 0.0,
             upper: 4.0,
         };
-        input.current.value.as_mut().unwrap().toward_direction.center_deg = 180.0;
+        input
+            .current
+            .value
+            .as_mut()
+            .unwrap()
+            .toward_direction
+            .center_deg = 180.0;
         let result = evaluate_robust_route_candidates(&polar(), input);
         assert_eq!(result.status, RobustPlanStatus::NoGuaranteedProgress);
-        assert!(result.candidates.iter().all(|candidate| {
-            candidate.ground_velocity_made_good_mps.lower <= 0.0
-        }));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| { candidate.ground_velocity_made_good_mps.lower <= 0.0 })
+        );
     }
 
     #[test]
@@ -873,10 +942,18 @@ mod tests {
     fn interval_directions_crossing_north_are_handled_circularly() {
         let mut input = request();
         input.wind.value.as_mut().unwrap().from_direction.center_deg = 359.0;
-        input.wind.value.as_mut().unwrap().from_direction.half_width_deg = 5.0;
+        input
+            .wind
+            .value
+            .as_mut()
+            .unwrap()
+            .from_direction
+            .half_width_deg = 5.0;
         let result = evaluate_robust_route_candidates(&polar(), input);
-        assert!(result.candidates.iter().all(|candidate| {
-            candidate.true_wind_angle_deg.lower >= polar().no_go_angle_deg
-        }));
+        assert!(
+            result.candidates.iter().all(|candidate| {
+                candidate.true_wind_angle_deg.lower >= polar().no_go_angle_deg
+            })
+        );
     }
 }
