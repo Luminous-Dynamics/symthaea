@@ -711,9 +711,9 @@ mod tests {
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
         let report = audit_fixture_json(FIXTURE).expect("fixture audit");
-        assert_eq!(report.scenario_count, 16);
+        assert_eq!(report.scenario_count, 19);
         assert_eq!(report.mismatched_expectations, 0);
-        assert_eq!(report.matched_expectations, 16);
+        assert_eq!(report.matched_expectations, 19);
         assert!(report.synthetic_only);
         assert!(!report.model_is_trained);
         assert!(!report.physical_measurements);
