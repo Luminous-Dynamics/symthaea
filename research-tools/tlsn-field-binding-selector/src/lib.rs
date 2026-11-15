@@ -1,5 +1,3 @@
-pub mod http11;
-
 //! Bounded JSON field selection that preserves the exact raw JSON value byte span.
 //!
 //! This is a host-side parser/range-selection primitive for the PPAC/TLSN field
@@ -9,6 +7,8 @@ pub mod http11;
 //! The returned span is relative to the exact JSON body slice passed by the
 //! caller. A separate qualified HTTP framing layer must establish whether that
 //! body slice maps contiguously to a particular TLS transcript range.
+
+pub mod http11;
 
 use std::{
     collections::HashSet,
