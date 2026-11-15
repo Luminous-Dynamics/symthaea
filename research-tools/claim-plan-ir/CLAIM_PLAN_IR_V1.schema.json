@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research-tools/claim-plan-ir/CLAIM_PLAN_IR_V1.schema.json",
   "title": "Symthaea Claim Plan IR v1",
-  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems. Canonicalization is an explicit required field; raw JSON duplicate-name detection and I-JSON/JCS numeric admission must occur before canonical serialization.",
+  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems. Canonicalization is an explicit required field; raw JSON duplicate-name detection and I-JSON/JCS numeric admission must occur before canonical serialization. A plan may bind multiple typed fields from the same authenticated HTTP response; the predicate AST refers to exact field IDs, and freshness predicates anchor to the verifier request issue time.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,8 +11,7 @@
     "canonicalization",
     "authority",
     "source",
-    "field",
-    "interpretation",
+    "fields",
     "predicate",
     "request",
     "uniqueness",
@@ -246,102 +245,6 @@
         }
       }
     },
-    "field": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "parser_profile_id",
-        "parser_profile_digest",
-        "schema_profile_id",
-        "schema_profile_digest",
-        "json_pointer",
-        "duplicate_key_policy",
-        "unicode_policy"
-      ],
-      "properties": {
-        "parser_profile_id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "parser_profile_digest": {
-          "$ref": "#/$defs/sha256"
-        },
-        "schema_profile_id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "schema_profile_digest": {
-          "$ref": "#/$defs/sha256"
-        },
-        "json_pointer": {
-          "type": "string",
-          "maxLength": 2048
-        },
-        "duplicate_key_policy": {
-          "const": "reject"
-        },
-        "unicode_policy": {
-          "const": "exact_scalar_sequence_no_normalization"
-        },
-        "lexical_profile_id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "lexical_profile_digest": {
-          "$ref": "#/$defs/sha256"
-        }
-      }
-    },
-    "interpretation": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "value_type",
-        "conversion_profile_id",
-        "conversion_profile_digest"
-      ],
-      "properties": {
-        "value_type": {
-          "enum": [
-            "utf8_string",
-            "unsigned_integer",
-            "signed_integer",
-            "decimal_string",
-            "timestamp_rfc3339",
-            "timestamp_unix_seconds",
-            "closed_enum"
-          ]
-        },
-        "unit": {
-          "type": "string",
-          "maxLength": 128
-        },
-        "currency": {
-          "type": "string",
-          "pattern": "^[A-Z]{3}$"
-        },
-        "minor_unit_scale": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 18
-        },
-        "timezone": {
-          "type": "string",
-          "maxLength": 128
-        },
-        "conversion_profile_id": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
-        },
-        "conversion_profile_digest": {
-          "$ref": "#/$defs/sha256"
-        }
-      }
-    },
     "predicate": {
       "type": "object",
       "additionalProperties": false,
@@ -366,6 +269,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "issued_at",
         "verifier_id",
         "audience",
         "purpose",
@@ -402,6 +306,10 @@
           "$ref": "#/$defs/sha256"
         },
         "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "issued_at": {
           "type": "string",
           "format": "date-time"
         }
@@ -625,6 +533,15 @@
           "const": "preserve_as_is_no_normalization"
         }
       }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/field_binding"
+      },
+      "description": "All selected fields must be opened from the same authenticated response ordinal under this source profile. Field IDs are unique within the plan (checked by semantic preflight)."
     }
   },
   "$defs": {
@@ -638,11 +555,17 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "kind"
+            "kind",
+            "field_id"
           ],
           "properties": {
             "kind": {
               "const": "claim_value"
+            },
+            "field_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
             }
           }
         },
@@ -737,6 +660,40 @@
             },
             "child": {
               "$ref": "#/$defs/expression"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field_id",
+            "max_age_seconds",
+            "future_skew_seconds",
+            "reference"
+          ],
+          "properties": {
+            "kind": {
+              "const": "freshness"
+            },
+            "field_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "max_age_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31536000
+            },
+            "future_skew_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400
+            },
+            "reference": {
+              "const": "request_issued_at"
             }
           }
         }
@@ -871,6 +828,39 @@
           "type": "integer",
           "minimum": 131072,
           "maximum": 2147483647
+        }
+      }
+    },
+    "field_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_id",
+        "parser_profile_id",
+        "parser_profile_digest",
+        "schema_profile_id",
+        "schema_profile_digest",
+        "json_pointer",
+        "duplicate_key_policy",
+        "unicode_policy",
+        "lexical_profile_id",
+        "lexical_profile_digest",
+        "interpretation"
+      ],
+      "properties": {
+        "field_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "interpretation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_type",
+            "conversion_profile_id",
+            "conversion_profile_digest"
+          ]
         }
       }
     }
