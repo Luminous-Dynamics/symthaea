@@ -28,13 +28,15 @@ For every edge of the combined authorized support, the harness records per-chann
 - parent and output left/right short-window RMS discontinuity;
 - drift in that left/right RMS discontinuity.
 
+Each step also records change relative to the frozen original source, the cumulative authorized frame union, source-relative maximum sample residual and source-relative off-support mutation count. This gives a per-step and terminal drift curve without confusing immediate-parent changes with session-root drift.
+
 These are deterministic diagnostic measurements, not universal perceptual thresholds. A boundary gate becomes Verified only when both calibrated thresholds are present and satisfied. Missing thresholds produce Unknown/Abstain; exceeding either threshold produces Rejected.
 
 No single threshold should be used indiscriminately for hard cuts, crossfades, transients, sustained instruments, stereo phase relationships and different sample rates. Calibrate thresholds by operation, format and listener cohort.
 
 ## Implemented controls
 
-Sixteen unit tests are authored for:
+Seventeen unit tests are authored for:
 - exact preservation outside the support;
 - one-sample off-support leakage;
 - declared transition support versus undeclared dilation;
