@@ -2845,57 +2845,110 @@ mod tests {
         assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
     }
 
-    /// Frozen-parameter scalar gate law check. This is a pure algebraic test:
-    /// it does not claim that the state-dependent HDC-LTC neuron is an exact flow.
+    /// Isolated scalar update-law candidates. These are test-only oracles;
+    /// they do not alter the production neuron or assert full nonlinear flow exactness.
+    #[derive(Debug, Clone, Copy)]
+    enum GateLawCandidate {
+        Current,
+        Product,
+        ExponentialRate,
+        Ungated,
+    }
+
+    fn candidate_softplus(x: f32) -> f32 {
+        x.max(0.0) + (-x.abs()).exp().ln_1p()
+    }
+
+    fn candidate_gate_sigma(law: GateLawCandidate, gate_logit: f32, tau: f32, dt: f32) -> f32 {
+        let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
+        let relaxation = -(-dt / tau).exp_m1();
+        match law {
+            GateLawCandidate::Current => {
+                1.0 - (-dt / tau).exp() * (1.0 - sigma_base)
+            }
+            GateLawCandidate::Product => sigma_base * relaxation,
+            GateLawCandidate::ExponentialRate => {
+                let lambda = candidate_softplus(gate_logit) / tau;
+                -(-lambda * dt).exp_m1()
+            }
+            GateLawCandidate::Ungated => relaxation,
+        }
+    }
+
+    /// Compare all four scalar laws with frozen equilibrium, gate and tau.
+    /// Only rate and ungated exponential relaxation should form a semigroup.
     #[test]
-    fn exponential_rate_gate_is_partition_consistent_but_product_gate_is_not() {
+    fn gate_law_candidates_separate_identity_gate_semantics_and_composition() {
         let gate_logit = 0.0_f32;
-        let stable_softplus =
-            |x: f32| x.max(0.0) + (-x.abs()).exp().ln_1p();
         let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
         let tau = 0.1_f32;
         let dt = tau;
-        let lambda = stable_softplus(gate_logit) / tau;
+        let laws = [
+            GateLawCandidate::Current,
+            GateLawCandidate::Product,
+            GateLawCandidate::ExponentialRate,
+            GateLawCandidate::Ungated,
+        ];
 
-        let rate_retention = |step: f32| (-lambda * step).exp();
-        let rate_sigma = |step: f32| -(-lambda * step).exp_m1();
-        let rate_one = rate_retention(dt);
-        let rate_two = rate_retention(dt / 2.0).powi(2);
+        let sigma_at_zero: Vec<f32> = laws
+            .iter()
+            .map(|law| candidate_gate_sigma(*law, gate_logit, tau, 0.0))
+            .collect();
+        assert!(sigma_at_zero[0] > 0.0, "current gate is the identity-failing control");
+        assert!(sigma_at_zero[1..].iter().all(|&sigma| sigma == 0.0));
+
+        let rate_at_tau = candidate_gate_sigma(GateLawCandidate::ExponentialRate, gate_logit, tau, tau);
         assert!(
-            (rate_one - rate_two).abs() < 2e-7,
-            "exponential-rate retention must compose: full={rate_one}, halves={rate_two}"
-        );
-        assert!(
-            (rate_sigma(tau) - sigma_base).abs() < 2e-7,
+            (rate_at_tau - sigma_base).abs() < 2e-7,
             "rate mapping must preserve the original gate at dt=tau"
         );
-        assert_eq!(rate_sigma(0.0), 0.0);
 
-        // Changing the unit of time changes dt and tau together, but not the
-        // dimensionless interpolation or the resulting state transition.
+        let retention = |law: GateLawCandidate, step: f32| {
+            1.0 - candidate_gate_sigma(law, gate_logit, tau, step)
+        };
+        for law in laws {
+            let full = retention(law, dt);
+            let halves = retention(law, dt / 2.0).powi(2);
+            let composition_error = (full - halves).abs();
+            match law {
+                GateLawCandidate::ExponentialRate | GateLawCandidate::Ungated => assert!(
+                    composition_error < 2e-7,
+                    "{law:?} must compose for frozen parameters: full={full}, halves={halves}"
+                ),
+                GateLawCandidate::Current | GateLawCandidate::Product => assert!(
+                    composition_error > 1e-2,
+                    "{law:?} is expected to fail frozen-parameter composition: \
+                     full={full}, halves={halves}"
+                ),
+            }
+        }
+
+        // All candidates should be monotone over positive time for finite inputs.
+        for law in laws {
+            let mut previous = candidate_gate_sigma(law, gate_logit, tau, 0.0);
+            for step in [1e-5_f32, 1e-4, 1e-3, 1e-2, 0.1, 1.0] {
+                let current = candidate_gate_sigma(law, gate_logit, tau, step);
+                assert!(current >= previous, "{law:?} was not monotone at dt={step}");
+                assert!(current.is_finite() && (0.0..=1.0).contains(&current));
+                previous = current;
+            }
+        }
+
+        // The rate formulation is invariant to a consistent change of time units.
         for scale in [0.1_f32, 10.0_f32, 1000.0_f32] {
-            let scaled_tau = tau * scale;
-            let scaled_dt = dt * scale;
-            let scaled_lambda = stable_softplus(gate_logit) / scaled_tau;
-            let scaled_sigma = -(-scaled_lambda * scaled_dt).exp_m1();
+            let scaled = candidate_gate_sigma(
+                GateLawCandidate::ExponentialRate,
+                gate_logit,
+                tau * scale,
+                dt * scale,
+            );
             assert!(
-                (scaled_sigma - rate_sigma(dt)).abs() < 2e-7,
-                "time-unit scaling changed interpolation at scale={scale}"
+                (scaled - rate_at_tau).abs() < 2e-7,
+                "time-unit scaling changed rate interpolation at scale={scale}"
             );
         }
 
-        let product_retention = |step: f32| {
-            1.0 - sigma_base * (1.0 - (-step / tau).exp())
-        };
-        let product_one = product_retention(dt);
-        let product_two = product_retention(dt / 2.0).powi(2);
-        assert!(
-            (product_one - product_two).abs() > 1e-2,
-            "product candidate is expected to fail frozen-parameter composition: \
-             full={product_one}, halves={product_two}"
-        );
-
-        let large_logit_rate = stable_softplus(80.0) / tau;
+        let large_logit_rate = candidate_softplus(80.0) / tau;
         assert!(
             large_logit_rate.is_finite() && large_logit_rate > 0.0,
             "softplus rate must remain finite for large positive logits"
