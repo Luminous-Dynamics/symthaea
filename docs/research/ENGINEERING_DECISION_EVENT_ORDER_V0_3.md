@@ -12,14 +12,14 @@ The remaining gap is test realism. A collection of static traces is useful but c
 
 - Versioned schedule contract: schema version, generator version, seed, scenario family and typed action list.
 - Independent virtual time per source clock series, including clock domain, basis descriptor, epoch, scale, nanosecond unit, offset, uncertainty, calibration validity, receipt reference and qualification state. Each produced event binds back to that exact source clock series; `_ns` fields reject non-nanosecond units.
-- Event production with explicit causal predecessor edges.
+- Event production with explicit causal predecessor edges and an exact `clock_mapping_action_id` binding; the event's source timestamp is checked against that specific mapping's tick, not merely the latest clock tick.
 - Deterministic network delivery, duplicate/drop controls, partition and reconnect.
 - Observation and durability steps; cancellation request/acknowledgement; stop trigger, policy revision and discharge; effect attempt, commit and terminal reconciliation; process crash/restart; event supersession.
 - Canonical action ordering by virtual time and unique ordinal. Input vector order is not semantic; causal predecessor lists are normalized as sets.
 - Replay report with schedule digest, ordered action records and scheduler dispositions.
-- Fixed-seed SplitMix64 delivery/partition generator plus a second generator for both stop/cancel/commit race orders (commit-before-accepted-ack and commit-after-accepted-ack).
+- Fixed-seed SplitMix64 delivery/partition generator, a clock-mapping fault generator (unqualified, expired, stale mapping reference), and a second generator for both stop/cancel/commit race orders (commit-before-accepted-ack and commit-after-accepted-ack).
 - Delta-debugging shrinker that only accepts a candidate when structural validation still passes and the supplied counterexample predicate still reproduces.
-- Fifteen module unit tests and three Proptest properties (256 cases each configured), covering determinism, permutation invariance, receipt shape, clock epoch regression, exact stop action binding, crash/persistence, conflicting reconciliation, and both cancellation/commit race orders.
+- Sixteen module unit tests and four Proptest properties (256 cases each configured), covering determinism, permutation invariance, exact mapping identity, unqualified/expired/stale clock mappings, receipt shape, clock epoch regression, exact stop action binding, crash/persistence, conflicting reconciliation, and both cancellation/commit race orders.
 
 The scheduler is not the v0.2 safety oracle. It emits reproducible schedule observations and precondition outcomes. Clock regressions and event-time regressions are diagnosed within an exact source clock series; a new epoch starts a new series. Failed/unresolved clock qualifications and semantic unsafe orderings are retained as replay inputs; malformed identity, causal references, or receipt-digest shapes are rejected. The next adapter must translate those into v0.2 owner-qualified inputs and run the matched evaluator ladder. A schedule may intentionally contain unsafe orderings; the scheduler must preserve them rather than silently "repair" them. A local clock regression is an observation about that source clock, not a cross-domain ordering claim.
 
@@ -82,12 +82,12 @@ The differentiator to test is not "better clock sync" or a universal distributed
 
 ## Known limitations / next increment
 
-- The implemented generator families currently cover event production/delivery/partition and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for calibration expiry/drift, crash between effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
+- The implemented generator families currently cover event production/delivery/partition, three clock-mapping failures (unqualified, expired, stale reference), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for calibration drift/step changes, crash between effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
 - Observation and durable-persistence actions are currently ordered by simulator virtual time; they do not yet carry separate observer-clock and store-clock basis/epoch/timestamp evidence. The next increment must add these domains so the v0.2 bitemporal envelope can be populated without promoting simulator time into physical/owner time.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
 - The v0.3 scheduler is not yet wired to the v0.2 evaluator. That adapter and an independent oracle are the next critical step.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- Fourteen Rust module unit tests and three Proptest properties (256 cases each configured) are authored at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
+- Sixteen Rust module unit tests and four Proptest properties (256 cases each configured) are authored at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
 
 ## Reproduction
 
