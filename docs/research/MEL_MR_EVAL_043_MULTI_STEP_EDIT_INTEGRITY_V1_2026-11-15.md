@@ -1,7 +1,7 @@
 # MEL-MR-EVAL-043 — Multi-step edit integrity contract v1
 
 **Date:** 2026-11-15  
-**Status:** Stage 1 and Stage 2 patch algebra qualified at exact head `fefc148b1dfd1db898f1641dbee2756dbbfe5afc`; two-parent branch-merge extension authored and awaiting exact-head qualification  
+**Status:** Stages 1–3 (sequence ledger, reversible operation algebra, two-parent branch merge) qualified at exact head `36aaac064bfcd2672bd3f131385f6593a180b038`  
 **Issue:** [#12243](https://github.com/Luminous-Dynamics/symthaea/issues/12243)  
 **Stack base:** EVAL-042 [PR #12201](https://github.com/Luminous-Dynamics/symthaea/pull/12201)
 
@@ -30,7 +30,7 @@ The standalone crate is \`tools/mel-music-sequence-integrity-harness\`.
 
 ### Executable controls
 
-Forty-three unit tests are authored. Thirty-six passed on exact head `fefc148b1dfd1db898f1641dbee2756dbbfe5afc`; seven new two-parent merge tests are awaiting the current exact-head workflow. The tests cover:
+Forty-three unit tests passed on exact head `36aaac064bfcd2672bd3f131385f6593a180b038` (focused workflow run 20). The tests cover:
 - exact two-step ancestry and cumulative cost;
 - unauthorized collateral event changes;
 - stale artifact and symbolic-state parents;
@@ -66,17 +66,18 @@ This is a symbolic operation algebra, not yet a complete multi-track DAW or coll
 
 ## Exact-head qualification
 
-The focused Melothaea multi-step sequence integrity workflow passed on exact head `fefc148b1dfd1db898f1641dbee2756dbbfe5afc` (run 15):
+The focused Melothaea multi-step sequence integrity workflow passed on exact head `36aaac064bfcd2672bd3f131385f6593a180b038` (run 20):
 
 - Rust 1.96 exact checkout and SHA assertion: passed.
-- Sequence JSON Schema validation: passed.
+- Sequence, symbolic patch and two-parent merge JSON Schema validation: passed.
 - Staged isolated-crate formatting: passed.
-- Standalone compile/tests: **36 passed, 0 failed** (sequence ledger, patch algebra, undo/redo and operation-order controls).
+- Standalone compile/tests: **43 passed, 0 failed**.
 - Deterministic eight-step preservation example: passed.
+- Reversible operation, two-order commutativity, non-commuting conflict and two-parent merge example: passed.
 - Clippy with warnings denied: passed.
-- Exact source/schema/dependency identity artifact uploaded: `mel-sequence-fefc148b1dfd1db898f1641dbee2756dbbfe5afc` (SHA-256 `17e4311e58b633d0e27fcf1a8f746b2dd3b9af9d56c44f23e09c56de01b8fe78`). The new branch-merge implementation adds seven further tests; those remain pending until the current exact-head workflow passes.
+- Exact source/schema/dependency identity artifact uploaded: `mel-sequence-36aaac064bfcd2672bd3f131385f6593a180b038` (artifact SHA-256 `c429148397dd499edf7643182960b8d6d812364b87581e1bcba07c0582f44120`).
 
-Formatting is normalized on the staged copy; this is not a claim that committed source text was already rustfmt-clean. Repository-wide CI, Workflow Syntax and PR Governance were skipped by path filters, not passed.
+Formatting is normalized on the staged copy; this is not a claim that committed source text was already rustfmt-clean. Repository-wide CI, Workflow Syntax and PR Governance were skipped by path filters, not passed. A documentation-only follow-up commit requires a fresh exact-head run before its result is attributed to the new head.
 
 ## Deliberate limits
 
