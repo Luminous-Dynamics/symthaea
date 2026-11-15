@@ -9,10 +9,16 @@ use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
-use symthaea_vehicle::{VehicleHdcEncoder, VehicleState};
+use symthaea_vehicle::{VehicleCommand, VehicleHdcEncoder, VehicleState};
 use symthaea_vision_manifold::{VisionConfig, VisionManifold, VisionTelemetry};
 
 pub mod policy_compatibility;
+pub mod training_labels;
+pub use training_labels::{
+    APPLIED_ACTION_TRAINING_RECEIPT_SCHEMA_VERSION, AppliedActionSourceKind,
+    AppliedActionTrainingReceipt, TrainingLabelError, ValidatedAppliedActionLabel,
+    validate_applied_action_training_label,
+};
 
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 pub const MAX_ID_BYTES: usize = 256;
