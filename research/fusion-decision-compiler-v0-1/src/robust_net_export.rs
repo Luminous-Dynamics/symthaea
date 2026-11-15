@@ -30,6 +30,8 @@ pub struct NetExportLowerBoundReceipt {
     pub sign_convention_ref: String,
     pub lower_bound_mwe: f64,
     pub one_sided_coverage_level: f64,
+    /// Identifies the single-test or campaign-family coverage scope.
+    pub coverage_scope_ref: String,
     pub method: NetExportBoundMethod,
     pub method_ref: String,
     /// Authenticated method-specific evidence payload identity.
@@ -96,6 +98,7 @@ pub enum RobustNetExportDiagnostic {
     LowerBoundAbovePointEstimate,
     InvalidCoverageLevel,
     CoverageBelowRequirement,
+    EmptyCoverageScope,
     EmptyMethodReference,
     EmptyDistributionAssumption,
     InvalidAssumptionManifestDigest,
@@ -264,6 +267,9 @@ pub fn evaluate_robust_net_export(
     }
     if !receipt.lower_bound_mwe.is_finite() {
         diagnostics.push(RobustNetExportDiagnostic::NonFiniteLowerBound);
+    }
+    if receipt.coverage_scope_ref.trim().is_empty() {
+        diagnostics.push(RobustNetExportDiagnostic::EmptyCoverageScope);
     }
     if !receipt.one_sided_coverage_level.is_finite()
         || receipt.one_sided_coverage_level <= 0.0
@@ -571,8 +577,8 @@ mod tests {
         let run = power_run();
         NetExportLowerBoundReceipt {
             receipt_id: "net-uq-receipt-42".to_string(),
-            run_id: run.run_id,
-            output_sha256: run.output_sha256,
+            run_id: run.run_id.clone(),
+            output_sha256: run.output_sha256.clone(),
             schema_ref: profile.schema_ref,
             schema_sha256: profile.schema_sha256,
             service_boundary_ref: profile.service_boundary_ref,
@@ -581,6 +587,7 @@ mod tests {
             sign_convention_ref: profile.sign_convention_ref,
             lower_bound_mwe,
             one_sided_coverage_level: 0.95,
+            coverage_scope_ref: "single-net-export-reserve-test-v1".to_string(),
             method: NetExportBoundMethod::JointCovarianceContrast,
             method_ref: "joint-linear-contrast-v1".to_string(),
             method_evidence_sha256: sha('e'),
@@ -747,6 +754,118 @@ mod tests {
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
         assert!(report.diagnostics.contains(
             &RobustNetExportDiagnostic::MissingDirectNetAnalysisReceipt
+        ));
+    }
+
+    #[test]
+    fn joint_covariance_receipt_must_bind_exact_run_output_and_variable_order() {
+        let mut receipt = lower_bound(60.0);
+        receipt.covariance_run_id = Some("another-run".to_string());
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::NotEvaluable
+        );
+
+        let mut receipt = lower_bound(60.0);
+        receipt.covariance_output_sha256 = Some(sha('f'));
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::NotEvaluable
+        );
+
+        let mut receipt = lower_bound(60.0);
+        receipt.covariance_variable_order.swap(0, 1);
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::NotEvaluable
+        );
+    }
+
+    #[test]
+    fn simultaneous_component_interval_method_accepts_only_bound_allocation_receipt() {
+        let mut receipt = lower_bound(60.0);
+        receipt.method = NetExportBoundMethod::SimultaneousComponentIntervals;
+        receipt.covariance_receipt_ref = None;
+        receipt.covariance_receipt_sha256 = None;
+        receipt.covariance_run_id = None;
+        receipt.covariance_output_sha256 = None;
+        receipt.covariance_variable_order.clear();
+        receipt.simultaneous_allocation_ref = Some("familywise-allocation-95-v1".to_string());
+        let report = evaluate(Some(&receipt));
+        assert_eq!(
+            report.disposition,
+            RobustNetExportDisposition::RobustlyAboveReserve
+        );
+    }
+
+    #[test]
+    fn direct_net_interval_method_requires_bound_direct_analysis() {
+        let mut receipt = lower_bound(60.0);
+        receipt.method = NetExportBoundMethod::DirectNetOutputInterval;
+        receipt.covariance_receipt_ref = None;
+        receipt.covariance_receipt_sha256 = None;
+        receipt.covariance_run_id = None;
+        receipt.covariance_output_sha256 = None;
+        receipt.covariance_variable_order.clear();
+        receipt.method_variable_order = vec!["P_elec".to_string()];
+        receipt.direct_net_analysis_ref = Some("direct-net-output-analysis-v1".to_string());
+        let report = evaluate(Some(&receipt));
+        assert_eq!(
+            report.disposition,
+            RobustNetExportDisposition::RobustlyAboveReserve
+        );
+    }
+
+    #[test]
+    fn method_evidence_must_bind_exact_run_output_and_declared_variables() {
+        let mut receipt = lower_bound(60.0);
+        receipt.method_run_id = "stale-run".to_string();
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::NotEvaluable
+        );
+        let mut receipt = lower_bound(60.0);
+        receipt.method_output_sha256 = sha('f');
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::NotEvaluable
+        );
+        let mut receipt = lower_bound(60.0);
+        receipt.method_variable_order.swap(0, 1);
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::NotEvaluable
+        );
+    }
+
+    #[test]
+    fn point_report_cannot_be_forged_or_reused_from_another_run() {
+        let profile = power_profile();
+        let run = power_run();
+        let mut point = evaluate_plant_power_balance(&profile, &run);
+        point.run_id = "different-run".to_string();
+        let receipt = lower_bound(60.0);
+        let report = evaluate_robust_net_export(
+            &profile,
+            &run,
+            &point,
+            &robust_profile(),
+            Some(&receipt),
+        );
+        assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
+        assert!(report.diagnostics.contains(
+            &RobustNetExportDiagnostic::PointReportIdentityMismatch
+        ));
+    }
+
+    #[test]
+    fn coverage_scope_must_be_explicit() {
+        let mut receipt = lower_bound(60.0);
+        receipt.coverage_scope_ref.clear();
+        let report = evaluate(Some(&receipt));
+        assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
+        assert!(report.diagnostics.contains(
+            &RobustNetExportDiagnostic::EmptyCoverageScope
         ));
     }
 
