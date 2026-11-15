@@ -43,6 +43,8 @@ pub struct CandidateServiceInput {
     pub power_report: PowerBalanceReport,
     pub power_report_ref: String,
     pub plasma_gain_q: f64,
+    pub plasma_gain_run_id: String,
+    pub plasma_gain_output_sha256: String,
     pub plasma_gain_evidence_ref: String,
     pub lifecycle_report_ref: String,
     pub lifecycle_report_sha256: String,
@@ -83,6 +85,9 @@ pub enum ServiceBoundaryRankError {
     SignConventionMismatch,
     InvalidPlasmaGain,
     EmptyPlasmaGainEvidence,
+    PlasmaGainRunMismatch,
+    PlasmaGainOutputMismatch,
+    InvalidPlasmaGainDigest,
     LifecycleNotValid,
     InvalidLifecycleDigest,
     EmptyLifecycleReference,
@@ -141,11 +146,16 @@ pub struct BoundaryRanking {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PairwiseMetricWinner {
+    pub metric: ServiceRankingMetric,
+    pub winner_candidate_id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PairwiseRankReversal {
     pub first_candidate_id: String,
     pub second_candidate_id: String,
-    pub plasma_gain_winner: String,
-    pub lifetime_net_energy_winner: String,
+    pub metric_winners: Vec<PairwiseMetricWinner>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -321,6 +331,15 @@ fn validate_candidate(
     if candidate.plasma_gain_evidence_ref.trim().is_empty() {
         errors.push(ServiceBoundaryRankError::EmptyPlasmaGainEvidence);
     }
+    if candidate.plasma_gain_run_id != candidate.power_run.run_id {
+        errors.push(ServiceBoundaryRankError::PlasmaGainRunMismatch);
+    }
+    if candidate.plasma_gain_output_sha256 != candidate.power_run.output_sha256 {
+        errors.push(ServiceBoundaryRankError::PlasmaGainOutputMismatch);
+    }
+    if !is_sha256(&candidate.plasma_gain_output_sha256) {
+        errors.push(ServiceBoundaryRankError::InvalidPlasmaGainDigest);
+    }
 
     let lifecycle = &candidate.lifecycle_report;
     if lifecycle.disposition != LifecycleServiceDisposition::ValidDeterministicLedger {
@@ -481,35 +500,57 @@ fn rank_reversals(findings: &[CandidateServiceFinding]) -> Vec<PairwiseRankRever
         for second in (first + 1)..findings.len() {
             let a = &findings[first];
             let b = &findings[second];
-            let q_cmp = a.plasma_gain_q.total_cmp(&b.plasma_gain_q);
-            let life_cmp = a.lifetime_net_energy_mwh.total_cmp(&b.lifetime_net_energy_mwh);
-            if q_cmp != std::cmp::Ordering::Equal
-                && life_cmp != std::cmp::Ordering::Equal
-                && q_cmp != life_cmp
-            {
-                let plasma_gain_winner = if q_cmp.is_gt() {
-                    a.candidate_id.clone()
-                } else {
-                    b.candidate_id.clone()
-                };
-                let lifetime_net_energy_winner = if life_cmp.is_gt() {
-                    a.candidate_id.clone()
-                } else {
-                    b.candidate_id.clone()
-                };
+            let metrics = [
+                (
+                    ServiceRankingMetric::PlasmaGainQ,
+                    a.plasma_gain_q,
+                    b.plasma_gain_q,
+                ),
+                (
+                    ServiceRankingMetric::GrossElectricMwe,
+                    a.gross_electric_mwe,
+                    b.gross_electric_mwe,
+                ),
+                (
+                    ServiceRankingMetric::NetElectricMwe,
+                    a.net_electric_mwe,
+                    b.net_electric_mwe,
+                ),
+                (
+                    ServiceRankingMetric::LifetimeNetEnergyMwh,
+                    a.lifetime_net_energy_mwh,
+                    b.lifetime_net_energy_mwh,
+                ),
+            ];
+            let winners: Vec<PairwiseMetricWinner> = metrics
+                .into_iter()
+                .filter_map(|(metric, first_value, second_value)| {
+                    match first_value.total_cmp(&second_value) {
+                        std::cmp::Ordering::Greater => Some(PairwiseMetricWinner {
+                            metric,
+                            winner_candidate_id: a.candidate_id.clone(),
+                        }),
+                        std::cmp::Ordering::Less => Some(PairwiseMetricWinner {
+                            metric,
+                            winner_candidate_id: b.candidate_id.clone(),
+                        }),
+                        std::cmp::Ordering::Equal => None,
+                    }
+                })
+                .collect();
+            let distinct_winners: BTreeSet<&str> = winners
+                .iter()
+                .map(|winner| winner.winner_candidate_id.as_str())
+                .collect();
+            if distinct_winners.len() > 1 {
                 reversals.push(PairwiseRankReversal {
                     first_candidate_id: a.candidate_id.clone(),
                     second_candidate_id: b.candidate_id.clone(),
-                    plasma_gain_winner,
-                    lifetime_net_energy_winner,
+                    metric_winners: winners,
                 });
             }
         }
     }
-    reversals.sort_by(|left, right| {
-        (&left.first_candidate_id, &left.second_candidate_id)
-            .cmp(&(&right.first_candidate_id, &right.second_candidate_id))
-    });
     reversals
 }
 
@@ -708,6 +749,8 @@ mod tests {
             power_report,
             power_report_ref: format!("power-report-{candidate_id}"),
             plasma_gain_q: q,
+            plasma_gain_run_id: run.run_id.clone(),
+            plasma_gain_output_sha256: run.output_sha256.clone(),
             plasma_gain_evidence_ref: format!("q-evidence-{candidate_id}"),
             lifecycle_report_ref: format!("lifecycle-report-{candidate_id}"),
             lifecycle_report_sha256: sha(evidence_character.to_ascii_uppercase()),
@@ -759,8 +802,14 @@ mod tests {
         assert!(report.pairwise_rank_reversals.iter().any(|reversal| {
             reversal.first_candidate_id == "A"
                 && reversal.second_candidate_id == "B"
-                && reversal.plasma_gain_winner == "A"
-                && reversal.lifetime_net_energy_winner == "B"
+                && reversal.metric_winners.iter().any(|winner| {
+                    winner.metric == ServiceRankingMetric::PlasmaGainQ
+                        && winner.winner_candidate_id == "A"
+                })
+                && reversal.metric_winners.iter().any(|winner| {
+                    winner.metric == ServiceRankingMetric::LifetimeNetEnergyMwh
+                        && winner.winner_candidate_id == "B"
+                })
         }));
         assert_eq!(
             report.qualified_cost_energy_pareto_front
@@ -768,6 +817,45 @@ mod tests {
                 .map(|point| point.candidate_id.as_str())
                 .collect::<Vec<_>>(),
             vec!["B", "C"]
+        );
+    }
+
+    #[test]
+    fn plasma_gain_must_bind_exact_solver_run_and_output_digest() {
+        let mut candidates = three_candidate_fixture();
+        candidates[0].plasma_gain_run_id = "another-run".to_string();
+        assert!(compare_service_boundary_rankings(&profile(), &candidates).is_err());
+        let mut candidates = three_candidate_fixture();
+        candidates[0].plasma_gain_output_sha256 = sha('f');
+        assert!(compare_service_boundary_rankings(&profile(), &candidates).is_err());
+    }
+
+    #[test]
+    fn zero_net_electricity_is_not_export_qualified() {
+        let mut candidates = three_candidate_fixture();
+        let row = &mut candidates[1];
+        row.power_run
+            .terms
+            .iter_mut()
+            .find(|term| term.observable == PowerObservable::NetElectric)
+            .unwrap()
+            .value_mw = 0.0;
+        row.power_run
+            .terms
+            .iter_mut()
+            .find(|term| term.observable == PowerObservable::GrossElectric)
+            .unwrap()
+            .value_mw = 130.0;
+        row.power_report = evaluate_plant_power_balance(&row.power_profile, &row.power_run);
+        assert_eq!(
+            compare_service_boundary_rankings(&profile(), &candidates)
+                .unwrap()
+                .findings
+                .iter()
+                .find(|finding| finding.candidate_id == "B")
+                .unwrap()
+                .net_service_disposition,
+            NetServiceDisposition::NoNetExport
         );
     }
 
