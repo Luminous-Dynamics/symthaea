@@ -91,6 +91,12 @@ pub struct ChannelEvidenceState {
     pub channel: &'static str,
     pub state: EvidenceState,
     pub critical: bool,
+    /// Source identity is retained as receipt metadata, not treated as signer
+    /// authentication or physical-truth proof.
+    pub source_artifact_digest: [u8; 32],
+    pub source_timebase_id: String,
+    pub age_seconds: f64,
+    pub maximum_age_seconds: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -114,7 +120,7 @@ pub enum EncodeError {
         channel: &'static str,
         value: f64,
         minimum: f64,
-        maximum_exclusive: f64,
+        maximum: f64,
     },
 }
 
@@ -287,6 +293,10 @@ impl SailcraftEncoder {
             channel,
             state: evidence.state,
             critical,
+            source_artifact_digest: evidence.source_artifact_digest,
+            source_timebase_id: evidence.timebase_id.clone(),
+            age_seconds: evidence.age_seconds,
+            maximum_age_seconds: evidence.maximum_age_seconds,
         });
     }
 
@@ -312,7 +322,7 @@ impl SailcraftEncoder {
                     channel,
                     value,
                     minimum,
-                    maximum_exclusive: maximum,
+                    maximum,
                 });
             }
             let normalized = ((value - minimum) / (maximum - minimum)) as f32;
@@ -792,7 +802,10 @@ mod tests {
         let encoder = encoder();
         let mut other = observation();
         other.configuration_digest = [0x33; 32];
-        assert_eq!(encoder.encode(&other), Err(EncodeError::ConfigurationMismatch));
+        assert!(matches!(
+            encoder.encode(&other),
+            Err(EncodeError::ConfigurationMismatch)
+        ));
     }
 
     #[test]
@@ -804,6 +817,17 @@ mod tests {
         let a = encoder_a.encode(&observation()).unwrap();
         let b = encoder_b.encode(&observation()).unwrap();
         assert_eq!(a.sensor_hv.as_slice(), b.sensor_hv.as_slice());
+    }
+
+    #[test]
+    fn channel_receipt_preserves_source_identity_without_claiming_authenticity() {
+        let encoded = encoder().encode(&observation()).unwrap();
+        let wind = encoded.channel_states.iter()
+            .find(|state| state.channel == "true_wind_speed_mps").unwrap();
+        assert_eq!(wind.source_artifact_digest, [0xA5; 32]);
+        assert_eq!(wind.source_timebase_id, TIMEBASE);
+        assert_eq!(wind.age_seconds, 0.1);
+        assert_eq!(wind.maximum_age_seconds, 1.0);
     }
 
     #[test]
