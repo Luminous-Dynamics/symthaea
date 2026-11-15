@@ -9,7 +9,6 @@ use std::collections::BTreeSet;
 
 const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 const FOUR_SEED_DOMAIN: &str = "sympsi.synthetic.v0.1";
-const WILSON_99_Z: f64 = 2.575_829_303_548_900_4;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -241,8 +240,8 @@ pub fn run_profile(
 
     let run_id = sha256_hex(
         format!(
-            "{FOUR_SEED_DOMAIN}\0{profile_name}\0{}\0{}",
-            manifest.seed, manifest_sha256
+            "{FOUR_SEED_DOMAIN}\0{profile_name}\0{}\0{}\0{}",
+            manifest.seed, manifest_sha256, git_head.to_ascii_lowercase()
         )
         .as_bytes(),
     );
