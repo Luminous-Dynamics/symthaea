@@ -45,7 +45,6 @@ jobs:
   sympoetic-bench:
     name: SympoeticBench (schema, trace, and metric tests)
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
