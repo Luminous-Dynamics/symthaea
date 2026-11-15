@@ -4,7 +4,7 @@
   "claim_ceiling": "SYNTHETIC_DATA_CONTRACT_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
   "expected_counts": {
     "PASS": 2,
-    "BLOCKED": 7,
+    "BLOCKED": 8,
     "REJECTED": 4
   },
   "cases": [
