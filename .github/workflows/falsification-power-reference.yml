@@ -32,7 +32,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting
-        run: cargo fmt --locked --manifest-path research/falsification-power-reference/Cargo.toml -- --check
+        run: cargo fmt --manifest-path research/falsification-power-reference/Cargo.toml -- --check
 
       - name: Run tests
         run: cargo test --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets
