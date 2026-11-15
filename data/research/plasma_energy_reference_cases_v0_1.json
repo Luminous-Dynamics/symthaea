@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "programme": "PLASMA-ENERGY-001",
-  "generated_date": "2026-11-12",
+  "generated_date": "2026-11-15",
   "claim_ceiling": "SOURCE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_OR_PHYSICAL_RESULT",
   "rules": {
     "missing_auxiliary_energy_is_zero": false,
@@ -957,7 +957,7 @@
     {
       "case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
       "lane": "AMMONIA_CRACKING",
-      "evidence_class": "PUBLISHED_LAB_EXPERIMENT_WITH_COUPLED_MULTIPHYSICS_MODEL",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
       "source": {
         "title": "Microwave plasma-based NH3 decomposition: Reaching optimum performance by understanding the mechanisms",
         "publisher": "International Journal of Hydrogen Energy",
@@ -1019,7 +1019,7 @@
     {
       "case_id": "NH3-CRACK-WARM-RANS-TURBULENCE-2026",
       "lane": "AMMONIA_CRACKING_MODEL_FORM_AND_TRANSPORT",
-      "evidence_class": "PUBLISHED_NUMERICAL_STUDY_WITH_EXPERIMENTAL_COMPARISON",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
       "source": {
         "title": "Effect of turbulent transport on plasma-based NH3 cracking into H2: Insights from a RANS computational fluid dynamics model",
         "publisher": "Energy Conversion and Management",
