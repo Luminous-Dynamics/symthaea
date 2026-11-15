@@ -100,13 +100,17 @@ pub fn krippendorff_alpha_nominal(
                 bail!("Krippendorff alpha has an empty label on item {item_index}");
             }
             *item_counts.entry(label).or_default() += 1;
-            *marginal_counts.entry(label).or_default() += 1;
-            total_ratings += 1;
         }
 
         let item_n = item_counts.values().sum::<usize>();
         if item_n < 2 {
             continue;
+        }
+        // Singletons do not contribute coincidence pairs and therefore must
+        // not enter the marginals or expected-disagreement denominator.
+        for (label, count) in &item_counts {
+            *marginal_counts.entry(*label).or_default() += *count;
+            total_ratings += *count;
         }
         let same_ordered_pairs = item_counts
             .values()
