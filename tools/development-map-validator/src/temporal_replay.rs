@@ -776,11 +776,14 @@ mod tests {
         }
     }
     fn reseal(ledger: &mut EventLedger) {
+        let schema_version = ledger.schema_version.clone();
+        let ledger_id = ledger.ledger_id.clone();
+        let repository_full_name = ledger.repository_full_name.clone();
         let mut previous = GENESIS_HASH.to_owned();
         for (index, event) in ledger.events.iter_mut().enumerate() {
             event.sequence = index as u64 + 1;
             event.previous_hash = previous.clone();
-            event.event_hash = calculate_event_hash(&ledger.schema_version, &ledger.ledger_id, &ledger.repository_full_name, event).expect("hash");
+            event.event_hash = calculate_event_hash(&schema_version, &ledger_id, &repository_full_name, event).expect("hash");
             previous = event.event_hash.clone();
         }
     }
