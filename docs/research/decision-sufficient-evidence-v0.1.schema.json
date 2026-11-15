@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/decision-sufficient-evidence-v0.1.schema.json",
+  "title": "EGDDM decision-sufficient evidence problem v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "problem_id",
+    "hypotheses",
+    "actions",
+    "budgets",
+    "evidence_options"
+  ],
+  "properties": {
+    "problem_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "budgets": {
+      "$ref": "#/$defs/budgets"
+    },
+    "evidence_options": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidenceOption"
+      }
+    }
+  },
+  "$defs": {
+    "nonNegative": {
+      "type": "number",
+      "minimum": 0
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "prior_probability"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "loss_by_hypothesis"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loss_by_hypothesis": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonNegative"
+          }
+        }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_money_units",
+        "max_latency_seconds",
+        "max_reviewer_minutes",
+        "max_compute_units"
+      ],
+      "properties": {
+        "max_money_units": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonNegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_latency_seconds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonNegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_reviewer_minutes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonNegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_compute_units": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonNegative"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "evidenceOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "authority_satisfied",
+        "scope_satisfied",
+        "isolation_satisfied",
+        "prerequisites_satisfied",
+        "costs",
+        "acquisition_cost_utility",
+        "outcomes"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_satisfied": {
+          "type": "boolean"
+        },
+        "scope_satisfied": {
+          "type": "boolean"
+        },
+        "isolation_satisfied": {
+          "type": "boolean"
+        },
+        "prerequisites_satisfied": {
+          "type": "boolean"
+        },
+        "costs": {
+          "$ref": "#/$defs/costs"
+        },
+        "acquisition_cost_utility": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "costs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "money_units",
+        "latency_seconds",
+        "reviewer_minutes",
+        "compute_units"
+      ],
+      "properties": {
+        "money_units": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "latency_seconds": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "reviewer_minutes": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "compute_units": {
+          "$ref": "#/$defs/nonNegative"
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "likelihood_by_hypothesis"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "likelihood_by_hypothesis": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

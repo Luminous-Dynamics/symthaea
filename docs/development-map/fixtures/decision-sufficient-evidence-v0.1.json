@@ -1,0 +1,97 @@
+{
+  "problem_id": "contract-upgrade-example",
+  "hypotheses": [
+    {
+      "hypothesis_id": "compatible",
+      "prior_probability": 0.5
+    },
+    {
+      "hypothesis_id": "breaking",
+      "prior_probability": 0.5
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "ship",
+      "loss_by_hypothesis": [
+        0,
+        100
+      ]
+    },
+    {
+      "action_id": "hold",
+      "loss_by_hypothesis": [
+        5,
+        5
+      ]
+    }
+  ],
+  "budgets": {
+    "max_money_units": 3,
+    "max_latency_seconds": 10,
+    "max_reviewer_minutes": 3,
+    "max_compute_units": 4
+  },
+  "evidence_options": [
+    {
+      "evidence_id": "pinned-contract-test",
+      "authority_satisfied": true,
+      "scope_satisfied": true,
+      "isolation_satisfied": true,
+      "prerequisites_satisfied": true,
+      "costs": {
+        "money_units": 2,
+        "latency_seconds": 5,
+        "reviewer_minutes": 1,
+        "compute_units": 3
+      },
+      "acquisition_cost_utility": 1,
+      "outcomes": [
+        {
+          "outcome_id": "pass",
+          "likelihood_by_hypothesis": [
+            1,
+            0
+          ]
+        },
+        {
+          "outcome_id": "fail",
+          "likelihood_by_hypothesis": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "evidence_id": "uninformative-search",
+      "authority_satisfied": true,
+      "scope_satisfied": true,
+      "isolation_satisfied": true,
+      "prerequisites_satisfied": true,
+      "costs": {
+        "money_units": 0.5,
+        "latency_seconds": 1,
+        "reviewer_minutes": 0.5,
+        "compute_units": 0.5
+      },
+      "acquisition_cost_utility": 0.2,
+      "outcomes": [
+        {
+          "outcome_id": "hit",
+          "likelihood_by_hypothesis": [
+            0.5,
+            0.5
+          ]
+        },
+        {
+          "outcome_id": "miss",
+          "likelihood_by_hypothesis": [
+            0.5,
+            0.5
+          ]
+        }
+      ]
+    }
+  ]
+}
