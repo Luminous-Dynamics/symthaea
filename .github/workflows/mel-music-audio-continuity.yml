@@ -1,0 +1,90 @@
+name: Melothaea audio continuity and preservation
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-music-audio-continuity-harness/**"
+      - "benchmarks/mel/schemas/music-audio-sequence-v1.schema.json"
+      - ".github/workflows/mel-music-audio-continuity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audio-continuity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_AUDIO_CONTINUITY_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate audio sequence schema
+        run: python3 -m json.tool benchmarks/mel/schemas/music-audio-sequence-v1.schema.json >/dev/null
+
+      - name: Stage standalone harness outside root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-music-audio-continuity-harness"
+          mkdir -p "$staged/src" "$staged/examples"
+          cp tools/mel-music-audio-continuity-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-music-audio-continuity-harness/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-music-audio-continuity-harness/examples/eight_step_audio_session.rs "$staged/examples/eight_step_audio_session.rs"
+          echo "MEL_AUDIO_CONTINUITY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Normalize staged formatting and verify
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MEL_AUDIO_CONTINUITY_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MEL_AUDIO_CONTINUITY_MANIFEST"
+
+      - name: Resolve standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_AUDIO_CONTINUITY_MANIFEST"
+
+      - name: Run sample-accurate audio continuity tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_AUDIO_CONTINUITY_MANIFEST"
+
+      - name: Run deterministic eight-step PCM fixture
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_AUDIO_CONTINUITY_MANIFEST" --example eight_step_audio_session
+
+      - name: Run Clippy with warnings denied
+        run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_AUDIO_CONTINUITY_MANIFEST" --all-targets -- -D warnings
+
+      - name: Record exact source and dependency identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-audio-continuity-evidence"
+          mkdir -p "$evidence"
+          sha256sum tools/mel-music-audio-continuity-harness/Cargo.toml > "$evidence/manifest.sha256"
+          sha256sum tools/mel-music-audio-continuity-harness/src/lib.rs > "$evidence/library.sha256"
+          sha256sum tools/mel-music-audio-continuity-harness/examples/eight_step_audio_session.rs > "$evidence/example.sha256"
+          sha256sum benchmarks/mel/schemas/music-audio-sequence-v1.schema.json > "$evidence/schema.sha256"
+          cp "$(dirname "$MEL_AUDIO_CONTINUITY_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.lock" > "$evidence/Cargo.lock.sha256"
+          printf 'exact_head=%s\n' "$MEL_AUDIO_CONTINUITY_REVISION" > "$evidence/source-identities.txt"
+
+      - name: Upload audio continuity evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-audio-continuity-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-audio-continuity-evidence/
+          if-no-files-found: error
+          retention-days: 90
