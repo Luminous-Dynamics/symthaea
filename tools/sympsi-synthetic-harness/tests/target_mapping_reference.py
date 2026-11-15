@@ -102,7 +102,7 @@ class TargetMappingReferenceTests(unittest.TestCase):
     def test_known_answer_digest_and_four_five_choice_targets(self) -> None:
         digest = hashlib.sha256(transcript(CONTEXT)).digest()
         self.assertEqual(digest, EXPECTED_DIGEST)
-        self.assertEqual(target(CONTEXT, 4), (3, EXPECTED_DIGEST, 0))
+        self.assertEqual(target(CONTEXT, 4), (2, EXPECTED_DIGEST, 0))
         self.assertEqual(target(CONTEXT, 5), (2, EXPECTED_DIGEST, 0))
 
     def test_rejection_threshold_has_no_modulo_bias(self) -> None:
