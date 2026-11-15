@@ -13,10 +13,7 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut arguments = env::args().skip(1);
     if arguments.len() == 0 || arguments.len() > 2 {
-        return Err(
-            "usage: sympsi-beacon-verifier <round> <signature-hex-file> (exactly 48 bytes)"
-                .into(),
-        );
+        return Err("usage: sympsi-beacon-verifier <round> <signature-hex-file> (exactly 48 bytes)".into());
     }
 
     let requested_round = arguments
@@ -29,7 +26,10 @@ fn run() -> Result<(), String> {
         .ok_or_else(|| "missing signature hex file".to_string())?;
     let signature_text = fs::read_to_string(&signature_path)
         .map_err(|error| format!("cannot read signature file: {error}"))?;
-    let compact: String = signature_text.chars().filter(|ch| !ch.is_whitespace()).collect();
+    let compact: String = signature_text
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect();
     if compact.len() != 96 {
         return Err("signature file must contain exactly 96 hex characters".into());
     }
@@ -42,7 +42,10 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("verification failed: {error:?}"))?;
     println!("verification=VALID_SIGNATURE_FOR_PINNED_QUICKNET_TRUST_ROOT");
     println!("round={}", verified.round());
-    println!("scheduled_unix_seconds={}", verified.scheduled_unix_seconds());
+    println!(
+        "scheduled_unix_seconds={}",
+        verified.scheduled_unix_seconds()
+    );
     println!("chain_hash={}", encode_hex(verified.chain_hash()));
     println!("randomness_public={}", encode_hex(verified.randomness()));
     println!("freshness=NOT_ESTABLISHED");
