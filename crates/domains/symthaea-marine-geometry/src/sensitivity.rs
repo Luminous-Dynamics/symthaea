@@ -64,6 +64,7 @@ pub struct HydrostaticSensitivity {
     pub result_schema_version: u32,
     pub candidate_id: String,
     pub profile_id: String,
+    pub profile_digest_blake3: String,
     pub parameter: SectionParameter,
     pub parameter_code: String,
     pub parameter_units: String,
@@ -71,6 +72,7 @@ pub struct HydrostaticSensitivity {
     pub observable_units: String,
     pub finite_difference_step: f64,
     pub water_density_kg_m3: f64,
+    pub water_density_source: String,
     pub base_spec_digest_blake3: String,
     pub minus_spec_digest_blake3: String,
     pub plus_spec_digest_blake3: String,
@@ -177,8 +179,7 @@ fn perturb_spec(
                 code: "parameter_station_index".into(),
                 detail: format!("station index {station_index} is outside the source specification"),
             })?
-            .half_breadth_fraction
-            .borrow_mut(),
+            .half_breadth_fraction,
         SectionParameter::StationDraftFraction { station_index } => result
             .stations
             .get_mut(station_index)
@@ -186,8 +187,7 @@ fn perturb_spec(
                 code: "parameter_station_index".into(),
                 detail: format!("station index {station_index} is outside the source specification"),
             })?
-            .draft_fraction
-            .borrow_mut(),
+            .draft_fraction,
         SectionParameter::ControlBreadthFraction {
             station_index,
             control_index,
@@ -229,16 +229,6 @@ fn perturb_spec(
     };
     *value += delta;
     Ok(result)
-}
-
-trait BorrowMutF64 {
-    fn borrow_mut(&mut self) -> &mut f64;
-}
-
-impl BorrowMutF64 for f64 {
-    fn borrow_mut(&mut self) -> &mut f64 {
-        self
-    }
 }
 
 fn evaluate_spec(
@@ -307,11 +297,25 @@ pub fn calculate_hydrostatic_sensitivity(
     step: f64,
     observable: HydrostaticObservable,
     water_density_kg_m3: f64,
+    water_density_source: &str,
 ) -> Result<HydrostaticSensitivity, Vec<SensitivityViolation>> {
     if !step.is_finite() || step <= 0.0 {
         return Err(vec![SensitivityViolation {
             code: "finite_difference_step".into(),
             detail: "finite-difference step must be finite and strictly positive".into(),
+        }]);
+    }
+
+    if water_density_source.trim().is_empty() {
+        return Err(vec![SensitivityViolation {
+            code: "water_density_source".into(),
+            detail: "water density source/assumption identifier must be explicit".into(),
+        }]);
+    }
+    if !water_density_kg_m3.is_finite() || water_density_kg_m3 <= 0.0 {
+        return Err(vec![SensitivityViolation {
+            code: "water_density".into(),
+            detail: "water density must be finite and strictly positive in kg/m^3".into(),
         }]);
     }
 
@@ -359,10 +363,19 @@ pub fn calculate_hydrostatic_sensitivity(
         }]);
     }
 
+    let profile_bytes = serde_json::to_vec(profile).map_err(|error| {
+        vec![SensitivityViolation {
+            code: "profile_digest".into(),
+            detail: format!("could not serialize admission profile: {error}"),
+        }]
+    })?;
+    let profile_digest_blake3 = blake3::hash(&profile_bytes).to_hex().to_string();
+
     Ok(HydrostaticSensitivity {
         result_schema_version: 1,
         candidate_id: source.candidate_id.clone(),
         profile_id: profile.id.clone(),
+        profile_digest_blake3,
         parameter,
         parameter_code: parameter_code.into(),
         parameter_units: parameter_units.into(),
@@ -370,6 +383,7 @@ pub fn calculate_hydrostatic_sensitivity(
         observable_units: observable_units(observable).into(),
         finite_difference_step: step,
         water_density_kg_m3,
+        water_density_source: water_density_source.to_owned(),
         base_spec_digest_blake3: base_spec_digest,
         minus_spec_digest_blake3: minus_spec_digest,
         plus_spec_digest_blake3: plus_spec_digest,
@@ -448,6 +462,7 @@ mod tests {
             0.1,
             HydrostaticObservable::DisplacementVolumeM3,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap();
         assert!((result.base_value - 6_000.0).abs() < 1.0e-9);
@@ -471,6 +486,7 @@ mod tests {
             0.1,
             HydrostaticObservable::DisplacementVolumeM3,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap();
         assert!((result.derivative_per_parameter_unit - 300.0).abs() < 1.0e-8);
@@ -485,6 +501,7 @@ mod tests {
             0.1,
             HydrostaticObservable::DisplacementVolumeM3,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap();
         assert!((result.derivative_per_parameter_unit - 1_000.0).abs() < 1.0e-8);
@@ -499,6 +516,7 @@ mod tests {
             0.1,
             HydrostaticObservable::LongitudinalCentreOfBuoyancyM,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap();
         assert!((result.base_value - 50.0).abs() < 1.0e-9);
@@ -514,6 +532,7 @@ mod tests {
             0.0,
             HydrostaticObservable::DisplacementVolumeM3,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap_err();
         assert!(error
@@ -532,6 +551,7 @@ mod tests {
             0.1,
             HydrostaticObservable::DisplacementVolumeM3,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap_err();
         assert!(error
@@ -548,6 +568,7 @@ mod tests {
             0.01,
             HydrostaticObservable::DisplacementVolumeM3,
             1_025.0,
+            "synthetic-prism-known-answer",
         )
         .unwrap_err();
         assert!(error
