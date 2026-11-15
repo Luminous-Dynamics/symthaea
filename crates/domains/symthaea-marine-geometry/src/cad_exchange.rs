@@ -166,6 +166,10 @@ fn is_blake3_digest(value: &str) -> bool {
     value.len() == BLAKE3_HEX_LEN && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn is_git_commit_id(value: &str) -> bool {
+    matches!(value.len(), 40 | 64) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn add_violation(
     violations: &mut Vec<CadViolation>,
     code: &str,
@@ -245,6 +249,14 @@ pub fn verify_translation_receipt(
             &mut violations,
             "required_identity",
             "candidate, source artifact, semantic scope and tolerance profile IDs must be present",
+        );
+    }
+
+    if !is_git_commit_id(&payload.source_artifact.source_commit) {
+        add_violation(
+            &mut violations,
+            "source_commit",
+            "source commit must be a 40- or 64-character hexadecimal object ID",
         );
     }
 
@@ -338,6 +350,17 @@ pub fn verify_translation_receipt(
             "required_checks",
             "a qualification profile must declare at least one required check",
         );
+    }
+
+    let mut required_seen = std::collections::BTreeSet::new();
+    for required in &payload.tolerance_profile.required_checks {
+        if required.trim().is_empty() || !required_seen.insert(required.as_str()) {
+            add_violation(
+                &mut violations,
+                "required_check_identity",
+                "required check codes must be non-empty and unique",
+            );
+        }
     }
 
     let mut seen = std::collections::BTreeSet::new();
@@ -658,6 +681,35 @@ mod tests {
         item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
         let error = verify_translation_receipt(&item).unwrap_err();
         assert!(error.iter().any(|issue| issue.code == "full_hull_requires_exact_brep"));
+    }
+
+    #[test]
+    fn required_metric_missing_cannot_be_promoted_to_pass() {
+        let mut item = receipt();
+        item.payload.evidence.metrics.max_surface_deviation_m = None;
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        item.payload.tolerance_profile.required_checks.push("surface-deviation".into());
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error.iter().any(|issue| issue.code == "required_metric_missing"));
+    }
+
+    #[test]
+    fn duplicate_required_checks_are_rejected() {
+        let mut item = receipt();
+        item.payload.tolerance_profile.required_checks.push("brep-validity".into());
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error.iter().any(|issue| issue.code == "required_check_identity"));
+    }
+
+    #[test]
+    fn malformed_source_commit_identity_is_rejected() {
+        let mut item = receipt();
+        item.payload.source_artifact.source_commit = "not-a-commit".into();
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error.iter().any(|issue| issue.code == "source_commit"));
     }
 
     #[test]
