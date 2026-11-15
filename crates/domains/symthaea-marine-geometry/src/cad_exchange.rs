@@ -96,6 +96,7 @@ pub struct TranslationToleranceProfile {
     pub max_surface_deviation_m: f64,
     pub max_edge_gap_m: f64,
     pub required_checks: Vec<String>,
+    pub required_semantics: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -125,8 +126,17 @@ pub struct TranslationMetrics {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct SemanticPreservationCheck {
+    pub semantic: String,
+    pub status: EvidenceStatus,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TranslationEvidence {
     pub checks: Vec<TranslationCheck>,
+    pub semantic_checks: Vec<SemanticPreservationCheck>,
     pub metrics: TranslationMetrics,
     pub disposition: TranslationDisposition,
 }
@@ -351,6 +361,23 @@ pub fn verify_translation_receipt(
             "a qualification profile must declare at least one required check",
         );
     }
+    if payload.tolerance_profile.required_semantics.is_empty() {
+        add_violation(
+            &mut violations,
+            "required_semantics",
+            "a qualification profile must declare the semantic metadata that must survive translation",
+        );
+    }
+    let mut required_semantics_seen = std::collections::BTreeSet::new();
+    for semantic in &payload.tolerance_profile.required_semantics {
+        if semantic.trim().is_empty() || !required_semantics_seen.insert(semantic.as_str()) {
+            add_violation(
+                &mut violations,
+                "required_semantic_identity",
+                "required semantic metadata codes must be non-empty and unique",
+            );
+        }
+    }
 
     let mut required_seen = std::collections::BTreeSet::new();
     for required in &payload.tolerance_profile.required_checks {
@@ -360,6 +387,42 @@ pub fn verify_translation_receipt(
                 "required_check_identity",
                 "required check codes must be non-empty and unique",
             );
+        }
+    }
+
+    let mut semantic_seen = std::collections::BTreeSet::new();
+    for check in &payload.evidence.semantic_checks {
+        if check.semantic.trim().is_empty() || !semantic_seen.insert(check.semantic.as_str()) {
+            add_violation(
+                &mut violations,
+                "semantic_check_identity",
+                "semantic preservation codes must be non-empty and unique",
+            );
+        }
+    }
+    for required in &payload.tolerance_profile.required_semantics {
+        match payload
+            .evidence
+            .semantic_checks
+            .iter()
+            .find(|check| check.semantic == *required)
+        {
+            Some(check) if check.status == EvidenceStatus::Pass => {}
+            Some(check) if check.status == EvidenceStatus::Fail => add_violation(
+                &mut violations,
+                "semantic_preservation_failed",
+                format!("required semantic '{}' was not preserved", required),
+            ),
+            Some(_) => add_violation(
+                &mut violations,
+                "semantic_preservation_unknown",
+                format!("required semantic '{}' has unknown preservation status", required),
+            ),
+            None => add_violation(
+                &mut violations,
+                "semantic_preservation_missing",
+                format!("required semantic '{}' has no preservation evidence", required),
+            ),
         }
     }
 
@@ -523,6 +586,14 @@ mod tests {
                 "units-frame".into(),
                 "semantic-preservation".into(),
             ],
+            required_semantics: vec![
+                "product-identity".into(),
+                "configuration-revision".into(),
+                "pmi-gdt".into(),
+                "materials".into(),
+                "persistent-ids".into(),
+                "validation-properties".into(),
+            ],
         }
     }
 
@@ -569,6 +640,15 @@ mod tests {
             tolerance_profile,
             evidence: TranslationEvidence {
                 checks,
+                semantic_checks: profile()
+                    .required_semantics
+                    .iter()
+                    .map(|semantic| SemanticPreservationCheck {
+                        semantic: semantic.clone(),
+                        status: EvidenceStatus::Pass,
+                        detail: "fixture semantic preservation evidence".into(),
+                    })
+                    .collect(),
                 metrics: TranslationMetrics {
                     max_absolute_length_deviation_m: Some(1.0e-8),
                     relative_volume_deviation: Some(1.0e-10),
@@ -681,6 +761,35 @@ mod tests {
         item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
         let error = verify_translation_receipt(&item).unwrap_err();
         assert!(error.iter().any(|issue| issue.code == "full_hull_requires_exact_brep"));
+    }
+
+    #[test]
+    fn missing_required_pmi_evidence_cannot_be_promoted_to_pass() {
+        let mut item = receipt();
+        item.payload.evidence.semantic_checks.retain(|check| check.semantic != "pmi-gdt");
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error
+            .iter()
+            .any(|issue| issue.code == "semantic_preservation_missing"));
+    }
+
+    #[test]
+    fn unknown_required_material_evidence_forces_incomplete() {
+        let mut item = receipt();
+        let material = item
+            .payload
+            .evidence
+            .semantic_checks
+            .iter_mut()
+            .find(|check| check.semantic == "materials")
+            .unwrap();
+        material.status = EvidenceStatus::Unknown;
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error
+            .iter()
+            .any(|issue| issue.code == "semantic_preservation_unknown"));
     }
 
     #[test]
