@@ -146,15 +146,25 @@ fn validate_case(case: &DecisionCase) -> Vec<CaseInputFailure> {
             failures.push(CaseInputFailure::DuplicateHypothesisId { id: hypothesis.id });
         }
         if !hypothesis.prior.is_finite() || !(0.0..=1.0).contains(&hypothesis.prior) {
-            failures.push(CaseInputFailure::InvalidPrior { hypothesis_id: hypothesis.id });
+            failures.push(CaseInputFailure::InvalidPrior {
+                hypothesis_id: hypothesis.id,
+            });
         } else {
             prior_sum += hypothesis.prior;
         }
         if hypothesis.decision_losses.len() != case.decisions.len() {
-            failures.push(CaseInputFailure::DecisionLossCountMismatch { hypothesis_id: hypothesis.id });
+            failures.push(CaseInputFailure::DecisionLossCountMismatch {
+                hypothesis_id: hypothesis.id,
+            });
         }
-        if hypothesis.decision_losses.iter().any(|loss| !loss.is_finite() || *loss < 0.0) {
-            failures.push(CaseInputFailure::InvalidDecisionLoss { hypothesis_id: hypothesis.id });
+        if hypothesis
+            .decision_losses
+            .iter()
+            .any(|loss| !loss.is_finite() || *loss < 0.0)
+        {
+            failures.push(CaseInputFailure::InvalidDecisionLoss {
+                hypothesis_id: hypothesis.id,
+            });
         }
     }
     if !case.hypotheses.is_empty() && (prior_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
@@ -196,7 +206,10 @@ fn validate_measurement(
             if likelihoods.len() != case.hypotheses.len() {
                 reasons.push(MeasurementBlock::LikelihoodCountMismatch);
             }
-            if likelihoods.iter().any(|p| !p.is_finite() || !(0.0..=1.0).contains(p)) {
+            if likelihoods
+                .iter()
+                .any(|p| !p.is_finite() || !(0.0..=1.0).contains(p))
+            {
                 reasons.push(MeasurementBlock::InvalidLikelihood);
             }
         }
@@ -219,7 +232,8 @@ fn validate_measurement(
 }
 
 fn entropy_bits(probabilities: &[f64]) -> f64 {
-    probabilities.iter()
+    probabilities
+        .iter()
         .filter(|p| **p > 0.0)
         .map(|p| -p * p.log2())
         .sum()
@@ -231,9 +245,13 @@ fn minimum_expected_loss(case: &DecisionCase, posterior: &[f64]) -> DecisionEsti
         expected_loss: f64::INFINITY,
     };
     for (decision_index, decision_id) in case.decisions.iter().enumerate() {
-        let expected_loss: f64 = case.hypotheses.iter()
+        let expected_loss: f64 = case
+            .hypotheses
+            .iter()
             .zip(posterior)
-            .map(|(hypothesis, probability)| probability * hypothesis.decision_losses[decision_index])
+            .map(|(hypothesis, probability)| {
+                probability * hypothesis.decision_losses[decision_index]
+            })
             .sum();
         if expected_loss < best.expected_loss - METRIC_TOLERANCE {
             best = DecisionEstimate {
@@ -245,13 +263,24 @@ fn minimum_expected_loss(case: &DecisionCase, posterior: &[f64]) -> DecisionEsti
     best
 }
 
-fn posterior(prior: &[f64], likelihoods: &[f64], positive: bool, probability_outcome: f64) -> Option<Vec<f64>> {
+fn posterior(
+    prior: &[f64],
+    likelihoods: &[f64],
+    positive: bool,
+    probability_outcome: f64,
+) -> Option<Vec<f64>> {
     if probability_outcome <= 0.0 {
         return None;
     }
-    let values: Vec<f64> = prior.iter().zip(likelihoods)
+    let values: Vec<f64> = prior
+        .iter()
+        .zip(likelihoods)
         .map(|(p, likelihood)| {
-            let outcome_probability = if positive { *likelihood } else { 1.0 - *likelihood };
+            let outcome_probability = if positive {
+                *likelihood
+            } else {
+                1.0 - *likelihood
+            };
             p * outcome_probability / probability_outcome
         })
         .collect();
@@ -261,8 +290,12 @@ fn posterior(prior: &[f64], likelihoods: &[f64], positive: bool, probability_out
 /// Compute exact finite two-outcome posterior probabilities for one measurement.
 /// "Exact" means complete enumeration of the supplied hypothesis set and both
 /// outcomes; probabilities/losses are represented in f64, not symbolic rationals.
-pub fn evaluate_measurement(case: &DecisionCase, measurement: &Measurement) -> MeasurementEvaluation {
-    let existing_ids: BTreeSet<&'static str> = case.existing_evidence_origins.iter().copied().collect();
+pub fn evaluate_measurement(
+    case: &DecisionCase,
+    measurement: &Measurement,
+) -> MeasurementEvaluation {
+    let existing_ids: BTreeSet<&'static str> =
+        case.existing_evidence_origins.iter().copied().collect();
     let block_reasons = validate_measurement(case, measurement, &existing_ids);
     if !block_reasons.is_empty() {
         return MeasurementEvaluation {
@@ -280,26 +313,43 @@ pub fn evaluate_measurement(case: &DecisionCase, measurement: &Measurement) -> M
         };
     }
 
-    let prior: Vec<f64> = case.hypotheses.iter().map(|hypothesis| hypothesis.prior).collect();
-    let likelihoods = measurement.positive_likelihoods.as_ref().expect("validated likelihood model");
-    let probability_positive: f64 = prior.iter().zip(likelihoods).map(|(p, likelihood)| p * likelihood).sum();
+    let prior: Vec<f64> = case
+        .hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior)
+        .collect();
+    let likelihoods = measurement
+        .positive_likelihoods
+        .as_ref()
+        .expect("validated likelihood model");
+    let probability_positive: f64 = prior
+        .iter()
+        .zip(likelihoods)
+        .map(|(p, likelihood)| p * likelihood)
+        .sum();
     let probability_negative = (1.0 - probability_positive).max(0.0);
 
     let positive_posterior = posterior(&prior, likelihoods, true, probability_positive);
     let negative_posterior = posterior(&prior, likelihoods, false, probability_negative);
-    let positive_decision = positive_posterior.as_ref().map(|p| minimum_expected_loss(case, p));
-    let negative_decision = negative_posterior.as_ref().map(|p| minimum_expected_loss(case, p));
+    let positive_decision = positive_posterior
+        .as_ref()
+        .map(|p| minimum_expected_loss(case, p));
+    let negative_decision = negative_posterior
+        .as_ref()
+        .map(|p| minimum_expected_loss(case, p));
 
     let baseline_decision = minimum_expected_loss(case, &prior);
-    let expected_posterior_loss =
-        probability_positive * positive_decision.as_ref().map_or(0.0, |d| d.expected_loss)
+    let expected_posterior_loss = probability_positive
+        * positive_decision.as_ref().map_or(0.0, |d| d.expected_loss)
         + probability_negative * negative_decision.as_ref().map_or(0.0, |d| d.expected_loss);
-    let expected_posterior_entropy =
-        probability_positive * positive_posterior.as_ref().map_or(0.0, |p| entropy_bits(p))
+    let expected_posterior_entropy = probability_positive
+        * positive_posterior.as_ref().map_or(0.0, |p| entropy_bits(p))
         + probability_negative * negative_posterior.as_ref().map_or(0.0, |p| entropy_bits(p));
     let information_gain_bits = (entropy_bits(&prior) - expected_posterior_entropy).max(0.0);
-    let gross_value_of_information = (baseline_decision.expected_loss - expected_posterior_loss).max(0.0);
-    let net_value_of_information = baseline_decision.expected_loss - expected_posterior_loss - measurement.cost_units;
+    let gross_value_of_information =
+        (baseline_decision.expected_loss - expected_posterior_loss).max(0.0);
+    let net_value_of_information =
+        baseline_decision.expected_loss - expected_posterior_loss - measurement.cost_units;
 
     MeasurementEvaluation {
         measurement_id: measurement.id,
@@ -322,7 +372,8 @@ fn selection(
     score: impl Fn(&MeasurementEvaluation) -> Option<f64>,
     require_positive: bool,
 ) -> PolicySelection {
-    let best = evaluations.iter()
+    let best = evaluations
+        .iter()
         .filter(|evaluation| evaluation.disposition == MeasurementDisposition::Eligible)
         .filter_map(|evaluation| score(evaluation).map(|value| (evaluation, value)))
         .filter(|(_, value)| !require_positive || *value > 0.0)
@@ -341,7 +392,10 @@ fn selection(
     }
 }
 
-pub fn evaluate_case(case: &DecisionCase, measurements: &[Measurement]) -> Result<DiagnosisBenchmark, Vec<CaseInputFailure>> {
+pub fn evaluate_case(
+    case: &DecisionCase,
+    measurements: &[Measurement],
+) -> Result<DiagnosisBenchmark, Vec<CaseInputFailure>> {
     let failures = validate_case(case);
     if !failures.is_empty() {
         return Err(failures);
@@ -350,16 +404,22 @@ pub fn evaluate_case(case: &DecisionCase, measurements: &[Measurement]) -> Resul
     let mut duplicate_failures = Vec::new();
     for measurement in measurements {
         if !measurement.id.trim().is_empty() && !measurement_ids.insert(measurement.id) {
-            duplicate_failures.push(CaseInputFailure::DuplicateMeasurementId { id: measurement.id });
+            duplicate_failures
+                .push(CaseInputFailure::DuplicateMeasurementId { id: measurement.id });
         }
     }
     if !duplicate_failures.is_empty() {
         return Err(duplicate_failures);
     }
 
-    let prior: Vec<f64> = case.hypotheses.iter().map(|hypothesis| hypothesis.prior).collect();
+    let prior: Vec<f64> = case
+        .hypotheses
+        .iter()
+        .map(|hypothesis| hypothesis.prior)
+        .collect();
     let baseline_decision = minimum_expected_loss(case, &prior);
-    let evaluations: Vec<MeasurementEvaluation> = measurements.iter()
+    let evaluations: Vec<MeasurementEvaluation> = measurements
+        .iter()
         .map(|measurement| evaluate_measurement(case, measurement))
         .collect();
     let information_gain_choice = selection(
@@ -388,9 +448,21 @@ pub fn reference_case() -> DecisionCase {
         schema_version: "industrial-diagnosis-case/0.1",
         case_id: "PUMP-VALVE-VOI-SYNTHETIC-001",
         hypotheses: vec![
-            Hypothesis { id: "DANGEROUS_PROCESS_DEGRADATION", prior: 0.10, decision_losses: vec![100.0, 12.0, 60.0] },
-            Hypothesis { id: "METROLOGY_CALIBRATION_DRIFT", prior: 0.30, decision_losses: vec![20.0, 12.0, 2.0] },
-            Hypothesis { id: "NORMAL_OR_INNOCUOUS_VARIATION", prior: 0.60, decision_losses: vec![0.0, 12.0, 8.0] },
+            Hypothesis {
+                id: "DANGEROUS_PROCESS_DEGRADATION",
+                prior: 0.10,
+                decision_losses: vec![100.0, 12.0, 60.0],
+            },
+            Hypothesis {
+                id: "METROLOGY_CALIBRATION_DRIFT",
+                prior: 0.30,
+                decision_losses: vec![20.0, 12.0, 2.0],
+            },
+            Hypothesis {
+                id: "NORMAL_OR_INNOCUOUS_VARIATION",
+                prior: 0.60,
+                decision_losses: vec![0.0, 12.0, 8.0],
+            },
         ],
         decisions: vec!["CONTINUE", "STOP_AND_QUARANTINE", "RECALIBRATE_AND_RETEST"],
         existing_evidence_origins: vec!["LIVE-PRESSURE-TAG-07"],
@@ -451,7 +523,13 @@ pub fn hostile_measurements() -> Vec<Measurement> {
     missing_authority.id = "HOSTILE_NO_INSPECTOR_AUTHORITY";
     missing_authority.authority = EvidenceStatus::Unknown;
 
-    vec![stale, correlated, unknown_applicability, unknown_likelihood, missing_authority]
+    vec![
+        stale,
+        correlated,
+        unknown_applicability,
+        unknown_likelihood,
+        missing_authority,
+    ]
 }
 
 #[cfg(test)]
@@ -459,51 +537,83 @@ mod tests {
     use super::*;
 
     fn close(actual: f64, expected: f64) {
-        assert!((actual - expected).abs() < 1.0e-6, "actual={actual}, expected={expected}");
+        assert!(
+            (actual - expected).abs() < 1.0e-6,
+            "actual={actual}, expected={expected}"
+        );
     }
 
     #[test]
     fn baseline_recalibration_decision_has_expected_loss_11_4() {
         let case = reference_case();
         let benchmark = evaluate_case(&case, &reference_measurements()).unwrap();
-        assert_eq!(benchmark.baseline_decision.decision_id, "RECALIBRATE_AND_RETEST");
+        assert_eq!(
+            benchmark.baseline_decision.decision_id,
+            "RECALIBRATE_AND_RETEST"
+        );
         close(benchmark.baseline_decision.expected_loss, 11.4);
     }
 
     #[test]
     fn information_gain_prefers_calibration_artifact() {
         let benchmark = evaluate_case(&reference_case(), &reference_measurements()).unwrap();
-        assert_eq!(benchmark.information_gain_choice.measurement_id, Some("CALIBRATION_REFERENCE_ARTIFACT"));
+        assert_eq!(
+            benchmark.information_gain_choice.measurement_id,
+            Some("CALIBRATION_REFERENCE_ARTIFACT")
+        );
         close(benchmark.information_gain_choice.score.unwrap(), 0.6050793);
     }
 
     #[test]
     fn decision_value_prefers_process_safety_test() {
         let benchmark = evaluate_case(&reference_case(), &reference_measurements()).unwrap();
-        assert_eq!(benchmark.decision_value_choice.measurement_id, Some("INDEPENDENT_PROCESS_SAFETY_TEST"));
+        assert_eq!(
+            benchmark.decision_value_choice.measurement_id,
+            Some("INDEPENDENT_PROCESS_SAFETY_TEST")
+        );
         close(benchmark.decision_value_choice.score.unwrap(), 1.63);
     }
 
     #[test]
     fn most_informative_test_is_not_the_highest_decision_value_test() {
         let benchmark = evaluate_case(&reference_case(), &reference_measurements()).unwrap();
-        assert_ne!(benchmark.information_gain_choice.measurement_id, benchmark.decision_value_choice.measurement_id);
+        assert_ne!(
+            benchmark.information_gain_choice.measurement_id,
+            benchmark.decision_value_choice.measurement_id
+        );
     }
 
     #[test]
     fn low_value_test_is_rejected_economically() {
         let benchmark = evaluate_case(&reference_case(), &reference_measurements()).unwrap();
-        let general = benchmark.measurements.iter().find(|item| item.measurement_id == "GENERAL_VIBRATION_SCREEN").unwrap();
+        let general = benchmark
+            .measurements
+            .iter()
+            .find(|item| item.measurement_id == "GENERAL_VIBRATION_SCREEN")
+            .unwrap();
         close(general.net_value_of_information.unwrap(), -0.5);
-        assert_eq!(benchmark.decision_value_choice.measurement_id, Some("INDEPENDENT_PROCESS_SAFETY_TEST"));
+        assert_eq!(
+            benchmark.decision_value_choice.measurement_id,
+            Some("INDEPENDENT_PROCESS_SAFETY_TEST")
+        );
     }
 
     #[test]
     fn posterior_actions_change_after_test_outcomes() {
         let benchmark = evaluate_case(&reference_case(), &reference_measurements()).unwrap();
-        let process = benchmark.measurements.iter().find(|item| item.measurement_id == "INDEPENDENT_PROCESS_SAFETY_TEST").unwrap();
-        assert_eq!(process.positive_decision.as_ref().unwrap().decision_id, "STOP_AND_QUARANTINE");
-        assert_eq!(process.negative_decision.as_ref().unwrap().decision_id, "RECALIBRATE_AND_RETEST");
+        let process = benchmark
+            .measurements
+            .iter()
+            .find(|item| item.measurement_id == "INDEPENDENT_PROCESS_SAFETY_TEST")
+            .unwrap();
+        assert_eq!(
+            process.positive_decision.as_ref().unwrap().decision_id,
+            "STOP_AND_QUARANTINE"
+        );
+        assert_eq!(
+            process.negative_decision.as_ref().unwrap().decision_id,
+            "RECALIBRATE_AND_RETEST"
+        );
     }
 
     #[test]
@@ -512,7 +622,11 @@ mod tests {
         let measurement = hostile_measurements().remove(0);
         let result = evaluate_measurement(&case, &measurement);
         assert_eq!(result.disposition, MeasurementDisposition::Blocked);
-        assert!(result.block_reasons.contains(&MeasurementBlock::CalibrationNotCurrent));
+        assert!(
+            result
+                .block_reasons
+                .contains(&MeasurementBlock::CalibrationNotCurrent)
+        );
         assert!(result.net_value_of_information.is_none());
     }
 
@@ -522,7 +636,11 @@ mod tests {
         let measurement = hostile_measurements().remove(1);
         let result = evaluate_measurement(&case, &measurement);
         assert_eq!(result.disposition, MeasurementDisposition::Blocked);
-        assert!(result.block_reasons.contains(&MeasurementBlock::CorrelatedEvidenceOrigin));
+        assert!(
+            result
+                .block_reasons
+                .contains(&MeasurementBlock::CorrelatedEvidenceOrigin)
+        );
     }
 
     #[test]
@@ -531,7 +649,11 @@ mod tests {
         let measurement = hostile_measurements().remove(2);
         let result = evaluate_measurement(&case, &measurement);
         assert_eq!(result.disposition, MeasurementDisposition::Blocked);
-        assert!(result.block_reasons.contains(&MeasurementBlock::ApplicabilityNotCurrent));
+        assert!(
+            result
+                .block_reasons
+                .contains(&MeasurementBlock::ApplicabilityNotCurrent)
+        );
     }
 
     #[test]
@@ -540,7 +662,11 @@ mod tests {
         let measurement = hostile_measurements().remove(3);
         let result = evaluate_measurement(&case, &measurement);
         assert_eq!(result.disposition, MeasurementDisposition::Blocked);
-        assert!(result.block_reasons.contains(&MeasurementBlock::LikelihoodModelUnknown));
+        assert!(
+            result
+                .block_reasons
+                .contains(&MeasurementBlock::LikelihoodModelUnknown)
+        );
         assert!(result.information_gain_bits.is_none());
     }
 
@@ -550,7 +676,11 @@ mod tests {
         let measurement = hostile_measurements().remove(4);
         let result = evaluate_measurement(&case, &measurement);
         assert_eq!(result.disposition, MeasurementDisposition::Blocked);
-        assert!(result.block_reasons.contains(&MeasurementBlock::AuthorityNotCurrent));
+        assert!(
+            result
+                .block_reasons
+                .contains(&MeasurementBlock::AuthorityNotCurrent)
+        );
     }
 
     #[test]
@@ -587,7 +717,11 @@ mod tests {
         measurements[0].positive_likelihoods = Some(vec![0.5]);
         let result = evaluate_measurement(&case, &measurements[0]);
         assert_eq!(result.disposition, MeasurementDisposition::Blocked);
-        assert!(result.block_reasons.contains(&MeasurementBlock::LikelihoodCountMismatch));
+        assert!(
+            result
+                .block_reasons
+                .contains(&MeasurementBlock::LikelihoodCountMismatch)
+        );
     }
 
     #[test]
