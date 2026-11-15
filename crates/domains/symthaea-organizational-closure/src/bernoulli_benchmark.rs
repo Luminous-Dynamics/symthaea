@@ -105,7 +105,9 @@ fn truth_scoring_eligible(report: &BernoulliSequentialReport) -> bool {
 }
 
 fn coverage_eligible(report: &BernoulliSequentialReport) -> bool {
-    truth_scoring_eligible(report) && report.unqualified_samples == 0
+    truth_scoring_eligible(report)
+        && report.unqualified_samples == 0
+        && report.control.qualified_samples + report.treatment.qualified_samples > 0
 }
 
 /// Summarize a frozen episode batch without collapsing distinct scientific
@@ -316,7 +318,8 @@ mod tests {
         assert_eq!(summary.qualified_power_on_material_effect.episodes, 1);
         assert_eq!(summary.correct_claim_rate.successes, 1);
         assert_eq!(summary.correct_claim_rate.episodes, 3);
-        assert_eq!(summary.all_look_confidence_sequence_coverage.episodes, 3);
+        assert_eq!(summary.coverage_eligible_episodes, 2);
+        assert_eq!(summary.all_look_confidence_sequence_coverage.episodes, 2);
         assert_eq!(summary.process_qualification_rate.episodes, 4);
         assert!(summary.mean_attempted_samples.is_some());
     }
@@ -390,6 +393,26 @@ mod tests {
         assert_eq!(summary.null_episodes, 0);
         assert_eq!(summary.false_positive_rate_on_null.episodes, 0);
         assert_eq!(summary.coverage_eligible_episodes, 0);
+    }
+
+    #[test]
+    fn zero_observation_abstention_does_not_inflate_coverage_denominator() {
+        let scenario = scenario();
+        let no_look = BernoulliSequentialTrace {
+            trials: Vec::new(),
+            terminal: BernoulliTerminalDecision::Abstain { reason: "no observations".into() },
+        };
+        let report = evaluate_bernoulli_sequential(
+            &scenario,
+            &BernoulliOracle::new(0.5, 0.5),
+            &no_look,
+        );
+        let summary = summarize_bernoulli_episodes(&[report], scenario.minimum_effect).unwrap();
+        assert_eq!(summary.inconclusive_episodes, 1);
+        assert_eq!(summary.coverage_eligible_episodes, 0);
+        assert_eq!(summary.final_interval_coverage.episodes, 0);
+        assert_eq!(summary.all_look_confidence_sequence_coverage.episodes, 0);
+        assert_eq!(summary.process_qualification_rate.estimate, Some(0.0));
     }
 
 }
