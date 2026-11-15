@@ -38,7 +38,7 @@ pub use algorithmic_residual::{
     ResidualFindingCode, ResidualQualification, evaluate_algorithmic_residual,
 };
 pub use anytime_valid::{
-    AnytimeValidCausalClaim, AnytimeValidCausalOracle, AnytimeValidCausalReport,
+    SequentialCausalClaim, AnytimeValidCausalOracle, AnytimeValidCausalReport,
     AnytimeValidCausalScenario, AnytimeValidCausalTrace, AnytimeValidDecision,
     AnytimeValidDecisionQuality, AnytimeValidEvidenceOracle, AnytimeValidEvidenceReceipt,
     AnytimeValidFinding, AnytimeValidFindingCode, AnytimeValidPolicy, AnytimeValidQualification,
