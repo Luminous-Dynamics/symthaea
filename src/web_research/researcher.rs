@@ -10,7 +10,7 @@
 use anyhow::{Context, Result};
 use serde_json::Value;
 use std::collections::HashSet;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::extractor::{ContentExtractor, ContentType};
 use super::types::{
@@ -30,6 +30,90 @@ pub struct WebResearcher {
     extractor: ContentExtractor,
     /// Epistemic verifier
     verifier: EpistemicVerifier,
+    /// Space arXiv request starts within this researcher instance.
+    arxiv_rate_limiter: tokio::sync::Mutex<Instant>,
+}
+
+/// Build a bounded arXiv query that combines exact title/abstract phrase
+/// matching with an all-field keyword conjunction. Only alphanumeric tokens
+/// enter the query grammar, so user punctuation cannot inject Boolean syntax.
+fn build_arxiv_search_query(query: &str) -> Option<String> {
+    const STOP_WORDS: &[&str] = &[
+        "a", "about", "after", "an", "and", "are", "as", "at", "based", "be",
+        "by", "can", "could", "do", "does", "for", "from", "how", "in", "into",
+        "is", "it", "latest", "of", "on", "or", "paper", "papers", "please",
+        "research", "review", "search", "show", "status", "study", "studies",
+        "the", "their", "this", "to", "using", "what", "when", "where", "which",
+        "with",
+    ];
+
+    let mut terms = Vec::new();
+    let mut seen = HashSet::new();
+    let mut token = String::new();
+
+    let mut push_token = |token: &mut String| {
+        if token.is_empty() {
+            return;
+        }
+        let candidate = std::mem::take(token);
+        if candidate.chars().count() >= 2
+            && !STOP_WORDS.contains(&candidate.as_str())
+            && seen.insert(candidate.clone())
+            && terms.len() < 6
+        {
+            terms.push(candidate);
+        }
+    };
+
+    for character in query.chars().flat_map(char::to_lowercase) {
+        if character.is_alphanumeric() {
+            token.push(character);
+        } else {
+            push_token(&mut token);
+        }
+    }
+    push_token(&mut token);
+
+    if terms.is_empty() {
+        return None;
+    }
+
+    let phrase = terms.join(" ");
+    let all_fields = terms
+        .iter()
+        .take(4)
+        .map(|term| format!("all:{term}"))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+
+    if terms.len() == 1 {
+        Some(format!("all:{}", terms[0]))
+    } else {
+        Some(format!(
+            "(ti:\"{phrase}\" OR abs:\"{phrase}\") OR ({all_fields})"
+        ))
+    }
+}
+
+/// Use recency ordering only when the request explicitly asks for recent work.
+fn arxiv_sort_order(query: &str) -> (&'static str, &'static str) {
+    let lower = query.to_lowercase();
+    let requests_recency = [
+        "latest",
+        "recent",
+        "newest",
+        "most recent",
+        "current papers",
+        "this year",
+    ]
+    .iter()
+    .any(|cue| lower.contains(cue));
+
+    if requests_recency {
+        ("submittedDate", "descending")
+    } else {
+        ("relevance", "descending")
+    }
 }
 
 impl WebResearcher {
@@ -51,6 +135,9 @@ impl WebResearcher {
             client,
             extractor: ContentExtractor::new(),
             verifier: EpistemicVerifier::new(),
+            arxiv_rate_limiter: tokio::sync::Mutex::new(
+                Instant::now() - Duration::from_secs(3),
+            ),
         })
     }
 
@@ -70,8 +157,13 @@ impl WebResearcher {
 
         let mut visited_urls = std::collections::HashSet::new();
 
-        for search_query in &search_queries {
-            match self.fetch_search_results(search_query).await {
+        for (query_index, search_query) in search_queries.iter().enumerate() {
+            // Academic providers are queried once per user request. Search-engine
+            // variants remain useful, but must not fan out into repeated arXiv calls.
+            match self
+                .fetch_search_results(search_query, query_index == 0)
+                .await
+            {
                 Ok(urls) => {
                     for url in urls.iter().take(self.config.max_concurrent_requests) {
                         // Skip if this URL has already been processed during this loop cycle
@@ -232,7 +324,11 @@ impl WebResearcher {
     ///
     /// Returns URLs to fetch. In production, this would use a search API.
     /// Improved heuristic targeting high-quality technical domains.
-    async fn fetch_search_results(&self, query: &str) -> Result<Vec<String>> {
+    async fn fetch_search_results(
+        &self,
+        query: &str,
+        include_academic_sources: bool,
+    ) -> Result<Vec<String>> {
         let mut urls = Vec::new();
         let query_lower = query.to_lowercase();
         let encoded_query = urlencoding::encode(query);
@@ -242,30 +338,39 @@ impl WebResearcher {
             urls.extend(provider_urls);
         }
 
-        if self.config.enable_arxiv_api
-            && (query_lower.contains("arxiv")
-                || query_lower.contains("paper")
-                || query_lower.contains("research")
-                || query_lower.contains("state space")
-                || query_lower.contains("ssm")
-                || query_lower.contains("liquid time")
-                || query_lower.contains("mamba")
-                || query_lower.contains("selective scan"))
-        {
+        let academic_intent = [
+            "arxiv",
+            "paper",
+            "research",
+            "literature",
+            "academic",
+            "scientific",
+            "study",
+            "studies",
+            "publication",
+            "survey",
+            "benchmark",
+            "theorem",
+            "proof",
+            "mathemat",
+            "state space",
+            "ssm",
+            "liquid time",
+            "mamba",
+            "selective scan",
+        ]
+        .iter()
+        .any(|cue| query_lower.contains(cue));
+
+        if include_academic_sources && self.config.enable_arxiv_api && academic_intent {
             if let Ok(arxiv_urls) = self.search_arxiv_api(query).await {
                 urls.extend(arxiv_urls);
             }
         }
 
-        if self.config.enable_openreview_api
-            && (query_lower.contains("openreview")
-                || query_lower.contains("paper")
-                || query_lower.contains("research")
-                || query_lower.contains("state space")
-                || query_lower.contains("ssm")
-                || query_lower.contains("liquid time")
-                || query_lower.contains("mamba")
-                || query_lower.contains("selective scan"))
+        if include_academic_sources
+            && self.config.enable_openreview_api
+            && (query_lower.contains("openreview") || academic_intent)
         {
             if let Ok(or_urls) = self.search_openreview_api(query).await {
                 urls.extend(or_urls);
@@ -458,28 +563,28 @@ impl WebResearcher {
     }
 
     async fn search_arxiv_api(&self, query: &str) -> Result<Vec<String>> {
-        // Distill query to remove token pollution from academic indexing
-        let cleaned_query = query
-            .to_lowercase()
-            .replace("arxiv", "")
-            .replace("papers", "")
-            .replace("paper", "")
-            .replace("search", "")
-            .replace("latest", "")
-            .replace("status", "")
-            .replace("architecture", "")
-            .trim()
-            .to_string();
-
-        // Target both titles and abstracts specifically for high-density accuracy
-        let search_query = format!("ti:\"{0}\" OR abs:\"{0}\"", cleaned_query);
+        let Some(search_query) = build_arxiv_search_query(query) else {
+            return Ok(Vec::new());
+        };
         let encoded_query = urlencoding::encode(&search_query);
+        let (sort_by, sort_order) = arxiv_sort_order(query);
 
-        // Force chronological sorting to capture state-of-the-art results (2024-2026)
+        // arXiv supports Boolean field queries, relevance sorting, and paging.
+        // Keep the result window bounded and fetch once per user research request.
         let url = format!(
-            "{}?search_query={}&id_list=&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
-            self.config.arxiv_endpoint, encoded_query
+            "{}?search_query={}&id_list=&start=0&max_results=20&sortBy={}&sortOrder={}",
+            self.config.arxiv_endpoint, encoded_query, sort_by, sort_order
         );
+
+        {
+            let mut last_request = self.arxiv_rate_limiter.lock().await;
+            let minimum_interval = Duration::from_secs(3);
+            let elapsed = last_request.elapsed();
+            if elapsed < minimum_interval {
+                tokio::time::sleep(minimum_interval - elapsed).await;
+            }
+            *last_request = Instant::now();
+        }
 
         let response = self
             .client
@@ -812,6 +917,53 @@ impl Default for WebResearcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn arxiv_query_combines_phrase_and_all_field_terms() {
+        let query = build_arxiv_search_query("Riemann zeta zero density");
+        assert_eq!(
+            query.as_deref(),
+            Some(
+                "(ti:\\"riemann zeta zero density\\" OR abs:\\"riemann zeta zero density\\") OR (all:riemann AND all:zeta AND all:zero AND all:density)"
+            )
+        );
+    }
+
+    #[test]
+    fn arxiv_query_strips_punctuation_and_boolean_injection() {
+        let query = build_arxiv_search_query("HDC/CfC (state-space) OR theorem!").unwrap();
+        assert!(query.contains("all:hdc AND all:cfc AND all:state AND all:space"));
+        assert!(!query.contains("OR theorem"));
+    }
+
+    #[test]
+    fn arxiv_query_returns_none_for_stopword_only_input() {
+        assert_eq!(build_arxiv_search_query("the latest papers about"), None);
+    }
+
+    #[test]
+    fn arxiv_query_is_bounded_for_long_prompts() {
+        let query = build_arxiv_search_query(
+            "A long research prompt about neural dynamics and hyperdimensional representations with many additional words",
+        )
+        .unwrap();
+        assert!(query.len() < 400);
+        assert!(query.contains("all:long AND all:prompt AND all:neural AND all:dynamics"));
+        assert!(query.contains("hyperdimensional representations"));
+        assert!(!query.contains("additional"));
+    }
+
+    #[test]
+    fn arxiv_sort_defaults_to_relevance_and_honors_explicit_recency() {
+        assert_eq!(
+            arxiv_sort_order("Riemann zeta zero density"),
+            ("relevance", "descending")
+        );
+        assert_eq!(
+            arxiv_sort_order("latest papers on zeta zeros"),
+            ("submittedDate", "descending")
+        );
+    }
 
     #[test]
     fn test_query_planning() {
