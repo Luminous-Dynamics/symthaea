@@ -57,6 +57,40 @@ The crate uses a versioned deterministic SplitMix64 / partial Fisher–Yates sel
 
 SplitMix64 is **not cryptographically secure**. The seed commitment, population manifest, selection receipt and evidence references are declared identities; this crate does not fetch or hash their payloads, authenticate timestamps, prove that the seed was committed first, verify independent execution, or establish solver-label truth. A production audit must obtain an unpredictable seed from an external cryptographically secure randomness source after the population and strata are frozen, commit/reveal it under independent timestamped control, and independently verify source bytes, sample selection and solver evidence.
 
+
+## Conditional decision-opportunity audit
+
+The follow-on `decision_opportunity` module addresses a separate question: can a screen preserve *designs that could change the engineering decision*, not merely designs that are feasible?
+
+It reuses the frozen candidate universe, accepted/rejected partition, sample identities, exact hypergeometric inversion and Bonferroni familywise correction above. It does not implement a second sampler or statistical engine.
+
+The decision audit freezes:
+- the full objective vector, units, directions and per-objective materiality tolerances;
+- the incumbent reference frontier and its identity;
+- the opportunity rule and campaign identity;
+- a complete reference evaluation for every accepted candidate;
+- one reference evaluation for every sampled rejected candidate, in the exact frozen sample draw order.
+
+The v0.1 rule identifies a **conditional reference-front opportunity** when a candidate is confirmed feasible, lies within the declared model domain, is not epsilon-dominated or epsilon-equivalent to an incumbent, and materially improves at least one objective against the frozen frontier. A candidate may replace or improve an incumbent; this is not global Pareto-front discovery.
+
+The report gives two distinct lower bounds:
+- feasible-candidate recall, inherited from the original reject audit;
+- conditional reference-front opportunity recall, evaluated against the frozen incumbent frontier and objective manifest.
+
+Out-of-domain, failed, non-converged, unsupported and inconclusive evaluations remain unresolved and count as potential missed opportunities in the conservative rejected-population bound. A missing sample result, changed candidate order, altered objective identity or changed frontier is refused or requires a new campaign.
+
+The report preserves the frozen universe, accepted-population, objective, opportunity-rule, incumbent-frontier, stratum-population and sample-selection receipt identities. This is essential: the opportunity result is conditional on these exact inputs.
+
+### Scope limits
+
+- The opportunity recall is conditional on the frozen incumbent reference set. It is **not global Pareto recall** and cannot establish that an unenumerated physical design space has been searched adequately.
+- The epsilon rule is a frozen benchmark definition, not an industry standard. Objective units, direction, scale and tolerances must be justified and fixed before outcomes are viewed.
+- No average decision regret is emitted. A bounded regret metric requires finite, defensible objective bounds and a separate conservative derivation.
+- The objective evaluator consumes exact declared reference outcomes; it does not launch PROCESS or another physical solver.
+- Synthetic fixtures test the contract only. They are not physical validation or reactor-design evidence.
+
+The module adds 12 authored Rust unit tests for frontier extension, the feasibility/opportunity recall distinction, hard/inconclusive/out-of-domain results, epsilon dominance/equivalence, vector units/order, missing/retained sample identities, baseline frontier consistency and zero-sample conservatism. Across the original 15 rejected-candidate-audit tests and these 12 new authored tests, the crate contains 27 authored Rust tests. This is a source inventory, not a claim that the new tests have executed.
+
 ## Run
 
 ```sh
