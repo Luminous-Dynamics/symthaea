@@ -19,6 +19,15 @@ const MAX_LABEL_ID_BYTES: usize = 256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AppliedActionDisposition {
+    Applied,
+    Proposed,
+    Rejected,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AppliedActionSourceKind {
     HumanDemonstration,
     ClassicalController,
@@ -52,6 +61,7 @@ pub struct AppliedActionTrainingReceipt {
     pub command_id: String,
     pub tick: u64,
     pub applied_timestamp_us: u64,
+    pub disposition: AppliedActionDisposition,
     pub action_schema_sha256: String,
     pub source_kind: AppliedActionSourceKind,
     pub source_identity: String,
@@ -89,6 +99,12 @@ impl AppliedActionTrainingReceipt {
         update_string(&mut hasher, &self.command_id);
         hasher.update(self.tick.to_le_bytes());
         hasher.update(self.applied_timestamp_us.to_le_bytes());
+        update_string(&mut hasher, match self.disposition {
+            AppliedActionDisposition::Applied => "APPLIED",
+            AppliedActionDisposition::Proposed => "PROPOSED",
+            AppliedActionDisposition::Rejected => "REJECTED",
+            AppliedActionDisposition::Unknown => "UNKNOWN",
+        });
         update_string(&mut hasher, &self.action_schema_sha256);
         update_string(&mut hasher, self.source_kind.canonical_name());
         update_string(&mut hasher, &self.source_identity);
@@ -139,6 +155,7 @@ pub enum TrainingLabelError {
     FutureAppliedAction,
     UnknownSourceKind,
     UnknownPrivilegeProfile,
+    ActionNotApplied,
     NonFiniteAction,
     ActionOutOfRange,
 }
@@ -193,6 +210,9 @@ pub fn validate_applied_action_training_label(
         return Err(TrainingLabelError::InvalidReceiptDigest);
     }
 
+    if label.disposition != AppliedActionDisposition::Applied {
+        return Err(TrainingLabelError::ActionNotApplied);
+    }
     if label.action_schema_sha256 != vehicle_action_schema_sha256() {
         return Err(TrainingLabelError::ActionSchemaMismatch);
     }
@@ -204,7 +224,9 @@ pub fn validate_applied_action_training_label(
     }
 
     let receipt: &DrivingObservationReceipt = &observation.receipt;
-    if receipt.receipt_sha256 != crate::digest_receipt(receipt) {
+    if receipt.receipt_sha256 != crate::digest_receipt(receipt)
+        || receipt.capture_timestamp_us != receipt.upstream_capture_timestamp_us
+    {
         return Err(TrainingLabelError::ObservationReceiptMismatch);
     }
     if receipt.derived_dt_us == 0 {
@@ -271,6 +293,7 @@ pub fn validate_applied_action_training_label(
         clock_id: label.clock_id.clone(),
         tick: label.tick,
         applied_timestamp_us: label.applied_timestamp_us,
+        policy_input_sha256: receipt.fused_policy_input_sha256.clone(),
         dt_seconds: (receipt.derived_dt_us as f64 / 1_000_000.0) as f32,
         source_kind: label.source_kind,
         source_identity: label.source_identity.clone(),
@@ -308,6 +331,7 @@ mod tests {
             command_id: COMMAND_ID.into(),
             tick: TICK,
             applied_timestamp_us: 9_900,
+            disposition: AppliedActionDisposition::Applied,
             action_schema_sha256: vehicle_action_schema_sha256(),
             source_kind: AppliedActionSourceKind::ClassicalController,
             source_identity: "teacher-controller-r3".into(),
@@ -406,6 +430,32 @@ mod tests {
         assert_eq!(validated.tick, TICK);
         assert_eq!(validated.dt_seconds, 0.01);
         assert_eq!(validated.source_kind, AppliedActionSourceKind::ClassicalController);
+    }
+
+    #[test]
+    fn proposed_or_rejected_action_cannot_become_a_training_target() {
+        let mut value = label();
+        value.disposition = AppliedActionDisposition::Proposed;
+        value.receipt_sha256 = value.calculated_receipt_sha256();
+        assert_eq!(
+            validate_applied_action_training_label(&fused_input(&value), &value).unwrap_err(),
+            TrainingLabelError::ActionNotApplied
+        );
+        value.disposition = AppliedActionDisposition::Rejected;
+        value.receipt_sha256 = value.calculated_receipt_sha256();
+        assert_eq!(
+            validate_applied_action_training_label(&fused_input(&value), &value).unwrap_err(),
+            TrainingLabelError::ActionNotApplied
+        );
+    }
+
+    #[test]
+    fn validated_target_is_bound_to_exact_fused_input_digest() {
+        let value = label();
+        let observation = fused_input(&value);
+        let validated = validate_applied_action_training_label(&observation, &value).unwrap();
+        assert_eq!(validated.policy_input_sha256, observation.receipt.fused_policy_input_sha256);
+        assert_eq!(validated.observation_receipt_sha256, observation.receipt.receipt_sha256);
     }
 
     #[test]
