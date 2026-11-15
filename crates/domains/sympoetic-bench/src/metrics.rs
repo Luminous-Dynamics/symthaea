@@ -163,6 +163,146 @@ pub fn marginal_contribution_impact(
     Ok(Some(full_quality - replay_quality))
 }
 
+
+/// Exact Shapley attribution over a complete, bounded coalition-value table.
+///
+/// Coalition index is a bit mask: index 0 is the empty coalition and index
+/// (1 << n) - 1 is the full coalition. Every coalition must be identifiable.
+/// Missing counterfactuals cause an error rather than being treated as zero.
+/// This is a contribution-allocation measure, not a legal authorship measure.
+pub fn exact_shapley_values(coalition_values: &[Option<f64>]) -> Result<Vec<f64>> {
+    if coalition_values.len() < 2 || !coalition_values.len().is_power_of_two() {
+        bail!("Shapley attribution requires a complete 2^n coalition table for n >= 1");
+    }
+    let player_count = coalition_values.len().trailing_zeros() as usize;
+    if player_count > 12 {
+        bail!("exact Shapley attribution is limited to 12 players; use a sampled estimator above that");
+    }
+
+    let mut values = Vec::with_capacity(coalition_values.len());
+    for (coalition, value) in coalition_values.iter().enumerate() {
+        let value = value.with_context(|| {
+            format!("coalition {coalition} is non-identifiable; do not impute its value")
+        })?;
+        if !value.is_finite() || !(0.0..=1.0).contains(value) {
+            bail!("coalition {coalition} value must be finite and in [0, 1]");
+        }
+        values.push(*value);
+    }
+
+    let mut shapley = vec![0.0; player_count];
+    for player in 0..player_count {
+        let bit = 1usize << player;
+        for coalition in 0..values.len() {
+            if coalition & bit != 0 {
+                continue;
+            }
+            let coalition_size = coalition.count_ones() as usize;
+            let weight = 1.0
+                / (player_count as f64
+                    * binomial_coefficient(player_count - 1, coalition_size));
+            shapley[player] +=
+                weight * (values[coalition | bit] - values[coalition]);
+        }
+    }
+    Ok(shapley)
+}
+
+fn binomial_coefficient(n: usize, k: usize) -> f64 {
+    if k > n {
+        return 0.0;
+    }
+    let k = k.min(n - k);
+    (1..=k).fold(1.0, |value, index| {
+        value * (n - k + index) as f64 / index as f64
+    })
+}
+
+/// Difference-in-differences estimate of participant capability amplification.
+///
+/// Each arm contains one pre/post score per participant. The estimator first
+/// computes within-participant gain, then bootstraps participants independently
+/// within the collaborative and control arms. Positive values mean the
+/// collaboration condition improved independent capability more than the
+/// matched control. Scores must be measured on equivalent, non-identical test
+/// forms with the same bounded rubric.
+pub fn participant_capability_amplification(
+    collaborative_pre: &[f64],
+    collaborative_post: &[f64],
+    control_pre: &[f64],
+    control_post: &[f64],
+    draws: usize,
+    seed: u64,
+) -> Result<CapabilityAmplificationEstimate> {
+    if collaborative_pre.len() != collaborative_post.len()
+        || control_pre.len() != control_post.len()
+        || collaborative_pre.len() < 2
+        || control_pre.len() < 2
+    {
+        bail!("capability amplification requires matched pre/post scores and at least two participants per arm");
+    }
+    if draws < 1_000 {
+        bail!("capability amplification bootstrap requires at least 1,000 draws");
+    }
+
+    let mut collaborative_gains = Vec::with_capacity(collaborative_pre.len());
+    let mut control_gains = Vec::with_capacity(control_pre.len());
+    for (index, (&pre, &post)) in collaborative_pre.iter().zip(collaborative_post).enumerate() {
+        validate_learning_score("collaborative_pre", index, pre)?;
+        validate_learning_score("collaborative_post", index, post)?;
+        collaborative_gains.push(post - pre);
+    }
+    for (index, (&pre, &post)) in control_pre.iter().zip(control_post).enumerate() {
+        validate_learning_score("control_pre", index, pre)?;
+        validate_learning_score("control_post", index, post)?;
+        control_gains.push(post - pre);
+    }
+
+    let observed = mean(&collaborative_gains) - mean(&control_gains);
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut samples = Vec::with_capacity(draws);
+    for _ in 0..draws {
+        let collaborative_sample = (0..collaborative_gains.len())
+            .map(|_| collaborative_gains[rng.gen_range(0..collaborative_gains.len())])
+            .sum::<f64>()
+            / collaborative_gains.len() as f64;
+        let control_sample = (0..control_gains.len())
+            .map(|_| control_gains[rng.gen_range(0..control_gains.len())])
+            .sum::<f64>()
+            / control_gains.len() as f64;
+        samples.push(collaborative_sample - control_sample);
+    }
+    samples.sort_by(f64::total_cmp);
+
+    Ok(CapabilityAmplificationEstimate {
+        mean_gain_difference: observed,
+        ci_95_lower: percentile(&samples, 0.025),
+        ci_95_upper: percentile(&samples, 0.975),
+        draws,
+        seed,
+        collaborative_participants: collaborative_gains.len(),
+        control_participants: control_gains.len(),
+    })
+}
+
+fn validate_learning_score(label: &str, index: usize, score: f64) -> Result<()> {
+    if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+        bail!("{label}[{index}] must be finite and in [0, 1]");
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct CapabilityAmplificationEstimate {
+    pub mean_gain_difference: f64,
+    pub ci_95_lower: f64,
+    pub ci_95_upper: f64,
+    pub draws: usize,
+    pub seed: u64,
+    pub collaborative_participants: usize,
+    pub control_participants: usize,
+}
+
 /// Paired cluster bootstrap for participant-level means. Each array must contain
 /// one pre-aggregated value per participant, in matched participant order.
 /// This does not replace a multi-level participant/task model where task-level
@@ -346,6 +486,93 @@ mod tests {
             counterfactual_regret: Some(1.5),
         }];
         assert!(summarize_interventions(&invalid_regret).is_err());
+    }
+
+    #[test]
+    fn exact_shapley_recovers_additive_contributions() {
+        let values = (0..8)
+            .map(|mask| {
+                Some(
+                    0.1
+                        + if mask & 1 != 0 { 0.1 } else { 0.0 }
+                        + if mask & 2 != 0 { 0.2 } else { 0.0 }
+                        + if mask & 4 != 0 { 0.3 } else { 0.0 },
+                )
+            })
+            .collect::<Vec<_>>();
+        let result = exact_shapley_values(&values).unwrap();
+        assert!((result[0] - 0.1).abs() < 1e-12);
+        assert!((result[1] - 0.2).abs() < 1e-12);
+        assert!((result[2] - 0.3).abs() < 1e-12);
+        assert!((result.iter().sum::<f64>() - (values[7].unwrap() - values[0].unwrap())).abs() < 1e-12);
+    }
+
+    #[test]
+    fn exact_shapley_splits_a_fully_complementary_team_contribution() {
+        let values = vec![Some(0.0), Some(0.0), Some(0.0), Some(1.0)];
+        let result = exact_shapley_values(&values).unwrap();
+        assert!((result[0] - 0.5).abs() < 1e-12);
+        assert!((result[1] - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn exact_shapley_rejects_non_identifiable_or_malformed_coalitions() {
+        assert!(exact_shapley_values(&[Some(0.0), None]).is_err());
+        assert!(exact_shapley_values(&[Some(0.0), Some(1.1)]).is_err());
+        assert!(exact_shapley_values(&[Some(0.0), Some(0.5), Some(0.7)]).is_err());
+    }
+
+    #[test]
+    fn capability_amplification_uses_independent_participant_cluster_bootstrap() {
+        let collaborative_pre = [0.3, 0.4, 0.5];
+        let collaborative_post = [0.7, 0.8, 0.9];
+        let control_pre = [0.3, 0.4, 0.5, 0.6];
+        let control_post = [0.4, 0.5, 0.6, 0.7];
+        let first = participant_capability_amplification(
+            &collaborative_pre,
+            &collaborative_post,
+            &control_pre,
+            &control_post,
+            2_000,
+            42,
+        )
+        .unwrap();
+        let second = participant_capability_amplification(
+            &collaborative_pre,
+            &collaborative_post,
+            &control_pre,
+            &control_post,
+            2_000,
+            42,
+        )
+        .unwrap();
+        assert!((first.mean_gain_difference - 0.3).abs() < 1e-12);
+        assert_eq!(first.ci_95_lower, second.ci_95_lower);
+        assert_eq!(first.ci_95_upper, second.ci_95_upper);
+        assert_eq!(first.collaborative_participants, 3);
+        assert_eq!(first.control_participants, 4);
+    }
+
+    #[test]
+    fn capability_amplification_rejects_unmatched_or_invalid_learning_scores() {
+        assert!(participant_capability_amplification(
+            &[0.2],
+            &[0.4],
+            &[0.2, 0.3],
+            &[0.3, 0.4],
+            1_000,
+            7,
+        )
+        .is_err());
+        assert!(participant_capability_amplification(
+            &[0.2, 0.3],
+            &[0.4, f64::NAN],
+            &[0.2, 0.3],
+            &[0.3, 0.4],
+            1_000,
+            7,
+        )
+        .is_err());
     }
 
     #[test]
