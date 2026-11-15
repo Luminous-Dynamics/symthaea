@@ -385,7 +385,10 @@
     {
       "id": "CONTRA-ROTATING-ML-SCREEN-2026-11",
       "title": "Performance prediction of contra-rotating propellers based on artificial neural network and optimisation technique",
-      "authors": [],
+      "authors": [
+        "Mina Tadros",
+        "Evangelos Boulougouris"
+      ],
       "venue": "Journal of Marine Engineering & Technology",
       "published_on": "2026-11-05",
       "doi": "10.1080/20464177.2026.2763301",
