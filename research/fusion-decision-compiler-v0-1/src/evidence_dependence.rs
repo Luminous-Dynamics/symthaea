@@ -191,19 +191,19 @@ pub fn compare_observable_dependencies(
 
         shared_dependencies.sort_by(|left, right| {
             (
-                left.kind,
                 left.first_node_id.as_str(),
                 left.first_revision.as_str(),
                 left.second_node_id.as_str(),
                 left.second_revision.as_str(),
+                left.kind,
                 left.match_basis,
             )
                 .cmp(&(
-                    right.kind,
                     right.first_node_id.as_str(),
                     right.first_revision.as_str(),
                     right.second_node_id.as_str(),
                     right.second_revision.as_str(),
+                    right.kind,
                     right.match_basis,
                 ))
         });
