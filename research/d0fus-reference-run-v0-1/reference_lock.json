@@ -13,6 +13,6 @@
   "wheel_sha256": "068a865a979367b1c74a93138bc16384e00d7d85c2dfe7e6d8b5a212d5885847",
   "sdist_filename": "d0fus-3.2.0.tar.gz",
   "sdist_sha256": "02a81bbead2f7bc87b7f0f981687e784acfce27dea1090c9a2931ecd44e2fd40",
-  "expected_run_output_count": 165,
+  "documentation_declared_run_output_count": 165,
   "python_minor": "3.11"
 }
