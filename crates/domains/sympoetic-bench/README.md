@@ -2,7 +2,7 @@
 
 Rust validation and measurement core for SympoeticBench v0.1, including a proposal-only agent decision protocol guard.
 
-This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The 15-scenario development corpus includes partner coordination, adaptive intervention, and capability-amplification scenarios.
+This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The 16-scenario development corpus includes partner coordination, adaptive intervention, capability amplification, and epistemic resilience scenarios.
 
 ## Commands
 
@@ -42,6 +42,8 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 - File and payload digests use SHA-256 over the exact file or payload bytes supplied by the recorder.
 - `trace_digest`, when present, is SHA-256 over the trace JSON parsed into a `serde_json::Value`, with the `trace_digest` key removed, then serialized by `serde_json` (deterministic map-key ordering). This is the v0.1 canonicalization rule; it is not claimed to be RFC 8785.
 - Scenario, trace, artifact, prompt, and environment digests in a scorecard identify the exact inputs used. The scorer revision must identify the scoring implementation.
+
+The epistemic resilience track also reports confidence calibration (Brier/ECE), metacognitive sensitivity (AUC), selective accuracy, human-first attempts, AI core-step substitution, and human verification rates. These measures are separate; no single cognitive-sovereignty aggregate is asserted.
 
 ## Agent decision bridge
 
