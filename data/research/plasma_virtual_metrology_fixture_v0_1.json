@@ -3260,6 +3260,642 @@
       "material_in_model_domain": true,
       "expected_disposition": "REJECTED",
       "run_timestamp_unix_ms": 1794528000000
+    },
+    {
+      "scenario_id": "nitrogen-low-angle-unqualified-adhesive",
+      "service_profile_id": "PP_GRADE_A_SOUDAL_FIX_ALL_FLEXI",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-nitrogen-low-angle-unqualified-adhesive",
+      "specimen_id": "specimen-nitrogen-low-angle-unqualified-adhesive",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-low-angle-unqualified-adhesive-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-low-angle-unqualified-adhesive-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-low-angle-unqualified-adhesive-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-low-angle-unqualified-adhesive-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-nitrogen-low-angle-unqualified-adhesive-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-low-angle-unqualified-adhesive-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-nitrogen-low-angle-unqualified-adhesive",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 0.3,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          0.2,
+          0.4
+        ],
+        "probability_of_meeting_acceptance": 0.02,
+        "predicted_disposition": "ABSTAIN",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "manifest-nitrogen-low-angle-unqualified-adhesive",
+          "partition_receipt_digest": "sha256:partition-nitrogen-low-angle-unqualified-adhesive",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": false,
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000,
+      "surface_diagnostics": {
+        "method_id": "SYNTHETIC_D5946_CONTACT_ANGLE",
+        "adhesive_system_id": "SYNTHETIC_SOUDAL_FIX_ALL_FLEXI",
+        "process_gas": "N2",
+        "water_contact_angle_deg": 17,
+        "treatment_head_speed_mm_per_min": 2000,
+        "damage_status": "NONE_OBSERVED",
+        "evidence_class": "SYNTHETIC_DIAGNOSTIC"
+      }
+    },
+    {
+      "scenario_id": "argon-higher-angle-unqualified-adhesive",
+      "service_profile_id": "PP_GRADE_A_SOUDAL_FIX_ALL_FLEXI",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-argon-higher-angle-unqualified-adhesive",
+      "specimen_id": "specimen-argon-higher-angle-unqualified-adhesive",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-argon-higher-angle-unqualified-adhesive-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-argon-higher-angle-unqualified-adhesive-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-argon-higher-angle-unqualified-adhesive-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-argon-higher-angle-unqualified-adhesive-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-argon-higher-angle-unqualified-adhesive-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-argon-higher-angle-unqualified-adhesive-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-argon-higher-angle-unqualified-adhesive",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 0.8,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          0.6,
+          1
+        ],
+        "probability_of_meeting_acceptance": 0.03,
+        "predicted_disposition": "ABSTAIN",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "manifest-argon-higher-angle-unqualified-adhesive",
+          "partition_receipt_digest": "sha256:partition-argon-higher-angle-unqualified-adhesive",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": false,
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000,
+      "surface_diagnostics": {
+        "method_id": "SYNTHETIC_D5946_CONTACT_ANGLE",
+        "adhesive_system_id": "SYNTHETIC_SOUDAL_FIX_ALL_FLEXI",
+        "process_gas": "Ar",
+        "water_contact_angle_deg": 60,
+        "treatment_head_speed_mm_per_min": 2000,
+        "damage_status": "NONE_OBSERVED",
+        "evidence_class": "SYNTHETIC_DIAGNOSTIC"
+      }
+    },
+    {
+      "scenario_id": "nitrogen-overexposure-surface-damage",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-nitrogen-overexposure-surface-damage",
+      "specimen_id": "specimen-nitrogen-overexposure-surface-damage",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-overexposure-surface-damage-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-overexposure-surface-damage-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-overexposure-surface-damage-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-nitrogen-overexposure-surface-damage-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-nitrogen-overexposure-surface-damage-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:energy-nitrogen-overexposure-surface-damage-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-nitrogen-overexposure-surface-damage",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 11.6,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          10.8,
+          12.1
+        ],
+        "probability_of_meeting_acceptance": 0.99,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "manifest-nitrogen-overexposure-surface-damage",
+          "partition_receipt_digest": "sha256:partition-nitrogen-overexposure-surface-damage",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "REJECTED",
+      "run_timestamp_unix_ms": 1794528000000,
+      "surface_diagnostics": {
+        "method_id": "SYNTHETIC_D5946_CONTACT_ANGLE",
+        "adhesive_system_id": "SYNTHETIC_ADHESIVE_A",
+        "process_gas": "N2",
+        "water_contact_angle_deg": 17,
+        "treatment_head_speed_mm_per_min": 500,
+        "damage_status": "OBSERVED",
+        "evidence_class": "SYNTHETIC_DIAGNOSTIC"
+      }
     }
   ],
   "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
