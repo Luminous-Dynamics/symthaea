@@ -1032,10 +1032,10 @@ mod tests {
         let mut value = fixture_value();
         value["gold_overlay"]["required_revalidation_by_epoch"][0]["required_revalidation_obligations"]
             .as_array_mut().expect("gold set")
-            .retain(|item| item != "build-repro");
+            .retain(|item| item.as_str() != Some("build-repro"));
         value["gold_overlay"]["required_revalidation_by_epoch"][0]["reason_by_obligation"]
             .as_array_mut().expect("reasons")
-            .retain(|item| item["obligation_id"] != "build-repro");
+            .retain(|item| item["obligation_id"].as_str() != Some("build-repro"));
         let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
         assert!(error.contains("synthetic gold impact disagrees with dependency-implied impact"));
     }
@@ -1064,7 +1064,7 @@ mod tests {
         let old_source = value["candidate_view"]["baseline"]["source_tree_digest"].clone();
         value["candidate_traces"][0]["checkpoints"][0]["fresh_receipts"]
             .as_array_mut().expect("fresh receipts")
-            .retain(|receipt| receipt["obligation_id"] != "build-repro");
+            .retain(|receipt| receipt["obligation_id"].as_str() != Some("build-repro"));
         let reused = value["candidate_traces"][0]["checkpoints"][0]["reused_receipts"]
             .as_array_mut().expect("reused receipts");
         let mut stale = value["candidate_view"]["initial_receipts"][0].clone();
