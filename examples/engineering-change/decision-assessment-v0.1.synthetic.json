@@ -1,0 +1,151 @@
+{
+  "schema_version": "engineering-decision-assessment-v0.1",
+  "assessment_id": "synthetic-eng-decision-001",
+  "artifact_visibility": "public_synthetic",
+  "decision_episode": {
+    "case_id": "EC-DECISION-001",
+    "pair_id": "EC-PAIR-001",
+    "baseline_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "proposed_change_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "target_world_time": {
+      "state": "known",
+      "instant": "2026-11-12T12:00:00Z",
+      "observation_ref": "synthetic://clock/T"
+    },
+    "decision_frontier": {
+      "instant": "2026-11-13T09:00:00Z",
+      "boundary": "inclusive",
+      "frontier_ref": "synthetic://frontier/K-001",
+      "ordering_model": "single_source_authoritative_clock_or_monotonic_sequence",
+      "causal_frontier_state": "not_required"
+    },
+    "selected_action": "revalidate",
+    "selected_action_detail": "Synthetic change requires revalidation of one affected operating envelope."
+  },
+  "candidate_commitment": {
+    "state": "sealed",
+    "decision_packet_sha256": "6d58b234444f319e62be3642c7261a01a0dee2b8d90cba9482d6ab37e8895c86",
+    "evidence_manifest_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "action_set_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "loss_model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "committed_at": "2026-11-13T08:59:30Z",
+    "outcome_disclosure_state": "not_disclosed_before_commit"
+  },
+  "owner_receipts": {
+    "temporal_admissibility": {
+      "owner_id": "symthaea-temporal-v1.1",
+      "artifact_ref": "synthetic://symthaea-temporal-v1.1/receipt-001",
+      "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "contract_version": "0.1",
+      "native_status": "pass",
+      "claim_ceiling": "synthetic_known_answer_only"
+    },
+    "run_context_visibility": {
+      "owner_id": "symthaea-run-context-v1",
+      "artifact_ref": "synthetic://symthaea-run-context-v1/receipt-001",
+      "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "contract_version": "0.1",
+      "native_status": "pass",
+      "claim_ceiling": "synthetic_known_answer_only"
+    },
+    "evidence_use_validity": {
+      "owner_id": "symthaea-use-validity-v1",
+      "artifact_ref": "synthetic://symthaea-use-validity-v1/receipt-001",
+      "artifact_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "contract_version": "0.1",
+      "native_status": "pass",
+      "claim_ceiling": "synthetic_known_answer_only"
+    },
+    "engineering_applicability": {
+      "owner_id": "symthaea-engineering-gold-v1.1",
+      "artifact_ref": "synthetic://symthaea-engineering-gold-v1.1/receipt-001",
+      "artifact_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "contract_version": "0.1",
+      "native_status": "pass",
+      "claim_ceiling": "synthetic_known_answer_only"
+    },
+    "causal_frontier": {
+      "owner_id": "mycelix-causal-frontier-v2",
+      "artifact_ref": "synthetic://mycelix-causal-frontier-v2/receipt-001",
+      "artifact_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "contract_version": "0.1",
+      "native_status": "pass",
+      "claim_ceiling": "synthetic_known_answer_only"
+    },
+    "action_policy": {
+      "owner_id": "symthaea-risk-action-v0.1",
+      "artifact_ref": "synthetic://symthaea-risk-action-v0.1/receipt-001",
+      "artifact_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "contract_version": "0.1",
+      "native_status": "pass",
+      "claim_ceiling": "synthetic_known_answer_only"
+    }
+  },
+  "axes": {
+    "process_admissibility": {
+      "result": "pass",
+      "reason_codes": [],
+      "receipt_ref": "synthetic://process_admissibility/receipt-001"
+    },
+    "evidence_use_validity": {
+      "result": "pass",
+      "reason_codes": [],
+      "receipt_ref": "synthetic://evidence_use_validity/receipt-001"
+    },
+    "engineering_applicability": {
+      "result": "pass",
+      "reason_codes": [],
+      "receipt_ref": "synthetic://engineering_applicability/receipt-001"
+    },
+    "causal_justification": {
+      "result": "pass",
+      "reason_codes": [],
+      "receipt_ref": "synthetic://causal_justification/receipt-001"
+    },
+    "action_policy": {
+      "result": "pass",
+      "reason_codes": [],
+      "receipt_ref": "synthetic://action_policy/receipt-001"
+    }
+  },
+  "defeater_analysis": {
+    "state": "complete",
+    "protocol_ref": "synthetic://protocol/defeater-search-v0.1",
+    "protocol_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "findings": [
+      {
+        "defeater_id": "DEF-001",
+        "claim_ref": "synthetic://claim/operating-envelope",
+        "category": "measurement_or_uncertainty",
+        "severity": "minor",
+        "state": "accepted_residual",
+        "evidence_refs": [
+          "synthetic://evidence/uncertainty-bound"
+        ],
+        "residual_rationale": "Residual uncertainty is explicitly bounded and does not invalidate the required revalidation disposition."
+      }
+    ]
+  },
+  "counterfactual_adjudication": {
+    "relation": "not_applicable",
+    "result": "not_applicable"
+  },
+  "outcome": {
+    "state": "not_observed"
+  },
+  "evaluator": {
+    "evaluator_id": "synthetic-reference-evaluator-v0.1",
+    "build_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+    "assessed_at": "2026-11-13T09:01:00Z",
+    "assessment_kind": "synthetic_known_answer",
+    "independent_assessment": false
+  },
+  "assessment_result": {
+    "decision_support": "supported_at_K",
+    "critical_gate_failure_count": 0,
+    "indeterminate_axis_count": 0,
+    "non_authoritative": true,
+    "effect_authority": "none"
+  },
+  "claim_ceiling": "bounded_engineering_decision_assessment_no_release_or_effect_authority"
+}

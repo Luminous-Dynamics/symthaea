@@ -53,4 +53,6 @@ of writing; check the generated inventory rather than trusting this list if it m
 - `symthaea-ngspice-bridge`: dry-run ngspice circuit backend boundary.
 - `symthaea-openfoam-bridge`: dry-run OpenFOAM CFD backend boundary.
 
+- `symthaea-decision-assessment`: research-only, non-authoritative composition of qualified temporal, run-context, evidence-use, applicability, causal-frontier and action-policy receipts. It cannot authorize release or external effects; it remains unclassified and is not a production dependency until its verification gates are executed.
+
 See `docs/engineering/SYMTHAEA_ENGINEERING_ROADMAP.md` for the 18-month plan.
