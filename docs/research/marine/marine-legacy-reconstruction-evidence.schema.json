@@ -551,7 +551,8 @@
                   "pixel",
                   "engineering_coordinate",
                   "uncertainty",
-                  "source_note"
+                  "source_note",
+                  "engineering_axis"
                 ],
                 "properties": {
                   "pixel": {
@@ -566,6 +567,14 @@
                   "source_note": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "engineering_axis": {
+                    "enum": [
+                      "LONGITUDINAL",
+                      "TRANSVERSE",
+                      "VERTICAL",
+                      "OTHER"
+                    ]
                   }
                 }
               }
