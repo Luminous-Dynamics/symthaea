@@ -815,3 +815,23 @@ The target requires matched feed/composition/pressure, product purity and pressu
 This is an intentionally difficult Pareto challenge. The published 150 g/h point is at 92.4% conversion, not >99%; the benchmark refuses to combine those attributes. The target is a research objective, not published performance or a Luminous result.
 
 Four new controls refuse omitted thermal auxiliaries, unmeasured recoverable enthalpy, operating-point mismatch and non-closing/double-counted thermal balances.
+
+
+## 9.24 Plasma-to-electrocatalyst N2 vibrational-state transfer — 2026-11-15
+
+The JACS 2026 plasma-electrocatalytic nitrogen reduction source (DOI 10.1021/jacs.6c04148) is now represented with an explicit state-transfer evidence chain. It keeps three physical observation classes separate:
+- 15N2 isotope attribution and plasma/electrolysis on-off controls;
+- in-situ Raman observation of N-N-containing surface intermediates;
+- measured NH3 area production rate and electrochemical Faradaic efficiency.
+
+It separately records model-derived estimates: effective N2 vibrational-state temperature near 4,300 K; estimated 11.8% population in v=4–8; and modelled persistence toward the cathode. Those are not directly measured catalyst-interface populations or fluxes.
+
+### New target: NH3-PLASMA-N2V-TRANSFER-CAUSAL-001
+
+The benchmark requires state-resolved N2(v) at the catalyst interface or an independently validated measurement operator, uncertainty in discharge-to-interface transfer, isotope-attributed product, matched thermal/electrical controls and full grid-to-accepted-NH3 accounting. It explicitly refuses:
+- model-derived state estimates promoted to physical interface measurements;
+- discharge-exit population substituted for catalyst-interface population;
+- Raman intermediate signatures substituted for quantitative flux;
+- isotope attribution or Faradaic efficiency promoted to a causal mechanism or full-system energy claim.
+
+This is a mechanism/evidence qualification target, not a yield target or achieved result. The physical interface-resolved population/flux and its uncertainty remain an open research gap.
