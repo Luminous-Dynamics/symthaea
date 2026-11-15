@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod manifest;
 mod plasma_energy_audit;
 mod plasma_surface_bondability;
+mod plasma_ml_generalization;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -91,6 +92,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Offline validator for synthetic grouped plasma-ML split integrity and leakage controls.
+    #[command(name = "plasma-ml-generalization-audit")]
+    PlasmaMlGeneralizationAudit {
+        #[arg(long, default_value = "data/research/plasma_ml_generalization_fixture_v0_1.json")]
+        fixture: PathBuf,
+        /// Emit stable structured JSON instead of the human-readable summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -155,6 +166,10 @@ fn main() -> anyhow::Result<()> {
         Commands::PlasmaSurfaceBondabilityAudit { fixture, json } => {
             let report = plasma_surface_bondability::run_audit(&fixture)?;
             plasma_surface_bondability::print_report(&report, json)?;
+        }
+        Commands::PlasmaMlGeneralizationAudit { fixture, json } => {
+            let report = plasma_ml_generalization::run_audit(&fixture)?;
+            plasma_ml_generalization::print_report(&report, json)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
