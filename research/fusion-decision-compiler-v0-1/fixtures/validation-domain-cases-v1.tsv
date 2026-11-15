@@ -1,0 +1,18 @@
+# Synthetic-only split-integrity fixtures; no physical evidence or model score is represented.
+case_id|expected|mutation
+same-facility-new-operating-point|ACCEPT|valid_same_facility_new_op
+different-case-same-facility|ACCEPT|valid_new_case
+different-facility|ACCEPT|valid_new_facility
+same-domain-scope|REJECT|no_scope_difference
+calibration-episode-overlap|REJECT|calibration_episode_overlap
+calibration-dataset-reuse|REJECT|calibration_dataset_reuse
+calibration-artifact-reuse|REJECT|calibration_artifact_reuse
+holdout-used-for-training|REJECT|holdout_training_leak
+holdout-used-for-selection|REJECT|holdout_selection_leak
+solver-output-posed-as-measurement|REJECT|synthetic_test_stand
+missing-measurement-uncertainty|REJECT|missing_uncertainty
+geometry-outside-model-domain|REJECT|geometry_outside_domain
+unsupported-intended-use|REJECT|unsupported_use
+stale-model-domain-revision|REJECT|model_revision_mismatch
+holdout-not-withheld|REJECT|not_withheld
+test-holdout-episode-overlap|REJECT|test_holdout_episode_overlap
