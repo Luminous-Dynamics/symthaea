@@ -104,7 +104,15 @@
               "human_monitoring",
               "human_reflection",
               "independent_reasoning_attempt",
-              "ai_core_step_supplied"
+              "ai_core_step_supplied",
+              "team_cycle_started",
+              "shared_plan_revised",
+              "membership_change",
+              "role_transition",
+              "team_reflection",
+              "authority_revalidated",
+              "team_state_snapshot",
+              "memory_policy_changed"
             ]
           },
           "parent_event_ids": {
