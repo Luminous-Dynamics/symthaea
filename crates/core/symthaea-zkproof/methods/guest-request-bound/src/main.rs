@@ -6,7 +6,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
 use risc0_zkvm::guest::env;
-use symthaea_zkproof_core::{
+use symthaea_zkproof_request_bound_core::{
     BalanceProofRequestBoundInputV1, BalanceProofRequestBoundOutputV1,
 };
 
