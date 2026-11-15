@@ -45,8 +45,22 @@ jobs:
       - name: Format check
         run: cargo fmt --check -p symthaea-marine-geometry
 
-      - name: Unit tests
-        run: cargo test --locked -p symthaea-marine-geometry
+      - name: Unit tests and lockfile-delta diagnosis (temporary)
+        shell: bash
+        run: |
+          set +e
+          cargo test -p symthaea-marine-geometry
+          status=$?
+          set -e
+          echo "::group::Cargo.lock delta from diagnostic resolution"
+          git --no-pager diff -- Cargo.lock
+          echo "::endgroup::"
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+
+      - name: Reject uncommitted lockfile drift
+        run: git diff --exit-code -- Cargo.lock
 
       - name: Clippy
         run: cargo clippy --locked -p symthaea-marine-geometry --all-targets -- -D warnings
