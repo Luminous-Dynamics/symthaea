@@ -440,3 +440,33 @@ The station-flux record also declares `maximum_observation_skew_ms`. The auditor
 maximum observed timestamp spread across fluid density and both complete station planes.
 A transient record that exceeds this tolerance is INCOMPARABLE, even when its integrated
 flows happen to match. The observation-skew negative control is part of the focused workflow.
+
+
+## Matched-test waterjet performance composition
+
+Run the independent-test-path known-answer composition:
+
+~~~sh
+cargo run --bin pwc-waterjet-performance-composition -- \
+  ../../docs/research/marine/pwc-waterjet-performance-composition-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-pwc-waterjet-composition-independent-v0.1.0.json
+~~~
+
+The integrated-system-test path is a separate contract. It consumes measured system
+shaft power and effective pump power without inventing pump-loop free-stream efficiency,
+installation efficiency, or separate inlet/nozzle loss coefficients:
+
+~~~sh
+cargo run --bin pwc-waterjet-performance-composition -- \
+  ../../docs/research/marine/pwc-waterjet-performance-composition-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-pwc-waterjet-composition-integrated-v0.1.0.json
+~~~
+
+Both paths join propulsion NVR/interaction measurements, station-1/station-7 energy flux,
+configuration/scale and operating-point context. The independent path also verifies
+inlet/nozzle loss arithmetic and the two effective-pump-power identities, and cross-checks
+`eta_P0 * eta_inst` against `P_PE / P_D`. A system/operating-point mismatch is
+INCOMPARABLE; a zero NVR is unevaluable; an efficiency above unity is BLOCKED, never clipped.
+
+The seven-stage product remains a synthetic known-answer calculation only. Full method and
+source equations: `../../docs/research/marine/PWC-WATERJET-PERFORMANCE-COMPOSITION-001.md`.
