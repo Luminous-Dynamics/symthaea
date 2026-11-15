@@ -245,6 +245,7 @@ pub enum AudioContinuityErrorV1 {
     NonCanonicalWindows,
     EmptyEditSupport,
     InvalidAttemptAccounting,
+    NoAudioMutation,
     OffSupportMutation,
     ContinuationAfterBlockedStep,
     SerializationFailure,
@@ -268,6 +269,7 @@ impl fmt::Display for AudioContinuityErrorV1 {
             Self::NonCanonicalWindows => "windows must be sorted and non-overlapping",
             Self::EmptyEditSupport => "each edit step needs at least one semantic edit region",
             Self::InvalidAttemptAccounting => "candidate attempt counters are inconsistent",
+            Self::NoAudioMutation => "an edit step did not change any PCM sample",
             Self::OffSupportMutation => "one or more PCM samples changed outside declared edit and transition support",
             Self::ContinuationAfterBlockedStep => "a later edit cannot launder a failed or unknown audio gate",
             Self::SerializationFailure => "canonical evidence serialization failed",
@@ -622,6 +624,9 @@ pub fn evaluate_audio_sequence_v1(
                 }
             }
         }
+        if changed_sample_values == 0 {
+            return Err(AudioContinuityErrorV1::NoAudioMutation);
+        }
         if off_support_changes != 0 {
             return Err(AudioContinuityErrorV1::OffSupportMutation);
         }
@@ -869,6 +874,21 @@ mod tests {
     }
 
     #[test]
+    fn unchanged_output_cannot_be_counted_as_a_completed_edit() {
+        let original = source(128, 1);
+        let window = FrameWindowV1 { start_frame: 40, end_frame: 64 };
+        let unchanged = original.clone();
+        assert_eq!(
+            evaluate_audio_sequence_v1(
+                &request(&original, 1),
+                &original,
+                &[step(1, &original, unchanged, window)],
+            ),
+            Err(AudioContinuityErrorV1::NoAudioMutation)
+        );
+    }
+
+    #[test]
     fn explicitly_declared_transition_support_allows_only_that_extra_region() {
         let original = source(128, 1);
         let edit = FrameWindowV1 { start_frame: 40, end_frame: 64 };
@@ -942,7 +962,7 @@ mod tests {
                 &original,
                 &[step(1, &original, output, window)],
             ),
-            Err(AudioContinuityErrorV1::InvalidSampleLayout)
+            Err(AudioContinuityErrorV1::FrameCountMismatch)
         );
     }
 
