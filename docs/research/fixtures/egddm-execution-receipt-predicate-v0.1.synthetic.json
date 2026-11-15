@@ -1,120 +1,132 @@
 {
-  "predicate_version": "0.1.0",
-  "receipt_id": "synthetic-receipt-runner-0001",
-  "claim_kind": "runner_execution",
-  "subject_scope": {
-    "repository_full_name": "synthetic/decision-api",
-    "revision_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "configuration_world_digest": {
-      "algorithm": "sha256",
-      "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "synthetic/decision-api/compatibility-target",
+      "digest": {
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      }
     }
-  },
-  "obligation": {
-    "obligation_id": "api-contract",
-    "check_id": "api-compatibility",
-    "check_kind": "compatibility",
-    "outcome": "pass",
-    "critical": true
-  },
-  "producer": {
-    "role": "runner",
-    "workload_identity": "spiffe://synthetic.example/runner/job/0001",
-    "issuer_uri": "https://attestor.synthetic.example/",
-    "signing_key_reference": "test-key-not-present",
-    "identity_provider": "synthetic-workload-idp"
-  },
-  "execution": {
-    "attempt_id": "attempt-0001",
-    "invocation_id": "invocation-0001",
-    "runner_image_digest": {
-      "algorithm": "sha256",
-      "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  ],
+  "predicateType": "https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1",
+  "predicate": {
+    "predicate_version": "0.1.0",
+    "receipt_id": "synthetic-receipt-runner-0001",
+    "claim_kind": "runner_execution",
+    "subject_scope": {
+      "repository_full_name": "synthetic/decision-api",
+      "revision_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "configuration_world_digest": {
+        "algorithm": "sha256",
+        "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
     },
-    "toolchain_digest": {
-      "algorithm": "sha256",
-      "value": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    "obligation": {
+      "obligation_id": "api-contract",
+      "check_id": "api-compatibility",
+      "check_kind": "compatibility",
+      "outcome": "pass",
+      "critical": true
     },
-    "harness_digest": {
-      "algorithm": "sha256",
-      "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    "producer": {
+      "role": "runner",
+      "workload_identity": "spiffe://synthetic.example/runner/job/0001",
+      "issuer_uri": "https://attestor.synthetic.example/",
+      "signing_key_reference": "test-key-not-present",
+      "identity_provider": "synthetic-workload-idp"
     },
-    "command_digest": {
-      "algorithm": "sha256",
-      "value": "1111111111111111111111111111111111111111111111111111111111111111"
+    "execution": {
+      "attempt_id": "attempt-0001",
+      "invocation_id": "invocation-0001",
+      "runner_image_digest": {
+        "algorithm": "sha256",
+        "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "toolchain_digest": {
+        "algorithm": "sha256",
+        "value": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "harness_digest": {
+        "algorithm": "sha256",
+        "value": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "command_digest": {
+        "algorithm": "sha256",
+        "value": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "test_input_digest": {
+        "algorithm": "sha256",
+        "value": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "isolation_profile_digest": {
+        "algorithm": "sha256",
+        "value": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      "network_policy_digest": {
+        "algorithm": "sha256",
+        "value": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "environment_digest": {
+        "algorithm": "sha256",
+        "value": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "workflow_run_id": "synthetic-run-0001",
+      "workflow_attempt": 1,
+      "test_result": {
+        "statement_digest": {
+          "algorithm": "sha256",
+          "value": "9999999999999999999999999999999999999999999999999999999999999999"
+        },
+        "predicate_type": "https://in-toto.io/attestation/test-result/v0.1",
+        "subject_digest": {
+          "algorithm": "sha256",
+          "value": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      }
     },
-    "test_input_digest": {
-      "algorithm": "sha256",
-      "value": "2222222222222222222222222222222222222222222222222222222222222222"
+    "observation": {
+      "started_at": "2026-11-15T08:00:00Z",
+      "completed_at": "2026-11-15T08:00:12Z",
+      "observed_at": "2026-11-15T08:00:12Z",
+      "available_at": "2026-11-15T08:00:13Z",
+      "exit_code": 0,
+      "artifact_digests": [
+        {
+          "algorithm": "sha256",
+          "value": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      ],
+      "log_digest": {
+        "algorithm": "sha256",
+        "value": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "grader_report_digest": {
+        "algorithm": "sha256",
+        "value": "8888888888888888888888888888888888888888888888888888888888888888"
+      }
     },
-    "isolation_profile_digest": {
-      "algorithm": "sha256",
-      "value": "3333333333333333333333333333333333333333333333333333333333333333"
-    },
-    "network_policy_digest": {
-      "algorithm": "sha256",
-      "value": "4444444444444444444444444444444444444444444444444444444444444444"
-    },
-    "environment_digest": {
-      "algorithm": "sha256",
-      "value": "5555555555555555555555555555555555555555555555555555555555555555"
-    },
-    "workflow_run_id": "synthetic-run-0001",
-    "workflow_attempt": 1,
-    "test_result": {
-      "statement_digest": {
+    "authority": {
+      "decision_id": "synthetic-authority-decision-0001",
+      "policy_digest": {
         "algorithm": "sha256",
         "value": "9999999999999999999999999999999999999999999999999999999999999999"
       },
-      "predicate_type": "https://in-toto.io/attestation/test-result/v0.1",
-      "subject_digest": {
+      "permitted_scope": "synthetic/decision-api@aaaaaaaa...:api-contract",
+      "operation": "run_compatibility_check",
+      "valid_from": "2026-11-15T07:59:00Z",
+      "valid_until": "2026-11-15T09:00:00Z"
+    },
+    "anti_replay": {
+      "challenge_id": "synthetic-challenge-0001",
+      "nonce_digest": {
         "algorithm": "sha256",
-        "value": "6666666666666666666666666666666666666666666666666666666666666666"
-      }
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "issued_at": "2026-11-15T07:59:00Z",
+      "expires_at": "2026-11-15T08:01:00Z",
+      "single_use": true,
+      "challenge_issuer": "synthetic-challenge-service"
     }
-  },
-  "observation": {
-    "started_at": "2026-11-15T08:00:00Z",
-    "completed_at": "2026-11-15T08:00:12Z",
-    "observed_at": "2026-11-15T08:00:12Z",
-    "available_at": "2026-11-15T08:00:13Z",
-    "exit_code": 0,
-    "artifact_digests": [
-      {
-        "algorithm": "sha256",
-        "value": "6666666666666666666666666666666666666666666666666666666666666666"
-      }
-    ],
-    "log_digest": {
-      "algorithm": "sha256",
-      "value": "7777777777777777777777777777777777777777777777777777777777777777"
-    },
-    "grader_report_digest": {
-      "algorithm": "sha256",
-      "value": "8888888888888888888888888888888888888888888888888888888888888888"
-    }
-  },
-  "authority": {
-    "decision_id": "synthetic-authority-decision-0001",
-    "policy_digest": {
-      "algorithm": "sha256",
-      "value": "9999999999999999999999999999999999999999999999999999999999999999"
-    },
-    "permitted_scope": "synthetic/decision-api@aaaaaaaa...:api-contract",
-    "operation": "run_compatibility_check",
-    "valid_from": "2026-11-15T07:59:00Z",
-    "valid_until": "2026-11-15T09:00:00Z"
-  },
-  "anti_replay": {
-    "challenge_id": "synthetic-challenge-0001",
-    "nonce_digest": {
-      "algorithm": "sha256",
-      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    },
-    "issued_at": "2026-11-15T07:59:00Z",
-    "expires_at": "2026-11-15T08:01:00Z",
-    "single_use": true,
-    "challenge_issuer": "synthetic-challenge-service"
   }
 }
