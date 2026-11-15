@@ -93,6 +93,13 @@ fn base_scorecard() -> Scorecard {
             collaboration_gap: Some(-0.1),
             partner_order_sensitivity: Some(0.02),
             handoff_recovery_rate: Some(0.9),
+            intervention_appropriateness: Some(0.9),
+            unnecessary_intervention_rate: Some(0.05),
+            missed_critical_intervention_rate: Some(0.02),
+            intervention_regret: Some(0.1),
+            participant_capability_gain_delta: Some(0.2),
+            delayed_retention_gain_delta: Some(0.15),
+            transfer_gain_delta: Some(0.1),
         },
         hard_gates: HardGates {
             pass: true,
@@ -400,6 +407,18 @@ fn synergy_and_collaboration_gap_are_sign_consistent() {
     assert!((synergy + gap).abs() < 1e-12);
     assert!((partner_order_sensitivity(0.7, 0.6).unwrap() - 0.1).abs() < 1e-12);
     assert_eq!(handoff_recovery_rate(9, 10).unwrap(), Some(0.9));
+}
+
+#[test]
+fn scorecard_accepts_negative_capability_gain_deltas_and_rejects_out_of_range_values() {
+    let mut scorecard = base_scorecard();
+    scorecard.scores.participant_capability_gain_delta = Some(-0.2);
+    scorecard.scores.delayed_retention_gain_delta = Some(-0.1);
+    scorecard.scores.transfer_gain_delta = Some(0.05);
+    validate_scorecard(&scorecard).unwrap();
+
+    scorecard.scores.participant_capability_gain_delta = Some(2.1);
+    assert!(validate_scorecard(&scorecard).is_err());
 }
 
 #[test]
