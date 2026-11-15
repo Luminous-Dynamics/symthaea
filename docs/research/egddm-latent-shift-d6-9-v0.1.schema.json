@@ -154,7 +154,7 @@
           "minLength": 1
         },
         "cost_units": {
-          "type": "number",
+          "type": "integer",
           "minimum": 0
         },
         "expected_latency_seconds": {
