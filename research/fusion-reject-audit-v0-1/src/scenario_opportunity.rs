@@ -1495,13 +1495,20 @@ mod tests {
     #[test]
     fn familywise_error_is_allocated_across_union_and_scenario_strata() {
         let report = audit_scenario_opportunities(&plan()).unwrap();
-        assert_eq!(report.simultaneous_bound_count, 3);
+        assert_eq!(report.simultaneous_bound_count, 4);
         assert!((report.union.per_hypothesis_error_probability - (0.05 / 4.0)).abs() < 1e-12);
         assert!(
             (report.scenarios[0].per_hypothesis_error_probability - (0.05 / 4.0)).abs() < 1e-12
         );
         assert!(
             (report.scenarios[1].per_hypothesis_error_probability - (0.05 / 4.0)).abs() < 1e-12
+        );
+        let mut adjusted_base = plan().base_plan;
+        adjusted_base.familywise_confidence_level = 1.0 - (0.05 / 4.0);
+        let expected_feasibility = audit_rejected_candidates(&adjusted_base).unwrap();
+        assert_eq!(
+            report.feasible_recall_lower_bound,
+            expected_feasibility.feasible_recall_lower_bound
         );
     }
 
