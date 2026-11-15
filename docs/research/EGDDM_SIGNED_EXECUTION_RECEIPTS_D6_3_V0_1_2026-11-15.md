@@ -13,9 +13,10 @@ The next step should reuse existing signed-attestation and transparency standard
 ### Relevant standards and systems
 
 - **[IETF RFC 9943 — SCITT architecture](https://www.rfc-editor.org/rfc/rfc9943.html), June 2026.** Defines signed statements about supply-chain artifacts, registration with a transparency service, COSE receipts over verifiable data structures, and independently auditable statement history. The RFC's security considerations distinguish issuer authentication from transparency; a logged statement can still be false, and issuers can selectively omit statements.
-- **[in-toto Attestation Framework](https://github.com/in-toto/attestation), v1.2.** Separates predicate, statement, envelope and bundle layers. Its envelope guidance recommends DSSE v1.0, a signed payload type, and support for multiple signatures.
+- **[in-toto Attestation Framework](https://github.com/in-toto/attestation), v1.2.** Separates predicate, statement, envelope and bundle layers. Its envelope guidance recommends DSSE v1.0, a signed payload type, and support for multiple signatures. The bundle is a container, not an authenticated whole: each included envelope is authenticated separately; consumers must not trust ordering and must account for deletion, replay and injection.
 - **[Sigstore Rekor](https://docs.sigstore.dev/logging/overview/).** Provides a transparency log for signed software-supply-chain metadata, with inclusion proofs and integrity/consistency verification.
 - [Rekor transparency-log specification](https://github.com/sigstore/architecture-docs/blob/main/rekor-spec.md) describes inclusion proofs, signed checkpoints and consistency proofs for append-only history.
+- **[SLSA Build Provenance v1.2](https://slsa.dev/spec/v1.2/build-provenance).** The current approved predicate type is `https://slsa.dev/provenance/v1`. It binds output subjects to a build definition and run details, including `builder.id`, input parameters, resolved dependencies, invocation and start/finish times. `builder.id` describes the transitive closure of the trusted build platform, and consumers should accept only explicitly allowed signer/builder pairs.
 
 These are related but not identical formats. DSSE and COSE/SCITT must not be treated as interchangeable. The integration should profile a clear bridge between an in-toto Statement digest and the SCITT Signed Statement/receipt or Rekor entry, without silently inventing a new signature protocol.
 
@@ -56,11 +57,22 @@ The intended layering is:
 1. **Predicate:** the D6.3 schema captures the execution, obligation, exact scope, authority and anti-replay claims.
 2. **Statement:** an in-toto Statement binds the predicate to exact immutable subjects and a predicate type URI.
 3. **Envelope:** DSSE signs the authenticated payload type and serialized Statement. Multiple signatures can represent distinct issuers or approval roles.
-4. **Bundle:** package the envelope and associated verification material using an established bundle format.
+4. **Bundle:** package envelopes using the in-toto Bundle format. The bundle is not itself authenticated; verify each envelope, ignore unknown types, do not depend on line order, and detect required-but-missing attestations through policy and external custody.
 5. **Transparency:** submit the signed statement (or a precisely specified digest/representation) to a SCITT transparency service or an appropriate Rekor integration; retain the signed receipt, inclusion proof and checkpoint.
-6. **Independent verification:** verify the signature and identity, then verify transparency inclusion and log consistency, and finally apply the relying party's policy.
+6. **Independent verification:** verify every signature and identity, verify each transparency inclusion and log consistency, verify required signer/builder pairs and statement relationships, then apply the relying party's policy.
 
 RFC 9943 defines SCITT Signed Statements and COSE Receipts. The eventual mapping from the in-toto subject/predicate to SCITT's COSE profile must be explicit and interoperably tested. Do not simply place DSSE bytes inside an arbitrary COSE wrapper and call it SCITT.
+
+### SLSA provenance is a separate, standard predicate
+
+EGDDM should not redefine build provenance. For a `runner_execution` claim, the custom predicate now requires an `execution.slsa_provenance` reference containing:
+- the digest of a separately signed in-toto Statement;
+- the exact predicate type `https://slsa.dev/provenance/v1`; and
+- the digest of the output subject that must match one of that Statement's subjects.
+
+The referenced SLSA v1.2 predicate remains responsible for build provenance: `buildDefinition` (including build type, external parameters and resolved dependencies) and `runDetails` (including builder identity, invocation and execution times). EGDDM's predicate adds the information SLSA does not intend to define for this use case: obligation/check identity, temporal availability, active-requirement state, authority decision, anti-replay challenge and relationship to the evidence ledger.
+
+The verifier must validate both statements and their linkage. In particular, the trusted signer and `builder.id` are separate identities; accept only configured signer/builder pairs. A digest reference alone does not authenticate the SLSA statement, so its envelope and issuer identity must be independently verified.
 
 ## 4. Required signed predicate claims
 
@@ -69,7 +81,7 @@ The schema at `docs/research/egddm-execution-receipt-predicate-v0.1.schema.json`
 - **Exact subject scope:** repository identity, commit OID, tree OID, configuration-world digest, source and target artifact digests.
 - **Obligation:** obligation/check identity, check kind, criticality, outcome and optional active-requirement digest.
 - **Producer:** claim role, workload identity, issuer URI, identity provider and signing-key reference.
-- **Execution:** attempt and invocation IDs, runner image, toolchain, harness, command, test-input, isolation profile, network policy and environment digests.
+- **Execution:** attempt and invocation IDs, runner image, toolchain, harness, command, test-input, isolation profile, network policy and environment digests, plus a required digest reference to separately signed SLSA Build Provenance v1.2 for runner-execution claims.
 - **Observation:** start/completion, observed and available times, exit code, output/log/grader-report digests.
 - **Authority:** decision ID, policy digest, permitted scope, operation and validity interval.
 - **Anti-replay:** unique challenge ID, nonce digest, issue and expiry times, and single-use requirement.
@@ -124,12 +136,12 @@ Prefer offline verification when possible. Cache verified key material, identity
 
 ## 8. Implementation sequence
 
-1. Freeze the predicate schema and a canonical test vector.
-2. Select and pin an in-toto Statement/DSSE library; avoid hand-written signature-envelope code.
-3. Add signature verification and workload-identity policy as a separate crate.
+1. Freeze the EGDDM predicate schema, SLSA linkage rules and canonical cross-statement test vectors.
+2. Select and pin an in-toto Statement/DSSE library and a SLSA v1.2 verifier; avoid hand-written signature-envelope code.
+3. Add signature verification and workload-identity policy as a separate crate, including configured signer/builder pairs.
 4. Add a consume-once challenge issuer/ledger with crash and unknown-outcome recovery.
 5. Add SCITT COSE receipt and/or Rekor inclusion/consistency verification through supported libraries.
-6. Add independent grader receipt integration and role-separation rules.
+6. Add independent grader receipt integration and role-separation rules; verify every bundle entry independently and enforce required-attestation completeness.
 7. Add key rotation, revocation, expiry, policy updates and persisted checkpoint handling.
 8. Conduct independent security review before using signed receipts as deployment or payment gates.
 
