@@ -61,6 +61,10 @@ pub enum ScheduleAction {
     EventProduced {
         event_id: String,
         clock_domain: String,
+        basis_id: String,
+        epoch: String,
+        scale: String,
+        unit: String,
         source_timestamp_ns: u64,
         causal_predecessors: Vec<String>,
     },
@@ -241,7 +245,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
 
     let mut action_ids = BTreeSet::new();
     let mut ordinals = BTreeSet::new();
-    let mut clock_ticks = BTreeMap::<String, u64>::new();
+    let mut clock_ticks = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut produced_events = BTreeSet::<String>::new();
     let mut delivery_ids = BTreeSet::<String>::new();
 
@@ -266,15 +270,23 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(calibration_id, "calibration_id")?;
                 require_id(mapping_receipt_ref, "mapping_receipt_ref")?;
                 require_sha256(mapping_receipt_sha256, "mapping_receipt_sha256")?;
-                clock_ticks.insert(clock_domain.clone(), *local_tick_ns);
+                clock_ticks.insert(
+                    clock_series_key(clock_domain, basis_id, epoch, scale, unit),
+                    *local_tick_ns,
+                );
             }
             ScheduleAction::EventProduced {
-                event_id, clock_domain, source_timestamp_ns, causal_predecessors,
+                event_id, clock_domain, basis_id, epoch, scale, unit,
+                source_timestamp_ns, causal_predecessors,
             } => {
                 require_id(event_id, "event_id")?;
                 require_id(clock_domain, "clock_domain")?;
+                require_id(basis_id, "basis_id")?;
+                require_id(epoch, "epoch")?;
+                require_id(scale, "scale")?;
+                require_id(unit, "unit")?;
                 let latest_tick = clock_ticks
-                    .get(clock_domain)
+                    .get(&clock_series_key(clock_domain, basis_id, epoch, scale, unit))
                     .ok_or_else(|| ReplayError::MissingClock(clock_domain.clone()))?;
                 if source_timestamp_ns > latest_tick {
                     return Err(ReplayError::EventBeyondClock(event_id.clone()));
@@ -365,6 +377,24 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
     Ok(())
 }
 
+type ClockSeriesKey = (String, String, String, String, String);
+
+fn clock_series_key(
+    clock_domain: &str,
+    basis_id: &str,
+    epoch: &str,
+    scale: &str,
+    unit: &str,
+) -> ClockSeriesKey {
+    (
+        clock_domain.to_owned(),
+        basis_id.to_owned(),
+        epoch.to_owned(),
+        scale.to_owned(),
+        unit.to_owned(),
+    )
+}
+
 fn require_id(value: &str, name: &'static str) -> Result<(), ReplayError> {
     if value.trim().is_empty() {
         Err(ReplayError::EmptyIdentifier(name))
@@ -428,8 +458,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut partitioned = BTreeSet::<String>::new();
     let mut crashed = BTreeSet::<String>::new();
     let mut produced = BTreeSet::<String>::new();
-    let mut clock_ticks = BTreeMap::<String, u64>::new();
-    let mut event_times = BTreeMap::<String, u64>::new();
+    let mut clock_ticks = BTreeMap::<ClockSeriesKey, u64>::new();
+    let mut event_times = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
     let mut persisted = BTreeSet::<(String, String)>::new();
@@ -444,17 +474,23 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
 
     for scheduled in ordered_actions(schedule) {
         let disposition = match &scheduled.action {
-            ScheduleAction::ClockAdvance { clock_domain, local_tick_ns, .. } => {
-                let previous = clock_ticks.insert(clock_domain.clone(), *local_tick_ns);
+            ScheduleAction::ClockAdvance {
+                clock_domain, basis_id, epoch, scale, unit, local_tick_ns, ..
+            } => {
+                let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                let previous = clock_ticks.insert(key, *local_tick_ns);
                 if previous.is_some_and(|tick| *local_tick_ns < tick) {
                     SchedulerDisposition::ClockRegression
                 } else {
                     SchedulerDisposition::Applied
                 }
             }
-            ScheduleAction::EventProduced { event_id, clock_domain, source_timestamp_ns, .. } => {
+            ScheduleAction::EventProduced {
+                event_id, clock_domain, basis_id, epoch, scale, unit, source_timestamp_ns, ..
+            } => {
                 produced.insert(event_id.clone());
-                let previous = event_times.insert(clock_domain.clone(), *source_timestamp_ns);
+                let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                let previous = event_times.insert(key, *source_timestamp_ns);
                 if previous.is_some_and(|timestamp| *source_timestamp_ns < timestamp) {
                     SchedulerDisposition::EventTimeRegression
                 } else {
@@ -730,6 +766,10 @@ pub fn generate_delivery_schedule(
             ScheduleAction::EventProduced {
                 event_id: event_id.clone(),
                 clock_domain: domain.to_owned(),
+                basis_id: format!("basis-{domain}"),
+                epoch: "epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
                 source_timestamp_ns: clock_ticks[clock_index],
                 causal_predecessors,
             },
@@ -1107,6 +1147,10 @@ mod tests {
         push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::EventProduced {
             event_id: "event-backwards".to_owned(),
             clock_domain: "clock-a".to_owned(),
+            basis_id: "basis-clock-a".to_owned(),
+            epoch: "epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
             source_timestamp_ns: 50,
             causal_predecessors: Vec::new(),
         });
