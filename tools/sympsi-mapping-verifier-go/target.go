@@ -12,14 +12,14 @@ import (
 const domain = "sympsi.aia.target.v1\x00"
 
 type Context struct {
-	ProtocolID          string
-	CampaignID          string
-	TrialID             string
-	ChainHash           [32]byte
-	SchemeID            string
-	ResponseCommitment  [32]byte
-	Round               uint64
-	VerifiedRandomness  [32]byte
+	ProtocolID         string
+	CampaignID         string
+	TrialID            string
+	ChainHash          [32]byte
+	SchemeID           string
+	ResponseCommitment [32]byte
+	Round              uint64
+	VerifiedRandomness [32]byte
 }
 
 // Digest constructs the exact domain-separated transcript used by the Rust
