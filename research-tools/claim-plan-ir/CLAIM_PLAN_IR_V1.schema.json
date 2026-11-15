@@ -1,0 +1,539 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research-tools/claim-plan-ir/CLAIM_PLAN_IR_V1.schema.json",
+  "title": "Symthaea Claim Plan IR v1",
+  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "plan_id",
+    "authority",
+    "source",
+    "field",
+    "interpretation",
+    "predicate",
+    "request",
+    "uniqueness",
+    "proof",
+    "dependencies"
+  ],
+  "properties": {
+    "version": {
+      "const": "claim-plan-ir/v1"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_owner", "policy_digest", "evidence_requirements"],
+      "properties": {
+        "policy_owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trust_profile_id",
+        "protocol_mode",
+        "implementation",
+        "server",
+        "request",
+        "response",
+        "commitment"
+      ],
+      "properties": {
+        "trust_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "protocol_mode": {
+          "enum": [
+            "tlsnotary_mpc_direct",
+            "tlsnotary_delegated_notary",
+            "tlsnotary_proxy",
+            "deco_three_party",
+            "dido_plus_three_party",
+            "zkpass_proxy",
+            "zkpass_mpc",
+            "reclaim_split_tee_mpc",
+            "scribe_attestor_stark"
+          ]
+        },
+        "implementation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "release", "source_commit"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "release": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "source_commit": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "build_profile_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "server": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["identity_kind", "identity_value", "trust_root_digest"],
+          "properties": {
+            "identity_kind": {
+              "enum": ["dns_name", "spki", "certificate_fingerprint", "provider_profile"]
+            },
+            "identity_value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "trust_root_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "origin", "path_template", "query_policy_digest"],
+          "properties": {
+            "method": {
+              "type": "string",
+              "pattern": "^[A-Z]{1,16}$"
+            },
+            "origin": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048
+            },
+            "path_template": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "query_policy_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ordinal", "direction", "http_profile_id", "http_profile_digest"],
+          "properties": {
+            "ordinal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "direction": {
+              "const": "received"
+            },
+            "http_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "http_profile_digest": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "commitment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy", "hash_algorithm", "opening_profile_id"],
+          "properties": {
+            "strategy": {
+              "enum": ["custom_range", "http_object", "per_byte", "attestor_value_commitment"]
+            },
+            "hash_algorithm": {
+              "type": "string",
+              "enum": ["sha256", "blake3", "rescue", "profile_defined"]
+            },
+            "opening_profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parser_profile_id",
+        "parser_profile_digest",
+        "schema_profile_id",
+        "schema_profile_digest",
+        "json_pointer",
+        "duplicate_key_policy",
+        "unicode_policy"
+      ],
+      "properties": {
+        "parser_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parser_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "schema_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "json_pointer": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "duplicate_key_policy": {
+          "const": "reject"
+        },
+        "unicode_policy": {
+          "const": "exact_scalar_sequence_no_normalization"
+        },
+        "lexical_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "lexical_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "interpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_type", "conversion_profile_id", "conversion_profile_digest"],
+      "properties": {
+        "value_type": {
+          "enum": [
+            "utf8_string",
+            "unsigned_integer",
+            "signed_integer",
+            "decimal_string",
+            "timestamp_rfc3339",
+            "timestamp_unix_seconds",
+            "closed_enum"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "minor_unit_scale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 18
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "conversion_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "conversion_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "digest", "ast"],
+      "properties": {
+        "language": {
+          "const": "symthaea-claim-predicate/v1"
+        },
+        "digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ast": {
+          "$ref": "#/$defs/expression"
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verifier_id",
+        "audience",
+        "purpose",
+        "challenge_ref",
+        "challenge_nonce_digest",
+        "request_digest",
+        "expires_at"
+      ],
+      "properties": {
+        "verifier_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "audience": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "challenge_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "challenge_nonce_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "request_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "uniqueness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_kind",
+        "scope_id",
+        "binding_profile_id",
+        "nullifier_profile_id"
+      ],
+      "properties": {
+        "subject_kind": {
+          "enum": [
+            "credential",
+            "provider_account",
+            "entitlement",
+            "application_participant",
+            "legal_or_natural_person"
+          ]
+        },
+        "scope_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "binding_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "nullifier_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend_id",
+        "proof_profile_id",
+        "program_digest",
+        "verifier_build_digest",
+        "statement_encoding"
+      ],
+      "properties": {
+        "backend_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "proof_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "program_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "image_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "verifier_build_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "statement_encoding": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owner", "dependency_id", "digest", "invalidation_scope"],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "dependency_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "digest": {
+            "$ref": "#/$defs/sha256"
+          },
+          "invalidation_scope": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "critical": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "claim_value"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "const": "literal"
+            },
+            "value": {
+              "type": ["string", "integer", "boolean"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "operator", "left", "right"],
+          "properties": {
+            "kind": {
+              "const": "compare"
+            },
+            "operator": {
+              "enum": ["eq", "neq", "gt", "gte", "lt", "lte"]
+            },
+            "left": {
+              "$ref": "#/$defs/expression"
+            },
+            "right": {
+              "$ref": "#/$defs/expression"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "children"],
+          "properties": {
+            "kind": {
+              "enum": ["all", "any"]
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/expression"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "child"],
+          "properties": {
+            "kind": {
+              "const": "not"
+            },
+            "child": {
+              "$ref": "#/$defs/expression"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
