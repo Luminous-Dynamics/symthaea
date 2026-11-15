@@ -176,10 +176,7 @@ struct CampaignCounts {
     block_hits: Vec<u64>,
 }
 
-pub fn run_benchmark(
-    git_head: &str,
-    manifest_bytes: &[u8],
-) -> Result<ReceiptEnvelope, String> {
+pub fn run_benchmark(git_head: &str, manifest_bytes: &[u8]) -> Result<ReceiptEnvelope, String> {
     validate_git_head(git_head)?;
     let manifest: Manifest = serde_json::from_slice(manifest_bytes)
         .map_err(|error| format!("manifest parse failed: {error}"))?;
@@ -196,12 +193,7 @@ pub fn run_benchmark(
             .ok_or_else(|| format!("missing profile {profile_name}"))?;
 
         for spec in SCENARIOS {
-            let result = simulate_scenario(
-                spec,
-                profile_name,
-                profile,
-                &manifest,
-            )?;
+            let result = simulate_scenario(spec, profile_name, profile, &manifest)?;
             controls.push(control(
                 &format!("{profile_name}:{}:naive-disposition", spec.id),
                 result.naive_fixed_1_over_k.passed_expected_disposition,
@@ -265,7 +257,10 @@ fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
         return Err("this v0.1 benchmark is frozen at alpha=0.005".into());
     }
     if (manifest.conditional_randomization_z_critical - 2.575_829_303_548_900_4).abs() > 1e-12 {
-        return Err("conditional randomization z threshold differs from the frozen one-sided 99.5% value".into());
+        return Err(
+            "conditional randomization z threshold differs from the frozen one-sided 99.5% value"
+                .into(),
+        );
     }
     if !(1.96..=3.5).contains(&manifest.confidence_z) {
         return Err("confidence z-score is outside supported range".into());
@@ -273,12 +268,21 @@ fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
     if manifest.profiles.len() != 2 {
         return Err("manifest must contain exactly four-choice and five-choice profiles".into());
     }
-    if manifest.scenario_ids != SCENARIOS.iter().map(|scenario| scenario.id.to_string()).collect::<Vec<_>>() {
+    if manifest.scenario_ids
+        != SCENARIOS
+            .iter()
+            .map(|scenario| scenario.id.to_string())
+            .collect::<Vec<_>>()
+    {
         return Err("scenario IDs or ordering differ from the frozen scenario catalogue".into());
     }
-    let four = manifest.profiles.get("four-choice")
+    let four = manifest
+        .profiles
+        .get("four-choice")
         .ok_or_else(|| "four-choice profile missing".to_string())?;
-    let five = manifest.profiles.get("five-choice")
+    let five = manifest
+        .profiles
+        .get("five-choice")
         .ok_or_else(|| "five-choice profile missing".to_string())?;
     validate_profile(four, 4, 7_300, 1_922)?;
     validate_profile(five, 5, 6_300, 1_343)?;
@@ -297,7 +301,9 @@ fn validate_profile(
         || profile.block_count != 10
         || profile.analysis_trials % profile.block_count != 0
     {
-        return Err(format!("profile does not match frozen {choices}-choice reference contract"));
+        return Err(format!(
+            "profile does not match frozen {choices}-choice reference contract"
+        ));
     }
     Ok(())
 }
@@ -321,11 +327,7 @@ fn simulate_scenario(
     let mut global_rejections = 0_u64;
     let mut block_rejections = 0_u64;
 
-    let scenario_seed = derive_seed(
-        manifest.master_seed,
-        profile_name,
-        spec.id,
-    );
+    let scenario_seed = derive_seed(manifest.master_seed, profile_name, spec.id);
 
     for campaign in 0..manifest.campaigns_per_scenario {
         let counts = generate_campaign(
@@ -462,11 +464,7 @@ fn generate_campaign(
     }
 }
 
-fn scenario_weights(
-    scenario_id: &str,
-    choices: usize,
-    block: usize,
-) -> (Vec<f64>, Vec<f64>, bool) {
+fn scenario_weights(scenario_id: &str, choices: usize, block: usize) -> (Vec<f64>, Vec<f64>, bool) {
     let uniform = vec![1.0 / choices as f64; choices];
     let biased = if choices == 4 {
         vec![0.70, 0.10, 0.10, 0.10]
@@ -491,10 +489,7 @@ fn scenario_weights(
 
 /// Mean and variance of the match count when target labels are permuted over
 /// fixed response positions, conditional on both category margins.
-fn conditional_moments(
-    target_counts: &[u64],
-    response_counts: &[u64],
-) -> (f64, f64) {
+fn conditional_moments(target_counts: &[u64], response_counts: &[u64]) -> (f64, f64) {
     let n: u64 = target_counts.iter().sum();
     if n == 0 || response_counts.iter().sum::<u64>() != n {
         return (0.0, 0.0);
@@ -524,8 +519,7 @@ fn conditional_moments(
                 let a_other = target_counts[other] as f64;
                 let b_other = response_counts[other] as f64;
                 let p_other = a_other / nf;
-                let covariance_different =
-                    a * a_other / denominator - p * p_other;
+                let covariance_different = a * a_other / denominator - p * p_other;
                 variance += 2.0 * b * b_other * covariance_different;
             }
         }
@@ -552,8 +546,7 @@ fn conditional_block_z(
     let mut total_mean = 0.0;
     let mut total_variance = 0.0;
     for block in 0..target_counts.len() {
-        let (mean, variance) =
-            conditional_moments(&target_counts[block], &response_counts[block]);
+        let (mean, variance) = conditional_moments(&target_counts[block], &response_counts[block]);
         total_observed += observed_hits[block] as f64;
         total_mean += mean;
         total_variance += variance;
@@ -585,8 +578,7 @@ fn make_fpr(
     let rate = rejections as f64 / campaigns as f64;
     let interval = wilson_interval(rejections, campaigns, confidence_z);
     let tolerance =
-        4.0 * (alpha * (1.0 - alpha) / campaigns as f64).sqrt()
-            + 1.0 / campaigns as f64;
+        4.0 * (alpha * (1.0 - alpha) / campaigns as f64).sqrt() + 1.0 / campaigns as f64;
     let (expected_pass, disposition) = match expected {
         ExpectedDisposition::Controlled => (
             interval.upper <= alpha + tolerance,
@@ -614,8 +606,7 @@ fn wilson_interval(successes: u64, trials: u64, z: f64) -> Interval {
     let z2 = z * z;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let margin =
-        z * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
+    let margin = z * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
     Interval {
         lower: (center - margin).max(0.0),
         upper: (center + margin).min(1.0),
@@ -732,13 +723,7 @@ mod tests {
             naive_critical_hits: 1_922,
             block_count: 10,
         };
-        let counts = generate_campaign(
-            4,
-            7_300,
-            1,
-            "static_marginal_alignment",
-            1234,
-        );
+        let counts = generate_campaign(4, 7_300, 1, "static_marginal_alignment", 1234);
         let naive_rate = counts.global_hits as f64 / 7_300.0;
         let global_z = conditional_randomization_z(
             &counts.global_target,
