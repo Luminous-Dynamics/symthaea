@@ -6,7 +6,7 @@
 //! using source-bound intervals for transition time and ground progress.
 //! It does not model aerodynamic/hydrodynamic forces or emit actuator actions.
 
-use super::{Evidence, EvidenceState, PlanStatus, evidence_gate};
+use super::{Evidence, PlanStatus, evidence_gate};
 use super::robust::{RobustCourseCandidate, ScalarInterval};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -220,6 +220,8 @@ mod tests {
 
     fn candidate(vmg: ScalarInterval) -> RobustCourseCandidate {
         RobustCourseCandidate {
+            configuration_digest: CONFIG,
+            polar_artifact_digest: POLAR,
             heading_deg: 45.0,
             tack_side: TackSide::Port,
             true_wind_angle_deg: ScalarInterval { lower: 45.0, upper: 50.0 },
