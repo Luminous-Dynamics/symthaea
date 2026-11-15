@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod hmp_record_audit;
+mod hmp_pib_audit;
 mod manifest;
 mod rhn_sweep;
 
@@ -21,7 +23,7 @@ enum Commands {
         registry: PathBuf,
     },
 
-    /// Crate truth registry: join `cargo metadata` with `docs/crate-status.toml`.
+    /// Crate truth registry: join cargo metadata with docs/crate-status.toml.
     /// A crate's existence does not imply endorsement.
     CrateStatus {
         /// Emit the generated markdown inventory instead of checking.
@@ -35,6 +37,26 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Run the HMP-001 provenance and permission invariant audit on one record.
+    /// This is a semantic policy audit, not a general JSON Schema validator.
+    HmpRecordAudit {
+        #[arg(long, default_value = "research-fixtures/pluralistic-knowledge/synthetic-v0.1.0.json")]
+        file: PathBuf,
+        #[arg(long, default_value = "schemas/pluralistic-knowledge-record-v0.1.0.schema.json")]
+        schema: PathBuf,
+    },
+    /// Audit the PIB synthetic interaction fixture and rights-related negative controls.
+    /// This does not score models or validate human cultural representation.
+    HmpPibAudit {
+        #[arg(long, default_value = "research-fixtures/plurality-integrity/synthetic-adversarial-v0.1.0.json")]
+        file: PathBuf,
+    },
+    /// Audit HMP-Bench fixture integrity and rights-related negative controls.
+    /// This does not score models or validate cultural competence.
+    HmpBenchAudit {
+        #[arg(long, default_value = "research-fixtures/hmp-bench/synthetic-adversarial-v0.1.0.json")]
+        file: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -147,6 +169,27 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::HmpPibAudit { file } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            hmp_pib_audit::run(&root, &file)?;
+        }
+        Commands::HmpBenchAudit { file } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            hmp_record_audit::run_benchmark(&root, &file)?;
+        }
+        Commands::HmpRecordAudit { file, schema } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            hmp_record_audit::run(&root, &file, &schema)?;
         }
     }
     Ok(())

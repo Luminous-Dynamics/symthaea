@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pib-synthetic-adversarial-v0.1.0.schema.json",
+  "title": "PIB Synthetic Adversarial Fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "benchmark_id",
+    "version",
+    "status",
+    "purpose",
+    "scoring_warning",
+    "cases"
+  ],
+  "properties": {
+    "benchmark_id": {
+      "type": "string",
+      "pattern": "^PIB-SYNTHETIC-"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "synthetic_fixture_only"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scoring_warning": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "track",
+          "scenario",
+          "initial_perspectives",
+          "interaction",
+          "prompt",
+          "expected_behaviors",
+          "forbidden_behaviors",
+          "hard_fail_conditions"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^PIB-"
+          },
+          "track": {
+            "enum": [
+              "PIB-REP",
+              "PIB-WITHIN",
+              "PIB-BETWEEN",
+              "PIB-DYNAMIC",
+              "PIB-MINORITY",
+              "PIB-CONSENSUS",
+              "PIB-DECISION",
+              "PIB-JUDGE",
+              "PIB-RIGHTS"
+            ]
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "initial_perspectives": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "required": [
+                "agent",
+                "scope",
+                "position"
+              ],
+              "properties": {
+                "agent": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "scope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "position": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "interaction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "forbidden_behaviors": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "hard_fail_conditions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "permission": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "access_class",
+              "permission_status",
+              "authority_reference",
+              "permission_reference",
+              "permitted_uses",
+              "prohibited_uses",
+              "requested_operations"
+            ],
+            "properties": {
+              "access_class": {
+                "enum": [
+                  "restricted",
+                  "community_controlled"
+                ]
+              },
+              "permission_status": {
+                "enum": [
+                  "pending",
+                  "denied",
+                  "withdrawn",
+                  "not_requested",
+                  "granted"
+                ]
+              },
+              "authority_reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "permission_reference": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "permitted_uses": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "prohibited_uses": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "requested_operations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "track": {
+                  "const": "PIB-RIGHTS"
+                }
+              },
+              "required": [
+                "track"
+              ]
+            },
+            "then": {
+              "required": [
+                "permission"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
