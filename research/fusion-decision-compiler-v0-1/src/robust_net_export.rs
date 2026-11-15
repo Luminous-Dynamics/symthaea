@@ -37,6 +37,11 @@ pub struct NetExportLowerBoundReceipt {
     pub validity_domain_ref: String,
     /// Required for JointCovarianceContrast; absent for other methods.
     pub covariance_receipt_ref: Option<String>,
+    pub covariance_receipt_sha256: Option<String>,
+    pub covariance_run_id: Option<String>,
+    pub covariance_output_sha256: Option<String>,
+    /// Exact ordered variables used in c^T Sigma c.
+    pub covariance_variable_order: Vec<String>,
     /// Required for SimultaneousComponentIntervals.
     pub simultaneous_allocation_ref: Option<String>,
     /// Required for DirectNetOutputInterval.
@@ -71,6 +76,7 @@ pub enum RobustNetExportDiagnostic {
     PointBalanceNotAdmissible,
     RunIdentityMismatch,
     SolverIdentityMismatch,
+    PointReportIdentityMismatch,
     OutputDigestMismatch,
     InvalidOutputDigest,
     SchemaReferenceMismatch,
@@ -143,6 +149,18 @@ pub fn evaluate_robust_net_export(
     }
     if point.is_none_or(|value| !value.is_finite()) {
         diagnostics.push(RobustNetExportDiagnostic::MissingPointEstimate);
+    }
+    if point_report.run_id != power_run.run_id
+        || point_report.solver_id != power_run.solver_id
+    {
+        diagnostics.push(RobustNetExportDiagnostic::PointReportIdentityMismatch);
+    }
+    let recomputed_point_report = super::plant_service_gate::evaluate_plant_power_balance(
+        power_profile,
+        power_run,
+    );
+    if recomputed_point_report != *point_report {
+        diagnostics.push(RobustNetExportDiagnostic::PointReportIdentityMismatch);
     }
     if matches!(
         point_report.disposition,
@@ -259,6 +277,18 @@ pub fn evaluate_robust_net_export(
             {
                 diagnostics.push(RobustNetExportDiagnostic::MissingCovarianceReceipt);
             }
+            if receipt
+                .covariance_receipt_sha256
+                .as_deref()
+                .is_none_or(|value| !is_sha256(value))
+                || receipt.covariance_run_id.as_deref() != Some(receipt.run_id.as_str())
+                || receipt.covariance_output_sha256.as_deref()
+                    != Some(receipt.output_sha256.as_str())
+                || receipt.covariance_variable_order
+                    != ["P_e_gross", "P_recirc_var", "P_recirc_fix"]
+            {
+                diagnostics.push(RobustNetExportDiagnostic::MissingCovarianceReceipt);
+            }
             if receipt.simultaneous_allocation_ref.is_some()
                 || receipt.direct_net_analysis_ref.is_some()
             {
@@ -289,6 +319,10 @@ pub fn evaluate_robust_net_export(
             }
             if receipt.covariance_receipt_ref.is_some()
                 || receipt.simultaneous_allocation_ref.is_some()
+                || receipt.covariance_receipt_sha256.is_some()
+                || receipt.covariance_run_id.is_some()
+                || receipt.covariance_output_sha256.is_some()
+                || !receipt.covariance_variable_order.is_empty()
             {
                 diagnostics.push(RobustNetExportDiagnostic::UnexpectedMethodReceipt);
             }
@@ -494,6 +528,14 @@ mod tests {
             assumption_manifest_sha256: sha('c'),
             validity_domain_ref: "declared-process-regime-v1".to_string(),
             covariance_receipt_ref: Some("symtropy-joint-covariance-42".to_string()),
+            covariance_receipt_sha256: Some(sha('d')),
+            covariance_run_id: Some(run.run_id.clone()),
+            covariance_output_sha256: Some(run.output_sha256.clone()),
+            covariance_variable_order: vec![
+                "P_e_gross".to_string(),
+                "P_recirc_var".to_string(),
+                "P_recirc_fix".to_string(),
+            ],
             simultaneous_allocation_ref: None,
             direct_net_analysis_ref: None,
             evidence_ref: "net-lower-bound-evidence-42".to_string(),
