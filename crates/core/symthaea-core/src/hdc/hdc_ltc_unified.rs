@@ -3061,6 +3061,65 @@ mod tests {
         );
     }
 
+
+    /// The active scalar-gate neuron should be equivariant to a consistent
+    /// relabeling of hypervector coordinates. Coordinate indices are not
+    /// semantic channels unless an explicit basis/partition says otherwise.
+    #[test]
+    fn scalar_hdc_ltc_dynamics_are_coordinate_permutation_equivariant() {
+        let dimension = 256;
+        let shift = 37;
+        let config = UnifiedConfig {
+            dimension,
+            fourier_frequencies: Vec::new(),
+            ..UnifiedConfig::default()
+        };
+        let values = |phase: f32| {
+            (0..dimension)
+                .map(|i| ((i as f32 + phase) * 0.071).sin() * 0.7)
+                .collect::<Vec<f32>>()
+        };
+        let mut original = HdcLtcUnifiedNeuron::new(config, 901);
+        original.state = ContinuousHV::from_values(values(0.3));
+        original.weight_hv = ContinuousHV::from_values(values(1.1));
+        original.input_mask = ContinuousHV::from_values(values(2.3));
+        original.tau_modulator = ContinuousHV::from_values(values(3.7));
+        original.gate_weight = ContinuousHV::from_values(values(4.9));
+        original.gate_bias = ContinuousHV::from_values(values(5.3));
+
+        let permute = |source: &[f32]| {
+            let mut result = vec![0.0; source.len()];
+            for (index, value) in source.iter().enumerate() {
+                result[(index + shift) % source.len()] = *value;
+            }
+            result
+        };
+        let mut permuted = original.clone();
+        permuted.state = ContinuousHV::from_values(permute(&original.state.values));
+        permuted.weight_hv = ContinuousHV::from_values(permute(&original.weight_hv.values));
+        permuted.input_mask = ContinuousHV::from_values(permute(&original.input_mask.values));
+        permuted.tau_modulator =
+            ContinuousHV::from_values(permute(&original.tau_modulator.values));
+        permuted.gate_weight = ContinuousHV::from_values(permute(&original.gate_weight.values));
+        permuted.gate_bias = ContinuousHV::from_values(permute(&original.gate_bias.values));
+
+        let input = ContinuousHV::from_values(values(7.1));
+        let permuted_input = ContinuousHV::from_values(permute(&input.values));
+        original.evolve_closed_form(0.037, &input);
+        permuted.evolve_closed_form(0.037, &permuted_input);
+
+        let expected = permute(&original.state.values);
+        let max_error = expected
+            .iter()
+            .zip(permuted.state.values.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_error < 2e-5,
+            "consistent coordinate permutation changed scalar HDC-LTC dynamics: max error={max_error}"
+        );
+    }
+
     /// Acceptance regression for the currently known zero-time identity defect.
     ///
     /// This is intentionally ignored until a candidate update law is selected.
