@@ -89,7 +89,7 @@ The report preserves the frozen universe, accepted-population, objective, opport
 - The objective evaluator consumes exact declared reference outcomes; it does not launch PROCESS or another physical solver.
 - Synthetic fixtures test the contract only. They are not physical validation or reactor-design evidence.
 
-The module adds 12 authored Rust unit tests for frontier extension, the feasibility/opportunity recall distinction, hard/inconclusive/out-of-domain results, epsilon dominance/equivalence, vector units/order, missing/retained sample identities, baseline frontier consistency and zero-sample conservatism. Across the original 15 rejected-candidate-audit tests and these 12 new authored tests, the crate contains 27 authored Rust tests. This is a source inventory, not a claim that the new tests have executed.
+The module adds 15 authored Rust unit tests for frontier extension, the feasibility/opportunity recall distinction, hard/inconclusive/out-of-domain results, epsilon dominance/equivalence, vector units/order, missing/retained sample identities, baseline frontier consistency, zero-sample conservatism, exact accepted/rejected solver-evidence binding and cross-metric OOD consistency. Across the original 15 rejected-candidate-audit tests and these 15 new authored tests, the crate contains 30 authored Rust tests. This is a source inventory, not a claim that the new tests have executed.
 
 ## Run
 
