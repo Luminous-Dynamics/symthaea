@@ -10,6 +10,8 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
+pub mod sequential;
+
 /// Errors for invalid designs and power-envelope declarations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PowerError {
