@@ -128,7 +128,14 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
     }
     check_object_keys(
         &manifest["intervention"],
-        &["family", "position", "position_percentile", "control_class"],
+        &[
+            "family",
+            "position",
+            "position_percentile",
+            "planned_work_units_completed",
+            "planned_work_units_total",
+            "control_class",
+        ],
         "intervention",
         &mut report,
     );
@@ -209,6 +216,30 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
             "intervention.position",
             "aggregate phase does not match the exact intervention percentile",
         );
+    }
+    let completed_work = manifest.pointer("/intervention/planned_work_units_completed")
+        .and_then(Value::as_u64);
+    let total_work = manifest.pointer("/intervention/planned_work_units_total")
+        .and_then(Value::as_u64);
+    match (completed_work, total_work, position_percentile) {
+        (Some(completed), Some(total), Some(target))
+            if completed > 0 && completed < total =>
+        {
+            let actual_scaled = (completed as u128) * 100;
+            let target_scaled = (target as u128) * (total as u128);
+            let difference = actual_scaled.abs_diff(target_scaled);
+            // Permit at most 2.5 percentage points of scheduling tolerance.
+            if difference * 2 > (total as u128) * 5 {
+                report.error(
+                    "intervention.planned_work_units",
+                    "realized work progress must be within 2.5 percentage points of the declared p10-p90 position",
+                );
+            }
+        }
+        _ => report.error(
+            "intervention.planned_work_units",
+            "completed and total planned-work units must be positive, completed must be less than total, and both must be unsigned integers",
+        ),
     }
     if !["target_intervention", "sham", "positive_control", "negative_control", "common_cause_control"]
         .contains(&str_at(&manifest, &["intervention", "control_class"]).unwrap_or(""))
@@ -465,6 +496,37 @@ mod tests {
         let mut v: Value = serde_json::from_str(VALID).unwrap();
         v["intervention"]["position"] = json!("whenever");
         assert!(!check(&v).valid);
+    }
+
+    #[test]
+    fn accepts_all_nine_positions_when_progress_matches_the_declared_decile() {
+        for (percentile, phase) in [
+            (10, "early"),
+            (20, "early"),
+            (30, "early"),
+            (40, "middle"),
+            (50, "middle"),
+            (60, "middle"),
+            (70, "late"),
+            (80, "late"),
+            (90, "late"),
+        ] {
+            let mut value: Value = serde_json::from_str(VALID).unwrap();
+            value["intervention"]["position"] = json!(phase);
+            value["intervention"]["position_percentile"] = json!(percentile);
+            value["intervention"]["planned_work_units_completed"] = json!(percentile);
+            value["intervention"]["planned_work_units_total"] = json!(100);
+            let report = check(&value);
+            assert!(report.valid, "p{percentile}: {:?}", report.diagnostics);
+        }
+    }
+
+    #[test]
+    fn rejects_realized_work_position_outside_decile_tolerance() {
+        let mut value: Value = serde_json::from_str(VALID).unwrap();
+        value["intervention"]["planned_work_units_completed"] = json!(54);
+        value["intervention"]["planned_work_units_total"] = json!(100);
+        assert!(!check(&value).valid);
     }
 
     #[test]
