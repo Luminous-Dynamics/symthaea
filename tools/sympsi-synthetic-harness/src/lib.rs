@@ -19,6 +19,7 @@ pub struct Manifest {
     pub alpha: f64,
     pub null_campaigns: u64,
     pub power_campaigns: u64,
+    pub optional_stopping_looks: usize,
     pub confidence_z: f64,
     pub profiles: std::collections::BTreeMap<String, ProfileSpec>,
 }
@@ -64,6 +65,19 @@ pub struct PowerCalibration {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct SequentialLookCalibration {
+    pub campaigns: u64,
+    pub looks: usize,
+    pub alpha_per_look: f64,
+    pub empirical_familywise_false_positive_count: u64,
+    pub empirical_familywise_false_positive_rate: f64,
+    pub empirical_familywise_false_positive_wilson_99: Interval,
+    pub nominal_fixed_sample_alpha: f64,
+    pub inflation_multiple: f64,
+    pub demonstrates_optional_stopping_inflation: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct PlantedEffect {
     pub planted_hit_rate: f64,
     pub synthetic_trials: usize,
@@ -101,6 +115,7 @@ pub struct ReceiptBody {
     pub seed_ids: Vec<String>,
     pub null_calibration: NullCalibration,
     pub power_calibration: PowerCalibration,
+    pub sequential_look_calibration: SequentialLookCalibration,
     pub planted_effect: PlantedEffect,
     pub controls: Vec<ControlResult>,
     pub all_controls_passed: bool,
@@ -298,6 +313,17 @@ pub fn run_profile(
         + 1.0 / manifest.power_campaigns as f64;
     let power_mc_pass = (empirical_power - exact_power).abs() <= power_mc_tolerance;
 
+    let sequential_seed = derive_seed(manifest.seed, "ten-look-optional-stopping-null");
+    let sequential_look_calibration = simulate_optional_stopping_null(
+        n,
+        chance_rate,
+        manifest.alpha,
+        manifest.null_campaigns,
+        manifest.optional_stopping_looks,
+        sequential_seed,
+        manifest.confidence_z,
+    )?;
+
     let planted_seed = derive_seed(manifest.seed, "strong-planted-effect");
     let mut planted_rng = SplitMix64::new(planted_seed);
     let planted_distribution = BinomialDistribution::new(n, profile.planted_hit_rate)?;
@@ -311,7 +337,7 @@ pub fn run_profile(
         rejects_null: planted_hits >= critical_hits,
     };
 
-    let controls = run_controls(
+    let mut controls = run_controls(
         choice_count,
         &manifest_sha256,
         profile_name,
@@ -319,10 +345,22 @@ pub fn run_profile(
         &null_distribution,
         &manifest,
     );
+    controls.push(control(
+        "ten_look_optional_stopping_inflation",
+        "SEQUENTIAL_NULL_FWER_EXCEEDS_FIXED_ALPHA",
+        if sequential_look_calibration.demonstrates_optional_stopping_inflation {
+            "SEQUENTIAL_NULL_FWER_EXCEEDS_FIXED_ALPHA"
+        } else {
+            "SEQUENTIAL_NULL_FWER_NOT_DEMONSTRABLY_INFLATED"
+        }
+        .into(),
+        "Under synthetic null outcomes, ten unadjusted fixed-alpha looks inflate campaign-level false positives; this is a researcher-flexibility diagnostic, not a psi test.",
+    ));
     let all_controls_passed = controls.iter().all(|control| control.passed)
         && null_mc_pass
         && power_mc_pass
-        && planted.rejects_null;
+        && planted.rejects_null
+        && sequential_look_calibration.demonstrates_optional_stopping_inflation;
 
     let run_id = sha256_hex(
         format!(
@@ -351,6 +389,7 @@ pub fn run_profile(
         seed_ids: vec![
             "null-calibration".into(),
             "sesoi-power-calibration".into(),
+            "ten-look-optional-stopping-null".into(),
             "strong-planted-effect".into(),
             "leakage-and-custody-fixtures".into(),
             "label-permutation".into(),
@@ -376,6 +415,7 @@ pub fn run_profile(
             empirical_power_wilson_99: power_interval,
             monte_carlo_within_four_standard_errors: power_mc_pass,
         },
+        sequential_look_calibration,
         planted_effect: planted,
         controls,
         all_controls_passed,
@@ -408,6 +448,9 @@ fn validate_manifest(manifest: &Manifest) -> Result<(), String> {
     }
     if manifest.null_campaigns < 10_000 || manifest.power_campaigns < 1_000 {
         return Err("simulation campaign counts are below qualification minimums".into());
+    }
+    if !(2..=25).contains(&manifest.optional_stopping_looks) {
+        return Err("optional-stopping diagnostic must use between 2 and 25 looks".into());
     }
     if !(1.96..=3.5).contains(&manifest.confidence_z) {
         return Err("confidence z-score is outside the supported range".into());
@@ -949,6 +992,69 @@ fn log_factorial(n: usize) -> f64 {
     (2..=n).map(|value| (value as f64).ln()).sum()
 }
 
+fn simulate_optional_stopping_null(
+    total_trials: usize,
+    chance_rate: f64,
+    alpha_per_look: f64,
+    campaigns: u64,
+    looks: usize,
+    seed: u64,
+    confidence_z: f64,
+) -> Result<SequentialLookCalibration, String> {
+    if looks < 2 || looks > total_trials {
+        return Err("sequential diagnostic requires 2..=total_trials looks".into());
+    }
+
+    let base_block = total_trials / looks;
+    let remainder = total_trials % looks;
+    let mut block_distributions = Vec::with_capacity(looks);
+    let mut critical_hits = Vec::with_capacity(looks);
+    let mut cumulative_trials = 0usize;
+
+    for look in 0..looks {
+        let block_size = base_block + usize::from(look < remainder);
+        let block_distribution = BinomialDistribution::new(block_size, chance_rate)?;
+        cumulative_trials += block_size;
+        let cumulative_distribution = BinomialDistribution::new(cumulative_trials, chance_rate)?;
+        critical_hits.push(cumulative_distribution.critical_hits(alpha_per_look)?);
+        block_distributions.push(block_distribution);
+    }
+
+    let mut rng = SplitMix64::new(seed);
+    let mut false_positives = 0_u64;
+    for _ in 0..campaigns {
+        let mut cumulative_hits = 0usize;
+        let mut crossed_at_least_one_look = false;
+        for (look, distribution) in block_distributions.iter().enumerate() {
+            cumulative_hits += distribution.sample(&mut rng);
+            if cumulative_hits >= critical_hits[look] {
+                crossed_at_least_one_look = true;
+                break;
+            }
+        }
+        if crossed_at_least_one_look {
+            false_positives += 1;
+        }
+    }
+
+    let rate = false_positives as f64 / campaigns as f64;
+    Ok(SequentialLookCalibration {
+        campaigns,
+        looks,
+        alpha_per_look,
+        empirical_familywise_false_positive_count: false_positives,
+        empirical_familywise_false_positive_rate: rate,
+        empirical_familywise_false_positive_wilson_99: wilson_interval(
+            false_positives,
+            campaigns,
+            confidence_z,
+        ),
+        nominal_fixed_sample_alpha: alpha_per_look,
+        inflation_multiple: rate / alpha_per_look,
+        demonstrates_optional_stopping_inflation: rate > alpha_per_look * 1.5,
+    })
+}
+
 fn wilson_interval(successes: u64, trials: u64, z: f64) -> Interval {
     let n = trials as f64;
     let p = successes as f64 / n;
@@ -1021,6 +1127,25 @@ mod tests {
 
     fn manifest_bytes() -> Vec<u8> {
         include_bytes!("../fixtures/manifest-v0.1.json").to_vec()
+    }
+
+    #[test]
+    fn ten_unadjusted_null_looks_inflate_familywise_false_positives() {
+        for (trials, chance) in [(7300, 0.25), (6300, 0.20)] {
+            let result = simulate_optional_stopping_null(
+                trials,
+                chance,
+                0.005,
+                100_000,
+                10,
+                20261115,
+                2.5758293035489004,
+            )
+            .unwrap();
+            assert!(result.empirical_familywise_false_positive_rate > 0.0075);
+            assert!(result.inflation_multiple > 1.5);
+            assert!(result.demonstrates_optional_stopping_inflation);
+        }
     }
 
     #[test]
