@@ -189,8 +189,7 @@ pub fn audit_screening_funnel(
         }
     }
 
-    let mut record_map: BTreeMap<(String, ScreeningStage), ScreeningRecord> =
-        BTreeMap::new();
+    let mut record_map: BTreeMap<(String, ScreeningStage), ScreeningRecord> = BTreeMap::new();
     for record in records {
         if record.candidate_id.trim().is_empty() {
             errors.push(FunnelValidationError::EmptyCandidateId);
@@ -405,15 +404,11 @@ fn valid_selection_basis(
 
     match record.selection_basis {
         SelectionBasis::InitialGeneration | SelectionBasis::NotScheduled => false,
-        SelectionBasis::PipelineAdvance => record
-            .stage
-            .prior_stages()
-            .iter()
-            .all(|stage| {
-                records
-                    .get(&(record.candidate_id.clone(), *stage))
-                    .is_some_and(|prior| prior.disposition == ScreeningDisposition::Passed)
-            }),
+        SelectionBasis::PipelineAdvance => record.stage.prior_stages().iter().all(|stage| {
+            records
+                .get(&(record.candidate_id.clone(), *stage))
+                .is_some_and(|prior| prior.disposition == ScreeningDisposition::Passed)
+        }),
         SelectionBasis::StratifiedAudit | SelectionBasis::HumanOverride => true,
     }
 }
@@ -472,12 +467,8 @@ mod tests {
     #[test]
     fn complete_funnel_reports_full_denominator_and_exact_recall() {
         let ids = two_candidates();
-        let report = audit_screening_funnel(
-            &ids,
-            &complete_records(&ids),
-            &feasible_labels(&ids),
-        )
-        .unwrap();
+        let report =
+            audit_screening_funnel(&ids, &complete_records(&ids), &feasible_labels(&ids)).unwrap();
 
         assert_eq!(report.candidate_count, 2);
         assert_eq!(report.high_fidelity_calls, 2);
@@ -492,24 +483,20 @@ mod tests {
         let high = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::HighFidelity
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::HighFidelity
             })
             .unwrap();
         high.disposition = ScreeningDisposition::NotEvaluated;
         high.reason_code = Some("budget-deferred".to_string());
         high.selection_basis = SelectionBasis::NotScheduled;
 
-        let report = audit_screening_funnel(
-            &ids,
-            &records,
-            &feasible_labels(&ids),
-        )
-        .unwrap();
+        let report = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap();
         assert_eq!(report.candidate_count, 2);
         assert_eq!(report.high_fidelity_calls, 1);
         assert_eq!(
-            report.reference_audit.feasible_not_evaluated_at_high_fidelity,
+            report
+                .reference_audit
+                .feasible_not_evaluated_at_high_fidelity,
             1
         );
         assert_eq!(report.reference_audit.screening_recall, Some(0.5));
@@ -520,11 +507,9 @@ mod tests {
         let ids = two_candidates();
         let mut records = complete_records(&ids);
         records.retain(|record| {
-            !(record.candidate_id == "candidate-b"
-                && record.stage == ScreeningStage::LowFidelity)
+            !(record.candidate_id == "candidate-b" && record.stage == ScreeningStage::LowFidelity)
         });
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
         assert!(errors.contains(&FunnelValidationError::MissingStageRecord {
             candidate_id: "candidate-b".to_string(),
             stage: ScreeningStage::LowFidelity,
@@ -536,12 +521,13 @@ mod tests {
         let ids = two_candidates();
         let mut records = complete_records(&ids);
         records.push(records[0].clone());
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::DuplicateStageRecord {
-            candidate_id: "candidate-a".to_string(),
-            stage: ScreeningStage::Analytical,
-        }));
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::DuplicateStageRecord {
+                candidate_id: "candidate-a".to_string(),
+                stage: ScreeningStage::Analytical,
+            })
+        );
     }
 
     #[test]
@@ -556,8 +542,7 @@ mod tests {
             selection_basis: SelectionBasis::InitialGeneration,
             selection_reason: None,
         });
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
         assert!(errors.contains(&FunnelValidationError::UnknownCandidateId(
             "not-in-frozen-universe".to_string()
         )));
@@ -570,19 +555,19 @@ mod tests {
         let analytical = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::Analytical
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::Analytical
             })
             .unwrap();
         analytical.disposition = ScreeningDisposition::Rejected;
         analytical.reason_code = Some("analytical-limit".to_string());
 
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::InvalidSelectionBasis {
-            candidate_id: "candidate-b".to_string(),
-            stage: ScreeningStage::LowFidelity,
-        }));
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::InvalidSelectionBasis {
+                candidate_id: "candidate-b".to_string(),
+                stage: ScreeningStage::LowFidelity,
+            })
+        );
     }
 
     #[test]
@@ -592,8 +577,7 @@ mod tests {
         let analytical = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::Analytical
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::Analytical
             })
             .unwrap();
         analytical.disposition = ScreeningDisposition::Rejected;
@@ -602,8 +586,7 @@ mod tests {
         let low = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::LowFidelity
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::LowFidelity
             })
             .unwrap();
         low.selection_basis = SelectionBasis::StratifiedAudit;
@@ -612,19 +595,14 @@ mod tests {
         let high = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::HighFidelity
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::HighFidelity
             })
             .unwrap();
         high.selection_basis = SelectionBasis::StratifiedAudit;
-        high.selection_reason = Some("complete reference audit of sampled rejected candidate".to_string());
+        high.selection_reason =
+            Some("complete reference audit of sampled rejected candidate".to_string());
 
-        let report = audit_screening_funnel(
-            &ids,
-            &records,
-            &feasible_labels(&ids),
-        )
-        .unwrap();
+        let report = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap();
         assert_eq!(report.candidate_count, 2);
         assert_eq!(report.high_fidelity_calls, 2);
     }
@@ -636,17 +614,17 @@ mod tests {
         let low = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::LowFidelity
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::LowFidelity
             })
             .unwrap();
         low.selection_basis = SelectionBasis::StratifiedAudit;
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::MissingSelectionReason {
-            candidate_id: "candidate-b".to_string(),
-            stage: ScreeningStage::LowFidelity,
-        }));
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::MissingSelectionReason {
+                candidate_id: "candidate-b".to_string(),
+                stage: ScreeningStage::LowFidelity,
+            })
+        );
     }
 
     #[test]
@@ -656,8 +634,7 @@ mod tests {
         let first = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-a"
-                    && record.stage == ScreeningStage::HighFidelity
+                record.candidate_id == "candidate-a" && record.stage == ScreeningStage::HighFidelity
             })
             .unwrap();
         first.disposition = ScreeningDisposition::NonConverged;
@@ -666,19 +643,15 @@ mod tests {
         let second = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::HighFidelity
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::HighFidelity
             })
             .unwrap();
         second.disposition = ScreeningDisposition::Failed;
         second.reason_code = Some("solver-process-failed".to_string());
 
-        let report = audit_screening_funnel(
-            &ids,
-            &records,
-            &ReferenceAuditInput { labels: vec![] },
-        )
-        .unwrap();
+        let report =
+            audit_screening_funnel(&ids, &records, &ReferenceAuditInput { labels: vec![] })
+                .unwrap();
         let high = report
             .stages
             .iter()
@@ -699,8 +672,7 @@ mod tests {
                 disposition: ReferenceDisposition::Feasible,
             }],
         };
-        let report =
-            audit_screening_funnel(&ids, &complete_records(&ids), &partial).unwrap();
+        let report = audit_screening_funnel(&ids, &complete_records(&ids), &partial).unwrap();
         assert!(!report.reference_audit.exhaustive_labels);
         assert_eq!(report.reference_audit.labels_supplied, 1);
         assert_eq!(report.reference_audit.screening_recall, None);
@@ -713,15 +685,13 @@ mod tests {
         let analytical = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::Analytical
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::Analytical
             })
             .unwrap();
         analytical.disposition = ScreeningDisposition::Rejected;
         analytical.reason_code = None;
 
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
         assert!(errors.contains(&FunnelValidationError::MissingReasonCode {
             candidate_id: "candidate-b".to_string(),
             stage: ScreeningStage::Analytical,
@@ -735,19 +705,19 @@ mod tests {
         let analytical = records
             .iter_mut()
             .find(|record| {
-                record.candidate_id == "candidate-b"
-                    && record.stage == ScreeningStage::Analytical
+                record.candidate_id == "candidate-b" && record.stage == ScreeningStage::Analytical
             })
             .unwrap();
         analytical.disposition = ScreeningDisposition::NotEvaluated;
         analytical.reason_code = Some("analytical-stage-skipped".to_string());
 
-        let errors =
-            audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::InvalidSelectionBasis {
-            candidate_id: "candidate-b".to_string(),
-            stage: ScreeningStage::Analytical,
-        }));
+        let errors = audit_screening_funnel(&ids, &records, &feasible_labels(&ids)).unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::InvalidSelectionBasis {
+                candidate_id: "candidate-b".to_string(),
+                stage: ScreeningStage::Analytical,
+            })
+        );
     }
 
     #[test]
@@ -759,11 +729,12 @@ mod tests {
                 disposition: ReferenceDisposition::Feasible,
             }],
         };
-        let errors =
-            audit_screening_funnel(&ids, &complete_records(&ids), &labels).unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::UnknownReferenceLabel(
-            "not-in-universe".to_string()
-        )));
+        let errors = audit_screening_funnel(&ids, &complete_records(&ids), &labels).unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::UnknownReferenceLabel(
+                "not-in-universe".to_string()
+            ))
+        );
     }
 
     #[test]
@@ -781,22 +752,24 @@ mod tests {
                 },
             ],
         };
-        let errors =
-            audit_screening_funnel(&ids, &complete_records(&ids), &labels).unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::DuplicateReferenceLabel(
-            "candidate-a".to_string()
-        )));
+        let errors = audit_screening_funnel(&ids, &complete_records(&ids), &labels).unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::DuplicateReferenceLabel(
+                "candidate-a".to_string()
+            ))
+        );
     }
 
     #[test]
     fn candidate_universe_duplicate_is_rejected() {
         let ids = vec!["candidate-a".to_string(), "candidate-a".to_string()];
-        let errors =
-            audit_screening_funnel(&ids, &complete_records(&ids), &feasible_labels(&ids))
-                .unwrap_err();
-        assert!(errors.contains(&FunnelValidationError::DuplicateCandidateId(
-            "candidate-a".to_string()
-        )));
+        let errors = audit_screening_funnel(&ids, &complete_records(&ids), &feasible_labels(&ids))
+            .unwrap_err();
+        assert!(
+            errors.contains(&FunnelValidationError::DuplicateCandidateId(
+                "candidate-a".to_string()
+            ))
+        );
     }
 
     #[test]
