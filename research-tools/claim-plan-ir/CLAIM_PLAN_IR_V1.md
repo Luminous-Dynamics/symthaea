@@ -7,7 +7,7 @@
 
 ## 1. Purpose
 
-Claim Plan IR (CPIR) is a verifier-authorized, deterministic intermediate representation for a single private claim. It prevents separately correct components from silently composing different sources, fields, units, predicates, audiences, policies, or trust profiles.
+Claim Plan IR (CPIR) is a verifier-authorized, deterministic intermediate representation for a single private claim that may depend on multiple typed fields from one authenticated HTTP response. It prevents separately correct components from silently composing different sources, fields, units, predicates, audiences, policies, or trust profiles.
 
 The relying verifier or domain policy owner supplies the plan. The claimant may provide witness material and choose among explicitly permitted source sessions, but may not widen the requested field, parser, policy, audience, proof program, uniqueness scope, or trust profile.
 
@@ -67,7 +67,7 @@ The plan fixes:
 - opaque plan identifier and version;
 - policy owner/issuer reference and policy digest;
 - verifier identity, audience, purpose and intended claim;
-- verifier-issued challenge reference, nonce commitment and expiry;
+- verifier-issued challenge reference, nonce commitment, request issue time (`issued_at`) and expiry;
 - request digest and the allowed public inputs.
 
 The plan is created before source acquisition. A claimant cannot self-issue a new audience, freshness window, or challenge and have it treated as equivalent.
@@ -105,10 +105,13 @@ The field contract fixes:
 - response framing restrictions and body offset mapping;
 - media type and content-encoding policy;
 - JSON parser/schema profile and digest;
-- exact RFC 6901 JSON Pointer;
+- one or more exact RFC 6901 JSON Pointers (v1 admits 1–64 typed fields from the same authenticated response ordinal);
+- a unique stable `field_id` for each field, referenced by the predicate AST;
 - duplicate-key behavior (v1 requires rejection);
 - Unicode comparison/normalization policy (v1 defaults to exact scalar sequence; no implicit normalization);
-- lexical rules for the selected scalar and resource limits.
+- lexical rules for each selected scalar and resource limits.
+
+All field openings in a v1 plan must come from the same authenticated response ordinal/direction and share one HTTP parser and application schema profile. Duplicate field IDs and duplicate JSON Pointers reject. The predicate compiler must bind every selected field; unused field selections reject rather than silently increasing disclosure.
 
 A body-relative JSON span is not a TLS transcript offset. The mapping must be derived through the frozen HTTP framing profile and then authenticated by the selected TLSNotary opening. A parser result cannot authenticate itself.
 
@@ -116,7 +119,7 @@ A hidden JSON string requires a proof of the relevant lexical grammar as well as
 
 ### 4.5 Typed interpretation and predicate
 
-The plan fixes the conversion profile from raw field bytes to a typed semantic value. Examples:
+The plan fixes a conversion profile for each field from raw field bytes to a typed semantic value. The predicate AST addresses fields by `field_id`, never by a host-supplied value or positional index. Examples:
 - money: currency, minor-unit scale, decimal grammar, sign and rounding policy;
 - time: timezone, calendar/epoch representation and freshness boundary;
 - quantities: dimension, unit and conversion version;
@@ -124,7 +127,7 @@ The plan fixes the conversion profile from raw field bytes to a typed semantic v
 
 Avoid floating-point money and unspecified locale parsing. Conversion MUST be deterministic and versioned. Any normalized value must be derived from the exact authenticated field under the declared conversion profile.
 
-The predicate AST is typed and versioned. Public constants and private witness inputs are explicit. The proof relation consumes the exact value derived by the field contract; it cannot accept a parallel caller-provided scalar.
+The predicate AST is typed and versioned. It supports boolean composition (`all`, `any`, `not`), typed comparisons, and a timestamp freshness leaf anchored to the verifier request's `issued_at`. Public constants and private witness inputs are explicit. The compiler resolves every `field_id`, checks operand types and verifies that all selected fields participate in the predicate. The proof relation consumes the exact values derived by the field contracts; it cannot accept a parallel caller-provided scalar. A freshness leaf is admitted only for a field parsed under the RFC 3339 timestamp profile and binds maximum age plus permitted future skew to the verifier request issue time.
 
 ### 4.6 Privacy-preserving uniqueness
 
@@ -231,8 +234,8 @@ VerifierApprovedPlan
   -> VerifiedSourceSession
   -> AuthenticatedTranscript
   -> OpenedTranscriptRange
-  -> ParsedClaimField
-  -> TypedClaimValue
+  -> ParsedClaimFieldSet
+  -> TypedClaimValueSet
   -> PredicateStatement
   -> ProofReceipt
   -> MycelixQualificationInput
@@ -248,7 +251,7 @@ A deterministic compiler has two outputs:
 1. a canonical public plan and plan digest;
 2. a compiled obligation/dependency manifest naming the exact verification steps and owner for each.
 
-Compilation fails closed on missing trust roots, unsupported source mode, unresolved parser/schema, ambiguous field encoding, unspecified units, floating-point policy values, stale/revoked key snapshot, missing proof program identity, unsupported uniqueness scope, or an incomplete dependency owner.
+Compilation fails closed on missing trust roots, unsupported source mode, unresolved parser/schema, ambiguous field encoding, duplicate or unreferenced field IDs, unresolved predicate field references, operand/type mismatch, invalid freshness semantics, unspecified units, floating-point policy values, stale/revoked key snapshot, missing proof program identity, unsupported uniqueness scope, or an incomplete dependency owner.
 
 Compilation is not execution. A compiled plan does not prove that any TLS session occurred, that an opening verifies, that a credential is current, or that an action is authorized.
 
@@ -297,6 +300,8 @@ For an eventual matched system benchmark, report source/session time, notary/TEE
 
 ## 10. Initial fixture corpus
 
+The positive fixture now demonstrates one multi-field ZAR eligibility decision from one authenticated response: `currency == ZAR`, `available_minor_units >= 100000`, and `as_of` fresh within 300 seconds of verifier `issued_at` (with 30 seconds future skew). This avoids relying on host-supplied pre-normalized composites.
+
 The standalone fixture directory now contains:
 - one synthetic ZAR balance plan positive fixture;
 - unsafe integer literal (JCS/I-JSON admission);
@@ -307,6 +312,21 @@ The standalone fixture directory now contains:
 - a machine-readable manifest describing the expected rejection stage.
 
 The fixtures are structural/semantic test inputs only. They contain zero digests and synthetic profile IDs, so they do not represent a valid cryptographic trust profile, issued credential, source session, or proof. The duplicate-member fixture must be rejected by the raw JSON admission parser before a normal JSON object is formed.
+
+### Standalone Rust preflight prototype
+
+An isolated, research-only Rust workspace now exists at `research-tools/claim-plan-ir/validator/`. Its intended admission pipeline is:
+
+1. bounded raw JSON input;
+2. custom duplicate-aware deserialization (reject decoded duplicate keys before ordinary object construction);
+3. integer/floating-point admission before JCS;
+4. JSON Schema 2020-12 validation with format assertions enabled;
+5. cross-field semantic checks for multi-field binding, typed predicate references, freshness, status maturity, HTTPS origin/server continuity and source-mode/commitment consistency;
+6. RFC 8785 serialization and domain-separated SHA-256 plan digest.
+
+Direct crate versions are pinned in `Cargo.toml`: `jsonschema 0.61.2`, `serde_json_canonicalizer 0.4.1`, `serde_json 1.0.151`, `serde 1.0.229`, `sha2 0.10.9` and `hex 0.4.3`. JSON Schema format assertion is explicitly enabled. Canonicalization follows the duplicate-aware parser because canonicalization cannot repair ambiguous duplicate-key input after an ordinary map parser has discarded a duplicate.
+
+The Rust source contains authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields and floating-point inputs. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
 
 ## 11. Implementation sequence
 
