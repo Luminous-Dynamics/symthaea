@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 
 pub const SOURCE_OBSERVATION_SCHEMA_V1: &str = "mel-music-source-observation-v1";
