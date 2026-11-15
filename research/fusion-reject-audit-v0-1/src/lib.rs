@@ -663,6 +663,7 @@ fn log_add_exp(left: f64, right: f64) -> f64 {
     maximum + ((left - maximum).exp() + (right - maximum).exp()).ln()
 }
 
+#[cfg(test)]
 fn hypergeometric_pmf(
     population_size: usize,
     population_successes: usize,
@@ -922,7 +923,7 @@ mod tests {
         let outcomes = vec![AuditOutcome::ConfirmedInfeasible; 20];
         let samples_a = samples("a", &population_a, 20, 0x5eed_f00d_cafe_babe, &outcomes);
         let samples_b = samples("b", &population_b, 20, 0x5eed_f00d_cafe_babe, &outcomes);
-        let accepted = (0..1_000)
+        let accepted: Vec<AcceptedCandidate> = (0..1_000)
             .map(|index| accepted_candidate(index, AuditOutcome::ConfirmedFeasible))
             .collect();
 
@@ -1098,7 +1099,7 @@ mod tests {
     #[test]
     fn exact_hypergeometric_upper_bound_has_at_least_nominal_coverage() {
         let alpha = 0.05;
-        for population_size in 1..=18 {
+        for population_size in 1_usize..=18 {
             for sample_size in 0..=population_size {
                 for true_successes in 0..=population_size {
                     let minimum = sample_size.saturating_sub(population_size - true_successes);
