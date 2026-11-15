@@ -8,7 +8,7 @@
 
 This crate is a small, deterministic route-candidate kernel. It consumes a declared craft-specific polar surface and qualified wind/current/waypoint-bearing inputs. It calculates:
 
-- whether the direct waypoint bearing lies inside the supplied craft-specific no-go sector;
+- whether the direct waypoint bearing lies inside the supplied craft-specific no-go sector (the boundary is inclusive);
 - the best port- and starboard-tack course candidate under the supplied polar surface;
 - predicted boat speed and ground velocity made good (VMG), including the supplied current vector.
 
@@ -38,7 +38,7 @@ For each heading it computes the full true-wind-angle interval. A candidate is a
 
 The ground-VMG envelope is propagated with signed projection. If the heading points away from the waypoint, the upper boat-speed bound determines the most negative boat-VMG bound. Current speed/direction uncertainty is bounded separately. Non-finite interval arithmetic is rejected.
 
-The evaluator retains at most one worst-case-VMG candidate per tack. When port/starboard VMG envelopes overlap, it returns `RankingUnresolved` and preserves both candidates rather than forcing a winner. It is an interval envelope under declared input bounds, not a probabilistic forecast or physical validation.
+The evaluator retains at most one worst-case-VMG candidate per tack. It only declares a unique-best tack when both tack sides are represented and one side's best guaranteed VMG strictly exceeds the maximum possible VMG of every candidate on the other side. If the envelopes overlap, a tack side is absent, or the uncertainty reaches the dead-downwind side boundary, it preserves ambiguity instead of forcing a winner. It is an interval envelope under declared input bounds, not a probabilistic forecast or physical validation.
 
 The robust module does **not** yet model vertical wind profile, apparent-wind conversion, leeway, heel/roll, waves, tack/gybe duration or loss, actuator response, weather evolution, COLREG encounter resolution or a closed-loop sailcraft dynamics model. Those are separate research increments.
 
