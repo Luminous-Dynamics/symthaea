@@ -1,7 +1,8 @@
 //! Read-only evaluator for matched clean/shifted engineering continuations.
 //!
 //! The evaluator checks trace structure, evidence scope, selective invalidation,
-//! retained functionality and active-requirement conformance. Receipt digests
+//! retained functionality, active-requirement conformance and longitudinal
+//! time spent with obligations lacking current passing evidence. Receipt digests
 //! provide deterministic integrity checks only; they do not authenticate a
 //! producer, source observation, test execution, authority or CI result.
 
