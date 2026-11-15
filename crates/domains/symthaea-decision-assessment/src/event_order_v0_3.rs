@@ -2052,7 +2052,6 @@ impl OwnerReceiptAssessment {
             self.digest_integrity,
             self.authenticity,
             self.scope_qualification,
-            self.completeness,
             self.semantic_qualification,
         ];
         if gates.contains(&GateState::Fail) {
@@ -2173,6 +2172,7 @@ pub fn project_action_history(
 ) -> Result<ActionHistoryProjectionReport, ReplayError> {
     validate_schedule(schedule)?;
     let replay = replay_virtual_schedule(schedule)?;
+    let canonical_actions = ordered_actions(schedule);
     let mut reasons = BTreeSet::new();
     let mut critical = false;
     let mut indeterminate = false;
@@ -2187,7 +2187,7 @@ pub fn project_action_history(
     let mut terminal_actions = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, OwnerReceiptAssessment)>::new();
     let mut commits = Vec::new();
 
-    for action in &schedule.actions {
+    for action in &canonical_actions {
         match &action.action {
             ScheduleAction::EffectAttempted { operation_id, attempt_id } => {
                 let key = (operation_id.clone(), attempt_id.clone());
@@ -2428,7 +2428,7 @@ pub fn project_action_history(
     let mut inventories = Vec::<(AttemptHistoryInventory, String)>::new();
     let mut stop_trigger_actions = BTreeMap::<String, (&ScheduledAction, StopScope, String, QualifiedEventTime)>::new();
     let mut latest_policy_actions = BTreeMap::<String, (&ScheduledAction, StopScope, String, QualifiedEventTime)>::new();
-    for action in &schedule.actions {
+    for action in &canonical_actions {
         match &action.action {
             ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
                 let (scope, receipt_ref, receipt_sha256) = match &action.evidence {
@@ -2617,7 +2617,7 @@ pub fn project_action_history(
     }
 
     let mut discharged_obligation_ids = BTreeSet::new();
-    for action in &schedule.actions {
+    for action in &canonical_actions {
         let ScheduleAction::StopDischarged {
             obligation_id, trigger_action_id, policy_revision_action_id, policy_revision,
             receipt_ref, receipt_sha256,
