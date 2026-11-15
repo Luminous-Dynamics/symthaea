@@ -39,6 +39,7 @@ jobs:
         run: cargo clippy --manifest-path tools/sympsi-adversarial-null/Cargo.toml --all-targets -- -D warnings
 
       - name: Run adversarial null-world campaigns
+        continue-on-error: true
         env:
           EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
@@ -46,12 +47,53 @@ jobs:
             --git-head "$EXACT_HEAD" \
             --manifest tools/sympsi-adversarial-null/fixtures/manifest-v0.1.json \
             --out "$RUNNER_TEMP/sympsi-adversarial-null-receipt.json"
-          cat "$RUNNER_TEMP/sympsi-adversarial-null-receipt.json"
 
-      - name: Upload adversarial-null receipt
+      - name: Preserve scenario diagnostics even when qualification fails
+        if: always()
+        run: |
+          receipt="$RUNNER_TEMP/sympsi-adversarial-null-receipt.json"
+          if [ ! -f "$receipt" ]; then
+            echo "No receipt was emitted; runner or precondition failed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          jq -c '.receipt.scenarios[] | {
+            profile,
+            scenario_id,
+            exchangeability_unit,
+            naive_fixed_1_over_k: {
+              rejections: .naive_fixed_1_over_k.rejections,
+              empirical_rate: .naive_fixed_1_over_k.empirical_rate,
+              wilson_99: .naive_fixed_1_over_k.wilson_99,
+              disposition: .naive_fixed_1_over_k.disposition
+            },
+            global_conditional_target_randomization: {
+              rejections: .global_conditional_target_randomization.rejections,
+              empirical_rate: .global_conditional_target_randomization.empirical_rate,
+              wilson_99: .global_conditional_target_randomization.wilson_99,
+              disposition: .global_conditional_target_randomization.disposition
+            },
+            block_conditional_target_randomization: {
+              rejections: .block_conditional_target_randomization.rejections,
+              empirical_rate: .block_conditional_target_randomization.empirical_rate,
+              wilson_99: .block_conditional_target_randomization.wilson_99,
+              disposition: .block_conditional_target_randomization.disposition
+            }
+          }' "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          jq -c '.receipt.controls[] | select(.passed == false)' "$receipt" >> "$GITHUB_STEP_SUMMARY" || true
+          sha256sum "$receipt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload adversarial-null receipt (including failed qualification)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sympsi-adversarial-null-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/sympsi-adversarial-null-receipt.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
+
+      - name: Enforce adversarial-null qualification gate
+        if: always()
+        run: |
+          receipt="$RUNNER_TEMP/sympsi-adversarial-null-receipt.json"
+          test -f "$receipt"
+          jq -e '.receipt.all_controls_passed == true' "$receipt" >/dev/null
