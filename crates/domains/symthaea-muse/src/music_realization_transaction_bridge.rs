@@ -1756,14 +1756,25 @@ mod tests {
             reason_code: None,
         });
         receipt = seal_music_realization_bridge_receipt_v1(receipt.payload).unwrap();
-        assert!(verify_music_realization_transaction_binding_v1(
+        assert_eq!(tx.attempts[0].render_calls, 1);
+        assert_eq!(
+            receipt.payload.execution_events
+                .iter()
+                .filter(|event| event.state == MusicRealizerExecutionEventStateV1::Submitted)
+                .count(),
+            2
+        );
+        let issues = verify_music_realization_transaction_binding_v1(
             &tx,
             &expected_binding(),
             &receipt,
-            Some(bytes)
+            Some(bytes),
         )
-        .unwrap_err()
-        .contains(&MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted));
+        .unwrap_err();
+        assert!(
+            issues.contains(&MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted),
+            "expected submission under-count; got: {issues:?}"
+        );
         let issues = verify_music_realization_transaction_binding_v1(
             &tx,
             &expected_binding(),
