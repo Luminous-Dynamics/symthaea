@@ -668,7 +668,7 @@ fn validate_connections(
             profiles.get(connection.from_module_ref.as_str()).copied(),
             profiles.get(connection.to_module_ref.as_str()).copied(),
         ) else {
-            findings.add(ReconfigurationReasonCode::PortMissing, ReasonSeverity::Indeterminate, &connection.connection_ref);
+            findings.add(ReconfigurationReasonCode::PortMissing, missing_severity(target.resolution), &connection.connection_ref);
             continue;
         };
 
