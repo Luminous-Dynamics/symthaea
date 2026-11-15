@@ -611,5 +611,7 @@
     "vendor_claim_not_independent_result",
     "no_environmental_benefit_without_metered_or_validated_LCA_evidence",
     "no_actuation_or_machine_safety_authority"
-  ]
+  ],
+  "factory_bench_issue": 12289,
+  "companion_corpus_path": "research/atelier/factorybench/factory-bench-corpus.v0.1.json"
 }
