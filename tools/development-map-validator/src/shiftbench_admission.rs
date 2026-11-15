@@ -214,7 +214,12 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
     }
 
     digest_field(&manifest, &["gold_custody", "gold_label_manifest_digest"], "gold_custody.gold_label_manifest_digest", &mut report);
-    if required_string(&manifest, &["gold_custody", "custodian_id"], "gold_custody.custodian_id", &mut report).is_none() {}
+    let _custodian_id = required_string(
+        &manifest,
+        &["gold_custody", "custodian_id"],
+        "gold_custody.custodian_id",
+        &mut report,
+    );
     if bool_at(&manifest, &["gold_custody", "candidate_readable"]) != Some(false) {
         report.error("gold_custody.candidate_readable", "must be explicitly false");
     }
