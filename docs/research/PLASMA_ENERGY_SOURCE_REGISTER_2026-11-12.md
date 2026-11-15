@@ -686,3 +686,15 @@ The paper states that insulating-duct capability and validation against ALEX ins
 Reproduce each source case with exact geometry, electrical wall condition, conductivity ratio, Hartmann / Reynolds / interaction parameters, applied-field profile, boundary conditions, model closure, solver revision and experimental uncertainty. Compare pressure drop, flow distribution and thermal observables separately. Hold out at least one field profile or geometry for transfer testing. Keep SAM reduced-order output, NekRS high-fidelity output and ALEX measurements as three distinct evidence records.
 
 The source register adds `FUSION-BLANKET-MHD-SAM-NEKRS-ALEX-2026` plus negative controls against model/evidence substitution and extrapolation to insulating/full-blanket designs.
+
+
+## 9.17 Warm-plasma CO2 quenching frontier — 2026-11-15
+
+The new [PLASMA-QUENCH-001 #12342](https://github.com/Luminous-Dynamics/symthaea/issues/12342) separates post-plasma chemistry preservation from in-plasma dissociation. Four source cases have been added:
+
+- **Counterflow experiment:** Chen et al., Journal of Environmental Chemical Engineering 14 (2026), DOI 10.1016/j.jece.2026.122322. The MAGD-stabilized 4 slm / 792 W point reports 23.6% conversion and 25.1% efficiency. A separate 302 W highlight reports 46.2% efficiency; its conversion is not inferred. The source reports 207.3% / 203.6% relative improvements at the 2.5 counterflow ratio / 30 mm distance parameter point. These relative and absolute metrics remain distinct.
+- **Particle-assisted catalytic quench model:** Albrechts et al., Journal of CO2 Utilization 112 (2026), DOI 10.1016/j.jcou.2026.103579. A kinetic model predicts 49% / 29% baseline to 79% / 47% with Al2O3-particle-assisted cooling and O-O recombination; SO2-assisted model results are 72% / 43%. All are model predictions.
+- **Multidimensional arc quenching model:** Albrechts et al., Chemical Engineering Journal (2026), DOI 10.1016/j.cej.2026.176010. The 2D model is compared with nozzle and heat-exchanger experiments. It predicts around 20% conversion / 30% efficiency under source-comparable stable-takeover cases; >50% conversion is conditional on perfect wall cooling and must not be represented as demonstrated.
+- **Thermal-management measurements/model:** Kaufmann et al., Results in Chemistry 27 (2026), DOI 10.1016/j.rechem.2026.103513. The source reports radiation up to 70% of plasma power in its reactor and source-specific thermal gradients / catalyst-zone temperature results; these are not universal constants or a complete product efficiency.
+
+The benchmark treats product-species preservation, cooling trajectory, discharge stability, heat recovery, pressure drop, quench auxiliaries, separation, uptime and maintenance as coupled but separately measured dimensions. The corpus now includes four quench source cases and eight adversarial controls against operating-point mixing, relative/absolute metric confusion, model-to-experiment promotion, ideal-wall extrapolation, chemistry transfer and omitted quench loads.
