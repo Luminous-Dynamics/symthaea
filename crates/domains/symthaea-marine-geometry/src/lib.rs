@@ -1,10 +1,11 @@
 //! Deterministic, deliberately scoped marine geometry admission.
 
-pub mod section;
 //!
 //! This crate validates a versioned triangle-mesh interchange artifact. It is
 //! not a CAD kernel, hydrostatics solver, self-intersection detector, DFM
 //! checker, CFD solver, or vessel-approval system.
+
+pub mod section;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
