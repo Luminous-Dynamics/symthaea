@@ -286,3 +286,17 @@ A potentially defensible next step is to qualify **the link between upstream pla
 - quantify avoided scrap/rework, reduced destructive testing, energy and lifecycle cost against incumbent quality-control practice.
 
 The differentiator is therefore not "more sensors". It is a validated, material-aware process-quality model whose predictions are audited against actual downstream product outcomes and whose economic value is demonstrated under production conditions. Even this is a hypothesis until compared against the vendor's existing process-control and quality systems.
+
+
+## Matched five-polymer plasma reference — 2026-11-15
+
+Péczi-Kovács & Kókai (20 October 2026) supplies an unusually useful source-specific benchmark because Ar and N2 are compared on five engineering thermoplastics under identical processing conditions (DOI 10.1007/s44245-026-00396-4).
+
+Important metrics include:
+- PP + Loctite EA 9466: N2 11.6 ± 0.7 MPa vs untreated 0.5 ± 0.1 MPa, with WCA 17° vs 94°.
+- PP + Soudal Fix All Flexi: Ar 0.8 MPa vs N2 0.3 ± 0.05 MPa despite WCA 60° vs 17°.
+- HIPS + Soudal Fix All X-treme Power Express: both gases 4.9 MPa despite WCA 25° (Ar) vs 0° (N2).
+- PET + Loctite 4860: Ar 2.4 ± 0.5 MPa vs N2 2.0 ± 0.1 MPa despite WCA 31° vs 13°.
+- N2 visible treatment damage at PP 500 mm/min and PVC/HIPS 250 mm/min; argon had no visible damage in its tested window.
+
+This strengthens the competitive claim boundary: vendors can monitor discharge power, OES, flow, pressure and rotation; the product-level differentiation is a calibrated, adhesive-specific model that jointly predicts bond outcome and substrate damage, then abstains for unqualified profiles. The source has only three specimens per treatment group, no aging cohort and no complete wall-plug energy boundary; it is a lab comparator, not production qualification.
