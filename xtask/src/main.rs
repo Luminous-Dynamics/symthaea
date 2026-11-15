@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod plasma_medical_evidence_audit;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -62,6 +63,8 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Audit medical plasma research claims against source-specific evidence ceilings.
+    PlasmaMedicalEvidenceAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +108,13 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::PlasmaMedicalEvidenceAudit => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            plasma_medical_evidence_audit::run(&root)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
