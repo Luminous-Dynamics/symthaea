@@ -100,7 +100,7 @@
           "predicted_affected_obligation_ids": [],
           "receipts": [
             {
-              "receipt_id": "clean-epoch1-api",
+              "receipt_id": "clean-epoch0-api",
               "obligation_id": "api-contract",
               "check_id": "api-compatibility",
               "outcome": "pass",
@@ -108,12 +108,12 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "c76c62895534780b5f2ccf4aee7e812f07626bdc9186ad4f2f7a52929bf4e250",
+              "receipt_digest": "bac71f2fa4b205f3f62417af671a3df1e006b9d19421f0757bb98772d8012177",
               "observed_at": "2026-11-15T07:01:00Z",
               "available_at": "2026-11-15T07:02:00Z"
             },
             {
-              "receipt_id": "clean-epoch1-build",
+              "receipt_id": "clean-epoch0-build",
               "obligation_id": "build-repro",
               "check_id": "reproducible-build",
               "outcome": "pass",
@@ -121,7 +121,7 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "aa8faf6a2f1f4c34ead203fa797949195418555395e552e53375d8f73de854a7",
+              "receipt_digest": "bc5c3e6e1bd3bb4c4d84f277b125c20e91655673f9b41a5cd7467b4f57c885e2",
               "observed_at": "2026-11-15T07:01:00Z",
               "available_at": "2026-11-15T07:02:00Z"
             }
@@ -224,7 +224,7 @@
               "available_at": "2026-11-15T07:13:00Z"
             },
             {
-              "receipt_id": "shifted-epoch1-build",
+              "receipt_id": "shifted-epoch0-build",
               "obligation_id": "build-repro",
               "check_id": "reproducible-build",
               "outcome": "pass",
@@ -232,7 +232,7 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "e3adde987a3507da4bc56c3ab419db776f2fa404978dbd4ce18af01bf2257954",
+              "receipt_digest": "38b87b38ad9005dff8e968aeb26a61f3d211db1ad6ca3f0a1212aede8025b4c4",
               "observed_at": "2026-11-15T07:01:00Z",
               "available_at": "2026-11-15T07:02:00Z"
             },
