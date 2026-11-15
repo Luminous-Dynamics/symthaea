@@ -75,6 +75,7 @@ cargo test --manifest-path Cargo.toml
 cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
+cargo run --manifest-path Cargo.toml --bin qualify_plant_service
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
