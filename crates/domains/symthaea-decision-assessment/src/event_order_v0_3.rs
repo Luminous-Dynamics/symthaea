@@ -2222,12 +2222,67 @@ pub struct ProjectedCancellationAcknowledgement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedTerminalReconciliation {
+    pub action_id: String,
+    pub logical_operation_id: String,
+    pub attempt_id: String,
+    pub exact_start_action_id: String,
+    pub outcome: ReconciledOperationOutcome,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectedStopEvidenceKind {
+    Trigger,
+    PolicyRevision,
+    Discharge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedStopEvidence {
+    pub action_id: String,
+    pub obligation_id: String,
+    pub kind: ProjectedStopEvidenceKind,
+    pub policy_revision: String,
+    pub scope: StopScope,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedInventoryAttestation {
+    pub action_id: String,
+    pub scope: StopScope,
+    pub inventory_frontier_event_id: String,
+    pub attempt_manifest_sha256: String,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub identity: GateState,
+    pub digest_integrity: GateState,
+    pub authenticity: GateState,
+    pub scope_qualification: GateState,
+    pub completeness: GateState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionHistoryProjectionReport {
+    pub schedule_sha256: Option<String>,
+    pub replay_sha256: Option<String>,
     pub disposition: EventTraceDisposition,
     pub attempts: Vec<OperationAttemptRecord>,
+    pub terminal_reconciliations: Vec<ProjectedTerminalReconciliation>,
     pub attempt_lifecycle: AttemptLifecycleReport,
     pub obligations: Vec<ScopedStopObligation>,
+    pub stop_evidence: Vec<ProjectedStopEvidence>,
     pub inventory: Option<AttemptHistoryInventory>,
+    pub inventory_attestations: Vec<ProjectedInventoryAttestation>,
     pub start_gate: Option<StartGateReport>,
     pub effect_commits: Vec<ProjectedEffectCommit>,
     pub cancellation_acknowledgements: Vec<ProjectedCancellationAcknowledgement>,
@@ -2290,15 +2345,20 @@ fn action_projection_failure(fault: ProjectionFault) -> ActionHistoryProjectionR
         ProjectionFault::Critical(code) => (EventTraceDisposition::CriticalFailure, code),
     };
     ActionHistoryProjectionReport {
+        schedule_sha256: None,
+        replay_sha256: None,
         disposition,
         attempts: Vec::new(),
+        terminal_reconciliations: Vec::new(),
         attempt_lifecycle: AttemptLifecycleReport {
             disposition,
             pending_attempt_ids: Vec::new(),
             reason_codes: vec![code.to_owned()],
         },
         obligations: Vec::new(),
+        stop_evidence: Vec::new(),
         inventory: None,
+        inventory_attestations: Vec::new(),
         start_gate: None,
         effect_commits: Vec::new(),
         cancellation_acknowledgements: Vec::new(),
@@ -2585,6 +2645,17 @@ pub fn project_action_history(
                     start_to_terminal_order: start_to_terminal,
                 };
                 attempt_terminal_times.insert(attempt_id.clone(), terminal_time.clone());
+                terminal_receipts.push(ProjectedTerminalReconciliation {
+                    action_id: terminal_action.action_id.clone(),
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    exact_start_action_id,
+                    outcome: mapped_outcome,
+                    owner_time: terminal_time.clone(),
+                    receipt_ref: receipt_ref.clone(),
+                    receipt_sha256: receipt_sha256.clone(),
+                    receipt_qualification: assessment.receipt_qualification(),
+                });
                 (Some(record), Some(terminal_time.clone()))
             } else {
                 indeterminate = true;
@@ -2687,7 +2758,17 @@ pub fn project_action_history(
                         continue;
                     }
                 };
-                let _ = (receipt_ref, receipt_sha256, assessment);
+                stop_evidence.push(ProjectedStopEvidence {
+                    action_id: action.action_id.clone(),
+                    obligation_id: obligation_id.clone(),
+                    kind: ProjectedStopEvidenceKind::Trigger,
+                    policy_revision: policy_revision.clone(),
+                    scope: scope.clone(),
+                    owner_time: owner_time.clone(),
+                    receipt_ref,
+                    receipt_sha256,
+                    receipt_qualification: assessment.receipt_qualification(),
+                });
                 if stop_trigger_actions.insert(obligation_id.clone(), (action, scope.clone(), policy_revision.clone(), owner_time.clone())).is_some() {
                     critical = true;
                     reasons.insert(format!("DUPLICATE_STOP_TRIGGER:{obligation_id}"));
@@ -2771,10 +2852,21 @@ pub fn project_action_history(
                         }
                     }
                 }
-                let _ = (trigger_action, receipt_ref, receipt_sha256, assessment);
                 if revision_is_ordered {
+                    stop_evidence.push(ProjectedStopEvidence {
+                        action_id: action.action_id.clone(),
+                        obligation_id: obligation_id.clone(),
+                        kind: ProjectedStopEvidenceKind::PolicyRevision,
+                        policy_revision: policy_revision.clone(),
+                        scope: scope.clone(),
+                        owner_time: owner_time.clone(),
+                        receipt_ref,
+                        receipt_sha256,
+                        receipt_qualification: assessment.receipt_qualification(),
+                    });
                     latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
                 }
+                let _ = trigger_action;
             }
             ScheduleAction::AttemptInventoryAttested {
                 scope, inventory_frontier_event_id, attempt_manifest_sha256,
@@ -2871,6 +2963,20 @@ pub fn project_action_history(
                     }
                 }
                 inventory_frontier_times.insert(inventory_frontier_event_id.clone(), frontier_time);
+                inventory_attestations.push(ProjectedInventoryAttestation {
+                    action_id: action.action_id.clone(),
+                    scope: scope.clone(),
+                    inventory_frontier_event_id: inventory_frontier_event_id.clone(),
+                    attempt_manifest_sha256: attempt_manifest_sha256.clone(),
+                    owner_time: inventory_time.clone(),
+                    receipt_ref: receipt_ref.clone(),
+                    receipt_sha256: receipt_sha256.clone(),
+                    identity: assessment.identity,
+                    digest_integrity: assessment.digest_integrity,
+                    authenticity: assessment.authenticity,
+                    scope_qualification: assessment.scope_qualification,
+                    completeness: assessment.completeness,
+                });
                 inventories.push((AttemptHistoryInventory {
                     inventory_frontier_event_id: inventory_frontier_event_id.clone(),
                     attempt_manifest_sha256: attempt_manifest_sha256.clone(),
@@ -3013,6 +3119,17 @@ pub fn project_action_history(
                 EventOrder::Before => {}
             }
         }
+        stop_evidence.push(ProjectedStopEvidence {
+            action_id: action.action_id.clone(),
+            obligation_id: obligation_id.clone(),
+            kind: ProjectedStopEvidenceKind::Discharge,
+            policy_revision: current_policy.clone(),
+            scope: scope.clone(),
+            owner_time: discharge_time.clone(),
+            receipt_ref: receipt_ref.clone(),
+            receipt_sha256: receipt_sha256.clone(),
+            receipt_qualification: assessment.receipt_qualification(),
+        });
         let discharge = StopDischargeReceipt {
             event_id: action.action_id.clone(),
             obligation_id: obligation_id.clone(),
@@ -3242,11 +3359,16 @@ pub fn project_action_history(
         gate
     });
     Ok(ActionHistoryProjectionReport {
+        schedule_sha256: Some(replay.schedule_sha256.clone()),
+        replay_sha256: Some(replay.replay_sha256.clone()),
         disposition,
         attempts,
+        terminal_reconciliations: terminal_receipts,
         attempt_lifecycle,
         obligations,
+        stop_evidence,
         inventory,
+        inventory_attestations,
         start_gate,
         effect_commits: commits,
         cancellation_acknowledgements,
