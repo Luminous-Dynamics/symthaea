@@ -623,7 +623,7 @@ mod tests {
         receipt.revision = source.revision.clone();
         receipt.tree_oid = source.tree_oid.clone();
         receipt.configuration_world_digest = source.configuration_world_digest.clone();
-        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
+        receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, receipt).expect("reseal");
         assert!(evaluate_shift_scenario(&scenario).is_err());
     }
 
@@ -636,7 +636,7 @@ mod tests {
         let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
             .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
         receipt.available_at = "2026-11-15T07:16:00Z".to_owned();
-        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
+        receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, receipt).expect("reseal");
         assert!(evaluate_shift_scenario(&scenario).is_err());
     }
 
@@ -649,7 +649,7 @@ mod tests {
         let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
             .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
         receipt.observed_at = "2026-11-15T07:14:00Z".to_owned();
-        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
+        receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, receipt).expect("reseal");
         assert!(evaluate_shift_scenario(&scenario).is_err());
     }
 
