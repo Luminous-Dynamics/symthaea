@@ -136,12 +136,6 @@ Require non-identical assessment forms and no AI assistance during independent t
 
 A strong joint artifact with no independent human gain is not capability amplification.
 
-### 5.4 Distributional capability amplification
-
-A pooled treatment effect is insufficient. Report treatment-control independent-learning gain and the negative individual-gain rate within every preregistered baseline task-capability stratum. The strata must be fixed from pretest data before post-test outcomes are inspected; underfilled strata remain unavailable rather than being merged after the fact.
-
-**Qualification target:** no stratum is omitted from reporting, every adequately sampled stratum has its own participant-level bootstrap interval, and any stratum whose collaborative negative-gain rate exceeds its control rate is explicitly surfaced. Do not infer protected or sensitive identity from task-performance strata. This is a distributional outcome report, not a single fairness score.
-
 ### 5.3 Metacognitive reliability
 
 Keep separate:
@@ -151,6 +145,13 @@ Keep separate:
 - Human-first attempt, monitoring, reflection, AI core-step supply, AI substitution among supplied steps, and human verification rates.
 
 **Qualification target:** on a locked synthetic epistemic slice, first-person false-belief classification ≥0.95, material source-attribution precision ≥0.95 and recall ≥0.90, contradiction detection ≥0.90, and unsupported certainty on unknown claims ≤0.05. These are pilot targets; human-facing confirmatory thresholds must be validated and preregistered.
+
+### 5.4 Distributional capability amplification
+
+A pooled treatment effect is insufficient. Report treatment-control independent-learning gain and the negative individual-gain rate within every preregistered baseline task-capability stratum. The strata must be fixed from pretest data before post-test outcomes are inspected; underfilled strata remain unavailable rather than being merged after the fact.
+
+**Qualification target:** no stratum is omitted from reporting, every adequately sampled stratum has its own participant-level bootstrap interval, and any stratum whose collaborative negative-gain rate exceeds its control rate is explicitly surfaced. Do not infer protected or sensitive identity from task-performance strata. This is a distributional outcome report, not a single fairness score.
+
 
 ## 6. Creative quality and diversity
 
