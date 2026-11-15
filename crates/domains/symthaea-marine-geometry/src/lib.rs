@@ -846,7 +846,7 @@ mod tests {
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
         assert!(report.checks.iter().any(|c| {
-            c.code == "positive_signed_volume" && c.status == CheckStatus::Fail
+            c.code == "positive_component_signed_volumes" && c.status == CheckStatus::Fail
         }));
     }
 
@@ -931,6 +931,28 @@ mod tests {
         assert!(report.checks.iter().any(|c| {
             c.code == "finite_coordinates" && c.status == CheckStatus::Fail
         }));
+    }
+
+    #[test]
+    fn inward_small_disconnected_component_cannot_hide_behind_positive_total_volume() {
+        let mut candidate = tetrahedron();
+        candidate.geometry.vertices.extend([
+            [3.0, 0.0, 0.0],
+            [3.5, 0.0, 0.0],
+            [3.0, 0.5, 0.0],
+            [3.0, 0.0, 0.5],
+        ]);
+        let offset_faces = [[0_u32, 2_u32, 1_u32], [0, 1, 3], [0, 3, 2], [1, 2, 3]];
+        for [a, b, c] in offset_faces {
+            candidate.geometry.faces.push([a + 4, c + 4, b + 4]);
+        }
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
+        let report = admit(&candidate);
+        assert!(report.metrics.signed_volume_m3.unwrap() > 0.0);
+        assert_eq!(report.metrics.component_signed_volumes_m3.len(), 2);
+        assert!(report.metrics.component_signed_volumes_m3.iter().any(|v| *v < 0.0));
+        assert_eq!(report.disposition, Disposition::Invalid);
     }
 
     #[test]
