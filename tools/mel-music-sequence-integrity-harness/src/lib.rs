@@ -561,7 +561,7 @@ pub struct BranchMergePlanV1 {
     pub conflicts: Vec<BranchMergeConflictV1>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MergeChoiceV1 {
     UseLeft,
@@ -819,8 +819,8 @@ fn diff_event_patches_v1(
     Ok(ids
         .into_iter()
         .filter_map(|event_id| {
-            let before = base.get(event_id).map(|event| (*event).clone());
-            let after = branch.get(event_id).map(|event| (*event).clone());
+            let before = base.get(event_id).map(|event| (**event).clone());
+            let after = branch.get(event_id).map(|event| (**event).clone());
             (before != after).then(|| MusicalEventPatchV1 {
                 event_id: event_id.to_owned(),
                 before,
