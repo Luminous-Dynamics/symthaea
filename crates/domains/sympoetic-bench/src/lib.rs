@@ -6,6 +6,7 @@
 
 pub mod agent_protocol;
 pub mod metrics;
+pub mod reliability;
 pub mod model;
 pub mod trajectory;
 pub mod validate;
