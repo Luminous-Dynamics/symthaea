@@ -1,7 +1,7 @@
 # Falsification power reference — design note
 
 **Date:** 2026-11-15  
-**Status:** candidate implementation; Rust compilation and tests not yet executed  
+**Status:** exact-head Rust qualification passed on source-integrated head 02f44f520e344277eae5cbc9a8aeabac8dcf482f; Rust 1.96.0, rustfmt, 11/11 tests and strict Clippy all passed in [focused workflow run #7](https://github.com/Luminous-Dynamics/symthaea/actions/runs/43760015297)  
 **Owner:** Symthaea issue #12375  
 **Implementation:** research/falsification-power-reference/
 
