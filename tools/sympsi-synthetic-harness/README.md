@@ -37,12 +37,12 @@ These are exact-binomial model calculations for independent synthetic trials, no
 - Outcome-dependent stopping and post-hoc exclusions.
 - Repeated experimental units presented to an iid analysis path.
 - Label recoding invariance and deterministic target-order permutation/re-scoring.
-- A pure four-/five-choice target-mapping primitive over **already verified** 32-byte beacon randomness: length-prefixed fields, domain-separated SHA-256, explicit scheme/chain/round/trial binding, and rejection sampling rather than modulo bias. Frozen known-answer vectors are cross-checked against an independent Python implementation.
+- A pure four-/five-choice target-mapping primitive over **already verified** 32-byte beacon randomness: length-prefixed fields, domain-separated SHA-256, explicit scheme/chain/round/trial/response-commitment binding, and rejection sampling rather than modulo bias. Frozen known-answer vectors are cross-checked against an independent Python implementation.
 - Deterministic receipts bound to the exact Git HEAD and exact manifest bytes.
 
 The direct leakage control only detects the known planted direct-target channel in its fixture. It does **not** claim to detect every possible unknown side channel. The target-order permutation control checks marginal preservation and score recomputation; it is not evidence of psi.
 
-The target-mapping function consumes a caller-supplied `verified_randomness` field, but it does **not** verify a drand signature, trust root, timestamp, or response-before-target chronology. Those remain the separate responsibilities of SCI-PSI-003. Its frozen known-answer vector maps the specified test beacon/context to target index 2 under both four- and five-choice mappings; independent target selection for actual experiments must use the complete versioned manifest and verifier receipts.
+The target-mapping function consumes a caller-supplied `verified_randomness` field and a response-commitment digest, but it does **not** verify a drand signature, trust root, timestamp, or response-before-target chronology. Those remain the separate responsibilities of SCI-PSI-003. Its frozen known-answer vector maps the specified test beacon/context/response commitment to target index 2 under both four- and five-choice mappings; independent target selection for actual experiments must use the complete versioned manifest and verifier receipts.
 
 ## Reproduce
 
