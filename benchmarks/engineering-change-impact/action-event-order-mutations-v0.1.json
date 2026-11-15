@@ -78,10 +78,10 @@
     },
     {
       "id": "MUT-EVT-007",
-      "base_case": "EO-UNK-001",
+      "base_case": "EO-POS-003",
       "mutation_family": "temporal_order",
       "mutation": "remove_causal_resolution",
-      "transform": "Remove a decisive causal edge while retaining overlapping qualified time intervals.",
+      "transform": "Remove the decisive effect-to-stop causal predecessor while retaining overlapping qualified clock intervals.",
       "expected_behavior": {
         "disposition": "indeterminate",
         "reason_code": "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING"
@@ -135,8 +135,8 @@
       "id": "MUT-EVT-012",
       "base_case": "EO-POS-004",
       "mutation_family": "stop_disposition",
-      "mutation": "stop_receipt_digest_substitution",
-      "transform": "Change the stop-disposition receipt digest without changing the receipt reference or event bindings.",
+      "mutation": "malformed_stop_receipt_digest",
+      "transform": "Replace receipt digest with a malformed 63-character hexadecimal value. This tests consumer-side format rejection only; valid-digest content binding belongs to the upstream receipt owner.",
       "expected_behavior": {
         "disposition": "critical_failure",
         "reason_code": "STOP_DISPOSITION_RECEIPT_BINDING_INVALID"
@@ -232,10 +232,10 @@
     },
     {
       "id": "MUT-EVT-021",
-      "base_case": "EO-NEG-002",
+      "base_case": "EO-POS-002",
       "mutation_family": "retry_safety",
       "mutation": "retry_before_reconciliation",
-      "transform": "Retry the same operation while its prior outcome remains unknown.",
+      "transform": "Remove the exact NOT_APPLIED terminal reconciliation from a safe trace and replace it with a retry while the original operation outcome remains unknown; keep the valid stop discharge so the retry defect is isolated.",
       "expected_behavior": {
         "disposition": "critical_failure",
         "reason_code": "RETRY_BEFORE_RECONCILIATION"
