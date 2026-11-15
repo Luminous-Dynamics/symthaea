@@ -18,7 +18,7 @@ use symthaea_camera_driving_bridge::{
     BridgeConfig, CameraDrivingBridge, CapturedDrivingObservation, DrivingObservationReceipt,
     DrivingRunIdentity, RECEIPT_SCHEMA_VERSION, UpstreamCameraObservation,
 };
-use symthaea_vehicle::{VehicleController, VehicleConfig, VehicleState};
+use symthaea_vehicle::{VehicleConfig, VehicleController, VehicleState};
 use symthaea_vision_manifold::VisionConfig;
 
 const MAX_EPISODE_OBSERVATIONS: usize = 100_000;
@@ -448,11 +448,8 @@ mod tests {
         let mut state = VehicleState::cruising(4.0);
         state.timestamp = 0.01;
         let upstream = test_upstream_receipt(&pixels, 1, 1, 10_000);
-        let mut bridge = CameraDrivingBridge::try_new(
-            test_bridge_config(),
-            VisionConfig::default(),
-        )
-        .unwrap();
+        let mut bridge =
+            CameraDrivingBridge::try_new(test_bridge_config(), VisionConfig::default()).unwrap();
         let fused = bridge
             .observe(CapturedDrivingObservation {
                 sequence: 1,
