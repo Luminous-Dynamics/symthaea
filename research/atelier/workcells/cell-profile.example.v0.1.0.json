@@ -1,0 +1,149 @@
+{
+  "profile_version": "0.1.0",
+  "profile_id": "urn:example:atelier:cell:woven-sew-cell-01",
+  "revision": 1,
+  "profile_status": "candidate",
+  "created_at": "2026-11-15T00:00:00Z",
+  "organization_ref": "urn:example:atelier:organization:atelier",
+  "facility_ref": "urn:example:atelier:facility:illustrative-partner",
+  "facility_role": "partner",
+  "cell_ref": "urn:example:atelier:cell:woven-sew-cell-01",
+  "validity": {
+    "valid_from": "2026-11-15T00:00:00Z",
+    "expires_at": "2026-11-16T00:00:00Z"
+  },
+  "layout_context": {
+    "facility_layout_ref": "urn:example:atelier:layout:synthetic-layout-a",
+    "layout_revision_ref": "urn:example:atelier:layout:synthetic-layout-a:revision:1",
+    "coordinate_frame_ref": "urn:example:atelier:frame:synthetic-mm"
+  },
+  "equipment": [
+    {
+      "asset_ref": "urn:example:asset:sewing-machine-01",
+      "equipment_class_ref": "urn:example:mfg-proc:equipment-class:lockstitch",
+      "operational_status": "unknown",
+      "capability_refs": [
+        "urn:example:mfg-proc:capability:lockstitch"
+      ],
+      "tooling_refs": [
+        "urn:example:tooling:standard-folder"
+      ],
+      "calibration_evidence_refs": []
+    }
+  ],
+  "capabilities": [
+    {
+      "process_capability_ref": "urn:example:mfg-proc:capability:woven-lockstitch-assembly",
+      "operation_refs": [
+        "urn:example:apparel-eng:operation:join-shoulder-seam",
+        "urn:example:apparel-eng:operation:attach-sleeve"
+      ],
+      "product_family_refs": [
+        "urn:example:atelier:product-family:woven-overshirt"
+      ],
+      "process_config_refs": [
+        "urn:example:atelier:process-config:woven-sew-01-r1"
+      ],
+      "exclusions": [
+        "No knit-route capability is asserted by this illustrative fixture."
+      ]
+    }
+  ],
+  "operator_requirements": [
+    {
+      "skill_ref": "urn:example:skill:industrial-lockstitch-sewing",
+      "minimum_people": 1,
+      "qualification_evidence_refs": []
+    }
+  ],
+  "utility_requirements": [],
+  "spatial_envelope": {
+    "coordinate_frame_ref": "urn:example:atelier:frame:synthetic-mm",
+    "width_mm": 6000,
+    "depth_mm": 8000,
+    "height_mm": 3000,
+    "basis": "synthetic",
+    "clearance_refs": [],
+    "keepout_refs": [],
+    "maintenance_access_refs": []
+  },
+  "material_interfaces": {
+    "inputs": [
+      {
+        "material_class": "new_material",
+        "lot_identity_required": true,
+        "handling_procedure_ref": "urn:example:atelier:handling:accepted-new-material"
+      },
+      {
+        "material_class": "work_in_progress",
+        "lot_identity_required": true,
+        "handling_procedure_ref": "urn:example:atelier:handling:identified-wip"
+      }
+    ],
+    "outputs": [
+      {
+        "material_class": "work_in_progress",
+        "lot_identity_required": true,
+        "handling_procedure_ref": "urn:example:atelier:handling:identified-wip"
+      },
+      {
+        "material_class": "scrap",
+        "lot_identity_required": true,
+        "handling_procedure_ref": "urn:example:atelier:handling:segregated-scrap"
+      }
+    ],
+    "segregation_rules": [
+      {
+        "from_class": "return",
+        "to_class": "new_material",
+        "rule_ref": "urn:example:atelier:rule:no-return-to-new-material-flow"
+      }
+    ]
+  },
+  "process_configurations": [
+    {
+      "config_ref": "urn:example:atelier:process-config:woven-sew-01-r1",
+      "revision": 1,
+      "process_revision_ref": "urn:example:mfg-proc:process:illustrative-woven-assembly-r1",
+      "equipment_refs": [
+        "urn:example:asset:sewing-machine-01"
+      ],
+      "operation_refs": [
+        "urn:example:apparel-eng:operation:join-shoulder-seam",
+        "urn:example:apparel-eng:operation:attach-sleeve"
+      ],
+      "tooling_refs": [
+        "urn:example:tooling:standard-folder"
+      ],
+      "inspection_plan_ref": "urn:example:quality:inspection-plan:illustrative-seam-check",
+      "qualification_evidence_refs": [],
+      "valid_from": "2026-11-15T00:00:00Z",
+      "expires_at": "2026-11-16T00:00:00Z",
+      "parameter_digest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "changeover": {
+    "procedure_ref": "urn:example:atelier:changeover:woven-sew-cell",
+    "basis": "synthetic",
+    "first_good_unit_acceptance_ref": "urn:example:quality:first-good-unit-check"
+  },
+  "qualification_evidence_refs": [],
+  "independent_verifier_refs": [],
+  "evidence_refs": [
+    {
+      "evidence_ref": "urn:example:atelier:evidence:synthetic-cell-fixture",
+      "evidence_type": "simulation",
+      "basis": "synthetic",
+      "issuer_ref": "urn:example:atelier:organization:atelier",
+      "observed_at": "2026-11-15T00:00:00Z"
+    }
+  ],
+  "limitations": [
+    "Illustrative synthetic fixture only; not a surveyed partner facility.",
+    "Operational status is unknown; this cell is not eligible for production assignment.",
+    "Spatial dimensions are synthetic placeholders, not facility or clearance measurements.",
+    "No operator qualification, calibration, process qualification, safety approval, or production capacity is asserted."
+  ],
+  "machine_control_authority": false,
+  "claim_ceiling": "declared capability profile only; no machine actuation, safety approval, statutory certification, building approval, or production-capacity guarantee"
+}

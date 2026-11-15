@@ -1,0 +1,776 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/atelier/schemas/reconfigurable-textile-cell-profile-v0.1.0.schema.json",
+  "title": "Atelier Reconfigurable Textile Production Cell Profile",
+  "description": "A versioned, evidence-linked capability declaration for an owned, leased, shared-service, or partner textile production cell. This profile is not a safety certificate, production schedule, machine controller, or approval to operate.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "profile_id",
+    "revision",
+    "profile_status",
+    "created_at",
+    "organization_ref",
+    "facility_ref",
+    "facility_role",
+    "cell_ref",
+    "validity",
+    "equipment",
+    "capabilities",
+    "operator_requirements",
+    "utility_requirements",
+    "spatial_envelope",
+    "material_interfaces",
+    "process_configurations",
+    "qualification_evidence_refs",
+    "evidence_refs",
+    "limitations",
+    "machine_control_authority"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "0.1.0"
+    },
+    "profile_id": {
+      "$ref": "#/$defs/ref"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "profile_status": {
+      "enum": [
+        "draft",
+        "candidate",
+        "qualified",
+        "suspended",
+        "expired",
+        "revoked"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "organization_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "facility_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "facility_role": {
+      "enum": [
+        "owned",
+        "leased",
+        "partner",
+        "shared_service"
+      ]
+    },
+    "cell_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "parent_cell_ref": {
+      "$ref": "#/$defs/ref"
+    },
+    "layout_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facility_layout_ref",
+        "layout_revision_ref"
+      ],
+      "properties": {
+        "facility_layout_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "layout_revision_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "coordinate_frame_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_from",
+        "expires_at"
+      ],
+      "properties": {
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "suspension_reason_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "revocation_reason_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "equipment": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/equipment"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
+    },
+    "operator_requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/operatorRequirement"
+      }
+    },
+    "utility_requirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/utilityRequirement"
+      }
+    },
+    "spatial_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinate_frame_ref",
+        "width_mm",
+        "depth_mm",
+        "height_mm",
+        "basis",
+        "clearance_refs"
+      ],
+      "properties": {
+        "coordinate_frame_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "width_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "depth_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "basis": {
+          "enum": [
+            "synthetic",
+            "measured",
+            "imported"
+          ]
+        },
+        "clearance_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "keepout_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "maintenance_access_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        }
+      }
+    },
+    "material_interfaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputs",
+        "outputs",
+        "segregation_rules"
+      ],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/materialInterface"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/materialInterface"
+          }
+        },
+        "segregation_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from_class",
+              "to_class",
+              "rule_ref"
+            ],
+            "properties": {
+              "from_class": {
+                "$ref": "#/$defs/materialClass"
+              },
+              "to_class": {
+                "$ref": "#/$defs/materialClass"
+              },
+              "rule_ref": {
+                "$ref": "#/$defs/ref"
+              }
+            }
+          }
+        }
+      }
+    },
+    "process_configurations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/processConfiguration"
+      }
+    },
+    "changeover": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "procedure_ref",
+        "basis"
+      ],
+      "properties": {
+        "procedure_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "basis": {
+          "enum": [
+            "synthetic",
+            "measured",
+            "imported"
+          ]
+        },
+        "setup_time_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "teardown_time_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "first_good_unit_acceptance_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "qualification_evidence_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "independent_verifier_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ref"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "machine_control_authority": {
+      "const": false
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "const": "declared capability profile only; no machine actuation, safety approval, statutory certification, building approval, or production-capacity guarantee"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile_status": {
+            "const": "qualified"
+          }
+        },
+        "required": [
+          "profile_status"
+        ]
+      },
+      "then": {
+        "required": [
+          "qualification_evidence_refs",
+          "independent_verifier_refs"
+        ],
+        "properties": {
+          "qualification_evidence_refs": {
+            "minItems": 1
+          },
+          "independent_verifier_refs": {
+            "minItems": 1
+          },
+          "layout_context": {
+            "required": [
+              "facility_layout_ref",
+              "layout_revision_ref",
+              "coordinate_frame_ref"
+            ]
+          },
+          "equipment": {
+            "items": {
+              "properties": {
+                "operational_status": {
+                  "const": "available"
+                },
+                "calibration_evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          "process_configurations": {
+            "items": {
+              "properties": {
+                "qualification_evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          "operator_requirements": {
+            "items": {
+              "properties": {
+                "qualification_evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile_status": {
+            "const": "suspended"
+          }
+        },
+        "required": [
+          "profile_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "validity": {
+            "required": [
+              "suspension_reason_ref"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "profile_status": {
+            "const": "revoked"
+          }
+        },
+        "required": [
+          "profile_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "validity": {
+            "required": [
+              "revocation_reason_ref"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "minLength": 8,
+      "format": "uri",
+      "pattern": "^(urn:|https?://)"
+    },
+    "materialClass": {
+      "enum": [
+        "new_material",
+        "work_in_progress",
+        "finished_product",
+        "return",
+        "scrap",
+        "recovered_component"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_ref",
+        "evidence_type",
+        "basis",
+        "issuer_ref",
+        "observed_at"
+      ],
+      "properties": {
+        "evidence_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "evidence_type": {
+          "enum": [
+            "inspection",
+            "calibration",
+            "process_qualification",
+            "commissioning",
+            "measurement",
+            "maintenance",
+            "training",
+            "imported_record",
+            "simulation"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "measured",
+            "imported",
+            "synthetic",
+            "simulated"
+          ]
+        },
+        "issuer_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "supersedes_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "equipment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_ref",
+        "equipment_class_ref",
+        "operational_status",
+        "capability_refs",
+        "tooling_refs",
+        "calibration_evidence_refs"
+      ],
+      "properties": {
+        "asset_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "equipment_class_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "manufacturer_model_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "operational_status": {
+          "enum": [
+            "available",
+            "maintenance",
+            "quarantined",
+            "unknown"
+          ]
+        },
+        "capability_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "tooling_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "calibration_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "maintenance_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "process_capability_ref",
+        "operation_refs",
+        "product_family_refs",
+        "process_config_refs"
+      ],
+      "properties": {
+        "process_capability_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "operation_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "product_family_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "process_config_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "material_envelope_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "operatorRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skill_ref",
+        "minimum_people",
+        "qualification_evidence_refs"
+      ],
+      "properties": {
+        "skill_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "minimum_people": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "qualification_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        }
+      }
+    },
+    "quantityRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum",
+        "maximum",
+        "unit"
+      ],
+      "properties": {
+        "minimum": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "utilityRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service",
+        "demand_range",
+        "basis"
+      ],
+      "properties": {
+        "service": {
+          "enum": [
+            "electricity",
+            "compressed_air",
+            "water",
+            "steam",
+            "extraction",
+            "network",
+            "other"
+          ]
+        },
+        "demand_range": {
+          "$ref": "#/$defs/quantityRange"
+        },
+        "basis": {
+          "enum": [
+            "synthetic",
+            "measured",
+            "imported"
+          ]
+        },
+        "quality_requirement_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "continuity_requirement_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "materialInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material_class",
+        "lot_identity_required",
+        "handling_procedure_ref"
+      ],
+      "properties": {
+        "material_class": {
+          "$ref": "#/$defs/materialClass"
+        },
+        "lot_identity_required": {
+          "type": "boolean"
+        },
+        "handling_procedure_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "status_gate_ref": {
+          "$ref": "#/$defs/ref"
+        }
+      }
+    },
+    "processConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_ref",
+        "revision",
+        "process_revision_ref",
+        "equipment_refs",
+        "operation_refs",
+        "tooling_refs",
+        "inspection_plan_ref",
+        "qualification_evidence_refs",
+        "valid_from",
+        "expires_at",
+        "parameter_digest_sha256"
+      ],
+      "properties": {
+        "config_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "process_revision_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "equipment_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "operation_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "tooling_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "inspection_plan_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "qualification_evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "parameter_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      }
+    }
+  }
+}
