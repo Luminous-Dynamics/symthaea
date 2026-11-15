@@ -633,7 +633,7 @@ fn classify_evaluation(
     }
 }
 
-fn is_epsilon_frontier_extension(
+pub(crate) fn is_epsilon_frontier_extension(
     candidate_id: &str,
     candidate: &[ObjectiveValue],
     frontier: &[IncumbentFrontierPoint],
@@ -670,7 +670,7 @@ fn is_epsilon_frontier_extension(
     })
 }
 
-fn epsilon_equivalent(
+pub(crate) fn epsilon_equivalent(
     first: &[ObjectiveValue],
     second: &[ObjectiveValue],
     definitions: &[ObjectiveDefinition],
@@ -686,7 +686,7 @@ fn epsilon_equivalent(
         })
 }
 
-fn epsilon_dominates(
+pub(crate) fn epsilon_dominates(
     first: &[ObjectiveValue],
     second: &[ObjectiveValue],
     definitions: &[ObjectiveDefinition],
@@ -713,7 +713,7 @@ fn oriented_value(value: &ObjectiveValue, definition: &ObjectiveDefinition) -> f
     }
 }
 
-fn valid_objective_vector(values: &[ObjectiveValue], definitions: &[ObjectiveDefinition]) -> bool {
+pub(crate) fn valid_objective_vector(values: &[ObjectiveValue], definitions: &[ObjectiveDefinition]) -> bool {
     if values.len() != definitions.len() {
         return false;
     }
