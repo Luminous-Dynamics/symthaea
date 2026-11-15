@@ -25,6 +25,7 @@ pub struct SourceManifestSummary {
     pub case_count: usize,
     pub negative_control_count: usize,
     pub derived_reference_check_count: usize,
+    pub benchmark_target_count: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -601,11 +602,12 @@ pub fn print_report(report: &AuditReport, as_json: bool) -> Result<()> {
     println!("Claim ceiling: {}", report.claim_ceiling);
     for source in &report.source_manifests {
         println!(
-            "SOURCE PASS {} cases={} negative_controls={} derived_checks={} path={}",
+            "SOURCE PASS {} cases={} negative_controls={} derived_checks={} benchmark_targets={} path={}",
             source.programme,
             source.case_count,
             source.negative_control_count,
             source.derived_reference_check_count,
+            source.benchmark_target_count,
             source.path
         );
     }
@@ -1273,6 +1275,100 @@ mod tests {
         assert!(error.to_string().contains("must preserve a no-credit baseline"));
     }
 
+    fn minimal_benchmark_target_manifest(lane: &str) -> Value {
+        let metrics = if lane == "AMMONIA_CRACKING" {
+            serde_json::json!({
+                "ammonia_conversion_min_fraction": 0.99,
+                "hydrogen_energy_yield_min_g_H2_per_kWh": 51.0,
+                "hydrogen_production_rate_min_g_H2_per_hour": 150.0,
+                "all_thresholds_must_hold_at_same_operating_point": true
+            })
+        } else {
+            serde_json::json!({
+                "methane_conversion_min_fraction": 0.92,
+                "hydrogen_selectivity_min_fraction": 0.99,
+                "levelized_cost_hydrogen_max_usd_per_kg": 0.70,
+                "all_thresholds_must_hold_at_same_operating_point": true
+            })
+        };
+        let guards = if lane == "AMMONIA_CRACKING" {
+            serde_json::json!({
+                "full_wall_plug_to_accepted_h2_boundary_required": true
+            })
+        } else {
+            serde_json::json!({
+                "no_credit_baseline_required": true,
+                "avoided_product_credit_requires_independent_carbon_grade_qualification": true
+            })
+        };
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [
+                {
+                    "case_id": "case-1",
+                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                    "luminous_reproduction": false,
+                    "source": {"url": "https://example.org/source"}
+                }
+            ],
+            "benchmark_targets": [{
+                "target_id": "target-1",
+                "lane": lane,
+                "status": "RESEARCH_TARGET_NOT_RESULT",
+                "comparator_case_ids": ["case-1"],
+                "metric_thresholds": metrics,
+                "claim_guards": guards,
+                "credit_policies": ["NO_CREDIT", "ALLOCATION", "AVOIDED_PRODUCT_CREDIT"]
+            }],
+            "negative_controls": [{
+                "control_id": "nc-1",
+                "expected_disposition": "BLOCKED"
+            }]
+        })
+    }
+
+    #[test]
+    fn source_manifest_accepts_ammonia_pareto_target_with_matched_operating_point() {
+        let source = minimal_benchmark_target_manifest("AMMONIA_CRACKING");
+        let summary = audit_source_value(&source, "ammonia-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_accepts_methane_target_with_no_credit_baseline() {
+        let source = minimal_benchmark_target_manifest("METHANE_PYROLYSIS");
+        let summary = audit_source_value(&source, "methane-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_benchmark_target_promoted_to_result() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING");
+        source["benchmark_targets"][0]["status"] = serde_json::json!("ACHIEVED");
+        let error = audit_source_value(&source, "target.json").unwrap_err();
+        assert!(error.to_string().contains("RESEARCH_TARGET_NOT_RESULT"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_benchmark_target_with_unknown_comparator() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING");
+        source["benchmark_targets"][0]["comparator_case_ids"][0] =
+            serde_json::json!("unknown-case");
+        let error = audit_source_value(&source, "target.json").unwrap_err();
+        assert!(error.to_string().contains("references unknown comparator case"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_methane_target_without_no_credit_policy() {
+        let mut source = minimal_benchmark_target_manifest("METHANE_PYROLYSIS");
+        source["benchmark_targets"][0]["credit_policies"] =
+            serde_json::json!(["ALLOCATION", "AVOIDED_PRODUCT_CREDIT"]);
+        let error = audit_source_value(&source, "target.json").unwrap_err();
+        assert!(error.to_string().contains("must include a NO_CREDIT scenario"));
+    }
+
     #[test]
     fn source_manifest_rejects_duplicate_case_and_control_ids() {
         let duplicate_case = serde_json::json!({
@@ -1819,6 +1915,119 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         }
     }
 
+    let benchmark_targets: &[Value] = match root.get("benchmark_targets") {
+        None => &[],
+        Some(value) => value
+            .as_array()
+            .with_context(|| format!("{display_name}: benchmark_targets must be an array"))?,
+    };
+    let mut benchmark_target_ids = BTreeSet::new();
+    for target in benchmark_targets {
+        let target_id = target
+            .get("target_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: benchmark target has no target_id"))?;
+        ensure!(
+            benchmark_target_ids.insert(target_id.to_owned()),
+            "{display_name}: duplicate benchmark target ID {target_id}"
+        );
+        ensure!(
+            target.get("status").and_then(Value::as_str) == Some("RESEARCH_TARGET_NOT_RESULT"),
+            "{display_name}: benchmark target {target_id} must be marked RESEARCH_TARGET_NOT_RESULT"
+        );
+        let lane = target
+            .get("lane")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: benchmark target {target_id} has no lane"))?;
+        let comparators = target
+            .get("comparator_case_ids")
+            .and_then(Value::as_array)
+            .filter(|value| !value.is_empty())
+            .with_context(|| format!("{display_name}: benchmark target {target_id} has no comparator_case_ids"))?;
+        let mut comparator_ids = BTreeSet::new();
+        for comparator in comparators {
+            let comparator_id = comparator
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+                .with_context(|| format!("{display_name}: benchmark target {target_id} has an empty comparator ID"))?;
+            ensure!(
+                comparator_ids.insert(comparator_id.to_owned()),
+                "{display_name}: benchmark target {target_id} has duplicate comparator {comparator_id}"
+            );
+            ensure!(
+                case_ids.contains(comparator_id),
+                "{display_name}: benchmark target {target_id} references unknown comparator case {comparator_id}"
+            );
+        }
+        ensure!(
+            target.get("metric_thresholds").and_then(Value::as_object).is_some_and(|value| !value.is_empty()),
+            "{display_name}: benchmark target {target_id} has no metric_thresholds"
+        );
+        let guards = target
+            .get("claim_guards")
+            .and_then(Value::as_object)
+            .filter(|value| !value.is_empty())
+            .with_context(|| format!("{display_name}: benchmark target {target_id} has no claim_guards"))?;
+
+        match lane {
+            "AMMONIA_CRACKING" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: ammonia benchmark target {target_id} must bind all metrics to one operating point"
+                );
+                ensure!(
+                    guards.get("full_wall_plug_to_accepted_h2_boundary_required").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: ammonia benchmark target {target_id} must require full wall-plug-to-product accounting"
+                );
+                for key in [
+                    "ammonia_conversion_min_fraction",
+                    "hydrogen_energy_yield_min_g_H2_per_kWh",
+                    "hydrogen_production_rate_min_g_H2_per_hour",
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                        "{display_name}: ammonia benchmark target {target_id} has invalid or missing threshold {key}"
+                    );
+                }
+            }
+            "METHANE_PYROLYSIS" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: methane benchmark target {target_id} must bind metrics to one operating point"
+                );
+                let credit_policies = target
+                    .get("credit_policies")
+                    .and_then(Value::as_array)
+                    .filter(|value| value.iter().any(|item| item.as_str() == Some("NO_CREDIT")))
+                    .with_context(|| format!("{display_name}: methane benchmark target {target_id} must include a NO_CREDIT scenario"))?;
+                let _ = credit_policies;
+                ensure!(
+                    guards.get("no_credit_baseline_required").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: methane benchmark target {target_id} must require a no-credit baseline"
+                );
+                ensure!(
+                    guards.get("avoided_product_credit_requires_independent_carbon_grade_qualification").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: methane benchmark target {target_id} must require independent carbon product qualification"
+                );
+                for key in [
+                    "methane_conversion_min_fraction",
+                    "hydrogen_selectivity_min_fraction",
+                    "levelized_cost_hydrogen_max_usd_per_kg",
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                        "{display_name}: methane benchmark target {target_id} has invalid or missing threshold {key}"
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
     let controls = root
         .get("negative_controls")
         .and_then(Value::as_array)
@@ -1847,6 +2056,7 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         case_count: cases.len(),
         negative_control_count: controls.len(),
         derived_reference_check_count: derived_checks.len(),
+        benchmark_target_count: benchmark_targets.len(),
     })
 }
 
