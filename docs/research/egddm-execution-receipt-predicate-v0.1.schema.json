@@ -283,6 +283,27 @@
             }
           },
           "description": "Digest reference to a separately signed in-toto Statement containing SLSA Build Provenance v1.2; verify the statement subject matches subject_digest and accept only an allowed signer/builder.id pair."
+        },
+        "test_result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "statement_digest",
+            "predicate_type",
+            "subject_digest"
+          ],
+          "properties": {
+            "statement_digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "predicate_type": {
+              "const": "https://in-toto.io/attestation/test-result/v0.1"
+            },
+            "subject_digest": {
+              "$ref": "#/$defs/digest"
+            }
+          },
+          "description": "Digest reference to a separately signed in-toto Statement carrying the vetted Test Result predicate; verify that the Statement subject matches subject_digest and inspect result/configuration/test lists under policy."
         }
       }
     },
@@ -408,6 +429,32 @@
       "if": {
         "properties": {
           "claim_kind": {
+            "const": "agent_observation"
+          }
+        },
+        "required": [
+          "claim_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "properties": {
+              "role": {
+                "const": "agent"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_kind": {
             "const": "runner_execution"
           }
         },
@@ -417,9 +464,133 @@
       },
       "then": {
         "properties": {
+          "producer": {
+            "properties": {
+              "role": {
+                "const": "runner"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_kind": {
+            "const": "independent_regrade"
+          }
+        },
+        "required": [
+          "claim_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "properties": {
+              "role": {
+                "const": "independent_grader"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_kind": {
+            "const": "authority_decision"
+          }
+        },
+        "required": [
+          "claim_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "producer": {
+            "properties": {
+              "role": {
+                "const": "authority_service"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_kind": {
+            "const": "runner_execution"
+          },
+          "obligation": {
+            "properties": {
+              "check_kind": {
+                "const": "build"
+              }
+            },
+            "required": [
+              "check_kind"
+            ]
+          }
+        },
+        "required": [
+          "claim_kind",
+          "obligation"
+        ]
+      },
+      "then": {
+        "properties": {
           "execution": {
             "required": [
               "slsa_provenance"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "claim_kind": {
+            "const": "runner_execution"
+          },
+          "obligation": {
+            "properties": {
+              "check_kind": {
+                "enum": [
+                  "test",
+                  "compatibility"
+                ]
+              }
+            },
+            "required": [
+              "check_kind"
+            ]
+          }
+        },
+        "required": [
+          "claim_kind",
+          "obligation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "required": [
+              "test_result"
             ]
           }
         }
