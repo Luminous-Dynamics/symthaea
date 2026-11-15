@@ -5137,6 +5137,152 @@ mod tests {
     }
 
     #[test]
+    fn broader_inventory_can_attest_a_narrower_stop_obligation() {
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let operation_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned()].into_iter().collect(),
+        );
+        for action in &mut schedule.actions {
+            match action.evidence.as_mut() {
+                Some(ActionEvidence::StopTrigger { scope, .. })
+                | Some(ActionEvidence::StopDischarge { scope, .. }) => {
+                    *scope = operation_scope.clone();
+                }
+                _ => {}
+            }
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("broader inventory projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.inventory.as_ref().map(|inventory| inventory.scope.clone()), Some(StopScope::Global));
+        assert_eq!(report.obligations[0].scope, operation_scope);
+        assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
+    }
+
+    #[test]
+    fn policy_revision_may_expand_stop_scope_but_not_narrow_it() {
+        let (mut schedule, mut resolutions, mut receipts, _) = action_history_fixture();
+        let operation_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned()].into_iter().collect(),
+        );
+        for action in &mut schedule.actions {
+            if let Some(ActionEvidence::StopTrigger { scope, .. }) = action.evidence.as_mut() {
+                *scope = operation_scope.clone();
+            }
+        }
+
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let revision_mapping_id = push_test_clock_mapping(
+            &mut schedule.actions, &mut ordinal, 8, 133,
+        );
+        let revision_ref = "synthetic://stop-policy-revision/expanded".to_owned();
+        let revision_sha = "9".repeat(64);
+        let revision_action_id = push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            8,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: "global-stop-1".to_owned(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: revision_mapping_id.clone(),
+                local_timestamp_ns: 133,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: StopScope::Global,
+                receipt_ref: revision_ref.clone(),
+                receipt_sha256: revision_sha.clone(),
+            },
+        );
+        resolutions.insert(
+            (revision_mapping_id.clone(), 133),
+            qualified_resolution_from_fixture(
+                &schedule.actions, &revision_mapping_id, 133, 1_155,
+            ),
+        );
+        receipts.insert(revision_action_id.clone(), passing_owner_receipt(&revision_ref, &revision_sha));
+
+        let discharge = schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::StopDischarged { .. })
+        }).expect("stop discharge action");
+        if let ScheduleAction::StopDischarged {
+            policy_revision_action_id, policy_revision, ..
+        } = &mut discharge.action {
+            *policy_revision_action_id = revision_action_id.clone();
+            *policy_revision = "policy-v2".to_owned();
+        }
+        if let Some(ActionEvidence::StopDischarge { scope, .. }) = discharge.evidence.as_mut() {
+            *scope = StopScope::Global;
+        }
+
+        let expanded = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("monotonic scope expansion assessment");
+        assert_eq!(expanded.disposition, EventTraceDisposition::Safe);
+        assert_eq!(expanded.obligations[0].scope, StopScope::Global);
+        assert!(expanded.stop_evidence.iter().any(|item| {
+            item.kind == ProjectedStopEvidenceKind::PolicyRevision
+                && item.scope == StopScope::Global
+        }));
+
+        let (mut narrowed_schedule, mut narrowed_resolutions, mut narrowed_receipts, _) =
+            action_history_fixture();
+        let mut ordinal = narrowed_schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let narrowed_mapping_id = push_test_clock_mapping(
+            &mut narrowed_schedule.actions, &mut ordinal, 8, 133,
+        );
+        let narrowed_ref = "synthetic://stop-policy-revision/narrowed".to_owned();
+        let narrowed_sha = "8".repeat(64);
+        let narrowed_action_id = push_clocked_action(
+            &mut narrowed_schedule.actions,
+            &mut ordinal,
+            8,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: "global-stop-1".to_owned(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: narrowed_mapping_id.clone(),
+                local_timestamp_ns: 133,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: StopScope::LogicalOperations(
+                    ["robot-1".to_owned()].into_iter().collect(),
+                ),
+                receipt_ref: narrowed_ref.clone(),
+                receipt_sha256: narrowed_sha.clone(),
+            },
+        );
+        narrowed_resolutions.insert(
+            (narrowed_mapping_id.clone(), 133),
+            qualified_resolution_from_fixture(
+                &narrowed_schedule.actions, &narrowed_mapping_id, 133, 1_155,
+            ),
+        );
+        narrowed_receipts.insert(narrowed_action_id.clone(), passing_owner_receipt(&narrowed_ref, &narrowed_sha));
+
+        let narrowed_discharge = narrowed_schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::StopDischarged { .. })
+        }).expect("stop discharge action");
+        if let ScheduleAction::StopDischarged {
+            policy_revision_action_id, policy_revision, ..
+        } = &mut narrowed_discharge.action {
+            *policy_revision_action_id = narrowed_action_id;
+            *policy_revision = "policy-v2".to_owned();
+        }
+        if let Some(ActionEvidence::StopDischarge { scope, .. }) = narrowed_discharge.evidence.as_mut() {
+            *scope = StopScope::LogicalOperations(
+                ["robot-1".to_owned()].into_iter().collect(),
+            );
+        }
+        let narrowed = project_action_history(
+            &narrowed_schedule, "robot-1", &narrowed_resolutions, &narrowed_receipts,
+        ).expect("scope narrowing assessment");
+        assert_eq!(narrowed.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(narrowed.reason_codes.iter().any(|code| code == "STOP_POLICY_SCOPE_NARROWED:global-stop-1"));
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
