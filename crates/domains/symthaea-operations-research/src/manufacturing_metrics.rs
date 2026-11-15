@@ -14,6 +14,7 @@ pub const PPM_SCALE: u128 = 1_000_000;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KpiError {
     ZeroDenominator,
+    EmptyWorkUnitRef,
     NumeratorExceedsDenominator,
     RunTimeExceedsPlannedTime,
     FirstPassGoodExceedsTotal,
@@ -185,6 +186,10 @@ pub fn calculate_oee(
     total_count: u64,
     first_pass_good_count: u64,
 ) -> Result<OeeReport, KpiError> {
+    let work_unit_ref = work_unit_ref.into();
+    if work_unit_ref.trim().is_empty() {
+        return Err(KpiError::EmptyWorkUnitRef);
+    }
     if run_time_seconds > planned_production_time_seconds {
         return Err(KpiError::RunTimeExceedsPlannedTime);
     }
@@ -224,7 +229,7 @@ pub fn calculate_oee(
     )?.value_ppm;
 
     Ok(OeeReport {
-        work_unit_ref: work_unit_ref.into(),
+        work_unit_ref,
         availability,
         performance,
         quality,
@@ -342,6 +347,15 @@ mod tests {
         assert_eq!(report.quality.value_ppm, 950_000);
         assert_eq!(report.oee_ppm, 760_000);
         assert_eq!(report.work_unit_ref, "urn:example:asset:sewing-cell-a");
+    }
+
+
+    #[test]
+    fn oee_requires_a_named_work_unit() {
+        assert_eq!(
+            calculate_oee("", 100, 90, 1, 50, 50),
+            Err(KpiError::EmptyWorkUnitRef)
+        );
     }
 
     #[test]
