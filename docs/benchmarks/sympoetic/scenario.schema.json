@@ -41,7 +41,8 @@
         "repair",
         "consent_governance",
         "longitudinal_adaptation",
-        "partner_coordination"
+        "partner_coordination",
+        "adaptive_intervention"
       ]
     },
     "difficulty": {
