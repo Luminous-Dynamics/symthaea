@@ -16,6 +16,28 @@ const MAX_STATIONS: usize = 512;
 const MAX_CONTROL_POINTS_PER_STATION: usize = 128;
 const MAX_TOTAL_OUTPUT_POINTS: usize = 1_000_000;
 
+/// Declares how the first or last longitudinal section closes the displacement hull.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LongitudinalEndCondition {
+    /// A positive-breadth section is closed by an explicit planar end cap.
+    #[default]
+    PlanarEndCap,
+    /// The full keel-to-waterline sample column lies on y=0 and is shared by port/starboard.
+    CollapsedCentreline,
+}
+
+/// Bow and stern are independent; interior stations are never collapsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LongitudinalEndConditions {
+    #[serde(default)]
+    pub bow: LongitudinalEndCondition,
+    #[serde(default)]
+    pub stern: LongitudinalEndCondition,
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SectionHullSpec {
@@ -30,6 +52,9 @@ pub struct SectionHullSpec {
     pub samples_per_segment: u32,
     /// Longitudinal stations must start at 0, end at 1 and increase strictly.
     pub stations: Vec<SectionStation>,
+    /// Missing field in v1 input JSON defaults to planar bow and stern.
+    #[serde(default)]
+    pub longitudinal_end_conditions: LongitudinalEndConditions,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +103,8 @@ pub struct SectionFamilyArtifact {
     pub draft_m: f64,
     pub units: String,
     pub coordinate_frame: CoordinateFrame,
+    #[serde(default)]
+    pub longitudinal_end_conditions: LongitudinalEndConditions,
     pub sections: Vec<SampledSection>,
 }
 
@@ -166,6 +193,19 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
         );
     }
 
+    if spec.stations.len() == 2
+        && spec.longitudinal_end_conditions.bow
+            == LongitudinalEndCondition::CollapsedCentreline
+        && spec.longitudinal_end_conditions.stern
+            == LongitudinalEndCondition::CollapsedCentreline
+    {
+        violation(
+            &mut violations,
+            "adjacent_collapsed_ends",
+            "two adjacent collapsed endpoints leave no positive interior station or displacement length",
+        );
+    }
+
     if spec.stations.len() >= 2 {
         if !close_enough(spec.stations[0].x_over_length, 0.0) {
             violation(
@@ -217,6 +257,46 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
                 "half_breadth_fraction",
                 format!("station {station_index} half-breadth fraction must lie in [0, 1]"),
             );
+        }
+
+        let declared_end = if station_index == 0 {
+            Some(spec.longitudinal_end_conditions.bow)
+        } else if station_index + 1 == spec.stations.len() {
+            Some(spec.longitudinal_end_conditions.stern)
+        } else {
+            None
+        };
+        match declared_end {
+            Some(LongitudinalEndCondition::CollapsedCentreline)
+                if station.half_breadth_fraction != 0.0 =>
+            {
+                violation(
+                    &mut violations,
+                    "collapsed_end_breadth",
+                    format!(
+                        "collapsed endpoint station {station_index} must declare exactly zero half-breadth"
+                    ),
+                );
+            }
+            Some(LongitudinalEndCondition::PlanarEndCap)
+                if station.half_breadth_fraction <= 0.0 =>
+            {
+                violation(
+                    &mut violations,
+                    "planar_end_breadth",
+                    format!(
+                        "planar endpoint station {station_index} must have positive half-breadth"
+                    ),
+                );
+            }
+            None if station.half_breadth_fraction <= 0.0 => {
+                violation(
+                    &mut violations,
+                    "interior_station_breadth",
+                    format!("interior station {station_index} must have positive half-breadth"),
+                );
+            }
+            _ => {}
         }
         if !station.draft_fraction.is_finite()
             || !(0.0..=1.0).contains(&station.draft_fraction)
@@ -460,6 +540,7 @@ pub fn generate_section_artifact(
         draft_m: spec.draft_m,
         units: "m".into(),
         coordinate_frame: spec.coordinate_frame.clone(),
+        longitudinal_end_conditions: spec.longitudinal_end_conditions,
         sections,
     })
 }
@@ -499,6 +580,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 4,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
