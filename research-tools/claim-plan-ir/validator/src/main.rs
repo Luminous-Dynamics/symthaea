@@ -507,6 +507,17 @@ mod tests {
         include_str!("../../fixtures/negative/invalid_json_pointer_escape.json");
 
     #[test]
+    fn jcs_uses_utf16_code_unit_order_for_object_keys() {
+        // UTF-16 sorts U+1F600 (D83D DE00) before U+E000; UTF-8 byte
+        // ordering and Rust's scalar-value ordering produce the opposite.
+        let raw = r#"{"\\uE000":"bmp","\\uD83D\\uDE00":"astral"}"#;
+        let strict = parse_strict(raw).expect("valid JCS input");
+        let canonical =
+            serde_json_canonicalizer::to_string(&strict).expect("canonicalize with JCS");
+        assert_eq!(canonical, r#"{"😀":"astral","":"bmp"}"#);
+    }
+
+    #[test]
     fn positive_three_field_plan_passes_preflight() {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
