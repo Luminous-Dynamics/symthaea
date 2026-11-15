@@ -133,6 +133,8 @@ pub enum SoftAssignmentIssueCode {
     ModuleNotQualified,
     ModuleUnavailable,
     ModuleAvailabilityUnknown,
+    ModuleNotYetValid,
+    ModuleExpired,
     ModuleValidityUnknown,
     QualificationEvidenceInvalid,
     IndependentEvidenceInvalid,
@@ -668,10 +670,33 @@ pub fn propose_soft_reallocation(
             });
         }
     }
+    if module_pool_resolution != SnapshotResolution::Complete {
+        issues.push(SoftAssignmentIssue {
+            code: SoftAssignmentIssueCode::ModulePoolUnresolved,
+            subject_ref: facility_ref.to_owned(),
+        });
+    }
 
     let mut profiles_by_ref = BTreeMap::<&str, Vec<&ModuleProfile>>::new();
     for profile in module_profiles {
         profiles_by_ref.entry(profile.module_ref.as_str()).or_default().push(profile);
+    }
+    for module_ref in &installed {
+        match profiles_by_ref.get(module_ref) {
+            None => issues.push(SoftAssignmentIssue {
+                code: if module_pool_resolution == SnapshotResolution::Complete {
+                    SoftAssignmentIssueCode::ModuleMissing
+                } else {
+                    SoftAssignmentIssueCode::ModulePoolUnresolved
+                },
+                subject_ref: (*module_ref).to_owned(),
+            }),
+            Some(matches) if matches.len() > 1 => issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::ModuleAmbiguous,
+                subject_ref: (*module_ref).to_owned(),
+            }),
+            _ => {}
+        }
     }
     let mut current_by_operation = BTreeMap::<&str, &str>::new();
     for assignment in current_assignments {
@@ -738,11 +763,11 @@ pub fn propose_soft_reallocation(
                 ModuleAvailability::Unavailable => return Err(SoftAssignmentIssueCode::ModuleUnavailable),
                 ModuleAvailability::Unknown => return Err(SoftAssignmentIssueCode::ModuleAvailabilityUnknown),
             }
-            if !matches!(
-                (profile.valid_from_unix_seconds, profile.valid_until_unix_seconds),
-                (Some(from), Some(until)) if from <= at && at < until
-            ) {
-                return Err(SoftAssignmentIssueCode::ModuleValidityUnknown);
+            match (profile.valid_from_unix_seconds, profile.valid_until_unix_seconds) {
+                (Some(from), Some(until)) if from <= at && at < until => {}
+                (Some(from), Some(_)) if at < from => return Err(SoftAssignmentIssueCode::ModuleNotYetValid),
+                (Some(_), Some(until)) if at >= until => return Err(SoftAssignmentIssueCode::ModuleExpired),
+                _ => return Err(SoftAssignmentIssueCode::ModuleValidityUnknown),
             }
             if !evidence_is_current(&profile.qualification_evidence, at) {
                 return Err(SoftAssignmentIssueCode::QualificationEvidenceInvalid);
@@ -774,15 +799,19 @@ pub fn propose_soft_reallocation(
         };
 
         let current = current_by_operation.get(demand.operation_ref.as_str()).copied();
-        let selected = if let Some(current_module) = current {
-            if installed.contains(current_module) && is_eligible(current_module) == Ok(true) {
-                Some(current_module.to_owned())
-            } else {
-                installed.iter().copied().filter(|module_ref| is_eligible(module_ref) == Ok(true)).min().map(str::to_owned)
+        let mut candidates = Vec::<&str>::new();
+        let mut candidate_failures = Vec::<SoftAssignmentIssueCode>::new();
+        for module_ref in &installed {
+            match is_eligible(module_ref) {
+                Ok(true) => candidates.push(module_ref),
+                Ok(false) => {}
+                Err(code) => candidate_failures.push(code),
             }
-        } else {
-            installed.iter().copied().filter(|module_ref| is_eligible(module_ref) == Ok(true)).min().map(str::to_owned)
-        };
+        }
+        let selected = current
+            .filter(|module_ref| candidates.contains(module_ref))
+            .map(str::to_owned)
+            .or_else(|| candidates.into_iter().min().map(str::to_owned));
 
         match selected {
             Some(module_ref) => {
@@ -797,56 +826,41 @@ pub fn propose_soft_reallocation(
                 });
             }
             None => {
-                let mut emitted = false;
-                if let Some(current_module) = current {
+                let code = if let Some(current_module) = current {
                     if !installed.contains(current_module) {
-                        issues.push(SoftAssignmentIssue {
-                            code: SoftAssignmentIssueCode::ModuleMissing,
-                            subject_ref: current_module.to_owned(),
-                        });
-                        emitted = true;
-                    } else if let Err(code) = is_eligible(current_module) {
-                        issues.push(SoftAssignmentIssue {
-                            code,
-                            subject_ref: current_module.to_owned(),
-                        });
-                        emitted = true;
-                    }
-                }
-                if !emitted {
-                    let code = if installed.is_empty() && module_pool_resolution != SnapshotResolution::Complete {
-                        SoftAssignmentIssueCode::ModulePoolUnresolved
-                    } else if installed.is_empty() {
                         SoftAssignmentIssueCode::ModuleMissing
                     } else {
-                        SoftAssignmentIssueCode::CapabilityMissing
-                    };
-                    issues.push(SoftAssignmentIssue {
-                        code,
-                        subject_ref: demand.operation_ref.clone(),
-                    });
-                }
+                        is_eligible(current_module).err().unwrap_or_else(|| {
+                            candidate_failures.first().copied().unwrap_or(SoftAssignmentIssueCode::CapabilityMissing)
+                        })
+                    }
+                } else {
+                    candidate_failures.first().copied().unwrap_or_else(|| {
+                        if installed.is_empty() && module_pool_resolution != SnapshotResolution::Complete {
+                            SoftAssignmentIssueCode::ModulePoolUnresolved
+                        } else if installed.is_empty() {
+                            SoftAssignmentIssueCode::ModuleMissing
+                        } else {
+                            SoftAssignmentIssueCode::CapabilityMissing
+                        }
+                    })
+                };
+                issues.push(SoftAssignmentIssue {
+                    code,
+                    subject_ref: demand.operation_ref.clone(),
+                });
             }
         }
     }
 
+    for operation_ref in current_by_operation.keys() {
+        if !demands_by_ref.contains(operation_ref) {
+            changed += 1;
+        }
+    }
     issues.sort();
     issues.dedup();
-    let status = if issues.iter().any(|issue| matches!(
-        issue.code,
-        SoftAssignmentIssueCode::DuplicateInstalledModule
-            | SoftAssignmentIssueCode::DuplicateOperationDemand
-            | SoftAssignmentIssueCode::DuplicateCurrentAssignment
-            | SoftAssignmentIssueCode::ModuleWrongFacility
-            | SoftAssignmentIssueCode::ModuleNotQualified
-            | SoftAssignmentIssueCode::ModuleUnavailable
-            | SoftAssignmentIssueCode::CapabilityMissing
-            | SoftAssignmentIssueCode::CapabilityAmbiguous
-            | SoftAssignmentIssueCode::ProcessRevisionMismatch
-            | SoftAssignmentIssueCode::ParameterDigestInvalid
-            | SoftAssignmentIssueCode::ParameterDigestMismatch
-            | SoftAssignmentIssueCode::InspectionPlanMismatch
-    )) {
+    let status = if issues.iter().any(|issue| soft_issue_is_blocked(issue.code)) {
         PlanStatus::Blocked
     } else if !issues.is_empty() {
         PlanStatus::Indeterminate
@@ -864,6 +878,28 @@ pub fn propose_soft_reallocation(
         issues,
         production_authorized: false,
     }
+}
+
+fn soft_issue_is_blocked(code: SoftAssignmentIssueCode) -> bool {
+    matches!(
+        code,
+        SoftAssignmentIssueCode::DuplicateInstalledModule
+            | SoftAssignmentIssueCode::DuplicateOperationDemand
+            | SoftAssignmentIssueCode::DuplicateCurrentAssignment
+            | SoftAssignmentIssueCode::ModuleMissing
+            | SoftAssignmentIssueCode::ModuleAmbiguous
+            | SoftAssignmentIssueCode::ModuleWrongFacility
+            | SoftAssignmentIssueCode::ModuleNotQualified
+            | SoftAssignmentIssueCode::ModuleUnavailable
+            | SoftAssignmentIssueCode::ModuleNotYetValid
+            | SoftAssignmentIssueCode::ModuleExpired
+            | SoftAssignmentIssueCode::CapabilityMissing
+            | SoftAssignmentIssueCode::CapabilityAmbiguous
+            | SoftAssignmentIssueCode::ProcessRevisionMismatch
+            | SoftAssignmentIssueCode::ParameterDigestInvalid
+            | SoftAssignmentIssueCode::ParameterDigestMismatch
+            | SoftAssignmentIssueCode::InspectionPlanMismatch
+    )
 }
 
 fn evidence_is_current(evidence: &EvidenceRecord, at: i64) -> bool {
