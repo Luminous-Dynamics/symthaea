@@ -644,6 +644,68 @@ fn cognitive_process_trace_events_enforce_human_and_agent_actors() {
 }
 
 #[test]
+fn scorecard_requires_one_evidence_receipt_for_every_reported_metric() {
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence.pop();
+    assert!(validate_scorecard(&scorecard).is_err());
+
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence.push(scorecard.metric_evidence[0].clone());
+    assert!(validate_scorecard(&scorecard).is_err());
+}
+
+#[test]
+fn scorecard_metric_receipt_value_must_match_the_reported_score() {
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].value += 0.1;
+    assert!(validate_scorecard(&scorecard).is_err());
+}
+
+#[test]
+fn scorecard_ratio_receipt_must_match_its_numerator_and_denominator() {
+    let mut scorecard = base_scorecard();
+    scorecard.scores.constraint_satisfaction = Some(0.8);
+    let receipt = scorecard
+        .metric_evidence
+        .iter_mut()
+        .find(|receipt| receipt.metric_name == "constraint_satisfaction")
+        .unwrap();
+    receipt.value = 0.8;
+    receipt.numerator = Some(8.0);
+    receipt.denominator = Some(10.0);
+    validate_scorecard(&scorecard).unwrap();
+
+    receipt.denominator = Some(9.0);
+    assert!(validate_scorecard(&scorecard).is_err());
+}
+
+#[test]
+fn scorecard_receipts_require_sources_and_complete_uncertainty_intervals() {
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].evidence_refs.clear();
+    assert!(validate_scorecard(&scorecard).is_err());
+
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].ci_lower = Some(0.9);
+    assert!(validate_scorecard(&scorecard).is_err());
+
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].ci_lower = Some(0.7);
+    scorecard.metric_evidence[0].ci_upper = Some(0.9);
+    validate_scorecard(&scorecard).unwrap();
+}
+
+#[test]
+fn scorecard_rejects_unrecognized_and_auxiliary_only_scorer_kinds() {
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].scorer_kind = "model_auxiliary".to_owned();
+    assert!(validate_scorecard(&scorecard).is_err());
+
+    scorecard.metric_evidence[0].scorer_kind = "unknown".to_owned();
+    assert!(validate_scorecard(&scorecard).is_err());
+}
+
+#[test]
 fn clean_scorecard_validates() {
     validate_scorecard(&base_scorecard()).unwrap();
 }
