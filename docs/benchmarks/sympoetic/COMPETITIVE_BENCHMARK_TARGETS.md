@@ -148,7 +148,7 @@ Keep separate:
 
 ### 5.4 Distributional capability amplification
 
-A pooled treatment effect is insufficient. Report treatment-control independent-learning gain and the negative individual-gain rate within every preregistered baseline task-capability stratum. The strata must be fixed from pretest data before post-test outcomes are inspected; underfilled strata remain unavailable rather than being merged after the fact.
+A pooled treatment effect is insufficient. Report treatment-control independent-learning gain and the negative individual-gain rate within every preregistered baseline task-capability stratum, including participant-level bootstrap intervals for both gain and the negative-gain-rate difference. The strata must be fixed from pretest data before post-test outcomes are inspected; underfilled strata remain unavailable rather than being merged after the fact.
 
 **Qualification target:** no stratum is omitted from reporting, every adequately sampled stratum has its own participant-level bootstrap interval, and any stratum whose collaborative negative-gain rate exceeds its control rate is explicitly surfaced. Do not infer protected or sensitive identity from task-performance strata. This is a distributional outcome report, not a single fairness score.
 
