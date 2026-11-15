@@ -101,7 +101,7 @@ pub struct AgentDecision {
     pub idempotency_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence_refs: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub question: Option<String>,
@@ -295,6 +295,9 @@ impl AgentProtocolGuard {
                 require_nonempty("tool_name", tool_name)?;
                 require_nonempty("idempotency_key", idempotency_key)?;
                 require_nonempty("purpose", purpose)?;
+                if purpose.chars().count() > 500 {
+                    bail!("tool-call purpose exceeds 500 characters");
+                }
                 if !request.available_tools.iter().any(|tool| tool.name == tool_name) {
                     bail!("tool {:?} is not in the role-filtered available tool list", tool_name);
                 }
@@ -325,6 +328,9 @@ impl AgentProtocolGuard {
                     .context("ask requires why_required")?;
                 require_nonempty("question", question)?;
                 require_nonempty("why_required", why)?;
+                if why.chars().count() > 500 {
+                    bail!("why_required exceeds 500 characters");
+                }
                 ensure_no_tool_fields(decision)?;
                 if decision.reason.is_some()
                     || decision.content.is_some()
