@@ -13,6 +13,8 @@ This benchmark compares three approaches:
 
 The conditional statistic uses the exact mean and variance of the match count under label permutation, with a one-sided normal approximation. The resulting FPR is measured by outer Monte Carlo campaigns. This is a diagnostic approximation, not yet a production confirmatory test; it must itself pass calibration and independent review.
 
+For a controlled null, the preregistered Monte Carlo gate compares the **observed** rejection-rate estimate with the nominal alpha using a four-standard-error tolerance (plus one campaign of discreteness). The 99% Wilson interval is reported separately for inspection; it is not compared with a second four-SE allowance. This avoids counting Monte Carlo uncertainty twice. Passing means only that this deterministic simulation estimate is not unexpectedly far from the declared null probability; it does not prove a population FPR bound.
+
 ## Frozen null worlds
 
 Each profile uses its original planned sample size and exact-binomial critical value. The manifest fixes 10,000 campaigns per scenario.
