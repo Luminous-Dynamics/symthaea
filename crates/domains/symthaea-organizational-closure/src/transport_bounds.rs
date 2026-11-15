@@ -1316,11 +1316,15 @@ mod tests {
         let (mut scenario, mut oracle, trace) = fixture();
         scenario.target_strata.push(TargetStratumMass::new("x1", 0.5));
         scenario.target_strata[0].target_mass = 0.5;
+        for row in &mut oracle.target_rows {
+            row.population_weight *= 0.5;
+        }
         oracle.target_rows.push(TargetPotentialOutcomeRow::new(
             104, "x1", 0.5, 0.0, 1.0,
         ));
         let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, TransportQualification::Inconclusive);
+        assert_eq!(report.oracle_target_ate, Some(3.0));
         assert!(report.findings.iter().any(|finding| {
             finding.code == TransportFindingCode::MissingSourceArmSupport
         }));
@@ -1366,6 +1370,32 @@ mod tests {
         assert!(report.findings.iter().any(|finding| {
             finding.code == TransportFindingCode::UnsafeDecision
         }));
+    }
+
+    #[test]
+    fn population_and_estimand_identity_must_match_the_evaluator_oracle() {
+        let (scenario, mut oracle, trace) = fixture();
+        oracle.target_population_digest = ContentDigest::of(b"different-target");
+        let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, TransportQualification::NotQualified);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == TransportFindingCode::TargetPopulationDigestMismatch
+        }));
+    }
+
+    #[test]
+    fn negative_outcome_support_is_handled_by_threshold_ordering() {
+        let (mut scenario, oracle, mut trace) = fixture();
+        scenario.source_trial[0].observed_outcome = -10.0;
+        scenario.source_trial[1].observed_outcome = 10.0;
+        scenario.source_trial[2].observed_outcome = -10.0;
+        scenario.source_trial[3].observed_outcome = 10.0;
+        trace.claim.reported_interval = TransportEffectInterval::new(-10.0, 10.0);
+        let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, TransportQualification::Qualified, "{:?}", report.findings);
+        let bounds = report.recomputed_target_effect_bounds.unwrap();
+        assert!(bounds.lower <= bounds.upper);
+        assert!(bounds.lower.is_finite() && bounds.upper.is_finite());
     }
 
     #[test]
