@@ -503,6 +503,8 @@ mod tests {
         include_str!("../../fixtures/negative/missing_status_anti_rollback.json");
     const DUPLICATE: &str =
         include_str!("../../fixtures/negative/duplicate_member_name.raw.json");
+    const BAD_POINTER: &str =
+        include_str!("../../fixtures/negative/invalid_json_pointer_escape.json");
 
     #[test]
     fn positive_three_field_plan_passes_preflight() {
@@ -513,10 +515,8 @@ mod tests {
 
     #[test]
     fn invalid_json_pointer_escape_rejects() {
-        let mut value: Value = serde_json::from_str(POSITIVE).expect("fixture JSON");
-        value["fields"][0]["json_pointer"] = Value::String("/currency~2code".to_owned());
-        let raw = serde_json::to_string(&value).expect("serialize mutation");
-        let error = validate_plan(&raw).expect_err("invalid pointer escape must reject");
+        let error = validate_plan(BAD_POINTER)
+            .expect_err("invalid pointer escape fixture must reject");
         assert!(error.contains("invalid RFC6901 JSON Pointer"));
     }
 
