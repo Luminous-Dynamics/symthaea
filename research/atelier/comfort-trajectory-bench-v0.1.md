@@ -5,6 +5,12 @@
 **Applies to:** AO-01 Everyday Overshirt and CR-01 Continuum Wrap  
 **Date:** 2026-11-15
 
+## Machine-readable session contract
+
+The versioned session schema and synthetic examples live in [the schema/fixture directory](comfort-trajectory-bench-v0.1/README.md). The Draft 2020-12 schema fixes the 0/15/30/60/90/120-minute schedule, dimension-specific 1–7 ratings, consent, pseudonymous participant identity, exact garment/pattern/BOM/assembly/configuration identities and material lot. It explicitly represents missing observations and observations not collected after a voluntary stop.
+
+The fixture set includes complete AO-01, early-stop CR-01 and explicit-missing positive examples, plus negative cases for a transposed observation schedule, an out-of-range rating and missing consent. JSON Schema checks record shape; additional cross-field semantic checks are listed in the directory README and remain a separate validator implementation task.
+
 ## 1. Purpose and boundary
 
 This document extends EverydayWearBench with a time-resolved, wearer-led evaluation of comfort. It does not create a competing benchmark, replace the existing textile-test programme, or define a universal comfort score.
