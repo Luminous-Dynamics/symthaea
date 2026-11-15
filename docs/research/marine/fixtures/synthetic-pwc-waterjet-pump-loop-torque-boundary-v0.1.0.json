@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-PWC-PUMP-LOOP-TORQUE-LOWER-CROSSES-ZERO-0001",
+  "record_status": "synthetic",
+  "method": {
+    "document": "ITTC 7.5-02-05-03.2",
+    "revision": "02",
+    "effective_year": 2017,
+    "test_type": "pump_loop",
+    "scope_note": "Synthetic pump-loop arithmetic vector; method applicability is not a PWC qualification."
+  },
+  "test_boundary": {
+    "drive_power_boundary": "impeller_shaft",
+    "torque_source": "shaft_dynamometer",
+    "friction_correction_method": "separately_measured_and_subtracted",
+    "electrical_conversion_losses_included": false
+  },
+  "measurement_window": {
+    "start_utc": "2026-11-15T00:00:00Z",
+    "end_utc": "2026-11-15T00:01:00Z"
+  },
+  "fluid": {
+    "density": {
+      "value": 998,
+      "lower": 997,
+      "upper": 999,
+      "unit": "kg/m3",
+      "observed_at_utc": "2026-11-15T00:00:00Z",
+      "available_at_utc": "2026-11-15T00:00:01Z",
+      "calibration_status": "synthetic"
+    }
+  },
+  "pump_loop": {
+    "volume_flow_rate": {
+      "value": 0.02,
+      "lower": 0.0199,
+      "upper": 0.0201,
+      "unit": "m3/s",
+      "observed_at_utc": "2026-11-15T00:00:00Z",
+      "available_at_utc": "2026-11-15T00:00:01Z",
+      "calibration_status": "synthetic"
+    },
+    "pump_total_head_rise": {
+      "value": 10,
+      "lower": 9.95,
+      "upper": 10.05,
+      "unit": "m",
+      "observed_at_utc": "2026-11-15T00:00:00Z",
+      "available_at_utc": "2026-11-15T00:00:01Z",
+      "calibration_status": "synthetic"
+    },
+    "shaft_speed": {
+      "value": 6000,
+      "lower": 5990,
+      "upper": 6010,
+      "unit": "rpm",
+      "observed_at_utc": "2026-11-15T00:00:00Z",
+      "available_at_utc": "2026-11-15T00:00:01Z",
+      "calibration_status": "synthetic"
+    },
+    "measured_shaft_torque": {
+      "value": 0.25,
+      "lower": 0.24,
+      "upper": 0.26,
+      "unit": "N*m",
+      "observed_at_utc": "2026-11-15T00:00:00Z",
+      "available_at_utc": "2026-11-15T00:00:01Z",
+      "calibration_status": "synthetic"
+    },
+    "shaft_friction_torque": {
+      "value": 0.2,
+      "lower": 0.19,
+      "upper": 0.3,
+      "unit": "N*m",
+      "observed_at_utc": "2026-11-15T00:00:00Z",
+      "available_at_utc": "2026-11-15T00:00:01Z",
+      "calibration_status": "synthetic"
+    }
+  },
+  "limitations": [
+    "Synthetic known-answer arithmetic only.",
+    "No vessel, pump, PWC or full-scale performance claim.",
+    "No system-level, hull-waterjet interaction, cavitation, acoustic, safety, or compliance result.",
+    "Corrected impeller torque has a nominal positive value but a lower interval bound below zero; expected disposition is INCOMPLETE with no efficiency output."
+  ]
+}

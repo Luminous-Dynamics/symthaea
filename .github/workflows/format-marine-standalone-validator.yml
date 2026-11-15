@@ -1,0 +1,51 @@
+name: Format Marine Standalone Validator
+
+on:
+  push:
+    branches:
+      - research/pwc-waterjet-energy-reference-20261115
+      - research/pwc-waterjet-station-flux-20261115
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/**"
+      - ".github/workflows/format-marine-standalone-validator.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: format-marine-standalone-validator-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  format:
+    name: Apply pinned rustfmt to the isolated standalone crate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the pushed branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: true
+
+      - name: Install repository-pinned Rust toolchain and rustfmt
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only the standalone marine validator workspace
+        run: cargo fmt --manifest-path tools/marine-propulsion-validator/Cargo.toml --all
+
+      - name: Commit formatting-only changes when present
+        shell: bash
+        run: |
+          if git diff --quiet -- tools/marine-propulsion-validator/src; then
+            echo "Standalone marine validator sources are already rustfmt-clean."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/marine-propulsion-validator/src
+          git commit -m "style(marine): format standalone validator sources"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

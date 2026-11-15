@@ -1,0 +1,158 @@
+name: PWC Waterjet Pump-Loop Reference
+
+on:
+  pull_request:
+    branches:
+      - research/marine-waps-co-design-20261110
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/bin/pwc_waterjet_pump_loop_reference.rs"
+      - "docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-*.json"
+      - ".github/workflows/pwc-waterjet-pump-loop-reference.yml"
+  push:
+    branches:
+      - research/pwc-waterjet-energy-reference-20261115
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/bin/pwc_waterjet_pump_loop_reference.rs"
+      - "docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-*.json"
+      - ".github/workflows/pwc-waterjet-pump-loop-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pwc-waterjet-pump-loop-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  reference:
+    name: Exact-head arithmetic, bounds, and adversarial controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Generate standalone lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-propulsion-validator/Cargo.toml
+
+      - name: Format check for the new reference only
+        run: rustfmt --edition 2024 --check tools/marine-propulsion-validator/src/bin/pwc_waterjet_pump_loop_reference.rs
+
+      - name: Unit tests for pump-loop arithmetic and fail-closed boundaries
+        run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --bin pwc-waterjet-pump-loop-reference
+
+      - name: Positive known-answer vector preserves synthetic claim ceiling
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-pump-loop-reference -- \
+            docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-waterjet-positive.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-waterjet-positive.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .arithmetic_status == "VALID" and .reason_code == "SYNTHETIC_ONLY" and (.impeller_shaft_power.value - 3141.592653589793 | fabs) < 0.000000001 and (.effective_pump_power.value - 1957.40734 | fabs) < 0.00000001 and (.free_stream_pump_loop_efficiency_eta_p0.value - 0.6230621076107163 | fabs) < 0.000000000001 and .system_level_metrics.overall_hull_waterjet_efficiency == null' "$RUNNER_TEMP/pwc-waterjet-positive.json"
+
+      - name: Idle point remains unevaluable, not efficient
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-pump-loop-reference -- \
+            docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-idle-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-waterjet-idle.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-waterjet-idle.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .reason_code == "IDLE_NOT_EVALUABLE" and .free_stream_pump_loop_efficiency_eta_p0 == null' "$RUNNER_TEMP/pwc-waterjet-idle.json"
+
+      - name: Negative flow is rejected
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-pump-loop-reference -- \
+            docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-negative-flow-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-waterjet-negative-flow.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-waterjet-negative-flow.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INVALID" and .reason_code == "INVALID_INPUT"' "$RUNNER_TEMP/pwc-waterjet-negative-flow.json"
+
+      - name: Impossible efficiency is blocked and never clipped
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-pump-loop-reference -- \
+            docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-impossible-efficiency-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-waterjet-impossible.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-waterjet-impossible.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "BLOCKED" and .reason_code == "PHYSICALLY_INADMISSIBLE_EFFICIENCY" and .free_stream_pump_loop_efficiency_eta_p0.value > 1' "$RUNNER_TEMP/pwc-waterjet-impossible.json"
+
+
+      - name: Uncertainty crossing unity remains incomplete
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-pump-loop-reference -- \
+            docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-uncertainty-crosses-unity-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-waterjet-uncertain.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-waterjet-uncertain.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .reason_code == "UNCERTAINTY_CROSSES_PHYSICAL_LIMIT" and .free_stream_pump_loop_efficiency_eta_p0.value < 1 and .free_stream_pump_loop_efficiency_eta_p0.upper > 1' "$RUNNER_TEMP/pwc-waterjet-uncertain.json"
+
+      - name: Friction-corrected torque interval crossing zero remains unevaluable
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-pump-loop-reference -- \
+            docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-torque-boundary-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-waterjet-torque-boundary.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-waterjet-torque-boundary.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .reason_code == "INCOMPLETE_INPUT" and .impeller_shaft_power == null and .free_stream_pump_loop_efficiency_eta_p0 == null' "$RUNNER_TEMP/pwc-waterjet-torque-boundary.json"
+
+      - name: Preserve reference calculation receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwc-waterjet-reference-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/pwc-waterjet-positive.json
+            ${{ runner.temp }}/pwc-waterjet-idle.json
+            ${{ runner.temp }}/pwc-waterjet-negative-flow.json
+            ${{ runner.temp }}/pwc-waterjet-impossible.json
+            ${{ runner.temp }}/pwc-waterjet-uncertain.json
+            ${{ runner.temp }}/pwc-waterjet-torque-boundary.json

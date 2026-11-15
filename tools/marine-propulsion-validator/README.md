@@ -373,3 +373,41 @@ The v0.1.0 corpus is intentionally synthetic. Its expected audit disposition is
 INCOMPLETE even when all structural and temporal checks are satisfied. This does not
 train a performance model, identify biofouling, validate hydrodynamics, or establish
 cleaning efficacy or vessel performance.
+
+
+## PWC installed-waterjet pump-loop arithmetic reference
+
+Run the v0.1 synthetic known-answer calculation:
+
+~~~sh
+cargo run --bin pwc-waterjet-pump-loop-reference -- \
+  ../../docs/research/marine/pwc-waterjet-pump-loop-reference-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-v0.1.0.json
+~~~
+
+The reference calculates friction-corrected impeller shaft power, effective pump power,
+free-stream pump-loop efficiency and conservative interval bounds. The raw dynamometer
+torque is corrected by separately measured shaft-friction torque before calculating
+impeller-shaft power. All inputs are explicit SI quantities with observation/availability
+times and synthetic status.
+
+The positive known-answer case intentionally exits with the semantic status `INCOMPLETE`:
+its arithmetic is valid, but synthetic inputs cannot establish measured pump performance.
+Additional fixtures check an idle point, negative flow, and an efficiency above unity.
+The idle point is not treated as an infinite or perfect efficiency; negative flow is invalid;
+an impossible efficiency is blocked and never clipped.
+
+The pump-loop report must leave installation, ducting, ideal, interaction, and overall
+hull-waterjet efficiencies unset. ITTC 7.5-02-05-03.2 separates pump-loop, inlet-duct,
+and waterjet-system tests; these have distinct measurement boundaries. This calculator
+is not an ITTC conformance tool, PWC model, pump map, or physical-validation claim.
+
+
+Additional adversarial controls:
+- uncertainty interval crosses unity while nominal efficiency remains below unity -> INCOMPLETE, not a claimed pass;
+- friction-corrected torque interval reaches zero -> INCOMPLETE with no efficiency denominator.
+
+The current product crosswalk and matched ride-service benchmark proposal are in
+`../../docs/research/marine/PWC-INDUSTRY-BENCHMARK-CROSSWALK-2026-11-15.md`.
+The next independent stage—station energy flux, NVR, inlet/duct and interaction-efficiency
+joining—is tracked in Symthaea issue #12232.
