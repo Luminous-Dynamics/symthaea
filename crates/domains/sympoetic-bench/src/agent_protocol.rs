@@ -87,6 +87,7 @@ pub struct DecisionBudget {
 pub struct AgentDecision {
     pub protocol_version: String,
     pub kind: String,
+    pub run_id: String,
     pub turn_id: String,
     pub decision_id: String,
     pub action: String,
@@ -121,6 +122,7 @@ pub struct AgentDecision {
 pub struct ToolObservation {
     pub protocol_version: String,
     pub kind: String,
+    pub run_id: String,
     pub turn_id: String,
     pub call_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -206,10 +208,17 @@ impl AgentTurnRequest {
                 bail!("duplicate available tool {:?}", tool.name);
             }
         }
+        if self.constraints.iter().any(|constraint| constraint.trim().is_empty()) {
+            bail!("constraints must not contain empty entries");
+        }
         let mut event_ids = HashSet::new();
         for event in &self.history {
             require_nonempty("history event_id", &event.event_id)?;
-            require_nonempty("history actor", &event.actor)?;
+            require_member(
+                "history actor",
+                &event.actor,
+                &["human", "agent", "tool", "environment", "system"],
+            )?;
             require_nonempty("history kind", &event.kind)?;
             require_member(
                 "history trust_class",
@@ -250,11 +259,11 @@ impl AgentProtocolGuard {
         if decision.protocol_version != PROTOCOL_VERSION || decision.kind != "agent_decision" {
             bail!("unsupported agent-decision protocol version or kind");
         }
-        if decision.turn_id != request.turn_id {
-            bail!("decision turn_id does not match the active request");
+        if decision.run_id != request.run_id || decision.turn_id != request.turn_id {
+            bail!("decision run_id or turn_id does not match the active request");
         }
         require_nonempty("decision_id", &decision.decision_id)?;
-        if !self.seen_decision_ids.insert(decision.decision_id.clone()) {
+        if self.seen_decision_ids.contains(&decision.decision_id) {
             bail!("duplicate decision_id {:?}", decision.decision_id);
         }
         require_member("decision action", &decision.action, ALLOWED_ACTIONS)?;
@@ -285,17 +294,20 @@ impl AgentProtocolGuard {
                 if !request.available_tools.iter().any(|tool| tool.name == tool_name) {
                     bail!("tool {:?} is not in the role-filtered available tool list", tool_name);
                 }
-                if !self.seen_call_ids.insert(call_id.to_owned()) {
+                if self.seen_call_ids.contains(call_id) {
                     bail!("duplicate call_id {:?}", call_id);
                 }
                 if decision.question.is_some()
                     || decision.why_required.is_some()
                     || decision.reason.is_some()
                     || decision.content.is_some()
+                    || !decision.blocked_on.is_empty()
+                    || !decision.limitations.is_empty()
                 {
                     bail!("tool_call contains fields belonging to another decision type");
                 }
                 let _ = arguments;
+                self.seen_call_ids.insert(call_id.to_owned());
                 self.pending_call = Some(PendingCall {
                     call_id: call_id.to_owned(),
                     tool_name: tool_name.to_owned(),
@@ -310,19 +322,41 @@ impl AgentProtocolGuard {
                 require_nonempty("question", question)?;
                 require_nonempty("why_required", why)?;
                 ensure_no_tool_fields(decision)?;
+                if decision.reason.is_some()
+                    || decision.content.is_some()
+                    || !decision.blocked_on.is_empty()
+                    || !decision.limitations.is_empty()
+                {
+                    bail!("ask contains fields belonging to another decision type");
+                }
             }
             "defer" => {
                 let reason = decision.reason.as_deref().context("defer requires reason")?;
                 require_nonempty("defer reason", reason)?;
                 ensure_no_tool_fields(decision)?;
+                if decision.question.is_some()
+                    || decision.why_required.is_some()
+                    || decision.content.is_some()
+                    || !decision.limitations.is_empty()
+                {
+                    bail!("defer contains fields belonging to another decision type");
+                }
             }
             "final_answer" => {
                 let content = decision.content.as_deref().context("final_answer requires content")?;
                 require_nonempty("final_answer content", content)?;
                 ensure_no_tool_fields(decision)?;
+                if decision.question.is_some()
+                    || decision.why_required.is_some()
+                    || decision.reason.is_some()
+                    || !decision.blocked_on.is_empty()
+                {
+                    bail!("final_answer contains fields belonging to another decision type");
+                }
             }
             _ => unreachable!("action was checked against ALLOWED_ACTIONS"),
         }
+        self.seen_decision_ids.insert(decision.decision_id.clone());
         Ok(())
     }
 
@@ -335,13 +369,19 @@ impl AgentProtocolGuard {
         if observation.protocol_version != PROTOCOL_VERSION {
             bail!("unsupported tool-observation protocol version");
         }
-        if observation.turn_id != request.turn_id {
-            bail!("observation turn_id does not match the active request");
+        if observation.run_id != request.run_id || observation.turn_id != request.turn_id {
+            bail!("observation run_id or turn_id does not match the active request");
         }
         match observation.kind.as_str() {
             "tool_observation" => {
                 if self.unresolved_unknown.is_some() {
                     bail!("only execution_reconciled may follow an unresolved unknown outcome");
+                }
+                if observation.reconciled_status.is_some()
+                    || observation.state_digest.is_some()
+                    || observation.observer.is_some()
+                {
+                    bail!("tool_observation contains reconciliation-only fields");
                 }
                 let pending = self
                     .pending_call
@@ -373,6 +413,9 @@ impl AgentProtocolGuard {
                 if status == "unknown" && observation.postcondition_digest.is_some() {
                     bail!("unknown outcome must not claim a postcondition digest");
                 }
+                if observation.external_side_effect.is_none() || observation.reversible.is_none() {
+                    bail!("tool_observation requires external_side_effect and reversible flags");
+                }
                 let pending = self.pending_call.take().expect("checked above");
                 if status == "unknown" {
                     self.unresolved_unknown = Some(pending);
@@ -385,6 +428,14 @@ impl AgentProtocolGuard {
                     .context("execution_reconciled has no unresolved unknown call")?;
                 if observation.call_id != pending.call_id {
                     bail!("reconciliation call_id does not match the unresolved call");
+                }
+                if observation.tool_name.is_some()
+                    || observation.status.is_some()
+                    || observation.observation_digest.is_some()
+                    || observation.postcondition_digest.is_some()
+                    || observation.external_side_effect.is_some()
+                {
+                    bail!("execution_reconciled contains tool-observation-only fields");
                 }
                 let status = observation
                     .reconciled_status
