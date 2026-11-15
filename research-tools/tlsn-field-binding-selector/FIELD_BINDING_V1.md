@@ -16,6 +16,10 @@ Select an exact raw JSON value token using a verifier-supplied RFC 6901 JSON Poi
 - Returns the exact raw JSON token byte range within the supplied body, including string quotes and preserving number lexemes such as 1.00 versus 1e2.
 - Does not return or hash the private field value in a public receipt.
 
+## Sparse transcript-to-disclosure adapter
+
+`partial_bytes_from_visible_ranges_v1` converts packed authenticated bytes plus sorted received-direction ranges into a `Vec<Option<u8>>` disclosure view. It rejects empty/out-of-bounds, unsorted, overlapping ranges and packed-byte length mismatches. Only positions covered by explicitly supplied visible ranges become `Some(byte)`; all other positions remain `None`. The caller must obtain both the ranges and packed bytes from a TLSNotary-verified `PartialTranscript` (or an equivalent independently verified source). Prover-supplied ranges are not trusted merely because this adapter accepts them.
+
 ## Partial structural disclosure and HTTP mapping
 
 The implementation now supports one hidden string-content range represented as exactly one contiguous run of None bytes. The verifier parses the body after removing that run; the requested JSON Pointer must resolve to an empty string token, and the removed run must sit exactly between that token's two quote bytes. This binds the sole structural hole to the verifier-selected field under the declared serde_json profile. Duplicate decoded keys anywhere in the document reject.
@@ -40,6 +44,9 @@ A separate HTTP capture/framing layer must prove that the body slice is the exac
 ## Tests authored
 
 - exact nested field range;
+- reconstruction of sparse authenticated ranges without filling hidden gaps;
+- rejection of empty/out-of-bounds, unsorted, overlapping and byte-count-mismatched visible ranges;
+- sparse-range input feeding the hidden-field path binder;
 - one hidden string field bound to the exact JSON Pointer;
 - wrong-field hidden value rejection;
 - rejection of multiple/no hidden ranges and quote-boundary removal;
@@ -55,7 +62,7 @@ A separate HTTP capture/framing layer must prove that the body slice is the exac
 - document resource bound;
 - duplicates in unselected nested subtrees.
 
-All tests are authored but not executed. No compile or runtime result is claimed. The Rust source currently includes 19 selector/partial-hole tests and 13 HTTP framing/composition tests; check the branch head for the exact authored count.
+All tests are authored but not executed. No compile or runtime result is claimed. The current Rust source includes 27 selector/sparse-range/partial-hole tests and 13 HTTP framing/composition tests (40 total).
 
 
 ## Reproducibility
