@@ -22,6 +22,9 @@ It is an integration contract, not another fusion system code. It does not repla
 - Candidate-funnel audit across the frozen universe at analytical, low-fidelity and high-fidelity stages; every candidate/stage pair must have an explicit disposition, including NotEvaluated.
 - Pipeline advancement must follow prior passes; rejected candidates can re-enter only through a documented stratified audit or human override.
 - Exact screening recall is reported only when retrospective reference labels cover the full candidate universe; partial labels never masquerade as an exact recall estimate.
+- Validation-domain module distinguishes calibration exposure, measured test-stand evidence and blind holdout; it checks source/dataset/episode non-overlap, holdout exposure flags, measured-evidence class, diagnostic/uncertainty provenance, model revision and declared regime/geometry/facility/case/operating-point envelope.
+- Holdout transfer requires at least one declared difference from the test-stand measurement (facility, case or operating point), while remaining inside the model's declared domain.
+- A successful validation-domain audit grants only eligibility for independent metric evaluation; it is not a model-performance or physical-validation result.
 
 ## Dispositions
 
@@ -51,10 +54,13 @@ From this directory:
 cargo fmt --manifest-path Cargo.toml -- --check
 cargo test --manifest-path Cargo.toml
 cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
+cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. The new candidate-funnel module adds 16 authored tests for complete stage matrices, missing/duplicate candidate records, skip reasons, ordinary pipeline transitions, explicit audit overrides, failure/non-convergence accounting and exact-vs-partial reference-label coverage. Total authored Rust test declarations across the two source files: 48. These are authored test cases, not executed test results.
+The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. Total authored Rust test declarations across the three source modules: 64. These are authored test cases, not executed test results.
+
+The separate validation-domain inventory binary checks fixture structure without calling the split validator. Its 16 synthetic cases contain 3 expected acceptances and 13 expected refusals.
 
 ## Claim ceiling
 
