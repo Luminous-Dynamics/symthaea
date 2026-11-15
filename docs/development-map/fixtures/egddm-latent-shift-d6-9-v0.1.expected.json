@@ -31,7 +31,8 @@
       ],
       "dependency_only_impact_obligations": [],
       "gold_only_impact_obligations": [],
-      "critical_unsupported_current_claims": []
+      "critical_unsupported_current_claims": [],
+      "gold_adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
     },
     {
       "episode_id": "sham-load-noise",
@@ -58,7 +59,8 @@
       ],
       "dependency_only_impact_obligations": [],
       "gold_only_impact_obligations": [],
-      "critical_unsupported_current_claims": []
+      "critical_unsupported_current_claims": [],
+      "gold_adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
     }
   ],
   "claim_ceiling": "Deterministic scoring of supplied candidate-visible observations and evaluator-side latent-shift labels. Does not authenticate observation producers, independently adjudicate hidden truth, implement a detector or probe planner, or establish production monitoring reliability."
