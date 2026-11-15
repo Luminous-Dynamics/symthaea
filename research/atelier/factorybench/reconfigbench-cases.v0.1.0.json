@@ -1,0 +1,214 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark": "Atelier ReconfigBench — Soft-first modular configuration",
+  "evidence_class": "synthetic",
+  "status": "proposed_deterministic_regression_corpus",
+  "claim_ceiling": "Cases exercise configuration and transition logic only. They do not establish physical changeover time, production readiness, safety clearance, machine qualification, operator qualification or factory performance.",
+  "evaluator_contract": {
+    "transition_kinds": [
+      "NoChange",
+      "AllocationOnly",
+      "PhysicalReconfiguration"
+    ],
+    "plan_statuses": [
+      "FeasibleForQualification",
+      "Blocked",
+      "Indeterminate"
+    ],
+    "success_meaning": "Structurally feasible for qualification only; production_authorized must remain false.",
+    "physical_change_rule": "Physical module, connection, placement, layout or coordinate-frame changes create independent requalification obligations.",
+    "soft_change_rule": "Operation reassignment without physical or layout changes is AllocationOnly and retains the current physical installation; process/workforce/inspection obligations remain explicit.",
+    "missing_fact_rule": "Missing in a Complete source pool is Blocked; missing in Partial/Unknown is Indeterminate.",
+    "evidence_rule": "Expired or revoked evidence is Blocked; missing, unknown, issuerless or validity-unresolved evidence is Indeterminate."
+  },
+  "cases": [
+    {
+      "case_id": "RCB-001",
+      "name": "Initial qualified module composition",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "no_current_configuration_with_valid_modules_ports_and_process_capability",
+      "reason": "Initial assembly can be planned but still requires physical commissioning and independent requalification."
+    },
+    {
+      "case_id": "RCB-002",
+      "name": "Unchanged current configuration",
+      "expected_transition_kind": "NoChange",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "current_and_target_placements_connections_assignments_and_revisions_equal",
+      "reason": "No transition is needed when the qualified physical and allocation state is unchanged."
+    },
+    {
+      "case_id": "RCB-003",
+      "name": "Soft operation reassignment",
+      "expected_transition_kind": "AllocationOnly",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "reassign_operation_to_another_qualified_installed_module",
+      "reason": "Demand changes should be handled in software before moving equipment when a qualified installed alternative exists."
+    },
+    {
+      "case_id": "RCB-004",
+      "name": "Add a qualified module",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "add_module_to_target_configuration",
+      "reason": "New physical module installation requires interface inspection, layout validation and independent commissioning."
+    },
+    {
+      "case_id": "RCB-005",
+      "name": "Relocate a qualified module",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "change_module_xy_or_orthogonal_rotation",
+      "reason": "Relocation changes geometry and invalidates the installed cell qualification context."
+    },
+    {
+      "case_id": "RCB-006",
+      "name": "Expired module profile",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_valid_until<=evaluation_time",
+      "reason": "A module with expired qualification cannot enter a target configuration."
+    },
+    {
+      "case_id": "RCB-007",
+      "name": "Revoked module qualification evidence",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_qualification_evidence=Revoked",
+      "reason": "Revoked evidence blocks module use even when its profile status still says Qualified."
+    },
+    {
+      "case_id": "RCB-008",
+      "name": "Process parameter digest drift",
+      "expected_transition_kind": "AllocationOnly",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_process_parameter_digest!=required_operation_digest",
+      "reason": "A process parameter change cannot reuse capability qualification bound to another digest."
+    },
+    {
+      "case_id": "RCB-009",
+      "name": "Port protocol mismatch",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "connected_ports_have_different_protocol_refs",
+      "reason": "Modules cannot be composed across an interface protocol mismatch."
+    },
+    {
+      "case_id": "RCB-010",
+      "name": "Port unit mismatch",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "connected_ports_have_different_unit_refs",
+      "reason": "Numeric capacity is not comparable across incompatible units."
+    },
+    {
+      "case_id": "RCB-011",
+      "name": "Port capacity exceeded",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "connection_capacity_exceeds_either_port_capacity",
+      "reason": "A physically connectable interface can still be undersized for the required process flow."
+    },
+    {
+      "case_id": "RCB-012",
+      "name": "Required port left unconnected",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "required_peer_port_has_no_connection_in_complete_target",
+      "reason": "A complete target configuration cannot omit a required process/service interface."
+    },
+    {
+      "case_id": "RCB-013",
+      "name": "Module footprint collision",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "target_module_rectangles_overlap",
+      "reason": "Target module footprints cannot occupy the same declared physical area."
+    },
+    {
+      "case_id": "RCB-014",
+      "name": "Module intersects keepout",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_rectangle_intersects_declared_keepout",
+      "reason": "Declared keepout regions are hard geometry constraints; this does not replace formal egress or safety review."
+    },
+    {
+      "case_id": "RCB-015",
+      "name": "Coordinate-frame mismatch",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_placement_frame!=target_layout_frame",
+      "reason": "Coordinates from different spatial frames cannot be composed without an explicit evidenced transform."
+    },
+    {
+      "case_id": "RCB-016",
+      "name": "Partner module reused at another facility",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_facility_ref!=target_cell_facility_ref",
+      "reason": "Module qualification is site-scoped and cannot be silently transferred to another facility."
+    },
+    {
+      "case_id": "RCB-017",
+      "name": "Module profile unresolved in partial pool",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Indeterminate",
+      "mutation": "module_profile_absent_and_pool_resolution=Partial",
+      "reason": "Unresolved owner data cannot be treated as module absence or availability."
+    },
+    {
+      "case_id": "RCB-018",
+      "name": "Module profile absent from complete pool",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "Blocked",
+      "mutation": "module_profile_absent_and_pool_resolution=Complete",
+      "reason": "The complete owner snapshot establishes that no matching qualified module profile was supplied."
+    },
+    {
+      "case_id": "RCB-019",
+      "name": "Commissioning evidence missing for unchanged cell",
+      "expected_transition_kind": "NoChange",
+      "expected_plan_status": "Indeterminate",
+      "mutation": "target_commissioning_evidence=null",
+      "reason": "An unchanged physical installation still requires current commissioning evidence to remain in service."
+    },
+    {
+      "case_id": "RCB-020",
+      "name": "Layout revision changes without module movement",
+      "expected_transition_kind": "PhysicalReconfiguration",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "target_layout_revision_ref!=current_layout_revision_ref",
+      "reason": "A changed layout context requires review and requalification even if module coordinates happen to remain numerically identical."
+    },
+    {
+      "case_id": "RCB-021",
+      "name": "Assignment removed",
+      "expected_transition_kind": "AllocationOnly",
+      "expected_plan_status": "FeasibleForQualification",
+      "mutation": "remove_operation_assignment_without_physical_change",
+      "reason": "The transition report must explicitly unassign work removed from the required route without forcing a physical module move."
+    }
+  ],
+  "comparison_methods": [
+    "static_assignment",
+    "fifo_edd_earliest_finish",
+    "pattern_driven_genetic_algorithm_when_task_is_matched",
+    "exact_small_instance_assignment_oracle",
+    "atelier_soft_first_transition_evaluator"
+  ],
+  "proposed_targets_not_achieved": {
+    "soft_reallocation_share_of_eligible_demand_changes_pct": 80,
+    "configuration_decision_latency_reduction_vs_frozen_heuristic_pct": 30,
+    "physical_time_to_first_conforming_unit_reduction_pct": 20,
+    "false_eligible_target_configurations": 0
+  },
+  "publication_requirements": [
+    "Publish exact module/profile/configuration revisions and input digest.",
+    "Separate allocation-only changes from physical transitions.",
+    "Count qualification obligations and independent review steps.",
+    "Never compare a synthetic transition estimate to physical changeover time.",
+    "Report all blocked and indeterminate cases; do not filter them from optimizer metrics."
+  ]
+}

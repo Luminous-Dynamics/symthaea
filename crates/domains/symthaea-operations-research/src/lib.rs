@@ -23,6 +23,7 @@
 //! assert!((MM1 { arrival_rate: 2.0, service_rate: 3.0 }.avg_in_system() - 2.0).abs() < 1e-12);
 //! ```
 
+pub mod modular_reconfiguration;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
@@ -30,3 +31,13 @@ pub mod queue;
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
 pub use queue::MM1;
+
+pub use modular_reconfiguration::{
+    evaluate_reconfiguration, CellConfiguration, EvidenceRecord, EvidenceStatus,
+    GeometryBasis, LayoutRect, ModuleAvailability, ModuleCapability, ModulePlacement, ModulePort,
+    ModuleProfile, ModuleStatus, OperationAssignment, OperationDemand, PlanStatus,
+    PortConnection, PortDirection, QualificationObligation, ReconfigurationInput,
+    ReconfigurationReason, ReconfigurationReasonCode, ReconfigurationReport,
+    ReasonSeverity, SnapshotResolution, SoftAssignmentIssue, SoftAssignmentIssueCode,
+    SoftAssignmentProposal, TransitionAction, TransitionKind, propose_soft_reallocation,
+};
