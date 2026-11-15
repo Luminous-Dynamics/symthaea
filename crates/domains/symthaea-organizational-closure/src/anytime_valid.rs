@@ -309,7 +309,12 @@ pub fn hoeffding_alpha_spending_radius(
     let n_f = n as f64;
     let log_two_over_alpha_n =
         LN_2 - armwise_alpha.ln() + n_f.ln() + (n_f + 1.0).ln();
-    let radius = outcome_range * (log_two_over_alpha_n / (2.0 * n_f)).sqrt();
+    let multiplier = (log_two_over_alpha_n / (2.0 * n_f)).sqrt();
+    let radius = if multiplier >= 1.0 {
+        outcome_range
+    } else {
+        outcome_range * multiplier
+    };
     radius.is_finite().then_some(radius)
 }
 
@@ -324,14 +329,27 @@ fn arm_confidence_interval(
     }
 
     let n = outcomes.len();
-    let mean = outcomes.iter().sum::<f64>() / n as f64;
-    let radius = hoeffding_alpha_spending_radius(upper - lower, n, armwise_alpha)
-        .unwrap_or(upper - lower);
+    // Stable online mean avoids overflowing a direct sum of large bounded values.
+    let mean = outcomes.iter().enumerate().fold(0.0, |current, (index, value)| {
+        current + (value - current) / (index + 1) as f64
+    });
+    let range = upper - lower;
+    let radius = hoeffding_alpha_spending_radius(range, n, armwise_alpha)
+        .unwrap_or(range);
+    let distance_to_lower = mean - lower;
+    let distance_to_upper = upper - mean;
+    let interval_lower = if radius >= distance_to_lower {
+        lower
+    } else {
+        mean - radius
+    };
+    let interval_upper = if radius >= distance_to_upper {
+        upper
+    } else {
+        mean + radius
+    };
 
-    CausalEffectInterval::new(
-        lower.max(mean - radius),
-        upper.min(mean + radius),
-    )
+    CausalEffectInterval::new(interval_lower, interval_upper)
 }
 
 fn effect_support(lower: f64, upper: f64) -> CausalEffectInterval {
@@ -378,7 +396,10 @@ fn empty_report(
     AnytimeValidCausalReport {
         qualification,
         familywise_alpha: scenario.familywise_alpha,
-        per_arm_alpha: if scenario.queries.is_empty() {
+        per_arm_alpha: if scenario.queries.is_empty()
+            || !scenario.familywise_alpha.is_finite()
+            || !(0.0 < scenario.familywise_alpha && scenario.familywise_alpha < 1.0)
+        {
             0.0
         } else {
             scenario.familywise_alpha / (2.0 * scenario.queries.len() as f64)
@@ -456,6 +477,8 @@ pub fn evaluate_anytime_valid_causal_effects(
         if !query.outcome_lower.is_finite()
             || !query.outcome_upper.is_finite()
             || query.outcome_lower >= query.outcome_upper
+            || !(query.outcome_upper - query.outcome_lower).is_finite()
+            || query.outcome_upper - query.outcome_lower > f64::MAX / 2.0
         {
             push_finding(
                 &mut findings,
@@ -847,7 +870,11 @@ pub fn evaluate_anytime_valid_causal_effects(
             );
             continue;
         }
-        if !claim.reported_effect_interval.contains_interval(&recomputed) {
+        let contains_recomputed = claim.reported_effect_interval.lower
+            <= recomputed.lower + policy.claim_tolerance
+            && claim.reported_effect_interval.upper + policy.claim_tolerance
+                >= recomputed.upper;
+        if !contains_recomputed {
             push_finding(
                 &mut findings,
                 AnytimeValidFindingCode::ClaimNarrowerThanConfidenceSequence,
@@ -996,6 +1023,16 @@ mod tests {
         assert!(hoeffding_alpha_spending_radius(1.0, 0, 0.025).is_none());
         assert!(hoeffding_alpha_spending_radius(1.0, 100, 1.0).is_none());
         assert!(hoeffding_alpha_spending_radius(f64::NAN, 100, 0.025).is_none());
+    }
+
+    #[test]
+    fn alpha_spending_is_summable_within_the_armwise_error_budget() {
+        let arm_alpha = 0.025;
+        let spent: f64 = (1..=100_000)
+            .map(|n| arm_alpha / (n as f64 * (n as f64 + 1.0)))
+            .sum();
+        assert!(spent <= arm_alpha);
+        assert!(spent > arm_alpha * 0.9999);
     }
 
     #[test]
