@@ -4,9 +4,9 @@
   "generated_date": "2026-11-15",
   "claim_ceiling": "SYNTHETIC_EVIDENCE_CLAIM_AUDIT_ONLY_NO_CLINICAL_DECISION_OR_DEVICE_AUTHORITY",
   "counts_expected": {
-    "SUPPORTED": 8,
-    "REJECTED": 8,
-    "BLOCKED": 6
+    "SUPPORTED": 11,
+    "REJECTED": 11,
+    "BLOCKED": 7
   },
   "cases": [
     {
@@ -228,6 +228,76 @@
       "requested_claim": "SURVIVAL_BENEFIT_ESTABLISHED",
       "expected_disposition": "REJECTED",
       "rationale": "A wound-area and healing study does not establish survival benefit."
+    },
+    {
+      "id": "VLU_RCT_EXACT_NON_SUPERIORITY_RESULT",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "HUMAN_COMPARATIVE_RESULT_NOT_STATISTICALLY_SUPERIOR",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The claim preserves the actual non-significant primary-endpoint result and immediate microbial findings."
+    },
+    {
+      "id": "VLU_RCT_PROMOTED_TO_STATISTICAL_SUPERIORITY",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "CLINICAL_SUPERIORITY_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "The primary wound-area superiority test was not statistically significant."
+    },
+    {
+      "id": "VLU_RCT_NON_SIGNIFICANCE_PROMOTED_TO_EQUIVALENCE",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "CLINICAL_EQUIVALENCE_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "Failure to demonstrate superiority does not establish equivalence or non-inferiority."
+    },
+    {
+      "id": "VLU_RCT_TRANSFERRED_TO_DIABETIC_FOOT_ULCERS",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "DIABETIC_FOOT_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "HUMAN_COMPARATIVE_RESULT_NOT_STATISTICALLY_SUPERIOR",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Venous-ulcer evidence cannot be transferred to diabetic foot ulcers without an explicit clinical evidence bridge."
+    },
+    {
+      "id": "NIPP_RD_III_RECRUITMENT_COMPLETE_STATUS",
+      "source_id": "RADIATION-DERMATITIS-NIPP-RD-III-PROTOCOL",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "BREAST_RADIOTHERAPY_DERMATITIS_PREVENTION",
+      "requested_scope": "nipp_rd_iii_protocol_specific_breast_radiotherapy_prevention",
+      "requested_claim": "TRIAL_RECRUITMENT_COMPLETE_STATUS",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The registry reports recruitment complete, study continuing and a final sample size of 141; no Phase III result is claimed."
+    },
+    {
+      "id": "KINPEN_MED_CATALOGUE_SPECIFICATION",
+      "source_id": "KINPEN-MED-DEVICE-CATALOGUE-2026",
+      "requested_modality": "DIRECT_APPJ_ARGON",
+      "requested_indication": "CHRONIC_WOUNDS_AND_PATHOGEN_INDUCED_SKIN_DISEASES",
+      "requested_scope": "kinpen_med_inptdat_catalogue_class_iia_power_below_3_5w_1mhz_argon_4_to_6_slm_temp_35_to_38c",
+      "requested_claim": "DEVICE_CATALOGUE_SPECIFICATION_ONLY",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The claim is limited to the specifications and device status listed in the institutional catalogue."
+    },
+    {
+      "id": "KINPEN_MED_SPECIFICATION_PROMOTED_TO_EFFICACY",
+      "source_id": "KINPEN-MED-DEVICE-CATALOGUE-2026",
+      "requested_modality": "DIRECT_APPJ_ARGON",
+      "requested_indication": "CHRONIC_WOUNDS_AND_PATHOGEN_INDUCED_SKIN_DISEASES",
+      "requested_scope": "kinpen_med_inptdat_catalogue_class_iia_power_below_3_5w_1mhz_argon_4_to_6_slm_temp_35_to_38c",
+      "requested_claim": "CLINICAL_EFFECTIVENESS_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "Device catalogue specifications do not establish comparative clinical efficacy."
     }
   ]
 }
