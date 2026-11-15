@@ -37,5 +37,46 @@ jobs:
       - name: Run tests
         run: cargo test --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets
 
+      - name: Run sequential null and alternative calibration
+        run: |
+          set -euo pipefail
+          manifest="research/falsification-power-reference/Cargo.toml"
+          report="$RUNNER_TEMP/sequential-null-calibration.json"
+          cargo run --locked --manifest-path "$manifest" --bin sequential_null_calibration > "$report"
+          jq -e '
+            .schema == "symthaea_sequential_null_calibration_v0" and
+            .nominal_alpha == 0.05 and
+            .paths_per_scenario == 20000 and
+            .maximum_looks == 100 and
+            (.scenarios | length) == 3 and
+            all(.scenarios[];
+              .paths == 20000 and
+              .horizon == 100 and
+              .e_process_rate >= 0 and .e_process_rate <= 1 and
+              .naive_repeated_fixed_time_rate >= 0 and .naive_repeated_fixed_time_rate <= 1 and
+              .e_process_wilson95[0] <= .e_process_rate and
+              .e_process_rate <= .e_process_wilson95[1] and
+              .naive_repeated_fixed_time_wilson95[0] <= .naive_repeated_fixed_time_rate and
+              .naive_repeated_fixed_time_rate <= .naive_repeated_fixed_time_wilson95[1]
+            ) and
+            ( .scenarios[] | select(.scenario == "fixed_known_variance_null") | .e_process_rate ) <= 0.06 and
+            ( .scenarios[] | select(.scenario == "predictable_adaptive_variance_null") | .e_process_rate ) <= 0.06 and
+            ( .scenarios[] | select(.scenario == "predictable_adaptive_variance_null") | .naive_repeated_fixed_time_rate ) > 0.10
+          ' "$report"
+          printf '%s\\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
+          cat "$report"
+
+      - name: Upload sequential calibration receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: sequential-falsification-calibration-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/sequential-null-calibration.json
+            ${{ runner.temp }}/sequential-null-calibration.json.sha256
+            ${{ runner.temp }}/sequential-null-calibration.json.source-sha
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
