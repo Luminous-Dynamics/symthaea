@@ -1,0 +1,88 @@
+{
+  "request": {
+    "schema_version": "mel-music-selection-trajectory-v1",
+    "trajectory_id": "synthetic-noop-similarity-two-candidate",
+    "task_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+    "source_lineage_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+    "instruction_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+    "evaluator_suite_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+    "seed": 2026,
+    "assigned_candidate_count": 2,
+    "adaptive_rounds": 1,
+    "backend_portfolio_size": 2,
+    "budget": {
+      "generation_calls": 2,
+      "render_calls": 2,
+      "wall_clock_budget_ms": 60000
+    },
+    "policy": "best_of_n_similarity"
+  },
+  "slots": [
+    {
+      "sequence": 1,
+      "slot_id": "slot-000",
+      "outcome": "materialized",
+      "observation": {
+        "candidate_id": "candidate-000",
+        "source_lineage_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+        "instruction_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+        "output_sha256": "0000000000000000000000000000000000000000000000000000000000000064",
+        "adaptive_round": 1,
+        "backend_id": "synthetic-backend-a",
+        "backend_version": "offline-fixture-v1",
+        "renderer_id": "synthetic-renderer-a",
+        "renderer_version": "offline-fixture-v1",
+        "proxy": {
+          "similarity_bp": 6000,
+          "loudness_match_bp": 5500,
+          "novelty_bp": 4000,
+          "complexity_bp": 4500,
+          "prompt_alignment_bp": 5200,
+          "style_match_bp": 5000
+        },
+        "uncertainty_bp": 200,
+        "hard_gates": {
+          "edit_execution": "verified",
+          "protected_preservation": "verified",
+          "rights_admission": "verified",
+          "integrity": "verified",
+          "source_lineage": "verified",
+          "required_evidence": "verified"
+        }
+      }
+    },
+    {
+      "sequence": 2,
+      "slot_id": "slot-001",
+      "outcome": "materialized",
+      "observation": {
+        "candidate_id": "candidate-001",
+        "source_lineage_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+        "instruction_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+        "output_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+        "adaptive_round": 1,
+        "backend_id": "synthetic-backend-b",
+        "backend_version": "offline-fixture-v1",
+        "renderer_id": "synthetic-renderer-b",
+        "renderer_version": "offline-fixture-v1",
+        "proxy": {
+          "similarity_bp": 9800,
+          "loudness_match_bp": 8000,
+          "novelty_bp": 7000,
+          "complexity_bp": 9000,
+          "prompt_alignment_bp": 9500,
+          "style_match_bp": 9000
+        },
+        "uncertainty_bp": 800,
+        "hard_gates": {
+          "edit_execution": "rejected",
+          "protected_preservation": "verified",
+          "rights_admission": "verified",
+          "integrity": "verified",
+          "source_lineage": "verified",
+          "required_evidence": "verified"
+        }
+      }
+    }
+  ]
+}
