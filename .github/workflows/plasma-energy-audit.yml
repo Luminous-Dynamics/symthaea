@@ -36,9 +36,9 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Format check of audited source module
+      - name: Format check of the exact audit module
         run: rustfmt --edition 2024 --check xtask/src/plasma_energy_audit.rs
-      - name: Prepare isolated audit harness
+      - name: Prepare isolated xtask audit harness
         shell: bash
         run: |
           set -euo pipefail
