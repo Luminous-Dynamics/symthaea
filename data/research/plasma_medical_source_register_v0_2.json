@@ -1,0 +1,294 @@
+{
+  "schema_version": "0.2.0",
+  "programme": "PLASMA-MEDICAL-001",
+  "generated_date": "2026-11-15",
+  "claim_ceiling": "PUBLIC_RESEARCH_SOURCE_REGISTER_ONLY_NO_TREATMENT_DOSE_DEVICE_SAFETY_CLINICAL_EFFICACY_OR_REGULATORY_AUTHORIZATION",
+  "sources": [
+    {
+      "id": "WOUND-CAP-RCT-STROHAL-2025",
+      "modality": "DIRECT_CAP",
+      "indication": "CHRONIC_WOUNDS",
+      "qualified_scope": "chronic_wounds_cap_plus_best_practice_care_vs_placebo_plus_best_practice_care_study_specific",
+      "evidence_class": "HUMAN_RANDOMIZED_CLINICAL_TRIAL",
+      "study_design": "MULTICENTRE_RANDOMIZED_SINGLE_BLIND_PLACEBO_CONTROLLED",
+      "publication_status": "PUBLISHED_RESULTS",
+      "human_participants": 70,
+      "study_count": 1,
+      "claim_ceiling": "Human comparative signal in the exact chronic-wound study population and intervention context; not universal effectiveness or cross-device equivalence.",
+      "allowed_claims": [
+        "HUMAN_COMPARATIVE_SIGNAL"
+      ],
+      "source_url": "https://doi.org/10.12968/jowc.2025.0207",
+      "limitations": [
+        "35 participants per arm.",
+        "CAP was used alongside best-practice wound care.",
+        "A study-specific result does not establish equivalence across wound etiologies or devices.",
+        "A reported wound-area result is not a universal complete-healing or recurrence guarantee."
+      ]
+    },
+    {
+      "id": "WOUND-CAP-SRMA-YUAN-2026",
+      "modality": "DIRECT_CAP",
+      "indication": "CHRONIC_WOUNDS",
+      "qualified_scope": "chronic_wounds_rcts_2010_to_2025_review_specific",
+      "evidence_class": "SYSTEMATIC_REVIEW_META_ANALYSIS_OF_RCTS",
+      "study_design": "SYSTEMATIC_REVIEW_META_ANALYSIS",
+      "publication_status": "PUBLISHED_RESULTS",
+      "human_participants": 477,
+      "study_count": 12,
+      "claim_ceiling": "A review-level comparative signal across included chronic-wound RCTs; heterogeneity and risk of bias limit transfer and certainty.",
+      "allowed_claims": [
+        "SYSTEMATIC_REVIEW_SIGNAL"
+      ],
+      "source_url": "https://doi.org/10.1016/j.jtv.2026.101017",
+      "limitations": [
+        "The review included 12 RCTs and 477 participants.",
+        "Intervention devices, protocols and wound populations varied.",
+        "The authors identify heterogeneity and study-quality limitations.",
+        "Source-specific pooled estimates must not be reinterpreted as device-specific treatment effects."
+      ]
+    },
+    {
+      "id": "DFU-CAP-SRMA-2025-2026",
+      "modality": "DIRECT_CAP",
+      "indication": "DIABETIC_FOOT_ULCERS",
+      "qualified_scope": "diabetic_foot_ulcers_three_rcts_107_participants_126_ulcers_review_specific",
+      "evidence_class": "SYSTEMATIC_REVIEW_META_ANALYSIS_OF_RCTS",
+      "study_design": "SYSTEMATIC_REVIEW_META_ANALYSIS",
+      "publication_status": "PUBLISHED_RESULTS",
+      "human_participants": 107,
+      "study_count": 3,
+      "claim_ceiling": "Early wound-area signal and short-term safety observations in the included DFU RCTs; not proof of durable infection control or general wound effectiveness.",
+      "allowed_claims": [
+        "SYSTEMATIC_REVIEW_SIGNAL"
+      ],
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/41264397/",
+      "limitations": [
+        "Only three RCTs, 107 participants and 126 ulcers were included.",
+        "No sustained between-group bacterial-load advantage was reported.",
+        "No serious treatment-related adverse events were reported in the included trials; this does not prove absence of risk.",
+        "Larger and longer randomized studies were recommended."
+      ]
+    },
+    {
+      "id": "RADIATION-DERMATITIS-NIPP-RD-III-PROTOCOL",
+      "modality": "DIRECT_CAP",
+      "indication": "BREAST_RADIOTHERAPY_DERMATITIS_PREVENTION",
+      "qualified_scope": "nipp_rd_iii_protocol_specific_breast_radiotherapy_prevention",
+      "evidence_class": "CLINICAL_TRIAL_PROTOCOL",
+      "study_design": "PHASE_III_RANDOMIZED_DOUBLE_BLIND_PLACEBO_CONTROLLED_PROTOCOL",
+      "publication_status": "PHASE_III_RECRUITMENT_COMPLETE_STUDY_CONTINUING_NO_PHASE_III_RESULTS_POSTED",
+      "human_participants": 141,
+      "study_count": 1,
+      "claim_ceiling": "Existence and design of a Phase III clinical-trial protocol, with recruitment reported complete and final sample size 141; no Phase III clinical outcome or efficacy claim.",
+      "allowed_claims": [
+        "TRIAL_PROTOCOL_EXISTS",
+        "TRIAL_RECRUITMENT_COMPLETE_STATUS"
+      ],
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/40108640/",
+      "limitations": [
+        "The registry update of 2026-10-08 reports recruitment complete and study continuing; no Phase III results are posted.",
+        "The planned sample size was 140 and the register reports final sample size 141.",
+        "This is prevention of radiation dermatitis during breast radiotherapy, not treatment of the tumour.",
+        "Earlier Phase I/II summaries in the registry are not Phase III outcome evidence.",
+        "Protocol and recruitment status do not establish clinical benefit, device authorization or routine clinical use."
+      ]
+    },
+    {
+      "id": "DENTAL-CAPP-SR-HEGDE-2026",
+      "modality": "DIRECT_CAP_AND_PAL",
+      "indication": "DENTISTRY",
+      "qualified_scope": "dental_capp_systematic_review_19_studies_11_in_vitro_7_animal_1_human_rct",
+      "evidence_class": "SYSTEMATIC_REVIEW_PRECLINICAL_DOMINANT",
+      "study_design": "SYSTEMATIC_REVIEW_PRECLINICAL_AND_LIMITED_CLINICAL",
+      "publication_status": "PUBLISHED_REVIEW",
+      "human_participants": null,
+      "study_count": 19,
+      "claim_ceiling": "Evidence synthesis dominated by preclinical results; the review reports only one short-term human randomized trial and says routine clinical use remains preliminary.",
+      "allowed_claims": [
+        "PRECLINICAL_DOMINANT_EVIDENCE_SUMMARY"
+      ],
+      "source_url": "https://doi.org/10.1155/ijod/7100799",
+      "limitations": [
+        "19 studies: 11 in vitro, 7 animal and 1 human randomized trial.",
+        "A single short-term human trial is insufficient to establish routine clinical use.",
+        "Direct CAP and plasma-activated liquids appear in the review and are not interchangeable interventions.",
+        "No blanket safety conclusion should be transferred to unstudied exposure conditions."
+      ]
+    },
+    {
+      "id": "ONCOLOGY-CHCP-PHASE-I-NCT04267575",
+      "modality": "INTRAOPERATIVE_DIRECT_CAP",
+      "indication": "SOLID_TUMOUR_SURGICAL_MARGIN_ADJUNCT",
+      "qualified_scope": "phase_i_intraoperative_chcp_after_macroscopic_resection_advanced_or_recurrent_solid_tumours",
+      "evidence_class": "PHASE_I_HUMAN_CLINICAL_TRIAL",
+      "study_design": "MULTICENTRE_OPEN_LABEL_PROSPECTIVE_PHASE_I",
+      "publication_status": "PUBLISHED_PHASE_I_RESULTS",
+      "human_participants": 20,
+      "study_count": 1,
+      "claim_ceiling": "A small Phase I human safety/feasibility signal for a specific intraoperative surgical-margin intervention; not general antitumour efficacy, survival benefit or systemic immunotherapy evidence.",
+      "allowed_claims": [
+        "HUMAN_SAFETY_FEASIBILITY_SIGNAL"
+      ],
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10378184/",
+      "limitations": [
+        "20 patients with advanced or recurrent solid tumours were reported.",
+        "The primary study objective was safety.",
+        "The intervention followed macroscopic tumour resection and was limited to the surgical setting described.",
+        "The study is not a randomized efficacy trial.",
+        "FDA IDE authorization for a clinical investigation is not marketing clearance or approval."
+      ]
+    },
+    {
+      "id": "PAW-DFU-PHASE-I-PROTOCOL-2026",
+      "modality": "PLASMA_ACTIVATED_WATER",
+      "indication": "DIABETIC_FOOT_ULCER_WOUND_RINSE",
+      "qualified_scope": "phase_i_randomized_double_blind_paw_wound_rinse_protocol_20_participants",
+      "evidence_class": "CLINICAL_TRIAL_PROTOCOL",
+      "study_design": "PHASE_I_RANDOMIZED_DOUBLE_BLIND_PROTOCOL",
+      "publication_status": "PROTOCOL_ONLY_NO_RESULTS_IN_SOURCE",
+      "human_participants": 20,
+      "study_count": 1,
+      "claim_ceiling": "Existence and design of a Phase I PAW wound-rinse protocol; no clinical safety or efficacy outcome.",
+      "allowed_claims": [
+        "TRIAL_PROTOCOL_EXISTS"
+      ],
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/42431657/",
+      "limitations": [
+        "Protocol only; no trial results are claimed.",
+        "PAW is an indirect liquid-delivery intervention, not direct CAP exposure.",
+        "Liquid composition, storage, time-dependent chemistry and biological matrix need independent characterization."
+      ]
+    },
+    {
+      "id": "CAP-DOSE-DUAL-INDEX-REVIEW-2026",
+      "modality": "CROSS_MODALITY_DOSIMETRY_REVIEW",
+      "indication": "CAP_BIOLOGICAL_DOSIMETRY",
+      "qualified_scope": "2020_to_2025_cap_dose_review_over_400_studies_dual_index_proposal",
+      "evidence_class": "SYSTEMATIC_REVIEW_DOSIMETRY_FRAMEWORK",
+      "study_design": "SYSTEMATIC_REVIEW_META_ANALYSIS",
+      "publication_status": "PUBLISHED_FRAMEWORK_PROPOSAL",
+      "human_participants": null,
+      "study_count": 400,
+      "claim_ceiling": "A proposed physical/biological dosimetry framework and synthesis of heterogeneous literature; not a validated universal clinical dose standard.",
+      "allowed_claims": [
+        "DOSE_FRAMEWORK_PROPOSED"
+      ],
+      "source_url": "https://doi.org/10.1016/j.redox.2026.104162",
+      "limitations": [
+        "The review discusses more than 400 studies.",
+        "It proposes volumetric RONS flux and redox-homeostatic status as complementary indices.",
+        "The proposal is not a universal calibrated clinical dosing standard.",
+        "Device, tissue, modality and biological-response heterogeneity remain substantial."
+      ]
+    },
+    {
+      "id": "VLU-CAPJ-RCT-HENARES-2026",
+      "modality": "DIRECT_CAP_APPJ_AIR",
+      "indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "qualified_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "evidence_class": "HUMAN_RANDOMIZED_CLINICAL_TRIAL",
+      "study_design": "PROSPECTIVE_RANDOMIZED_CONTROLLED_OPEN_LABEL_MULTICENTRE",
+      "publication_status": "PUBLISHED_RESULTS",
+      "human_participants": 60,
+      "study_count": 1,
+      "claim_ceiling": "Study-specific randomized comparative result: numerically greater wound-area reduction but no statistically significant superiority to standard care on the primary week-17 wound-area endpoint; immediate microbial-burden reductions were observed.",
+      "allowed_claims": [
+        "HUMAN_COMPARATIVE_RESULT_NOT_STATISTICALLY_SUPERIOR"
+      ],
+      "source_url": "https://doi.org/10.1097/GOX.0000000000007553",
+      "limitations": [
+        "60 adults with nonhealing venous leg ulcers were randomized in an open-label multicentre study.",
+        "At week 17, mean wound-area reduction was -72.9% with CAPJ versus -56.7% with standard care, but the difference was not statistically significant (P=0.30).",
+        "Complete healing was 42.9% versus 30.4% (P=0.361).",
+        "CAPJ produced significant immediate microbial-burden reductions at weeks 0 and 4.",
+        "No serious device-attributed adverse events were reported; transient pain-related sensations were the most frequent treatment-related effects.",
+        "This result is not evidence of equivalence or proof of no benefit, and does not transfer to other wound etiologies or CAP devices."
+      ]
+    },
+    {
+      "id": "KINPEN-MED-DEVICE-CATALOGUE-2026",
+      "modality": "DIRECT_APPJ_ARGON",
+      "indication": "CHRONIC_WOUNDS_AND_PATHOGEN_INDUCED_SKIN_DISEASES",
+      "qualified_scope": "kinpen_med_inptdat_catalogue_class_iia_power_below_3_5w_1mhz_argon_4_to_6_slm_temp_35_to_38c",
+      "evidence_class": "INSTITUTIONAL_DEVICE_CATALOGUE",
+      "study_design": "DEVICE_SPECIFICATION_CATALOGUE",
+      "publication_status": "CATALOGUE_RETRIEVED_2026_11_15",
+      "human_participants": null,
+      "study_count": null,
+      "claim_ceiling": "The institutional technology catalogue identifies kINPen MED as a commercially available Class IIa medical device and lists source specifications; catalogue data is not independent comparative clinical performance evidence.",
+      "allowed_claims": [
+        "DEVICE_CATALOGUE_SPECIFICATION_ONLY"
+      ],
+      "source_url": "https://www.inptdat.de/kinpen%C2%AE-med",
+      "limitations": [
+        "Catalogue-listed power is below 3.5 W at 1 MHz with argon flow 4–6 standard L/min and reported temperature 35–38 °C.",
+        "The catalogue describes a small-area plasma jet and identifies chronic wounds and pathogen-induced skin diseases as medical-use areas.",
+        "Catalogue specifications are not a matched head-to-head performance result or a Luminous measurement.",
+        "A device-specific class IIa statement from this catalogue is not a substitute for jurisdiction-specific authorization verification."
+      ]
+    },
+    {
+      "id": "DFU-CAP-RCT-YAGHOOBI-2026",
+      "modality": "DIRECT_CAP",
+      "indication": "DIABETIC_FOOT_ULCER",
+      "qualified_scope": "Wagner_grade_2_diabetic_foot_ulcers_helium_CAP_plus_standard_care_vs_standard_care_short_term_to_day_21",
+      "evidence_class": "HUMAN_RANDOMIZED_CLINICAL_TRIAL",
+      "study_design": "OPEN_LABEL_RANDOMIZED_CONTROLLED_TRIAL",
+      "publication_status": "PUBLISHED_RESULTS",
+      "publication_date": "2026-07-16",
+      "human_participants": 50,
+      "study_count": 1,
+      "claim_ceiling": "Short-term human comparative signal in the exact studied Wagner grade 2 DFU population and helium CAP protocol; does not establish long-term complete closure, recurrence prevention, limb preservation, or transfer to other devices and wound etiologies.",
+      "allowed_claims": [
+        "HUMAN_COMPARATIVE_SIGNAL"
+      ],
+      "source_url": "https://doi.org/10.1038/s41598-026-62803-w",
+      "notable_findings": [
+        "The study assigned 50 participants to standard care or standard care plus helium-based CAP.",
+        "CAP was applied twice weekly for three weeks; wound size and targeted bacterial cultures were assessed at baseline and days 7, 14 and 21.",
+        "Authors reported wound contraction of 1.21 cm/day versus 0.79 cm/day and bacterial-load reduction of 32.8% versus 10.0% for CAP plus standard care versus standard care."
+      ],
+      "limitations": [
+        "Open-label design.",
+        "Only 50 participants and one study.",
+        "The population was limited to Wagner grade 2 DFUs.",
+        "Reported measurements ended at day 21; durable complete closure, recurrence, amputation and long-term safety are not established.",
+        "The study was published after the 2010–2025 search window described by the 2026 chronic-wound meta-analysis and must not be silently counted among its 12 RCTs.",
+        "The authors declare no competing interests; two authors are affiliated with a plasma technology company, which should remain visible as contextual provenance without inferring undisclosed conflict."
+      ]
+    },
+    {
+      "id": "CAP-MULTIJET-SAFETY-OSSOWSKA-2026",
+      "modality": "DIRECT_CAP",
+      "indication": "PRECLINICAL_DEVICE_SAFETY_AND_SPATIAL_COVERAGE_CHARACTERIZATION",
+      "qualified_scope": "helium_multijet_two_and_four_outlet_research_device_DIN_SPEC_91315_2025_07_aligned_physical_ex_vivo_and_in_vitro_assessment",
+      "evidence_class": "PRECLINICAL_DEVICE_SAFETY_CHARACTERIZATION",
+      "study_design": "DIN_SPEC_91315_2025_07_ALIGNED_PRECLINICAL_CHARACTERIZATION",
+      "publication_status": "PUBLISHED_RESULTS",
+      "publication_date": "2026-11-07",
+      "human_participants": 0,
+      "study_count": 1,
+      "claim_ceiling": "Preclinical characterization of a specific helium multijet research source under its declared test conditions; does not establish clinical efficacy, a clinical indication, regulatory authorization or a transferable biological dose.",
+      "allowed_claims": [
+        "PRECLINICAL_DEVICE_CHARACTERIZATION"
+      ],
+      "source_url": "https://doi.org/10.1038/s41598-026-78776-9",
+      "notable_findings": [
+        "Two- and four-outlet applicators were evaluated with active surface treatment area, evaporation, ex-vivo porcine-skin temperature, electrical characterization, in-vitro cytotoxicity and micronucleus/genotoxicity testing.",
+        "At 10 mm and four minutes, the paper reports full active surface treatment area of 1,311 mm² for the two-jet applicator and 787 mm² for the four-jet applicator.",
+        "At 8 mm the four-jet result was 540 mm² versus 443 mm² for the two-jet applicator, a 22% difference under the reported assay conditions.",
+        "Short-exposure blind spots between plume targets and geometry-dependent thermal effects were reported.",
+        "The authors reported no increase in micronuclei relative to untreated control in the tested HaCaT assay and limited cytotoxicity under the studied conditions."
+      ],
+      "limitations": [
+        "A single research device and study protocol; no independent multi-laboratory replication is established by this source record.",
+        "KI-starch active-area mapping is a spatial screening measure and not species-specific RONS dosimetry or biological-dose measurement.",
+        "The 2-jet/4-jet area results are specific to the paper's geometry, assay threshold, distance and time; they are not universal scaling coefficients.",
+        "Ex-vivo and in-vitro safety findings do not establish human clinical safety or efficacy.",
+        "No human participants or clinical trial outcomes."
+      ]
+    }
+  ],
+  "previous_version": "0.1.0"
+}

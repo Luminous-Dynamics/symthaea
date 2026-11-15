@@ -1,0 +1,1119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/plasma_medical_exposure_record_v0_1.json",
+  "title": "Luminous Plasma Medical Exposure Record",
+  "description": "Research-data contract for reconstructing plasma source configuration, direct physical exposure or plasma-activated-liquid lineage, biological context/response and governed clinical context. Not a treatment protocol or clinical dose standard.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme",
+    "record_id",
+    "claim_ceiling",
+    "modality",
+    "indication",
+    "source_configuration",
+    "exposure",
+    "biological_context",
+    "biological_observations",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme": {
+      "const": "PLASMA-MEDICAL-002"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,127}$"
+    },
+    "claim_ceiling": {
+      "const": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION"
+    },
+    "modality": {
+      "enum": [
+        "DIRECT_CAP",
+        "PLASMA_ACTIVATED_LIQUID"
+      ]
+    },
+    "indication": {
+      "enum": [
+        "CHRONIC_WOUNDS",
+        "DIABETIC_FOOT_ULCER",
+        "VENOUS_LEG_ULCER",
+        "RADIATION_DERMATITIS_PREVENTION",
+        "DENTISTRY",
+        "ONCOLOGY_SURGICAL_MARGIN",
+        "OTHER_DECLARED"
+      ]
+    },
+    "source_configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_revision",
+        "discharge_architecture",
+        "gas",
+        "nominal_settings"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discharge_architecture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gas": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "composition"
+          ],
+          "properties": {
+            "composition": {
+              "type": "string",
+              "minLength": 1
+            },
+            "purity_fraction": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "lot_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "nominal_settings": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": [
+              "number",
+              "string",
+              "boolean",
+              "object",
+              "array",
+              "null"
+            ]
+          }
+        },
+        "consumable_lots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "software_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "service_record_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "exposure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "exposure_event_id",
+            "event_time",
+            "interface",
+            "geometry",
+            "physical_observations"
+          ],
+          "properties": {
+            "type": {
+              "const": "DIRECT_CAP"
+            },
+            "exposure_event_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event_time": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "interface": {
+              "enum": [
+                "TISSUE_PHANTOM",
+                "IN_VITRO_MEDIUM",
+                "EX_VIVO_TISSUE",
+                "ANIMAL_TISSUE",
+                "HUMAN_TISSUE",
+                "OTHER_DECLARED"
+              ]
+            },
+            "geometry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "coordinate_frame",
+                "target_distance_mm",
+                "treated_area_mm2",
+                "sampling_plan_id",
+                "sample_count"
+              ],
+              "properties": {
+                "coordinate_frame": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "target_distance_mm": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "treated_area_mm2": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "sampling_plan_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sample_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "spatial_map_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "coverage_fraction": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            },
+            "physical_observations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "quantity_id",
+                  "status",
+                  "method_id"
+                ],
+                "properties": {
+                  "quantity_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "status": {
+                    "enum": [
+                      "MEASURED",
+                      "BELOW_DETECTION_LIMIT",
+                      "NOT_MEASURED",
+                      "NOT_APPLICABLE",
+                      "UNKNOWN",
+                      "WITHHELD"
+                    ]
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "detection_limit": {
+                    "type": "number"
+                  },
+                  "method_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "calibration": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "IN_DATE",
+                          "EXPIRED",
+                          "UNKNOWN",
+                          "NOT_REQUIRED",
+                          "NOT_APPLICABLE"
+                        ]
+                      },
+                      "calibration_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "valid_from": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "valid_until": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "certificate_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    }
+                  },
+                  "uncertainty": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "QUANTIFIED",
+                          "NOT_QUANTIFIED"
+                        ]
+                      },
+                      "value": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "coverage_factor": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "confidence_level": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "raw_data_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "sampling_location_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "status": {
+                          "const": "MEASURED"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "value",
+                        "unit",
+                        "calibration",
+                        "uncertainty",
+                        "observed_at",
+                        "raw_data_sha256"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "status": {
+                          "const": "BELOW_DETECTION_LIMIT"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "detection_limit",
+                        "unit",
+                        "calibration",
+                        "observed_at",
+                        "raw_data_sha256"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            "spatial_summary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "uniformity_claimed",
+                "local_peak_reviewed"
+              ],
+              "properties": {
+                "uniformity_claimed": {
+                  "type": "boolean"
+                },
+                "local_peak_reviewed": {
+                  "type": "boolean"
+                },
+                "minimum": {
+                  "type": "number"
+                },
+                "mean": {
+                  "type": "number"
+                },
+                "maximum": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "spatial_map_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "exposure_event_id",
+            "event_time",
+            "interface",
+            "liquid_lineage",
+            "delivery"
+          ],
+          "properties": {
+            "type": {
+              "const": "PLASMA_ACTIVATED_LIQUID"
+            },
+            "exposure_event_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event_time": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "interface": {
+              "const": "LIQUID_TO_TISSUE"
+            },
+            "liquid_lineage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "matrix_id",
+                "matrix_type",
+                "generation_event_id",
+                "generation_source_id",
+                "container_material",
+                "storage",
+                "elapsed_minutes_at_application",
+                "chemistry_observations"
+              ],
+              "properties": {
+                "matrix_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "matrix_type": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "generation_event_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "generation_source_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "container_material": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "container_lot_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "storage": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "condition",
+                    "temperature_c",
+                    "stored_at",
+                    "applied_at"
+                  ],
+                  "properties": {
+                    "condition": {
+                      "enum": [
+                        "DARK",
+                        "AMBIENT_LIGHT",
+                        "CONTROLLED_LIGHT",
+                        "OTHER_DECLARED"
+                      ]
+                    },
+                    "temperature_c": {
+                      "type": "number"
+                    },
+                    "stored_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "applied_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                },
+                "elapsed_minutes_at_application": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "chemistry_observations": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "quantity_id",
+                      "status",
+                      "method_id"
+                    ],
+                    "properties": {
+                      "quantity_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "status": {
+                        "enum": [
+                          "MEASURED",
+                          "BELOW_DETECTION_LIMIT",
+                          "NOT_MEASURED",
+                          "NOT_APPLICABLE",
+                          "UNKNOWN",
+                          "WITHHELD"
+                        ]
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "detection_limit": {
+                        "type": "number"
+                      },
+                      "method_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "calibration": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "IN_DATE",
+                              "EXPIRED",
+                              "UNKNOWN",
+                              "NOT_REQUIRED",
+                              "NOT_APPLICABLE"
+                            ]
+                          },
+                          "calibration_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "valid_from": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "valid_until": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "certificate_sha256": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          }
+                        }
+                      },
+                      "uncertainty": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "enum": [
+                              "QUANTIFIED",
+                              "NOT_QUANTIFIED"
+                            ]
+                          },
+                          "value": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "coverage_factor": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "confidence_level": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "maximum": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      "observed_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "raw_data_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "sampling_location_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "notes": {
+                        "type": "string"
+                      }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "status": {
+                              "const": "MEASURED"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "value",
+                            "unit",
+                            "calibration",
+                            "uncertainty",
+                            "observed_at",
+                            "raw_data_sha256"
+                          ]
+                        }
+                      },
+                      {
+                        "if": {
+                          "properties": {
+                            "status": {
+                              "const": "BELOW_DETECTION_LIMIT"
+                            }
+                          },
+                          "required": [
+                            "status"
+                          ]
+                        },
+                        "then": {
+                          "required": [
+                            "detection_limit",
+                            "unit",
+                            "calibration",
+                            "observed_at",
+                            "raw_data_sha256"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "delivery": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "volume_ml",
+                "contact_duration_seconds"
+              ],
+              "properties": {
+                "volume_ml": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "contact_duration_seconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "delivery_method": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "biological_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_class",
+        "model_id",
+        "tissue_or_matrix"
+      ],
+      "properties": {
+        "model_class": {
+          "enum": [
+            "IN_VITRO",
+            "EX_VIVO",
+            "ANIMAL",
+            "HUMAN",
+            "ENGINEERING_PHANTOM",
+            "NOT_APPLICABLE",
+            "UNKNOWN"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tissue_or_matrix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "etiology": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baseline_state_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pseudonymous_subject_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "biological_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "assay_id",
+          "linked_exposure_event_id",
+          "time_after_exposure_minutes",
+          "measurement"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "assay_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "linked_exposure_event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "time_after_exposure_minutes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "measurement": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "quantity_id",
+              "status",
+              "method_id"
+            ],
+            "properties": {
+              "quantity_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "MEASURED",
+                  "BELOW_DETECTION_LIMIT",
+                  "NOT_MEASURED",
+                  "NOT_APPLICABLE",
+                  "UNKNOWN",
+                  "WITHHELD"
+                ]
+              },
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "detection_limit": {
+                "type": "number"
+              },
+              "method_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "calibration": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "IN_DATE",
+                      "EXPIRED",
+                      "UNKNOWN",
+                      "NOT_REQUIRED",
+                      "NOT_APPLICABLE"
+                    ]
+                  },
+                  "calibration_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "valid_from": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "valid_until": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "certificate_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "uncertainty": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "QUANTIFIED",
+                      "NOT_QUANTIFIED"
+                    ]
+                  },
+                  "value": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "coverage_factor": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "confidence_level": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "raw_data_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "sampling_location_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "notes": {
+                "type": "string"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "MEASURED"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "value",
+                    "unit",
+                    "calibration",
+                    "uncertainty",
+                    "observed_at",
+                    "raw_data_sha256"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "BELOW_DETECTION_LIMIT"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "detection_limit",
+                    "unit",
+                    "calibration",
+                    "observed_at",
+                    "raw_data_sha256"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "clinical_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "comparator_id",
+        "standard_care_record_ref",
+        "follow_up_days",
+        "endpoint_definition",
+        "analysis_plan_ref"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registry_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "comparator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standard_care_record_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "co_intervention_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "follow_up_days": {
+          "type": "number",
+          "minimum": 0
+        },
+        "endpoint_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_plan_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adverse_event_dataset_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED",
+          "BIOLOGICAL_RESPONSE_ASSOCIATED",
+          "CLINICAL_OUTCOME_ASSOCIATED"
+        ]
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recorded_at",
+        "method_document_sha256",
+        "raw_data_manifest_sha256",
+        "software_revision"
+      ],
+      "properties": {
+        "recorded_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "method_document_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "raw_data_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "software_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "modality": {
+            "const": "DIRECT_CAP"
+          }
+        },
+        "required": [
+          "modality"
+        ]
+      },
+      "then": {
+        "properties": {
+          "exposure": {
+            "properties": {
+              "type": {
+                "const": "DIRECT_CAP"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "modality": {
+            "const": "PLASMA_ACTIVATED_LIQUID"
+          }
+        },
+        "required": [
+          "modality"
+        ]
+      },
+      "then": {
+        "properties": {
+          "exposure": {
+            "properties": {
+              "type": {
+                "const": "PLASMA_ACTIVATED_LIQUID"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

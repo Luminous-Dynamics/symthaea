@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod plasma_medical_evidence_audit;
+mod plasma_medical_exposure_audit;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -65,6 +66,8 @@ enum Commands {
     },
     /// Audit medical plasma research claims against source-specific evidence ceilings.
     PlasmaMedicalEvidenceAudit,
+    /// Audit reconstructability of synthetic biological plasma-exposure records.
+    PlasmaMedicalExposureAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -108,6 +111,13 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::PlasmaMedicalExposureAudit => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            plasma_medical_exposure_audit::run(&root)?;
         }
         Commands::PlasmaMedicalEvidenceAudit => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

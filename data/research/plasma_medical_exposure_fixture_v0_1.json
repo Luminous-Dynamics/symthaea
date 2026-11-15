@@ -1,0 +1,1758 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "PLASMA-MEDICAL-002",
+  "claim_ceiling": "SYNTHETIC_DATA_CONTRACT_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+  "expected_counts": {
+    "PASS": 2,
+    "BLOCKED": 8,
+    "REJECTED": 4
+  },
+  "cases": [
+    {
+      "id": "DIRECT_CAP_COMPLETE_RECONSTRUCTABLE",
+      "expected_disposition": "PASS",
+      "reason_code": "COMPLETE_DIRECT_CAP_RECORD",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "PAW_COMPLETE_LINEAGE_RECONSTRUCTABLE",
+      "expected_disposition": "PASS",
+      "reason_code": "COMPLETE_PAW_LINEAGE",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_PAW_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "PLASMA_ACTIVATED_LIQUID",
+        "indication": "DIABETIC_FOOT_ULCER",
+        "source_configuration": {
+          "source_id": "SYNTH-PAW-GENERATOR-01",
+          "source_revision": "REV-B",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1100,
+            "activation_duration_s": 60
+          },
+          "consumable_lots": [
+            "SYNTH-VESSEL-LOT-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "PLASMA_ACTIVATED_LIQUID",
+          "exposure_event_id": "SYNTH-EXPOSURE-PAW-001",
+          "event_time": "2026-10-01T12:25:00Z",
+          "interface": "LIQUID_TO_TISSUE",
+          "liquid_lineage": {
+            "matrix_id": "SYNTH-MATRIX-01",
+            "matrix_type": "synthetic-buffered-aqueous-matrix",
+            "generation_event_id": "SYNTH-GEN-01",
+            "generation_source_id": "SYNTH-PAW-GENERATOR-01",
+            "container_material": "borosilicate",
+            "container_lot_id": "SYNTH-VESSEL-LOT-01",
+            "storage": {
+              "condition": "DARK",
+              "temperature_c": 4,
+              "stored_at": "2026-10-01T12:00:00Z",
+              "applied_at": "2026-10-01T12:25:00Z"
+            },
+            "elapsed_minutes_at_application": 25,
+            "chemistry_observations": [
+              {
+                "quantity_id": "pH",
+                "status": "MEASURED",
+                "value": 5.8,
+                "unit": "pH",
+                "method_id": "METHOD-SYNTH-01",
+                "calibration": {
+                  "status": "IN_DATE",
+                  "calibration_id": "CAL-SYNTH-01",
+                  "valid_from": "2026-01-01T00:00:00Z",
+                  "valid_until": "2027-01-01T00:00:00Z",
+                  "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "uncertainty": {
+                  "status": "QUANTIFIED",
+                  "value": 0.2,
+                  "unit": "pH",
+                  "coverage_factor": 2,
+                  "confidence_level": 0.95
+                },
+                "observed_at": "2026-10-01T12:00:00Z",
+                "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "sampling_location_id": "GRID-01"
+              },
+              {
+                "quantity_id": "hydrogen_peroxide",
+                "status": "MEASURED",
+                "value": 0.12,
+                "unit": "mmol/L",
+                "method_id": "METHOD-SYNTH-01",
+                "calibration": {
+                  "status": "IN_DATE",
+                  "calibration_id": "CAL-SYNTH-01",
+                  "valid_from": "2026-01-01T00:00:00Z",
+                  "valid_until": "2027-01-01T00:00:00Z",
+                  "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "uncertainty": {
+                  "status": "QUANTIFIED",
+                  "value": 0.2,
+                  "unit": "mmol/L",
+                  "coverage_factor": 2,
+                  "confidence_level": 0.95
+                },
+                "observed_at": "2026-10-01T12:00:00Z",
+                "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "sampling_location_id": "GRID-01"
+              }
+            ]
+          },
+          "delivery": {
+            "volume_ml": 5,
+            "contact_duration_seconds": 600,
+            "delivery_method": "synthetic-gauze-contact"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PAW-PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "NOMINAL_SETTINGS_ONLY_NOT_MEASURED_EXPOSURE",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "NO_PHYSICAL_OBSERVATIONS",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "UNKNOWN_CANNOT_CARRY_NUMERIC_ZERO",
+      "expected_disposition": "REJECTED",
+      "reason_code": "UNKNOWN_VALUE_MUST_NOT_BE_ZERO",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "UNKNOWN",
+              "value": 0,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "BELOW_LIMIT_IS_NOT_MEASURED_ZERO",
+      "expected_disposition": "REJECTED",
+      "reason_code": "BELOW_LIMIT_CANNOT_CARRY_VALUE",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "BELOW_DETECTION_LIMIT",
+              "value": 0,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01",
+              "detection_limit": 0.01
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "EXPIRED_CALIBRATION_BLOCKS_TRACEABILITY",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "CALIBRATION_NOT_VALID",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "EXPIRED",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "UNIFORMITY_WITHOUT_SPATIAL_MAP",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "SPATIAL_UNIFORMITY_EVIDENCE_INCOMPLETE",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "UNREVIEWED_LOCAL_HOTSPOT",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "LOCAL_PEAK_NOT_REVIEWED",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": false,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.08,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "PAW_WITHOUT_TIME_TO_USE",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "PAW_STABILITY_LINEAGE_INCOMPLETE",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_PAW_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "PLASMA_ACTIVATED_LIQUID",
+        "indication": "DIABETIC_FOOT_ULCER",
+        "source_configuration": {
+          "source_id": "SYNTH-PAW-GENERATOR-01",
+          "source_revision": "REV-B",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1100,
+            "activation_duration_s": 60
+          },
+          "consumable_lots": [
+            "SYNTH-VESSEL-LOT-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "PLASMA_ACTIVATED_LIQUID",
+          "exposure_event_id": "SYNTH-EXPOSURE-PAW-001",
+          "event_time": "2026-10-01T12:25:00Z",
+          "interface": "LIQUID_TO_TISSUE",
+          "liquid_lineage": {
+            "matrix_id": "SYNTH-MATRIX-01",
+            "matrix_type": "synthetic-buffered-aqueous-matrix",
+            "generation_event_id": "SYNTH-GEN-01",
+            "generation_source_id": "SYNTH-PAW-GENERATOR-01",
+            "container_material": "borosilicate",
+            "container_lot_id": "SYNTH-VESSEL-LOT-01",
+            "storage": {
+              "condition": "DARK",
+              "temperature_c": 4,
+              "stored_at": "2026-10-01T12:00:00Z",
+              "applied_at": "2026-10-01T12:25:00Z"
+            },
+            "chemistry_observations": [
+              {
+                "quantity_id": "pH",
+                "status": "MEASURED",
+                "value": 5.8,
+                "unit": "pH",
+                "method_id": "METHOD-SYNTH-01",
+                "calibration": {
+                  "status": "IN_DATE",
+                  "calibration_id": "CAL-SYNTH-01",
+                  "valid_from": "2026-01-01T00:00:00Z",
+                  "valid_until": "2027-01-01T00:00:00Z",
+                  "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "uncertainty": {
+                  "status": "QUANTIFIED",
+                  "value": 0.2,
+                  "unit": "pH",
+                  "coverage_factor": 2,
+                  "confidence_level": 0.95
+                },
+                "observed_at": "2026-10-01T12:00:00Z",
+                "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "sampling_location_id": "GRID-01"
+              },
+              {
+                "quantity_id": "hydrogen_peroxide",
+                "status": "MEASURED",
+                "value": 0.12,
+                "unit": "mmol/L",
+                "method_id": "METHOD-SYNTH-01",
+                "calibration": {
+                  "status": "IN_DATE",
+                  "calibration_id": "CAL-SYNTH-01",
+                  "valid_from": "2026-01-01T00:00:00Z",
+                  "valid_until": "2027-01-01T00:00:00Z",
+                  "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "uncertainty": {
+                  "status": "QUANTIFIED",
+                  "value": 0.2,
+                  "unit": "mmol/L",
+                  "coverage_factor": 2,
+                  "confidence_level": 0.95
+                },
+                "observed_at": "2026-10-01T12:00:00Z",
+                "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                "sampling_location_id": "GRID-01"
+              }
+            ]
+          },
+          "delivery": {
+            "volume_ml": 5,
+            "contact_duration_seconds": 600,
+            "delivery_method": "synthetic-gauze-contact"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PAW-PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "BIOLOGICAL_RESPONSE_LINKS_WRONG_EXPOSURE",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "EXPOSURE_LINK_MISMATCH",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [
+          {
+            "observation_id": "BIO-01",
+            "assay_id": "ASSAY-SYNTH-01",
+            "linked_exposure_event_id": "OTHER-EXPOSURE",
+            "time_after_exposure_minutes": 30,
+            "measurement": {
+              "quantity_id": "cell_viability",
+              "status": "MEASURED",
+              "value": 90,
+              "unit": "percent",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "percent",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          }
+        ],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "CLINICAL_OUTCOME_WITHOUT_COMPARATOR_AND_CARE",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "CLINICAL_CONTEXT_INCOMPLETE",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "CLINICAL_OUTCOME_ASSOCIATED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        },
+        "clinical_context": {
+          "protocol_id": "SYNTH-PROTOCOL"
+        }
+      }
+    },
+    {
+      "id": "MALFORMED_RAW_DATA_MANIFEST_DIGEST",
+      "expected_disposition": "REJECTED",
+      "reason_code": "PROVENANCE_DIGEST_INVALID",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "not-a-digest",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "MODALITY_DOES_NOT_MATCH_EXPOSURE_TYPE",
+      "expected_disposition": "REJECTED",
+      "reason_code": "MODALITY_TYPE_MISMATCH",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "PLASMA_ACTIVATED_LIQUID",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "degC",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    },
+    {
+      "id": "UNQUANTIFIED_MEASUREMENT_UNCERTAINTY",
+      "expected_disposition": "BLOCKED",
+      "reason_code": "UNCERTAINTY_NOT_QUANTIFIED",
+      "record": {
+        "schema_version": "0.1.0",
+        "programme": "PLASMA-MEDICAL-002",
+        "record_id": "SYNTH_DIRECT_VALID_001",
+        "claim_ceiling": "DATA_CONTRACT_AND_SYNTHETIC_AUDIT_ONLY_NO_PHYSICAL_OR_CLINICAL_VALIDATION",
+        "modality": "DIRECT_CAP",
+        "indication": "CHRONIC_WOUNDS",
+        "source_configuration": {
+          "source_id": "SYNTH-SOURCE-01",
+          "source_revision": "REV-A",
+          "discharge_architecture": "DBD",
+          "gas": {
+            "composition": "ambient_air",
+            "purity_fraction": null,
+            "lot_id": null
+          },
+          "nominal_settings": {
+            "voltage_vpp": 1200,
+            "pulse_frequency_hz": 10000
+          },
+          "consumable_lots": [
+            "SYNTH-CONSUMABLE-01"
+          ],
+          "software_revision": "sim-0.1",
+          "service_record_ref": null
+        },
+        "exposure": {
+          "type": "DIRECT_CAP",
+          "exposure_event_id": "SYNTH-EXPOSURE-DIRECT-001",
+          "event_time": "2026-10-01T12:00:00Z",
+          "interface": "TISSUE_PHANTOM",
+          "geometry": {
+            "coordinate_frame": "PHANTOM-FRAME-A",
+            "target_distance_mm": 10,
+            "treated_area_mm2": 400,
+            "sampling_plan_id": "GRID-5X5",
+            "sample_count": 25,
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "coverage_fraction": 0.96
+          },
+          "physical_observations": [
+            {
+              "quantity_id": "interface_temperature",
+              "status": "MEASURED",
+              "value": 34.2,
+              "unit": "degC",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "NOT_QUANTIFIED",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            },
+            {
+              "quantity_id": "ozone_concentration",
+              "status": "MEASURED",
+              "value": 0.01,
+              "unit": "ppm",
+              "method_id": "METHOD-SYNTH-01",
+              "calibration": {
+                "status": "IN_DATE",
+                "calibration_id": "CAL-SYNTH-01",
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_until": "2027-01-01T00:00:00Z",
+                "certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              "uncertainty": {
+                "status": "QUANTIFIED",
+                "value": 0.2,
+                "unit": "ppm",
+                "coverage_factor": 2,
+                "confidence_level": 0.95
+              },
+              "observed_at": "2026-10-01T12:00:00Z",
+              "raw_data_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "sampling_location_id": "GRID-01"
+            }
+          ],
+          "spatial_summary": {
+            "uniformity_claimed": true,
+            "local_peak_reviewed": true,
+            "minimum": 0.008,
+            "mean": 0.01,
+            "maximum": 0.013,
+            "unit": "ppm",
+            "spatial_map_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "biological_context": {
+          "model_class": "ENGINEERING_PHANTOM",
+          "model_id": "PHANTOM-SYNTH-01",
+          "tissue_or_matrix": "synthetic-interface-phantom",
+          "etiology": null,
+          "baseline_state_ref": null,
+          "pseudonymous_subject_ref": null
+        },
+        "biological_observations": [],
+        "claims": [
+          "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+          "SPATIAL_UNIFORMITY_SUPPORTED"
+        ],
+        "provenance": {
+          "recorded_at": "2026-10-01T13:00:00Z",
+          "method_document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "raw_data_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "software_revision": "synthetic-fixture-generator-0.1",
+          "operator_ref": "SYNTH-OPERATOR"
+        }
+      }
+    }
+  ]
+}
