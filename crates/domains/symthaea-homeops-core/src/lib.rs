@@ -485,7 +485,7 @@ impl HandoffReceipt {
         if self.releasing_party == self.receiving_party {
             return Err(HandoffError::SameParty);
         }
-        if self.accepted && self.evidence_ref.trim().is_empty() {
+        if self.evidence_ref.trim().is_empty() {
             return Err(HandoffError::MissingEvidence);
         }
         Ok(())
