@@ -481,7 +481,7 @@ fn audit(record: &Record) -> AuditReport {
                 "synthetic fixture validates arithmetic only and cannot qualify measured pump performance",
             );
 
-            let mut report = AuditReport {
+            let report = AuditReport {
                 auditor: "pwc-waterjet-pump-loop-reference",
                 auditor_version: "0.1.0",
                 record_id: record.record_id.clone(),
@@ -530,9 +530,6 @@ fn audit(record: &Record) -> AuditReport {
                 diagnostics: findings.diagnostics,
                 claim_ceiling: "Synthetic arithmetic reference only; no measured PWC, waterjet-system, hydrodynamic, cavitation, safety, regulatory, or product-performance claim.",
             };
-            // Preserve the highest-priority disposition after adding the synthetic-only
-            // qualification finding.
-            report.disposition = findings.disposition();
             return report;
         }
     }
