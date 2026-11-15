@@ -32,6 +32,20 @@ A request contains `lofted_artifact` and `water_density_kg_m3`:
 
 The triangular-prism known-answer fixture is 100 m long, 20 m waterplane beam and 6 m depth. Its displacement volume is 6,000 m³, waterplane area is 2,000 m², and the analytical centre of buoyancy is 50 m longitudinally and 2 m below the waterplane.
 
+## G2d hydrostatic sensitivity receipts
+
+G2d is under development for [issue #12383](https://github.com/Luminous-Dynamics/symthaea/issues/12383) on branch `research/marine-hydrostatic-sensitivity-g2d-20261115`. It computes local central finite-difference sensitivities of G2c hydrostatic observables with respect to length, beam, draft, station breadth/depth fractions and section control points.
+
+For each parameter it evaluates the base, minus/plus h and minus/plus h/2 designs through the **same** section validation, G2b loft, G0/G1 admission and G2c hydrostatics pipeline. Both perturbation pairs must pass; there is no one-sided fallback, clamping or geometry repair. The receipt includes exact spec/geometry digests, profile digest, explicit water-density source, coarse/fine derivatives, Richardson extrapolation, truncation-error estimate and a BLAKE3 result digest.
+
+The triangular-prism known-answer tests check dV/dL = 60 m², dV/dB = 300 m², dV/dT = 1,000 m² and dLCB/dL = 0.5.
+
+The CLI accepts a JSON request with `section_spec`, `profile`, `parameter`, `step`, `observable`, `water_density_kg_m3` and `water_density_source`:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-hydrostatic-sensitivity -- sensitivity-request.json
+
+The derivative applies only to this bounded parameterization and its polyhedral hydrostatic model; it is not a CFD/structural/DFM sensitivity or a global optimum guarantee.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
