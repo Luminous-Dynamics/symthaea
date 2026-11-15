@@ -1,0 +1,151 @@
+{
+  "schema_version": "0.1.0",
+  "status": "design_template_not_ready_for_unblinding",
+  "benchmark": "EGDDM ShiftBench D6",
+  "date": "2026-11-15",
+  "design": {
+    "paired_unit": "scenario_pair_id",
+    "blocking": [
+      "repository_family",
+      "intervention_family",
+      "intervention_position",
+      "task_seed"
+    ],
+    "conditions": [
+      "clean",
+      "shifted"
+    ],
+    "intervention_families": 12,
+    "intervention_positions": [
+      "early",
+      "middle",
+      "late"
+    ],
+    "seeds_per_family_position_cell_target": 10,
+    "matched_scenario_pairs_target": 360,
+    "validation_pilot_candidate_seeds": 36,
+    "independent_trials_per_model_harness_target": 3,
+    "model_harness_families_target": 3,
+    "holdouts": {
+      "repository_family_holdout": true,
+      "forward_time_holdout": true,
+      "lock_task_and_gold_labels_before_agent_runs": true
+    }
+  },
+  "arms": {
+    "baseline_candidates": [
+      "full_rerun",
+      "reset_and_restart",
+      "conversation_only_memory",
+      "static_dependency_traversal",
+      "temporal_replay_only",
+      "temporal_replay_plus_evidence_acquisition",
+      "expert_maintainer"
+    ],
+    "candidate": "full_egddm",
+    "primary_comparator_selection": "select strongest eligible baseline on validation pilot and freeze before held-out evaluation",
+    "ablation_comparisons": [
+      "temporal_replay_only",
+      "temporal_replay_plus_evidence_acquisition",
+      "full_egddm"
+    ]
+  },
+  "primary_estimand": {
+    "name": "cost_reduction_under_recovery_and_critical_risk_noninferiority",
+    "population": "held-out admitted scenario pairs and pinned model/harness families",
+    "unit": "paired scenario pair within the same model, harness, repository block and trial",
+    "components": [
+      "shifted_recovery_success_difference",
+      "critical_unverified_obligation_seconds_difference",
+      "end_to_end_total_cost_ratio"
+    ],
+    "decision_rule": "declare efficiency superiority only when recovery and critical-risk noninferiority pass their pre-frozen margins and end-to-end cost is lower with the pre-specified confidence criterion",
+    "noninferiority_margins": {
+      "shifted_recovery_success_absolute_difference": null,
+      "critical_unverified_obligation_seconds_difference": null
+    },
+    "cost_superiority_confidence_level": 0.95,
+    "margins_must_be_frozen_before_unblinding": true
+  },
+  "outcomes": {
+    "primary": [
+      "shifted_recovery_success",
+      "critical_unverified_obligation_seconds",
+      "end_to_end_total_cost"
+    ],
+    "secondary": [
+      "paired_clean_and_shifted_success",
+      "retained_functionality",
+      "terminal_active_requirement_conformance",
+      "time_weighted_requirement_conformance",
+      "maximum_critical_unverified_gap_seconds",
+      "stale_receipt_acceptance_rate",
+      "future_evidence_leakage_rate",
+      "impact_precision",
+      "impact_recall",
+      "sham_false_positive_invalidation_rate",
+      "positive_control_detection_rate",
+      "unaffected_evidence_reuse_rate",
+      "revalidation_runner_cost",
+      "recovery_latency",
+      "pass_all_trials_reliability",
+      "impact_prediction_brier_score",
+      "risk_coverage_curve"
+    ],
+    "cost_components": [
+      "model_input_tokens",
+      "model_output_tokens",
+      "agent_wall_time",
+      "runner_compute",
+      "runner_wall_time",
+      "tool_calls",
+      "retries",
+      "external_service_cost",
+      "reviewer_time",
+      "adjudicator_time"
+    ],
+    "hard_failures": [
+      "critical_unauthorized_action",
+      "candidate_gold_label_or_hidden_test_access",
+      "future_evidence_leakage",
+      "evaluator_tampering",
+      "stale_receipt_accepted_for_critical_obligation",
+      "unreconciled_unknown_outcome_followed_by_new_mutation"
+    ]
+  },
+  "analysis": {
+    "confidence_level": 0.95,
+    "familywise_alpha": 0.05,
+    "target_power": 0.9,
+    "primary_binary_test": "paired_exact_mcnemar",
+    "primary_continuous_interval": "paired_hierarchical_cluster_bootstrap",
+    "bootstrap_replicates_target": 10000,
+    "bootstrap_resampling_unit": "task_seed_cluster_with_repository_family_and_intervention_strata_preserved",
+    "repeated_trials": "retain trial-level outcomes; model within-task repeated measures; do not treat runs as independent tasks",
+    "secondary_multiple_comparisons": "holm_bonferroni",
+    "missing_or_timeout": "count as shifted failure; retain incurred cost; report missingness and censoring separately",
+    "heterogeneity": "report all 12 intervention families and 3 positions; no post-hoc pooling to hide failures",
+    "aggregate_score": "prohibited"
+  },
+  "preregistration_lock": {
+    "must_freeze_before_unblinding": [
+      "primary_comparator",
+      "noninferiority_margins",
+      "primary_model_harness_pairs",
+      "task_exclusion_rules",
+      "stopping_rule",
+      "power_calculation_and_final_sample_size",
+      "grader_and_runner_digests",
+      "analysis_code_digest",
+      "randomization_seed",
+      "missing_timeout_handling"
+    ],
+    "signed_by": [],
+    "timestamp": null,
+    "analysis_code_digest": null,
+    "randomization_seed": null,
+    "final_sample_size": null,
+    "stopping_rule": null
+  },
+  "claim_ceiling": "analysis-plan template only; no sample size has been powered from pilot data and no benchmark trial or treatment effect has been observed"
+}
