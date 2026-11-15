@@ -53,6 +53,7 @@ Ownership remains split:
 - Symthaea #12373: TLSNotary typed verified-commitment API boundary.
 - Symthaea #12269: issuer/source and verifier-request binding.
 - Mycelix #6230 / #6245 / #6251 / #6219: PPAC composition, source profile, domain-scoped uniqueness, and LISE requalification.
+- Mycelix #5401 / #5404 / #5405 / #5411 / #5466 / #5468: cross-session linkability, cumulative disclosure inference, proof-shape correlation, and federated disclosure-budget conservation. CPIR references these owners rather than implementing a duplicate privacy ledger.
 - Xenia: session authentication and exact human consent/action capabilities.
 - The domain authority owner: whether a qualified claim may authorize a particular effect.
 
@@ -136,7 +137,26 @@ A commitment salt is not a uniqueness subject. Freshly reissued commitments must
 
 The IR specifies a nullifier derivation profile reference and scope, not a new nullifier engine. Mycelix's existing owner and consume-once boundary remains authoritative.
 
-### 4.7 Proof and qualification identity
+### 4.7 Adaptive disclosure and observer-visible privacy
+
+A zero-knowledge predicate result can still leak the private value through repeated queries. For example, repeated verifier-authorized threshold checks `x >= t` can binary-search a bounded amount or age, even when every individual response reveals only one bit. Fresh challenges prevent replay; they do not prevent inference from an adaptive sequence.
+
+The plan therefore references, but does not reimplement, the relevant Mycelix-owned privacy profiles:
+- **Cumulative disclosure composition** — Mycelix #5404 / benchmark #5405 measures candidate-set reduction and inference after a sequence of minimized outputs.
+- **Cross-session / recipient linkability** — #5401 measures content, identifier, proof, envelope and behavioral correlation.
+- **Proof-shape correlation** — #5411 measures statement-count, revealed-index, schema/profile and structural fingerprints even when proof bytes are fresh.
+- **Federated disclosure-budget conservation** — #5466 / #5468 measures concurrent spend, stale replicas, partitions, retries, policy epochs and escrow double-spend.
+- **Observer-visible traces** — #5460 / #5462 handle trace distinguishability and side channels.
+
+CPIR must bind the exact profile IDs and digests for: allowed predicate/query families; cumulative disclosure model; per-subject/scope query-budget policy and epoch; presentation-shape policy; status/credential lookup privacy; and metadata/observer surface. The owner of each profile remains authoritative. If a scope or owner is absent, query history is incomplete, a stale policy epoch is presented, or the budget state is indeterminate, the claim is not silently treated as a fresh allowance.
+
+The query policy must address adaptive composition, not merely each query in isolation. It should specify the permitted result granularity, query-family constraints, request/subject scope, concurrency/retry semantics and denial/indeterminate behavior. Any budget reservation/consumption must use the existing Mycelix owner boundary and consume-once semantics; a fresh nonce, new salt, new presentation or new verifier replica must not reset a same-scope limit.
+
+Do not label abstract disclosure-risk units as differential-privacy epsilon/delta. #5466 explicitly models abstract risk costs, not a calibrated formal DP guarantee. A ZK proof establishes a relation; it does not automatically establish anonymity, unlinkability, non-inference or protection against adaptive querying.
+
+Benchmark privacy as a vector: candidate-set reduction/inference accuracy by query depth; reconstruction success for adaptive predicates; cross-verifier linkability; proof-shape correlation; status-fetch correlation; observer-visible timing/size/error differences; and budget overspend under concurrency/replay. Preserve task utility across controls—denying optional disclosure must not silently change the required task result.
+
+### 4.8 Proof and qualification identity
 
 The proof contract fixes:
 - backend and proof-format profile;
@@ -149,7 +169,7 @@ The verifier must check the expected program identity from trusted configuration
 
 The output is a proof/qualification receipt candidate bound to the plan digest. It is not consent or action authority.
 
-### 4.8 LISE dependency manifest
+### 4.9 LISE dependency manifest
 
 The compiler emits owner-qualified dependencies for at least:
 - source TLS release/profile and server identity trust root;
@@ -229,6 +249,7 @@ The first frozen fixture set should contain:
 - replay, expiry and concurrent same-scope duplicate claim;
 - fresh-salt re-issuance under the same qualified subject;
 - nullifier scope substitution and cross-context linkability;
+- adaptive threshold/binary-search query sequences; repeated identical and near-identical predicates; cross-verifier composition; fresh-challenge and fresh-salt budget resets; stale disclosure-budget epochs; concurrent budget double-spend; proof-shape and status-fetch correlation; timing/size/error-channel leakage;
 - missing LISE dependency edge or incomplete change feed;
 - proof-valid but issuer-unauthorized, consent-denied or institutionally unauthorized result;
 - accepted request but failed, partial, unknown or unobserved external effect.
@@ -237,7 +258,7 @@ Every suite needs positive, negative and indeterminate controls. Reject-all beha
 
 ## 9. Benchmark plan and prospective gates
 
-Benchmark plan compilation separately from TLS, proving and institutional decision latency.
+Benchmark plan compilation separately from TLS, proving and institutional decision latency. CPIR's privacy references are bindings to the Mycelix owners above, not a replacement implementation or a claim of differential privacy.
 
 | Dimension | Measurement | Initial target |
 |---|---|---|
@@ -246,6 +267,8 @@ Benchmark plan compilation separately from TLS, proving and institutional decisi
 | Conformance | positive controls accepted; negative controls rejected; indeterminate controls remain indeterminate | 100% of adjudicated fixtures |
 | Determinism | same plan/version yields same digest and dependency manifest | 100% |
 | Privacy | extra fields disclosed or new cross-scope stable identifiers emitted | 0 |
+| Adaptive disclosure | unauthorized query-sequence inference and same-scope budget overspend | 0 accepted beyond the owner-defined policy |
+| Linkability | cross-scope presentation correlation and proof-shape/status-fetch false negatives | 0 for the frozen declared observer model |
 | Requalification | affected receipts selected after a relevant dependency change | 100% of frozen dependency-change controls |
 | Performance | plan compile/validate p50/p95/p99, CPU, memory, bytes, manifest size | baseline first; optimize after matched measurement |
 
