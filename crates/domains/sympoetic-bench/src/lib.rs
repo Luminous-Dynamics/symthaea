@@ -4,6 +4,7 @@
 //! human-subject scoring shortcut. It validates benchmark artifacts and
 //! computes only metrics whose inputs and assumptions are explicit.
 
+pub mod agent_protocol;
 pub mod metrics;
 pub mod model;
 pub mod validate;
