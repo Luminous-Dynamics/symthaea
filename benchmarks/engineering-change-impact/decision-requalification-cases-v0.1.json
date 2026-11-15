@@ -1,0 +1,826 @@
+{
+  "schema_version": "engineering-decision-requalification-v0.1",
+  "status": "synthetic_known_answers_not_adjudicated_engineering_data",
+  "claim_ceiling": "non_authoritative_decision_requalification_assessment",
+  "event_model": {
+    "time_semantics": "effective_at is world-valid time; observed_at is knowledge/record time; source_sequence is owner order when qualified",
+    "k0_semantics": "Only qualified events both effective and observed by K0 may affect as_of_state",
+    "k1_semantics": "Only qualified events both effective and observed by K1 may affect current_state",
+    "unknown_scope_semantics": "null affected_dependency_ids means unknown scope, never an empty scope",
+    "inventory_semantics": "Only complete_frozen event inventories can support a current supported result",
+    "ordering_semantics": "event_ordering_state=unknown cannot be upgraded to supported when a decision-relevant event could be unordered"
+  },
+  "cases": [
+    {
+      "id": "RQ-POS-001",
+      "family": "no_change",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-POS-001",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-POS-001",
+      "decisions": [
+        {
+          "decision_id": "D-PUMP-01",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-PUMP-BRG",
+            "DEP-PUMP-SEAL"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "supported",
+            "current_action": "no_requalification",
+            "reason_codes": []
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-PUMP-BRG",
+          "kind": "evidence",
+          "root_id": "ROOT-PUMP-BRG",
+          "configuration": "PUMP-7"
+        },
+        {
+          "dependency_id": "DEP-PUMP-SEAL",
+          "kind": "evidence",
+          "root_id": "ROOT-PUMP-SEAL",
+          "configuration": "PUMP-7"
+        }
+      ],
+      "events": [],
+      "candidate_visible_event_ids": [],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "721f37810e9104dcd5df56200589188df7e0d6c0512e1dbc68038eae947fa20a",
+      "event_inventory_sha256": "eb690975c8f0c6b19c499a4533a037eca74c0a6b2e96d5d2c676c3e388b7d306",
+      "candidate_visible_event_manifest_sha256": "a9fd6569dab5eba431da56b1eb5a8fc5d7120fa9b32adacd40a8001c64e2bf1b",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "71229f3c0d9bfd987fbaf7154c54133261e51f511f765eb7901dfc66aca7988b"
+    },
+    {
+      "id": "RQ-NEG-001",
+      "family": "evidence_supersession",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-NEG-001",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-NEG-001",
+      "decisions": [
+        {
+          "decision_id": "D-BEARING-02",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-BEARING-LIMIT"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "requalification_required",
+            "current_action": "hold_and_requalify",
+            "reason_codes": [
+              "EVIDENCE_SUPERSEDED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-BEARING-LIMIT",
+          "kind": "evidence",
+          "root_id": "ROOT-BEARING-CERT",
+          "configuration": "BEARING-4"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-BRG-001",
+          "event_type": "evidence_superseded",
+          "effective_at": "2026-11-14T10:30:00Z",
+          "observed_at": "2026-11-14T10:40:00Z",
+          "source_sequence": 41,
+          "affected_dependency_ids": [
+            "DEP-BEARING-LIMIT"
+          ],
+          "qualification_state": "qualified",
+          "severity": "major"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-BRG-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "d2a023edc5e8792b8eed4fafb4b4cfb4ce7a2f2fb94350f80139e0909708fe09",
+      "event_inventory_sha256": "5ce994c800d731b8196218e31dc4e325e1c68018b30e04d7eefc1a65cd5f7959",
+      "candidate_visible_event_manifest_sha256": "ee71b4be69fa9ab730fc3c3ae15c7f21fa5cccd55a986183141e2b776546ffa5",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "a5fc697da1ab624a4ed2cea430fdd96433cbe9e0581888e09967881e0311cbbe"
+    },
+    {
+      "id": "RQ-NEG-002",
+      "family": "late_arriving_trust_revocation",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-NEG-002",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-NEG-002",
+      "decisions": [
+        {
+          "decision_id": "D-BOND-03",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-BOND-LOT"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "withdrawn",
+            "current_action": "withdraw_claim_and_hold",
+            "reason_codes": [
+              "LATE_ARRIVING_EVENT",
+              "TRUST_REVOKED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-BOND-LOT",
+          "kind": "attestation",
+          "root_id": "ROOT-BOND-LOT",
+          "configuration": "BOND-3"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-BOND-REVOKE-001",
+          "event_type": "trust_revoked",
+          "effective_at": "2026-11-14T08:30:00Z",
+          "observed_at": "2026-11-14T11:45:00Z",
+          "source_sequence": 88,
+          "affected_dependency_ids": [
+            "DEP-BOND-LOT"
+          ],
+          "qualification_state": "qualified",
+          "severity": "critical"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-BOND-REVOKE-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "7d33f03c411765824dcff55075d4ea948a96eaaa56354766f0444e165d1eb950",
+      "event_inventory_sha256": "ec31dd4419ec43eea5019ca09af347bde339c0eaa10e6b8656f6b88e59c446b3",
+      "candidate_visible_event_manifest_sha256": "17cf246980c3438916f4cc21cda6433139a8f3667acdc3dbb49c9acec32a9116",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "dee2be9252ffa4a2e459752f2d815d33a9a5d8589497d4ef25180481cf34faf5"
+    },
+    {
+      "id": "RQ-POS-002",
+      "family": "irrelevant_duplicate_event",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-POS-002",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-POS-002",
+      "decisions": [
+        {
+          "decision_id": "D-PUMP-09",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-PUMP-09-BRG"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "supported",
+            "current_action": "no_requalification",
+            "reason_codes": [
+              "NON_AFFECTING_EVENT_IGNORED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-PUMP-09-BRG",
+          "kind": "evidence",
+          "root_id": "ROOT-PUMP-09",
+          "configuration": "PUMP-9"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-PUMP-NOTICE-009",
+          "event_type": "duplicate_notice",
+          "effective_at": "2026-11-14T10:45:00Z",
+          "observed_at": "2026-11-14T10:46:00Z",
+          "source_sequence": 105,
+          "affected_dependency_ids": [
+            "DEP-UNRELATED-THING"
+          ],
+          "qualification_state": "qualified",
+          "severity": "informational"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-PUMP-NOTICE-009"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "f192601e45ae4b27e365fcae6224b57a63bf9b253da8af17d0f00a691873eba5",
+      "event_inventory_sha256": "b5cc682531e73b5286c9b8f2709fba9e32f27bf3c2d3e827abdd48a29d9f9600",
+      "candidate_visible_event_manifest_sha256": "c5812240917a88a547e084b212bc150d3c5d137d6e1165e0f0c7089f7cf25919",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "2dc215bf41e3738330c4f5da27c9857bce36f549a675d5d67046b70d5025792e"
+    },
+    {
+      "id": "RQ-POS-003",
+      "family": "two_decision_scope_control",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-POS-003",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-POS-003",
+      "decisions": [
+        {
+          "decision_id": "D-ROBOT-04",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-ROBOT-CFG-A"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "supported",
+            "current_action": "no_requalification",
+            "reason_codes": []
+          }
+        },
+        {
+          "decision_id": "D-POWER-04",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-POWER-CFG-B"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "supported",
+            "current_action": "no_requalification",
+            "reason_codes": []
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-ROBOT-CFG-A",
+          "kind": "configuration",
+          "root_id": "ROOT-ROBOT-REV-A",
+          "configuration": "ROBOT-4"
+        },
+        {
+          "dependency_id": "DEP-POWER-CFG-B",
+          "kind": "configuration",
+          "root_id": "ROOT-POWER-REV-B",
+          "configuration": "GRID-2"
+        }
+      ],
+      "events": [],
+      "candidate_visible_event_ids": [],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "583cb44f87e329e13de273df5ed3cba325c0ac1a30bf89d9a8ce600435cc9bca",
+      "event_inventory_sha256": "eb690975c8f0c6b19c499a4533a037eca74c0a6b2e96d5d2c676c3e388b7d306",
+      "candidate_visible_event_manifest_sha256": "a9fd6569dab5eba431da56b1eb5a8fc5d7120fa9b32adacd40a8001c64e2bf1b",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "71229f3c0d9bfd987fbaf7154c54133261e51f511f765eb7901dfc66aca7988b"
+    },
+    {
+      "id": "RQ-NEG-003",
+      "family": "configuration_drift_scoped_invalidation",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-NEG-003",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-NEG-003",
+      "decisions": [
+        {
+          "decision_id": "D-ROBOT-04",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-ROBOT-CFG-A"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "requalification_required",
+            "current_action": "hold_and_requalify",
+            "reason_codes": [
+              "CONFIGURATION_CHANGED"
+            ]
+          }
+        },
+        {
+          "decision_id": "D-POWER-04",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-POWER-CFG-B"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "supported",
+            "current_action": "no_requalification",
+            "reason_codes": [
+              "NON_AFFECTING_EVENT_IGNORED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-ROBOT-CFG-A",
+          "kind": "configuration",
+          "root_id": "ROOT-ROBOT-REV-A",
+          "configuration": "ROBOT-4"
+        },
+        {
+          "dependency_id": "DEP-POWER-CFG-B",
+          "kind": "configuration",
+          "root_id": "ROOT-POWER-REV-B",
+          "configuration": "GRID-2"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-ROBOT-CFG-001",
+          "event_type": "configuration_changed",
+          "effective_at": "2026-11-14T10:15:00Z",
+          "observed_at": "2026-11-14T10:20:00Z",
+          "source_sequence": 12,
+          "affected_dependency_ids": [
+            "DEP-ROBOT-CFG-A"
+          ],
+          "qualification_state": "qualified",
+          "severity": "major"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-ROBOT-CFG-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "583cb44f87e329e13de273df5ed3cba325c0ac1a30bf89d9a8ce600435cc9bca",
+      "event_inventory_sha256": "00847741838938a2e325da8697c6931e04747a255a09a9fa3ac053ae819840a8",
+      "candidate_visible_event_manifest_sha256": "2bc397ad87bd353d5f85316166ce89c81e1565dd0f6edc67c51d3850fab85c53",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "58811f5dc42cf0e450b7a67c3d96084a7c04fc5b0b9968566222fbd40563fe47"
+    },
+    {
+      "id": "RQ-NEG-004",
+      "family": "operating_envelope_breach",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-NEG-004",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-NEG-004",
+      "decisions": [
+        {
+          "decision_id": "D-MARINE-06",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-MARINE-HULL-LOAD"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "withdrawn",
+            "current_action": "withdraw_claim_and_hold",
+            "reason_codes": [
+              "OPERATING_ENVELOPE_BREACH"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-MARINE-HULL-LOAD",
+          "kind": "operating-envelope",
+          "root_id": "ROOT-HULL-CLASS",
+          "configuration": "VESSEL-6"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-HULL-ENV-001",
+          "event_type": "operating_envelope_breach",
+          "effective_at": "2026-11-14T11:15:00Z",
+          "observed_at": "2026-11-14T11:15:00Z",
+          "source_sequence": 7,
+          "affected_dependency_ids": [
+            "DEP-MARINE-HULL-LOAD"
+          ],
+          "qualification_state": "qualified",
+          "severity": "critical"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-HULL-ENV-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "ed244cfdd949674c9e8da4a84ba007b3b4186d33a81553a1da827813321c6f30",
+      "event_inventory_sha256": "e9dd47905ceff9b4425b9f82093ea1080a35829a1a216beac0c252a2d1d2a722",
+      "candidate_visible_event_manifest_sha256": "c263122267c8ce7d2b533dd68a32d8f05150b1995bfb9dca82685d1918b4796e",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "dc5f2bab2b96523629f15f1bcb9cbb3c82e065727879e8f6c1fd8e14ea4a2514"
+    },
+    {
+      "id": "RQ-NEG-005",
+      "family": "solver_calibration_drift",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-NEG-005",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-NEG-005",
+      "decisions": [
+        {
+          "decision_id": "D-SOLVER-07",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-CFD-MODEL-CAL"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "requalification_required",
+            "current_action": "hold_and_requalify",
+            "reason_codes": [
+              "CALIBRATION_DRIFT"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-CFD-MODEL-CAL",
+          "kind": "model-calibration",
+          "root_id": "ROOT-CFD-MODEL-4",
+          "configuration": "CFD-4"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-CFD-CAL-001",
+          "event_type": "calibration_drift",
+          "effective_at": "2026-11-14T10:50:00Z",
+          "observed_at": "2026-11-14T11:00:00Z",
+          "source_sequence": 56,
+          "affected_dependency_ids": [
+            "DEP-CFD-MODEL-CAL"
+          ],
+          "qualification_state": "qualified",
+          "severity": "major"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-CFD-CAL-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "3c183e70e3854693a39ff3c487722f3f5bc1de1f01d8d7de7bc954ad19cf53f7",
+      "event_inventory_sha256": "4de08103b5eb3268b48e2f7b3b3e3e552b617a5907b186d9418883f99f1f63cc",
+      "candidate_visible_event_manifest_sha256": "16a24cf79fc49f80959eac68e2115c288ae7778ae977aaf56a0636b20bc38834",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "22388218090bf6b0800f7446e3ba7ef1baaa5d2166ef5871baf426b22f0881c3"
+    },
+    {
+      "id": "RQ-UNK-001",
+      "family": "unknown_scope_incomplete_inventory",
+      "event_inventory_state": "incomplete",
+      "event_ordering_state": "unknown",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-UNK-001",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-UNK-001",
+      "decisions": [
+        {
+          "decision_id": "D-SEISMIC-08",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-SEISMIC-ANCHOR"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "indeterminate",
+            "current_action": "hold_pending_evidence",
+            "reason_codes": [
+              "EVENT_INVENTORY_INCOMPLETE",
+              "EVENT_ORDERING_UNQUALIFIED",
+              "TRIGGER_QUALIFICATION_UNKNOWN",
+              "TRIGGER_SCOPE_UNKNOWN"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-SEISMIC-ANCHOR",
+          "kind": "evidence",
+          "root_id": "ROOT-SEISMIC-ANCHOR",
+          "configuration": "ANCHOR-5"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-SEISMIC-UNKNOWN-001",
+          "event_type": "evidence_withdrawn",
+          "effective_at": "2026-11-14T10:00:00Z",
+          "observed_at": "2026-11-14T10:10:00Z",
+          "source_sequence": null,
+          "affected_dependency_ids": null,
+          "qualification_state": "unknown",
+          "severity": "critical"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-SEISMIC-UNKNOWN-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "6878f4a57c24b920618d557fd0f52950bee35d1e211d35f72bd04e38f955d4b1",
+      "event_inventory_sha256": "41861b7ba68746db58b9c9683b58a6a53638445d5cd5035ab0b72e4abdd2cedb",
+      "candidate_visible_event_manifest_sha256": "c2d90b28b4c83378251402cfa5dad479c44118080cf0f820e2ca75d56cbe961c",
+      "candidate_visible_event_ids_at_k0": [],
+      "candidate_visible_event_manifest_k0_sha256": "294828f474239efb0785c0f0d724c94026a77ad6632578932b401fd392d833e6"
+    },
+    {
+      "id": "RQ-NEG-006",
+      "family": "revocation_known_before_K0",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-NEG-006",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-NEG-006",
+      "decisions": [
+        {
+          "decision_id": "D-VALVE-10",
+          "original_decision_at": "2026-11-14T09:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T09:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:00:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-VALVE-CERT"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "withdrawn",
+            "current_state": "withdrawn",
+            "current_action": "withdraw_claim_and_hold",
+            "reason_codes": [
+              "TRUST_REVOKED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-VALVE-CERT",
+          "kind": "attestation",
+          "root_id": "ROOT-VALVE-CERT",
+          "configuration": "VALVE-2"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-VALVE-REVOKE-001",
+          "event_type": "trust_revoked",
+          "effective_at": "2026-11-14T08:00:00Z",
+          "observed_at": "2026-11-14T08:15:00Z",
+          "source_sequence": 23,
+          "affected_dependency_ids": [
+            "DEP-VALVE-CERT"
+          ],
+          "qualification_state": "qualified",
+          "severity": "critical"
+        }
+      ],
+      "candidate_visible_event_ids": [
+        "EV-VALVE-REVOKE-001"
+      ],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "dependency_manifest_sha256": "ce8e5868f32b4045954cff8b132565bb9e3a13cf3858a6165ba1a22c96f4e6b2",
+      "event_inventory_sha256": "05fca2163998b709321ae0d524427623eaf63db87b0c46fd5829c70ffef71dbe",
+      "candidate_visible_event_manifest_sha256": "aa731f951fe294182a44a45132326668c9aeb66cc1b552b2f8bd0a9c3d3d53b7",
+      "candidate_visible_event_ids_at_k0": [
+        "EV-VALVE-REVOKE-001"
+      ],
+      "candidate_visible_event_manifest_k0_sha256": "d603d3d2327198db26a1deb8388be40e7988407eccb222cb5b6544bc67830047"
+    },
+    {
+      "id": "RQ-UNK-002",
+      "family": "relevant_event_not_materialized",
+      "event_inventory_state": "complete_frozen",
+      "event_ordering_state": "total",
+      "event_inventory_ref": "synthetic://owner-event-inventory/RQ-UNK-002",
+      "dependency_inventory_ref": "synthetic://decision-dependencies/RQ-UNK-002",
+      "decisions": [
+        {
+          "decision_id": "D-BOND-03",
+          "original_decision_at": "2026-11-14T10:00:00Z",
+          "knowledge_frontier_k0": "2026-11-14T10:00:00Z",
+          "current_frontier_k1": "2026-11-14T12:30:00Z",
+          "pre_event_state": "supported",
+          "dependency_ids": [
+            "DEP-BOND-LOT"
+          ],
+          "effect_authority": "none",
+          "expected": {
+            "as_of_state": "supported",
+            "current_state": "indeterminate",
+            "current_action": "hold_pending_evidence",
+            "reason_codes": [
+              "RELEVANT_EVENT_NOT_MATERIALIZED"
+            ]
+          }
+        }
+      ],
+      "dependencies": [
+        {
+          "dependency_id": "DEP-BOND-LOT",
+          "kind": "attestation",
+          "root_id": "ROOT-BOND-LOT",
+          "configuration": "BOND-3"
+        }
+      ],
+      "events": [
+        {
+          "event_id": "EV-BOND-REVOKE-002",
+          "event_type": "trust_revoked",
+          "effective_at": "2026-11-14T09:30:00Z",
+          "observed_at": "2026-11-14T11:45:00Z",
+          "source_sequence": 89,
+          "affected_dependency_ids": [
+            "DEP-BOND-LOT"
+          ],
+          "qualification_state": "qualified",
+          "severity": "critical"
+        }
+      ],
+      "candidate_visible_event_ids": [],
+      "event_inventory_state_at_k0": "complete_frozen",
+      "event_ordering_state_at_k0": "total",
+      "effect_authority": "none",
+      "candidate_visible_event_ids_at_k0": [],
+      "dependency_manifest_sha256": "2ca15fdfe61acfc2050cf28530a3c9e5d0ee9578fac5f18faea4373656c70662",
+      "event_inventory_sha256": "c1df20fea1b3d9005ce3048ddcf7111672b4f071c3e28bbec86dcc065d5d48d1",
+      "candidate_visible_event_manifest_k0_sha256": "e71b85d49eb942bde9fb50cb3c00c000374ef649d1ddd4a6eff2429fa8322e80",
+      "candidate_visible_event_manifest_sha256": "041a554399ad36c7996366ffb8a03664946e440904f996d20293cfae0f05ce11"
+    }
+  ],
+  "intervention_pairs": [
+    {
+      "id": "RQ-PAIR-001",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-POS-002",
+      "expected_relation": "invariant",
+      "decision_id": "D-PUMP-01",
+      "expected_as_of_state": "supported",
+      "expected_current_state": "supported",
+      "expected_current_action": "no_requalification",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-PUMP-09"
+    },
+    {
+      "id": "RQ-PAIR-002",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-NEG-001",
+      "expected_relation": "flip",
+      "decision_id": "D-BEARING-02",
+      "expected_before_current_state": "supported",
+      "expected_after_current_state": "requalification_required",
+      "expected_after_action": "hold_and_requalify",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-BEARING-02"
+    },
+    {
+      "id": "RQ-PAIR-003",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-NEG-002",
+      "expected_relation": "as_of_invariant_current_flip",
+      "decision_id": "D-BOND-03",
+      "expected_as_of_state": "supported",
+      "expected_current_state": "withdrawn",
+      "expected_current_action": "withdraw_claim_and_hold",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-BOND-03"
+    },
+    {
+      "id": "RQ-PAIR-004",
+      "before_case_id": "RQ-POS-003",
+      "after_case_id": "RQ-NEG-003",
+      "expected_relation": "scoped_invalidation",
+      "affected_decision_id": "D-ROBOT-04",
+      "unaffected_decision_id": "D-POWER-04",
+      "expected_affected_state": "requalification_required",
+      "expected_unaffected_state": "supported",
+      "before_decision_id": "D-ROBOT-04",
+      "after_decision_id": "D-ROBOT-04"
+    },
+    {
+      "id": "RQ-PAIR-005",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-UNK-001",
+      "expected_relation": "flip_to_indeterminate",
+      "decision_id": "D-SEISMIC-08",
+      "expected_current_state": "indeterminate",
+      "expected_current_action": "hold_pending_evidence",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-SEISMIC-08"
+    },
+    {
+      "id": "RQ-PAIR-006",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-NEG-004",
+      "expected_relation": "flip_to_withdrawn",
+      "decision_id": "D-MARINE-06",
+      "expected_current_state": "withdrawn",
+      "expected_current_action": "withdraw_claim_and_hold",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-MARINE-06"
+    },
+    {
+      "id": "RQ-PAIR-007",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-NEG-005",
+      "expected_relation": "flip_to_requalification",
+      "decision_id": "D-SOLVER-07",
+      "expected_current_state": "requalification_required",
+      "expected_current_action": "hold_and_requalify",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-SOLVER-07"
+    },
+    {
+      "id": "RQ-PAIR-008",
+      "before_case_id": "RQ-POS-001",
+      "after_case_id": "RQ-NEG-006",
+      "expected_relation": "historical_rejection",
+      "decision_id": "D-VALVE-10",
+      "expected_as_of_state": "withdrawn",
+      "expected_current_state": "withdrawn",
+      "before_decision_id": "D-PUMP-01",
+      "after_decision_id": "D-VALVE-10"
+    },
+    {
+      "id": "RQ-PAIR-009",
+      "before_case_id": "RQ-NEG-002",
+      "after_case_id": "RQ-UNK-002",
+      "expected_relation": "materialization_gate",
+      "before_decision_id": "D-BOND-03",
+      "after_decision_id": "D-BOND-03",
+      "expected_as_of_state": "supported",
+      "expected_before_current_state": "withdrawn",
+      "expected_after_current_state": "indeterminate",
+      "expected_after_action": "hold_pending_evidence"
+    }
+  ]
+}
