@@ -34,9 +34,10 @@ pub use queue::MM1;
 
 pub use modular_reconfiguration::{
     evaluate_reconfiguration, CellConfiguration, EvidenceRecord, EvidenceStatus,
-    GeometryBasis, LayoutRect, ModuleCapability, ModulePlacement, ModulePort,
+    GeometryBasis, LayoutRect, ModuleAvailability, ModuleCapability, ModulePlacement, ModulePort,
     ModuleProfile, ModuleStatus, OperationAssignment, OperationDemand, PlanStatus,
     PortConnection, PortDirection, QualificationObligation, ReconfigurationInput,
     ReconfigurationReason, ReconfigurationReasonCode, ReconfigurationReport,
-    ReasonSeverity, SnapshotResolution, TransitionAction, TransitionKind,
+    ReasonSeverity, SnapshotResolution, SoftAssignmentIssue, SoftAssignmentIssueCode,
+    SoftAssignmentProposal, TransitionAction, TransitionKind, propose_soft_reallocation,
 };
