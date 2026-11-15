@@ -26,7 +26,7 @@ The official ITER deck is not included in the PyPI wheel; it is retrieved from t
 3. Installs the runtime dependencies defined by the upstream `pyproject.toml` floors (without the optional PyVista 3-D dependency).
 4. Executes the same ITER RUN deck using the installed wheel and the source checkout, with figure generation and 3-D rendering disabled.
 5. Records the actual output tuple length (the release README/doc surfaces differ between 165 and 167) and requires finite, positive values for B0, energy confinement time, Q and plasma current.
-6. Compares the canonicalized complete output tuple digest between wheel and source execution.
+6. Compares the actual config-field count, output tuple length and canonicalized complete output tuple digest between wheel and source execution. Module byte differences are preserved separately, so source/wheel output parity is not mistaken for source-code identity.
 7. Records the runtime Python/dependency versions, actual GlobalConfig dataclass field count, output tuple length, core observables, deck/output hashes, source/wheel identities and output report hashes.
 8. Uploads the receipts and generated text reports as a workflow artifact.
 
