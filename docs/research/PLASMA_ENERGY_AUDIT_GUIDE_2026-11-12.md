@@ -257,3 +257,20 @@ The audit-branch source corpus now contains **38 source cases / 49 negative cont
 ## 9.21 Adjacent DBD syngas source lane — 2026-11-15
 
 The merged corpus adds an experimental coaxial DBD source for humidified CO2-to-syngas, RSC Advances 16 (2026), DOI 10.1039/D5YA00293A. The reported 4.5–23.3% energy-efficiency range and H2/CO ratio 0.1–0.2 belong to humidified CO2/H2O cases; a 13.3% pure-CO2 point is separate. Do not compare these directly with dry warm-arc CO2-to-CO quench results. H2/CO ratio is a composition metric, not conversion or selectivity.
+
+
+## 9.16 Harmonized methane-pyrolysis comparison and carbon-coproduct qualification
+
+The current machine-readable corpus contains three distinct methane-pyrolysis evidence classes:
+- 156-dataset direct-heating review with multi-objective Pareto comparison;
+- arc-plasma Aspen Plus / discounted-cash-flow TEA with separate on-site and no-on-site power boundaries;
+- harmonized cradle-to-gate LCA/total-cost study with plant-gate H2 at 200 bar, PSA/compression and avoided-carbon-black product credit.
+
+Every methane-pyrolysis source case now carries a `coproduct_accounting` contract with:
+- explicit source credit policy;
+- `credit_claim_status=SOURCE_MODEL_ONLY`;
+- carbon-product qualification, carbon-market capacity and offtake statuses frozen as `NOT_VALIDATED`;
+- `realized_revenue_evidence=false`;
+- `no_credit_baseline_required=true`.
+
+This is a source/claim floor. It does not preclude future evidence from qualifying a product, market or offtake; it prevents source-reported modeling assumptions from being promoted into Luminous physical or commercial evidence. The Rust auditor now enforces these conservative conditions.
