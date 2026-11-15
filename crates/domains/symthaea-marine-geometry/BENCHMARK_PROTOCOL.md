@@ -168,6 +168,46 @@ A candidate may advance only when:
 
 A geometry pass is not design approval. A CFD pass is not a physical trial. A physical model test is not full-scale operational validation.
 
+## 8A. Independent sectional hydrostatics cross-check (G2c)
+
+The existing G2c implementation calculates volume and centre of buoyancy from the oriented closed triangle mesh using tetrahedral integration, and obtains waterplane properties from the designated waterplane triangles. This implementation is checked against analytical prism fixtures.
+
+The independent sectional oracle is tracked by [MARINE-HYDROSTATICS-SECTIONAL-CROSSCHECK-001 #12400](https://github.com/Luminous-Dynamics/symthaea/issues/12400). It must not reuse the G2c volume or waterplane integration routines.
+
+For each station bay, it intersects the actual G2b triangle mesh with an interior longitudinal plane, reconstructs the submerged section polygon, calculates section area and vertical first moment, and applies Simpson's 1/3 rule over the actual bay length. Waterplane breadth is integrated separately to obtain waterplane area, longitudinal centre of flotation and second moments. Nonuniform station intervals are treated bay-by-bay.
+
+This is consistent with established naval-architecture numerical practice: USCG tonnage procedures use Simpson integration of cross-sectional areas as volume ordinates; the GOV.UK naval-architecture syllabus explicitly includes Simpson integration of sectional areas, displacement volume and first moments; OpenNAOE describes displacement as the longitudinal integral of immersed section area and the waterplane inertia integrals in terms of half-breadths. These references support the method family, not the implementation's correctness or its tolerance values.
+
+- USCG MTN.01-99.CH-10: https://www.dco.uscg.mil/Portals/9/DCO%20Documents/Marine%20Safety%20Center/Tonnage/MTN.01-99.CH-10.pdf
+- GOV.UK Naval Architecture written examination syllabus: https://www.gov.uk/government/publications/second-engineer-written-examination-syllabuses/naval-architecture-written-examination-syllabus
+- OpenNAOE, Numerical integration for ship geometry: https://opennaoe.org/books/hydrostatics-stability/ch02/
+
+### Independent-method metrics
+
+Compare G2c and sectional results for:
+- displacement volume and mass;
+- LCB, TCB and VCB;
+- waterplane area, LCF and TCF;
+- transverse/longitudinal waterplane second moments and product of inertia;
+- BM_T, BM_L and TPC.
+
+The receipt must bind:
+- source-spec and sampled-section identities;
+- mesh and loft-manifest digests;
+- exact water density;
+- both numerical method identifiers;
+- bay intervals and midpoint intersection counts;
+- named tolerance profile and the complete numeric tolerance values;
+- per-observable measured absolute error and allowed error.
+
+A mismatch of candidate, geometry, manifest or density is INCOMPARABLE. A non-finite observable blocks the check. A tolerance breach is INCONSISTENT. Only a complete comparison within the frozen profile is CONSISTENT.
+
+### Required adversarial corpus
+
+Include uniform triangular and rectangular prisms, a tapered multi-bay hull with unequal station spacing, large coordinate offsets, altered side/waterplane facets, changed source/mesh digests, wrong density, malformed slice intersections and tampered numerical results/receipts.
+
+Tolerance profiles must be derived and frozen from exact known-answer and convergence fixtures before interpreting benchmark candidate performance. The initial cross-check is restricted to the convex, symmetric, piecewise-planar G2b geometry class. It does not establish full-hull validity, KG/GM, stability, trim, structural adequacy, seakeeping or class compliance.
+
 ## 9. Implementation order
 
 - G0/G1: candidate schema, deterministic geometry identity, topology and scoped admission (implemented in the companion Rust crate).
