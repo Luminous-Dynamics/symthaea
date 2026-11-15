@@ -133,7 +133,7 @@ Measure partner-order sensitivity as the absolute difference between A→B and B
 
 Include blind handoff, structured handoff, strong-first relay, weak-first relay, and role-specialized parallel work where the task supports them. Counterbalance order. Do not assume that strongest-first or any other ordering is universally optimal.
 
-Use [Competitive Benchmark Targets](COMPETITIVE_BENCHMARK_TARGETS.md) for non-compensatory release gates and external SOTA comparison rules. Use the separate [Collaboration Gap and Relay Protocol](COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) for the detailed experimental matrix and reporting rules. Use [Adaptive Intervention Policy](ADAPTIVE_INTERVENTION_POLICY.md) for action-selection constructs and negative controls. Use [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for independent learning, retention, transfer, and coalition attribution. Use [Epistemic Resilience and Metacognition](EPISTEMIC_RESILIENCE_AND_METACOGNITION.md) for belief/fact distinctions, evidence provenance, confidence calibration, and cognitive process measures. Use [Persistent Team Trajectories](PERSISTENT_TEAM_TRAJECTORIES.md) for multi-cycle team continuity and the evidence stages required for collective-intelligence claims.
+Use [Competitive Benchmark Targets](COMPETITIVE_BENCHMARK_TARGETS.md) for non-compensatory release gates and external SOTA comparison rules. Use the separate [Collaboration Gap and Relay Protocol](COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) for the detailed experimental matrix and reporting rules. Use [Adaptive Intervention Policy](ADAPTIVE_INTERVENTION_POLICY.md) for action-selection constructs and negative controls. Use [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for independent learning, retention, transfer, coalition attribution, and distributional learning effects across baseline-capability strata. Use [Epistemic Resilience and Metacognition](EPISTEMIC_RESILIENCE_AND_METACOGNITION.md) for belief/fact distinctions, evidence provenance, confidence calibration, and cognitive process measures. Use [Persistent Team Trajectories](PERSISTENT_TEAM_TRAJECTORIES.md) for multi-cycle team continuity and the evidence stages required for collective-intelligence claims.
 
 ## 5. Scenario domains
 
@@ -151,7 +151,7 @@ The first suite covers:
 - Epistemic resilience, first-person belief handling, evidence provenance, and metacognitive sensitivity.
 - Persistent human-AI teams, cycle continuity, membership and authority changes, and consent-scoped team memory.
 
-The development corpus in SEED_CORPUS.v0.1.jsonl contains seventeen task templates. It is not a representative sample of human creativity and is not a locked test set.
+The development corpus in SEED_CORPUS.v0.1.jsonl contains eighteen task templates. It is not a representative sample of human creativity and is not a locked test set.
 
 ## 6. Evaluation protocol
 
