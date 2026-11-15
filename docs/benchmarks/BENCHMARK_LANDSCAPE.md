@@ -16,6 +16,8 @@
 | CHI 2026 co-creation experiment | Compares model-led rewriting with reflective human-led interaction and measures quality, diversity and ownership | Randomized study with 486 participants and a separate replication with 640 participants | Turn the interaction-mode finding into repeatable, cross-domain, longitudinal benchmark tasks |
 | Symthaea Psych-Bench | Broad cognitive and psychometric architectural tests | Existing suite with synthetic and externally grounded components | Keep as a separate cognitive suite; do not relabel it as evidence of human-AI collaboration |
 
+| Capability Amplification (SympoeticBench extension) | Whether co-creation builds independent human capability, not only a better in-session artifact | Development protocol and a 15th seed scenario; no human-subject results yet | Measure pre/post gain, delayed retention, and transfer against matched controls; keep agency and self-efficacy separate |
+
 ## 2. Findings that shape our design
 
 The 2026 common-ground benchmark formalizes shared assumptions, goals, situation awareness, joint action and repair as core conditions for collaboration. This is a strong reference for SympoeticBench's common-ground and repair tasks.
@@ -46,6 +48,8 @@ No benchmark should claim that the adjacent work is absent. The opportunity is t
 10. Cost, latency, human time, workload, accessibility, and rework.
 11. Collaboration gap, partner-order sensitivity, and handoff recovery.
 12. Adaptive intervention policy: when to ask, suggest, challenge, delegate, synthesize, preserve disagreement, or step back.
+13. Human capability amplification: independent learning, delayed retention, and transfer after collaboration.
+14. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
 
 The benchmark's contribution is the integrated measurement protocol and reproducible corpus, not a claim that any one of these constructs is newly invented.
 
@@ -71,6 +75,7 @@ The first goal is construct validity and reproducibility, not leaderboard rank. 
 - A matched solo/pair and counterbalanced relay evaluation inspired by The Collaboration Gap.
 - An adaptive-intervention comparison measuring overreach, missed critical warnings, and unnecessary interruption.
 - An external human study with preregistered outcomes and blinded raters.
+- A learning/transfer study showing independent human capability gain versus matched practice controls, including delayed retention.
 - An independent replication on a held-out scenario set.
 
 A SympoeticBench result should be considered stronger than a baseline only when it improves the intended outcome without violating its declared non-inferiority or hard-gate constraints.
