@@ -195,7 +195,9 @@ impl ServiceMetric {
             Self::NetElectricExportPowerMegawatt => "net-electric-export-boundary",
             Self::UsefulThermalPowerMegawatt => "useful-thermal-service-boundary",
             Self::LifetimeNetElectricEnergyMegawattHour => "lifetime-net-electric-energy-boundary",
-            Self::LifetimeUsefulThermalEnergyMegawattHour => "lifetime-useful-thermal-energy-boundary",
+            Self::LifetimeUsefulThermalEnergyMegawattHour => {
+                "lifetime-useful-thermal-energy-boundary"
+            }
             Self::AvailabilityFraction => "plant-availability-boundary",
         }
     }
@@ -533,7 +535,11 @@ fn validate_candidate(candidate: &CandidateInput) -> Vec<ValidationError> {
     if let Some(boundary_ref) = candidate.service_boundary_ref.as_deref()
         && !boundary_ref.trim().is_empty()
     {
-        match candidate.evidence.iter().find(|item| item.id == boundary_ref) {
+        match candidate
+            .evidence
+            .iter()
+            .find(|item| item.id == boundary_ref)
+        {
             None => errors.push(ValidationError::MissingServiceBoundaryEvidence(
                 boundary_ref.to_string(),
             )),
@@ -659,9 +665,7 @@ fn validate_candidate(candidate: &CandidateInput) -> Vec<ValidationError> {
             ));
         }
         if !evidence.class.supports(claim.requested_class) {
-            errors.push(ValidationError::ClaimClassMismatch(
-                claim.claim_id.clone(),
-            ));
+            errors.push(ValidationError::ClaimClassMismatch(claim.claim_id.clone()));
         }
     }
 
@@ -758,10 +762,7 @@ fn is_unknown_group(group: &Option<String>) -> bool {
 ///
 /// The result is sorted and deterministic. Cycles do not cause unbounded
 /// traversal. This is impact analysis, not authority revocation.
-pub fn affected_by_change(
-    changed_nodes: &[String],
-    edges: &[DependencyEdge],
-) -> Vec<String> {
+pub fn affected_by_change(changed_nodes: &[String], edges: &[DependencyEdge]) -> Vec<String> {
     let mut affected = BTreeSet::new();
     let mut queue = VecDeque::new();
 
@@ -899,7 +900,9 @@ mod tests {
     fn decision_build_preserves_typed_service_metric() {
         let mut source = candidate();
         source.service_metric = ServiceMetric::LifetimeNetElectricEnergyMegawattHour;
-        let service_evidence = source.evidence.iter_mut()
+        let service_evidence = source
+            .evidence
+            .iter_mut()
             .find(|evidence| evidence.id == "grid-export-boundary-v1")
             .unwrap();
         service_evidence.scope_ref = source.service_metric.boundary_scope_ref().to_string();
@@ -925,25 +928,23 @@ mod tests {
         let errors = compile_candidate(&source).unwrap_err();
         assert!(has_error(
             &errors,
-            ValidationError::MissingServiceBoundaryEvidence(
-                "missing-boundary-record".to_string()
-            )
+            ValidationError::MissingServiceBoundaryEvidence("missing-boundary-record".to_string())
         ));
     }
 
     #[test]
     fn service_boundary_evidence_must_match_typed_metric_scope() {
         let mut source = candidate();
-        let service_evidence = source.evidence.iter_mut()
+        let service_evidence = source
+            .evidence
+            .iter_mut()
             .find(|evidence| evidence.id == "grid-export-boundary-v1")
             .unwrap();
         service_evidence.scope_ref = "gross-thermal-boundary".to_string();
         let errors = compile_candidate(&source).unwrap_err();
         assert!(has_error(
             &errors,
-            ValidationError::ServiceBoundaryScopeMismatch(
-                "grid-export-boundary-v1".to_string()
-            )
+            ValidationError::ServiceBoundaryScopeMismatch("grid-export-boundary-v1".to_string())
         ));
     }
 
@@ -961,7 +962,9 @@ mod tests {
     #[test]
     fn missing_required_gate_is_indeterminate() {
         let mut source = candidate();
-        source.hard_gates.retain(|gate| gate.kind != HardGateKind::EnergyBoundary);
+        source
+            .hard_gates
+            .retain(|gate| gate.kind != HardGateKind::EnergyBoundary);
         let build = compile_candidate(&source).unwrap();
         assert_eq!(build.disposition, CandidateDisposition::Indeterminate);
     }
@@ -1167,7 +1170,8 @@ mod tests {
     fn shared_dataset_dependency_is_common_mode_not_independent() {
         let mut source = candidate();
         let mut second = solver_run("run-b", 'e', 'f');
-        second.dependencies.dataset_group = source.solver_runs[0].dependencies.dataset_group.clone();
+        second.dependencies.dataset_group =
+            source.solver_runs[0].dependencies.dataset_group.clone();
         source.solver_runs.push(second);
         let build = compile_candidate(&source).unwrap();
         assert_eq!(
@@ -1276,17 +1280,25 @@ mod tests {
                     source.solver_runs[0].output_observables = vec!["psi".to_string()];
                 }
                 "missing_energy_gate" => {
-                    source.hard_gates.retain(|gate| gate.kind != HardGateKind::EnergyBoundary);
+                    source
+                        .hard_gates
+                        .retain(|gate| gate.kind != HardGateKind::EnergyBoundary);
                 }
                 "replacement_failed" => {
-                    let gate = source.hard_gates.iter_mut()
-                        .find(|gate| gate.kind == HardGateKind::ReplacementAccess).unwrap();
+                    let gate = source
+                        .hard_gates
+                        .iter_mut()
+                        .find(|gate| gate.kind == HardGateKind::ReplacementAccess)
+                        .unwrap();
                     gate.state = GateState::Fail;
                     gate.reason_code = Some("replacement-envelope-failed".to_string());
                 }
                 "material_unknown" => {
-                    let gate = source.hard_gates.iter_mut()
-                        .find(|gate| gate.kind == HardGateKind::MaterialApplicability).unwrap();
+                    let gate = source
+                        .hard_gates
+                        .iter_mut()
+                        .find(|gate| gate.kind == HardGateKind::MaterialApplicability)
+                        .unwrap();
                     gate.state = GateState::Unknown;
                     gate.reason_code = Some("material-domain-unknown".to_string());
                 }
@@ -1322,20 +1334,45 @@ mod tests {
                 }
                 "dependency_invalidation" => {
                     let edges = vec![
-                        DependencyEdge { upstream: "material".to_string(), downstream: "component".to_string() },
-                        DependencyEdge { upstream: "component".to_string(), downstream: "decision".to_string() },
+                        DependencyEdge {
+                            upstream: "material".to_string(),
+                            downstream: "component".to_string(),
+                        },
+                        DependencyEdge {
+                            upstream: "component".to_string(),
+                            downstream: "decision".to_string(),
+                        },
                     ];
                     let affected = affected_by_change(&["material".to_string()], &edges);
-                    assert_eq!(affected, vec!["component".to_string(), "decision".to_string(), "material".to_string()]);
+                    assert_eq!(
+                        affected,
+                        vec![
+                            "component".to_string(),
+                            "decision".to_string(),
+                            "material".to_string()
+                        ]
+                    );
                 }
                 "dependency_cycle" => {
                     let edges = vec![
-                        DependencyEdge { upstream: "a".to_string(), downstream: "b".to_string() },
-                        DependencyEdge { upstream: "b".to_string(), downstream: "c".to_string() },
-                        DependencyEdge { upstream: "c".to_string(), downstream: "a".to_string() },
+                        DependencyEdge {
+                            upstream: "a".to_string(),
+                            downstream: "b".to_string(),
+                        },
+                        DependencyEdge {
+                            upstream: "b".to_string(),
+                            downstream: "c".to_string(),
+                        },
+                        DependencyEdge {
+                            upstream: "c".to_string(),
+                            downstream: "a".to_string(),
+                        },
                     ];
                     let affected = affected_by_change(&["a".to_string()], &edges);
-                    assert_eq!(affected, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+                    assert_eq!(
+                        affected,
+                        vec!["a".to_string(), "b".to_string(), "c".to_string()]
+                    );
                 }
                 "solver_revision_mismatch" => {
                     source.solver_runs[0].candidate_revision = "design-r6".to_string();
