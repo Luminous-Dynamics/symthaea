@@ -835,3 +835,22 @@ The benchmark requires state-resolved N2(v) at the catalyst interface or an inde
 - isotope attribution or Faradaic efficiency promoted to a causal mechanism or full-system energy claim.
 
 This is a mechanism/evidence qualification target, not a yield target or achieved result. The physical interface-resolved population/flux and its uncertainty remain an open research gap.
+
+
+## 9.25 Gas–liquid plasma-electrocatalytic ammonia comparator
+
+Zhu et al., *One-step ammonia synthesis via a gas–liquid plasma-electrocatalytic tandem reactor with effective proton utilization*, AIChE Journal 72(8), e70407 (first published 20 April 2026), DOI https://doi.org/10.1002/aic.70407.
+
+The source reports:
+- 150.2 μmol NH3/h at about 20 mA/cm²;
+- 1,161 kWh/kg NH3 specific energy consumption;
+- a gas–liquid non-thermal plasma + electrocatalytic tandem architecture using plasma-activated nitrogen components and H2O-derived adsorbed H on Cu;
+- 0.861 g NH3/kWh by reciprocal arithmetic on the source-reported system-specific-energy figure.
+
+The absolute 150.2 μmol/h rate is not directly comparable with the JACS 7.7 nmol/s/cm² area-normalized rate without actual active area and equivalent product basis. The 1,161 kWh/kg value is a source-specific tandem-system metric, not automatically plant-gate accepted NH3 energy: Table S6 separates NTP and ERR input accounting; product isolation/purification and all auxiliaries still need reconciliation.
+
+### Reproduction opportunity
+
+The publisher identifies numerical data for Figures 1–5 and supplementary figures, Ansys Fluent H5 CFD input cases, and supplementary Tables S5–S7 covering economic assumptions and separate NTP/ERR energy inputs. Triplicate independent measurements are reported for selected figures; other results are single-run data. This provides a concrete source-reconstruction path, with repeatability limits preserved.
+
+The benchmark should independently reconstruct the combined NTP+ERR energy denominator, then extend the boundary to accepted NH3 product recovery. Do not borrow the JACS area-normalized product metric, Faradaic efficiency or N2(v) mechanism into this different reactor.
