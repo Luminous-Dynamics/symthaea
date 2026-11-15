@@ -328,7 +328,7 @@ An isolated, research-only Rust workspace now exists at `research-tools/claim-pl
 
 Direct crate versions are pinned in `Cargo.toml`: `jsonschema 0.61.2`, `serde_json_canonicalizer 0.4.1`, `serde_json 1.0.151`, `serde 1.0.229`, `sha2 0.10.9` and `hex 0.4.3`. JSON Schema format assertion is explicitly enabled. Canonicalization follows the duplicate-aware parser because canonicalization cannot repair ambiguous duplicate-key input after an ordinary map parser has discarded a duplicate.
 
-The Rust source contains authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs and invalid RFC 6901 pointer escapes. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
+The Rust source contains 12 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes and RFC 8785 UTF-16 object-key ordering. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
 
 ## 11. Implementation sequence
 
