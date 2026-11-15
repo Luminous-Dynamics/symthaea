@@ -144,7 +144,7 @@ The follow-on is tracked by [issue #12316](https://github.com/Luminous-Dynamics/
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
 - The v0.3.1 bitemporal projection alone does not reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory; the v0.3.2 action projector now supplies a synthetic-schedule adapter for these contracts, but production owner verification and real effect-system adapters remain unimplemented.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- At v0.3.2, 43 Rust module unit tests and eight Proptest properties (256 cases each configured; 2,048 potential cases) are authored, not executed. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
+- At v0.3.2, 46 Rust module unit tests, eight Proptest properties (256 cases each configured; 2,048 potential cases), and two integration tests are authored, not executed. The frozen action-history known-answer fixture contains 14 actions, seven owner-time resolutions and five owner receipt assessments. The projector returns exact terminal, stop, inventory, effect and cancellation sidecars plus schedule/replay digests. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
 
 ## Reproduction
 
