@@ -198,6 +198,8 @@ pub enum ReplayError {
     DuplicateOrdinal(u64),
     #[error("required identifier is empty: {0}")]
     EmptyIdentifier(&'static str),
+    #[error("SHA-256 field is not exactly 64 lowercase hexadecimal characters: {0}")]
+    MalformedSha256(&'static str),
     #[error("clock moved backwards in domain {0}")]
     ClockRegression(String),
     #[error("event was produced without a clock advance: {0}")]
@@ -255,7 +257,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
         match &scheduled.action {
             ScheduleAction::ClockAdvance {
                 clock_domain, basis_id, epoch, scale, unit, local_tick_ns,
-                calibration_id, mapping_receipt_ref, ..
+                calibration_id, mapping_receipt_ref, mapping_receipt_sha256, ..
             } => {
                 require_id(clock_domain, "clock_domain")?;
                 require_id(basis_id, "basis_id")?;
@@ -264,6 +266,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(unit, "unit")?;
                 require_id(calibration_id, "calibration_id")?;
                 require_id(mapping_receipt_ref, "mapping_receipt_ref")?;
+                require_sha256(mapping_receipt_sha256, "mapping_receipt_sha256")?;
                 if let Some(previous) = clock_ticks.get(clock_domain) {
                     if local_tick_ns < previous {
                         return Err(ReplayError::ClockRegression(clock_domain.clone()));
@@ -337,8 +340,9 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 if let ScheduleAction::EffectCommitted { effect_id, .. } = &scheduled.action {
                     require_id(effect_id, "effect_id")?;
                 }
-                if let ScheduleAction::AttemptReconciled { receipt_ref, .. } = &scheduled.action {
+                if let ScheduleAction::AttemptReconciled { receipt_ref, receipt_sha256, .. } = &scheduled.action {
                     require_id(receipt_ref, "receipt_ref")?;
+                    require_sha256(receipt_sha256, "attempt_receipt_sha256")?;
                 }
             }
             ScheduleAction::StopTriggered { obligation_id, policy_revision }
@@ -346,10 +350,11 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(obligation_id, "obligation_id")?;
                 require_id(policy_revision, "policy_revision")?;
             }
-            ScheduleAction::StopDischarged { obligation_id, policy_revision, receipt_ref, .. } => {
+            ScheduleAction::StopDischarged { obligation_id, policy_revision, receipt_ref, receipt_sha256 } => {
                 require_id(obligation_id, "obligation_id")?;
                 require_id(policy_revision, "policy_revision")?;
                 require_id(receipt_ref, "receipt_ref")?;
+                require_sha256(receipt_sha256, "stop_discharge_receipt_sha256")?;
             }
             ScheduleAction::ProcessCrashed { process_id }
             | ScheduleAction::ProcessRestarted { process_id } => {
@@ -372,6 +377,16 @@ fn require_id(value: &str, name: &'static str) -> Result<(), ReplayError> {
         Err(ReplayError::EmptyIdentifier(name))
     } else {
         Ok(())
+    }
+}
+
+fn require_sha256(value: &str, field: &'static str) -> Result<(), ReplayError> {
+    if value.len() == 64
+        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(ReplayError::MalformedSha256(field))
     }
 }
 
@@ -1033,6 +1048,31 @@ mod tests {
             SchedulerDisposition::BlockedByCrashedRecipient,
             SchedulerDisposition::Applied,
         ]);
+    }
+
+
+    #[test]
+    fn receipt_digests_require_canonical_sha256_shape() {
+        let mut schedule = generate_delivery_schedule(53, 2).expect("valid schedule");
+        if let Some(item) = schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::ClockAdvance { .. })
+        }) {
+            if let ScheduleAction::ClockAdvance { mapping_receipt_sha256, .. } = &mut item.action {
+                *mapping_receipt_sha256 = "not-a-digest".to_owned();
+            }
+        }
+        assert!(matches!(validate_schedule(&schedule), Err(ReplayError::MalformedSha256("mapping_receipt_sha256"))));
+
+        let mut schedule = generate_delivery_schedule(59, 1).expect("valid schedule");
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        push_action(&mut schedule.actions, &mut ordinal, 20_000, ScheduleAction::StopTriggered {
+            obligation_id: "digest-stop".to_owned(), policy_revision: "policy-1".to_owned(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, 20_001, ScheduleAction::StopDischarged {
+            obligation_id: "digest-stop".to_owned(), policy_revision: "policy-1".to_owned(),
+            receipt_ref: "receipt".to_owned(), receipt_sha256: "z".repeat(64),
+        });
+        assert!(matches!(validate_schedule(&schedule), Err(ReplayError::MalformedSha256("stop_discharge_receipt_sha256"))));
     }
 
     #[test]
