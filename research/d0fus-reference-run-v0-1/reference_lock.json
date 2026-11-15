@@ -14,5 +14,7 @@
   "sdist_filename": "d0fus-3.2.0.tar.gz",
   "sdist_sha256": "02a81bbead2f7bc87b7f0f981687e784acfce27dea1090c9a2931ecd44e2fd40",
   "documentation_declared_run_output_count": 165,
+  "observed_run_output_tuple_length": 165,
+  "observed_global_config_dataclass_field_count": 167,
   "python_minor": "3.11"
 }
