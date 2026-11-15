@@ -10,19 +10,58 @@
     ],
     "intervention_positions": [
       {
-        "position_id": "early",
-        "fraction_of_planned_work": 0.15,
+        "position_id": "p10",
+        "fraction_of_planned_work": 0.1,
+        "phase_aggregate": "early",
         "definition": "Intervention occurs after initial orientation and baseline evidence, before substantial implementation."
       },
       {
-        "position_id": "middle",
-        "fraction_of_planned_work": 0.5,
-        "definition": "Intervention occurs after meaningful implementation and at least one intermediate verification cycle."
+        "position_id": "p20",
+        "fraction_of_planned_work": 0.2,
+        "phase_aggregate": "early",
+        "definition": "Intervention occurs during early exploration and initial design decisions."
       },
       {
-        "position_id": "late",
-        "fraction_of_planned_work": 0.85,
-        "definition": "Intervention occurs near completion, after substantial prior work has accumulated."
+        "position_id": "p30",
+        "fraction_of_planned_work": 0.3,
+        "phase_aggregate": "early",
+        "definition": "Intervention occurs as implementation begins, before broad integration."
+      },
+      {
+        "position_id": "p40",
+        "fraction_of_planned_work": 0.4,
+        "phase_aggregate": "middle",
+        "definition": "Intervention occurs after initial implementation, before the midpoint verification cycle."
+      },
+      {
+        "position_id": "p50",
+        "fraction_of_planned_work": 0.5,
+        "phase_aggregate": "middle",
+        "definition": "Intervention occurs at the planned-work midpoint after meaningful implementation."
+      },
+      {
+        "position_id": "p60",
+        "fraction_of_planned_work": 0.6,
+        "phase_aggregate": "middle",
+        "definition": "Intervention occurs after a midpoint verification cycle, during continued implementation."
+      },
+      {
+        "position_id": "p70",
+        "fraction_of_planned_work": 0.7,
+        "phase_aggregate": "late",
+        "definition": "Intervention occurs during integration when several obligations depend on completed work."
+      },
+      {
+        "position_id": "p80",
+        "fraction_of_planned_work": 0.8,
+        "phase_aggregate": "late",
+        "definition": "Intervention occurs during late integration and hardening, before final verification."
+      },
+      {
+        "position_id": "p90",
+        "fraction_of_planned_work": 0.9,
+        "phase_aggregate": "late",
+        "definition": "Intervention occurs immediately before final acceptance/release verification."
       }
     ],
     "intervention_families": [
@@ -125,264 +164,878 @@
     ],
     "family_position_cells": [
       {
-        "cell_id": "requirement_addition__early",
+        "cell_id": "requirement_addition__p10",
         "family_id": "requirement_addition",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "requirement_addition__middle",
+        "cell_id": "requirement_addition__p20",
         "family_id": "requirement_addition",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "requirement_addition__late",
+        "cell_id": "requirement_addition__p30",
         "family_id": "requirement_addition",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "requirement_removal_or_deprecation__early",
+        "cell_id": "requirement_addition__p40",
+        "family_id": "requirement_addition",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_addition__p50",
+        "family_id": "requirement_addition",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_addition__p60",
+        "family_id": "requirement_addition",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_addition__p70",
+        "family_id": "requirement_addition",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_addition__p80",
+        "family_id": "requirement_addition",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_addition__p90",
+        "family_id": "requirement_addition",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__p10",
         "family_id": "requirement_removal_or_deprecation",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "requirement_removal_or_deprecation__middle",
+        "cell_id": "requirement_removal_or_deprecation__p20",
         "family_id": "requirement_removal_or_deprecation",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "requirement_removal_or_deprecation__late",
+        "cell_id": "requirement_removal_or_deprecation__p30",
         "family_id": "requirement_removal_or_deprecation",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "dependency_api_break__early",
+        "cell_id": "requirement_removal_or_deprecation__p40",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__p50",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__p60",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__p70",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__p80",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__p90",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "dependency_api_break__p10",
         "family_id": "dependency_api_break",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "dependency_api_break__middle",
+        "cell_id": "dependency_api_break__p20",
         "family_id": "dependency_api_break",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "dependency_api_break__late",
+        "cell_id": "dependency_api_break__p30",
         "family_id": "dependency_api_break",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "toolchain_upgrade__early",
+        "cell_id": "dependency_api_break__p40",
+        "family_id": "dependency_api_break",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "dependency_api_break__p50",
+        "family_id": "dependency_api_break",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "dependency_api_break__p60",
+        "family_id": "dependency_api_break",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "dependency_api_break__p70",
+        "family_id": "dependency_api_break",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "dependency_api_break__p80",
+        "family_id": "dependency_api_break",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "dependency_api_break__p90",
+        "family_id": "dependency_api_break",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "toolchain_upgrade__p10",
         "family_id": "toolchain_upgrade",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "toolchain_upgrade__middle",
+        "cell_id": "toolchain_upgrade__p20",
         "family_id": "toolchain_upgrade",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "toolchain_upgrade__late",
+        "cell_id": "toolchain_upgrade__p30",
         "family_id": "toolchain_upgrade",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "configuration_world_drift__early",
+        "cell_id": "toolchain_upgrade__p40",
+        "family_id": "toolchain_upgrade",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "toolchain_upgrade__p50",
+        "family_id": "toolchain_upgrade",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "toolchain_upgrade__p60",
+        "family_id": "toolchain_upgrade",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "toolchain_upgrade__p70",
+        "family_id": "toolchain_upgrade",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "toolchain_upgrade__p80",
+        "family_id": "toolchain_upgrade",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "toolchain_upgrade__p90",
+        "family_id": "toolchain_upgrade",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "configuration_world_drift__p10",
         "family_id": "configuration_world_drift",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "configuration_world_drift__middle",
+        "cell_id": "configuration_world_drift__p20",
         "family_id": "configuration_world_drift",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "configuration_world_drift__late",
+        "cell_id": "configuration_world_drift__p30",
         "family_id": "configuration_world_drift",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "runtime_external_state__early",
+        "cell_id": "configuration_world_drift__p40",
+        "family_id": "configuration_world_drift",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "configuration_world_drift__p50",
+        "family_id": "configuration_world_drift",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "configuration_world_drift__p60",
+        "family_id": "configuration_world_drift",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "configuration_world_drift__p70",
+        "family_id": "configuration_world_drift",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "configuration_world_drift__p80",
+        "family_id": "configuration_world_drift",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "configuration_world_drift__p90",
+        "family_id": "configuration_world_drift",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "runtime_external_state__p10",
         "family_id": "runtime_external_state",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "runtime_external_state__middle",
+        "cell_id": "runtime_external_state__p20",
         "family_id": "runtime_external_state",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "runtime_external_state__late",
+        "cell_id": "runtime_external_state__p30",
         "family_id": "runtime_external_state",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "session_tool_identity__early",
+        "cell_id": "runtime_external_state__p40",
+        "family_id": "runtime_external_state",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "runtime_external_state__p50",
+        "family_id": "runtime_external_state",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "runtime_external_state__p60",
+        "family_id": "runtime_external_state",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "runtime_external_state__p70",
+        "family_id": "runtime_external_state",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "runtime_external_state__p80",
+        "family_id": "runtime_external_state",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "runtime_external_state__p90",
+        "family_id": "runtime_external_state",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "session_tool_identity__p10",
         "family_id": "session_tool_identity",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "session_tool_identity__middle",
+        "cell_id": "session_tool_identity__p20",
         "family_id": "session_tool_identity",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "session_tool_identity__late",
+        "cell_id": "session_tool_identity__p30",
         "family_id": "session_tool_identity",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "authority_policy_change__early",
+        "cell_id": "session_tool_identity__p40",
+        "family_id": "session_tool_identity",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "session_tool_identity__p50",
+        "family_id": "session_tool_identity",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "session_tool_identity__p60",
+        "family_id": "session_tool_identity",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "session_tool_identity__p70",
+        "family_id": "session_tool_identity",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "session_tool_identity__p80",
+        "family_id": "session_tool_identity",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "session_tool_identity__p90",
+        "family_id": "session_tool_identity",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "authority_policy_change__p10",
         "family_id": "authority_policy_change",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "authority_policy_change__middle",
+        "cell_id": "authority_policy_change__p20",
         "family_id": "authority_policy_change",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "authority_policy_change__late",
+        "cell_id": "authority_policy_change__p30",
         "family_id": "authority_policy_change",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "evidence_invalidation_contradiction__early",
+        "cell_id": "authority_policy_change__p40",
+        "family_id": "authority_policy_change",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "authority_policy_change__p50",
+        "family_id": "authority_policy_change",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "authority_policy_change__p60",
+        "family_id": "authority_policy_change",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "authority_policy_change__p70",
+        "family_id": "authority_policy_change",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "authority_policy_change__p80",
+        "family_id": "authority_policy_change",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "authority_policy_change__p90",
+        "family_id": "authority_policy_change",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__p10",
         "family_id": "evidence_invalidation_contradiction",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "evidence_invalidation_contradiction__middle",
+        "cell_id": "evidence_invalidation_contradiction__p20",
         "family_id": "evidence_invalidation_contradiction",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "evidence_invalidation_contradiction__late",
+        "cell_id": "evidence_invalidation_contradiction__p30",
         "family_id": "evidence_invalidation_contradiction",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "test_oracle_revision__early",
+        "cell_id": "evidence_invalidation_contradiction__p40",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__p50",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__p60",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__p70",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__p80",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__p90",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "test_oracle_revision__p10",
         "family_id": "test_oracle_revision",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "test_oracle_revision__middle",
+        "cell_id": "test_oracle_revision__p20",
         "family_id": "test_oracle_revision",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "test_oracle_revision__late",
+        "cell_id": "test_oracle_revision__p30",
         "family_id": "test_oracle_revision",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "common_cause_environment__early",
+        "cell_id": "test_oracle_revision__p40",
+        "family_id": "test_oracle_revision",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "test_oracle_revision__p50",
+        "family_id": "test_oracle_revision",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "test_oracle_revision__p60",
+        "family_id": "test_oracle_revision",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "test_oracle_revision__p70",
+        "family_id": "test_oracle_revision",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "test_oracle_revision__p80",
+        "family_id": "test_oracle_revision",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "test_oracle_revision__p90",
+        "family_id": "test_oracle_revision",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "common_cause_environment__p10",
         "family_id": "common_cause_environment",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "common_cause_environment__middle",
+        "cell_id": "common_cause_environment__p20",
         "family_id": "common_cause_environment",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "common_cause_environment__late",
+        "cell_id": "common_cause_environment__p30",
         "family_id": "common_cause_environment",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "cross_repository_contract__early",
-        "family_id": "cross_repository_contract",
-        "position_id": "early",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "cell_id": "common_cause_environment__p40",
+        "family_id": "common_cause_environment",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "cross_repository_contract__middle",
-        "family_id": "cross_repository_contract",
-        "position_id": "middle",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "cell_id": "common_cause_environment__p50",
+        "family_id": "common_cause_environment",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       },
       {
-        "cell_id": "cross_repository_contract__late",
+        "cell_id": "common_cause_environment__p60",
+        "family_id": "common_cause_environment",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "common_cause_environment__p70",
+        "family_id": "common_cause_environment",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "common_cause_environment__p80",
+        "family_id": "common_cause_environment",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "common_cause_environment__p90",
+        "family_id": "common_cause_environment",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p10",
         "family_id": "cross_repository_contract",
-        "position_id": "late",
-        "target_independent_task_seeds": 10,
-        "target_matched_pairs": 10
+        "position_id": "p10",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p20",
+        "family_id": "cross_repository_contract",
+        "position_id": "p20",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p30",
+        "family_id": "cross_repository_contract",
+        "position_id": "p30",
+        "phase_aggregate": "early",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p40",
+        "family_id": "cross_repository_contract",
+        "position_id": "p40",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p50",
+        "family_id": "cross_repository_contract",
+        "position_id": "p50",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p60",
+        "family_id": "cross_repository_contract",
+        "position_id": "p60",
+        "phase_aggregate": "middle",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p70",
+        "family_id": "cross_repository_contract",
+        "position_id": "p70",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p80",
+        "family_id": "cross_repository_contract",
+        "position_id": "p80",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
+      },
+      {
+        "cell_id": "cross_repository_contract__p90",
+        "family_id": "cross_repository_contract",
+        "position_id": "p90",
+        "phase_aggregate": "late",
+        "target_independent_task_seeds": 5,
+        "target_matched_pairs": 5
       }
     ],
-    "target_seed_count_per_cell": 10,
-    "target_matched_scenario_pairs": 360,
+    "target_seed_count_per_cell": 5,
+    "target_matched_scenario_pairs": 540,
     "trajectories_per_matched_pair": 2,
-    "target_trajectories_per_model_per_trial": 720,
+    "target_trajectories_per_model_per_trial": 1080,
     "independent_trials_target": 3,
-    "model_harness_families_target": 3
+    "model_harness_families_target": 3,
+    "validation_pilot_candidate_seeds": 108,
+    "target_total_trajectories_across_three_models_and_trials": 9720
   },
   "required_controls": [
     "reference_solution_passes",
