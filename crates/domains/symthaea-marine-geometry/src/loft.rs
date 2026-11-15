@@ -5,13 +5,16 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::section::{compute_sampled_sections_digest, SectionFamilyArtifact};
+use crate::section::{
+    compute_sampled_sections_digest, LongitudinalEndCondition, LongitudinalEndConditions,
+    SectionFamilyArtifact,
+};
 use crate::{
     admit, compute_geometry_digest, AdmissionProfile, AdmissionReport, CandidateInput,
     MeshGeometry,
 };
 
-const LOFT_SCHEMA_VERSION: u32 = 1;
+const LOFT_SCHEMA_VERSION: u32 = 2;
 const MAX_STATIONS: usize = 512;
 const MAX_SECTION_POINTS: usize = 8_193;
 const MAX_MESH_VERTICES: usize = 1_000_000;
@@ -44,6 +47,11 @@ pub struct LoftedHullArtifact {
     pub side_face_range: FaceRange,
     pub waterplane_face_range: FaceRange,
     pub end_cap_face_range: FaceRange,
+    pub bow_end_cap_face_range: FaceRange,
+    pub stern_end_cap_face_range: FaceRange,
+    pub station_count: usize,
+    pub section_point_count: usize,
+    pub longitudinal_end_conditions: LongitudinalEndConditions,
     pub candidate: CandidateInput,
     pub admission_report: AdmissionReport,
 }
@@ -59,6 +67,11 @@ struct LoftArtifactIdentity<'a> {
     side_face_range: FaceRange,
     waterplane_face_range: FaceRange,
     end_cap_face_range: FaceRange,
+    bow_end_cap_face_range: FaceRange,
+    stern_end_cap_face_range: FaceRange,
+    station_count: usize,
+    section_point_count: usize,
+    longitudinal_end_conditions: LongitudinalEndConditions,
     candidate_schema_version: u32,
     candidate_id: &'a str,
     geometry_digest_blake3: &'a str,
@@ -78,6 +91,11 @@ fn compute_loft_manifest_digest(
         side_face_range: artifact.side_face_range,
         waterplane_face_range: artifact.waterplane_face_range,
         end_cap_face_range: artifact.end_cap_face_range,
+        bow_end_cap_face_range: artifact.bow_end_cap_face_range,
+        stern_end_cap_face_range: artifact.stern_end_cap_face_range,
+        station_count: artifact.station_count,
+        section_point_count: artifact.section_point_count,
+        longitudinal_end_conditions: artifact.longitudinal_end_conditions,
         candidate_schema_version: artifact.candidate.schema_version,
         candidate_id: &artifact.candidate.candidate_id,
         geometry_digest_blake3: &artifact.candidate.geometry_digest_blake3,
@@ -175,6 +193,19 @@ fn validate_section_family(
             &mut violations,
             "station_count",
             format!("station count must be between 2 and {MAX_STATIONS}"),
+        );
+    }
+
+    if artifact.sections.len() == 2
+        && artifact.longitudinal_end_conditions.bow
+            == LongitudinalEndCondition::CollapsedCentreline
+        && artifact.longitudinal_end_conditions.stern
+            == LongitudinalEndCondition::CollapsedCentreline
+    {
+        violation(
+            &mut violations,
+            "adjacent_collapsed_ends",
+            "two adjacent collapsed endpoints have no positive interior station",
         );
     }
 
@@ -329,9 +360,51 @@ fn validate_section_family(
                 format!("station {station_index} must begin on the centreline below the waterplane"),
             );
         }
-        if waterline[1] <= coordinate_tolerance
-            || !close_enough(waterline[2], 0.0, coordinate_tolerance)
-        {
+        if !close_enough(waterline[2], 0.0, coordinate_tolerance) {
+            violation(
+                &mut violations,
+                "waterline_endpoint",
+                format!("station {station_index} must end on z=0"),
+            );
+        }
+
+        let endpoint_condition = if station_index == 0 {
+            Some(artifact.longitudinal_end_conditions.bow)
+        } else if station_index + 1 == artifact.sections.len() {
+            Some(artifact.longitudinal_end_conditions.stern)
+        } else {
+            None
+        };
+        let collapsed = endpoint_condition
+            == Some(LongitudinalEndCondition::CollapsedCentreline);
+
+        if collapsed {
+            if section.keel_to_sheer_m.iter().any(|point| point[1] != 0.0) {
+                violation(
+                    &mut violations,
+                    "collapsed_end_not_centreline",
+                    format!(
+                        "collapsed endpoint station {station_index} must have exact y=0 for every sample"
+                    ),
+                );
+            }
+            for pair in section.keel_to_sheer_m.windows(2) {
+                if pair[0][2] <= pair[1][2] {
+                    violation(
+                        &mut violations,
+                        "collapsed_end_sample_order",
+                        format!(
+                            "collapsed endpoint station {station_index} must have strictly descending z samples from keel to waterline"
+                        ),
+                    );
+                    break;
+                }
+            }
+            // A collapsed endpoint is a line, not an area-bearing section ring.
+            continue;
+        }
+
+        if waterline[1] <= coordinate_tolerance {
             violation(
                 &mut violations,
                 "waterline_endpoint",
