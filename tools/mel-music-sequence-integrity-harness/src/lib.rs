@@ -184,6 +184,18 @@ pub enum SequenceErrorV1 {
     InvalidAttemptAccounting,
     MissingReceiptIdentity,
     ContinuationAfterHardGateFailure,
+    OperationIdentityMissing,
+    PatchSetNotCanonical,
+    PatchPreconditionMismatch,
+    ReadSetMissingEvent,
+    EmptyOperation,
+    HistoryReceiptMismatch,
+    UndoStateMismatch,
+    RedoStateMismatch,
+    BranchIdentityInvalid,
+    BranchBaseMismatch,
+    MergeResolutionSetMismatch,
+    MergeResolutionIdentityMismatch,
 }
 
 impl fmt::Display for SequenceErrorV1 {
@@ -209,6 +221,18 @@ impl fmt::Display for SequenceErrorV1 {
             Self::InvalidAttemptAccounting => "candidate attempt counters are inconsistent",
             Self::MissingReceiptIdentity => "selection, realization or verification receipt is missing",
             Self::ContinuationAfterHardGateFailure => "a later step cannot erase or follow an unresolved hard-gate failure",
+            Self::OperationIdentityMissing => "operation identity must be nonempty",
+            Self::PatchSetNotCanonical => "event patches or read sets are not sorted and unique",
+            Self::PatchPreconditionMismatch => "event patch does not match the exact current event state",
+            Self::ReadSetMissingEvent => "an operation read set references a missing event",
+            Self::EmptyOperation => "an operation must declare at least one event patch",
+            Self::HistoryReceiptMismatch => "edit history receipt commitment is invalid",
+            Self::UndoStateMismatch => "undo requires the exact state produced by the operation",
+            Self::RedoStateMismatch => "redo requires the exact state restored by undo",
+            Self::BranchIdentityInvalid => "branch identities must be nonempty and distinct",
+            Self::BranchBaseMismatch => "branch snapshot does not descend from the frozen base state",
+            Self::MergeResolutionSetMismatch => "every conflict must have exactly one explicit resolution",
+            Self::MergeResolutionIdentityMismatch => "a merge resolution names an unknown or duplicate conflict",
         };
         f.write_str(message)
     }
@@ -470,6 +494,503 @@ pub fn evaluate_sequence_v1(
     })
 }
 
+// ---- Operation algebra, undo/redo, and explicit branch merge (Stage 2) ----
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MusicalEventPatchV1 {
+    pub event_id: String,
+    /// None means the event must not exist in the input state.
+    pub before: Option<MusicalEventV1>,
+    /// None means the event is deleted from the output state.
+    pub after: Option<MusicalEventV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SymbolicEditOperationV1 {
+    pub operation_id: String,
+    /// Sorted event IDs whose current state is read by this operation.
+    pub read_event_ids: Vec<String>,
+    /// Sorted, unique writes with exact before-state preconditions.
+    pub patches: Vec<MusicalEventPatchV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EditHistoryReceiptV1 {
+    pub operation: SymbolicEditOperationV1,
+    pub before_state_sha256: String,
+    pub after_state_sha256: String,
+    pub receipt_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct EditHistoryReceiptPayloadV1 {
+    operation: SymbolicEditOperationV1,
+    before_state_sha256: String,
+    after_state_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BranchSnapshotV1 {
+    pub branch_id: String,
+    pub base_state_sha256: String,
+    pub events: Vec<MusicalEventV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BranchMergeConflictV1 {
+    pub event_id: String,
+    pub base: Option<MusicalEventV1>,
+    pub left: Option<MusicalEventV1>,
+    pub right: Option<MusicalEventV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BranchMergePlanV1 {
+    pub left_branch_id: String,
+    pub right_branch_id: String,
+    pub base_state_sha256: String,
+    pub base_events: Vec<MusicalEventV1>,
+    pub left_patches: Vec<MusicalEventPatchV1>,
+    pub right_patches: Vec<MusicalEventPatchV1>,
+    pub conflicts: Vec<BranchMergeConflictV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MergeChoiceV1 {
+    UseLeft,
+    UseRight,
+    UseCustom,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MergeResolutionV1 {
+    pub event_id: String,
+    pub choice: MergeChoiceV1,
+    /// Required for UseCustom; None explicitly means delete the event.
+    #[serde(default)]
+    pub custom_event: Option<MusicalEventV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BranchMergeResultV1 {
+    pub merge_parent_ids: [String; 2],
+    pub base_state_sha256: String,
+    pub output_state_sha256: String,
+    pub resolved_conflict_event_ids: Vec<String>,
+    pub events: Vec<MusicalEventV1>,
+    pub merge_receipt_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct BranchMergeResultPayloadV1 {
+    merge_parent_ids: [String; 2],
+    base_state_sha256: String,
+    output_state_sha256: String,
+    resolved_conflict_event_ids: Vec<String>,
+    events: Vec<MusicalEventV1>,
+}
+
+fn validate_operation_v1(operation: &SymbolicEditOperationV1) -> Result<(), SequenceErrorV1> {
+    if operation.operation_id.is_empty() {
+        return Err(SequenceErrorV1::OperationIdentityMissing);
+    }
+    if operation.patches.is_empty() {
+        return Err(SequenceErrorV1::EmptyOperation);
+    }
+    if !operation
+        .read_event_ids
+        .windows(2)
+        .all(|pair| pair[0] < pair[1])
+        || !operation
+            .patches
+            .windows(2)
+            .all(|pair| pair[0].event_id < pair[1].event_id)
+    {
+        return Err(SequenceErrorV1::PatchSetNotCanonical);
+    }
+    for patch in &operation.patches {
+        if patch.event_id.is_empty()
+            || patch.before.as_ref().is_some_and(|event| event.event_id != patch.event_id)
+            || patch.after.as_ref().is_some_and(|event| event.event_id != patch.event_id)
+            || (patch.before.is_none() && patch.after.is_none())
+        {
+            return Err(SequenceErrorV1::InvalidEvent);
+        }
+    }
+    Ok(())
+}
+
+pub fn apply_event_patches_v1(
+    events: &[MusicalEventV1],
+    patches: &[MusicalEventPatchV1],
+) -> Result<Vec<MusicalEventV1>, SequenceErrorV1> {
+    symbolic_state_sha256_v1(events)?;
+    if !patches
+        .windows(2)
+        .all(|pair| pair[0].event_id < pair[1].event_id)
+    {
+        return Err(SequenceErrorV1::PatchSetNotCanonical);
+    }
+    let mut state: BTreeMap<String, MusicalEventV1> = events
+        .iter()
+        .cloned()
+        .map(|event| (event.event_id.clone(), event))
+        .collect();
+    for patch in patches {
+        if patch.event_id.is_empty()
+            || patch.before.as_ref().is_some_and(|event| event.event_id != patch.event_id)
+            || patch.after.as_ref().is_some_and(|event| event.event_id != patch.event_id)
+            || (patch.before.is_none() && patch.after.is_none())
+        {
+            return Err(SequenceErrorV1::InvalidEvent);
+        }
+        let actual = state.get(&patch.event_id).cloned();
+        if actual != patch.before {
+            return Err(SequenceErrorV1::PatchPreconditionMismatch);
+        }
+        match &patch.after {
+            Some(event) => {
+                state.insert(patch.event_id.clone(), event.clone());
+            }
+            None => {
+                state.remove(&patch.event_id);
+            }
+        }
+    }
+    let output: Vec<MusicalEventV1> = state.into_values().collect();
+    symbolic_state_sha256_v1(&output)?;
+    Ok(output)
+}
+
+pub fn apply_symbolic_edit_operation_v1(
+    events: &[MusicalEventV1],
+    operation: &SymbolicEditOperationV1,
+) -> Result<Vec<MusicalEventV1>, SequenceErrorV1> {
+    validate_operation_v1(operation)?;
+    let available: BTreeSet<&str> = events.iter().map(|event| event.event_id.as_str()).collect();
+    if operation
+        .read_event_ids
+        .iter()
+        .any(|event_id| !available.contains(event_id.as_str()))
+    {
+        return Err(SequenceErrorV1::ReadSetMissingEvent);
+    }
+    apply_event_patches_v1(events, &operation.patches)
+}
+
+pub fn apply_symbolic_edit_with_history_v1(
+    events: &[MusicalEventV1],
+    operation: &SymbolicEditOperationV1,
+) -> Result<(Vec<MusicalEventV1>, EditHistoryReceiptV1), SequenceErrorV1> {
+    let before_state_sha256 = symbolic_state_sha256_v1(events)?;
+    let output = apply_symbolic_edit_operation_v1(events, operation)?;
+    let after_state_sha256 = symbolic_state_sha256_v1(&output)?;
+    let payload = EditHistoryReceiptPayloadV1 {
+        operation: operation.clone(),
+        before_state_sha256: before_state_sha256.clone(),
+        after_state_sha256: after_state_sha256.clone(),
+    };
+    let encoded = serde_json::to_vec(&payload)
+        .map_err(|_| SequenceErrorV1::InvalidEvent)?;
+    let receipt_sha256 = digest(b"luminous.mel.edit-history-receipt.v1", &encoded);
+    Ok((
+        output,
+        EditHistoryReceiptV1 {
+            operation: operation.clone(),
+            before_state_sha256,
+            after_state_sha256,
+            receipt_sha256,
+        },
+    ))
+}
+
+fn verify_history_receipt_v1(receipt: &EditHistoryReceiptV1) -> Result<(), SequenceErrorV1> {
+    let payload = EditHistoryReceiptPayloadV1 {
+        operation: receipt.operation.clone(),
+        before_state_sha256: receipt.before_state_sha256.clone(),
+        after_state_sha256: receipt.after_state_sha256.clone(),
+    };
+    let encoded = serde_json::to_vec(&payload)
+        .map_err(|_| SequenceErrorV1::HistoryReceiptMismatch)?;
+    let expected = digest(b"luminous.mel.edit-history-receipt.v1", &encoded);
+    if receipt.receipt_sha256 != expected {
+        return Err(SequenceErrorV1::HistoryReceiptMismatch);
+    }
+    validate_operation_v1(&receipt.operation)
+}
+
+pub fn undo_symbolic_edit_v1(
+    current_events: &[MusicalEventV1],
+    receipt: &EditHistoryReceiptV1,
+) -> Result<Vec<MusicalEventV1>, SequenceErrorV1> {
+    verify_history_receipt_v1(receipt)?;
+    if symbolic_state_sha256_v1(current_events)? != receipt.after_state_sha256 {
+        return Err(SequenceErrorV1::UndoStateMismatch);
+    }
+    let inverse: Vec<MusicalEventPatchV1> = receipt
+        .operation
+        .patches
+        .iter()
+        .map(|patch| MusicalEventPatchV1 {
+            event_id: patch.event_id.clone(),
+            before: patch.after.clone(),
+            after: patch.before.clone(),
+        })
+        .collect();
+    let restored = apply_event_patches_v1(current_events, &inverse)?;
+    if symbolic_state_sha256_v1(&restored)? != receipt.before_state_sha256 {
+        return Err(SequenceErrorV1::UndoStateMismatch);
+    }
+    Ok(restored)
+}
+
+pub fn redo_symbolic_edit_v1(
+    current_events: &[MusicalEventV1],
+    receipt: &EditHistoryReceiptV1,
+) -> Result<Vec<MusicalEventV1>, SequenceErrorV1> {
+    verify_history_receipt_v1(receipt)?;
+    if symbolic_state_sha256_v1(current_events)? != receipt.before_state_sha256 {
+        return Err(SequenceErrorV1::RedoStateMismatch);
+    }
+    let restored = apply_event_patches_v1(current_events, &receipt.operation.patches)?;
+    if symbolic_state_sha256_v1(&restored)? != receipt.after_state_sha256 {
+        return Err(SequenceErrorV1::RedoStateMismatch);
+    }
+    Ok(restored)
+}
+
+fn operation_read_set(operation: &SymbolicEditOperationV1) -> BTreeSet<&str> {
+    operation.read_event_ids.iter().map(String::as_str).collect()
+}
+
+fn operation_write_set(operation: &SymbolicEditOperationV1) -> BTreeSet<&str> {
+    operation.patches.iter().map(|patch| patch.event_id.as_str()).collect()
+}
+
+/// Return true only when the read/write independence test holds and executing
+/// both operations in either order yields the same canonical state.
+pub fn symbolic_operations_commute_v1(
+    base_events: &[MusicalEventV1],
+    left: &SymbolicEditOperationV1,
+    right: &SymbolicEditOperationV1,
+) -> Result<bool, SequenceErrorV1> {
+    validate_operation_v1(left)?;
+    validate_operation_v1(right)?;
+    let left_reads = operation_read_set(left);
+    let right_reads = operation_read_set(right);
+    let left_writes = operation_write_set(left);
+    let right_writes = operation_write_set(right);
+    if !left_writes.is_disjoint(&right_writes)
+        || !left_writes.is_disjoint(&right_reads)
+        || !right_writes.is_disjoint(&left_reads)
+    {
+        return Ok(false);
+    }
+    let left_then_right = apply_symbolic_edit_operation_v1(
+        &apply_symbolic_edit_operation_v1(base_events, left)?,
+        right,
+    )?;
+    let right_then_left = apply_symbolic_edit_operation_v1(
+        &apply_symbolic_edit_operation_v1(base_events, right)?,
+        left,
+    )?;
+    Ok(symbolic_state_sha256_v1(&left_then_right)?
+        == symbolic_state_sha256_v1(&right_then_left)?)
+}
+
+fn diff_event_patches_v1(
+    base_events: &[MusicalEventV1],
+    branch_events: &[MusicalEventV1],
+) -> Result<Vec<MusicalEventPatchV1>, SequenceErrorV1> {
+    symbolic_state_sha256_v1(base_events)?;
+    symbolic_state_sha256_v1(branch_events)?;
+    let base = event_map(base_events);
+    let branch = event_map(branch_events);
+    let ids: BTreeSet<&str> = base.keys().chain(branch.keys()).copied().collect();
+    Ok(ids
+        .into_iter()
+        .filter_map(|event_id| {
+            let before = base.get(event_id).map(|event| (*event).clone());
+            let after = branch.get(event_id).map(|event| (*event).clone());
+            (before != after).then(|| MusicalEventPatchV1 {
+                event_id: event_id.to_owned(),
+                before,
+                after,
+            })
+        })
+        .collect())
+}
+
+pub fn plan_branch_merge_v1(
+    base_events: &[MusicalEventV1],
+    left: &BranchSnapshotV1,
+    right: &BranchSnapshotV1,
+) -> Result<BranchMergePlanV1, SequenceErrorV1> {
+    if left.branch_id.is_empty()
+        || right.branch_id.is_empty()
+        || left.branch_id == right.branch_id
+    {
+        return Err(SequenceErrorV1::BranchIdentityInvalid);
+    }
+    let base_state_sha256 = symbolic_state_sha256_v1(base_events)?;
+    if left.base_state_sha256 != base_state_sha256
+        || right.base_state_sha256 != base_state_sha256
+    {
+        return Err(SequenceErrorV1::BranchBaseMismatch);
+    }
+    let left_patches = diff_event_patches_v1(base_events, &left.events)?;
+    let right_patches = diff_event_patches_v1(base_events, &right.events)?;
+    let left_by_id: BTreeMap<&str, &MusicalEventPatchV1> = left_patches
+        .iter()
+        .map(|patch| (patch.event_id.as_str(), patch))
+        .collect();
+    let right_by_id: BTreeMap<&str, &MusicalEventPatchV1> = right_patches
+        .iter()
+        .map(|patch| (patch.event_id.as_str(), patch))
+        .collect();
+    let mut conflicts = Vec::new();
+    for (event_id, left_patch) in &left_by_id {
+        if let Some(right_patch) = right_by_id.get(event_id)
+            && left_patch.after != right_patch.after
+        {
+            conflicts.push(BranchMergeConflictV1 {
+                event_id: (*event_id).to_owned(),
+                base: left_patch.before.clone(),
+                left: left_patch.after.clone(),
+                right: right_patch.after.clone(),
+            });
+        }
+    }
+    Ok(BranchMergePlanV1 {
+        left_branch_id: left.branch_id.clone(),
+        right_branch_id: right.branch_id.clone(),
+        base_state_sha256,
+        base_events: base_events.to_vec(),
+        left_patches,
+        right_patches,
+        conflicts,
+    })
+}
+
+pub fn resolve_branch_merge_v1(
+    plan: &BranchMergePlanV1,
+    resolutions: &[MergeResolutionV1],
+) -> Result<BranchMergeResultV1, SequenceErrorV1> {
+    if plan.left_branch_id.is_empty()
+        || plan.right_branch_id.is_empty()
+        || plan.left_branch_id == plan.right_branch_id
+        || symbolic_state_sha256_v1(&plan.base_events)? != plan.base_state_sha256
+    {
+        return Err(SequenceErrorV1::BranchBaseMismatch);
+    }
+    if !resolutions
+        .windows(2)
+        .all(|pair| pair[0].event_id < pair[1].event_id)
+    {
+        return Err(SequenceErrorV1::MergeResolutionIdentityMismatch);
+    }
+    let conflict_ids: BTreeSet<&str> = plan
+        .conflicts
+        .iter()
+        .map(|conflict| conflict.event_id.as_str())
+        .collect();
+    let resolution_ids: BTreeSet<&str> = resolutions
+        .iter()
+        .map(|resolution| resolution.event_id.as_str())
+        .collect();
+    if conflict_ids.len() != plan.conflicts.len() || conflict_ids != resolution_ids {
+        return Err(SequenceErrorV1::MergeResolutionSetMismatch);
+    }
+    let resolution_map: BTreeMap<&str, &MergeResolutionV1> = resolutions
+        .iter()
+        .map(|resolution| (resolution.event_id.as_str(), resolution))
+        .collect();
+    let left: BTreeMap<&str, &MusicalEventPatchV1> = plan
+        .left_patches
+        .iter()
+        .map(|patch| (patch.event_id.as_str(), patch))
+        .collect();
+    let right: BTreeMap<&str, &MusicalEventPatchV1> = plan
+        .right_patches
+        .iter()
+        .map(|patch| (patch.event_id.as_str(), patch))
+        .collect();
+    let ids: BTreeSet<&str> = left.keys().chain(right.keys()).copied().collect();
+    let mut merged_patches = Vec::new();
+    for event_id in ids {
+        let left_patch = left.get(event_id).copied();
+        let right_patch = right.get(event_id).copied();
+        let before = left_patch
+            .or(right_patch)
+            .map(|patch| patch.before.clone())
+            .unwrap_or(None);
+        let after = match (left_patch, right_patch) {
+            (Some(left_patch), Some(right_patch)) if left_patch.after == right_patch.after => {
+                left_patch.after.clone()
+            }
+            (Some(_), Some(_)) => {
+                let resolution = resolution_map
+                    .get(event_id)
+                    .ok_or(SequenceErrorV1::MergeResolutionSetMismatch)?;
+                match resolution.choice {
+                    MergeChoiceV1::UseLeft => left_patch.unwrap().after.clone(),
+                    MergeChoiceV1::UseRight => right_patch.unwrap().after.clone(),
+                    MergeChoiceV1::UseCustom => {
+                        if resolution.custom_event.as_ref().is_some_and(|event| event.event_id != event_id) {
+                            return Err(SequenceErrorV1::MergeResolutionIdentityMismatch);
+                        }
+                        resolution.custom_event.clone()
+                    }
+                }
+            }
+            (Some(left_patch), None) => left_patch.after.clone(),
+            (None, Some(right_patch)) => right_patch.after.clone(),
+            (None, None) => continue,
+        };
+        merged_patches.push(MusicalEventPatchV1 {
+            event_id: event_id.to_owned(),
+            before,
+            after,
+        });
+    }
+    let merged_events = apply_event_patches_v1(&plan.base_events, &merged_patches)?;
+    let output_state_sha256 = symbolic_state_sha256_v1(&merged_events)?;
+    let resolved_conflict_event_ids: Vec<String> = plan
+        .conflicts
+        .iter()
+        .map(|conflict| conflict.event_id.clone())
+        .collect();
+    let payload = BranchMergeResultPayloadV1 {
+        merge_parent_ids: [
+            plan.left_branch_id.clone(),
+            plan.right_branch_id.clone(),
+        ],
+        base_state_sha256: plan.base_state_sha256.clone(),
+        output_state_sha256: output_state_sha256.clone(),
+        resolved_conflict_event_ids: resolved_conflict_event_ids.clone(),
+        events: merged_events.clone(),
+    };
+    let encoded = serde_json::to_vec(&payload).map_err(|_| SequenceErrorV1::InvalidEvent)?;
+    let merge_receipt_sha256 = digest(b"luminous.mel.branch-merge-receipt.v1", &encoded);
+    Ok(BranchMergeResultV1 {
+        merge_parent_ids: payload.merge_parent_ids,
+        base_state_sha256: payload.base_state_sha256,
+        output_state_sha256,
+        resolved_conflict_event_ids,
+        events: merged_events,
+        merge_receipt_sha256,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -584,6 +1105,170 @@ mod tests {
         assert_eq!(result.disposition, SequenceDispositionV1::RejectedAtStep);
         assert_eq!(result.accepted_step_count, 1);
         assert_eq!(result.rejected_at_step, Some(2));
+    }
+
+    fn patch(event_id: &str, before: i32, after: i32) -> MusicalEventPatchV1 {
+        MusicalEventPatchV1 {
+            event_id: event_id.to_owned(),
+            before: Some(event(event_id, before)),
+            after: Some(event(event_id, after)),
+        }
+    }
+
+    fn operation(id: &str, event_id: &str, before: i32, after: i32) -> SymbolicEditOperationV1 {
+        SymbolicEditOperationV1 {
+            operation_id: id.to_owned(),
+            read_event_ids: vec![event_id.to_owned()],
+            patches: vec![patch(event_id, before, after)],
+        }
+    }
+
+    #[test]
+    fn disjoint_event_operations_commute_and_converge() {
+        let base = vec![
+            event("event-a", 60_000),
+            event("event-b", 64_000),
+            event("event-c", 67_000),
+        ];
+        let left = operation("raise-a", "event-a", 60_000, 61_000);
+        let right = operation("raise-c", "event-c", 67_000, 68_000);
+        assert!(symbolic_operations_commute_v1(&base, &left, &right).unwrap());
+        let left_then_right = apply_symbolic_edit_operation_v1(
+            &apply_symbolic_edit_operation_v1(&base, &left).unwrap(),
+            &right,
+        )
+        .unwrap();
+        let right_then_left = apply_symbolic_edit_operation_v1(
+            &apply_symbolic_edit_operation_v1(&base, &right).unwrap(),
+            &left,
+        )
+        .unwrap();
+        assert_eq!(
+            symbolic_state_sha256_v1(&left_then_right).unwrap(),
+            symbolic_state_sha256_v1(&right_then_left).unwrap()
+        );
+    }
+
+    #[test]
+    fn same_event_operations_are_noncommuting_and_need_explicit_conflict_handling() {
+        let base = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let left = operation("left-tune", "event-a", 60_000, 61_000);
+        let right = operation("right-tune", "event-a", 60_000, 62_000);
+        assert!(!symbolic_operations_commute_v1(&base, &left, &right).unwrap());
+        assert_eq!(
+            apply_symbolic_edit_operation_v1(
+                &apply_symbolic_edit_operation_v1(&base, &left).unwrap(),
+                &right,
+            ),
+            Err(SequenceErrorV1::PatchPreconditionMismatch)
+        );
+    }
+
+    #[test]
+    fn undo_and_redo_restore_exact_symbolic_states() {
+        let base = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let edit = operation("edit-a", "event-a", 60_000, 63_000);
+        let (edited, receipt) = apply_symbolic_edit_with_history_v1(&base, &edit).unwrap();
+        let undone = undo_symbolic_edit_v1(&edited, &receipt).unwrap();
+        assert_eq!(
+            symbolic_state_sha256_v1(&undone).unwrap(),
+            symbolic_state_sha256_v1(&base).unwrap()
+        );
+        let redone = redo_symbolic_edit_v1(&undone, &receipt).unwrap();
+        assert_eq!(
+            symbolic_state_sha256_v1(&redone).unwrap(),
+            symbolic_state_sha256_v1(&edited).unwrap()
+        );
+    }
+
+    #[test]
+    fn undo_rejects_stale_state_and_tampered_history() {
+        let base = vec![event("event-a", 60_000)];
+        let edit = operation("edit-a", "event-a", 60_000, 62_000);
+        let (edited, receipt) = apply_symbolic_edit_with_history_v1(&base, &edit).unwrap();
+        assert_eq!(
+            undo_symbolic_edit_v1(&base, &receipt),
+            Err(SequenceErrorV1::UndoStateMismatch)
+        );
+        let mut tampered = receipt.clone();
+        tampered.operation.patches[0].after.as_mut().unwrap().pitch_millist = 65_000;
+        assert_eq!(
+            undo_symbolic_edit_v1(&edited, &tampered),
+            Err(SequenceErrorV1::HistoryReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn disjoint_branches_merge_without_losing_parentage() {
+        let base = vec![
+            event("event-a", 60_000),
+            event("event-b", 64_000),
+            event("event-c", 67_000),
+        ];
+        let base_hash = symbolic_state_sha256_v1(&base).unwrap();
+        let left_events = vec![
+            event("event-a", 61_000),
+            event("event-b", 64_000),
+            event("event-c", 67_000),
+        ];
+        let right_events = vec![
+            event("event-a", 60_000),
+            event("event-b", 65_000),
+            event("event-c", 67_000),
+        ];
+        let left = BranchSnapshotV1 {
+            branch_id: "left".to_owned(),
+            base_state_sha256: base_hash.clone(),
+            events: left_events,
+        };
+        let right = BranchSnapshotV1 {
+            branch_id: "right".to_owned(),
+            base_state_sha256: base_hash,
+            events: right_events,
+        };
+        let plan = plan_branch_merge_v1(&base, &left, &right).unwrap();
+        assert!(plan.conflicts.is_empty());
+        let result = resolve_branch_merge_v1(&plan, &[]).unwrap();
+        assert_eq!(result.merge_parent_ids, ["left".to_owned(), "right".to_owned()]);
+        assert_eq!(result.events, vec![
+            event("event-a", 61_000),
+            event("event-b", 65_000),
+            event("event-c", 67_000),
+        ]);
+    }
+
+    #[test]
+    fn conflicting_branches_require_one_explicit_resolution_per_event() {
+        let base = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let base_hash = symbolic_state_sha256_v1(&base).unwrap();
+        let left = BranchSnapshotV1 {
+            branch_id: "left".to_owned(),
+            base_state_sha256: base_hash.clone(),
+            events: vec![event("event-a", 61_000), event("event-b", 64_000)],
+        };
+        let right = BranchSnapshotV1 {
+            branch_id: "right".to_owned(),
+            base_state_sha256: base_hash,
+            events: vec![event("event-a", 62_000), event("event-b", 64_000)],
+        };
+        let plan = plan_branch_merge_v1(&base, &left, &right).unwrap();
+        assert_eq!(plan.conflicts.len(), 1);
+        assert_eq!(
+            resolve_branch_merge_v1(&plan, &[]),
+            Err(SequenceErrorV1::MergeResolutionSetMismatch)
+        );
+        let result = resolve_branch_merge_v1(
+            &plan,
+            &[MergeResolutionV1 {
+                event_id: "event-a".to_owned(),
+                choice: MergeChoiceV1::UseRight,
+                custom_event: None,
+            }],
+        )
+        .unwrap();
+        assert_eq!(result.events, vec![event("event-a", 62_000), event("event-b", 64_000)]);
+        assert_eq!(result.resolved_conflict_event_ids, vec!["event-a"]);
+        assert_eq!(result.merge_parent_ids, ["left".to_owned(), "right".to_owned()]);
     }
 
     #[test]
