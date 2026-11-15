@@ -79,19 +79,19 @@ Seed controlled ambiguity, changed constraints, mistaken references, and intenti
 
 Attribute material contributions to human, AI, external source, or jointly transformed contribution at the level of event or artifact segment. Evaluate precision, recall, and F1 against human-annotated traces. Do not represent attribution as a legal authorship or copyright determination.
 
+For small teams, exact Shapley values may allocate a bounded task outcome across contributors when the complete coalition-value table is identifiable. Missing coalitions are reported as non-identifiable, never imputed as zero. Shapley allocation is neither legal authorship nor a measure of human worth.
+
 ### 3.9 Consent and boundary handling
 
 Test explicit opt-in, scope changes, revocation, deletion requests, and limits on reuse. Consent and authorization violations are reported as hard failures, never averaged against quality. A system must not claim to have deleted data from systems it cannot control; it must accurately describe the scope of the action it performed.
 
-### 3.11 Participant capability amplification
+### 3.10 Participant capability amplification
 
 Measure whether a participant becomes more capable independently after collaboration. Use a baseline pretest, a non-identical immediate post-test without AI assistance, a delayed retention test, and a transfer task in a new context. The primary estimand is the difference-in-differences between the collaboration arm's pre/post gain and a matched control arm's pre/post gain. Report delayed retention and transfer separately.
 
 The participant must complete independent assessments without AI hints, tools, or hidden assistance. Test forms, difficulty, time budgets, scoring rubrics, and assistance exposure must be preregistered and matched. Do not infer learning from joint artifact quality, confidence alone, or one immediate post-test. See [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for the full experimental protocol and statistical design.
 
-For small teams, exact Shapley values may be used to allocate a bounded task outcome across contributors only when the complete coalition-value table is identifiable. Missing coalitions are reported as non-identifiable; they are never imputed as zero. Shapley allocation is neither legal authorship nor a measure of human worth.
-
-### 3.10 Burden and efficiency
+### 3.11 Burden and efficiency
 
 Report human time, interaction turns, latency, token and tool costs, interruption rate, cognitive workload, and accessibility friction. Faster is not automatically better if it increases rework or reduces agency.
 
