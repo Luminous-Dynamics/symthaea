@@ -13,6 +13,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod robust;
+pub use robust::{
+    CurrentUncertainty, DirectionInterval, PolarErrorBound, RobustCourseCandidate,
+    RobustPlanStatus, RobustRouteEvaluation, RobustRouteRequest, ScalarInterval, WindUncertainty,
+    evaluate_robust_route_candidates,
+};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceState {
     Qualified,
@@ -37,13 +44,7 @@ pub struct Evidence<T> {
 
 impl<T> Evidence<T> {
     pub fn qualified(value: T) -> Self {
-        Self::qualified_with_freshness(
-            value,
-            [0xa5; 32],
-            "synthetic-common-timebase",
-            0.0,
-            0.0,
-        )
+        Self::qualified_with_freshness(value, [0xa5; 32], "synthetic-common-timebase", 0.0, 0.0)
     }
 
     pub fn qualified_with_freshness(
@@ -220,8 +221,8 @@ impl PolarDiagram {
     fn speed_at(&self, wind_speed_mps: f64, twa_deg: f64) -> Result<f64, PolarError> {
         let (wind_low, wind_fraction) = bracket(&self.true_wind_speeds_mps, wind_speed_mps)
             .ok_or(PolarError::WindOutOfDomain)?;
-        let (angle_low, angle_fraction) = bracket(&self.true_wind_angles_deg, twa_deg)
-            .ok_or(PolarError::Invalid)?;
+        let (angle_low, angle_fraction) =
+            bracket(&self.true_wind_angles_deg, twa_deg).ok_or(PolarError::Invalid)?;
 
         let wind_high = (wind_low + 1).min(self.true_wind_speeds_mps.len() - 1);
         let angle_high = (angle_low + 1).min(self.true_wind_angles_deg.len() - 1);
@@ -239,16 +240,14 @@ impl PolarDiagram {
 
 fn strictly_increasing_nonnegative(values: &[f64]) -> bool {
     values.len() >= 2
-        && values.iter().all(|value| value.is_finite() && *value >= 0.0)
+        && values
+            .iter()
+            .all(|value| value.is_finite() && *value >= 0.0)
         && values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
 fn bracket(values: &[f64], query: f64) -> Option<(usize, f64)> {
-    if !query.is_finite()
-        || values.is_empty()
-        || query < values[0]
-        || query > *values.last()?
-    {
+    if !query.is_finite() || values.is_empty() || query < values[0] || query > *values.last()? {
         return None;
     }
 
@@ -296,10 +295,8 @@ fn ground_vmg(
     let current_heading = current.toward_direction_deg.to_radians();
     let target = target_bearing_deg.to_radians();
 
-    let north_velocity =
-        boat_speed_mps * heading.cos() + current.speed_mps * current_heading.cos();
-    let east_velocity =
-        boat_speed_mps * heading.sin() + current.speed_mps * current_heading.sin();
+    let north_velocity = boat_speed_mps * heading.cos() + current.speed_mps * current_heading.cos();
+    let east_velocity = boat_speed_mps * heading.sin() + current.speed_mps * current_heading.sin();
 
     north_velocity * target.cos() + east_velocity * target.sin()
 }
@@ -320,9 +317,9 @@ fn evidence_gate<T>(evidence: &Evidence<T>) -> Result<&T, PlanStatus> {
             }
             evidence.value.as_ref().ok_or(PlanStatus::NotEvaluated)
         }
-        EvidenceState::Missing
-        | EvidenceState::Stale
-        | EvidenceState::Unverified => Err(PlanStatus::NotEvaluated),
+        EvidenceState::Missing | EvidenceState::Stale | EvidenceState::Unverified => {
+            Err(PlanStatus::NotEvaluated)
+        }
     }
 }
 
@@ -331,10 +328,7 @@ fn evidence_gate<T>(evidence: &Evidence<T>) -> Result<&T, PlanStatus> {
 /// The search evaluates integer-degree headings, interpolates only inside the
 /// declared polar domain, and returns at most one best candidate for each tack.
 /// It never outputs rudder, sail-sheet, throttle or actuator commands.
-pub fn evaluate_route_candidates(
-    polar: &PolarDiagram,
-    request: RouteRequest,
-) -> RouteEvaluation {
+pub fn evaluate_route_candidates(polar: &PolarDiagram, request: RouteRequest) -> RouteEvaluation {
     let wind = match evidence_gate(&request.wind) {
         Ok(value) => value,
         Err(status) => {
@@ -412,8 +406,7 @@ pub fn evaluate_route_candidates(
         );
     }
 
-    let direct_twa =
-        signed_angle_deg(wind.from_direction_deg, target_bearing).abs();
+    let direct_twa = signed_angle_deg(wind.from_direction_deg, target_bearing).abs();
     let direct_inside_no_go = direct_twa <= polar.no_go_angle_deg;
 
     let mut best_port: Option<CourseCandidate> = None;
@@ -422,8 +415,7 @@ pub fn evaluate_route_candidates(
     // One-degree search is an explicit P0 numerical policy, not a steering rate.
     for heading_integer in 0..360 {
         let heading_deg = f64::from(heading_integer);
-        let signed_twa =
-            signed_angle_deg(wind.from_direction_deg, heading_deg);
+        let signed_twa = signed_angle_deg(wind.from_direction_deg, heading_deg);
         let absolute_twa = signed_twa.abs();
 
         if absolute_twa <= polar.no_go_angle_deg {
@@ -451,12 +443,7 @@ pub fn evaluate_route_candidates(
             signed_true_wind_angle_deg: signed_twa,
             tack_side: tack_side(signed_twa),
             predicted_boat_speed_mps: boat_speed,
-            velocity_made_good_mps: ground_vmg(
-                boat_speed,
-                heading_deg,
-                current,
-                target_bearing,
-            ),
+            velocity_made_good_mps: ground_vmg(boat_speed, heading_deg, current, target_bearing),
         };
 
         let slot = match candidate.tack_side {
@@ -557,15 +544,24 @@ mod tests {
         assert_eq!(result.status, PlanStatus::CandidatesAvailable);
         assert_eq!(result.direct_course_inside_no_go_sector, Some(true));
         assert_eq!(result.candidates.len(), 2);
-        assert!(result.candidates.iter().any(|c| c.tack_side == TackSide::Port));
-        assert!(result
-            .candidates
-            .iter()
-            .any(|c| c.tack_side == TackSide::Starboard));
-        assert!(result
-            .candidates
-            .iter()
-            .all(|c| c.heading_deg != 0.0 && c.velocity_made_good_mps > 0.0));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .any(|c| c.tack_side == TackSide::Port)
+        );
+        assert!(
+            result
+                .candidates
+                .iter()
+                .any(|c| c.tack_side == TackSide::Starboard)
+        );
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|c| c.heading_deg != 0.0 && c.velocity_made_good_mps > 0.0)
+        );
     }
 
     #[test]
@@ -573,10 +569,12 @@ mod tests {
         let result = evaluate_route_candidates(&polar(), request(40.0));
         assert_eq!(result.status, PlanStatus::CandidatesAvailable);
         assert_eq!(result.direct_course_inside_no_go_sector, Some(true));
-        assert!(result
-            .candidates
-            .iter()
-            .all(|candidate| candidate.signed_true_wind_angle_deg.abs() > 40.0));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| candidate.signed_true_wind_angle_deg.abs() > 40.0)
+        );
     }
 
     #[test]
@@ -684,10 +682,12 @@ mod tests {
         let result = evaluate_route_candidates(&polar(), input);
         assert_eq!(result.status, PlanStatus::NoFeasibleProgress);
         assert!(!result.candidates.is_empty());
-        assert!(result
-            .candidates
-            .iter()
-            .all(|c| c.velocity_made_good_mps <= 0.0));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|c| c.velocity_made_good_mps <= 0.0)
+        );
     }
 
     #[test]
