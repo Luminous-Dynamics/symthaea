@@ -298,3 +298,8 @@ The third linked benchmark target `NH3-PLASMA-SYNTHESIS-FULL-CHAIN-001` requires
 - Haber–Bosch comparison with H2-production energy included.
 
 The Rust validator checks all five guards, the numeric threshold, comparator IDs and `RESEARCH_TARGET_NOT_RESULT` ceiling.
+
+
+## 9.19 Power-to-X syngas target validation
+
+The source manifest now includes `BIOGAS-PLASMA-SYNGAS-COST-001`, marked `RESEARCH_TARGET_NOT_RESULT`. The auditor requires same-point cost/efficiency thresholds and the five plant-boundary guards for syngas quality, grid-side input, electricity-price/capacity-factor assumptions, downstream service, and no unqualified coproduct credit.
