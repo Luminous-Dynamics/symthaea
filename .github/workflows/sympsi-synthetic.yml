@@ -41,13 +41,19 @@ jobs:
       - name: Qualify four-choice synthetic profile
         env:
           EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          cargo run --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --             --profile four-choice             --git-head "$EXACT_HEAD"             --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json             --out "$RUNNER_TEMP/sympsi-four-choice-receipt.json"
-          cat "$RUNNER_TEMP/sympsi-four-choice-receipt.json"
+        run: >-
+          cargo run --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --
+          --profile four-choice
+          --git-head "$EXACT_HEAD"
+          --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json
+          --out "$RUNNER_TEMP/sympsi-four-choice-receipt.json"
 
       - name: Qualify five-choice synthetic profile
         env:
           EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          cargo run --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --             --profile five-choice             --git-head "$EXACT_HEAD"             --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json             --out "$RUNNER_TEMP/sympsi-five-choice-receipt.json"
-          cat "$RUNNER_TEMP/sympsi-five-choice-receipt.json"
+        run: >-
+          cargo run --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --
+          --profile five-choice
+          --git-head "$EXACT_HEAD"
+          --manifest tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json
+          --out "$RUNNER_TEMP/sympsi-five-choice-receipt.json"
