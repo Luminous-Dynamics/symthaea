@@ -260,6 +260,11 @@ def main() -> int:
 
     if not isinstance(results, tuple):
         raise RuntimeError(f"D0FUS RUN did not return a tuple: {type(results)!r}")
+    expected_length = int(lock["observed_run_output_tuple_length"])
+    if len(results) != expected_length:
+        raise RuntimeError(
+            f"D0FUS v3.2.0 output tuple schema drift: expected {expected_length}, got {len(results)}"
+        )
     if len(results) <= max(index for index, _ in CORE_OUTPUTS.values()):
         raise RuntimeError(
             f"D0FUS output tuple is too short for the declared core observables: {len(results)}"
@@ -298,6 +303,12 @@ def main() -> int:
     report = reports[0]
 
     config_field_count = len(dataclasses.fields(type(DEFAULT_CONFIG)))
+    expected_config_fields = int(lock["observed_global_config_dataclass_field_count"])
+    if config_field_count != expected_config_fields:
+        raise RuntimeError(
+            "D0FUS GlobalConfig schema drift: "
+            f"expected {expected_config_fields} fields, got {config_field_count}"
+        )
     net_electric = core_observables["P_elec_MW"]
     gross_electric = core_observables["P_e_gross_MWe"]
     recirculated_electric = core_observables["P_recirculated_MWe"]
