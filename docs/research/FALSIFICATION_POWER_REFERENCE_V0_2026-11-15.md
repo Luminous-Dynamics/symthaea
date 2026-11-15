@@ -44,7 +44,7 @@ The correct negative result is **underpowered / not evaluable**, not **adequate*
 For each blind campaign:
 1. Pin the candidate-model digest, experiment-policy digest, observation IDs and exact design.
 2. Evaluator custody supplies a declared alternative envelope and calculates each alternative's residual vector after the design is frozen.
-3. Evaluate all alternatives with the same observation count and cost budget.
+3. Evaluate all alternatives with the same observation IDs, order, observation count and cost budget. The crate checks vector lengths only; the evaluator harness must bind the exact design and cost records.
 4. Preserve every alternative row; report minimum power and minimum detectable effect rather than a pooled power mean.
 5. If an alternative is below target, mark the campaign underpowered for that alternative. Do not treat a non-rejection as adequacy evidence.
 6. Only after the oracle reference is differentially verified should the actual Symthaea research policy be compared with random, fixed grid, EIG/model disagreement, D-optimal and support-aware policies under matched costs.
@@ -61,6 +61,9 @@ The initial known-answer family is a simple Gaussian mean shift. Future extensio
 - **Sol-Atlas:** may consume only domain-scoped, uncertainty-bearing model claims with applicable field evidence and professional approval.
 
 ## 6. Acceptance gates
+
+The current v0 API checks equal residual-vector lengths; it does not validate observation identity/order, units, sensor basis or acquisition cost. Those identities must be bound by the evaluator harness. This limitation is deliberate and must remain visible in every integration.
+
 
 Before calling the crate qualified:
 - exact-head cargo fmt --check, cargo test, and strict Clippy;
