@@ -1585,20 +1585,89 @@ mod tests {
         let observer = "worker-after-reconnect".to_owned();
         let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
         let t = 20_000;
+        let store_clock_mapping_id = format!("action-{ordinal:06}");
+        push_action(&mut schedule.actions, &mut ordinal, t - 4, ScheduleAction::ClockAdvance {
+            clock_domain: "store-clock".to_owned(),
+            basis_id: "basis-store".to_owned(),
+            epoch: "store-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 1_000,
+            offset_ns: 0,
+            uncertainty_ns: 10,
+            calibration_id: "store-calibration".to_owned(),
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 2_000,
+            mapping_receipt_ref: "synthetic://store-clock-map".to_owned(),
+            mapping_receipt_sha256: "a".repeat(64),
+            qualification: GateState::Pass,
+        });
+        let observer_clock_mapping_id = format!("action-{ordinal:06}");
+        push_action(&mut schedule.actions, &mut ordinal, t - 3, ScheduleAction::ClockAdvance {
+            clock_domain: "observer-clock".to_owned(),
+            basis_id: "basis-observer".to_owned(),
+            epoch: "observer-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 1_000,
+            offset_ns: 0,
+            uncertainty_ns: 20,
+            calibration_id: "observer-calibration".to_owned(),
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 2_000,
+            mapping_receipt_ref: "synthetic://observer-clock-map".to_owned(),
+            mapping_receipt_sha256: "b".repeat(64),
+            qualification: GateState::Pass,
+        });
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::EventObserved {
-            event_id: event_id.clone(), observer_id: observer.clone(),
+            event_id: event_id.clone(),
+            observer_id: observer.clone(),
+            clock_domain: "observer-clock".to_owned(),
+            basis_id: "basis-observer".to_owned(),
+            epoch: "observer-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: observer_clock_mapping_id,
+            observed_at_ns: 100,
+            observation_receipt_ref: "synthetic://observation/first".to_owned(),
+            observation_receipt_sha256: "c".repeat(64),
+            qualification: GateState::Pass,
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::ProcessCrashed {
             process_id: observer.clone(),
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::EventPersisted {
-            event_id: event_id.clone(), observer_id: observer.clone(), store_id: "store-1".to_owned(),
+            event_id: event_id.clone(),
+            observer_id: observer.clone(),
+            store_id: "store-1".to_owned(),
+            clock_domain: "store-clock".to_owned(),
+            basis_id: "basis-store".to_owned(),
+            epoch: "store-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: store_clock_mapping_id.clone(),
+            persisted_at_ns: 150,
+            persistence_receipt_ref: "synthetic://persistence/durable".to_owned(),
+            persistence_receipt_sha256: "d".repeat(64),
+            qualification: GateState::Pass,
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::ProcessRestarted {
             process_id: observer.clone(),
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 4, ScheduleAction::EventPersisted {
-            event_id, observer_id: observer, store_id: "store-1".to_owned(),
+            event_id,
+            observer_id: observer,
+            store_id: "store-1".to_owned(),
+            clock_domain: "store-clock".to_owned(),
+            basis_id: "basis-store".to_owned(),
+            epoch: "store-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: store_clock_mapping_id,
+            persisted_at_ns: 150,
+            persistence_receipt_ref: "synthetic://persistence/durable".to_owned(),
+            persistence_receipt_sha256: "d".repeat(64),
+            qualification: GateState::Pass,
         });
         let report = replay_virtual_schedule(&schedule).expect("replay");
         let persistence_dispositions: Vec<_> = report.records.iter().filter_map(|record| {
