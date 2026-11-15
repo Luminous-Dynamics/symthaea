@@ -5,12 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::section::{
-    compute_sampled_sections_digest, SectionFamilyArtifact, SectionViolation,
-};
+use crate::section::{compute_sampled_sections_digest, SectionFamilyArtifact};
 use crate::{
     admit, compute_geometry_digest, AdmissionProfile, AdmissionReport, CandidateInput,
-    CoordinateFrame, Disposition, MeshGeometry,
+    MeshGeometry,
 };
 
 const LOFT_SCHEMA_VERSION: u32 = 1;
@@ -300,7 +298,8 @@ fn validate_section_family(
                 current[1] * next[2] - current[2] * next[1]
             })
             .sum();
-        if !signed_area_twice.is_finite() || signed_area_twice >= -coordinate_tolerance {
+        let area_tolerance = coordinate_tolerance * coordinate_tolerance;
+        if !signed_area_twice.is_finite() || signed_area_twice >= -area_tolerance {
             violation(
                 &mut violations,
                 "section_area_orientation",
@@ -317,7 +316,7 @@ fn validate_section_family(
                 [current[1], current[2]],
                 [next[1], next[2]],
             );
-            if !turn.is_finite() || turn > coordinate_tolerance * coordinate_tolerance {
+            if !turn.is_finite() || turn > area_tolerance {
                 violation(
                     &mut violations,
                     "non_convex_section",
@@ -431,7 +430,7 @@ pub fn loft_waterplane_capped_hull(
             detail: "face count overflowed".into(),
         }]);
     };
-    let end_cap_face_count = point_count.checked_mul(4).and_then(|count| count.checked_sub(4));
+    let end_cap_face_count = point_count.checked_mul(4).and_then(|count| count.checked_sub(2));
     let Some(end_cap_face_count) = end_cap_face_count else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
@@ -594,6 +593,7 @@ mod tests {
     use crate::section::{
         generate_section_artifact, SectionControlPoint, SectionHullSpec, SectionStation,
     };
+    use crate::{CoordinateFrame, Disposition};
 
     fn convex_spec() -> SectionHullSpec {
         let shape = vec![
