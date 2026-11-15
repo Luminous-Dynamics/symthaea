@@ -544,6 +544,9 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                     return Err(ReplayError::ActionEvidenceMismatch("inventory_scope"));
                 }
                 require_id(inventory_frontier_event_id, "inventory_frontier_event_id")?;
+                if !produced_events.contains(inventory_frontier_event_id) {
+                    return Err(ReplayError::InvalidCausalPredecessor(inventory_frontier_event_id.clone()));
+                }
                 require_sha256(attempt_manifest_sha256, "attempt_manifest_sha256")?;
             }
             ScheduleAction::ProcessCrashed { process_id }
@@ -2267,6 +2270,7 @@ pub fn project_action_history(
     let mut starts = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, Option<String>)>::new();
     let mut terminal_actions = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, OwnerReceiptAssessment)>::new();
     let mut commits = Vec::new();
+    let mut commit_times = BTreeMap::<(String, String), Vec<QualifiedEventTime>>::new();
     let mut cancellation_acknowledgements = Vec::new();
 
     for action in &canonical_actions {
@@ -2435,6 +2439,9 @@ pub fn project_action_history(
                         continue;
                     }
                 };
+                commit_times.entry((operation_id.clone(), attempt_id.clone()))
+                    .or_default()
+                    .push(owner_time.clone());
                 commits.push(ProjectedEffectCommit {
                     action_id: action.action_id.clone(),
                     logical_operation_id: operation_id.clone(),
@@ -2473,6 +2480,27 @@ pub fn project_action_history(
             };
             let _ = (receipt_ref, receipt_sha256);
             let start_to_terminal = event_order_between(start_time, terminal_time);
+            if let Some(committed_times) = commit_times.get(&(operation_id.clone(), attempt_id.clone())) {
+                for committed_time in committed_times {
+                    match event_order_between(committed_time, terminal_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            reasons.insert(format!("TERMINAL_PRECEDES_EFFECT_COMMIT:{attempt_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("EFFECT_COMMIT_TERMINAL_ORDER_UNRESOLVED:{attempt_id}"));
+                        }
+                    }
+                }
+            }
+            if *outcome == ReconciliationOutcome::NotApplied
+                && commit_times.contains_key(&(operation_id.clone(), attempt_id.clone()))
+            {
+                critical = true;
+                reasons.insert(format!("NOT_APPLIED_TERMINAL_CONTRADICTS_EFFECT_COMMIT:{attempt_id}"));
+            }
             let mapped_outcome = match outcome {
                 ReconciliationOutcome::Applied => Some(ReconciledOperationOutcome::Applied),
                 ReconciliationOutcome::NotApplied => Some(ReconciledOperationOutcome::NotApplied),
@@ -3427,7 +3455,7 @@ mod tests {
         receipts.insert(trigger_action_id.clone(), passing_owner_receipt());
 
         let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
-        let inventory_frontier = "inventory-frontier-1".to_owned();
+        let inventory_frontier = "event-000003".to_owned();
         let discharge_action_id = format!("action-{:06}", ordinal + 2);
         let mut expected_attempt = OperationAttemptRecord {
             identity: AttemptIdentity {
