@@ -48,6 +48,16 @@ Exit codes: 0 = qualified within profile; 1 = incomplete; 2 = rejected; 3 = CLI,
 
 See [CAD_BACKEND_EVALUATION.md](./CAD_BACKEND_EVALUATION.md) for candidate capabilities, CAx-IF fixture families and the cross-kernel bake-off. No backend is qualified by this manifest alone; real backend tests remain required.
 
+## G3b Part 21 STEP header inspection
+
+The G3b backend branch also includes a minimal ISO 10303-21 Part 21 envelope inspector. It checks the start/end markers, HEADER/DATA/ENDSEC ordering, a single FILE_SCHEMA statement and an exact match against a caller-supplied frozen list of schema identifiers. It ignores text inside comments and quoted strings.
+
+Run it with:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-step-header-inspect -- model.step ap242e4-header-profile.json
+
+Important: this inspects the Part 21 envelope and exact FILE_SCHEMA string only. The required edition is profile metadata; the header string alone does not prove ISO edition/conformance, valid DATA entities, B-rep correctness, PMI preservation or geometric equivalence.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
