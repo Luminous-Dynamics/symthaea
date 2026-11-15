@@ -28,6 +28,7 @@ pub mod semantic_continuity;
 pub mod experiment_design;
 pub mod bernoulli_sequential;
 pub mod bernoulli_benchmark;
+pub mod bernoulli_simulation;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
@@ -55,6 +56,12 @@ pub use bernoulli_sequential::{
 pub use bernoulli_benchmark::{
     BernoulliBenchmarkError, BernoulliBenchmarkSummary, RateEstimate,
     summarize_bernoulli_episodes,
+};
+pub use bernoulli_simulation::{
+    BERNOULLI_SIMULATION_POLICY_VERSION, BERNOULLI_SIMULATION_PRNG_VERSION,
+    BernoulliSimulationError, BernoulliSimulationEpisode, BernoulliSimulationManifest,
+    BernoulliSimulationStratum, BernoulliSimulationStratumResult,
+    BernoulliSimulationSuiteResult, run_bernoulli_simulation_suite,
 };
 pub use semantic_continuity::{
     AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
