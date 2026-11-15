@@ -1,0 +1,42 @@
+name: Fusion reduced-space search benchmark
+
+on:
+  pull_request:
+    paths:
+      - "research/fusion-search-benchmark-v0-1/**"
+      - ".github/workflows/fusion-search-benchmark.yml"
+  push:
+    branches:
+      - main
+      - research/fusion-search-benchmark-v0-1
+    paths:
+      - "research/fusion-search-benchmark-v0-1/**"
+      - ".github/workflows/fusion-search-benchmark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path research/fusion-search-benchmark-v0-1/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --manifest-path research/fusion-search-benchmark-v0-1/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/fusion-search-benchmark-v0-1/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run frozen synthetic benchmark
+        run: cargo run --manifest-path research/fusion-search-benchmark-v0-1/Cargo.toml --bin run_fusion_search_benchmark
