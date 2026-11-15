@@ -47,6 +47,11 @@ const EVENT_KINDS: &[&str] = &[
     "role_assignment",
     "role_change",
     "reflection",
+    "pretest",
+    "scaffold_adjustment",
+    "independent_assessment",
+    "retention_check",
+    "independent_transfer",
 ];
 const SCORING_MODES: &[&str] = &["binary", "ordinal", "human_rating", "trace_audit"];
 const CONSENT_VALUES: &[&str] = &["not_applicable", "task_only", "explicit_opt_in"];
@@ -73,6 +78,11 @@ const TRACE_EVENT_TYPES: &[&str] = &[
     "evaluator_annotation",
     "session_end",
     "intervention_decision",
+    "participant_assessment",
+    "scaffold_adjustment",
+    "independent_assessment",
+    "retention_assessment",
+    "transfer_assessment",
 ];
 
 const INTERVENTION_ACTIONS: &[&str] = &[
