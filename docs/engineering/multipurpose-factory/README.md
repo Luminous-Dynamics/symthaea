@@ -105,6 +105,16 @@ No architecture is presumed to win across every product mix, process envelope, v
 
 The benchmark includes a synthetic continuous chemical-process skid as a distinct process family. It requires feedstock characterization, process instrumentation, thermal/fluid utilities, emergency isolation, effluent treatment, a classified process zone, trained operators and laboratory acceptance. This is intentionally separate from discrete assembly and thermal batch processing. NIST's Super Intelligence for Manufacturing initiative identifies the Tennessee Eastman Process as an initial integration/diagnosis benchmark, with extensions planned to physical digital-twin and additive-manufacturing testbeds: https://www.nist.gov/programs-projects/super-intelligence-si-manufacturing. Our corpus does not reproduce Tennessee Eastman or claim chemical-process control fidelity; it adds a capability/segregation/restart admission case so process industries are not omitted from the architecture.
 
+
+
+## Potential first terrestrial pilot: industrial spares and repair
+
+A separately scoped South African discovery workstream is [SA-INDUSTRIAL-MICROFACTORY-001 #12372](https://github.com/Luminous-Dynamics/symthaea/issues/12372). It investigates a narrow first product/repair family: mechanical spares, pump/valve subassemblies, repair/refurbishment and selected metal support components. The proposed core modules are material receipt/traceability, machining, tooling, assembly, metrology, functional test and repair/quarantine; hazardous or capital-intensive processes remain qualified partner services until evidence supports an owned cell.
+
+The sector choice is aligned with the dtic's 2026 Industrial Development Strategy and its published industrial/localisation value chains, which include metals fabrication, mining capital equipment, electrotechnical products, pumps/valves and renewable-energy components. This is a reason to investigate the vertical, not proof of demand, supplier availability, a local-content threshold for every product, or commercial viability. Exact product/tender applicability and customer evidence must be resolved per product scope.
+
+References: [dtic Industrial Development Strategy 2026](https://www.thedtic.gov.za/south-africas-industrial-development-strategy-2026/), [dtic sector directory](https://www.thedtic.gov.za/sectors-and-services-2/industrial-development/sectors/), [dtic industrial procurement designations](https://www.thedtic.gov.za/sectors-and-services-2/industrial-development/industrial-procurement/), [InvestSA clean-technology component manufacturing](https://www.investsa.gov.za/key-sectors/clean-technology-component-manufacturing/).
+
 ## 6. Reconfiguration acceptance
 
 A transition is not complete when a module is physically connected. It becomes a synthetic accepted configuration only after:
