@@ -551,7 +551,7 @@ mod tests {
         assert_eq!(report.flow_metrics[0].weighted_travel_mm_per_period, 6_000);
         assert_eq!(report.flow_metrics[0].path_edges[0].edge_id, "e01");
         assert_eq!(report.flow_metrics[0].path_edges[0].basis, DistanceBasis::Synthetic);
-        assert_eq!(report.flow_metrics[3].path_zone_ids, vec!["DISPATCH", "REPAIR"]);
+        assert_eq!(report.flow_metrics[3].path_zone_ids, vec!["DISPATCH".to_owned(), "REPAIR".to_owned()]);
         assert_eq!(report.flow_metrics[4].path_edges[0].edge_id, "e07");
         assert_eq!(report.total_weighted_travel_mm_per_period, 50_000);
     }
