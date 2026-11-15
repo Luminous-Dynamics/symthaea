@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-selection-trajectory-v1.schema.json",
+  "title": "Melothaea Music Selection Trajectory Manifest v1",
+  "description": "Frozen input manifest for a candidate-selection trajectory. Hidden synthetic or human truth is intentionally excluded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request", "slots"],
+  "properties": {
+    "request": { "$ref": "#/$defs/request" },
+    "slots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/slot" }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "trajectory_id",
+        "task_sha256",
+        "source_lineage_sha256",
+        "instruction_sha256",
+        "evaluator_suite_sha256",
+        "seed",
+        "assigned_candidate_count",
+        "adaptive_rounds",
+        "backend_portfolio_size",
+        "budget",
+        "policy"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-music-selection-trajectory-v1" },
+        "trajectory_id": { "type": "string", "minLength": 1 },
+        "task_sha256": { "$ref": "#/$defs/sha256" },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "instruction_sha256": { "$ref": "#/$defs/sha256" },
+        "evaluator_suite_sha256": { "$ref": "#/$defs/sha256" },
+        "seed": { "type": "integer", "minimum": 0 },
+        "assigned_candidate_count": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "adaptive_rounds": { "enum": [1, 2, 4, 8] },
+        "backend_portfolio_size": { "enum": [1, 2, 4] },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["generation_calls", "render_calls", "wall_clock_budget_ms"],
+          "properties": {
+            "generation_calls": { "type": "integer", "minimum": 1, "maximum": 128 },
+            "render_calls": { "type": "integer", "minimum": 0, "maximum": 128 },
+            "wall_clock_budget_ms": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "policy": {
+          "enum": [
+            "random",
+            "best_of_n_similarity",
+            "best_of_n_loudness",
+            "best_of_n_prompt_alignment",
+            "mean_ensemble",
+            "pessimistic_ensemble",
+            "hard_gate_first_pareto"
+          ]
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "similarity_bp",
+        "loudness_match_bp",
+        "novelty_bp",
+        "complexity_bp",
+        "prompt_alignment_bp",
+        "style_match_bp"
+      ],
+      "properties": {
+        "similarity_bp": { "$ref": "#/$defs/score" },
+        "loudness_match_bp": { "$ref": "#/$defs/score" },
+        "novelty_bp": { "$ref": "#/$defs/score" },
+        "complexity_bp": { "$ref": "#/$defs/score" },
+        "prompt_alignment_bp": { "$ref": "#/$defs/score" },
+        "style_match_bp": { "$ref": "#/$defs/score" }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "edit_execution",
+        "protected_preservation",
+        "rights_admission",
+        "integrity",
+        "source_lineage",
+        "required_evidence"
+      ],
+      "properties": {
+        "edit_execution": { "enum": ["verified", "rejected", "unknown"] },
+        "protected_preservation": { "enum": ["verified", "rejected", "unknown"] },
+        "rights_admission": { "enum": ["verified", "rejected", "unknown"] },
+        "integrity": { "enum": ["verified", "rejected", "unknown"] },
+        "source_lineage": { "enum": ["verified", "rejected", "unknown"] },
+        "required_evidence": { "enum": ["verified", "rejected", "unknown"] }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "source_lineage_sha256",
+        "instruction_sha256",
+        "output_sha256",
+        "adaptive_round",
+        "backend_id",
+        "backend_version",
+        "renderer_id",
+        "renderer_version",
+        "proxy",
+        "uncertainty_bp",
+        "hard_gates"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "instruction_sha256": { "$ref": "#/$defs/sha256" },
+        "output_sha256": { "$ref": "#/$defs/sha256" },
+        "adaptive_round": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "backend_id": { "type": "string", "minLength": 1 },
+        "backend_version": { "type": "string", "minLength": 1 },
+        "renderer_id": { "type": "string", "minLength": 1 },
+        "renderer_version": { "type": "string", "minLength": 1 },
+        "proxy": { "$ref": "#/$defs/proxy" },
+        "uncertainty_bp": { "$ref": "#/$defs/score" },
+        "hard_gates": { "$ref": "#/$defs/gates" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "slot_id", "outcome"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "slot_id": { "type": "string", "minLength": 1 },
+        "outcome": {
+          "enum": [
+            "materialized",
+            "failed_before_render",
+            "render_failed",
+            "timed_out",
+            "malformed",
+            "not_rendered"
+          ]
+        },
+        "observation": { "$ref": "#/$defs/observation" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "materialized" } } },
+          "then": { "required": ["observation"] },
+          "else": { "not": { "required": ["observation"] } }
+        }
+      ]
+    }
+  }
+}
