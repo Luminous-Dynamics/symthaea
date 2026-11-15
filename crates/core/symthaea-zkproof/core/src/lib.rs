@@ -194,7 +194,7 @@ impl BalanceProofRequestV1 {
     pub fn canonical_digest(&self) -> [u8; 32] {
         use sha2::{Digest, Sha256};
 
-        const DOMAIN: &[u8] = b"symthaea-balance-proof-request-v1\\0";
+        const DOMAIN: &[u8] = b"symthaea-balance-proof-request-v1\0";
 
         let mut hasher = Sha256::new();
         hasher.update(DOMAIN);
