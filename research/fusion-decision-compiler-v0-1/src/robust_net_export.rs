@@ -201,15 +201,11 @@ pub fn evaluate_robust_net_export(
     if point.is_none_or(|value| !value.is_finite()) {
         diagnostics.push(RobustNetExportDiagnostic::MissingPointEstimate);
     }
-    if point_report.run_id != power_run.run_id
-        || point_report.solver_id != power_run.solver_id
-    {
+    if point_report.run_id != power_run.run_id || point_report.solver_id != power_run.solver_id {
         diagnostics.push(RobustNetExportDiagnostic::PointReportIdentityMismatch);
     }
-    let recomputed_point_report = super::plant_service_gate::evaluate_plant_power_balance(
-        power_profile,
-        power_run,
-    );
+    let recomputed_point_report =
+        super::plant_service_gate::evaluate_plant_power_balance(power_profile, power_run);
     if recomputed_point_report != *point_report {
         diagnostics.push(RobustNetExportDiagnostic::PointReportIdentityMismatch);
     }
@@ -258,8 +254,7 @@ pub fn evaluate_robust_net_export(
     if !is_sha256(&receipt.output_sha256) {
         diagnostics.push(RobustNetExportDiagnostic::InvalidOutputDigest);
     }
-    if receipt.schema_ref != power_profile.schema_ref
-        || receipt.schema_ref != power_run.schema_ref
+    if receipt.schema_ref != power_profile.schema_ref || receipt.schema_ref != power_run.schema_ref
     {
         diagnostics.push(RobustNetExportDiagnostic::SchemaReferenceMismatch);
     }
@@ -298,9 +293,7 @@ pub fn evaluate_robust_net_export(
         || receipt.one_sided_coverage_level > 1.0
     {
         diagnostics.push(RobustNetExportDiagnostic::InvalidCoverageLevel);
-    } else if receipt.one_sided_coverage_level
-        < robust_profile.required_one_sided_coverage_level
-    {
+    } else if receipt.one_sided_coverage_level < robust_profile.required_one_sided_coverage_level {
         diagnostics.push(RobustNetExportDiagnostic::CoverageBelowRequirement);
     }
     if receipt.distribution_assumption_ref.trim().is_empty() {
@@ -335,7 +328,10 @@ pub fn evaluate_robust_net_export(
         NetExportBoundMethod::DirectNetOutputInterval => &["P_elec"],
     };
     if receipt.method_variable_order
-        != expected_method_order.iter().map(|value| (*value).to_string()).collect::<Vec<_>>()
+        != expected_method_order
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect::<Vec<_>>()
     {
         diagnostics.push(RobustNetExportDiagnostic::MethodVariableOrderMismatch);
     }
@@ -412,10 +408,7 @@ pub fn evaluate_robust_net_export(
         diagnostics.push(RobustNetExportDiagnostic::LowerBoundAbovePointEstimate);
     }
 
-    let mut evidence_refs = vec![
-        power_run.receipt_ref.clone(),
-        receipt.evidence_ref.clone(),
-    ];
+    let mut evidence_refs = vec![power_run.receipt_ref.clone(), receipt.evidence_ref.clone()];
     if let Some(reference) = &receipt.covariance_receipt_ref {
         evidence_refs.push(reference.clone());
     }
@@ -521,9 +514,7 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plant_service_gate::{
-        PowerObservable, PowerTermEvidence,
-    };
+    use crate::plant_service_gate::{PowerObservable, PowerTermEvidence};
 
     fn sha(character: char) -> String {
         character.to_string().repeat(64)
@@ -652,9 +643,7 @@ mod tests {
         }
     }
 
-    fn evaluate(
-        receipt: Option<&NetExportLowerBoundReceipt>,
-    ) -> RobustNetExportReport {
+    fn evaluate(receipt: Option<&NetExportLowerBoundReceipt>) -> RobustNetExportReport {
         let profile = power_profile();
         let run = power_run();
         let point = evaluate_plant_power_balance(&profile, &run);
@@ -717,16 +706,21 @@ mod tests {
         receipt.model_form_evidence_sha256 = "bad-digest".to_string();
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::InvalidModelFormEvidence
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::InvalidModelFormEvidence)
+        );
     }
 
     #[test]
     fn lower_bound_below_reserve_blocks_robust_qualification() {
         let receipt = lower_bound(20.0);
         let report = evaluate(Some(&receipt));
-        assert_eq!(report.disposition, RobustNetExportDisposition::RobustlyBelowReserve);
+        assert_eq!(
+            report.disposition,
+            RobustNetExportDisposition::RobustlyBelowReserve
+        );
         assert_eq!(report.robust_reserve_margin_mwe, Some(-30.0));
     }
 
@@ -734,14 +728,20 @@ mod tests {
     fn lower_bound_above_reserve_qualifies_declared_robust_service() {
         let receipt = lower_bound(60.0);
         let report = evaluate(Some(&receipt));
-        assert_eq!(report.disposition, RobustNetExportDisposition::RobustlyAboveReserve);
+        assert_eq!(
+            report.disposition,
+            RobustNetExportDisposition::RobustlyAboveReserve
+        );
         assert_eq!(report.robust_reserve_margin_mwe, Some(10.0));
     }
 
     #[test]
     fn missing_uncertainty_receipt_is_point_estimate_only() {
         let report = evaluate(None);
-        assert_eq!(report.disposition, RobustNetExportDisposition::PointEstimateOnly);
+        assert_eq!(
+            report.disposition,
+            RobustNetExportDisposition::PointEstimateOnly
+        );
         assert_eq!(report.one_sided_lower_bound_mwe, None);
     }
 
@@ -803,9 +803,11 @@ mod tests {
     fn insufficient_one_sided_coverage_is_not_qualified() {
         let mut receipt = lower_bound(60.0);
         receipt.one_sided_coverage_level = 0.90;
-        assert!(evaluate(Some(&receipt))
-            .diagnostics
-            .contains(&RobustNetExportDiagnostic::CoverageBelowRequirement));
+        assert!(
+            evaluate(Some(&receipt))
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::CoverageBelowRequirement)
+        );
     }
 
     #[test]
@@ -814,9 +816,11 @@ mod tests {
         receipt.covariance_receipt_ref = None;
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::MissingCovarianceReceipt
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::MissingCovarianceReceipt)
+        );
     }
 
     #[test]
@@ -826,9 +830,11 @@ mod tests {
         receipt.covariance_receipt_ref = None;
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::MissingSimultaneousAllocationReceipt
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::MissingSimultaneousAllocationReceipt)
+        );
     }
 
     #[test]
@@ -838,9 +844,11 @@ mod tests {
         receipt.covariance_receipt_ref = None;
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::MissingDirectNetAnalysisReceipt
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::MissingDirectNetAnalysisReceipt)
+        );
     }
 
     #[test]
@@ -931,17 +939,14 @@ mod tests {
         let mut point = evaluate_plant_power_balance(&profile, &run);
         point.run_id = "different-run".to_string();
         let receipt = lower_bound(60.0);
-        let report = evaluate_robust_net_export(
-            &profile,
-            &run,
-            &point,
-            &robust_profile(),
-            Some(&receipt),
-        );
+        let report =
+            evaluate_robust_net_export(&profile, &run, &point, &robust_profile(), Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::PointReportIdentityMismatch
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::PointReportIdentityMismatch)
+        );
     }
 
     #[test]
@@ -950,9 +955,11 @@ mod tests {
         receipt.coverage_scope_ref.clear();
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::EmptyCoverageScope
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::EmptyCoverageScope)
+        );
     }
 
     #[test]
@@ -960,9 +967,11 @@ mod tests {
         let receipt = lower_bound(151.0);
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::LowerBoundAbovePointEstimate
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::LowerBoundAbovePointEstimate)
+        );
     }
 
     #[test]
@@ -1033,8 +1042,16 @@ mod tests {
         receipt.validity_domain_ref.clear();
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&RobustNetExportDiagnostic::EmptyDistributionAssumption));
-        assert!(report.diagnostics.contains(&RobustNetExportDiagnostic::EmptyValidityDomain));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::EmptyDistributionAssumption)
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::EmptyValidityDomain)
+        );
     }
 
     #[test]
