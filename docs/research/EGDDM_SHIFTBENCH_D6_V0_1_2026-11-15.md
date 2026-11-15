@@ -17,6 +17,8 @@ Recent work makes this a practical research problem, not a speculative one:
 - The [2026 Long-Horizon Software Engineering Agents survey](https://longhorizonswe.github.io/) argues that length alone is not continuity. It identifies retained functionality and conformance to active requirements as useful measures, and reports a ChainSWE comparison where per-issue resolution falls from 69.1% with reference fixes to 49.0% with agent-produced patches, and 47.4% when prior dialogue is also retained.
 - [SWE-Gate](https://arxiv.org/abs/2609.04167) finds that functional success is not complete acceptance: 221 of 644 repairs that passed functional tests failed review-derived constraints.
 - [SWE-Time](https://arxiv.org/abs/2611.12083) treats repository evolution as the reasoning target, including retrospective and prospective temporal understanding.
+- [SWE-Atlas (May 2026)](https://scale.com/blog/swe-atlas-complete) evaluates 284 codebase Q&A, test-writing and refactoring tasks. Its report finds large reliability gaps across repeated trials: systems were reported to be 2–3× more likely to succeed on at least one of three trials than on all three; it also highlights investigation and native harness tooling as important confounders.
+- [SWE-fficiency (ICML 2026)](https://proceedings.mlr.press/v306/ma26l.html) evaluates 498 performance-optimization tasks across nine repositories and reports that top agents averaged less than 0.23× expert speedup. This is not a D6 task family, but it reinforces that engineering quality must include measured cost and expert-relative efficiency, not only patch acceptance.
 
 D6 must complement these benchmarks. It does not claim that EGDDM invented workspace-shift evaluation, temporal repository reasoning, sequential maintenance, or review-constraint testing.
 
@@ -72,10 +74,11 @@ The v0.1 trace has:
 - evaluator-side affected-obligation labels;
 - active requirements at each epoch;
 - candidate impact predictions;
-- check receipts pinned to source epochs and exact repository/tree/configuration identities; and
+- check receipts pinned to source epochs and exact repository/tree/configuration identities;
+- exact checkpoint cutoffs, receipt-observation times and actor-availability times; and
 - declared revalidation cost units.
 
-The evaluator derives freshness from the last gold impact epoch for each obligation. A receipt from an earlier epoch remains reusable for an unaffected obligation, but becomes stale when a later intervention affects that obligation. A source receipt cannot claim a future epoch or mismatch its own epoch's repository/tree/configuration pins.
+The evaluator derives freshness from the last gold impact epoch for each obligation. A receipt from an earlier epoch remains reusable for an unaffected obligation, but becomes stale when a later intervention affects that obligation. A source receipt cannot claim a future epoch or mismatch its own epoch's repository/tree/configuration pins. Receipt observation must not predate its source epoch; observation must precede availability; and availability must be no later than the checkpoint cutoff. This blocks within-epoch and post-checkpoint evidence leakage, not only future-epoch leakage.
 
 The scorer reports separate measures:
 - **Retained functionality:** proportion of baseline-passing obligations that remain active and still have fresh passing evidence.
@@ -83,7 +86,7 @@ The scorer reports separate measures:
 - **Impact precision/recall:** agreement between predicted and evaluator-held affected obligation sets.
 - **Stale active receipts:** latest evidence that predates a change affecting its obligation.
 - **Critical unverified obligations:** critical active requirements without fresh passing evidence.
-- **Revalidation cost and savings:** declared cost compared with a full-rerun reference that rechecks every active obligation after each shift.
+- **Revalidation cost and savings:** declared post-baseline cost compared with a full-rerun reference that rechecks every active obligation after each later epoch. Baseline acquisition is excluded from both sides.
 - **Paired success:** both clean and shifted arms preserve prior passing functionality and satisfy all active requirements.
 
 A missing receipt, failed or unknown check, stale critical receipt, or incomplete active requirement cannot be converted into success by a high score elsewhere. The v0.1 digest is a deterministic integrity field, not a signature or proof that a test actually ran.
@@ -107,7 +110,7 @@ These are fixture expectations, not executed Rust results or empirical agent out
 
 ## 6. Baselines and ablations
 
-Use identical model versions, agent harnesses, context budgets, tool permissions, initial snapshots, task text, intervention times and compute budgets.
+Use identical model versions, agent harnesses, context budgets, tool permissions, initial snapshots, task text, intervention times and compute budgets. Report at least three independent trials per task when feasible; publish single-run and pass-all reliability separately. Agent harness and native scaffolding identity must be pinned because tool orchestration materially affects performance.
 
 Compare at least:
 
@@ -198,5 +201,6 @@ No cross-paper headline score should be described as a direct apples-to-apples c
 - The local fixture's affected-obligation labels are visible; this is not a blind benchmark.
 - Cost units are declared inputs, not measured wall-clock or infrastructure costs.
 - The scorer is a prototype and has not been compiled or executed in this environment.
+- Epoch-level and timestamp-level availability checks improve leakage controls but do not replace authenticated actor identities, signed execution receipts or independently administered benchmark custody.
 - A dependency graph, even when time-indexed, is not causal evidence. D5 requires intervention design and valid controls.
 - A high continuity score does not authorize deployment or irreversible changes. Authority, safety and execution remain independent gates.
