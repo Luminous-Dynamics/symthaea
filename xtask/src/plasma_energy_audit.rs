@@ -235,11 +235,7 @@ pub fn run_audit(
             "duplicate comparison ID: {}",
             comparison.comparison_id
         );
-        let result = evaluate_comparison(
-            comparison,
-            &scenario_sources,
-            &scenario_results,
-        );
+        let result = evaluate_comparison(comparison, &scenario_sources, &scenario_results);
         ensure!(
             result.disposition == comparison.expected_disposition,
             "comparison {} expected {:?}, evaluator returned {:?}: {}",
@@ -270,8 +266,8 @@ pub fn run_audit(
 }
 
 fn audit_source_manifest(path: &Path) -> Result<SourceManifestSummary> {
-    let bytes = fs::read(path)
-        .with_context(|| format!("read source manifest {}", path.display()))?;
+    let bytes =
+        fs::read(path).with_context(|| format!("read source manifest {}", path.display()))?;
     let root: Value = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse source manifest {}", path.display()))?;
     audit_source_value(&root, &path.display().to_string())
@@ -301,7 +297,10 @@ fn validate_fixture_header(fixture: &ThermalFixtureManifest) -> Result<()> {
         !fixture.generated_date.trim().is_empty(),
         "thermal fixture generated_date must not be empty"
     );
-    ensure!(!fixture.scenarios.is_empty(), "thermal fixture has no scenarios");
+    ensure!(
+        !fixture.scenarios.is_empty(),
+        "thermal fixture has no scenarios"
+    );
     ensure!(
         !fixture.comparisons.is_empty(),
         "thermal fixture has no comparison controls"
@@ -310,8 +309,26 @@ fn validate_fixture_header(fixture: &ThermalFixtureManifest) -> Result<()> {
 }
 
 fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
-    let reject = |reason: &str| scenario_result(scenario, ScenarioDisposition::Rejected, reason, None, None, None);
-    let blocked = |reason: &str| scenario_result(scenario, ScenarioDisposition::Blocked, reason, None, None, None);
+    let reject = |reason: &str| {
+        scenario_result(
+            scenario,
+            ScenarioDisposition::Rejected,
+            reason,
+            None,
+            None,
+            None,
+        )
+    };
+    let blocked = |reason: &str| {
+        scenario_result(
+            scenario,
+            ScenarioDisposition::Blocked,
+            reason,
+            None,
+            None,
+            None,
+        )
+    };
 
     if scenario.scenario_id.trim().is_empty() || scenario.technology.trim().is_empty() {
         return reject("scenario and technology identities must be non-empty");
@@ -328,7 +345,10 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
 
     if scenario.service.service_contract_id.trim().is_empty()
         || scenario.service.service_type.trim().is_empty()
-        || scenario.service.outlet_temperature_mk.is_none_or(|value| value == 0)
+        || scenario
+            .service
+            .outlet_temperature_mk
+            .is_none_or(|value| value == 0)
         || scenario.service.delivery_duration_s == 0
         || scenario.service.delivery_trace_digest.trim().is_empty()
     {
@@ -420,7 +440,9 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
             return reject("charge-stage energy sum overflow");
         };
         if primary_input_j != primary_expected {
-            return reject("primary-process input does not close to stored-energy increase plus charge loss");
+            return reject(
+                "primary-process input does not close to stored-energy increase plus charge loss",
+            );
         }
         if auxiliary_input_j != charge.auxiliary_dissipation_j {
             return reject("auxiliary meters do not close to declared auxiliary dissipation");
@@ -434,7 +456,9 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
             return reject("charge-stage energy sum overflow");
         };
         if total_input_j != charge_total {
-            return reject("exclusive total meter does not close to charge-stage stored energy and losses");
+            return reject(
+                "exclusive total meter does not close to charge-stage stored energy and losses",
+            );
         }
     }
 
@@ -445,7 +469,9 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
         return reject("hold-stage energy sum overflow");
     };
     if hold_reconstructed != charge.stored_energy_increase_j {
-        return reject("charge-end stored energy does not close to post-hold energy plus hold loss");
+        return reject(
+            "charge-end stored energy does not close to post-hold energy plus hold loss",
+        );
     }
     if hold.hold_duration_s == 0 {
         return blocked("storage hold duration is absent");
@@ -460,10 +486,14 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
     if discharge.stored_energy_withdrawn_j != hold.stored_energy_after_hold_j
         || discharge_reconstructed != discharge.stored_energy_withdrawn_j
     {
-        return reject("post-hold energy does not close to useful delivered heat plus discharge loss");
+        return reject(
+            "post-hold energy does not close to useful delivered heat plus discharge loss",
+        );
     }
     if discharge.useful_heat_delivered_j == 0 {
-        return reject("positive-duration heat service cannot PASS with zero useful heat delivered");
+        return reject(
+            "positive-duration heat service cannot PASS with zero useful heat delivered",
+        );
     }
 
     let Some(all_losses_j) = charge
@@ -474,14 +504,15 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
     else {
         return reject("end-to-end loss sum overflow");
     };
-    let Some(end_to_end_reconstructed) = discharge
-        .useful_heat_delivered_j
-        .checked_add(all_losses_j)
+    let Some(end_to_end_reconstructed) =
+        discharge.useful_heat_delivered_j.checked_add(all_losses_j)
     else {
         return reject("end-to-end energy reconstruction overflow");
     };
     if end_to_end_reconstructed != total_input_j {
-        return reject("end-to-end wall-plug input does not close to useful heat plus all declared losses");
+        return reject(
+            "end-to-end wall-plug input does not close to useful heat plus all declared losses",
+        );
     }
 
     let efficiency = ((discharge.useful_heat_delivered_j as u128) * 1_000_000_u128
@@ -819,8 +850,7 @@ mod tests {
         let baseline = base_scenario();
         let mut candidate = base_scenario();
         candidate.scenario_id = "candidate".to_owned();
-        candidate.energy_boundary_contract_id =
-            "WALL-PLUG-HEATER-ONLY-V1".to_owned();
+        candidate.energy_boundary_contract_id = "WALL-PLUG-HEATER-ONLY-V1".to_owned();
 
         let baseline_result = evaluate_scenario(&baseline);
         let candidate_result = evaluate_scenario(&candidate);
@@ -849,7 +879,9 @@ mod tests {
     #[test]
     fn absent_auxiliary_meter_is_blocked_even_when_ledger_arithmetic_closes() {
         let mut scenario = base_scenario();
-        scenario.wall_plug_inputs.retain(|input| input.role != InputRole::Auxiliary);
+        scenario
+            .wall_plug_inputs
+            .retain(|input| input.role != InputRole::Auxiliary);
         scenario.charge.auxiliary_dissipation_j = 0;
         scenario.wall_plug_inputs[0].energy_j = Some(3_600_000_000);
         assert_eq!(
@@ -927,11 +959,9 @@ mod tests {
         for scenario in &fixture.scenarios {
             let result = evaluate_scenario(scenario);
             assert_eq!(
-                result.disposition,
-                scenario.expected_disposition,
+                result.disposition, scenario.expected_disposition,
                 "unexpected result for {}: {}",
-                scenario.scenario_id,
-                result.reason
+                scenario.scenario_id, result.reason
             );
             scenarios.insert(scenario.scenario_id.clone(), scenario);
             results.insert(scenario.scenario_id.clone(), result);
@@ -940,11 +970,9 @@ mod tests {
         for comparison in &fixture.comparisons {
             let result = evaluate_comparison(comparison, &scenarios, &results);
             assert_eq!(
-                result.disposition,
-                comparison.expected_disposition,
+                result.disposition, comparison.expected_disposition,
                 "unexpected comparison result for {}: {}",
-                comparison.comparison_id,
-                result.reason
+                comparison.comparison_id, result.reason
             );
         }
     }
@@ -1048,7 +1076,11 @@ mod tests {
             Some(true),
         ));
         let error = audit_source_value(&source, "dec-origin.json").unwrap_err();
-        assert!(error.to_string().contains("fusion_born_output_demonstrated=false"));
+        assert!(
+            error
+                .to_string()
+                .contains("fusion_born_output_demonstrated=false")
+        );
     }
 
     fn nh3_energy_yield_source_manifest() -> Value {
@@ -1125,7 +1157,11 @@ mod tests {
         source["cases"][0]["operating_points"][0]["hydrogen_production_rate_g_per_hour"] =
             serde_json::json!(150.0);
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
-        assert!(error.to_string().contains("must not borrow the 150 g/h throughput value"));
+        assert!(
+            error
+                .to_string()
+                .contains("must not borrow the 150 g/h throughput value")
+        );
     }
 
     #[test]
@@ -1134,33 +1170,43 @@ mod tests {
         source["cases"][0]["operating_points"][1]["hydrogen_energy_yield_g_H2_per_kWh"] =
             serde_json::json!(45.0);
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
-        assert!(error.to_string().contains("150 g/h point must retain its 50 g/kWh energy yield"));
+        assert!(
+            error
+                .to_string()
+                .contains("150 g/h point must retain its 50 g/kWh energy yield")
+        );
     }
 
     #[test]
     fn source_manifest_rejects_incorrect_nh3_specific_energy_arithmetic() {
         let mut source = nh3_energy_yield_source_manifest();
-        source["derived_reference_checks"][0]["derivation"]
-            ["best_energy_yield_specific_energy_kWh_per_kg_H2"] = serde_json::json!(18.0);
+        source["derived_reference_checks"][0]["derivation"]["best_energy_yield_specific_energy_kWh_per_kg_H2"] =
+            serde_json::json!(18.0);
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
-        assert!(error.to_string().contains("best-yield specific-energy derivation"));
+        assert!(
+            error
+                .to_string()
+                .contains("best-yield specific-energy derivation")
+        );
     }
 
     #[test]
     fn source_manifest_rejects_cross_point_throughput_energy_yield_mismatch() {
         let mut source = nh3_energy_yield_source_manifest();
-        source["derived_reference_checks"][0]["derivation"]
-            ["intermediate_92_4_percent_specific_energy_kWh_per_kg_H2"] =
+        source["derived_reference_checks"][0]["derivation"]["intermediate_92_4_percent_specific_energy_kWh_per_kg_H2"] =
             serde_json::json!(22.2222222222);
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
-        assert!(error.to_string().contains("92.4-percent specific-energy derivation"));
+        assert!(
+            error
+                .to_string()
+                .contains("92.4-percent specific-energy derivation")
+        );
     }
 
     #[test]
     fn source_manifest_rejects_derived_check_with_unknown_case_reference() {
         let mut source = nh3_energy_yield_source_manifest();
-        source["derived_reference_checks"][0]["source_case_id"] =
-            serde_json::json!("MISSING-CASE");
+        source["derived_reference_checks"][0]["source_case_id"] = serde_json::json!("MISSING-CASE");
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
         assert!(error.to_string().contains("references unknown source case"));
     }
@@ -1168,8 +1214,7 @@ mod tests {
     #[test]
     fn source_manifest_rejects_derived_check_claimed_as_luminous_measurement() {
         let mut source = nh3_energy_yield_source_manifest();
-        source["derived_reference_checks"][0]["luminous_measurement"] =
-            serde_json::json!(true);
+        source["derived_reference_checks"][0]["luminous_measurement"] = serde_json::json!(true);
         let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
         assert!(error.to_string().contains("luminous_measurement=false"));
     }
@@ -1223,7 +1268,8 @@ mod tests {
 
     #[test]
     fn source_manifest_accepts_separate_co2_counterflow_operating_points() {
-        let summary = audit_source_value(&co2_counterflow_source_manifest(), "co2-counterflow.json").unwrap();
+        let summary =
+            audit_source_value(&co2_counterflow_source_manifest(), "co2-counterflow.json").unwrap();
         assert_eq!(summary.case_count, 1);
     }
 
@@ -1233,7 +1279,11 @@ mod tests {
         source["cases"][0]["configurations"][1]["observations"][1]["value"] =
             serde_json::json!(0.236);
         let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
-        assert!(error.to_string().contains("302 W conversion must remain unknown"));
+        assert!(
+            error
+                .to_string()
+                .contains("302 W conversion must remain unknown")
+        );
     }
 
     #[test]
@@ -1242,14 +1292,17 @@ mod tests {
         source["cases"][0]["configurations"][2]["observations"][3]["unit"] =
             serde_json::json!("fraction");
         let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
-        assert!(error.to_string().contains("must remain a relative increase"));
+        assert!(
+            error
+                .to_string()
+                .contains("must remain a relative increase")
+        );
     }
 
     #[test]
     fn source_manifest_rejects_duplicate_co2_operating_point_ids() {
         let mut source = co2_counterflow_source_manifest();
-        source["cases"][0]["configurations"][1]["id"] =
-            serde_json::json!("counterflow-magd-792w");
+        source["cases"][0]["configurations"][1]["id"] = serde_json::json!("counterflow-magd-792w");
         let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
         assert!(error.to_string().contains("duplicate configuration ID"));
     }
@@ -1295,7 +1348,11 @@ mod tests {
         source["cases"][0]["coproduct_accounting"]["carbon_product_qualification_status"] =
             serde_json::json!("VALIDATED");
         let error = audit_source_value(&source, "methane.json").unwrap_err();
-        assert!(error.to_string().contains("must not promote carbon-product grade"));
+        assert!(
+            error
+                .to_string()
+                .contains("must not promote carbon-product grade")
+        );
     }
 
     #[test]
@@ -1304,7 +1361,11 @@ mod tests {
         source["cases"][0]["coproduct_accounting"]["realized_revenue_evidence"] =
             serde_json::json!(true);
         let error = audit_source_value(&source, "methane.json").unwrap_err();
-        assert!(error.to_string().contains("cannot claim realized carbon-black revenue"));
+        assert!(
+            error
+                .to_string()
+                .contains("cannot claim realized carbon-black revenue")
+        );
     }
 
     #[test]
@@ -1313,7 +1374,11 @@ mod tests {
         source["cases"][0]["coproduct_accounting"]["no_credit_baseline_required"] =
             serde_json::json!(false);
         let error = audit_source_value(&source, "methane.json").unwrap_err();
-        assert!(error.to_string().contains("must preserve a no-credit baseline"));
+        assert!(
+            error
+                .to_string()
+                .contains("must preserve a no-credit baseline")
+        );
     }
 
     fn minimal_benchmark_target_manifest(lane: &str) -> Value {
@@ -1424,7 +1489,11 @@ mod tests {
         source["benchmark_targets"][0]["claim_guards"]["hydrogen_generation_energy_included"] =
             serde_json::json!(false);
         let error = audit_source_value(&source, "ammonia-synthesis-target.json").unwrap_err();
-        assert!(error.to_string().contains("hydrogen_generation_energy_included"));
+        assert!(
+            error
+                .to_string()
+                .contains("hydrogen_generation_energy_included")
+        );
     }
 
     #[test]
@@ -1440,7 +1509,11 @@ mod tests {
         source["benchmark_targets"][0]["claim_guards"]["electricity_price_and_capacity_factor_scenario_required"] =
             serde_json::json!(false);
         let error = audit_source_value(&source, "biogas-target.json").unwrap_err();
-        assert!(error.to_string().contains("electricity_price_and_capacity_factor_scenario_required"));
+        assert!(
+            error
+                .to_string()
+                .contains("electricity_price_and_capacity_factor_scenario_required")
+        );
     }
 
     #[test]
@@ -1457,7 +1530,11 @@ mod tests {
         source["benchmark_targets"][0]["comparator_case_ids"][0] =
             serde_json::json!("unknown-case");
         let error = audit_source_value(&source, "target.json").unwrap_err();
-        assert!(error.to_string().contains("references unknown comparator case"));
+        assert!(
+            error
+                .to_string()
+                .contains("references unknown comparator case")
+        );
     }
 
     #[test]
@@ -1466,7 +1543,11 @@ mod tests {
         source["benchmark_targets"][0]["credit_policies"] =
             serde_json::json!(["ALLOCATION", "AVOIDED_PRODUCT_CREDIT"]);
         let error = audit_source_value(&source, "target.json").unwrap_err();
-        assert!(error.to_string().contains("must include a NO_CREDIT scenario"));
+        assert!(
+            error
+                .to_string()
+                .contains("must include a NO_CREDIT scenario")
+        );
     }
 
     #[test]
@@ -1514,7 +1595,11 @@ mod tests {
         });
         let control_error =
             audit_source_value(&duplicate_control, "duplicate-control.json").unwrap_err();
-        assert!(control_error.to_string().contains("duplicate negative-control ID"));
+        assert!(
+            control_error
+                .to_string()
+                .contains("duplicate negative-control ID")
+        );
     }
 
     #[test]
@@ -1659,7 +1744,11 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
     );
     ensure!(
         close_f64(
-            required_f64(high_conversion, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
+            required_f64(
+                high_conversion,
+                "hydrogen_energy_yield_g_H2_per_kWh",
+                &context
+            )?,
             45.0
         ),
         "{context}: >99% conversion point must retain its 45 g/kWh yield"
@@ -1669,7 +1758,9 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
         "{context}: >99% conversion point must retain its 242 kJ/mol energy cost"
     );
     ensure!(
-        high_conversion.get("hydrogen_production_rate_g_per_hour").is_some_and(Value::is_null),
+        high_conversion
+            .get("hydrogen_production_rate_g_per_hour")
+            .is_some_and(Value::is_null),
         "{context}: high-conversion point must not borrow the 150 g/h throughput value"
     );
 
@@ -1682,7 +1773,11 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
     );
     ensure!(
         close_f64(
-            required_f64(high_throughput, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
+            required_f64(
+                high_throughput,
+                "hydrogen_energy_yield_g_H2_per_kWh",
+                &context
+            )?,
             50.0
         ),
         "{context}: 150 g/h point must retain its 50 g/kWh energy yield"
@@ -1692,7 +1787,8 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
         "{context}: 150 g/h point must retain its 217 kJ/mol energy cost"
     );
     ensure!(
-        high_throughput.get("hydrogen_production_rate_g_per_hour")
+        high_throughput
+            .get("hydrogen_production_rate_g_per_hour")
             .and_then(Value::as_f64)
             .is_some_and(|value| close_f64(value, 150.0)),
         "{context}: 150 g/h throughput must remain paired with the 92.4% conversion point"
@@ -1717,7 +1813,9 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
         "{context}: highest-yield point must retain 210 kJ/mol energy cost"
     );
     ensure!(
-        high_yield.get("hydrogen_production_rate_g_per_hour").is_some_and(Value::is_null),
+        high_yield
+            .get("hydrogen_production_rate_g_per_hour")
+            .is_some_and(Value::is_null),
         "{context}: highest-yield point must not borrow the 150 g/h throughput value"
     );
     Ok(())
@@ -1737,10 +1835,12 @@ fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<
         .get("derivation")
         .with_context(|| format!("{context}: derivation is missing"))?;
 
-    let near_complete_yield =
-        required_f64(inputs, "near_complete_conversion_energy_yield_g_H2_per_kWh", &context)?;
-    let best_yield =
-        required_f64(inputs, "best_energy_yield_g_H2_per_kWh", &context)?;
+    let near_complete_yield = required_f64(
+        inputs,
+        "near_complete_conversion_energy_yield_g_H2_per_kWh",
+        &context,
+    )?;
+    let best_yield = required_f64(inputs, "best_energy_yield_g_H2_per_kWh", &context)?;
     ensure!(
         near_complete_yield > 0.0 && best_yield > 0.0,
         "{context}: energy yields must be positive"
@@ -1821,12 +1921,11 @@ fn co2_configuration<'a>(case: &'a Value, configuration_id: &str) -> Option<&'a 
 }
 
 fn co2_metric<'a>(configuration: &'a Value, metric_name: &str) -> Option<&'a Value> {
-    configuration.get("observations")?
+    configuration
+        .get("observations")?
         .as_array()?
         .iter()
-        .find(|observation| {
-            observation.get("metric").and_then(Value::as_str) == Some(metric_name)
-        })
+        .find(|observation| observation.get("metric").and_then(Value::as_str) == Some(metric_name))
 }
 
 fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -> Result<()> {
@@ -1863,14 +1962,14 @@ fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -
         magd.get("gas_flow_slm").and_then(Value::as_f64) == Some(4.0),
         "{context}: MAGD configuration must retain its 4 slm feed-flow point"
     );
-    for (metric_name, expected) in [
-        ("co2_conversion", 0.236),
-        ("energy_efficiency", 0.251),
-    ] {
+    for (metric_name, expected) in [("co2_conversion", 0.236), ("energy_efficiency", 0.251)] {
         let observation = co2_metric(magd, metric_name)
             .with_context(|| format!("{context}: 792 W configuration lacks {metric_name}"))?;
         ensure!(
-            observation.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, expected)),
+            observation
+                .get("value")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| close_f64(value, expected)),
             "{context}: 792 W {metric_name} does not match its source-pinned operating point"
         );
     }
@@ -1884,26 +1983,41 @@ fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -
     let low_power_efficiency = co2_metric(low_power, "energy_efficiency")
         .with_context(|| format!("{context}: 302 W configuration lacks energy_efficiency"))?;
     ensure!(
-        low_power_efficiency.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, 0.462)),
+        low_power_efficiency
+            .get("value")
+            .and_then(Value::as_f64)
+            .is_some_and(|value| close_f64(value, 0.462)),
         "{context}: 302 W energy efficiency must remain the source-reported 46.2% point"
     );
-    let low_power_conversion = co2_metric(low_power, "co2_conversion")
-        .with_context(|| format!("{context}: 302 W configuration must explicitly preserve unknown CO2 conversion"))?;
+    let low_power_conversion = co2_metric(low_power, "co2_conversion").with_context(|| {
+        format!("{context}: 302 W configuration must explicitly preserve unknown CO2 conversion")
+    })?;
     ensure!(
-        low_power_conversion.get("value").is_some_and(Value::is_null),
+        low_power_conversion
+            .get("value")
+            .is_some_and(Value::is_null),
         "{context}: 302 W conversion must remain unknown; do not borrow the 792 W conversion"
     );
 
-    let sweep = co2_configuration(case, "counterflow-ratio-distance-optimization")
-        .with_context(|| format!("{context}: missing separate ratio/distance optimization record"))?;
+    let sweep =
+        co2_configuration(case, "counterflow-ratio-distance-optimization").with_context(|| {
+            format!("{context}: missing separate ratio/distance optimization record")
+        })?;
     for (metric_name, expected, expected_unit) in [
         ("relative_conversion_increase", 2.073, "fractional_increase"),
-        ("relative_energy_efficiency_increase", 2.036, "fractional_increase"),
+        (
+            "relative_energy_efficiency_increase",
+            2.036,
+            "fractional_increase",
+        ),
     ] {
         let observation = co2_metric(sweep, metric_name)
             .with_context(|| format!("{context}: optimization record lacks {metric_name}"))?;
         ensure!(
-            observation.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, expected)),
+            observation
+                .get("value")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| close_f64(value, expected)),
             "{context}: {metric_name} does not match the source-reported relative increase"
         );
         ensure!(
@@ -1912,12 +2026,18 @@ fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -
         );
     }
     ensure!(
-        sweep.get("observations").and_then(Value::as_array).is_some_and(|items| {
-            items.iter().any(|item| item.get("metric").and_then(Value::as_str) == Some("counterflow_gas_ratio")
-                && item.get("value").and_then(Value::as_f64) == Some(2.5))
-                && items.iter().any(|item| item.get("metric").and_then(Value::as_str) == Some("counterflow_distance")
-                    && item.get("value").and_then(Value::as_f64) == Some(30.0))
-        }),
+        sweep
+            .get("observations")
+            .and_then(Value::as_array)
+            .is_some_and(|items| {
+                items.iter().any(|item| {
+                    item.get("metric").and_then(Value::as_str) == Some("counterflow_gas_ratio")
+                        && item.get("value").and_then(Value::as_f64) == Some(2.5)
+                }) && items.iter().any(|item| {
+                    item.get("metric").and_then(Value::as_str) == Some("counterflow_distance")
+                        && item.get("value").and_then(Value::as_f64) == Some(30.0)
+                })
+            }),
         "{context}: relative-improvement record must retain its 2.5 ratio / 30 mm geometry context"
     );
 
@@ -1996,7 +2116,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .and_then(Value::as_str)
             .filter(|url| has_http_authority(url))
             .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL with a non-empty authority"))?;
-        ensure!(!source_url.trim().is_empty(), "{display_name}: case {case_id} has empty source URL");
+        ensure!(
+            !source_url.trim().is_empty(),
+            "{display_name}: case {case_id} has empty source URL"
+        );
 
         if case_id == "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026" {
             validate_co2_counterflow_operating_points(case, display_name)?;
@@ -2035,26 +2158,35 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                 "{display_name}: methane-pyrolysis case {case_id} must label carbon credit as SOURCE_MODEL_ONLY"
             );
             ensure!(
-                coproduct.get("carbon_product_qualification_status").and_then(Value::as_str)
+                coproduct
+                    .get("carbon_product_qualification_status")
+                    .and_then(Value::as_str)
                     == Some("NOT_VALIDATED"),
                 "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-product grade to validated"
             );
             ensure!(
-                coproduct.get("carbon_market_capacity_status").and_then(Value::as_str)
+                coproduct
+                    .get("carbon_market_capacity_status")
+                    .and_then(Value::as_str)
                     == Some("NOT_VALIDATED"),
                 "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-market capacity to validated"
             );
             ensure!(
-                coproduct.get("offtake_status").and_then(Value::as_str)
-                    == Some("NOT_VALIDATED"),
+                coproduct.get("offtake_status").and_then(Value::as_str) == Some("NOT_VALIDATED"),
                 "{display_name}: methane-pyrolysis case {case_id} must not infer verified offtake"
             );
             ensure!(
-                coproduct.get("realized_revenue_evidence").and_then(Value::as_bool) == Some(false),
+                coproduct
+                    .get("realized_revenue_evidence")
+                    .and_then(Value::as_bool)
+                    == Some(false),
                 "{display_name}: methane-pyrolysis case {case_id} cannot claim realized carbon-black revenue"
             );
             ensure!(
-                coproduct.get("no_credit_baseline_required").and_then(Value::as_bool) == Some(true),
+                coproduct
+                    .get("no_credit_baseline_required")
+                    .and_then(Value::as_bool)
+                    == Some(true),
                 "{display_name}: methane-pyrolysis case {case_id} must preserve a no-credit baseline"
             );
         }
@@ -2074,11 +2206,15 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                 "{display_name}: fusion DEC/fuel-partition case {case_id} has an empty particle_energy_origin"
             );
             ensure!(
-                case.get("fusion_born_output_demonstrated").and_then(Value::as_bool) == Some(false),
+                case.get("fusion_born_output_demonstrated")
+                    .and_then(Value::as_bool)
+                    == Some(false),
                 "{display_name}: fusion DEC/fuel-partition case {case_id} must explicitly preserve fusion_born_output_demonstrated=false until source-matched conversion output is admitted"
             );
             ensure!(
-                case.get("comparison_status").and_then(Value::as_str).is_some(),
+                case.get("comparison_status")
+                    .and_then(Value::as_str)
+                    .is_some(),
                 "{display_name}: fusion DEC/fuel-partition case {case_id} has no comparison_status"
             );
         }
@@ -2086,9 +2222,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
 
     let derived_checks: &[Value] = match root.get("derived_reference_checks") {
         None => &[],
-        Some(value) => value
-            .as_array()
-            .with_context(|| format!("{display_name}: derived_reference_checks must be an array"))?,
+        Some(value) => value.as_array().with_context(|| {
+            format!("{display_name}: derived_reference_checks must be an array")
+        })?,
     };
     let mut derived_check_ids = BTreeSet::new();
     for check in derived_checks {
@@ -2106,7 +2242,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .get("evidence_class")
             .and_then(Value::as_str)
             .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{display_name}: derived check {check_id} has no evidence_class"))?;
+            .with_context(|| {
+                format!("{display_name}: derived check {check_id} has no evidence_class")
+            })?;
         ensure!(
             evidence_class.starts_with("DERIVED_ARITHMETIC_"),
             "{display_name}: derived check {check_id} must use a DERIVED_ARITHMETIC evidence class"
@@ -2116,15 +2254,24 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             "{display_name}: derived check {check_id} must preserve luminous_measurement=false"
         );
         ensure!(
-            check.get("inputs").and_then(Value::as_object).is_some_and(|value| !value.is_empty()),
+            check
+                .get("inputs")
+                .and_then(Value::as_object)
+                .is_some_and(|value| !value.is_empty()),
             "{display_name}: derived check {check_id} has no input values"
         );
         ensure!(
-            check.get("derivation").and_then(Value::as_object).is_some_and(|value| !value.is_empty()),
+            check
+                .get("derivation")
+                .and_then(Value::as_object)
+                .is_some_and(|value| !value.is_empty()),
             "{display_name}: derived check {check_id} has no derivation values"
         );
         ensure!(
-            check.get("interpretation").and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty()),
+            check
+                .get("interpretation")
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.trim().is_empty()),
             "{display_name}: derived check {check_id} has no interpretation/claim ceiling"
         );
         if let Some(source_case_id) = check.get("source_case_id").and_then(Value::as_str) {
@@ -2169,13 +2316,19 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .get("comparator_case_ids")
             .and_then(Value::as_array)
             .filter(|value| !value.is_empty())
-            .with_context(|| format!("{display_name}: benchmark target {target_id} has no comparator_case_ids"))?;
+            .with_context(|| {
+                format!("{display_name}: benchmark target {target_id} has no comparator_case_ids")
+            })?;
         let mut comparator_ids = BTreeSet::new();
         for comparator in comparators {
             let comparator_id = comparator
                 .as_str()
                 .filter(|value| !value.trim().is_empty())
-                .with_context(|| format!("{display_name}: benchmark target {target_id} has an empty comparator ID"))?;
+                .with_context(|| {
+                    format!(
+                        "{display_name}: benchmark target {target_id} has an empty comparator ID"
+                    )
+                })?;
             ensure!(
                 comparator_ids.insert(comparator_id.to_owned()),
                 "{display_name}: benchmark target {target_id} has duplicate comparator {comparator_id}"
@@ -2186,24 +2339,35 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             );
         }
         ensure!(
-            target.get("metric_thresholds").and_then(Value::as_object).is_some_and(|value| !value.is_empty()),
+            target
+                .get("metric_thresholds")
+                .and_then(Value::as_object)
+                .is_some_and(|value| !value.is_empty()),
             "{display_name}: benchmark target {target_id} has no metric_thresholds"
         );
         let guards = target
             .get("claim_guards")
             .and_then(Value::as_object)
             .filter(|value| !value.is_empty())
-            .with_context(|| format!("{display_name}: benchmark target {target_id} has no claim_guards"))?;
+            .with_context(|| {
+                format!("{display_name}: benchmark target {target_id} has no claim_guards")
+            })?;
 
         match lane {
             "AMMONIA_CRACKING" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
-                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: ammonia benchmark target {target_id} must bind all metrics to one operating point"
                 );
                 ensure!(
-                    guards.get("full_wall_plug_to_accepted_h2_boundary_required").and_then(Value::as_bool) == Some(true),
+                    guards
+                        .get("full_wall_plug_to_accepted_h2_boundary_required")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: ammonia benchmark target {target_id} must require full wall-plug-to-product accounting"
                 );
                 for key in [
@@ -2212,7 +2376,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     "hydrogen_production_rate_min_g_H2_per_hour",
                 ] {
                     ensure!(
-                        metrics.get(key).and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value > 0.0),
                         "{display_name}: ammonia benchmark target {target_id} has invalid or missing threshold {key}"
                     );
                 }
@@ -2220,21 +2387,35 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             "METHANE_PYROLYSIS" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
-                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: methane benchmark target {target_id} must bind metrics to one operating point"
                 );
                 ensure!(
-                    target.get("credit_policies")
+                    target
+                        .get("credit_policies")
                         .and_then(Value::as_array)
-                        .is_some_and(|value| value.iter().any(|item| item.as_str() == Some("NO_CREDIT"))),
+                        .is_some_and(|value| value
+                            .iter()
+                            .any(|item| item.as_str() == Some("NO_CREDIT"))),
                     "{display_name}: methane benchmark target {target_id} must include a NO_CREDIT scenario"
                 );
                 ensure!(
-                    guards.get("no_credit_baseline_required").and_then(Value::as_bool) == Some(true),
+                    guards
+                        .get("no_credit_baseline_required")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: methane benchmark target {target_id} must require a no-credit baseline"
                 );
                 ensure!(
-                    guards.get("avoided_product_credit_requires_independent_carbon_grade_qualification").and_then(Value::as_bool) == Some(true),
+                    guards
+                        .get(
+                            "avoided_product_credit_requires_independent_carbon_grade_qualification"
+                        )
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: methane benchmark target {target_id} must require independent carbon product qualification"
                 );
                 for key in [
@@ -2243,7 +2424,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     "levelized_cost_hydrogen_max_usd_per_kg",
                 ] {
                     ensure!(
-                        metrics.get(key).and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value > 0.0),
                         "{display_name}: methane benchmark target {target_id} has invalid or missing threshold {key}"
                     );
                 }
@@ -2251,7 +2435,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             "AMMONIA_SYNTHESIS" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
-                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: ammonia synthesis target {target_id} must bind metrics to one operating point"
                 );
                 for key in [
@@ -2267,15 +2454,20 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     );
                 }
                 ensure!(
-                    metrics.get("ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh")
-                        .and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                    metrics
+                        .get("ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh")
+                        .and_then(Value::as_f64)
+                        .is_some_and(|value| value.is_finite() && value > 0.0),
                     "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
                 );
             }
             "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
-                    metrics.get("all_thresholds_must_hold_at_same_operating_point").and_then(Value::as_bool) == Some(true),
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: Power-to-X target {target_id} must bind cost and efficiency to one operating point"
                 );
                 for key in [
@@ -2290,9 +2482,15 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                         "{display_name}: Power-to-X target {target_id} is missing required guard {key}"
                     );
                 }
-                for key in ["syngas_cost_eur_per_tonne_max", "plant_efficiency_min_fraction"] {
+                for key in [
+                    "syngas_cost_eur_per_tonne_max",
+                    "plant_efficiency_min_fraction",
+                ] {
                     ensure!(
-                        metrics.get(key).and_then(Value::as_f64).is_some_and(|value| value.is_finite() && value > 0.0),
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value > 0.0),
                         "{display_name}: Power-to-X target {target_id} has invalid or missing threshold {key}"
                     );
                 }
@@ -2318,7 +2516,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             "{display_name}: duplicate negative-control ID {control_id}"
         );
         ensure!(
-            control.get("expected_disposition").and_then(Value::as_str).is_some(),
+            control
+                .get("expected_disposition")
+                .and_then(Value::as_str)
+                .is_some(),
             "{display_name}: negative control {control_id} has no expected disposition"
         );
     }
@@ -2332,4 +2533,3 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         benchmark_target_count: benchmark_targets.len(),
     })
 }
-
