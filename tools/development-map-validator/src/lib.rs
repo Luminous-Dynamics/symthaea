@@ -11,6 +11,7 @@ pub mod dynamapbench;
 pub mod temporal_replay;
 pub mod workspace_shift;
 pub mod selective_revalidation;
+pub mod multi_shift_sequence;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
