@@ -502,6 +502,14 @@ fn validate_snapshot_transition(
         reasons.insert("SNAPSHOT_CHILD_SCOPE_DOES_NOT_COVER_PARENT".to_owned());
     }
     check_before(
+        &parent.attested_at,
+        &child.frontier_time,
+        "SNAPSHOT_CHILD_FRONTIER_PRECEDES_PARENT_ATTESTATION",
+        "SNAPSHOT_PARENT_ATTESTATION_CHILD_FRONTIER_ORDER_UNRESOLVED",
+        &mut disposition,
+        &mut reasons,
+    );
+    check_before(
         &parent.frontier_time,
         &child.frontier_time,
         "SNAPSHOT_FRONTIER_NOT_MONOTONIC",
