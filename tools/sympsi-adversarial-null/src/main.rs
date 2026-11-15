@@ -13,9 +13,7 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let mut git_head: Option<String> = None;
-    let mut manifest = PathBuf::from(
-        "tools/sympsi-adversarial-null/fixtures/manifest-v0.1.json",
-    );
+    let mut manifest = PathBuf::from("tools/sympsi-adversarial-null/fixtures/manifest-v0.1.json");
     let mut output: Option<PathBuf> = None;
 
     let mut args = std::env::args().skip(1);
@@ -59,7 +57,10 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("cannot sync receipt {}: {error}", path.display()))?;
         println!("receipt_path={}", path.display());
         println!("receipt_sha256={}", envelope.receipt_sha256);
-        println!("all_controls_passed={}", envelope.receipt.all_controls_passed);
+        println!(
+            "all_controls_passed={}",
+            envelope.receipt.all_controls_passed
+        );
         if !envelope.receipt.all_controls_passed {
             return Err("one or more adversarial-null benchmark controls failed".into());
         }
