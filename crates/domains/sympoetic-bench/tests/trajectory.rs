@@ -32,6 +32,7 @@ fn agent_member(role: &str, authority: char) -> TeamMember {
 fn cycle_zero() -> TeamCycle {
     let mut cycle = TeamCycle {
         schema_version: "sympoetic-team-cycle/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
         cycle_index: 0,
         run_id: "run-cycle-0".to_owned(),
         scenario_id: "SP-LON-001".to_owned(),
@@ -53,6 +54,7 @@ fn cycle_zero() -> TeamCycle {
 fn cycle_one(previous: &TeamCycle) -> TeamCycle {
     let mut cycle = TeamCycle {
         schema_version: "sympoetic-team-cycle/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
         cycle_index: 1,
         run_id: "run-cycle-1".to_owned(),
         scenario_id: "SP-LON-001".to_owned(),
@@ -99,6 +101,20 @@ fn persistent_team_trajectory_validates_receipt_and_state_continuity() {
     assert_eq!(receipt.cycle_count, 2);
     assert_eq!(receipt.unique_run_count, 2);
     assert!(receipt.state_chain_verified);
+}
+
+#[test]
+fn trajectory_rejects_cycle_receipt_from_another_team() {
+    let mut first = cycle_zero();
+    first.team_id = "different-team".to_owned();
+    first.cycle_digest = compute_cycle_digest(&first).unwrap();
+    let trajectory = TeamTrajectory {
+        schema_version: "sympoetic-team-trajectory/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
+        cycles: vec![first],
+    };
+    let bytes = serde_json::to_vec(&trajectory).unwrap();
+    assert!(validate_trajectory(&trajectory, &bytes).is_err());
 }
 
 #[test]
