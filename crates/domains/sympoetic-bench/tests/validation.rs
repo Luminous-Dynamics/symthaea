@@ -98,6 +98,53 @@ fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
 
 fn base_scorecard() -> Scorecard {
     let scores = Scores {
+        task_quality: Some(0.8),
+        constraint_satisfaction: Some(1.0),
+        participant_agency_mean: Some(6.0),
+        agency_delta_sd_vs_reference: Some(-0.05),
+        common_ground_accuracy: Some(0.95),
+        repair_success_rate: Some(0.9),
+        attribution_precision: Some(0.9),
+        attribution_recall: Some(0.9),
+        attribution_f1: Some(0.9),
+        quality_matched_diversity_ratio: Some(0.95),
+        expert_rater_agreement: Some(0.85),
+        synergy_delta: Some(0.1),
+        collaboration_gap: Some(-0.1),
+        partner_order_sensitivity: Some(0.02),
+        handoff_recovery_rate: Some(0.9),
+        intervention_appropriateness: Some(0.9),
+        unnecessary_intervention_rate: Some(0.05),
+        missed_critical_intervention_rate: Some(0.02),
+        intervention_regret: Some(0.1),
+        participant_capability_gain_delta: Some(0.2),
+        delayed_retention_gain_delta: Some(0.15),
+        transfer_gain_delta: Some(0.1),
+        agent_confidence_brier_score: Some(0.08),
+        agent_expected_calibration_error: Some(0.06),
+        agent_metacognitive_sensitivity_auc: Some(0.91),
+        agent_selective_accuracy_at_80pct_coverage: Some(0.95),
+        participant_confidence_brier_score: Some(0.11),
+        participant_expected_calibration_error: Some(0.08),
+        participant_metacognitive_sensitivity_auc: Some(0.82),
+        participant_selective_accuracy_at_80pct_coverage: Some(0.88),
+        human_planning_rate: Some(0.8),
+        human_first_attempt_rate: Some(0.75),
+        human_monitoring_rate: Some(0.7),
+        human_reflection_rate: Some(0.65),
+        ai_core_step_supply_rate: Some(0.2),
+        ai_core_step_substitution_rate: Some(0.1),
+        human_verification_rate: Some(0.9),
+    };
+    let metric_evidence = scores
+        .entries()
+        .into_iter()
+        .filter_map(|(metric_name, value)| {
+            value.map(|value| fixture_metric_evidence(metric_name, value))
+        })
+        .collect();
+
+    Scorecard {
         schema_version: "sympoetic-scorecard/0.1".to_owned(),
         benchmark_version: "0.1".to_owned(),
         run_id: "test-run-001".to_owned(),
@@ -130,54 +177,6 @@ fn base_scorecard() -> Scorecard {
             environment_digest: None,
             consented_trace_uri: None,
         },
-        scores: Scores {
-            task_quality: Some(0.8),
-            constraint_satisfaction: Some(1.0),
-            participant_agency_mean: Some(6.0),
-            agency_delta_sd_vs_reference: Some(-0.05),
-            common_ground_accuracy: Some(0.95),
-            repair_success_rate: Some(0.9),
-            attribution_precision: Some(0.9),
-            attribution_recall: Some(0.9),
-            attribution_f1: Some(0.9),
-            quality_matched_diversity_ratio: Some(0.95),
-            expert_rater_agreement: Some(0.85),
-            synergy_delta: Some(0.1),
-            collaboration_gap: Some(-0.1),
-            partner_order_sensitivity: Some(0.02),
-            handoff_recovery_rate: Some(0.9),
-            intervention_appropriateness: Some(0.9),
-            unnecessary_intervention_rate: Some(0.05),
-            missed_critical_intervention_rate: Some(0.02),
-            intervention_regret: Some(0.1),
-            participant_capability_gain_delta: Some(0.2),
-            delayed_retention_gain_delta: Some(0.15),
-            transfer_gain_delta: Some(0.1),
-            agent_confidence_brier_score: Some(0.08),
-            agent_expected_calibration_error: Some(0.06),
-            agent_metacognitive_sensitivity_auc: Some(0.91),
-            agent_selective_accuracy_at_80pct_coverage: Some(0.95),
-            participant_confidence_brier_score: Some(0.11),
-            participant_expected_calibration_error: Some(0.08),
-            participant_metacognitive_sensitivity_auc: Some(0.82),
-            participant_selective_accuracy_at_80pct_coverage: Some(0.88),
-            human_planning_rate: Some(0.8),
-            human_first_attempt_rate: Some(0.75),
-            human_monitoring_rate: Some(0.7),
-            human_reflection_rate: Some(0.65),
-            ai_core_step_supply_rate: Some(0.2),
-            ai_core_step_substitution_rate: Some(0.1),
-            human_verification_rate: Some(0.9),
-        };
-    let metric_evidence = scores
-        .entries()
-        .into_iter()
-        .filter_map(|(metric_name, value)| {
-            value.map(|value| fixture_metric_evidence(metric_name, value))
-        })
-        .collect();
-
-    Scorecard {
         scores,
         metric_evidence,
         hard_gates: HardGates {
