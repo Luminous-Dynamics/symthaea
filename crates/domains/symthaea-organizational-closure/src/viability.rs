@@ -396,19 +396,22 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             );
             continue;
         }
-        if let Some(previous) = induced_realization.insert(
-            production_state.viability_class.clone(),
-            organization_state.viability_class.clone(),
-        ) {
-            if previous != organization_state.viability_class {
-                ap1_ok = false;
-                finding(
-                    &mut report,
-                    ViabilityFindingCode::RealizationNotWellDefined,
-                    Some(production_id.0.clone()),
-                    "one viable production class maps to multiple organization classes",
-                );
-            }
+        if induced_realization
+            .insert(
+                production_state.viability_class.clone(),
+                organization_state.viability_class.clone(),
+            )
+            .is_some_and(|previous| {
+                previous.as_str() != organization_state.viability_class.as_str()
+            })
+        {
+            ap1_ok = false;
+            finding(
+                &mut report,
+                ViabilityFindingCode::RealizationNotWellDefined,
+                Some(production_id.0.clone()),
+                "one viable production class maps to multiple organization classes",
+            );
         }
     }
     if !class_map_is_bijective(&induced_realization) {
@@ -512,19 +515,22 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
             continue;
         }
         represented_boundary_classes.insert(boundary_state.viability_class.clone());
-        if let Some(previous) = induced_boundary.insert(
-            production_state.viability_class.clone(),
-            boundary_state.viability_class.clone(),
-        ) {
-            if previous != boundary_state.viability_class {
-                ap2_ok = false;
-                finding(
-                    &mut report,
-                    ViabilityFindingCode::BoundaryClassNotWellDefined,
-                    Some(production_id.0.clone()),
-                    "one viable production class produces multiple boundary classes",
-                );
-            }
+        if induced_boundary
+            .insert(
+                production_state.viability_class.clone(),
+                boundary_state.viability_class.clone(),
+            )
+            .is_some_and(|previous| {
+                previous.as_str() != boundary_state.viability_class.as_str()
+            })
+        {
+            ap2_ok = false;
+            finding(
+                &mut report,
+                ViabilityFindingCode::BoundaryClassNotWellDefined,
+                Some(production_id.0.clone()),
+                "one viable production class produces multiple boundary classes",
+            );
         }
     }
     for required in &model.required_boundary_classes {
