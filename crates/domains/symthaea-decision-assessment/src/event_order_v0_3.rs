@@ -159,6 +159,8 @@ pub enum SchedulerDisposition {
     Duplicate,
     BlockedByPartition,
     BlockedByCrashedRecipient,
+    ClockRegression,
+    EventTimeRegression,
     PreconditionViolation,
 }
 
@@ -200,14 +202,10 @@ pub enum ReplayError {
     EmptyIdentifier(&'static str),
     #[error("SHA-256 field is not exactly 64 lowercase hexadecimal characters: {0}")]
     MalformedSha256(&'static str),
-    #[error("clock moved backwards in domain {0}")]
-    ClockRegression(String),
     #[error("event was produced without a clock advance: {0}")]
     MissingClock(String),
     #[error("event timestamp exceeds the latest virtual clock tick: {0}")]
     EventBeyondClock(String),
-    #[error("event source time regressed in domain {0}")]
-    EventTimeRegression(String),
     #[error("event ID is duplicated: {0}")]
     DuplicateEvent(String),
     #[error("causal predecessor is missing or appears after its dependent event: {0}")]
@@ -242,7 +240,6 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
     let mut action_ids = BTreeSet::new();
     let mut ordinals = BTreeSet::new();
     let mut clock_ticks = BTreeMap::<String, u64>::new();
-    let mut event_times = BTreeMap::<String, u64>::new();
     let mut produced_events = BTreeSet::<String>::new();
     let mut delivery_ids = BTreeSet::<String>::new();
 
@@ -267,11 +264,6 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(calibration_id, "calibration_id")?;
                 require_id(mapping_receipt_ref, "mapping_receipt_ref")?;
                 require_sha256(mapping_receipt_sha256, "mapping_receipt_sha256")?;
-                if let Some(previous) = clock_ticks.get(clock_domain) {
-                    if local_tick_ns < previous {
-                        return Err(ReplayError::ClockRegression(clock_domain.clone()));
-                    }
-                }
                 clock_ticks.insert(clock_domain.clone(), *local_tick_ns);
             }
             ScheduleAction::EventProduced {
@@ -285,11 +277,6 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 if source_timestamp_ns > latest_tick {
                     return Err(ReplayError::EventBeyondClock(event_id.clone()));
                 }
-                if let Some(previous_time) = event_times.get(clock_domain) {
-                    if source_timestamp_ns < previous_time {
-                        return Err(ReplayError::EventTimeRegression(clock_domain.clone()));
-                    }
-                }
                 if !produced_events.insert(event_id.clone()) {
                     return Err(ReplayError::DuplicateEvent(event_id.clone()));
                 }
@@ -302,7 +289,6 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                         return Err(ReplayError::InvalidCausalPredecessor(predecessor.clone()));
                     }
                 }
-                event_times.insert(clock_domain.clone(), *source_timestamp_ns);
             }
             ScheduleAction::NetworkPartition { channel_id, .. } => {
                 require_id(channel_id, "channel_id")?;
@@ -428,6 +414,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut partitioned = BTreeSet::<String>::new();
     let mut crashed = BTreeSet::<String>::new();
     let mut produced = BTreeSet::<String>::new();
+    let mut clock_ticks = BTreeMap::<String, u64>::new();
+    let mut event_times = BTreeMap::<String, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
     let mut persisted = BTreeSet::<(String, String)>::new();
@@ -443,10 +431,22 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
 
     for scheduled in ordered_actions(schedule) {
         let disposition = match &scheduled.action {
-            ScheduleAction::ClockAdvance { .. } => SchedulerDisposition::Applied,
-            ScheduleAction::EventProduced { event_id, .. } => {
+            ScheduleAction::ClockAdvance { clock_domain, local_tick_ns, .. } => {
+                let previous = clock_ticks.insert(clock_domain.clone(), *local_tick_ns);
+                if previous.is_some_and(|tick| *local_tick_ns < tick) {
+                    SchedulerDisposition::ClockRegression
+                } else {
+                    SchedulerDisposition::Applied
+                }
+            }
+            ScheduleAction::EventProduced { event_id, clock_domain, source_timestamp_ns, .. } => {
                 produced.insert(event_id.clone());
-                SchedulerDisposition::Applied
+                let previous = event_times.insert(clock_domain.clone(), *source_timestamp_ns);
+                if previous.is_some_and(|timestamp| *source_timestamp_ns < timestamp) {
+                    SchedulerDisposition::EventTimeRegression
+                } else {
+                    SchedulerDisposition::Applied
+                }
             }
             ScheduleAction::NetworkPartition { channel_id, partitioned: true } => {
                 partitioned.insert(channel_id.clone());
@@ -1050,6 +1050,42 @@ mod tests {
         ]);
     }
 
+
+    #[test]
+    fn clock_and_event_time_regressions_remain_replayable_faults() {
+        let mut schedule = generate_delivery_schedule(61, 2).expect("valid schedule");
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let t = 20_000;
+        push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::ClockAdvance {
+            clock_domain: "clock-a".to_owned(),
+            basis_id: "basis-a".to_owned(),
+            epoch: "epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 50,
+            offset_ns: -250_000,
+            uncertainty_ns: 50_000,
+            calibration_id: "calibration-backwards".to_owned(),
+            mapping_valid_through_ns: 60,
+            mapping_receipt_ref: "synthetic://mapping/backwards".to_owned(),
+            mapping_receipt_sha256: "d".repeat(64),
+            qualification: GateState::Indeterminate,
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::EventProduced {
+            event_id: "event-backwards".to_owned(),
+            clock_domain: "clock-a".to_owned(),
+            source_timestamp_ns: 50,
+            causal_predecessors: Vec::new(),
+        });
+        validate_schedule(&schedule).expect("fault schedule must remain structurally valid");
+        let report = replay_virtual_schedule(&schedule).expect("fault schedule replays");
+        assert!(report.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::ClockRegression
+        }));
+        assert!(report.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::EventTimeRegression
+        }));
+    }
 
     #[test]
     fn receipt_digests_require_canonical_sha256_shape() {
