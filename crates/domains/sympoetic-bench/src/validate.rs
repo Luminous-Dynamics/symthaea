@@ -530,7 +530,11 @@ pub fn validate_trace(
         canonical_trace_sha256: canonical_digest,
         trace_digest_verified: digest_verified,
         event_count: trace.events.len(),
-        unresolved_unknown_outcome_count: u64::from(awaiting_reconciliation.is_some()),
+        unresolved_unknown_outcome_count: if awaiting_reconciliation.is_some() {
+            1
+        } else {
+            0
+        },
         reconciliation_count,
     })
 }
