@@ -15,6 +15,15 @@ The four-choice profile preserves the original SCI-PSI-002 contract. The five-ch
 
 Both profiles use a one-sided exact binomial test with alpha = 0.005. The frozen manifest sets 100,000 null campaigns and 20,000 SESOI power campaigns. A discrete exact-binomial test may have a realized type-I rate below the nominal alpha; the receipt reports both.
 
+The analytic reference values from the frozen manifest are:
+
+| Profile | Critical hit count | Exact discrete type-I rate | Exact power at SESOI |
+|---|---:|---:|---:|
+| four-choice | 1,922 / 7,300 | 0.00472063 | 0.90429489 at 27% |
+| five-choice | 1,343 / 6,300 | 0.00492610 | 0.90744448 at 22% |
+
+These are exact-binomial model calculations for independent synthetic trials, not measured performance. The empirical campaigns are a deterministic Monte Carlo check against those analytical values.
+
 ## What it checks
 
 - Exact one-sided binomial critical values and discrete null-tail probabilities.
