@@ -11,6 +11,7 @@
     "method",
     "measurement_window",
     "evaluation_time_utc",
+    "maximum_observation_skew_ms",
     "fluid",
     "pressure_reference",
     "elevation_datum",
@@ -167,6 +168,11 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "maximum_observation_skew_ms": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 5000
     }
   },
   "$defs": {
