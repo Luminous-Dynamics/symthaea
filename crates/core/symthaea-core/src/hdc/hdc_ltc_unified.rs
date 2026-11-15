@@ -2958,6 +2958,7 @@ mod tests {
         Current,
         Product,
         ExponentialRate,
+        SigmoidRate,
         Ungated,
     }
 
@@ -2977,6 +2978,10 @@ mod tests {
                 let lambda = candidate_softplus(gate_logit) / tau;
                 -(-lambda * dt).exp_m1()
             }
+            GateLawCandidate::SigmoidRate => {
+                let lambda = sigma_base / tau;
+                -(-lambda * dt).exp_m1()
+            }
             GateLawCandidate::Ungated => relaxation,
         }
     }
@@ -2993,6 +2998,7 @@ mod tests {
             GateLawCandidate::Current,
             GateLawCandidate::Product,
             GateLawCandidate::ExponentialRate,
+            GateLawCandidate::SigmoidRate,
             GateLawCandidate::Ungated,
         ];
 
@@ -3017,7 +3023,9 @@ mod tests {
             let halves = retention(law, dt / 2.0).powi(2);
             let composition_error = (full - halves).abs();
             match law {
-                GateLawCandidate::ExponentialRate | GateLawCandidate::Ungated => assert!(
+                GateLawCandidate::ExponentialRate
+                | GateLawCandidate::SigmoidRate
+                | GateLawCandidate::Ungated => assert!(
                     composition_error < 2e-7,
                     "{law:?} must compose for frozen parameters: full={full}, halves={halves}"
                 ),
