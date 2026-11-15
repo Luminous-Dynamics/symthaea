@@ -315,7 +315,7 @@ pub fn validate_music_edit_metamorphic_pair_v1(
             }
         }
         R::NonInvariant | R::AbstainExpected => {
-            if !pair.admissibility_reason.as_ref().is_some_and(|v| !v.trim().is_empty()) {
+            if pair.admissibility_reason.as_ref().is_none_or(|v| v.trim().is_empty()) {
                 issues.push(MusicEditMetamorphicIssueV1::AdmissibilityReasonMissing);
             }
         }
@@ -516,15 +516,17 @@ fn validate_metamorphic_observation_v1(
         if property.property_id.trim().is_empty() {
             issues.push(MusicEditMetamorphicAssessmentIssueV1::EmptyPropertyId);
         }
-        if let MusicEditMetamorphicValueV1::Numeric { value, unit } = &property.value {
-            if !value.is_finite() || unit.trim().is_empty() {
+        if let MusicEditMetamorphicValueV1::Numeric { value, unit } = &property.value
+            && (!value.is_finite() || unit.trim().is_empty())
+        {
                 issues.push(MusicEditMetamorphicAssessmentIssueV1::NonFiniteNumericValue(
                     property.property_id.clone(),
                 ));
             }
         }
-        if let MusicEditMetamorphicValueV1::Category { value } = &property.value {
-            if value.trim().is_empty() {
+        if let MusicEditMetamorphicValueV1::Category { value } = &property.value
+            && value.trim().is_empty()
+        {
                 issues.push(MusicEditMetamorphicAssessmentIssueV1::EmptyPropertyId);
             }
         }
@@ -709,11 +711,7 @@ pub fn evaluate_music_edit_metamorphic_pair_v1(
                 }
             }
             (Rule::BooleanIdentity, Value::Boolean { value: source }, Value::Boolean { value: actual }) => {
-                if *source != *actual {
-                    matched = false;
-                } else {
-                    matched = true;
-                }
+                matched = *source == *actual;
             }
             _ => {
                 issues.push(MusicEditMetamorphicAssessmentIssueV1::PropertyTypeMismatch(
