@@ -51,7 +51,7 @@ The verifier should emit separate outcomes, not a generic "trusted" boolean:
 
 ## 3. Reuse the in-toto statement and envelope model
 
-The machine-readable schema added in this branch defines an **EGDDM execution-receipt predicate**, not a new envelope. A [synthetic predicate example](fixtures/egddm-execution-receipt-predicate-v0.1.synthetic.json) demonstrates the fields; its identities and digests are placeholders, and it contains no signature or transparency receipt.
+The machine-readable schema added in this branch defines the predicate object for an in-toto Statement/v1 with predicate type `https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1`; it does not define a new envelope. The [synthetic example](fixtures/egddm-execution-receipt-predicate-v0.1.synthetic.json) is a complete in-toto Statement with an immutable subject digest. Its identities and digests are placeholders, and it contains no DSSE signature or transparency receipt. This follows the [in-toto predicate authoring guidance](https://github.com/in-toto/attestation/blob/main/docs/new_predicate_guidelines.md), which calls for complete Statement examples rather than predicate fragments.
 
 The intended layering is:
 
