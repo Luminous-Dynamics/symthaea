@@ -49,7 +49,8 @@ jobs:
         run: test -z "$(gofmt -l tools/sympsi-mapping-verifier-go/*.go)"
 
       - name: Cross-language target mapping vectors
-        run: go test -count=1 -v ./tools/sympsi-mapping-verifier-go/...
+        working-directory: tools/sympsi-mapping-verifier-go
+        run: go test -count=1 -v ./...
 
       - name: Qualify four-choice synthetic profile
         env:
