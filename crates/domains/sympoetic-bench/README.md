@@ -45,6 +45,7 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 - File and payload digests use SHA-256 over the exact file or payload bytes supplied by the recorder.
 - `trace_digest`, when present, is SHA-256 over the trace JSON parsed into a `serde_json::Value`, with the `trace_digest` key removed, then serialized by `serde_json` (deterministic map-key ordering). This is the v0.1 canonicalization rule; it is not claimed to be RFC 8785.
 - Scenario, trace, artifact, prompt, and environment digests in a scorecard identify the exact inputs used. The scorer revision must identify the scoring implementation.
+- A team-cycle receipt digest is SHA-256 over the cycle serialized as `serde_json::Value` with the top-level `cycle_digest` field removed, then reserialized by `serde_json` with deterministic map-key ordering. This is v0.1's specified canonicalization, not RFC 8785. A digest proves content consistency only; it does not authenticate the recorder or prove that the observed team state was truthful.
 
 The epistemic resilience track also reports confidence calibration (Brier/ECE), metacognitive sensitivity (AUC), selective accuracy, human-first attempts, AI core-step supply, AI substitution among supplied steps, and human verification rates. These measures are separate; no single cognitive-sovereignty aggregate is asserted.
 
