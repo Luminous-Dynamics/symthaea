@@ -143,6 +143,101 @@ pub struct Rejection {
     pub code: &'static str,
 }
 
+/// Derive a 4- or 5-way target from *already verified* public beacon randomness.
+///
+/// This function does not fetch or verify a beacon, authenticate a timestamp,
+/// or prove the response preceded the beacon. Those are separate trust gates.
+/// Its caller must supply the 32-byte output of an independently pinned,
+/// successful beacon verifier.
+pub fn derive_target_index_from_verified_beacon(
+    choice_count: usize,
+    protocol_id: &str,
+    campaign_id: &str,
+    trial_id: &str,
+    chain_hash: &[u8; 32],
+    scheme_id: &str,
+    round: u64,
+    verified_randomness: &[u8; 32],
+) -> Result<usize, String> {
+    if choice_count != 4 && choice_count != 5 {
+        return Err("only four-choice and five-choice targets are supported".into());
+    }
+    if protocol_id.trim().is_empty()
+        || campaign_id.trim().is_empty()
+        || trial_id.trim().is_empty()
+        || scheme_id.trim().is_empty()
+        || round == 0
+    {
+        return Err("protocol, campaign, trial, scheme and nonzero round are required".into());
+    }
+
+    let threshold = two_to_256_mod(choice_count);
+    let mut counter = 0_u32;
+    loop {
+        let digest = target_mapping_digest(
+            protocol_id,
+            campaign_id,
+            trial_id,
+            chain_hash,
+            scheme_id,
+            round,
+            verified_randomness,
+            counter,
+        )?;
+        if !digest_is_below_small_integer(&digest, threshold) {
+            return Ok(digest_modulo(&digest, choice_count));
+        }
+        counter = counter
+            .checked_add(1)
+            .ok_or_else(|| "target mapping rejection counter exhausted".to_string())?;
+    }
+}
+
+fn target_mapping_digest(
+    protocol_id: &str,
+    campaign_id: &str,
+    trial_id: &str,
+    chain_hash: &[u8; 32],
+    scheme_id: &str,
+    round: u64,
+    verified_randomness: &[u8; 32],
+    counter: u32,
+) -> Result<[u8; 32], String> {
+    let mut bytes = b"sympsi.aia.target.v1\0".to_vec();
+    append_length_prefixed(&mut bytes, protocol_id.as_bytes())?;
+    append_length_prefixed(&mut bytes, campaign_id.as_bytes())?;
+    append_length_prefixed(&mut bytes, trial_id.as_bytes())?;
+    append_length_prefixed(&mut bytes, chain_hash)?;
+    append_length_prefixed(&mut bytes, scheme_id.as_bytes())?;
+    bytes.extend_from_slice(&round.to_be_bytes());
+    append_length_prefixed(&mut bytes, verified_randomness)?;
+    bytes.extend_from_slice(&counter.to_be_bytes());
+    Ok(Sha256::digest(&bytes).into())
+}
+
+fn append_length_prefixed(output: &mut Vec<u8>, field: &[u8]) -> Result<(), String> {
+    let length = u32::try_from(field.len())
+        .map_err(|_| "target-mapping field exceeds u32 length".to_string())?;
+    output.extend_from_slice(&length.to_be_bytes());
+    output.extend_from_slice(field);
+    Ok(())
+}
+
+fn two_to_256_mod(modulus: usize) -> usize {
+    (0..256).fold(1 % modulus, |remainder, _| (remainder * 2) % modulus)
+}
+
+fn digest_is_below_small_integer(digest: &[u8; 32], threshold: usize) -> bool {
+    digest[..31].iter().all(|byte| *byte == 0)
+        && usize::from(digest[31]) < threshold
+}
+
+fn digest_modulo(digest: &[u8; 32], modulus: usize) -> usize {
+    digest.iter().fold(0usize, |remainder, byte| {
+        (remainder * 256 + usize::from(*byte)) % modulus
+    })
+}
+
 pub fn run_profile(
     profile_name: &str,
     git_head: &str,
@@ -430,6 +525,7 @@ fn run_controls(
     let permutation_pass = label_permutation_is_invariant(choices, manifest.seed, profile_name);
     let target_order_permutation_pass =
         target_order_permutation_recomputes(choices, manifest.seed, profile_name);
+    let target_mapping_vectors_pass = target_mapping_known_answer_vectors();
 
     vec![
         control(
@@ -519,6 +615,17 @@ fn run_controls(
             }
             .into(),
             "A deterministic shuffle preserves target-label counts and the separately recomputed score is identical.",
+        ),
+        control(
+            "target_mapping_known_answer",
+            "MATCH_FROZEN_FOUR_AND_FIVE_CHOICE_VECTORS",
+            if target_mapping_vectors_pass {
+                "MATCH_FROZEN_FOUR_AND_FIVE_CHOICE_VECTORS"
+            } else {
+                "TARGET_MAPPING_VECTOR_MISMATCH"
+            }
+            .into(),
+            "Domain-separated SHA-256 mapping with rejection sampling matches independent known-answer vectors.",
         ),
         control(
             "critical_value",
@@ -681,6 +788,40 @@ fn validate_trial_bundle(
         }
     }
     Ok(())
+}
+
+fn target_mapping_known_answer_vectors() -> bool {
+    let chain_hash = [
+        0x52, 0xdb, 0x9b, 0xa7, 0x0e, 0x0c, 0xf0, 0xe6, 0xea, 0xf7, 0x80, 0x3d, 0xd0, 0x74,
+        0x47, 0xa1, 0xf5, 0x47, 0x77, 0x35, 0xfd, 0x3f, 0x66, 0x17, 0x92, 0xba, 0x94, 0x60,
+        0x0c, 0x84, 0xe9, 0x71,
+    ];
+    let randomness = [
+        0xfe, 0x29, 0x0b, 0xec, 0xa1, 0x08, 0x72, 0xef, 0x2f, 0xb1, 0x64, 0xd2, 0xaa, 0x44,
+        0x42, 0xde, 0x45, 0x66, 0x18, 0x3e, 0xc5, 0x1c, 0x56, 0xff, 0x3c, 0xd6, 0x03, 0xd9,
+        0x30, 0xe5, 0x4f, 0xdd,
+    ];
+    let four = derive_target_index_from_verified_beacon(
+        4,
+        "sympsi-aia-01-v0.1",
+        "campaign-0001",
+        "trial-000042",
+        &chain_hash,
+        "bls-unchained-g1-rfc9380",
+        1000,
+        &randomness,
+    );
+    let five = derive_target_index_from_verified_beacon(
+        5,
+        "sympsi-aia-01-v0.1",
+        "campaign-0001",
+        "trial-000042",
+        &chain_hash,
+        "bls-unchained-g1-rfc9380",
+        1000,
+        &randomness,
+    );
+    four == Ok(2) && five == Ok(2)
 }
 
 fn target_order_permutation_recomputes(choices: usize, seed: u64, profile: &str) -> bool {
@@ -1112,6 +1253,47 @@ mod tests {
                 .code,
             "REJECT_RESPONSE_PAYLOAD_MISMATCH"
         );
+    }
+
+    #[test]
+    fn target_mapping_matches_independent_four_and_five_choice_vectors() {
+        assert!(target_mapping_known_answer_vectors());
+    }
+
+    #[test]
+    fn target_mapping_rejects_zero_digest_for_five_choice_only() {
+        let zero = [0_u8; 32];
+        assert!(!digest_is_below_small_integer(&zero, two_to_256_mod(4)));
+        assert!(digest_is_below_small_integer(&zero, two_to_256_mod(5)));
+    }
+
+    #[test]
+    fn target_mapping_is_domain_and_round_separated() {
+        let chain_hash = [0x52_u8; 32];
+        let randomness = [0xfe_u8; 32];
+        let first = target_mapping_digest(
+            "protocol-v1",
+            "campaign-1",
+            "trial-1",
+            &chain_hash,
+            "scheme-a",
+            100,
+            &randomness,
+            0,
+        )
+        .unwrap();
+        let second = target_mapping_digest(
+            "protocol-v1",
+            "campaign-1",
+            "trial-1",
+            &chain_hash,
+            "scheme-a",
+            101,
+            &randomness,
+            0,
+        )
+        .unwrap();
+        assert_ne!(first, second);
     }
 
     #[test]
