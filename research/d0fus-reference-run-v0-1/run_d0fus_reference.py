@@ -47,6 +47,8 @@ CORE_OUTPUTS = {
     "P_wallplug_MW": (26, True),
     "P_th_MW": (-15, True),
     "P_e_gross_MWe": (-12, True),
+    "P_recirc_var_MWe": (-5, True),
+    "P_recirc_fix_MWe": (-4, True),
     "P_recirculated_MWe": (-3, True),
 }
 
@@ -299,9 +301,42 @@ def main() -> int:
     net_electric = core_observables["P_elec_MW"]
     gross_electric = core_observables["P_e_gross_MWe"]
     recirculated_electric = core_observables["P_recirculated_MWe"]
+    variable_recirculated = core_observables["P_recirc_var_MWe"]
+    fixed_recirculated = core_observables["P_recirc_fix_MWe"]
     engineering_gain = (
         gross_electric / recirculated_electric
         if recirculated_electric is not None and recirculated_electric > 0.0
+        else None
+    )
+    power_balance = {
+        "gross_electric_mwe": gross_electric,
+        "variable_recirculated_mwe": variable_recirculated,
+        "fixed_recirculated_mwe": fixed_recirculated,
+        "total_recirculated_mwe": recirculated_electric,
+        "reported_net_electric_mwe": net_electric,
+        "calculated_total_recirculated_mwe": (
+            variable_recirculated + fixed_recirculated
+            if variable_recirculated is not None and fixed_recirculated is not None
+            else None
+        ),
+        "calculated_net_electric_mwe": (
+            gross_electric - variable_recirculated - fixed_recirculated
+            if gross_electric is not None
+            and variable_recirculated is not None
+            and fixed_recirculated is not None
+            else None
+        ),
+    }
+    power_balance["total_recirculated_residual_mw"] = (
+        recirculated_electric - power_balance["calculated_total_recirculated_mwe"]
+        if recirculated_electric is not None
+        and power_balance["calculated_total_recirculated_mwe"] is not None
+        else None
+    )
+    power_balance["net_electric_residual_mw"] = (
+        net_electric - power_balance["calculated_net_electric_mwe"]
+        if net_electric is not None
+        and power_balance["calculated_net_electric_mwe"] is not None
         else None
     )
     receipt = {
@@ -325,6 +360,7 @@ def main() -> int:
         "run_output_tuple_length": len(results),
         "canonical_output_tuple_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
         "core_observables": core_observables,
+        "power_balance": power_balance,
         "power_balance_interpretation": {
             "gross_electric_over_recirculated_power": engineering_gain,
             "net_electricity_state": (
