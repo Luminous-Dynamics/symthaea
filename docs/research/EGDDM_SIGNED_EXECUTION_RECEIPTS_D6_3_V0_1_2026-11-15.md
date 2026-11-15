@@ -35,7 +35,7 @@ One composite "verified" flag would hide which part of the evidence chain was ac
 
 A valid signature proves attribution to a signing key and integrity of the signed bytes. Workload identity and policy connect that key to a claimed actor. An execution attestation is evidence about a run, not a mathematical proof that the software did what the issuer says. An independent regrade and task-validity gate are still needed.
 
-The verifier must also enforce role consistency across fields: `agent_observation` requires an agent producer; `runner_execution` requires a runner; `independent_regrade` requires an independent grader; and `authority_decision` requires an authority service. The JSON Schema validates field shapes and requires the matching producer role. It also requires a SLSA provenance reference for runner/build claims and an in-toto Test Result reference for runner/test or compatibility claims. It does not prove cross-statement subject linkage, identity, signature validity or policy.
+The verifier must also enforce role consistency across fields: `agent_observation` requires an agent producer; `runner_execution` requires a runner; `independent_regrade` requires an independent grader; and `authority_decision` requires an authority service. The schema requires a workload identity and identity provider for every producer. Execution metadata is required only for runner and independent-regrade claims; an agent observation or authority decision is not forced to masquerade as a runner invocation. It also requires SLSA provenance for runner/build claims and an in-toto Test Result reference for runner or independent-grader test/compatibility claims. The schema does not prove cross-statement subject linkage, identity, signature validity or policy.
 
 The verifier should emit separate outcomes, not a generic "trusted" boolean:
 - statement signature valid;
@@ -79,15 +79,15 @@ For SLSA, the verifier must separately validate the statement envelope and accep
 
 ## 4. Required signed predicate claims
 
-The schema at `docs/research/egddm-execution-receipt-predicate-v0.1.schema.json` binds the following:
+The schema at `docs/research/egddm-execution-receipt-predicate-v0.1.schema.json` binds the following. It uses conditional requirements by `claim_kind` and `check_kind`, so evidence that was not produced by a runner does not need artificial runner metadata:
 
 - **Exact subject scope:** repository identity, commit OID, tree OID, configuration-world digest, source and target artifact digests.
 - **Obligation:** obligation/check identity, check kind, criticality, outcome and optional active-requirement digest.
 - **Producer:** claim role, workload identity, issuer URI, identity provider and signing-key reference.
-- **Execution:** attempt and invocation IDs, runner image, toolchain, harness, command, test-input, isolation profile, network policy and environment digests, plus a digest reference to the standard attestation appropriate to the check kind: SLSA Build Provenance for build claims or in-toto Test Result for test/compatibility claims.
+- **Execution (conditional):** required for runner and independent-grader claims, but not for agent observations or authority decisions. It binds attempt and invocation IDs, runner image, toolchain, harness, command, test-input, isolation profile, network policy and environment digests, plus the applicable standard attestation reference: SLSA Build Provenance for runner/build claims; in-toto Test Result for runner or independent-grader test/compatibility claims.
 - **Observation:** start/completion, observed and available times, exit code, output/log/grader-report digests.
 - **Authority:** decision ID, policy digest, permitted scope, operation and validity interval.
-- **Anti-replay:** unique challenge ID, nonce digest, issue and expiry times, and single-use requirement.
+- **Anti-replay:** unique challenge ID, nonce digest, issuer, issue and expiry times, and a required single-use flag.
 - **History:** explicit superseded and related receipt IDs.
 
 The statement subject should identify immutable artifacts by digest. Mutable branch names, URLs and labels may be retained as descriptive context, but must not replace immutable identity.
@@ -142,7 +142,7 @@ Prefer offline verification when possible. Cache verified key material, identity
 1. Freeze the EGDDM predicate schema, SLSA linkage rules and canonical cross-statement test vectors.
 2. Select and pin an in-toto Statement/DSSE library, a SLSA v1.2 verifier and an in-toto Test Result verifier; avoid hand-written signature-envelope code.
 3. Add signature verification and workload-identity policy as a separate crate, including configured signer/builder pairs.
-4. Add a consume-once challenge issuer/ledger with crash and unknown-outcome recovery.
+4. Add a consume-once challenge issuer/ledger with durable challenge-identity state, replay-safe retry semantics, crash and unknown-outcome recovery.
 5. Add SCITT COSE receipt and/or Rekor inclusion/consistency verification through supported libraries.
 6. Add independent grader receipt integration and role-separation rules; verify every bundle entry independently and enforce required-attestation completeness.
 7. Add key rotation, revocation, expiry, policy updates and persisted checkpoint handling.
