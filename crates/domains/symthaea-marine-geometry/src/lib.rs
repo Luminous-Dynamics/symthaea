@@ -5,7 +5,7 @@
 //! checker, CFD solver, or vessel-approval system.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 const SCHEMA_VERSION: u32 = 1;
 const ADMISSION_SCOPE: &str = "triangle-mesh-integrity-v1";
@@ -92,6 +92,8 @@ pub struct GeometryMetrics {
     pub inconsistent_winding_edge_count: usize,
     pub duplicate_face_count: usize,
     pub degenerate_face_count: usize,
+    pub non_manifold_vertex_link_count: usize,
+    pub component_signed_volumes_m3: Vec<f64>,
     pub signed_volume_m3: Option<f64>,
 }
 
@@ -148,16 +150,120 @@ fn triangle_area(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> f64 {
     0.5 * dot(normal, normal).sqrt()
 }
 
-fn signed_volume(geometry: &MeshGeometry) -> Option<f64> {
-    let mut six_volume = 0.0_f64;
+/// Counts vertices whose link is not a single cycle, as required for a
+/// closed triangular 2-manifold. This detects disconnected shells pinched
+/// together at a vertex, which edge-incidence checks alone cannot detect.
+fn count_non_manifold_vertex_links(geometry: &MeshGeometry) -> Option<usize> {
+    let mut links: Vec<BTreeMap<u32, BTreeSet<u32>>> =
+        vec![BTreeMap::new(); geometry.vertices.len()];
+
     for face in &geometry.faces {
-        let a = *geometry.vertices.get(face[0] as usize)?;
-        let b = *geometry.vertices.get(face[1] as usize)?;
-        let c = *geometry.vertices.get(face[2] as usize)?;
-        six_volume += dot(a, cross(b, c));
+        let [a, b, c] = *face;
+        if a as usize >= links.len() || b as usize >= links.len() || c as usize >= links.len() {
+            return None;
+        }
+        for (center, left, right) in [(a, b, c), (b, c, a), (c, a, b)] {
+            links[center as usize].entry(left).or_default().insert(right);
+            links[center as usize].entry(right).or_default().insert(left);
+        }
     }
-    let volume = six_volume / 6.0;
-    volume.is_finite().then_some(volume)
+
+    let mut non_manifold = 0_usize;
+    for link in links {
+        if link.len() < 3 || link.values().any(|neighbors| neighbors.len() != 2) {
+            non_manifold += 1;
+            continue;
+        }
+
+        let Some(start) = link.keys().next().copied() else {
+            non_manifold += 1;
+            continue;
+        };
+        let mut visited = BTreeSet::new();
+        let mut queue = VecDeque::from([start]);
+        while let Some(vertex) = queue.pop_front() {
+            if !visited.insert(vertex) {
+                continue;
+            }
+            if let Some(neighbors) = link.get(&vertex) {
+                queue.extend(neighbors.iter().copied());
+            }
+        }
+        if visited.len() != link.len() {
+            non_manifold += 1;
+        }
+    }
+    Some(non_manifold)
+}
+
+/// Calculates signed volume independently for every edge-connected closed
+/// component. Each component uses a local reference vertex to reduce
+/// cancellation from large global coordinate offsets.
+fn component_signed_volumes(geometry: &MeshGeometry) -> Option<Vec<f64>> {
+    if geometry.faces.is_empty() {
+        return None;
+    }
+
+    let mut edge_faces: BTreeMap<(u32, u32), Vec<usize>> = BTreeMap::new();
+    for (face_index, face) in geometry.faces.iter().enumerate() {
+        let [a, b, c] = *face;
+        if a as usize >= geometry.vertices.len()
+            || b as usize >= geometry.vertices.len()
+            || c as usize >= geometry.vertices.len()
+        {
+            return None;
+        }
+        for (from, to) in [(a, b), (b, c), (c, a)] {
+            let edge = if from < to { (from, to) } else { (to, from) };
+            edge_faces.entry(edge).or_default().push(face_index);
+        }
+    }
+
+    let mut adjacency = vec![Vec::new(); geometry.faces.len()];
+    for incident_faces in edge_faces.values() {
+        if incident_faces.len() != 2 {
+            return None;
+        }
+        adjacency[incident_faces[0]].push(incident_faces[1]);
+        adjacency[incident_faces[1]].push(incident_faces[0]);
+    }
+
+    let mut visited = vec![false; geometry.faces.len()];
+    let mut volumes = Vec::new();
+    for start in 0..geometry.faces.len() {
+        if visited[start] {
+            continue;
+        }
+        let mut queue = VecDeque::from([start]);
+        let mut component = Vec::new();
+        visited[start] = true;
+        while let Some(face_index) = queue.pop_front() {
+            component.push(face_index);
+            for neighbor in &adjacency[face_index] {
+                if !visited[*neighbor] {
+                    visited[*neighbor] = true;
+                    queue.push_back(*neighbor);
+                }
+            }
+        }
+
+        let reference_index = geometry.faces[start][0] as usize;
+        let origin = *geometry.vertices.get(reference_index)?;
+        let mut six_volume = 0.0_f64;
+        for face_index in component {
+            let [a, b, c] = geometry.faces[face_index];
+            let a = sub(*geometry.vertices.get(a as usize)?, origin);
+            let b = sub(*geometry.vertices.get(b as usize)?, origin);
+            let c = sub(*geometry.vertices.get(c as usize)?, origin);
+            six_volume += dot(a, cross(b, c));
+        }
+        let volume = six_volume / 6.0;
+        if !volume.is_finite() {
+            return None;
+        }
+        volumes.push(volume);
+    }
+    Some(volumes)
 }
 
 /// Validates the candidate against its declared mesh-integrity profile.
@@ -470,41 +576,96 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
         );
     }
 
-    let volume = if indices_valid && finite_vertices && !faces.is_empty() {
-        signed_volume(&candidate.geometry)
-    } else {
-        None
-    };
-
-    let volume_evaluable = candidate.profile.require_closed_surface
-        && boundary_edges == 0
-        && non_manifold_edges == 0
-        && inconsistent_winding_edges == 0
+    let mut non_manifold_vertex_link_count = 0_usize;
+    let vertex_links_evaluable = candidate.profile.require_closed_surface
         && indices_valid
         && finite_vertices
+        && boundary_edges == 0
+        && non_manifold_edges == 0
         && duplicate_faces == 0
-        && degenerate_faces == 0
+        && degenerate_faces == 0;
+    if vertex_links_evaluable {
+        match count_non_manifold_vertex_links(&candidate.geometry) {
+            Some(0) => push(
+                &mut checks,
+                "vertex_link_manifoldness",
+                CheckStatus::Pass,
+                "each vertex link is one connected cycle",
+            ),
+            Some(count) => {
+                non_manifold_vertex_link_count = count;
+                invalid = true;
+                push(
+                    &mut checks,
+                    "vertex_link_manifoldness",
+                    CheckStatus::Fail,
+                    format!("{count} vertices have a disconnected or non-cyclic link"),
+                );
+            }
+            None => {
+                invalid = true;
+                push(
+                    &mut checks,
+                    "vertex_link_manifoldness",
+                    CheckStatus::Fail,
+                    "vertex-link analysis could not be completed",
+                );
+            }
+        }
+    } else if candidate.profile.require_closed_surface {
+        push(
+            &mut checks,
+            "vertex_link_manifoldness",
+            CheckStatus::NotEvaluated,
+            "requires valid indices, finite coordinates, and edge-closed topology",
+        );
+    } else {
+        push(
+            &mut checks,
+            "vertex_link_manifoldness",
+            CheckStatus::NotRequired,
+            "profile does not require a closed surface",
+        );
+    }
+
+    let volume_evaluable = vertex_links_evaluable
+        && non_manifold_vertex_link_count == 0
+        && inconsistent_winding_edges == 0
         && candidate.geometry.units == "m"
         && frame.handedness == "right-handed";
 
+    let component_volumes = if volume_evaluable {
+        component_signed_volumes(&candidate.geometry)
+    } else {
+        None
+    };
+    let all_components_outward = component_volumes
+        .as_ref()
+        .is_some_and(|volumes| !volumes.is_empty() && volumes.iter().all(|volume| *volume > 0.0));
+    let total_volume = component_volumes.as_ref().and_then(|volumes| {
+        let total: f64 = volumes.iter().sum();
+        total.is_finite().then_some(total)
+    });
+
     if volume_evaluable {
-        match volume {
-            Some(value) if value > 0.0 => {
+        match (component_volumes.as_ref(), total_volume, all_components_outward) {
+            (Some(volumes), Some(total), true) => {
                 push(
                     &mut checks,
-                    "positive_signed_volume",
+                    "positive_component_signed_volumes",
                     CheckStatus::Pass,
                     format!(
-                        "signed volume is {value:.12e} m^3 in the declared right-handed frame"
+                        "all {} closed components have positive signed volume in the declared right-handed frame",
+                        volumes.len()
                     ),
                 );
-                if value >= candidate.profile.minimum_enclosed_volume_m3 {
+                if total >= candidate.profile.minimum_enclosed_volume_m3 {
                     push(
                         &mut checks,
                         "minimum_enclosed_volume",
                         CheckStatus::Pass,
                         format!(
-                            "signed volume meets the profile minimum of {:.12e} m^3",
+                            "total component volume {total:.12e} m^3 meets the profile minimum {:.12e} m^3",
                             candidate.profile.minimum_enclosed_volume_m3
                         ),
                     );
@@ -515,57 +676,59 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
                         "minimum_enclosed_volume",
                         CheckStatus::Fail,
                         format!(
-                            "signed volume {value:.12e} m^3 is below the profile minimum {:.12e} m^3",
+                            "total component volume {total:.12e} m^3 is below the profile minimum {:.12e} m^3",
                             candidate.profile.minimum_enclosed_volume_m3
                         ),
                     );
                 }
             }
-            Some(value) => {
+            (Some(volumes), Some(total), false) => {
                 invalid = true;
+                let inward = volumes.iter().filter(|volume| **volume <= 0.0).count();
                 push(
                     &mut checks,
-                    "positive_signed_volume",
+                    "positive_component_signed_volumes",
                     CheckStatus::Fail,
                     format!(
-                        "signed volume must be positive in the declared right-handed frame; observed {value:.12e} m^3"
+                        "{inward} of {} components have non-positive signed volume; total signed volume is {total:.12e} m^3",
+                        volumes.len()
                     ),
                 );
                 push(
                     &mut checks,
                     "minimum_enclosed_volume",
                     CheckStatus::NotEvaluated,
-                    "requires a positive, closed, consistently oriented surface",
+                    "requires every closed component to have positive signed volume",
                 );
             }
-            None => {
+            _ => {
                 invalid = true;
                 push(
                     &mut checks,
-                    "positive_signed_volume",
+                    "positive_component_signed_volumes",
                     CheckStatus::Fail,
-                    "signed volume could not be calculated as a finite value",
+                    "per-component signed volume could not be calculated",
                 );
                 push(
                     &mut checks,
                     "minimum_enclosed_volume",
                     CheckStatus::NotEvaluated,
-                    "requires a finite signed volume",
+                    "requires finite per-component signed volumes",
                 );
             }
         }
     } else {
         push(
             &mut checks,
-            "positive_signed_volume",
+            "positive_component_signed_volumes",
             CheckStatus::NotEvaluated,
-            "requires a closed, valid, consistently oriented surface in a supported frame",
+            "requires a closed, edge-manifold, vertex-manifold, consistently oriented surface in a supported frame",
         );
         push(
             &mut checks,
             "minimum_enclosed_volume",
             CheckStatus::NotEvaluated,
-            "requires a valid signed-volume result",
+            "requires valid per-component signed-volume results",
         );
     }
 
@@ -607,7 +770,9 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
             inconsistent_winding_edge_count: inconsistent_winding_edges,
             duplicate_face_count: duplicate_faces,
             degenerate_face_count: degenerate_faces,
-            signed_volume_m3: volume.filter(|v| v.is_finite()),
+            non_manifold_vertex_link_count,
+            component_signed_volumes_m3: component_volumes.unwrap_or_default(),
+            signed_volume_m3: total_volume,
         },
     }
 }
@@ -653,6 +818,8 @@ mod tests {
         let report = admit(&tetrahedron());
         assert_eq!(report.disposition, Disposition::AdmissibleForProfile);
         assert_eq!(report.metrics.boundary_edge_count, 0);
+        assert_eq!(report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(report.metrics.component_signed_volumes_m3.len(), 1);
         assert!((report.metrics.signed_volume_m3.unwrap() - 1.0 / 6.0).abs() < 1.0e-12);
         assert_eq!(report.admission_scope, ADMISSION_SCOPE);
     }
@@ -764,6 +931,29 @@ mod tests {
         assert!(report.checks.iter().any(|c| {
             c.code == "finite_coordinates" && c.status == CheckStatus::Fail
         }));
+    }
+
+    #[test]
+    fn closed_shells_touching_only_at_one_vertex_are_rejected() {
+        let mut candidate = tetrahedron();
+        candidate.geometry.vertices.extend([
+            [ -1.0, 0.0, 0.0 ],
+            [ 0.0, -1.0, 0.0 ],
+            [ 0.0, 0.0, -1.0 ],
+        ]);
+        // The second tetrahedron shares the first tetrahedron's vertex 0,
+        // but shares no edges. Its local winding is outward.
+        candidate.geometry.faces.extend([
+            [0, 5, 4],
+            [0, 4, 6],
+            [0, 6, 5],
+            [4, 5, 6],
+        ]);
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
+        let report = admit(&candidate);
+        assert_eq!(report.disposition, Disposition::Invalid);
+        assert!(report.metrics.non_manifold_vertex_link_count > 0);
     }
 
     #[test]
