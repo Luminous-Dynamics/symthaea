@@ -66,3 +66,11 @@ This is not a general causal estimator, does not establish statistical power fro
 The `bernoulli_benchmark` module aggregates frozen per-episode reports without combining distinct scientific outcomes into one score. It reports null false-positive rate, qualified power on materially non-null episodes, final and all-interim-look coverage, claim accuracy, process qualification, and mean attempted samples/cost/risk. Proportions include 95% Wilson score intervals; invalid-oracle episodes remain in process totals but are excluded from truth-conditioned rates.
 
 These are episode-level summaries. Generator-family clustering and independent Monte Carlo runs are still required for confirmatory claims; Wilson intervals do not correct for clustered episodes or benchmark leakage.
+
+## Reproducible Monte Carlo calibration harness
+
+The `bernoulli_simulation` module provides an offline, deterministic SplitMix64-based generator and balanced anytime-stopping reference policy for frozen Bernoulli strata. A manifest pins the root seed, scenario limits, null/equivalence/material-effect probabilities and episode counts. Each stratum and episode receives an order-independent derived seed. The output keeps complete traces, per-episode evaluator reports, manifest digest, PRNG/policy versions and separate stratum-level operating-characteristic summaries.
+
+The reference policy uses only accumulated synthetic observations and the agent-visible interim confidence bounds to decide when to stop; generator probabilities are held by the simulation/evaluator side. The PRNG is for reproducible synthetic experiments only, not security or real-world randomization.
+
+Monte Carlo output is calibration evidence for the exact declared synthetic generator. It does not authenticate experiment assignment, prove real-world causal validity, or cover drift, interference, informative missingness, noncompliance or multiple queries. Compare this Bernoulli special case with the broader bounded-outcome / family-wise contract in AOBENCH-017 (#12242), rather than treating it as a replacement.

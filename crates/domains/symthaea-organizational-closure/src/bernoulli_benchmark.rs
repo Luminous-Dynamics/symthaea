@@ -59,6 +59,8 @@ pub struct BernoulliBenchmarkSummary {
     pub episode_count: usize,
     pub oracle_valid_episodes: usize,
     pub oracle_invalid_episodes: usize,
+    pub truth_scoring_eligible_episodes: usize,
+    pub non_evaluable_episodes: usize,
     pub qualified_episodes: usize,
     pub not_qualified_episodes: usize,
     pub inconclusive_episodes: usize,
@@ -92,10 +94,20 @@ fn valid_oracle(report: &BernoulliSequentialReport) -> bool {
         && (-1.0..=1.0).contains(&report.true_effect_for_scoring)
 }
 
+fn valid_scenario(report: &BernoulliSequentialReport) -> bool {
+    !has_finding(report, BernoulliFindingCode::InvalidAlpha)
+        && !has_finding(report, BernoulliFindingCode::InvalidMinimumEffect)
+        && !has_finding(report, BernoulliFindingCode::EmptySampleBudget)
+}
+
+fn truth_scoring_eligible(report: &BernoulliSequentialReport) -> bool {
+    valid_oracle(report) && valid_scenario(report)
+}
+
 fn coverage_eligible(report: &BernoulliSequentialReport) -> bool {
-    valid_oracle(report)
-        && !has_finding(report, BernoulliFindingCode::InvalidAlpha)
+    truth_scoring_eligible(report)
         && report.unqualified_samples == 0
+        && report.control.qualified_samples + report.treatment.qualified_samples > 0
 }
 
 /// Summarize a frozen episode batch without collapsing distinct scientific
@@ -111,6 +123,8 @@ pub fn summarize_bernoulli_episodes(
 
     let mut oracle_valid = 0_usize;
     let mut oracle_invalid = 0_usize;
+    let mut truth_scoring_eligible_count = 0_usize;
+    let mut non_evaluable_count = 0_usize;
     let mut qualified = 0_usize;
     let mut not_qualified = 0_usize;
     let mut inconclusive = 0_usize;
@@ -138,9 +152,14 @@ pub fn summarize_bernoulli_episodes(
 
         if !valid_oracle(report) {
             oracle_invalid += 1;
+        } else {
+            oracle_valid += 1;
+        }
+        if !truth_scoring_eligible(report) {
+            non_evaluable_count += 1;
             continue;
         }
-        oracle_valid += 1;
+        truth_scoring_eligible_count += 1;
 
         let is_null = report.true_effect_for_scoring.abs() <= minimum_effect;
         if is_null {
@@ -178,6 +197,8 @@ pub fn summarize_bernoulli_episodes(
         episode_count,
         oracle_valid_episodes: oracle_valid,
         oracle_invalid_episodes: oracle_invalid,
+        truth_scoring_eligible_episodes: truth_scoring_eligible_count,
+        non_evaluable_episodes: non_evaluable_count,
         qualified_episodes: qualified,
         not_qualified_episodes: not_qualified,
         inconclusive_episodes: inconclusive,
@@ -189,7 +210,7 @@ pub fn summarize_bernoulli_episodes(
             qualified_power,
             material_episodes,
         ),
-        correct_claim_rate: RateEstimate::from_counts(correct_claims, oracle_valid),
+        correct_claim_rate: RateEstimate::from_counts(correct_claims, truth_scoring_eligible_count),
         final_interval_coverage: RateEstimate::from_counts(final_coverage, coverage_eligible_count),
         all_look_confidence_sequence_coverage: RateEstimate::from_counts(
             all_look_coverage,
@@ -285,6 +306,8 @@ mod tests {
         assert_eq!(summary.episode_count, 4);
         assert_eq!(summary.oracle_valid_episodes, 3);
         assert_eq!(summary.oracle_invalid_episodes, 1);
+        assert_eq!(summary.truth_scoring_eligible_episodes, 3);
+        assert_eq!(summary.non_evaluable_episodes, 1);
         assert_eq!(summary.qualified_episodes, 2);
         assert_eq!(summary.inconclusive_episodes, 2);
         assert_eq!(summary.null_episodes, 2);
@@ -295,7 +318,8 @@ mod tests {
         assert_eq!(summary.qualified_power_on_material_effect.episodes, 1);
         assert_eq!(summary.correct_claim_rate.successes, 1);
         assert_eq!(summary.correct_claim_rate.episodes, 3);
-        assert_eq!(summary.all_look_confidence_sequence_coverage.episodes, 3);
+        assert_eq!(summary.coverage_eligible_episodes, 2);
+        assert_eq!(summary.all_look_confidence_sequence_coverage.episodes, 2);
         assert_eq!(summary.process_qualification_rate.episodes, 4);
         assert!(summary.mean_attempted_samples.is_some());
     }
@@ -348,5 +372,47 @@ mod tests {
         assert_eq!(summary.null_episodes, 0);
         assert_eq!(summary.false_positive_rate_on_null.episodes, 0);
         assert_eq!(summary.false_positive_rate_on_null.estimate, None);
+    } 
+    #[test]
+    fn invalid_scenario_is_not_included_in_truth_or_coverage_denominators() {
+        let mut invalid_scenario = scenario();
+        invalid_scenario.minimum_effect = 0.0;
+        let trace = BernoulliSequentialTrace {
+            trials: Vec::new(),
+            terminal: BernoulliTerminalDecision::Stop { claim: BernoulliClaim::Benefit },
+        };
+        let invalid_report = evaluate_bernoulli_sequential(
+            &invalid_scenario,
+            &BernoulliOracle::new(0.5, 0.5),
+            &trace,
+        );
+        let summary = summarize_bernoulli_episodes(&[invalid_report], 0.1).unwrap();
+        assert_eq!(summary.oracle_valid_episodes, 1);
+        assert_eq!(summary.truth_scoring_eligible_episodes, 0);
+        assert_eq!(summary.non_evaluable_episodes, 1);
+        assert_eq!(summary.null_episodes, 0);
+        assert_eq!(summary.false_positive_rate_on_null.episodes, 0);
+        assert_eq!(summary.coverage_eligible_episodes, 0);
     }
+
+    #[test]
+    fn zero_observation_abstention_does_not_inflate_coverage_denominator() {
+        let scenario = scenario();
+        let no_look = BernoulliSequentialTrace {
+            trials: Vec::new(),
+            terminal: BernoulliTerminalDecision::Abstain { reason: "no observations".into() },
+        };
+        let report = evaluate_bernoulli_sequential(
+            &scenario,
+            &BernoulliOracle::new(0.5, 0.5),
+            &no_look,
+        );
+        let summary = summarize_bernoulli_episodes(&[report], scenario.minimum_effect).unwrap();
+        assert_eq!(summary.inconclusive_episodes, 1);
+        assert_eq!(summary.coverage_eligible_episodes, 0);
+        assert_eq!(summary.final_interval_coverage.episodes, 0);
+        assert_eq!(summary.all_look_confidence_sequence_coverage.episodes, 0);
+        assert_eq!(summary.process_qualification_rate.estimate, Some(0.0));
+    }
+
 }
