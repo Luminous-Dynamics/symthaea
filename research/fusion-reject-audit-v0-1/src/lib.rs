@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 pub mod decision_opportunity;
+pub mod scenario_opportunity;
 
 pub const SAMPLING_ALGORITHM: &str = "splitmix64-partial-fisher-yates-v1";
 pub const BOUND_METHOD: &str = "exact-one-sided-hypergeometric-bonferroni-v1";
