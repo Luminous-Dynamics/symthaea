@@ -31,7 +31,7 @@ The crate uses a versioned deterministic SplitMix64 / partial Fisher–Yates sel
 
 The supplied sample identities must match the derived identities in draw order. Stratum definition and population manifest digests, a seed-commitment reference, selection-receipt references, and per-sample evidence references are required.
 
-These are declared identities. The crate does not fetch or hash source payloads, authenticate timestamps, prove that the seed was actually committed first, verify that the sampling process ran independently, or establish that solver labels are truthful. Those require independent artifact verification and trusted execution records.
+These are declared identities. The crate does not fetch or hash source payloads, authenticate timestamps, prove that the seed was actually committed first, verify that the sampling process ran independently, or establish that solver labels are truthful. Those require independent artifact verification and trusted execution records. SplitMix64 is not cryptographically secure and is used only to make this research harness deterministic and replayable. A production or adversarial audit must obtain an unpredictable seed from an external cryptographically secure randomness source after the population and strata are frozen, commit/reveal it under independent timestamped control, and independently verify the selection and solver evidence.
 
 ## Outcomes
 
