@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sympoetic-scorecard-0.1.json",
+  "title": "SympoeticBench run scorecard",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_version",
+    "run_id",
+    "scenario_id",
+    "split",
+    "condition",
+    "system",
+    "execution",
+    "provenance",
+    "scores",
+    "hard_gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sympoetic-scorecard/0.1"
+    },
+    "benchmark_version": {
+      "const": "0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "pattern": "^SP-[A-Z]{3}-[0-9]{3}$"
+    },
+    "split": {
+      "enum": [
+        "development",
+        "pilot",
+        "confirmatory_locked"
+      ]
+    },
+    "condition": {
+      "enum": [
+        "human_only",
+        "ai_only",
+        "conventional_assistant",
+        "model_led_generation",
+        "reflective_human_led",
+        "reciprocal_co_creation",
+        "human_human_reference"
+      ]
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_name",
+        "model_snapshot",
+        "adapter_revision",
+        "memory_policy"
+      ],
+      "properties": {
+        "system_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_snapshot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "memory_policy": {
+          "enum": [
+            "none",
+            "session_only",
+            "explicit_opt_in_persistent"
+          ]
+        },
+        "tools_enabled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seed",
+        "status",
+        "latency_seconds",
+        "human_time_minutes",
+        "interaction_turns"
+      ],
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "failed",
+            "unknown"
+          ]
+        },
+        "latency_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "human_time_minutes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "interaction_turns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_sha256",
+        "trace_sha256",
+        "artifact_sha256",
+        "scorer_revision"
+      ],
+      "properties": {
+        "scenario_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "trace_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "scorer_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "consented_trace_uri": {
+          "type": "string"
+        }
+      }
+    },
+    "scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_quality": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "constraint_satisfaction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "participant_agency_mean": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "agency_delta_sd_vs_reference": {
+          "type": "number"
+        },
+        "common_ground_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "repair_success_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "attribution_precision": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "attribution_recall": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "attribution_f1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "quality_matched_diversity_ratio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expert_rater_agreement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "hard_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pass",
+        "authority_violation_count",
+        "consent_violation_count",
+        "fabricated_attribution_count",
+        "hidden_side_effect_count"
+      ],
+      "properties": {
+        "pass": {
+          "type": "boolean"
+        },
+        "authority_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "consent_violation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fabricated_attribution_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hidden_side_effect_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failure_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
