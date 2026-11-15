@@ -225,6 +225,11 @@ pub struct ScenarioOpportunityReport {
     pub contract_version: &'static str,
     pub opportunity_rule: &'static str,
     pub campaign_id: String,
+    pub scenario_manifest_sha256: String,
+    pub objective_manifest_sha256: String,
+    pub opportunity_rule_sha256: String,
+    pub frozen_universe_manifest_sha256: String,
+    pub accepted_manifest_sha256: String,
     pub primary_scenario_id: String,
     pub familywise_confidence_level: f64,
     pub target_opportunity_recall: f64,
@@ -289,6 +294,7 @@ pub fn audit_scenario_opportunities(
             bundle.evaluations.iter().zip(&plan.scenarios).enumerate()
         {
             let disposition = classify_scenario_evaluation(
+                &bundle.candidate_id,
                 evaluation,
                 scenario,
                 &plan.objective_definitions,
@@ -338,6 +344,7 @@ pub fn audit_scenario_opportunities(
                 bundle.evaluations.iter().zip(&plan.scenarios).enumerate()
             {
                 let disposition = classify_scenario_evaluation(
+                    &bundle.candidate_id,
                     evaluation,
                     scenario,
                     &plan.objective_definitions,
@@ -501,6 +508,11 @@ pub fn audit_scenario_opportunities(
         contract_version: SCENARIO_OPPORTUNITY_VERSION,
         opportunity_rule: SCENARIO_OPPORTUNITY_RULE,
         campaign_id: plan.campaign_id.clone(),
+        scenario_manifest_sha256: plan.scenario_manifest_sha256.clone(),
+        objective_manifest_sha256: plan.objective_manifest_sha256.clone(),
+        opportunity_rule_sha256: plan.opportunity_rule_sha256.clone(),
+        frozen_universe_manifest_sha256: plan.base_plan.frozen_universe.manifest_sha256.clone(),
+        accepted_manifest_sha256: plan.base_plan.accepted.manifest_sha256.clone(),
         primary_scenario_id: plan.primary_scenario_id.clone(),
         familywise_confidence_level: plan.base_plan.familywise_confidence_level,
         target_opportunity_recall: plan.target_opportunity_recall,
@@ -658,6 +670,17 @@ fn validate_plan(plan: &ScenarioOpportunityPlan) -> Vec<ScenarioOpportunityError
     }
     let mut accepted_seen = BTreeSet::new();
     for (index, bundle) in plan.accepted_bundles.iter().enumerate() {
+        if plan
+            .base_plan
+            .accepted
+            .candidates
+            .get(index)
+            .is_some_and(|expected| expected.candidate_id != bundle.candidate_id)
+        {
+            errors.push(ScenarioOpportunityError::AcceptedBundleIdentityMismatch {
+                bundle_index: index,
+            });
+        }
         if !accepted_expected.contains_key(bundle.candidate_id.as_str()) {
             errors.push(ScenarioOpportunityError::AcceptedBundleIdentityMismatch {
                 bundle_index: index,
@@ -848,6 +871,7 @@ fn validate_bundle(
 }
 
 fn classify_scenario_evaluation(
+    candidate_id: &str,
     evaluation: &ScenarioEvaluation,
     scenario: &ScenarioDefinition,
     definitions: &[ObjectiveDefinition],
@@ -859,7 +883,7 @@ fn classify_scenario_evaluation(
         AuditOutcome::ConfirmedInfeasible => ScenarioDisposition::ConfirmedNoOpportunity,
         AuditOutcome::ConfirmedFeasible => {
             if is_epsilon_frontier_extension(
-                &format!("candidate:{}", evaluation.run_id),
+                candidate_id,
                 &evaluation.objectives,
                 &scenario.incumbent_frontier,
                 definitions,
@@ -1016,7 +1040,7 @@ mod tests {
     }
 
     fn eval(
-        candidate_id: &str,
+        _candidate_id: &str,
         scenario_id: &str,
         run_id: &str,
         outcome: AuditOutcome,
@@ -1433,6 +1457,10 @@ mod tests {
             second.scenario_manifest_sha256
         );
         assert_eq!(first_report.campaign_id, second_report.campaign_id);
+        assert_ne!(
+            first_report.scenario_manifest_sha256,
+            second_report.scenario_manifest_sha256
+        );
         assert_eq!(first_report.scenarios.len(), second_report.scenarios.len());
     }
 }
