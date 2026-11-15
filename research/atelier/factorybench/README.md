@@ -40,3 +40,11 @@ ISO 23247-5:2026 is published and provides a digital-thread architecture referen
 ### Executable arithmetic companion
 
 [draft PR #12364](https://github.com/Luminous-Dynamics/symthaea/pull/12364) adds dependency-free Rust calculators for the first eight KPI calculations/aggregations. The dictionary links the implemented functions directly to their metric definitions and marks them as authored but untested. The calculator does not perform source-data extraction, calibration, or measurement validation.
+
+
+## Counterfactual evaluation and SOTA admission
+
+- `counterfactual-evaluation-protocol.v0.1.0.md` defines frozen run manifests, separate synthetic/simulated/physical/independently measured lanes, paired scenario seeds, ablation and interaction tests, held-out garment/fabric/facility splits, independent feasibility checks, Pareto reporting, statistical reporting and strict industry-comparison admission.
+- A claimed improvement must state exactly what was held constant, what changed, the evidence class, uncertainty and independent-verification status.
+- Optimizer scores are not accepted until an independent feasibility verifier confirms the plan.
+- The protocol explicitly prevents comparisons between unlike garment complexity, staffing, paid-time, quality, facility and cost boundaries.
