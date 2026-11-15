@@ -100,6 +100,8 @@ pub struct TraceEvent {
     pub reconciled_status: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reconciliation_state_digest: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intervention_action: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
