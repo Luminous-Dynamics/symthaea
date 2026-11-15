@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_kind": "synthetic",
+  "task_id": "synthetic-dependency-api-middle-001",
+  "scenario_pair_id": "synthetic-pair-dependency-api-middle-001",
+  "intervention": {
+    "family": "dependency_api_breaking_change",
+    "position": "middle",
+    "control_class": "target_intervention"
+  },
+  "task_seed_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "task_bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "acceptance_contract_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "repository_snapshot": {
+    "repository_full_name": "synthetic/decision-api",
+    "revision_oid": "dddddddddddddddddddddddddddddddddddddddd",
+    "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "configuration_world_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "two_sided_validity": {
+    "reference_patch": {
+      "patch_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "result": "pass",
+      "clean_regrade": true,
+      "grader_environment_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "evidence_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "empty_patch_control": {
+      "patch_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "result": "fail",
+      "clean_regrade": true,
+      "grader_environment_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "evidence_digest": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  },
+  "blind_reconstruction": {
+    "completed": true,
+    "primary_author_id": "task-author-01",
+    "adjudicator_ids": [
+      "reviewer-01",
+      "reviewer-02"
+    ],
+    "disagreement_resolved": true
+  },
+  "isolation": {
+    "runner_image_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+    "network_policy_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+    "model_endpoint_only": true,
+    "candidate_evaluator_separated": true,
+    "pristine_regrade": true,
+    "candidate_can_read_gold": false
+  },
+  "gold_custody": {
+    "gold_label_manifest_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+    "custodian_id": "independent-custodian-01",
+    "candidate_readable": false,
+    "evaluator_readable": true,
+    "labels_separate_from_candidate_bundle": true
+  }
+}
