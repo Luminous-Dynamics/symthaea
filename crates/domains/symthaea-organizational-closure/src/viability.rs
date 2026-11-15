@@ -401,9 +401,7 @@ pub fn evaluate_finite_viability_model(model: &FiniteViabilityModel) -> FiniteVi
                 production_state.viability_class.clone(),
                 organization_state.viability_class.clone(),
             )
-            .is_some_and(|previous| {
-                previous != organization_state.viability_class
-            })
+            .is_some_and(|previous| previous != organization_state.viability_class)
         {
             ap1_ok = false;
             finding(
