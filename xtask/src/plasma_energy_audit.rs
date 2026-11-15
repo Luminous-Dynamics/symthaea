@@ -1401,6 +1401,14 @@ mod tests {
                 "ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh": 3.0,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
+        } else if lane == "AMMONIA_CRACKING_THERMAL_INTEGRATION" {
+            serde_json::json!({
+                "ammonia_conversion_min_fraction": 0.99,
+                "accepted_h2_production_rate_min_g_per_hour": 150.0,
+                "net_grid_specific_energy_reduction_min_fraction": 0.15,
+                "heat_balance_abs_residual_fraction_max": 0.05,
+                "all_thresholds_must_hold_at_same_operating_point": true
+            })
         } else {
             serde_json::json!({
                 "syngas_cost_eur_per_tonne_max": 600.0,
@@ -1424,6 +1432,19 @@ mod tests {
                 "gas_feed_and_product_separation_energy_included": true,
                 "accepted_nh3_product_purity_and_pressure_contract_required": true,
                 "matched_haber_bosch_baseline_includes_hydrogen_energy": true
+            })
+        } else if lane == "AMMONIA_CRACKING_THERMAL_INTEGRATION" {
+            serde_json::json!({
+                "paired_no_recovery_baseline_same_feed_and_operating_point_required": true,
+                "full_grid_to_accepted_h2_boundary_required": true,
+                "recovered_heat_must_be_measured_and_useful_at_declared_process_interface": true,
+                "insulation_or_recuperator_pressure_drop_and_all_auxiliaries_included": true,
+                "thermal_storage_and_heat_exchanger_losses_included": true,
+                "no_double_counting_of_recirculated_heat_or_reaction_enthalpy": true,
+                "thermal_energy_balance_must_close_with_uncertainty": true,
+                "product_purity_pressure_and_delivery_contract_unchanged": true,
+                "duty_cycle_and_steady_state_duration_matched": true,
+                "comparison_must_report_measurement_uncertainty_and_grouped_repeats": true
             })
         } else {
             serde_json::json!({
@@ -1494,6 +1515,41 @@ mod tests {
                 .to_string()
                 .contains("hydrogen_generation_energy_included")
         );
+    }
+
+    #[test]
+    fn source_manifest_accepts_ammonia_thermal_integration_target() {
+        let source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
+        let summary = audit_source_value(&source, "ammonia-thermal-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_ammonia_thermal_target_without_heat_double_count_guard() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
+        source["benchmark_targets"][0]["claim_guards"]
+            ["no_double_counting_of_recirculated_heat_or_reaction_enthalpy"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
+        assert!(error.to_string().contains("no_double_counting_of_recirculated_heat"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_ammonia_thermal_target_below_energy_reduction_floor() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
+        source["benchmark_targets"][0]["metric_thresholds"]
+            ["net_grid_specific_energy_reduction_min_fraction"] = serde_json::json!(0.10);
+        let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
+        assert!(error.to_string().contains("net_grid_specific_energy_reduction"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_ammonia_thermal_metrics_from_different_operating_points() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
+        source["benchmark_targets"][0]["metric_thresholds"]
+            ["all_thresholds_must_hold_at_same_operating_point"] = serde_json::json!(false);
+        let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
+        assert!(error.to_string().contains("same operating point"));
     }
 
     #[test]
@@ -2460,6 +2516,49 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                         .is_some_and(|value| value.is_finite() && value > 0.0),
                     "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
                 );
+            }
+            "AMMONIA_CRACKING_THERMAL_INTEGRATION" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool) == Some(true),
+                    "{display_name}: ammonia thermal-integration target {target_id} must bind all improvements to one operating point"
+                );
+                for (key, minimum) in [
+                    ("ammonia_conversion_min_fraction", 0.99),
+                    ("accepted_h2_production_rate_min_g_per_hour", 150.0),
+                    ("net_grid_specific_energy_reduction_min_fraction", 0.15),
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value >= minimum),
+                        "{display_name}: ammonia thermal-integration target {target_id} has an insufficient or invalid threshold {key}"
+                    );
+                }
+                let residual = metrics.get("heat_balance_abs_residual_fraction_max")
+                    .and_then(Value::as_f64)
+                    .filter(|value| value.is_finite() && *value > 0.0 && *value <= 0.05);
+                ensure!(
+                    residual.is_some(),
+                    "{display_name}: ammonia thermal-integration target {target_id} must declare a positive heat-balance residual cap <= 5%"
+                );
+                for key in [
+                    "paired_no_recovery_baseline_same_feed_and_operating_point_required",
+                    "full_grid_to_accepted_h2_boundary_required",
+                    "recovered_heat_must_be_measured_and_useful_at_declared_process_interface",
+                    "insulation_or_recuperator_pressure_drop_and_all_auxiliaries_included",
+                    "thermal_storage_and_heat_exchanger_losses_included",
+                    "no_double_counting_of_recirculated_heat_or_reaction_enthalpy",
+                    "thermal_energy_balance_must_close_with_uncertainty",
+                    "product_purity_pressure_and_delivery_contract_unchanged",
+                    "duty_cycle_and_steady_state_duration_matched",
+                    "comparison_must_report_measurement_uncertainty_and_grouped_repeats",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: ammonia thermal-integration target {target_id} is missing required guard {key}"
+                    );
+                }
             }
             "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
