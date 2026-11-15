@@ -7,6 +7,7 @@
 use std::collections::{BTreeSet, VecDeque};
 
 pub mod screening_funnel;
+pub mod validation_domain;
 
 pub const COMPILER_VERSION: &str = "fusion-decision-compiler/0.1";
 
