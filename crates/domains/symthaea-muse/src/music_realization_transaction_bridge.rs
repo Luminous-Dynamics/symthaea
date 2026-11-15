@@ -812,14 +812,26 @@ pub fn verify_music_realization_transaction_binding_v1(
         issues.push(MusicRealizationBridgeIssueV1::SourceLineageMismatch);
     }
 
+    // Count every submitted provider call independently of trace validity.
+    // A malformed later transition must not erase earlier/current submissions
+    // from the budget denominator.
+    let observed_submission_count = u64::try_from(
+        receipt
+            .payload
+            .execution_events
+            .iter()
+            .filter(|event| event.state == S::Submitted)
+            .count(),
+    )
+    .unwrap_or(u64::MAX);
     let submissions = match validate_execution_events(&receipt.payload) {
         Ok(count) => count,
         Err(trace_issues) => {
             issues.extend(trace_issues);
-            0
+            observed_submission_count
         }
     };
-    if attempt.render_calls < submissions {
+    if attempt.render_calls < observed_submission_count {
         issues.push(MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted);
     }
 
@@ -1752,6 +1764,15 @@ mod tests {
         )
         .unwrap_err()
         .contains(&MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted));
+        let issues = verify_music_realization_transaction_binding_v1(
+            &tx,
+            &expected_binding(),
+            &receipt,
+            Some(bytes),
+        )
+        .unwrap_err();
+        assert!(issues.contains(&MusicRealizationBridgeIssueV1::InvalidExecutionTransition));
+        assert!(issues.contains(&MusicRealizationBridgeIssueV1::SubmissionBudgetUnderCounted));
     }
 
     #[test]
