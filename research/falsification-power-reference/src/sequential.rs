@@ -79,7 +79,7 @@ impl fmt::Display for SequentialError {
             ),
             Self::AlternativeWeightsMustSumToOne => {
                 write!(f, "fixed alternative weights must sum to one")
-            },
+            }
             Self::AlternativeCountMismatch { expected, actual } => {
                 write!(
                     f,
@@ -503,7 +503,8 @@ impl PredictableGaussianMixture {
             .copied()
             .zip(self.component_log_e_values.iter().copied())
         {
-            let increment = likelihood_ratio_increment(discrepancy, observed_residual, pending.sigma)?;
+            let increment =
+                likelihood_ratio_increment(discrepancy, observed_residual, pending.sigma)?;
             let next = current + increment;
             if !next.is_finite() {
                 return Err(SequentialError::NumericalOverflow);
@@ -530,7 +531,10 @@ impl PredictableGaussianMixture {
         let anytime_p = anytime_p_value(next_maximum);
         let crossed = next_maximum >= alpha_boundary;
 
-        let pending = self.pending.take().expect("pending prediction was checked above");
+        let pending = self
+            .pending
+            .take()
+            .expect("pending prediction was checked above");
         self.consumed_observation_ids
             .insert(pending.observation_id.clone());
         self.component_log_e_values = next_components;
@@ -614,16 +618,12 @@ mod tests {
         process
             .commit_prediction_with_sigma("obs-1", "sha256:decision-1", 0.24, 0.15)
             .unwrap();
-        let first = process
-            .observe("obs-1", "sha256:decision-1", 0.20)
-            .unwrap();
+        let first = process.observe("obs-1", "sha256:decision-1", 0.20).unwrap();
 
         process
             .commit_prediction_with_sigma("obs-2", "sha256:decision-2", 0.24, 0.30)
             .unwrap();
-        let second = process
-            .observe("obs-2", "sha256:decision-2", 0.20)
-            .unwrap();
+        let second = process.observe("obs-2", "sha256:decision-2", 0.20).unwrap();
 
         assert!((first.log_e_value - 0.853_333_333_333_333_3).abs() < 1.0e-12);
         assert!((second.log_e_value - 1.066_666_666_666_666_7).abs() < 1.0e-12);
