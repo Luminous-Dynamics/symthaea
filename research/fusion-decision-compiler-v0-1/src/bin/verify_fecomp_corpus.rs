@@ -8,7 +8,7 @@ use std::process::ExitCode;
 
 const CORPUS: &str = include_str!("../../fixtures/fecomp-cases-v1.tsv");
 
-const REQUIRED_CASES: [&str; 20] = [
+const REQUIRED_CASES: [&str; 26] = [
     "complete-synthetic-candidate",
     "missing-service-boundary",
     "missing-model-capability",
