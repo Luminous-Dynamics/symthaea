@@ -138,13 +138,22 @@ The follow-on is tracked by [issue #12316](https://github.com/Luminous-Dynamics/
 4. Validate action/effect projection against independently authored oracles and real adapter traces; report per-family false-safe, false-hold and indeterminate rates.
 5. Benchmark projection latency, throughput, memory, counterexample shrinking and deterministic replay under increasing action cardinality.
 
+## v0.3.2 adversarial projection corrections
+
+The current v0.3.2 branch corrects two edge semantics found during source audit:
+
+- Retry linkage now binds the exact predecessor terminal action to the retry child's own start action. A regression test checks the child-start ID, the predecessor terminal ID and the terminal-before-child-start order.
+- Stop scope is monotonic: a revision may preserve or widen the trigger scope, never narrow it. A broader attempt inventory can cover a narrower stop scope, but a narrower inventory cannot cover a broader discharge. Regression tests cover broad-inventory/narrow-obligation, global expansion and narrowing rejection.
+
+The v2 independent reference model exercises exact child-start bindings and those scope relationships. Its recorded run reports zero unexpected retry/stop admissions. The execution was in a V8 JavaScript runtime, not Node.js and not Rust; the checked-in mjs file is a reproducible Node.js implementation, but it was not directly run for the recorded result. The JSON result record makes this distinction explicit.
+
 ## Known limitations at the v0.3.1 stage
 
 - The implemented generator families cover event production/delivery/partition, source-clock unqualified/expired/stale mapping faults, eight observer/store mapping faults (unqualified, expired, not-yet-valid and invalid validity interval), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for gradual calibration drift/step changes, crash precisely between physical effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
 - The v0.3.1 bitemporal projection alone does not reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory; the v0.3.2 action projector now supplies a synthetic-schedule adapter for these contracts, but production owner verification and real effect-system adapters remain unimplemented.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- At v0.3.2, 46 Rust module unit tests, eight Proptest properties (256 cases each configured; 2,048 potential cases), and two integration tests are authored, not executed. The frozen action-history known-answer fixture contains 14 actions, seven owner-time resolutions and five owner receipt assessments. The projector returns exact terminal, stop, inventory, effect and cancellation sidecars plus schedule/replay digests. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
+- At v0.3.2, 49 Rust module unit tests, eight Proptest properties (256 cases each configured; 2,048 potential cases), and two integration tests are authored, not executed. The frozen action-history known-answer fixture contains 14 actions, seven owner-time resolutions and five owner receipt assessments. The projector returns exact terminal, stop, inventory, effect and cancellation sidecars plus schedule/replay digests. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
 
 ## Reproduction
 
