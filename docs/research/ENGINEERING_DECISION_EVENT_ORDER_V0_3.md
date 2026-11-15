@@ -147,13 +147,30 @@ The current v0.3.2 branch corrects two edge semantics found during source audit:
 
 The v2 independent reference model exercises exact child-start bindings and scope relationships. A further finite-state policy-generation model covers discharge-as-of-policy semantics, historical v1 discharge followed by v2 revision, final-policy discharge status, scope widening/narrowing, and stale/substituted references. The recorded V8 run exercised 100,000 generated histories with zero historical false rejects, stale false accepts, scope-narrowing false accepts or final-policy projection mismatches; 109,887 historically valid discharge instances were preserved. The execution was in a V8 JavaScript runtime, not Node.js and not Rust; checked-in mjs files are reproducible Node.js implementations, but the recorded V8 run is not Rust execution.
 
+
+## v0.3.2 inventory frontier: snapshot plus append-only delta
+
+The first action-history projector used the same attempt slice both to validate the inventory manifest and to evaluate current history. That is incorrect once attempts may be appended after the inventory frontier. The v0.2 API now preserves the original `assess_start_under_stop_obligations` as a compatibility wrapper and exposes `assess_start_under_stop_obligations_with_inventory_cut` with distinct `current_attempts` and `inventory_snapshot_attempts`.
+
+The manifest is checked only against the attempt state knowable at its frontier. Attempt starts before the frontier enter the snapshot. Terminal reconciliations and attempt-to-stop-discharge relations are retained in the snapshot only when their exact owner times are before the frontier. Later terminals and discharge relations remain in current history but are excluded from the earlier snapshot commitment. A later attempt is a delta, never an implicit addition to the old manifest.
+
+Delta safety remains fail-closed:
+- a pending sibling that starts after an applicable global discharge may remain in flight without blocking a different logical operation;
+- an attempt outside the snapshot that started before its applicable discharge is a critical inventory omission;
+- a pending attempt for the requested logical operation still makes the requested start ineligible;
+- overlapping/unknown start-to-frontier or discharge-to-start ordering is Indeterminate, not a guessed side of the cut.
+
+The frozen 14-action known-answer fixture was updated to hash the actual pre-discharge snapshot (no future discharge relation). Canonical v0.2 attempt-manifest digest: `dd24fe30e2d4391a07629ba1e08990e5de7054bda2b393b62daeaac56bd3c865`.
+
+A separately authored V8 reference model exercised 100,000 cases across six cut/delta families with zero model violations. It is not Rust execution, owner receipt verification, or a reliability claim. See the [reference implementation](../../benchmarks/engineering-change-impact/event-order-v0.3.2-inventory-snapshot-delta-reference.mjs) and [recorded result](../../benchmarks/engineering-change-impact/event-order-v0.3.2-inventory-snapshot-delta-reference.json).
+
 ## Known limitations at the v0.3.1 stage
 
 - The implemented generator families cover event production/delivery/partition, source-clock unqualified/expired/stale mapping faults, eight observer/store mapping faults (unqualified, expired, not-yet-valid and invalid validity interval), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for gradual calibration drift/step changes, crash precisely between physical effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
 - The v0.3.1 bitemporal projection alone does not reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory; the v0.3.2 action projector now supplies a synthetic-schedule adapter for these contracts, but production owner verification and real effect-system adapters remain unimplemented.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- At v0.3.2, 53 Rust module unit tests, eight Proptest properties (256 cases each configured; 2,048 potential cases), and two integration tests are authored, not executed. The frozen action-history known-answer fixture contains 14 actions, seven owner-time resolutions and five owner receipt assessments. The projector returns exact terminal, stop, inventory, effect and cancellation sidecars plus schedule/replay digests. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
+- At v0.3.2, 86 Rust module unit tests across v0.2/v0.3, eight Proptest properties (256 cases each configured; 2,048 potential cases), and two integration tests are authored, not executed. The frozen action-history known-answer fixture contains 14 actions, seven owner-time resolutions and five owner receipt assessments. The projector returns exact terminal, stop, inventory, effect and cancellation sidecars plus schedule/replay digests. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
 
 ## Reproduction
 
