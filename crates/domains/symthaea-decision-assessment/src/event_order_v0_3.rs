@@ -306,8 +306,8 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
         match &scheduled.action {
             ScheduleAction::ClockAdvance {
                 clock_domain, basis_id, epoch, scale, unit, local_tick_ns,
-                calibration_id, mapping_valid_through_ns, mapping_receipt_ref,
-                mapping_receipt_sha256, qualification, ..
+                calibration_id, mapping_valid_from_ns, mapping_valid_through_ns,
+                mapping_receipt_ref, mapping_receipt_sha256, qualification, ..
             } => {
                 require_id(clock_domain, "clock_domain")?;
                 require_id(basis_id, "basis_id")?;
@@ -328,6 +328,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                         scheduled.action_id.clone(),
                         ClockMappingState {
                             local_tick_ns: *local_tick_ns,
+                            valid_from_ns: *mapping_valid_from_ns,
                             valid_through_ns: *mapping_valid_through_ns,
                             qualification: *qualification,
                         },
@@ -388,14 +389,54 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                     return Err(ReplayError::DuplicateDelivery(delivery_id.clone()));
                 }
             }
-            ScheduleAction::EventObserved { event_id, observer_id } => {
+            ScheduleAction::EventObserved {
+                event_id, observer_id, clock_domain, basis_id, epoch, scale, unit,
+                clock_mapping_action_id, observation_receipt_ref, observation_receipt_sha256, ..
+            } => {
                 require_id(event_id, "event_id")?;
                 require_id(observer_id, "observer_id")?;
+                require_id(clock_domain, "observer_clock_domain")?;
+                require_id(basis_id, "observer_clock_basis_id")?;
+                require_id(epoch, "observer_clock_epoch")?;
+                require_id(scale, "observer_clock_scale")?;
+                require_id(unit, "observer_clock_unit")?;
+                if unit != "nanoseconds" {
+                    return Err(ReplayError::UnsupportedTimeUnit(unit.clone()));
+                }
+                require_id(clock_mapping_action_id, "observer_clock_mapping_action_id")?;
+                require_id(observation_receipt_ref, "observation_receipt_ref")?;
+                require_sha256(observation_receipt_sha256, "observation_receipt_sha256")?;
+                let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                if !clock_mapping_action_history.get(&key)
+                    .is_some_and(|history| history.contains_key(clock_mapping_action_id))
+                {
+                    return Err(ReplayError::InvalidCausalPredecessor(clock_mapping_action_id.clone()));
+                }
             }
-            ScheduleAction::EventPersisted { event_id, observer_id, store_id } => {
+            ScheduleAction::EventPersisted {
+                event_id, observer_id, store_id, clock_domain, basis_id, epoch, scale, unit,
+                clock_mapping_action_id, persistence_receipt_ref, persistence_receipt_sha256, ..
+            } => {
                 require_id(event_id, "event_id")?;
                 require_id(observer_id, "observer_id")?;
                 require_id(store_id, "store_id")?;
+                require_id(clock_domain, "store_clock_domain")?;
+                require_id(basis_id, "store_clock_basis_id")?;
+                require_id(epoch, "store_clock_epoch")?;
+                require_id(scale, "store_clock_scale")?;
+                require_id(unit, "store_clock_unit")?;
+                if unit != "nanoseconds" {
+                    return Err(ReplayError::UnsupportedTimeUnit(unit.clone()));
+                }
+                require_id(clock_mapping_action_id, "store_clock_mapping_action_id")?;
+                require_id(persistence_receipt_ref, "persistence_receipt_ref")?;
+                require_sha256(persistence_receipt_sha256, "persistence_receipt_sha256")?;
+                let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
+                if !clock_mapping_action_history.get(&key)
+                    .is_some_and(|history| history.contains_key(clock_mapping_action_id))
+                {
+                    return Err(ReplayError::InvalidCausalPredecessor(clock_mapping_action_id.clone()));
+                }
             }
             ScheduleAction::CancellationRequested { operation_id, attempt_id }
             | ScheduleAction::CancellationAcknowledged { operation_id, attempt_id, .. }
@@ -880,6 +921,7 @@ pub fn generate_clock_mapping_fault_schedule(
             offset_ns: 0,
             uncertainty_ns: 100,
             calibration_id: format!("cal-{seed:016x}-first"),
+            mapping_valid_from_ns: 0,
             mapping_valid_through_ns: first_valid_through_ns,
             mapping_receipt_ref: format!("synthetic://mapping/{seed:016x}/first"),
             mapping_receipt_sha256: "1".repeat(64),
@@ -902,6 +944,7 @@ pub fn generate_clock_mapping_fault_schedule(
                 offset_ns: 0,
                 uncertainty_ns: 50,
                 calibration_id: format!("cal-{seed:016x}-second"),
+                mapping_valid_from_ns: 0,
                 mapping_valid_through_ns: 200,
                 mapping_receipt_ref: format!("synthetic://mapping/{seed:016x}/second"),
                 mapping_receipt_sha256: "2".repeat(64),
@@ -977,6 +1020,7 @@ pub fn generate_delivery_schedule(
                 offset_ns: (rng.next_u64() % 1_000_001) as i64 - 500_000,
                 uncertainty_ns: rng.next_u64() % 5_000,
                 calibration_id: format!("cal-{domain}-{}", clock_ticks[clock_index]),
+                mapping_valid_from_ns: clock_ticks[clock_index].saturating_sub(10_000),
                 mapping_valid_through_ns: clock_ticks[clock_index] + 10_000,
                 mapping_receipt_ref: format!("synthetic://mapping/{domain}/{}", clock_ticks[clock_index]),
                 mapping_receipt_sha256: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
@@ -1500,6 +1544,7 @@ mod tests {
             offset_ns: -250_000,
             uncertainty_ns: 50_000,
             calibration_id: "calibration-backwards".to_owned(),
+            mapping_valid_from_ns: 0,
             mapping_valid_through_ns: 60,
             mapping_receipt_ref: "synthetic://mapping/backwards".to_owned(),
             mapping_receipt_sha256: "d".repeat(64),
