@@ -15,11 +15,11 @@ use thiserror::Error;
 
 use crate::{EventTraceDisposition, GateState};
 use crate::event_order_v0_2::{
-    BitemporalEventEnvelope, QualifiedEventTime, StopScope, compare_qualified_event_times,
+    BitemporalEventEnvelope, QualifiedEventTime, compare_qualified_event_times,
 };
 
-pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.2";
-pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.3";
+pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.1";
+pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.2";
 pub const MAX_GENERATED_EVENTS: usize = 4_096;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,18 +34,10 @@ pub struct VirtualSchedule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ActionClockTimeReference {
-    pub clock_mapping_action_id: String,
-    pub local_timestamp_ns: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduledAction {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
-    #[serde(default)]
-    pub owner_time_ref: Option<ActionClockTimeReference>,
     pub action: ScheduleAction,
 }
 
@@ -133,46 +125,27 @@ pub enum ScheduleAction {
     StopTriggered {
         obligation_id: String,
         policy_revision: String,
-        scope: StopScope,
-        receipt_ref: String,
-        receipt_sha256: String,
     },
     StopPolicyRevised {
         obligation_id: String,
         policy_revision: String,
-        scope: StopScope,
-        receipt_ref: String,
-        receipt_sha256: String,
     },
     StopDischarged {
         obligation_id: String,
         trigger_action_id: String,
         policy_revision_action_id: String,
         policy_revision: String,
-        scope: StopScope,
-        in_flight_inventory_frontier_event_id: String,
-        in_flight_attempt_manifest_sha256: String,
         receipt_ref: String,
         receipt_sha256: String,
     },
     EffectAttempted {
         operation_id: String,
         attempt_id: String,
-        #[serde(default)]
-        retry_of_attempt_id: Option<String>,
     },
     EffectCommitted {
         operation_id: String,
         attempt_id: String,
         effect_id: String,
-        receipt_ref: String,
-        receipt_sha256: String,
-    },
-    AttemptInventoryAttested {
-        scope: StopScope,
-        attempt_manifest_sha256: String,
-        receipt_ref: String,
-        receipt_sha256: String,
     },
     AttemptReconciled {
         operation_id: String,
@@ -252,7 +225,6 @@ pub struct ReplayRecord {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
-    pub owner_time_ref: Option<ActionClockTimeReference>,
     pub disposition: SchedulerDisposition,
     pub action: ScheduleAction,
 }
@@ -1011,7 +983,6 @@ fn push_action(
         action_id: format!("action-{ordinal:06}"),
         at_ns,
         ordinal,
-        owner_time_ref: None,
         action,
     });
 }
@@ -1858,8 +1829,7 @@ pub fn generate_cancellation_commit_race_schedule(
         ScheduleAction::EffectAttempted {
             operation_id: operation_id.clone(),
             attempt_id: attempt_id.clone(),
-        
-            retry_of_attempt_id: None,},
+        },
     );
     // The next ordinal is the exact ID of the trigger action below.
     let trigger_action_id = format!("action-{ordinal:06}");
@@ -1870,10 +1840,7 @@ pub fn generate_cancellation_commit_race_schedule(
         ScheduleAction::StopTriggered {
             obligation_id: obligation_id.clone(),
             policy_revision: "policy-v1".to_owned(),
-        
-            scope: StopScope::Global,
-            receipt_ref: "synthetic://stop-trigger".to_owned(),
-            receipt_sha256: "b".repeat(64),},
+        },
     );
     push_action(
         &mut actions,
@@ -1894,9 +1861,7 @@ pub fn generate_cancellation_commit_race_schedule(
                 ScheduleAction::EffectCommitted {
                     operation_id: operation_id.clone(),
                     attempt_id: attempt_id.clone(),
-                    effect_id: format!("effect-{seed:016x
-            receipt_ref: "synthetic://effect-commit".to_owned(),
-            receipt_sha256: "a".repeat(64),}"),
+                    effect_id: format!("effect-{seed:016x}"),
                 },
             );
             push_action(
@@ -1928,9 +1893,7 @@ pub fn generate_cancellation_commit_race_schedule(
                 ScheduleAction::EffectCommitted {
                     operation_id: operation_id.clone(),
                     attempt_id: attempt_id.clone(),
-                    effect_id: format!("effect-{seed:016x
-            receipt_ref: "synthetic://effect-commit".to_owned(),
-            receipt_sha256: "a".repeat(64),}"),
+                    effect_id: format!("effect-{seed:016x}"),
                 },
             );
         }
@@ -1956,10 +1919,7 @@ pub fn generate_cancellation_commit_race_schedule(
             trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: trigger_action_id,
             policy_revision: "policy-v1".to_owned(),
-            receipt_ref: format!("synthetic://stop-discharge/{seed:016x
-            scope: StopScope::Global,
-            in_flight_inventory_frontier_event_id: "synthetic://inventory-frontier".to_owned(),
-            in_flight_attempt_manifest_sha256: "d".repeat(64),}"),
+            receipt_ref: format!("synthetic://stop-discharge/{seed:016x}"),
             receipt_sha256: "e".repeat(64),
         },
     );
@@ -2208,10 +2168,7 @@ mod tests {
             ScheduleAction::StopTriggered {
                 obligation_id: "stop-1".to_owned(),
                 policy_revision: "policy-1".to_owned(),
-            
-            scope: StopScope::Global,
-            receipt_ref: "synthetic://stop-trigger".to_owned(),
-            receipt_sha256: "b".repeat(64),},
+            },
         );
         push_action(
             &mut schedule.actions,
@@ -2220,8 +2177,7 @@ mod tests {
             ScheduleAction::EffectAttempted {
                 operation_id: "op-1".to_owned(),
                 attempt_id: "attempt-1".to_owned(),
-            
-            retry_of_attempt_id: None,},
+            },
         );
         push_action(
             &mut schedule.actions,
@@ -2231,9 +2187,7 @@ mod tests {
                 operation_id: "op-1".to_owned(),
                 attempt_id: "attempt-1".to_owned(),
                 effect_id: "effect-1".to_owned(),
-            
-            receipt_ref: "synthetic://effect-commit".to_owned(),
-            receipt_sha256: "a".repeat(64),},
+            },
         );
         let report = replay_virtual_schedule(&schedule).expect("fault schedule replays");
         assert!(report.records.iter().any(|record| {
@@ -2251,49 +2205,31 @@ mod tests {
         let trigger_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::StopTriggered {
             obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
-        
-            scope: StopScope::Global,
-            receipt_ref: "synthetic://stop-trigger".to_owned(),
-            receipt_sha256: "b".repeat(64),});
+        });
         push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::StopDischarged {
             obligation_id: obligation.to_owned(), trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: trigger_action_id.clone(), policy_revision: "policy-v1".to_owned(),
             receipt_ref: "receipt-v1".to_owned(), receipt_sha256: "a".repeat(64),
-        
-            scope: StopScope::Global,
-            in_flight_inventory_frontier_event_id: "synthetic://inventory-frontier".to_owned(),
-            in_flight_attempt_manifest_sha256: "d".repeat(64),});
+        });
         let revised_policy_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::StopPolicyRevised {
             obligation_id: obligation.to_owned(), policy_revision: "policy-v2".to_owned(),
-        
-            scope: StopScope::Global,
-            receipt_ref: "synthetic://stop-policy-revision".to_owned(),
-            receipt_sha256: "c".repeat(64),});
+        });
         push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::StopDischarged {
             obligation_id: obligation.to_owned(), trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: trigger_action_id.clone(), policy_revision: "policy-v1".to_owned(),
             receipt_ref: "stale-receipt".to_owned(), receipt_sha256: "b".repeat(64),
-        
-            scope: StopScope::Global,
-            in_flight_inventory_frontier_event_id: "synthetic://inventory-frontier".to_owned(),
-            in_flight_attempt_manifest_sha256: "d".repeat(64),});
+        });
         push_action(&mut schedule.actions, &mut ordinal, t + 4, ScheduleAction::StopDischarged {
             obligation_id: obligation.to_owned(), trigger_action_id: "substituted-trigger".to_owned(),
             policy_revision_action_id: revised_policy_action_id.clone(), policy_revision: "policy-v2".to_owned(),
             receipt_ref: "substituted-trigger".to_owned(), receipt_sha256: "c".repeat(64),
-        
-            scope: StopScope::Global,
-            in_flight_inventory_frontier_event_id: "synthetic://inventory-frontier".to_owned(),
-            in_flight_attempt_manifest_sha256: "d".repeat(64),});
+        });
         push_action(&mut schedule.actions, &mut ordinal, t + 5, ScheduleAction::StopDischarged {
             obligation_id: obligation.to_owned(), trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: revised_policy_action_id, policy_revision: "policy-v2".to_owned(),
             receipt_ref: "receipt-v2".to_owned(), receipt_sha256: "d".repeat(64),
-        
-            scope: StopScope::Global,
-            in_flight_inventory_frontier_event_id: "synthetic://inventory-frontier".to_owned(),
-            in_flight_attempt_manifest_sha256: "d".repeat(64),});
+        });
         let report = replay_virtual_schedule(&schedule).expect("replay");
         let discharge_dispositions: Vec<_> = report.records.iter().filter_map(|record| {
             if matches!(record.action, ScheduleAction::StopDischarged { .. }) {
@@ -2500,15 +2436,12 @@ mod tests {
         let t = 20_000;
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::EffectAttempted {
             operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
-        
-            retry_of_attempt_id: None,});
+        });
         for (offset, effect_id) in [(1, "effect-a"), (2, "effect-a"), (3, "effect-b")] {
             push_action(&mut schedule.actions, &mut ordinal, t + offset, ScheduleAction::EffectCommitted {
                 operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
                 effect_id: effect_id.to_owned(),
-            
-            receipt_ref: "synthetic://effect-commit".to_owned(),
-            receipt_sha256: "a".repeat(64),});
+            });
         }
         let report = replay_virtual_schedule(&schedule).expect("replay");
         let dispositions: Vec<_> = report.records.iter().filter_map(|record| {
@@ -2534,8 +2467,7 @@ mod tests {
         let t = 20_000;
         push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::EffectAttempted {
             operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
-        
-            retry_of_attempt_id: None,});
+        });
         for (offset, outcome, receipt_ref, digest) in [
             (1, ReconciliationOutcome::NotApplied, "terminal-a", "a"),
             (2, ReconciliationOutcome::NotApplied, "terminal-a", "a"),
@@ -3087,18 +3019,12 @@ mod tests {
         let trigger_action_id = format!("action-{ordinal:06}");
         push_action(&mut schedule.actions, &mut ordinal, 20_000, ScheduleAction::StopTriggered {
             obligation_id: "digest-stop".to_owned(), policy_revision: "policy-1".to_owned(),
-        
-            scope: StopScope::Global,
-            receipt_ref: "synthetic://stop-trigger".to_owned(),
-            receipt_sha256: "b".repeat(64),});
+        });
         push_action(&mut schedule.actions, &mut ordinal, 20_001, ScheduleAction::StopDischarged {
             obligation_id: "digest-stop".to_owned(), trigger_action_id: trigger_action_id.clone(),
             policy_revision_action_id: trigger_action_id, policy_revision: "policy-1".to_owned(),
             receipt_ref: "receipt".to_owned(), receipt_sha256: "z".repeat(64),
-        
-            scope: StopScope::Global,
-            in_flight_inventory_frontier_event_id: "synthetic://inventory-frontier".to_owned(),
-            in_flight_attempt_manifest_sha256: "d".repeat(64),});
+        });
         assert!(matches!(validate_schedule(&schedule), Err(ReplayError::MalformedSha256("stop_discharge_receipt_sha256"))));
     }
 
