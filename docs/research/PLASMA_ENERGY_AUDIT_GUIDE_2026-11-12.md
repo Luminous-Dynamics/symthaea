@@ -252,3 +252,8 @@ The merged source registry adds a coaxial DBD experiment for humidified CO2-to-s
 This is a different feed/product lane from dry warm-arc CO2-to-CO quenching. H2/CO ratio is not conversion or CO selectivity. Three new controls refuse feed/product comparability errors, pure-feed/humidified-point mixing and metric-semantic substitution.
 
 The audit-branch source corpus now contains **38 source cases / 49 negative controls / 5 derived checks**.
+
+
+## 9.21 Adjacent DBD syngas source lane — 2026-11-15
+
+The merged corpus adds an experimental coaxial DBD source for humidified CO2-to-syngas, RSC Advances 16 (2026), DOI 10.1039/D5YA00293A. The reported 4.5–23.3% energy-efficiency range and H2/CO ratio 0.1–0.2 belong to humidified CO2/H2O cases; a 13.3% pure-CO2 point is separate. Do not compare these directly with dry warm-arc CO2-to-CO quench results. H2/CO ratio is a composition metric, not conversion or selectivity.
