@@ -201,6 +201,38 @@ Report:
 
 Stretch target: at least 20% lower total evaluation cost to reach a matched robust-feasible frontier on held-out campaigns without increasing false-feasible decisions. This is an aspirational research target, not an achieved result or industry standard.
 
+## 6.1 2026 SOTA framing and fair competitor lanes
+
+Recent 2026 reviews describe a converging field sometimes called **Topology Optimization Informatics**: physics-driven iterative optimization and data-driven/generative design are treated as complementary information–physics co-modeling strategies, not as interchangeable solvers. AI-assisted topology optimization spans one-shot design generation, surrogate-assisted solver loops, deep learning, reinforcement learning, physics-informed methods, multi-physics/multi-scale optimization and uncertainty quantification. The review literature identifies domain shift, physical consistency, fabrication constraints, uncertainty and experimental validation as continuing barriers.
+
+A separate 2026 review of AI for spatial structures explicitly includes trusses, gridshells, tensegrities, cable domes and joint/connection design. This is directly relevant to orbital trusses, segmented rotating rings, spokes, modular joints and robotic assembly. It suggests that joint geometry/compliance, inspectability and assembly access should be first-class candidate variables—not treated as a fixed post-processing detail.
+
+Our fair comparison should freeze the same design domains, model/mesh families, boundary conditions, material/process evidence, constraints, candidate budgets and evaluation budgets across:
+1. Classical SIMP/ESO-BESO/level-set solver-in-the-loop topology optimization.
+2. One-shot AI topology generation (only when the training distribution and held-out domain are disclosed).
+3. Surrogate-assisted iterative optimization with mandatory high-fidelity escalation.
+4. Physics-informed or reduced-order acceleration with explicit error/discrepancy bounds.
+5. Evolutionary/robust Pareto and conventional MDO/DOE baselines.
+6. Symthaea decision-value/fidelity-aware proposal selection over the same admitted solver bank.
+7. Joint-aware spatial/lattice design including interface stiffness, fastener/joint mass, tool access, inspection observability and replaceability.
+
+Do not compare a generated geometry's inference time with a complete converged FEM workflow and call it a solver speedup. Report:
+- time/compute to first independently verified feasible candidate;
+- false-feasible rate and denominator on held-out cases;
+- robust Pareto-frontier recovery and regret after high-fidelity re-evaluation;
+- total solver, surrogate-training, data-preparation, failed-run and physical-test cost;
+- performance under unseen geometry, load, material/process and manufacturing regimes;
+- fabricated coupon/joint/subassembly agreement where such data exist;
+- process-aware constraints such as minimum feature size, overhang/support, build orientation, machining access, thermal distortion, porosity and anisotropy.
+
+The research advantage we should seek is **lower total engineering/validation cost per robust, manufacturable and independently supported design decision**, without increasing false-feasible outcomes. A surrogate or generated topology may reduce exploration cost, but only an admitted physical model and relevant validation evidence can support an engineering claim.
+
+Research anchors:
+- [Topology Optimization Informatics review (2026)](https://www.techscience.com/CMES/v147n1/67149/html), published 27 April 2026.
+- [AI-aided design/topology optimization review (2026)](https://journals.sagepub.com/doi/10.1177/16878132261489711), first published 21 September 2026.
+- [Generative design for additive-manufactured lattice structures (2026)](https://www.sciencedirect.com/science/article/pii/S0264127526000018), February 2026.
+- [AI for spatial structures and joints review (2026)](https://www.sciencedirect.com/science/article/pii/S2352710226000872), 15 February 2026.
+
 ## 7. Evidence gates and negative controls
 
 No candidate may become decision-eligible when any of these are present:
