@@ -1,0 +1,46 @@
+name: AIRROAD Structured MIMO Generator Support Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_STRUCTURED_MIMO_GENERATOR_SUPPORT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-structured-mimo-generator-support-v0.1.json"
+      - "tools/airroad-structured-mimo-generator-support/verify_structured_support.py"
+      - ".github/workflows/airroad-structured-mimo-generator-support-reference.yml"
+  push:
+    branches:
+      - research/airroad-structured-mimo-generator-support-v0.1
+    paths:
+      - "docs/research/AIRROAD_STRUCTURED_MIMO_GENERATOR_SUPPORT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-structured-mimo-generator-support-v0.1.json"
+      - "tools/airroad-structured-mimo-generator-support/verify_structured_support.py"
+      - ".github/workflows/airroad-structured-mimo-generator-support-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-structured-mimo-generator-support-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-structured-support-cover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute support/outer-cover oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-structured-mimo-generator-support/verify_structured_support.py
+          python3 \
+            tools/airroad-structured-mimo-generator-support/verify_structured_support.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-structured-mimo-generator-support-v0.1.json \
+            > /dev/null
