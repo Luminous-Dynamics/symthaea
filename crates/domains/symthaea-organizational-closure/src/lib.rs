@@ -30,12 +30,11 @@ pub mod semantic_continuity;
 pub mod viability;
 
 pub use algorithmic_residual::{
-    AgentEvidenceReceipt, AlgorithmGraphOutput, CausalGraph, EdgeEditOperation,
-    EvidenceBackedEdgeEdit, EvidenceKind, EvidenceReceiptOracle, EvidenceReceiptStatus,
-    GraphQualityMetrics, ResidualDirectedEdge, ResidualDiscoveryOracle,
+    AgentEvidenceReceipt, AlgorithmGraphOutput, BaselineSelectionOracle, CausalGraph,
+    EdgeEditOperation, EvidenceBackedEdgeEdit, EvidenceKind, EvidenceReceiptOracle,
+    EvidenceReceiptStatus, GraphQualityMetrics, ResidualDirectedEdge, ResidualDiscoveryOracle,
     ResidualDiscoveryReport, ResidualDiscoveryScenario, ResidualDiscoveryTrace,
-    ResidualFinding, ResidualFindingCode, ResidualQualification,
-    evaluate_algorithmic_residual,
+    ResidualFinding, ResidualFindingCode, ResidualQualification, evaluate_algorithmic_residual,
 };
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
