@@ -32,6 +32,8 @@ pub enum MusicEditEvidenceKindV1 {
     Metamorphic,
     RightsAdmission,
     ReferenceAdjudication,
+    /// Verified capability-qualified realization receipt bound to this attempt.
+    RealizationExecution,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -517,10 +519,10 @@ pub fn validate_music_edit_transaction_v1(
     issues
 }
 
-fn required_record<'a>(
-    attempt: &'a MusicEditCandidateAttemptV1,
+fn required_record(
+    attempt: &MusicEditCandidateAttemptV1,
     kind: MusicEditEvidenceKindV1,
-) -> Option<&'a MusicEditEvidenceRecordV1> {
+) -> Option<&MusicEditEvidenceRecordV1> {
     attempt.evidence.iter().find(|record| record.kind == kind)
 }
 

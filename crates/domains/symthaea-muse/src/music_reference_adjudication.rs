@@ -210,6 +210,7 @@ impl std::fmt::Display for MusicReferenceReviewIssueV1 {
 }
 impl std::error::Error for MusicReferenceReviewIssueV1 {}
 
+#[cfg(test)]
 fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut result = String::with_capacity(bytes.len() * 2);
@@ -221,7 +222,7 @@ fn encode_hex(bytes: &[u8]) -> String {
 }
 
 fn decode_hex(value: &str) -> Result<Vec<u8>, MusicReferenceReviewIssueV1> {
-    if value.is_empty() || value.len() % 2 != 0 {
+    if value.is_empty() || !value.len().is_multiple_of(2) {
         return Err(MusicReferenceReviewIssueV1::InvalidHex);
     }
     let mut result = Vec::with_capacity(value.len() / 2);
@@ -477,17 +478,30 @@ pub fn evaluate_music_reference_review_panel_v1(
     Ok(receipt)
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MusicReferenceReviewPanelVerificationContextV1<'a> {
+    pub task: &'a MusicReferenceReviewTaskV1,
+    pub credentials: &'a [MusicReviewerCredentialV1],
+    pub judgments: &'a [SignedMusicReferenceReviewV1],
+    pub trust_bundle: &'a SignedMusicReviewTrustBundleV1,
+    pub trust_root: &'a MusicReviewTrustRootV1,
+    pub policy: &'a MusicReviewPanelPolicyV1,
+    pub now: u64,
+}
+
 pub fn verify_music_reference_review_panel_receipt_v1(
     receipt: &MusicReviewPanelReceiptV1,
-    task: &MusicReferenceReviewTaskV1,
-    credentials: &[MusicReviewerCredentialV1],
-    judgments: &[SignedMusicReferenceReviewV1],
-    trust_bundle: &SignedMusicReviewTrustBundleV1,
-    trust_root: &MusicReviewTrustRootV1,
-    policy: &MusicReviewPanelPolicyV1,
-    now: u64,
+    context: MusicReferenceReviewPanelVerificationContextV1<'_>,
 ) -> Vec<MusicReferenceReviewIssueV1> {
-    match evaluate_music_reference_review_panel_v1(task, credentials, judgments, trust_bundle, trust_root, policy, now) {
+    match evaluate_music_reference_review_panel_v1(
+        context.task,
+        context.credentials,
+        context.judgments,
+        context.trust_bundle,
+        context.trust_root,
+        context.policy,
+        context.now,
+    ) {
         Ok(expected) if &expected == receipt => Vec::new(),
         Ok(_) => vec![MusicReferenceReviewIssueV1::ReceiptMismatch],
         Err(issues) => issues,
@@ -598,7 +612,10 @@ mod tests {
         let receipt = evaluate_music_reference_review_panel_v1(&t,&c,&r,&b,&root,&p,100).unwrap();
         assert_eq!(receipt.adequacy, MusicReferenceReviewAdequacyV1::Validated);
         assert_eq!(receipt.distinct_reviewer_key_count, 2);
-        assert!(verify_music_reference_review_panel_receipt_v1(&receipt,&t,&c,&r,&b,&root,&p,100).is_empty());
+        assert!(verify_music_reference_review_panel_receipt_v1(&receipt, MusicReferenceReviewPanelVerificationContextV1 {
+            task: &t, credentials: &c, judgments: &r, trust_bundle: &b,
+            trust_root: &root, policy: &p, now: 100,
+        }).is_empty());
     }
 
     #[test]
@@ -713,7 +730,10 @@ mod tests {
         let receipt = evaluate_music_reference_review_panel_v1(&t,&c,&r,&b,&root,&p,100).unwrap();
         let mut changed = receipt.clone();
         changed.adequacy = MusicReferenceReviewAdequacyV1::Invalid;
-        assert!(verify_music_reference_review_panel_receipt_v1(&changed,&t,&c,&r,&b,&root,&p,100)
+        assert!(verify_music_reference_review_panel_receipt_v1(&changed, MusicReferenceReviewPanelVerificationContextV1 {
+            task: &t, credentials: &c, judgments: &r, trust_bundle: &b,
+            trust_root: &root, policy: &p, now: 100,
+        })
             .contains(&MusicReferenceReviewIssueV1::ReceiptMismatch));
     }
 }

@@ -5,6 +5,7 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/music_edit_validity_envelope.rs"
       - "crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs"
+      - "crates/domains/symthaea-muse/src/music_reference_adjudication.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "tools/mel-music-edit-adapter-harness/**"
       - "benchmarks/mel/schemas/music-edit-validity-envelope-v1.schema.json"
@@ -48,6 +49,7 @@ jobs:
           cp tools/mel-music-edit-adapter-harness/src/lib.rs "$staged/src/lib.rs"
           cp crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs "$staged/src/music_edit_benchmark_adapter.rs"
           cp crates/domains/symthaea-muse/src/music_edit_validity_envelope.rs "$staged/src/music_edit_validity_envelope.rs"
+          cp crates/domains/symthaea-muse/src/music_reference_adjudication.rs "$staged/src/music_reference_adjudication.rs"
           cp tools/mel-music-edit-adapter-harness/examples/validate_validity_envelope.rs "$staged/examples/validate_validity_envelope.rs"
           cp benchmarks/mel/registry/synthetic-music-edit-validity-envelope-v1.json "$staged/fixtures/"
           echo "MEL_VALIDITY_ENVELOPE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
