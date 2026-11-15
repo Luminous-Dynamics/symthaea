@@ -133,6 +133,9 @@ pub enum ProposalReason {
     EmptyPhysicsOrObservableSet,
     DuplicatePhysicsOrObservable,
     OffEarthMaterialNotAdmitted,
+    ModelProfileIdentityMismatch,
+    BackendIdentityMismatch,
+    MaterialProfileMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,6 +145,7 @@ pub struct StructuralCandidateContext {
     pub geometry: ArtifactRef,
     pub material: ArtifactRef,
     pub process_batch: Option<ArtifactRef>,
+    pub material_qualified_profile_id: Option<String>,
     pub load_case: ArtifactRef,
     pub frame: ArtifactRef,
     pub material_evidence: MaterialEvidenceState,
@@ -152,6 +156,8 @@ pub struct StructuralProposalIntent {
     pub proposal_id: String,
     pub context: StructuralCandidateContext,
     pub model_profile: StructuralModelProfile,
+    pub model_profile_ref: ArtifactRef,
+    pub backend_ref: ArtifactRef,
     pub requested_physics: Vec<PhysicsTerm>,
     pub requested_observables: Vec<Observable>,
     pub intended_use: IntendedUse,
@@ -169,6 +175,8 @@ pub struct StructuralAnalysisProposal {
     pub load_case: ArtifactRef,
     pub frame: ArtifactRef,
     pub model_profile: StructuralModelProfile,
+    pub model_profile_ref: ArtifactRef,
+    pub backend_ref: ArtifactRef,
     pub model_profile_version: String,
     pub model_source_repository: String,
     pub model_source_commit: String,
@@ -221,6 +229,22 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
             .is_some_and(|reference| !reference.validate())
     {
         reasons.push(ProposalReason::ReferenceMalformed);
+    }
+
+    if !intent.model_profile_ref.validate() || !intent.backend_ref.validate() {
+        reasons.push(ProposalReason::ReferenceMalformed);
+    }
+
+    let expected_profile_id = match intent.model_profile {
+        StructuralModelProfile::ThinRotatingRingV0_1 => "ARTGRAV-THIN-RING-REF-V0_1",
+        StructuralModelProfile::UniformRadialSpokeV0_1 => "ARTGRAV-RADIAL-SPOKE-REF-V0_1",
+        _ => "",
+    };
+    if expected_profile_id.is_empty() || intent.model_profile_ref.id != expected_profile_id {
+        reasons.push(ProposalReason::ModelProfileIdentityMismatch);
+    }
+    if intent.backend_ref.id != "artgrav-prestress-reference" {
+        reasons.push(ProposalReason::BackendIdentityMismatch);
     }
 
     let (supported_physics, supported_observables) = match intent.model_profile {
@@ -288,6 +312,13 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
             reasons.push(ProposalReason::MaterialEvidenceInsufficient);
         }
         MaterialEvidenceState::BatchQualifiedForProfile => {
+            // A batch qualification is profile-specific; never transfer it to a
+            // different analytical/numerical model by material-name similarity.
+            if intent.context.material_qualified_profile_id.as_deref()
+                != Some(expected_profile_id)
+            {
+                reasons.push(ProposalReason::MaterialProfileMismatch);
+            }
             // These two draft analytical profiles do not yet admit batch-specific
             // engineering property evidence as a basis for a real design decision.
             reasons.push(ProposalReason::OffEarthMaterialNotAdmitted);
@@ -328,6 +359,8 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
         load_case: intent.context.load_case.clone(),
         frame: intent.context.frame.clone(),
         model_profile: intent.model_profile,
+        model_profile_ref: intent.model_profile_ref.clone(),
+        backend_ref: intent.backend_ref.clone(),
         model_profile_version: "0.1.0".to_owned(),
         model_source_repository: "Luminous-Dynamics/symtropy".to_owned(),
         model_source_commit: SYMTROPY_PRESTRESS_DRAFT_HEAD.to_owned(),
@@ -373,11 +406,14 @@ mod tests {
                 geometry: reference("RING-GEOMETRY-001", "g1", '3'),
                 material: reference("ANALYTICAL-MATERIAL-FIXTURE-001", "mat1", '4'),
                 process_batch: None,
+                material_qualified_profile_id: None,
                 load_case: reference("STEADY-RING-SPIN-001", "l1", '5'),
                 frame: reference("RING-LOCAL-FRAME-001", "f1", '6'),
                 material_evidence: MaterialEvidenceState::AnalyticalFixtureOnly,
             },
             model_profile: StructuralModelProfile::ThinRotatingRingV0_1,
+            model_profile_ref: reference("ARTGRAV-THIN-RING-REF-V0_1", "0.1.0", '7'),
+            backend_ref: reference("artgrav-prestress-reference", "0.1.0", '8'),
             requested_physics: vec![
                 PhysicsTerm::SteadyUniformRotation,
                 PhysicsTerm::ThinRingMembrane,
@@ -397,6 +433,8 @@ mod tests {
         assert_eq!(result.disposition, ProposalDisposition::EmittedForSymtropyAdmission);
         let proposal = result.proposal.expect("proposal should be emitted");
         assert_eq!(proposal.model_source_commit, SYMTROPY_PRESTRESS_DRAFT_HEAD);
+        assert_eq!(proposal.model_profile_ref.id, "ARTGRAV-THIN-RING-REF-V0_1");
+        assert_eq!(proposal.backend_ref.id, "artgrav-prestress-reference");
         assert_eq!(proposal.claim_ceiling, "SYNTHETIC_REFERENCE_CHECK");
         assert!(!proposal.solver_execution_requested);
         assert!(!proposal.execution_authorized);
@@ -441,6 +479,8 @@ mod tests {
         let mut intent = ring_intent();
         intent.context.material_evidence = MaterialEvidenceState::BatchQualifiedForProfile;
         intent.context.process_batch = Some(reference("LUNAR-BATCH-001", "b1", '7'));
+        intent.context.material_qualified_profile_id =
+            Some("ARTGRAV-THIN-RING-REF-V0_1".to_owned());
         let result = emit_structural_proposal(&intent);
         assert_eq!(result.disposition, ProposalDisposition::Abstain);
         assert!(result.reason_codes.contains(&ProposalReason::OffEarthMaterialNotAdmitted));
