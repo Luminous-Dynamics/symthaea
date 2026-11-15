@@ -35,3 +35,8 @@ Missing values remain null with an explicit reason; they are never imputed as ze
 The published KPI reference remains ISO 22400-2:2014 (with the applicable amendment). As of 15 November 2026, ISO/PRF 22400-2 Edition 2 entered the approval phase on 13 November 2026 but is not yet published. Keep KPI definition versions explicit and update the standard mapping after publication; do not claim conformity with an unpublished edition.
 
 ISO 23247-5:2026 is published and provides a digital-thread architecture reference. NIST IR 8536 (September 2026) supports interoperability over uniformity across heterogeneous supply-chain records. This corpus uses those as design references, not conformity claims.
+
+
+### Executable arithmetic companion
+
+[draft PR #12364](https://github.com/Luminous-Dynamics/symthaea/pull/12364) adds dependency-free Rust calculators for the first eight KPI calculations/aggregations. The dictionary links the implemented functions directly to their metric definitions and marks them as authored but untested. The calculator does not perform source-data extraction, calibration, or measurement validation.
