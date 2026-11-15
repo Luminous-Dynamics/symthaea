@@ -288,13 +288,13 @@ fn uniquely_dominant_tack(
         (Some(_), None) => Some(TackSide::Port),
         (None, Some(_)) => Some(TackSide::Starboard),
         (Some(port), Some(starboard)) => {
-            if port_max_possible_vmg.is_some_and(|upper| {
-                port.ground_velocity_made_good_mps.lower > upper
-            }) {
+            if starboard_max_possible_vmg
+                .is_some_and(|upper| port.ground_velocity_made_good_mps.lower > upper)
+            {
                 Some(TackSide::Port)
-            } else if starboard_max_possible_vmg.is_some_and(|upper| {
-                starboard.ground_velocity_made_good_mps.lower > upper
-            }) {
+            } else if port_max_possible_vmg
+                .is_some_and(|upper| starboard.ground_velocity_made_good_mps.lower > upper)
+            {
                 Some(TackSide::Starboard)
             } else {
                 None
