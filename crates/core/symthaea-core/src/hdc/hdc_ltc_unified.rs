@@ -3135,6 +3135,47 @@ mod tests {
         );
     }
 
+
+    /// The fused/SIMD path uses a rational tanh approximation. Verify its
+    /// output remains within the documented approximation envelope of the
+    /// allocating scalar reference for the same state, parameters and input.
+    #[test]
+    fn fused_closed_form_matches_scalar_reference_within_tanh_approximation_bound() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            activation: UnifiedActivation::Tanh,
+            ..UnifiedConfig::default()
+        };
+        let mut scalar = HdcLtcUnifiedNeuron::new(config, 442);
+        let mut fused = scalar.clone();
+        let initial: Vec<f32> = (0..dimension)
+            .map(|i| ((i as f32) * 0.037).sin() * 0.4)
+            .collect();
+        let input_values: Vec<f32> = (0..dimension)
+            .map(|i| ((i as f32 + 9.0) * 0.053).cos() * 0.6)
+            .collect();
+        let initial_hv = ContinuousHV::from_values(initial);
+        let input = ContinuousHV::from_values(input_values);
+        scalar.set_state(initial_hv.clone());
+        fused.set_state(initial_hv);
+
+        scalar.evolve_closed_form(0.037, &input);
+        fused.evolve_closed_form_fused(0.037, &input);
+
+        let max_error = scalar
+            .state()
+            .values
+            .iter()
+            .zip(fused.state().values.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_error < 5e-3,
+            "fused/SIMD tanh path exceeded the declared approximation envelope: max error={max_error}"
+        );
+    }
+
     /// Acceptance regression for the currently known zero-time identity defect.
     ///
     /// This is intentionally ignored until a candidate update law is selected.
