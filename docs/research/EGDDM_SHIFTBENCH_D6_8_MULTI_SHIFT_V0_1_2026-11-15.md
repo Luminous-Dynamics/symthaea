@@ -82,6 +82,8 @@ Retain all D6 terminal and longitudinal measures and add:
 - **revalidation churn:** repeated checks caused by discarded or lost still-valid evidence;
 - **path dependence:** difference in disposition/cost between histories that reach the same final state, where the reuse theorem says the histories should be equivalent;
 - **terminal/longitudinal divergence:** final success despite earlier critical unsupported intervals;
+- **unclaimed obligation coverage:** active obligations the agent explicitly does not claim current, separated from unsupported current claims;
+- **critical abstention:** critical obligations left unclaimed at a checkpoint; report risk-versus-coverage rather than rewarding an agent that abstains on everything;
 - **sequence cost regret:** candidate cost against the D6.7 cost-aware oracle and conservative full-rerun baseline, once those costs are independently measured.
 
 Do not create a single composite score. Report risk, recovery, cost, and uncertainty separately. Critical false-resurrection, authority, and safety failures remain hard gates.
@@ -154,6 +156,7 @@ Pin model/harness versions, system prompts, tool permissions, context, runner im
 - Positive, negative, sham, and no-op controls expose both under- and over-invalidation.
 - v0.1 accepts only strictly ordered events; partial-order/concurrent-event scoring is a deferred extension, not a current capability.
 - Terminal success does not erase prior critical unsupported exposure.
+- Active-but-unclaimed and critical-unclaimed obligations are reported separately; abstention is not conflated with a false-ready claim or treated as a successful qualification.
 - Candidate-visible data contains no gold labels, hidden obligations, reference patches, or grader credentials.
 - Unknown cost or impact remains unknown/bounded; it never silently becomes zero.
 - Existing D6 single-shift and D6.6 equal-cost fixtures retain their original semantics and remain regression controls.
@@ -178,8 +181,8 @@ These benchmarks are complementary, not directly score-comparable. D6.8's propos
 - The branch is based on D6.6 PR #12351's source branch.
 - Added `tools/development-map-validator/src/multi_shift_sequence.rs`, exported it from `lib.rs`, and wired the `multi-shift-sequence <bundle.json>` CLI command in `main.rs`.
 - Added the input bundle schema, deterministic input fixture, output report schema, and full expected-output fixture.
-- Authored Rust tests for full known-answer equality, false resurrection, stale dependency reuse, source-epoch laundering by rewritten context, future evidence, restoration, failed fresh checks, duplicate receipts, broken event chains, missing gold reasons, and synthetic/independent impact-label disagreement.
-- A separate JavaScript audit reproduced the fixture's derived-impact sets and trace counts: conformant 10/10 required fresh checks; adversarial 9/10 with one critical false resurrection; full-identity restoration reused all four eligible baseline receipts. The same audit found zero dependency/gold-set residuals in the synthetic fixture.
+- Authored Rust tests for full known-answer equality, false resurrection, stale dependency reuse, source-epoch laundering by rewritten context, future evidence, explicit abstention, complete restoration denominators, unknown event kinds, failed fresh checks, duplicate receipts, broken event chains, missing gold reasons, and synthetic/independent impact-label disagreement.
+- A separate JavaScript audit reproduced the fixture's direct-impact sets, source-epoch/current-context receipt decisions, checkpoint metrics and full restoration denominator: conformant 10/10 required fresh checks; adversarial 9/10 with one critical false resurrection and one unsupported critical current claim; no unclaimed obligations in either baseline trace; full-identity restoration reused all four eligible baseline receipts. The audit found zero direct-impact/gold-set residuals in the synthetic fixture.
 - The JSON files were parsed and fetched back from the branch. This is not Draft 2020-12 schema validation.
 - This environment has no `rustc`, `cargo`, `rustfmt`, or `nix`. Rust compilation/tests, formatting, Clippy, schema-engine validation, CI qualification, real task admission, independent human adjudication, model rollout, measured costs, and external replication have not been executed.
 
