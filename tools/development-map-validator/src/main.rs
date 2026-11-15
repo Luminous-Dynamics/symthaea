@@ -7,6 +7,7 @@ use development_map_validator::{
     dynamapbench::validate_dynamapbench_manifest_json,
     temporal_replay::{validate_temporal_ledger_json, replay_temporal_ledger_json},
     workspace_shift::evaluate_shift_scenario_json,
+    execution_receipt::verify_execution_receipt_json,
     validate_document_json,
 };
 
@@ -21,6 +22,7 @@ fn usage() {
     eprintln!("  development-map-validator temporal-ledger <ledger.json>");
     eprintln!("  development-map-validator temporal-replay <ledger.json> <query.json>");
     eprintln!("  development-map-validator workspace-shift <scenario.json>");
+    eprintln!("  development-map-validator execution-receipt <statement.json> <expected-context.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -327,6 +329,43 @@ fn evaluate_workspace_shift_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn verify_execution_receipt_file(args: &[String]) -> i32 {
+    if args.len() != 3 {
+        usage();
+        return 2;
+    }
+    let statement_path = &args[1];
+    let policy_path = &args[2];
+    let statement = match read_input(statement_path, "D6.3-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    let policy = match read_input(policy_path, "D6.3-IO-002") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match verify_execution_receipt_json(&statement, &policy) {
+        Err(error) => {
+            eprintln!("ERROR D6.3-RECEIPT-001 {statement_path}: {error}");
+            2
+        }
+        Ok(report) if report.valid => {
+            println!("VALID SEMANTIC_SCOPE receipt_id={}", report.receipt_id.as_deref().unwrap_or("unknown"));
+            println!("CLAIM_CEILING {}", report.claim_ceiling);
+            0
+        }
+        Ok(report) => {
+            for diagnostic in &report.diagnostics {
+                eprintln!("ERROR D6.3-RECEIPT-002 {diagnostic}");
+            }
+            eprintln!("INVALID SEMANTIC_SCOPE diagnostics={}", report.diagnostics.len());
+            eprintln!("CLAIM_CEILING {}", report.claim_ceiling);
+            1
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -346,6 +385,7 @@ fn main() {
         "temporal-ledger" => validate_temporal_ledger_file(&args),
         "temporal-replay" => replay_temporal_ledger_file(&args),
         "workspace-shift" => evaluate_workspace_shift_file(&args),
+        "execution-receipt" => verify_execution_receipt_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();

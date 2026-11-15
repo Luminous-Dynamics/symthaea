@@ -1,0 +1,315 @@
+{
+  "schema_version": "0.1.0",
+  "status": "proposed_security_test_matrix_not_executed",
+  "benchmark": "EGDDM D6.3 signed execution receipt and transparency verification",
+  "sources": [
+    "https://www.rfc-editor.org/rfc/rfc9943.html",
+    "https://slsa.dev/spec/v1.2/build-provenance",
+    "https://github.com/in-toto/attestation/blob/main/spec/v1/bundle.md",
+    "https://github.com/in-toto/attestation/blob/main/spec/predicates/test-result.md",
+    "https://docs.sigstore.dev/logging/overview/"
+  ],
+  "test_case_count": 33,
+  "positive_cases": 8,
+  "negative_cases": 25,
+  "cases": [
+    {
+      "id": "D63-POS-001",
+      "category": "positive",
+      "layer": "statement",
+      "claim": "runner_execution/test",
+      "setup": "Complete in-toto Statement/v1, exact predicateType, trusted runner identity, verified DSSE envelope, matching immutable subject.",
+      "expected": "accept_statement_structure_and_signature",
+      "claim_boundary": "Does not establish that the test result is accurate."
+    },
+    {
+      "id": "D63-POS-002",
+      "category": "positive",
+      "layer": "provenance",
+      "claim": "runner_execution/build",
+      "setup": "Separately signed SLSA Provenance v1.2 Statement; subject digest matches output; signer-builder pair is explicitly trusted.",
+      "expected": "accept_build_provenance_reference",
+      "claim_boundary": "Does not establish test-suite conformance."
+    },
+    {
+      "id": "D63-POS-003",
+      "category": "positive",
+      "layer": "test_result",
+      "claim": "runner_execution/test",
+      "setup": "Separately signed in-toto Test Result v0.1 Statement; subject and configuration match the EGDDM predicate.",
+      "expected": "accept_test_result_reference",
+      "claim_boundary": "Does not establish the runner platform trust base by itself."
+    },
+    {
+      "id": "D63-POS-004",
+      "category": "positive",
+      "layer": "identity",
+      "claim": "independent_regrade/test",
+      "setup": "Independent grader identity is distinct from agent and runner identities and permitted by relying-party policy.",
+      "expected": "accept_independent_grader_role",
+      "claim_boundary": "Does not prove task or oracle validity."
+    },
+    {
+      "id": "D63-POS-005",
+      "category": "positive",
+      "layer": "statement",
+      "claim": "agent_observation",
+      "setup": "Agent-signed statement carries a workload identity and exact scope but no runner execution block.",
+      "expected": "accept_agent_observation_without_execution",
+      "claim_boundary": "Must never satisfy runner or grader requirements."
+    },
+    {
+      "id": "D63-POS-006",
+      "category": "positive",
+      "layer": "statement",
+      "claim": "authority_decision",
+      "setup": "Authority-service statement carries policy digest, operation, scope and validity window but no runner execution block.",
+      "expected": "accept_authority_decision_without_execution",
+      "claim_boundary": "Does not prove the proposed action is safe."
+    },
+    {
+      "id": "D63-POS-007",
+      "category": "positive",
+      "layer": "transparency",
+      "claim": "runner_execution",
+      "setup": "Signed statement has a valid SCITT or Rekor receipt, inclusion proof, accepted checkpoint and consistency with persisted prior checkpoint.",
+      "expected": "accept_transparency_inclusion_and_consistency",
+      "claim_boundary": "Does not establish statement truth."
+    },
+    {
+      "id": "D63-POS-008",
+      "category": "positive",
+      "layer": "bundle",
+      "claim": "multi_role",
+      "setup": "Bundle contains independently valid agent, runner and grader envelopes; each is checked individually and required roles are present.",
+      "expected": "accept_bundle_after_per_entry_verification",
+      "claim_boundary": "Bundle container itself is not authenticated."
+    },
+    {
+      "id": "D63-NEG-001",
+      "category": "negative",
+      "layer": "identity",
+      "claim": "runner_execution",
+      "setup": "Claim kind is runner_execution while producer role is agent.",
+      "expected": "reject_claim_role_mismatch",
+      "attack": "Role confusion."
+    },
+    {
+      "id": "D63-NEG-002",
+      "category": "negative",
+      "layer": "identity",
+      "claim": "independent_regrade",
+      "setup": "Claim kind is independent_regrade while producer workload identity resolves to the candidate agent identity.",
+      "expected": "reject_non_independent_grader",
+      "attack": "Common-identity impersonation."
+    },
+    {
+      "id": "D63-NEG-003",
+      "category": "negative",
+      "layer": "provenance",
+      "claim": "runner_execution/build",
+      "setup": "SLSA statement subject digest differs from EGDDM output artifact digest.",
+      "expected": "reject_slsa_subject_mismatch",
+      "attack": "Provenance substitution."
+    },
+    {
+      "id": "D63-NEG-004",
+      "category": "negative",
+      "layer": "provenance",
+      "claim": "runner_execution/build",
+      "setup": "SLSA provenance is correctly signed but builder.id is not in the allowed signer-builder pair set.",
+      "expected": "reject_untrusted_signer_builder_pair",
+      "attack": "Untrusted builder platform."
+    },
+    {
+      "id": "D63-NEG-005",
+      "category": "negative",
+      "layer": "provenance",
+      "claim": "runner_execution/test",
+      "setup": "SLSA Build Provenance is supplied in place of required in-toto Test Result.",
+      "expected": "reject_wrong_predicate_for_test_claim",
+      "attack": "Predicate type confusion."
+    },
+    {
+      "id": "D63-NEG-006",
+      "category": "negative",
+      "layer": "test_result",
+      "claim": "runner_execution/build",
+      "setup": "in-toto Test Result is supplied in place of required SLSA build provenance.",
+      "expected": "reject_wrong_predicate_for_build_claim",
+      "attack": "Predicate type confusion."
+    },
+    {
+      "id": "D63-NEG-007",
+      "category": "negative",
+      "layer": "signature",
+      "claim": "any",
+      "setup": "Any signed payload byte, subject, predicate, outcome or timestamp is modified after signing.",
+      "expected": "reject_signature_verification",
+      "attack": "Tampering."
+    },
+    {
+      "id": "D63-NEG-008",
+      "category": "negative",
+      "layer": "identity",
+      "claim": "any",
+      "setup": "Signature is cryptographically valid but issuer identity is expired, revoked or outside policy.",
+      "expected": "reject_untrusted_or_revoked_identity",
+      "attack": "Stale credential."
+    },
+    {
+      "id": "D63-NEG-009",
+      "category": "negative",
+      "layer": "scope",
+      "claim": "any",
+      "setup": "Repository, revision, tree, configuration-world or artifact subject does not match the requested obligation.",
+      "expected": "reject_subject_scope_mismatch",
+      "attack": "Cross-repository or cross-world replay."
+    },
+    {
+      "id": "D63-NEG-010",
+      "category": "negative",
+      "layer": "replay",
+      "claim": "runner_execution",
+      "setup": "The same challenge ID or nonce digest is presented for a second attempt.",
+      "expected": "reject_duplicate_consumed_challenge",
+      "attack": "Replay."
+    },
+    {
+      "id": "D63-NEG-011",
+      "category": "negative",
+      "layer": "replay",
+      "claim": "runner_execution",
+      "setup": "Challenge is expired before execution completed.",
+      "expected": "reject_expired_challenge",
+      "attack": "Expired challenge."
+    },
+    {
+      "id": "D63-NEG-012",
+      "category": "negative",
+      "layer": "replay",
+      "claim": "runner_execution",
+      "setup": "Challenge was issued for a different repository, tree, obligation, runner policy or operation.",
+      "expected": "reject_challenge_scope_mismatch",
+      "attack": "Challenge substitution."
+    },
+    {
+      "id": "D63-NEG-013",
+      "category": "negative",
+      "layer": "replay",
+      "claim": "runner_execution",
+      "setup": "Challenge consumption outcome is unknown after a crash or timeout.",
+      "expected": "fail_closed_until_reconciled",
+      "attack": "Uncertain one-time state."
+    },
+    {
+      "id": "D63-NEG-014",
+      "category": "negative",
+      "layer": "authority",
+      "claim": "authority_decision",
+      "setup": "Authority decision expired or permitted scope/operation does not cover the attempted action.",
+      "expected": "reject_authority_scope_or_time",
+      "attack": "Privilege escalation."
+    },
+    {
+      "id": "D63-NEG-015",
+      "category": "negative",
+      "layer": "transparency",
+      "claim": "any",
+      "setup": "Required transparency receipt or inclusion proof is absent.",
+      "expected": "reject_missing_required_registration",
+      "attack": "Unlogged statement."
+    },
+    {
+      "id": "D63-NEG-016",
+      "category": "negative",
+      "layer": "transparency",
+      "claim": "any",
+      "setup": "Inclusion proof does not verify against the accepted signed checkpoint.",
+      "expected": "reject_invalid_inclusion_proof",
+      "attack": "Forged log membership."
+    },
+    {
+      "id": "D63-NEG-017",
+      "category": "negative",
+      "layer": "transparency",
+      "claim": "any",
+      "setup": "New checkpoint is inconsistent with persisted prior checkpoint.",
+      "expected": "reject_log_rollback_or_inconsistency",
+      "attack": "Transparency rollback."
+    },
+    {
+      "id": "D63-NEG-018",
+      "category": "negative",
+      "layer": "transparency",
+      "claim": "any",
+      "setup": "Two transparency services/witnesses return divergent histories for the same statement sequence.",
+      "expected": "report_equivocation_and_fail_policy",
+      "attack": "Log equivocation."
+    },
+    {
+      "id": "D63-NEG-019",
+      "category": "negative",
+      "layer": "bundle",
+      "claim": "independent_regrade",
+      "setup": "Bundle omits the independent-grader envelope required by policy.",
+      "expected": "reject_missing_required_attestation",
+      "attack": "Bundle deletion."
+    },
+    {
+      "id": "D63-NEG-020",
+      "category": "negative",
+      "layer": "bundle",
+      "claim": "multi_role",
+      "setup": "Bundle injects an invalid or irrelevant envelope alongside valid required envelopes.",
+      "expected": "ignore_unknown_but_reject_policy_violation",
+      "attack": "Bundle injection."
+    },
+    {
+      "id": "D63-NEG-021",
+      "category": "negative",
+      "layer": "bundle",
+      "claim": "multi_role",
+      "setup": "Bundle entry order is permuted without changing its entries.",
+      "expected": "same_policy_decision_independent_of_order",
+      "attack": "Order dependency."
+    },
+    {
+      "id": "D63-NEG-022",
+      "category": "negative",
+      "layer": "supersession",
+      "claim": "any",
+      "setup": "A correctly signed and logged pass is superseded or revoked by a later valid statement.",
+      "expected": "mark_prior_receipt_non_current",
+      "attack": "Historical result reused as current."
+    },
+    {
+      "id": "D63-NEG-023",
+      "category": "negative",
+      "layer": "truth",
+      "claim": "runner_execution",
+      "setup": "A trusted runner signs and logs a false pass assertion.",
+      "expected": "signature_and_log_valid_but_accuracy_unadjudicated_or_failed_by_regrade",
+      "attack": "Dishonest trusted issuer."
+    },
+    {
+      "id": "D63-NEG-024",
+      "category": "negative",
+      "layer": "completeness",
+      "claim": "multi_role",
+      "setup": "A producer selectively omits a failed run or conflicting statement from the required evidence history.",
+      "expected": "detect_against_external_run_ledger_or_required_challenge_sequence",
+      "attack": "Selective omission."
+    },
+    {
+      "id": "D63-NEG-025",
+      "category": "negative",
+      "layer": "identity",
+      "claim": "runner_execution",
+      "setup": "Signer is approved but builder.id is unknown, or builder is approved but signer is unknown.",
+      "expected": "reject_unapproved_signer_builder_pair",
+      "attack": "Trust-root substitution."
+    }
+  ],
+  "claim_ceiling": "Test design only. No case has been executed against a cryptographic verifier or live transparency service; expected outcomes are planned policy behaviors, not observed results."
+}
