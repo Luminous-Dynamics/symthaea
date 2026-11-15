@@ -916,10 +916,6 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
     }
     trace_reports.sort_by(|left, right| left.trace_id.cmp(&right.trace_id));
 
-    let final_state = sequence
-        .last()
-        .map(|item| &item.1)
-        .ok_or_else(|| "sequence has no terminal state".to_owned())?;
     let restoration_control =
         score_restoration_control(&bundle, candidate_view, &obligations, sequence.len())?;
 
@@ -965,7 +961,7 @@ mod tests {
         let adversarial = trace(&report, "false-resurrection-sequence");
         assert_eq!(adversarial.total_required_revalidation_units, 10);
         assert_eq!(adversarial.total_fresh_revalidation_units, 9);
-        assert_eq!(adversarial.total_under_revalidation_units, 0);
+        assert_eq!(adversarial.total_under_revalidation_units, 1);
         assert_eq!(adversarial.total_false_resurrections, 1);
         assert_eq!(adversarial.total_critical_false_resurrections, 1);
         assert_eq!(
