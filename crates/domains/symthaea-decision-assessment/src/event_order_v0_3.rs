@@ -2800,7 +2800,7 @@ pub fn project_action_history(
                         continue;
                     }
                 };
-                let _owner_time = match action_owner_time(schedule, action, time_resolutions) {
+                let inventory_time = match action_owner_time(schedule, action, time_resolutions) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2813,6 +2813,47 @@ pub fn project_action_history(
                         continue;
                     }
                 };
+                let frontier_actions = canonical_actions.iter().filter(|candidate| {
+                    matches!(&candidate.action, ScheduleAction::EventProduced { event_id, .. }
+                        if event_id == inventory_frontier_event_id)
+                }).collect::<Vec<_>>();
+                if frontier_actions.len() != 1 {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_FRONTIER_EVENT_NOT_UNIQUE".to_owned());
+                    continue;
+                }
+                let frontier_action = frontier_actions[0];
+                if record_disposition(&frontier_action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_FRONTIER_EVENT_NOT_REPLAY_APPLIED".to_owned());
+                    continue;
+                }
+                let frontier_time = match action_owner_time(schedule, frontier_action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:INVENTORY_FRONTIER"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:INVENTORY_FRONTIER"));
+                        continue;
+                    }
+                };
+                match event_order_between(&frontier_time, &inventory_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert("ATTEMPT_INVENTORY_FRONTIER_AFTER_ATTESTATION".to_owned());
+                        continue;
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert("ATTEMPT_INVENTORY_FRONTIER_ORDER_UNRESOLVED".to_owned());
+                        continue;
+                    }
+                }
                 inventories.push((AttemptHistoryInventory {
                     inventory_frontier_event_id: inventory_frontier_event_id.clone(),
                     attempt_manifest_sha256: attempt_manifest_sha256.clone(),
@@ -3537,9 +3578,36 @@ mod tests {
         );
         receipts.insert(trigger_action_id.clone(), passing_owner_receipt("synthetic://stop-trigger/1", &"d".repeat(64)));
 
-        let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
-        let inventory_frontier = "event-000003".to_owned();
-        let discharge_action_id = format!("action-{:06}", ordinal + 1);
+        let frontier_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
+        let inventory_frontier = "inventory-frontier-1".to_owned();
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            10,
+            ScheduleAction::EventProduced {
+                event_id: inventory_frontier.clone(),
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id: frontier_mapping.clone(),
+                source_timestamp_ns: 132,
+                causal_predecessors: Vec::new(),
+            },
+        );
+        let frontier_action = actions.last_mut().expect("frontier event action");
+        frontier_action.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: frontier_mapping.clone(),
+            local_timestamp_ns: 132,
+        });
+        resolutions.insert(
+            (frontier_mapping.clone(), 132),
+            qualified_resolution_from_fixture(&actions, &frontier_mapping, 132, 1_160),
+        );
+
+        let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 11, 135);
+        let discharge_action_id = format!("action-{:06}", ordinal + 2);
         let mut expected_attempt = OperationAttemptRecord {
             identity: AttemptIdentity {
                 logical_operation_id: operation_id.clone(),
@@ -3599,11 +3667,11 @@ mod tests {
         );
         receipts.insert(inventory_action_id, passing_owner_receipt("synthetic://inventory-attestation/1", &"e".repeat(64)));
 
-        let discharge_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 11, 140);
+        let discharge_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 13, 140);
         let discharge_action_id_actual = push_clocked_action(
             &mut actions,
             &mut ordinal,
-            12,
+            14,
             ScheduleAction::StopDischarged {
                 obligation_id,
                 trigger_action_id: trigger_action_id.clone(),
