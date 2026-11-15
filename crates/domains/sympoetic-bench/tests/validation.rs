@@ -106,8 +106,8 @@ fn base_scorecard() -> Scorecard {
 #[test]
 fn committed_seed_corpus_validates() {
     let (scenarios, receipt) = validate_corpus(SEED_CORPUS.as_bytes()).unwrap();
-    assert_eq!(scenarios.len(), 12);
-    assert_eq!(receipt.scenario_count, 12);
+    assert_eq!(scenarios.len(), 13);
+    assert_eq!(receipt.scenario_count, 13);
     assert_eq!(receipt.status, "pass");
     assert_eq!(receipt.scenario_ids[0], "SP-CRE-001");
 }
