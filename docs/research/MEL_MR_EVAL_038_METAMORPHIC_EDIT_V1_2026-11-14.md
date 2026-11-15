@@ -62,3 +62,12 @@ Metamorphic consistency is not correctness by itself: a system that consistently
 Suno Studio 2.0 integrates chat, MIDI, effects, automation and plug-in design; Moises Studio provides live collaboration, editable stems and visible/reversible agent actions; Google Lyria RealTime supports streaming generation with runtime BPM, density, brightness, scale, and mix controls. These make generic control and collaboration weak differentiators. The defensible Melothaea moat is operation-specific correctness, preservation, causal diagnosis, reversible edits, calibrated abstention and reproducible evidence. Sources: [Suno Studio](https://help.suno.com/en/articles/13670529), [Moises Studio](https://moises.ai/newsroom/product-announcements/moises-launches-studio-collaborative-workspace/), [Lyria RealTime](https://ai.google.dev/gemini-api/docs/realtime-music-generation).
 
 No SOTA superiority, human study, benchmark score or broad cultural-generalization claim is made.
+
+
+## Exact-head validation record — 2026-11-15
+
+The rebase intentionally inherits the corrected EVAL-037 implementation from the current parent branch. The metamorphic workflow validates the standalone contract harness, frozen synthetic pair registry, and exact production metamorphic module at the PR head.
+
+Before qualification, the workflow must pass on the exact current head. A JSON-schema parse, source inspection, or a successful parent-branch validity workflow is not a substitute for the metamorphic tests and Clippy result.
+
+The initial fixture registry is synthetic and serves only as a deterministic known-answer contract set. It does not establish transformation correctness on recorded music, listening quality, equivalence under real renderers, or rights to use any external corpus.
