@@ -1014,6 +1014,143 @@ fn score_restoration_control(
     })
 }
 
+
+fn validate_trace_summary(
+    summary: &Value,
+    trace: &MultiShiftTraceReport,
+    label: &str,
+) -> Result<(), String> {
+    ensure_allowed_keys(
+        summary,
+        &[
+            "required_revalidation_units",
+            "fresh_revalidation_units",
+            "missing_required_obligations",
+            "false_resurrection_obligations",
+            "unnecessary_revalidation_units",
+        ],
+        label,
+    )?;
+    let required = required_u64(summary, "required_revalidation_units", label)? as usize;
+    let fresh = required_u64(summary, "fresh_revalidation_units", label)? as usize;
+    let missing = unique_string_set(summary, "missing_required_obligations", label)?;
+    let false_resurrections =
+        unique_string_set(summary, "false_resurrection_obligations", label)?;
+    let unnecessary =
+        required_u64(summary, "unnecessary_revalidation_units", label)? as usize;
+
+    let actual_missing: BTreeSet<String> = trace
+        .epochs
+        .iter()
+        .flat_map(|epoch| epoch.missing_required_revalidation_obligations.iter().cloned())
+        .collect();
+    let actual_false_resurrections: BTreeSet<String> = trace
+        .epochs
+        .iter()
+        .flat_map(|epoch| epoch.false_resurrection_obligations.iter().cloned())
+        .collect();
+
+    if required != trace.total_required_revalidation_units
+        || fresh != trace.total_fresh_revalidation_units
+        || missing != actual_missing
+        || false_resurrections != actual_false_resurrections
+        || unnecessary != trace.total_over_revalidation_units
+    {
+        return Err(format!(
+            "{label} does not match the recomputed trace report"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_expected_summary(
+    bundle: &Value,
+    trace_reports: &[MultiShiftTraceReport],
+    restoration: &MultiShiftRestorationReport,
+) -> Result<(), String> {
+    let summary = bundle
+        .get("expected_summary")
+        .ok_or_else(|| "expected_summary is required".to_owned())?;
+    ensure_allowed_keys(
+        summary,
+        &["conformant_trace", "false_resurrection_trace", "restoration_control"],
+        "expected_summary",
+    )?;
+
+    let mut seen = BTreeSet::new();
+    for trace in trace_reports {
+        let key = match trace.trace_id.as_str() {
+            "conformant-sequence" => "conformant_trace",
+            "false-resurrection-sequence" => "false_resurrection_trace",
+            other => return Err(format!("unsupported D6.8 known-answer trace ID {other:?}")),
+        };
+        if !seen.insert(key) {
+            return Err(format!("duplicate known-answer trace role {key:?}"));
+        }
+        let expected = summary
+            .get(key)
+            .ok_or_else(|| format!("expected_summary.{key} is required"))?;
+        validate_trace_summary(expected, trace, &format!("expected_summary.{key}"))?;
+    }
+    if seen.len() != 2 {
+        return Err("both conformant and false-resurrection known-answer traces are required".to_owned());
+    }
+
+    let restoration_summary = summary
+        .get("restoration_control")
+        .ok_or_else(|| "expected_summary.restoration_control is required".to_owned())?;
+    ensure_allowed_keys(
+        restoration_summary,
+        &[
+            "required_revalidation_units",
+            "fresh_revalidation_units",
+            "missing_required_obligations",
+            "false_resurrection_obligations",
+            "unnecessary_revalidation_units",
+        ],
+        "expected_summary.restoration_control",
+    )?;
+    let required = required_u64(
+        restoration_summary,
+        "required_revalidation_units",
+        "expected_summary.restoration_control",
+    )? as usize;
+    let fresh = required_u64(
+        restoration_summary,
+        "fresh_revalidation_units",
+        "expected_summary.restoration_control",
+    )? as usize;
+    let missing = unique_string_set(
+        restoration_summary,
+        "missing_required_obligations",
+        "expected_summary.restoration_control",
+    )?;
+    let false_resurrections = unique_string_set(
+        restoration_summary,
+        "false_resurrection_obligations",
+        "expected_summary.restoration_control",
+    )?;
+    let unnecessary = required_u64(
+        restoration_summary,
+        "unnecessary_revalidation_units",
+        "expected_summary.restoration_control",
+    )? as usize;
+
+    let actual_required: BTreeSet<String> =
+        restoration.required_revalidation_obligations.iter().cloned().collect();
+    let actual_false: BTreeSet<String> =
+        restoration.false_resurrection_obligations.iter().cloned().collect();
+    if required != actual_required.len()
+        || fresh != 0
+        || missing != actual_required
+        || false_resurrections != actual_false
+        || unnecessary != 0
+    {
+        return Err("expected_summary.restoration_control does not match the recomputed restoration report".to_owned());
+    }
+    Ok(())
+}
+
 /// Score a D6.8 multi-shift bundle without mutating the supplied JSON.
 ///
 /// The bundle includes evaluator-side gold labels and candidate traces. The
@@ -1091,6 +1228,7 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
 
     let restoration_control =
         score_restoration_control(&bundle, candidate_view, &obligations, sequence.len())?;
+    validate_expected_summary(&bundle, &trace_reports, &restoration_control)?;
 
     Ok(MultiShiftSequenceReport {
         scenario_id,
@@ -1120,6 +1258,32 @@ mod tests {
 
     fn trace<'a>(report: &'a MultiShiftSequenceReport, id: &str) -> &'a MultiShiftTraceReport {
         report.trace_reports.iter().find(|item| item.trace_id == id).expect("trace")
+    }
+
+
+    #[test]
+    fn rejects_stale_embedded_expected_summary() {
+        let mut value = fixture_value();
+        value["expected_summary"]["false_resurrection_trace"]["fresh_revalidation_units"] =
+            json!(10);
+        let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("does not match the recomputed trace report"));
+    }
+
+    #[test]
+    fn rejects_unknown_fields_in_candidate_and_receipt_contracts() {
+        let mut value = fixture_value();
+        value["candidate_view"]["unreviewed_flag"] = json!(true);
+        let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("candidate_view contains unknown field"));
+    }
+
+    #[test]
+    fn rejects_unknown_fields_inside_a_checkpoint() {
+        let mut value = fixture_value();
+        value["candidate_traces"][0]["checkpoints"][0]["unreviewed_flag"] = json!(true);
+        let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("contains unknown field"));
     }
 
     #[test]
